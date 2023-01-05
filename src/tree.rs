@@ -1,12 +1,6 @@
-use std::ops::Range;
-
 use chumsky::prelude::*;
-use smartstring::{LazyCompact, SmartString};
 
-type SString = SmartString<LazyCompact>;
-
-pub type Span = Range<usize>;
-pub type Spanned<T> = (T, Span);
+use crate::{SString, Spanned};
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Tree {
