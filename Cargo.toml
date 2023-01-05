@@ -1,5 +1,5 @@
 [package]
-name = "ontol"
+name = "ontol-lang"
 version = "0.1.0"
 edition = "2021"
 
