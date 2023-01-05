@@ -1,46 +1,20 @@
-use std::ops::Range;
-
-use chumsky::prelude::*;
+use chumsky::{chain::Chain, Parser};
 use smartstring::{LazyCompact, SmartString};
 
-pub mod lex;
+pub mod ast;
+pub mod tree;
 
 type SmString = SmartString<LazyCompact>;
 
-pub type Span = Range<usize>;
-pub type Spanned<T> = (T, Span);
+pub fn compile(src: &str) -> Result<(), ()> {
+    let (trees, mut errs) = tree::trees_parser().parse_recovery(src);
 
-#[derive(Clone)]
-pub struct AstNode {
-    pub span: Range<usize>,
-    pub kind: AstKind,
-}
+    if let Some(trees) = trees {
+        let len = src.chars().len();
 
-#[derive(Clone)]
-pub enum AstKind {
-    Nothing,
-}
-
-pub fn parser() -> impl Parser<char, AstNode, Error = Simple<char>> {
-    recursive(|value| {
-        // value.map_err_with_span(f);
-
-        just("null")
-            .map_with_span(|_, span| AstNode {
-                span,
-                kind: AstKind::Nothing,
-            })
-            .labelled("null")
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_works() {
-        let parser = parser();
-        parser.parse("fdsjklfds").unwrap();
+        let (ast, parse_errs) = (1, 29);
+        // ast::ast_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
     }
+
+    panic!()
 }
