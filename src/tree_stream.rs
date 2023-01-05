@@ -8,6 +8,9 @@ use crate::{
     SString, Span, Spanned,
 };
 
+/// A stream of token trees.
+///
+/// The stream is consumed by parsing one element at a time.
 pub struct TreeStream {
     span: Span,
     remain_span: Span,
