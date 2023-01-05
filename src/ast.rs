@@ -13,18 +13,21 @@ pub enum Ast {
 
 pub struct Struct {
     ident: Spanned<SString>,
+    members: Vec<Spanned<StructMember>>,
 }
+
+pub struct StructMember {}
 
 pub struct Path(Vec<Spanned<SString>>);
 
-pub fn parse_tree((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
+pub fn parse((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
     match tree {
-        Tree::Paren(list) => parse_list(TreeStream::new(span, list)),
+        Tree::Paren(list) => parse_ast(TreeStream::new(span, list)),
         _ => Err(error(span, "expected list")),
     }
 }
 
-fn parse_list(mut input: TreeStream) -> ParseResult<Ast> {
+fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
     let (keyword, span) = input.next_sym_msg("Expected keyword")?;
 
     match keyword.as_str() {
@@ -43,12 +46,15 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
 fn parse_struct(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
     let ident = input.next_sym_msg("expected identifier")?;
+    let mut members = vec![];
 
     while input.peek_any() {
-        let _member = input.next_list("expected member")?;
+        let member = input.next_list("expected member")?;
+
+        members.push((StructMember {}, member.span()));
     }
 
-    Ok((Ast::Struct(Struct { ident }), span))
+    Ok((Ast::Struct(Struct { ident, members }), span))
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
@@ -79,7 +85,7 @@ mod tests {
 
     fn test_parse(input: &str) -> Ast {
         let tree = tree_parser().parse(input).unwrap();
-        parse_tree(tree).unwrap().0
+        parse(tree).unwrap().0
     }
 
     #[test]
@@ -89,5 +95,21 @@ mod tests {
         };
 
         assert_eq!(2, symbols.len());
+    }
+
+    #[test]
+    fn parse_struct() {
+        let src = "
+            (struct foobar
+                (something)
+                (else)
+            )
+        ";
+        let Ast::Struct(s) = test_parse(src) else {
+            panic!();
+        };
+
+        assert_eq!("foobar", s.ident.0);
+        assert_eq!(2, s.members.len());
     }
 }
