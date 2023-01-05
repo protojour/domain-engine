@@ -1,10 +1,16 @@
+use std::ops::Range;
+
 use chumsky::{chain::Chain, Parser};
 use smartstring::{LazyCompact, SmartString};
 
 pub mod ast;
 pub mod tree;
 
-type SmString = SmartString<LazyCompact>;
+mod tree_stream;
+
+pub type SString = SmartString<LazyCompact>;
+pub type Span = Range<usize>;
+pub type Spanned<T> = (T, Span);
 
 pub fn compile(src: &str) -> Result<(), ()> {
     let (trees, mut errs) = tree::trees_parser().parse_recovery(src);

@@ -12,7 +12,7 @@ pub type Spanned<T> = (T, Span);
 pub enum Tree {
     Paren(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
-    Keyword(Keyword),
+    Dot,
     Sym(SString),
     Num(SString),
 }
@@ -38,9 +38,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
 
         let combined_tree = paren
             .or(bracket)
-            .or(just("true").map(|_| Tree::Keyword(Keyword::True)))
-            .or(just("false").map(|_| Tree::Keyword(Keyword::False)))
-            .or(just("struct").map(|_| Tree::Keyword(Keyword::Struct)))
+            .or(just(".").map(|_| Tree::Dot))
             .or(num())
             .or(sym());
 
@@ -73,7 +71,7 @@ fn sym() -> impl Parser<char, Tree, Error = Simple<char>> {
 
 fn special_char(c: char) -> bool {
     match c {
-        '(' | ')' | '[' | ']' | '{' | '}' => true,
+        '(' | ')' | '[' | ']' | '{' | '}' | '.' => true,
         _ => false,
     }
 }
