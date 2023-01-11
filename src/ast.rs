@@ -12,11 +12,11 @@ pub enum Ast {
 }
 
 pub struct Struct {
-    ident: Spanned<SString>,
-    members: Vec<Spanned<StructMember>>,
+    pub ident: Spanned<SString>,
+    pub fields: Vec<Spanned<StructField>>,
 }
 
-pub struct StructMember {}
+pub struct StructField {}
 
 pub struct Path(Vec<Spanned<SString>>);
 
@@ -46,15 +46,15 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
 fn parse_struct(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
     let ident = input.next_sym_msg("expected identifier")?;
-    let mut members = vec![];
+    let mut fields = vec![];
 
     while input.peek_any() {
-        let member = input.next_list("expected member")?;
+        let field = input.next_list("expected field")?;
 
-        members.push((StructMember {}, member.span()));
+        fields.push((StructField {}, field.span()));
     }
 
-    Ok((Ast::Struct(Struct { ident, members }), span))
+    Ok((Ast::Struct(Struct { ident, fields }), span))
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
@@ -100,8 +100,9 @@ mod tests {
     #[test]
     fn parse_struct() {
         let src = "
+
             (struct foobar
-                (something)
+                (field)
                 (else)
             )
         ";
@@ -110,6 +111,6 @@ mod tests {
         };
 
         assert_eq!("foobar", s.ident.0);
-        assert_eq!(2, s.members.len());
+        assert_eq!(2, s.fields.len());
     }
 }

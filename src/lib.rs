@@ -6,6 +6,7 @@ use smartstring::{LazyCompact, SmartString};
 pub mod ast;
 pub mod tree;
 
+mod lambda;
 mod tree_stream;
 
 pub type SString = SmartString<LazyCompact>;

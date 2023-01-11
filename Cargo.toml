@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 chumsky = "0.8"
 smartstring = "1"
+fraction = "0.13"
