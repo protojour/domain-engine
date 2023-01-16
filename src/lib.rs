@@ -4,10 +4,13 @@ use chumsky::{chain::Chain, Parser};
 use smartstring::{LazyCompact, SmartString};
 
 pub mod ast;
+pub mod ena;
 pub mod tree;
 
+mod env;
 mod lambda;
 mod tree_stream;
+mod types;
 
 pub type SString = SmartString<LazyCompact>;
 pub type Span = Range<usize>;
