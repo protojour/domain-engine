@@ -3,17 +3,13 @@
 //! Not sure yet whether it's a compiler or runtime environment, let's see.
 //!
 
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    sync::atomic::AtomicU32,
-};
+use std::{collections::HashMap, sync::atomic::AtomicU32};
 
 use crate::{
     def::{Def, DefId},
     expr::{Expr, ExprId},
     misc::{Package, PackageId, Source, SourceId},
-    types::{Type, TypeKind, Types},
+    types::{Type, Types},
 };
 
 #[derive(Default)]
@@ -29,10 +25,9 @@ pub struct Env<'m> {
     pub(crate) sources: HashMap<SourceId, Source>,
 
     pub(crate) types: Types<'m>,
-    pub(crate) namespace: RefCell<HashMap<PackageId, HashMap<String, DefId>>>,
-    pub(crate) defs: RefCell<HashMap<DefId, Def>>,
-    pub(crate) defs2: HashMap<DefId, Def>,
-    pub(crate) expressions: RefCell<HashMap<ExprId, Expr>>,
+    pub(crate) namespace: HashMap<PackageId, HashMap<String, DefId>>,
+    pub(crate) defs: HashMap<DefId, Def>,
+    pub(crate) expressions: HashMap<ExprId, Expr>,
 
     pub(crate) def_types: HashMap<DefId, Type<'m>>,
 }
@@ -53,9 +48,7 @@ impl<'m> Env<'m> {
             types: Types::new(mem),
             namespace: Default::default(),
             defs: Default::default(),
-            defs2: Default::default(),
             expressions: Default::default(),
-            // def_types: Default::default(),
             def_types: Default::default(),
         }
     }

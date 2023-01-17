@@ -16,7 +16,7 @@ struct Ctx<'e, 'm> {
 impl<'m> Env<'m> {
     fn type_check_ctx(&mut self) -> Ctx<'_, 'm> {
         Ctx {
-            defs: &self.defs2,
+            defs: &self.defs,
             types: &mut self.types,
             def_types: &mut self.def_types
         }

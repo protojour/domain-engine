@@ -33,7 +33,7 @@ pub enum CoreFn {
 
 impl<'m> Env<'m> {
     pub fn def_by_name(&self, package: PackageId, name: &str) -> Option<DefId> {
-        Some(*self.namespace.borrow().get(&package)?.get(name)?)
+        Some(*self.namespace.get(&package)?.get(name)?)
     }
 
     pub fn core_def_by_name(&self, name: &str) -> Option<DefId> {
@@ -45,13 +45,11 @@ impl<'m> Env<'m> {
             self.def_counter
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
-        let mut namespace = self.namespace.borrow_mut();
-        namespace
+        self.namespace
             .entry(package)
             .or_insert_with(|| Default::default())
             .insert(name.into(), def_id);
-        let mut defs = self.defs.borrow_mut();
-        defs.insert(def_id, Def { package, kind });
+        self.defs.insert(def_id, Def { package, kind });
 
         def_id
     }
