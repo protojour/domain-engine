@@ -1,53 +1,60 @@
+use std::collections::HashMap;
+
 use crate::{
-    def::{DefId, DefKind, Primitive},
-    env::{Env, Intern},
+    def::{DefId, DefKind, Primitive, Def},
+    env::{Env, InternMut},
     expr::{Expr, ExprKind},
-    types::{Type, TypeKind},
+    types::{Type, TypeKind, Types},
 };
 
-struct Checker {}
+struct Ctx<'e, 'm> {
+    defs: &'e HashMap<DefId, Def>,
+    types: &'e mut Types<'m>,
+    def_types: &'e mut HashMap<DefId, Type<'m>>,
+}
 
-fn type_check_def<'m>(env: &Env<'m>, def_id: DefId) -> Type<'m> {
-    let defs = env.defs.borrow();
-    match &defs.get(&def_id).unwrap().kind {
+impl<'m> Env<'m> {
+    fn type_check_ctx(&mut self) -> Ctx<'_, 'm> {
+        Ctx {
+            defs: &self.defs2,
+            types: &mut self.types,
+            def_types: &mut self.def_types
+        }
+    }
+}
+
+fn type_check_def<'e, 'm>(ctx: &mut Ctx<'e, 'm>, def_id: DefId) -> Type<'m> {
+    match &ctx.defs.get(&def_id).unwrap().kind {
         DefKind::Constructor(_, arg_def) => {
-            let arg_type = type_check_def(env, *arg_def);
+            let arg_type = type_check_def(ctx, *arg_def);
 
-            let fn_ty = env.intern(TypeKind::Function {
-                args: env.intern([arg_type]),
-                output: env.intern(TypeKind::New(def_id, arg_type)),
+            let args = ctx.types.intern_mut([arg_type]);
+            let output = ctx.types.intern_mut(TypeKind::New(def_id, arg_type));
+            let fn_ty = ctx.types.intern_mut(TypeKind::Function {
+                args,
+                output,
             });
 
-            let mut def_types = env.def_types.borrow_mut();
-            def_types.insert(def_id, fn_ty);
-
+            ctx.def_types.insert(def_id, fn_ty);
             fn_ty
         }
-        DefKind::Primitive(Primitive::Number) => env.intern(TypeKind::Number),
+        DefKind::Primitive(Primitive::Number) => ctx.types.intern_mut(TypeKind::Number),
         other => {
             panic!("failed def typecheck: {other:?}");
         }
     }
 }
 
-fn type_check_expr<'m>(env: &Env<'m>, expr: &Expr) -> Type<'m> {
+fn type_check_expr<'e, 'm>(ctx: &mut Ctx<'e, 'm>, expr: &Expr) -> Type<'m> {
     match &expr.kind {
-        ExprKind::Constant(_) => env.intern(TypeKind::Number),
-        ExprKind::Call(def_id, args) => match env.type_of(*def_id).kind() {
+        ExprKind::Constant(_) => ctx.types.intern_mut(TypeKind::Number),
+        ExprKind::Call(def_id, args) => match ctx.def_types.get(&def_id).unwrap().kind() {
             TypeKind::Function { args, output } => *output,
             _ => panic!("Not a function"),
         },
         ExprKind::Variable(id) => {
             panic!()
         }
-    }
-}
-
-impl<'m> Env<'m> {
-    /// Type of a DefId of an already type checked package
-    fn type_of(&self, def_id: DefId) -> Type<'m> {
-        let def_types = self.def_types.borrow();
-        *def_types.get(&def_id).unwrap()
     }
 }
 
@@ -74,7 +81,7 @@ mod tests {
             "m",
             DefKind::Constructor("m".into(), env.core_def_by_name("Number").unwrap()),
         );
-        let m_ty = type_check_def(&env, m);
+        let m_ty = type_check_def(&mut env.type_check_ctx(), m);
         let expr = env.expr(
             ExprKind::Call(m, vec![env.expr(ExprKind::Variable(ExprId(100)), span)]),
             SourceSpan::none(),
@@ -84,7 +91,7 @@ mod tests {
             panic!();    
         };
 
-        let ty = type_check_expr(&env, &expr);
+        let ty = type_check_expr(&mut env.type_check_ctx(), &expr);
         assert_eq!(*m_output, ty);
     }
 }

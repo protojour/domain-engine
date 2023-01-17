@@ -1,5 +1,5 @@
 use crate::{
-    env::{Env, Intern},
+    env::{Env, InternMut},
     misc::{Package, PackageId},
     types::TypeKind,
 };
@@ -65,8 +65,8 @@ impl<'m> Env<'m> {
             },
         );
 
-        let num = self.intern(TypeKind::Number);
-        let num_num = self.intern([num, num]);
+        let num = self.types.intern_mut(TypeKind::Number);
+        let num_num = self.types.intern_mut([num, num]);
 
         self.add_core_def(
             "Number",
@@ -94,8 +94,7 @@ impl<'m> Env<'m> {
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: TypeKind<'m>) -> DefId {
         let def_id = self.add_def(PackageId(0), name, def_kind);
         self.def_types
-            .borrow_mut()
-            .insert(def_id, self.intern(type_kind));
+            .insert(def_id, self.types.intern_mut(type_kind));
 
         def_id
     }

@@ -1,8 +1,8 @@
-use std::ops::Deref;
+use std::{collections::HashSet, ops::Deref};
 
 use crate::{
     def::DefId,
-    env::{Env, Intern},
+    env::{Env, InternMut, Mem},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -33,48 +33,46 @@ impl<'m> Deref for Type<'m> {
     }
 }
 
-impl<'m> Intern<&str> for Env<'m> {
-    type Facade = &'m str;
+pub struct Types<'m> {
+    mem: &'m Mem,
+    pub(crate) types: HashSet<&'m TypeKind<'m>>,
+    pub(crate) slices: HashSet<&'m [Type<'m>]>,
+}
 
-    fn intern(&self, str: &str) -> Self::Facade {
-        let mut strings = self.strings.borrow_mut();
-        match strings.get(str) {
-            Some(str) => *str,
-            None => {
-                let str = self.bump().alloc_str(str);
-                strings.insert(str);
-                str
-            }
+impl<'m> Types<'m> {
+    pub fn new(mem: &'m Mem) -> Self {
+        Self {
+            mem,
+            types: Default::default(),
+            slices: Default::default(),
         }
     }
 }
 
-impl<'m> Intern<TypeKind<'m>> for Env<'m> {
+impl<'m> InternMut<TypeKind<'m>> for Types<'m> {
     type Facade = Type<'m>;
 
-    fn intern(&self, kind: TypeKind<'m>) -> Self::Facade {
-        let mut types = self.types.borrow_mut();
-        match types.get(&kind) {
+    fn intern_mut(&mut self, kind: TypeKind<'m>) -> Self::Facade {
+        match self.types.get(&kind) {
             Some(kind) => Type(kind),
             None => {
-                let kind = self.bump().alloc(kind);
-                types.insert(kind);
+                let kind = self.mem.bump.alloc(kind);
+                self.types.insert(kind);
                 Type(kind)
             }
         }
     }
 }
 
-impl<'m, const N: usize> Intern<[Type<'m>; N]> for Env<'m> {
+impl<'m, const N: usize> InternMut<[Type<'m>; N]> for Types<'m> {
     type Facade = &'m [Type<'m>];
 
-    fn intern(&self, types: [Type<'m>; N]) -> Self::Facade {
-        let mut slices = self.type_slices.borrow_mut();
-        match slices.get(types.as_slice()) {
+    fn intern_mut(&mut self, types: [Type<'m>; N]) -> Self::Facade {
+        match self.slices.get(types.as_slice()) {
             Some(slice) => slice,
             None => {
-                let slice = self.bump().alloc_slice_fill_iter(types.into_iter());
-                slices.insert(slice);
+                let slice = self.mem.bump.alloc_slice_fill_iter(types.into_iter());
+                self.slices.insert(slice);
                 slice
             }
         }
@@ -93,11 +91,11 @@ mod tests {
     #[test]
     fn dedup_types() {
         let mem = Mem::default();
-        let env = Env::new(&mem);
+        let mut env = Env::new(&mem);
 
-        let c0 = env.intern(TypeKind::Constant(42));
-        let c1 = env.intern(TypeKind::Constant(42));
-        let c2 = env.intern(TypeKind::Constant(66));
+        let c0 = env.types.intern_mut(TypeKind::Constant(42));
+        let c1 = env.types.intern_mut(TypeKind::Constant(42));
+        let c2 = env.types.intern_mut(TypeKind::Constant(66));
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));
@@ -106,8 +104,9 @@ mod tests {
     #[test]
     fn test_alloc_type() {
         let mem = Mem::default();
-        let env = Env::new(&mem);
+        let mut env = Env::new(&mem);
 
-        let ty = env.intern(TypeKind::New(DefId(42), env.intern(TypeKind::Constant(42))));
+        let constant = env.types.intern_mut(TypeKind::Constant(42));
+        let ty = env.types.intern_mut(TypeKind::New(DefId(42), constant));
     }
 }
