@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::env::{Env, Intern};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Type<'m>(pub(crate) &'m TypeKind<'m>);
+pub struct Type<'m>(&'m TypeKind<'m>);
 
 impl<'m> Type<'m> {
     fn kind(&self) -> &TypeKind<'m> {
@@ -68,8 +68,8 @@ mod tests {
 
     #[test]
     fn dedup_types() {
-        let mut mem = Mem::default();
-        let env = Env::new(&mut mem);
+        let mem = Mem::default();
+        let env = Env::new(&mem);
 
         let c0 = env.intern(TypeKind::Constant(42));
         let c1 = env.intern(TypeKind::Constant(42));
@@ -81,8 +81,8 @@ mod tests {
 
     #[test]
     fn test_alloc_type() {
-        let mut mem = Mem::default();
-        let env = Env::new(&mut mem);
+        let mem = Mem::default();
+        let env = Env::new(&mem);
 
         let ty = env.intern(TypeKind::New(
             env.intern("name"),

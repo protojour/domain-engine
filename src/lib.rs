@@ -8,7 +8,9 @@ pub mod ena;
 pub mod tree;
 
 mod env;
+mod expr;
 mod lambda;
+mod misc;
 mod tree_stream;
 mod types;
 
