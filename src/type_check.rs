@@ -13,10 +13,9 @@ fn type_check_def<'m>(env: &Env<'m>, def_id: DefId) -> Type<'m> {
         DefKind::Constructor(_, arg_def) => {
             let arg_type = type_check_def(env, *arg_def);
 
-            let ty = env.intern(TypeKind::New(def_id, arg_type));
             let fn_ty = env.intern(TypeKind::Function {
                 args: env.intern([arg_type]),
-                output: ty,
+                output: env.intern(TypeKind::New(def_id, arg_type)),
             });
 
             let mut def_types = env.def_types.borrow_mut();
