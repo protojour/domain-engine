@@ -1,7 +1,7 @@
-use crate::misc::SourceSpan;
+use crate::{def::DefId, env::Env, misc::SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct ExprId(u32);
+pub struct ExprId(pub u32);
 
 pub struct Expr {
     pub id: ExprId,
@@ -11,24 +11,16 @@ pub struct Expr {
 
 pub enum ExprKind {
     Constant(i32),
-    Call(ExprId, Vec<Expr>),
-    Variable(),
+    Call(DefId, Vec<Expr>),
+    Variable(ExprId),
 }
 
-pub struct ExprAlloc {
-    next_id: ExprId,
-}
-
-impl Default for ExprAlloc {
-    fn default() -> Self {
-        Self { next_id: ExprId(0) }
-    }
-}
-
-impl ExprAlloc {
-    pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
-        let id = self.next_id;
-        self.next_id.0 += 1;
+impl<'m> Env<'m> {
+    pub fn expr(&self, kind: ExprKind, span: SourceSpan) -> Expr {
+        let id = ExprId(
+            self.expr_counter
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
         Expr { id, kind, span }
     }
 }

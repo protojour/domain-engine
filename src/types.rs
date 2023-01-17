@@ -1,20 +1,28 @@
 use std::ops::Deref;
 
-use crate::env::{Env, Intern};
+use crate::{
+    def::DefId,
+    env::{Env, Intern},
+};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Type<'m>(&'m TypeKind<'m>);
 
 impl<'m> Type<'m> {
-    fn kind(&self) -> &TypeKind<'m> {
+    pub fn kind(&self) -> &TypeKind<'m> {
         self.0
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum TypeKind<'m> {
     Constant(i32),
-    New(&'m str, Type<'m>),
+    Number,
+    New(DefId, Type<'m>),
+    Function {
+        args: &'m [Type<'m>],
+        output: Type<'m>,
+    },
 }
 
 impl<'m> Deref for Type<'m> {
@@ -57,6 +65,22 @@ impl<'m> Intern<TypeKind<'m>> for Env<'m> {
     }
 }
 
+impl<'m, const N: usize> Intern<[Type<'m>; N]> for Env<'m> {
+    type Facade = &'m [Type<'m>];
+
+    fn intern(&self, types: [Type<'m>; N]) -> Self::Facade {
+        let mut slices = self.type_slices.borrow_mut();
+        match slices.get(types.as_slice()) {
+            Some(slice) => slice,
+            None => {
+                let slice = self.bump().alloc_slice_fill_iter(types.into_iter());
+                slices.insert(slice);
+                slice
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,9 +108,6 @@ mod tests {
         let mem = Mem::default();
         let env = Env::new(&mem);
 
-        let ty = env.intern(TypeKind::New(
-            env.intern("name"),
-            env.intern(TypeKind::Constant(42)),
-        ));
+        let ty = env.intern(TypeKind::New(DefId(42), env.intern(TypeKind::Constant(42))));
     }
 }

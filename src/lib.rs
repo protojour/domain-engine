@@ -7,11 +7,13 @@ pub mod ast;
 pub mod ena;
 pub mod tree;
 
+mod def;
 mod env;
 mod expr;
 mod lambda;
 mod misc;
 mod tree_stream;
+mod type_check;
 mod types;
 
 pub type SString = SmartString<LazyCompact>;
