@@ -16,11 +16,9 @@ pub enum ExprKind {
 }
 
 impl<'m> Env<'m> {
-    pub fn expr(&self, kind: ExprKind, span: SourceSpan) -> Expr {
-        let id = ExprId(
-            self.expr_counter
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+    pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
+        let id = ExprId(self.expr_counter);
+        self.expr_counter += 1;
         Expr { id, kind, span }
     }
 }

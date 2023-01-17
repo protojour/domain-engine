@@ -41,10 +41,8 @@ impl<'m> Env<'m> {
     }
 
     pub fn add_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
-        let def_id = DefId(
-            self.def_counter
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+        let def_id = DefId(self.def_counter);
+        self.def_counter += 1;
         self.namespace
             .entry(package)
             .or_insert_with(|| Default::default())

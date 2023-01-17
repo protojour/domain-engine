@@ -3,7 +3,7 @@
 //! Not sure yet whether it's a compiler or runtime environment, let's see.
 //!
 
-use std::{collections::HashMap, sync::atomic::AtomicU32};
+use std::collections::HashMap;
 
 use crate::{
     def::{Def, DefId},
@@ -18,8 +18,8 @@ pub struct Mem {
 }
 
 pub struct Env<'m> {
-    pub(crate) def_counter: AtomicU32,
-    pub(crate) expr_counter: AtomicU32,
+    pub(crate) def_counter: u32,
+    pub(crate) expr_counter: u32,
 
     pub(crate) packages: HashMap<PackageId, Package>,
     pub(crate) sources: HashMap<SourceId, Source>,

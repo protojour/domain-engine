@@ -82,8 +82,10 @@ mod tests {
             DefKind::Constructor("m".into(), env.core_def_by_name("Number").unwrap()),
         );
         let m_ty = type_check_def(&mut env.type_check_ctx(), m);
+
+        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), span)];
         let expr = env.expr(
-            ExprKind::Call(m, vec![env.expr(ExprKind::Variable(ExprId(100)), span)]),
+            ExprKind::Call(m, args),
             SourceSpan::none(),
         );
 
