@@ -9,18 +9,14 @@ use crate::{
     compile_error::CompileErrors,
     def::{Def, DefId},
     expr::{Expr, ExprId},
+    mem::Mem,
     misc::{Package, PackageId, Source, SourceId},
     types::{TypeRef, Types},
 };
 
-#[derive(Default)]
-pub struct Mem {
-    pub(crate) bump: bumpalo::Bump,
-}
-
 pub struct Env<'m> {
-    pub(crate) def_counter: u32,
-    pub(crate) expr_counter: u32,
+    next_def_id: DefId,
+    next_expr_id: ExprId,
 
     pub(crate) packages: HashMap<PackageId, Package>,
     pub(crate) sources: HashMap<SourceId, Source>,
@@ -35,18 +31,11 @@ pub struct Env<'m> {
     pub(crate) errors: CompileErrors,
 }
 
-/// Intern something in an arena
-pub trait Intern<T> {
-    type Facade;
-
-    fn intern(&mut self, value: T) -> Self::Facade;
-}
-
 impl<'m> Env<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
-            def_counter: Default::default(),
-            expr_counter: Default::default(),
+            next_def_id: DefId(0),
+            next_expr_id: ExprId(0),
             packages: Default::default(),
             sources: Default::default(),
             types: Types::new(mem),
@@ -56,5 +45,17 @@ impl<'m> Env<'m> {
             def_types: Default::default(),
             errors: Default::default(),
         }
+    }
+
+    pub fn alloc_def_id(&mut self) -> DefId {
+        let id = self.next_def_id;
+        self.next_def_id.0 += 1;
+        id
+    }
+
+    pub fn alloc_expr_id(&mut self) -> ExprId {
+        let id = self.next_expr_id;
+        self.next_expr_id.0 += 1;
+        id
     }
 }

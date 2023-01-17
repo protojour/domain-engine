@@ -1,5 +1,6 @@
 use crate::{
-    env::{Env, Intern},
+    env::Env,
+    mem::Intern,
     misc::{Package, PackageId},
     types::Type,
 };
@@ -41,8 +42,7 @@ impl<'m> Env<'m> {
     }
 
     pub fn add_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
-        let def_id = DefId(self.def_counter);
-        self.def_counter += 1;
+        let def_id = self.alloc_def_id();
         self.namespace
             .entry(package)
             .or_insert_with(|| Default::default())

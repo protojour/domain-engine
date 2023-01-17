@@ -17,8 +17,10 @@ pub enum ExprKind {
 
 impl<'m> Env<'m> {
     pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
-        let id = ExprId(self.expr_counter);
-        self.expr_counter += 1;
-        Expr { id, kind, span }
+        Expr {
+            id: self.alloc_expr_id(),
+            kind,
+            span,
+        }
     }
 }

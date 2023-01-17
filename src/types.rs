@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     def::DefId,
-    env::{Intern, Mem},
+    mem::{Intern, Mem},
 };
 
 // #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -71,7 +71,7 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::{Env, Mem};
+    use crate::env::Env;
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize

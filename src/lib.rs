@@ -5,11 +5,12 @@ use smartstring::{LazyCompact, SmartString};
 
 pub mod ast;
 pub mod ena;
+pub mod env;
+pub mod mem;
 pub mod tree;
 
 mod compile_error;
 mod def;
-mod env;
 mod expr;
 mod lambda;
 mod misc;

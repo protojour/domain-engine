@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use crate::{
     compile_error::{CompileError, CompileErrors},
     def::{Def, DefId, DefKind, Primitive},
-    env::{Env, Intern},
+    env::Env,
     expr::{Expr, ExprKind},
+    mem::Intern,
     types::{Type, TypeRef, Types},
 };
 
@@ -89,8 +90,9 @@ fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> TypeRef<'m
 mod tests {
     use crate::{
         def::DefKind,
-        env::{Env, Mem},
+        env::Env,
         expr::{ExprId, ExprKind},
+        mem::Mem,
         misc::{PackageId, SourceSpan},
         types::Type,
     };
