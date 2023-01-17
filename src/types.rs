@@ -20,7 +20,7 @@ pub enum TypeKind<'m> {
     Number,
     New(DefId, Type<'m>),
     Function {
-        args: &'m [Type<'m>],
+        params: &'m [Type<'m>],
         output: Type<'m>,
     },
 }

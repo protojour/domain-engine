@@ -17,6 +17,8 @@ pub struct Mem {
     pub(crate) bump: bumpalo::Bump,
 }
 
+enum Error {}
+
 pub struct Env<'m> {
     pub(crate) def_counter: u32,
     pub(crate) expr_counter: u32,
@@ -24,11 +26,11 @@ pub struct Env<'m> {
     pub(crate) packages: HashMap<PackageId, Package>,
     pub(crate) sources: HashMap<SourceId, Source>,
 
-    pub(crate) types: Types<'m>,
     pub(crate) namespace: HashMap<PackageId, HashMap<String, DefId>>,
     pub(crate) defs: HashMap<DefId, Def>,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
+    pub(crate) types: Types<'m>,
     pub(crate) def_types: HashMap<DefId, Type<'m>>,
 }
 

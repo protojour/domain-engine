@@ -73,7 +73,7 @@ impl<'m> Env<'m> {
             "*",
             DefKind::CoreFn(CoreFn::Mul),
             TypeKind::Function {
-                args: num_num,
+                params: num_num,
                 output: num,
             },
         );
@@ -81,7 +81,7 @@ impl<'m> Env<'m> {
             "/",
             DefKind::CoreFn(CoreFn::Div),
             TypeKind::Function {
-                args: num_num,
+                params: num_num,
                 output: num,
             },
         );
