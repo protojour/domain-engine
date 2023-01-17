@@ -6,18 +6,17 @@
 use std::collections::HashMap;
 
 use crate::{
+    compile_error::CompileErrors,
     def::{Def, DefId},
     expr::{Expr, ExprId},
     misc::{Package, PackageId, Source, SourceId},
-    types::{Type, Types},
+    types::{TypeRef, Types},
 };
 
 #[derive(Default)]
 pub struct Mem {
     pub(crate) bump: bumpalo::Bump,
 }
-
-enum Error {}
 
 pub struct Env<'m> {
     pub(crate) def_counter: u32,
@@ -31,13 +30,16 @@ pub struct Env<'m> {
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
     pub(crate) types: Types<'m>,
-    pub(crate) def_types: HashMap<DefId, Type<'m>>,
+    pub(crate) def_types: HashMap<DefId, TypeRef<'m>>,
+
+    pub(crate) errors: CompileErrors,
 }
 
-pub trait InternMut<T> {
+/// Intern something in an arena
+pub trait Intern<T> {
     type Facade;
 
-    fn intern_mut(&mut self, value: T) -> Self::Facade;
+    fn intern(&mut self, value: T) -> Self::Facade;
 }
 
 impl<'m> Env<'m> {
@@ -52,6 +54,7 @@ impl<'m> Env<'m> {
             defs: Default::default(),
             expressions: Default::default(),
             def_types: Default::default(),
+            errors: Default::default(),
         }
     }
 }

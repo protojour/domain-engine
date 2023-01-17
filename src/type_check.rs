@@ -1,21 +1,24 @@
 use std::collections::HashMap;
 
 use crate::{
-    def::{DefId, DefKind, Primitive, Def},
-    env::{Env, InternMut},
+    compile_error::{CompileError, CompileErrors},
+    def::{Def, DefId, DefKind, Primitive},
+    env::{Env, Intern},
     expr::{Expr, ExprKind},
-    types::{Type, TypeKind, Types},
+    types::{Type, TypeRef, Types},
 };
 
 struct DefCtx<'e, 'm> {
     types: &'e mut Types<'m>,
-    def_types: &'e mut HashMap<DefId, Type<'m>>,
+    def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
+    errors: &'e mut CompileErrors,
     defs: &'e HashMap<DefId, Def>,
 }
 
 struct ExprCtx<'e, 'm> {
     types: &'e mut Types<'m>,
-    def_types: &'e HashMap<DefId, Type<'m>>,
+    errors: &'e mut CompileErrors,
+    def_types: &'e HashMap<DefId, TypeRef<'m>>,
     defs: &'e HashMap<DefId, Def>,
 }
 
@@ -24,55 +27,57 @@ impl<'m> Env<'m> {
         DefCtx {
             types: &mut self.types,
             defs: &self.defs,
-            def_types: &mut self.def_types
+            errors: &mut self.errors,
+            def_types: &mut self.def_types,
         }
     }
 
     fn expr_type_check_ctx(&mut self) -> ExprCtx<'_, 'm> {
         ExprCtx {
             types: &mut self.types,
+            errors: &mut self.errors,
             defs: &self.defs,
-            def_types: &self.def_types
+            def_types: &self.def_types,
         }
     }
 }
 
-fn type_check_def<'e, 'm>(ctx: &mut DefCtx<'e, 'm>, def_id: DefId) -> Type<'m> {
+fn type_check_def<'e, 'm>(ctx: &mut DefCtx<'e, 'm>, def_id: DefId) -> TypeRef<'m> {
     match &ctx.defs.get(&def_id).unwrap().kind {
         DefKind::Constructor(_, arg_def) => {
             let arg_type = type_check_def(ctx, *arg_def);
 
-            let params = ctx.types.intern_mut([arg_type]);
-            let output = ctx.types.intern_mut(TypeKind::New(def_id, arg_type));
-            let fn_ty = ctx.types.intern_mut(TypeKind::Function {
-                params,
-                output,
-            });
+            let params = ctx.types.intern([arg_type]);
+            let output = ctx.types.intern(Type::New(def_id, arg_type));
+            let fn_ty = ctx.types.intern(Type::Function { params, output });
 
             ctx.def_types.insert(def_id, fn_ty);
             fn_ty
         }
-        DefKind::Primitive(Primitive::Number) => ctx.types.intern_mut(TypeKind::Number),
+        DefKind::Primitive(Primitive::Number) => ctx.types.intern(Type::Number),
         other => {
             panic!("failed def typecheck: {other:?}");
         }
     }
 }
 
-fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> Type<'m> {
+fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> TypeRef<'m> {
     match &expr.kind {
-        ExprKind::Constant(_) => ctx.types.intern_mut(TypeKind::Number),
-        ExprKind::Call(def_id, args) => {
-            let def_type = ctx.def_types.get(&def_id).unwrap();
-            match def_type.kind() {
-            TypeKind::Function { params, output } => {
-                for arg in args {
+        ExprKind::Constant(_) => ctx.types.intern(Type::Number),
+        ExprKind::Call(def_id, args) => match ctx.def_types.get(&def_id) {
+            Some(Type::Function { params, output }) => {
+                if args.len() != params.len() {
+                    ctx.errors.push(CompileError::WrongNumberOfArguments);
+                }
+                for (arg, param_ty) in args.iter().zip(*params) {
                     type_check_expr(ctx, arg);
                 }
                 *output
-            },
-            _ => panic!("Not a function")
-        }
+            }
+            _ => {
+                ctx.errors.push(CompileError::NotAFunction);
+                ctx.types.intern(Type::Error)
+            }
         },
         ExprKind::Variable(id) => {
             panic!()
@@ -86,7 +91,8 @@ mod tests {
         def::DefKind,
         env::{Env, Mem},
         expr::{ExprId, ExprKind},
-        misc::{PackageId, SourceSpan}, types::TypeKind,
+        misc::{PackageId, SourceSpan},
+        types::Type,
     };
 
     use super::{type_check_def, type_check_expr};
@@ -106,16 +112,13 @@ mod tests {
         let m_ty = type_check_def(&mut env.def_type_check_ctx(), m);
 
         let args = vec![env.expr(ExprKind::Variable(ExprId(100)), span)];
-        let expr = env.expr(
-            ExprKind::Call(m, args),
-            SourceSpan::none(),
-        );
+        let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
 
-        let TypeKind::Function { params: _, output: m_output } = m_ty.kind() else {
-            panic!();    
+        let Type::Function { params: _, output: m_output } = *m_ty else {
+            panic!();
         };
 
         let ty = type_check_expr(&mut env.expr_type_check_ctx(), &expr);
-        assert_eq!(*m_output, ty);
+        assert_eq!(m_output, ty);
     }
 }

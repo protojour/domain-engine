@@ -7,6 +7,7 @@ pub mod ast;
 pub mod ena;
 pub mod tree;
 
+mod compile_error;
 mod def;
 mod env;
 mod expr;

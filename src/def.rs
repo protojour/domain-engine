@@ -1,7 +1,7 @@
 use crate::{
-    env::{Env, InternMut},
+    env::{Env, Intern},
     misc::{Package, PackageId},
-    types::TypeKind,
+    types::Type,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -61,18 +61,18 @@ impl<'m> Env<'m> {
             },
         );
 
-        let num = self.types.intern_mut(TypeKind::Number);
-        let num_num = self.types.intern_mut([num, num]);
+        let num = self.types.intern(Type::Number);
+        let num_num = self.types.intern([num, num]);
 
         self.add_core_def(
             "Number",
             DefKind::Primitive(Primitive::Number),
-            TypeKind::Number,
+            Type::Number,
         );
         self.add_core_def(
             "*",
             DefKind::CoreFn(CoreFn::Mul),
-            TypeKind::Function {
+            Type::Function {
                 params: num_num,
                 output: num,
             },
@@ -80,17 +80,16 @@ impl<'m> Env<'m> {
         self.add_core_def(
             "/",
             DefKind::CoreFn(CoreFn::Div),
-            TypeKind::Function {
+            Type::Function {
                 params: num_num,
                 output: num,
             },
         );
     }
 
-    fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: TypeKind<'m>) -> DefId {
+    fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
         let def_id = self.add_def(PackageId(0), name, def_kind);
-        self.def_types
-            .insert(def_id, self.types.intern_mut(type_kind));
+        self.def_types.insert(def_id, self.types.intern(type_kind));
 
         def_id
     }
