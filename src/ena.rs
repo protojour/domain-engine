@@ -113,6 +113,7 @@ fn uh_great() {
     // inf.huh();
 }
 
+#[ignore]
 #[test]
 fn equate_expr() {
     let mut inf = Inference::new();

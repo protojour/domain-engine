@@ -55,6 +55,13 @@ impl TreeStream {
         }
     }
 
+    pub fn next_msg(&mut self, msg: impl ToString) -> ParseResult<Tree> {
+        match self.next() {
+            Some(next) => Ok(next),
+            None => Err(error(self.remain_span(), msg)),
+        }
+    }
+
     pub fn next_sym(&mut self) -> ParseResult<SString> {
         self.next_sym_msg("Expected symbol")
     }
@@ -67,7 +74,7 @@ impl TreeStream {
         }
     }
 
-    pub fn next_list(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree>> {
+    pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree>> {
         match self.next() {
             Some((Tree::Paren(vec), span)) => Ok(Self::new(span, vec)),
             Some((_, span)) => Err(error(span, msg)),

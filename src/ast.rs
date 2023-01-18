@@ -6,17 +6,29 @@ pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
 pub enum Ast {
     Nothing,
-    List(Vec<Spanned<Ast>>),
-    Struct(Struct),
     Import(Path),
+    List(Vec<Spanned<Ast>>),
+    Data(Data),
 }
 
-pub struct Struct {
+pub struct Data {
     pub ident: Spanned<SString>,
-    pub fields: Vec<Spanned<StructField>>,
+    pub ty: Spanned<Type>,
 }
 
-pub struct StructField {}
+pub enum Type {
+    Sym(SString),
+    Record(Record),
+}
+
+pub struct Record {
+    pub fields: Vec<Spanned<RecordField>>,
+}
+
+pub struct RecordField {
+    pub ident: Spanned<SString>,
+    pub ty: Spanned<Type>,
+}
 
 pub struct Path(Vec<Spanned<SString>>);
 
@@ -28,12 +40,12 @@ pub fn parse((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
 }
 
 fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
-    let (keyword, span) = input.next_sym_msg("Expected keyword")?;
+    let (keyword, span) = input.next_sym_msg("expected keyword")?;
 
     match keyword.as_str() {
         "import" => parse_import(input),
-        "struct" => parse_struct(input),
-        _ => Err(error(span, "Unknown keyword")),
+        "data" => parse_data(input),
+        _ => Err(error(span, "unknown keyword")),
     }
 }
 
@@ -43,18 +55,47 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
     Ok((Ast::Import(path), span))
 }
 
-fn parse_struct(mut input: TreeStream) -> ParseResult<Ast> {
+fn parse_data(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
     let ident = input.next_sym_msg("expected identifier")?;
+    let ty = parse_type(&mut input)?;
+    input.end()?;
+
+    Ok((Ast::Data(Data { ident, ty }), span))
+}
+
+fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
+    let type_span = stream.span();
+    let mut ty_stream = stream.next_list_msg("expected type")?;
+    let (kind, span) = ty_stream.next_sym_msg("")?;
+
+    let ty = match kind.as_str() {
+        "number" => Type::Sym(kind),
+        "record" => {
+            let (fields, _) = parse_record_fields(&mut ty_stream)?;
+            Type::Record(Record { fields })
+        }
+        _ => Err(error(span, "Unrecognized type"))?,
+    };
+
+    ty_stream.end()?;
+    Ok((ty, type_span))
+}
+
+fn parse_record_fields(input: &mut TreeStream) -> ParseResult<Vec<Spanned<RecordField>>> {
+    let span = input.span();
     let mut fields = vec![];
 
     while input.peek_any() {
-        let field = input.next_list("expected field")?;
+        let mut field_stream = input.next_list_msg("expected field")?;
+        let ident = field_stream.next_sym_msg("expected field name")?;
+        let ty = parse_type(&mut field_stream)?;
+        field_stream.end()?;
 
-        fields.push((StructField {}, field.span()));
+        fields.push((RecordField { ident, ty }, field_stream.span()));
     }
 
-    Ok((Ast::Struct(Struct { ident, fields }), span))
+    Ok((fields, span))
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
@@ -98,19 +139,21 @@ mod tests {
     }
 
     #[test]
-    fn parse_struct() {
+    fn parse_data_record() {
         let src = "
-
-            (struct foobar
-                (field)
-                (else)
-            )
+            (data foobar (record (field name (number))))
         ";
-        let Ast::Struct(s) = test_parse(src) else {
+        let Ast::Data(Data { ident, ty: (Type::Record(record), _), }) = test_parse(src) else {
             panic!();
         };
 
-        assert_eq!("foobar", s.ident.0);
-        assert_eq!(2, s.fields.len());
+        assert_eq!("foobar", ident.0);
+        assert_eq!(1, record.fields.len());
+
+        let (RecordField { ty: (Type::Sym(field_type), _), .. }, _) = &record.fields[0] else {
+            panic!();
+        };
+
+        assert_eq!(field_type, "number");
     }
 }
