@@ -1,7 +1,7 @@
 // TODO: Use miette
 pub enum CompileError {
     WrongNumberOfArguments,
-    NotAFunction,
+    NotCallable,
 }
 
 #[derive(Default)]

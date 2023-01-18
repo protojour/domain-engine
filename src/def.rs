@@ -1,5 +1,6 @@
 use crate::{
     env::Env,
+    expr::ExprId,
     mem::Intern,
     misc::{Package, PackageId},
     types::Type,
@@ -18,7 +19,10 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
+    // FIXME: The argument of the type constructor is a type expression, not a definition
     Constructor(String, DefId),
+    Field { type_def_id: DefId },
+    Equivalence(ExprId, ExprId),
 }
 
 #[derive(Debug)]
@@ -41,7 +45,14 @@ impl<'m> Env<'m> {
         self.def_by_name(PackageId(0), name)
     }
 
-    pub fn add_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
+    pub fn add_def(&mut self, package: PackageId, kind: DefKind) -> DefId {
+        let def_id = self.alloc_def_id();
+        self.defs.insert(def_id, Def { package, kind });
+
+        def_id
+    }
+
+    pub fn add_named_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
         let def_id = self.alloc_def_id();
         self.namespace
             .entry(package)
@@ -88,7 +99,7 @@ impl<'m> Env<'m> {
     }
 
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
-        let def_id = self.add_def(PackageId(0), name, def_kind);
+        let def_id = self.add_named_def(PackageId(0), name, def_kind);
         self.def_types.insert(def_id, self.types.intern(type_kind));
 
         def_id

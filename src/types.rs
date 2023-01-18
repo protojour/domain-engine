@@ -12,13 +12,20 @@ pub type TypeRef<'m> = &'m Type<'m>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Type<'m> {
+    // Don't know what to name this..
+    // This is the "type" of an equivalence assertion.
+    // It has no specific meaning.
+    Tautology,
     Constant(i32),
     Number,
-    New(DefId, TypeRef<'m>),
+    // Maybe this is a macro instead of a function, because
+    // it represents abstraction of syntax:
     Function {
         params: &'m [TypeRef<'m>],
         output: TypeRef<'m>,
     },
+    // TODO: Expand into proper user defined data types:
+    Data(DefId, DefId),
     Error,
 }
 
@@ -88,14 +95,5 @@ mod tests {
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));
-    }
-
-    #[test]
-    fn test_alloc_type() {
-        let mem = Mem::default();
-        let mut env = Env::new(&mem);
-
-        let constant = env.types.intern(Type::Constant(42));
-        let ty = env.types.intern(Type::New(DefId(42), constant));
     }
 }
