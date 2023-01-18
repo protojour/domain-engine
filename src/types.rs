@@ -5,9 +5,6 @@ use crate::{
     mem::{Intern, Mem},
 };
 
-// #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-// pub struct Type<'m>(pub &'m TypeKind<'m>);
-
 pub type TypeRef<'m> = &'m Type<'m>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -52,9 +49,9 @@ impl<'m> Intern<Type<'m>> for Types<'m> {
         match self.types.get(&ty) {
             Some(ty) => ty,
             None => {
-                let type_ref = self.mem.bump.alloc(ty);
-                self.types.insert(type_ref);
-                type_ref
+                let ty = self.mem.bump.alloc(ty);
+                self.types.insert(ty);
+                ty
             }
         }
     }

@@ -92,7 +92,7 @@ fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> TypeRef<'m
                 }
                 *output
             }
-            Some(Type::Data(data_def_id, _)) => {
+            Some(Type::Data(data_def_id, field_id)) => {
                 if args.len() != 1 {
                     ctx.errors.push(CompileError::WrongNumberOfArguments);
                 }
