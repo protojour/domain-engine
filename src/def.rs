@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     env::Env,
     expr::ExprId,
@@ -36,15 +38,31 @@ pub enum CoreFn {
     Div,
 }
 
+#[derive(Default)]
+pub struct Namespaces {
+    namespaces: HashMap<PackageId, HashMap<SString, DefId>>,
+}
+
+impl Namespaces {
+    pub fn lookup(&self, search_path: &[PackageId], ident: &str) -> Option<DefId> {
+        for package in search_path {
+            let Some(namespace) = self.namespaces.get(package) else {
+                continue
+            };
+            if let Some(def_id) = namespace.get(ident) {
+                return Some(*def_id);
+            };
+        }
+
+        None
+    }
+
+    pub fn get_mut(&mut self, package: PackageId) -> &mut HashMap<SString, DefId> {
+        self.namespaces.entry(package).or_default()
+    }
+}
+
 impl<'m> Env<'m> {
-    pub fn def_by_name(&self, package: PackageId, name: &str) -> Option<DefId> {
-        Some(*self.namespace.get(&package)?.get(name)?)
-    }
-
-    pub fn core_def_by_name(&self, name: &str) -> Option<DefId> {
-        self.def_by_name(PackageId(0), name)
-    }
-
     pub fn add_def(&mut self, package: PackageId, kind: DefKind) -> DefId {
         let def_id = self.alloc_def_id();
         self.defs.insert(def_id, Def { package, kind });
@@ -54,16 +72,13 @@ impl<'m> Env<'m> {
 
     pub fn add_named_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
         let def_id = self.alloc_def_id();
-        self.namespace
-            .entry(package)
-            .or_insert_with(|| Default::default())
-            .insert(name.into(), def_id);
+        self.namespaces.get_mut(package).insert(name.into(), def_id);
         self.defs.insert(def_id, Def { package, kind });
 
         def_id
     }
 
-    pub fn register_builtins(&mut self) {
+    pub fn with_core(mut self) -> Self {
         let core = PackageId(0);
         self.packages.insert(
             core,
@@ -76,7 +91,7 @@ impl<'m> Env<'m> {
         let num_num = self.types.intern([num, num]);
 
         self.add_core_def(
-            "Number",
+            "number",
             DefKind::Primitive(Primitive::Number),
             Type::Number,
         );
@@ -96,6 +111,7 @@ impl<'m> Env<'m> {
                 output: num,
             },
         );
+        self
     }
 
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {

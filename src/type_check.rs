@@ -116,36 +116,35 @@ fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> TypeRef<'m
 #[cfg(test)]
 mod tests {
     use crate::{
-        def::DefKind,
+        compile_error::CompileError,
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,
-        misc::{PackageId, SourceSpan},
+        misc::{SourceSpan, TEST_PKG},
+        Compile,
     };
 
     use super::{type_check_def, type_check_expr};
 
     #[test]
-    fn test_type_check_data_call() {
+    fn type_check_data_call() -> Result<(), CompileError> {
         let mem = Mem::default();
-        let mut env = Env::new(&mem);
-        env.register_builtins();
+        let mut env = Env::new(&mem).with_core();
 
-        let package = PackageId(1);
-        let span = SourceSpan::none();
-        let field = env.add_def(
-            package,
-            DefKind::Field {
-                type_def_id: env.core_def_by_name("Number").unwrap(),
-            },
-        );
-        let m = env.add_named_def(package, "m", DefKind::Constructor("m".into(), field));
-        let m_type = type_check_def(&mut env.def_type_check_ctx(), m);
+        "(data m (number))".compile(&mut env, TEST_PKG)?;
 
-        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), span)];
+        let m = env
+            .namespaces
+            .lookup(&[TEST_PKG], "m")
+            .expect("m not found");
+        let type_of_m = type_check_def(&mut env.def_type_check_ctx(), m);
+
+        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
         let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
         let expr_type = type_check_expr(&mut env.expr_type_check_ctx(), &expr);
 
-        assert_eq!(m_type, expr_type);
+        assert_eq!(expr_type, type_of_m);
+
+        Ok(())
     }
 }

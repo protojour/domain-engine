@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::{
     compile_error::CompileErrors,
-    def::{Def, DefId},
+    def::{Def, DefId, Namespaces},
     expr::{Expr, ExprId},
     mem::Mem,
     misc::{Package, PackageId, Source, SourceId},
@@ -22,7 +22,7 @@ pub struct Env<'m> {
     pub(crate) packages: HashMap<PackageId, Package>,
     pub(crate) sources: HashMap<SourceId, Source>,
 
-    pub(crate) namespace: HashMap<PackageId, HashMap<SString, DefId>>,
+    pub(crate) namespaces: Namespaces,
     pub(crate) defs: HashMap<DefId, Def>,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
@@ -40,7 +40,7 @@ impl<'m> Env<'m> {
             packages: Default::default(),
             sources: Default::default(),
             types: Types::new(mem),
-            namespace: Default::default(),
+            namespaces: Default::default(),
             defs: Default::default(),
             expressions: Default::default(),
             def_types: Default::default(),

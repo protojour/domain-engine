@@ -4,7 +4,7 @@ use crate::{
     compile_error::CompileError,
     def::{Def, DefId, DefKind},
     env::Env,
-    misc::{PackageId, SourceId},
+    misc::{PackageId, SourceId, CORE_PKG},
     parse::ast,
     Span,
 };
@@ -28,9 +28,8 @@ fn ast_to_def<'m>(
         ast::Ast::Data(ast::Data { ident, ty: ast_ty }) => {
             let def_id = env.alloc_def_id();
 
-            env.namespace
-                .entry(package)
-                .or_insert_with(|| Default::default())
+            env.namespaces
+                .get_mut(package)
                 .insert(ident.0.clone(), def_id);
 
             let type_def = ast_type_to_def(env, package, ast_ty)?;
@@ -54,10 +53,10 @@ fn ast_type_to_def<'m>(
     package: PackageId,
     (ast_ty, span): (ast::Type, Span),
 ) -> Result<DefId, CompileError> {
+    let def_id = env.alloc_def_id();
     match ast_ty {
         ast::Type::Sym(ident) => {
-            let def_id = env.alloc_def_id();
-            let Some(type_def_id) = env.core_def_by_name(&ident) else {
+            let Some(type_def_id) = env.namespaces.lookup(&[package, CORE_PKG], &ident) else {
                 return Err(CompileError::TypeNotFound);
             };
             env.defs.insert(
@@ -67,13 +66,8 @@ fn ast_type_to_def<'m>(
                     kind: DefKind::Field { type_def_id },
                 },
             );
-
-            Ok(def_id)
         }
-        ast::Type::Record(_) => {
-            let def_id = env.alloc_def_id();
-
-            Ok(def_id)
-        }
-    }
+        ast::Type::Record(_) => {}
+    };
+    Ok(def_id)
 }

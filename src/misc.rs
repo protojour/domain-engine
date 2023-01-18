@@ -1,10 +1,10 @@
-use std::{
-    ops::Range,
-    path::{Path, PathBuf},
-};
+use std::{ops::Range, path::PathBuf};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct PackageId(pub u32);
+
+pub const CORE_PKG: PackageId = PackageId(0);
+pub const TEST_PKG: PackageId = PackageId(1337);
 
 pub struct Package {
     pub name: String,
