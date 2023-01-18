@@ -4,6 +4,7 @@ use crate::{
     mem::Intern,
     misc::{Package, PackageId},
     types::Type,
+    SString,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -19,8 +20,7 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
-    // FIXME: The argument of the type constructor is a type expression, not a definition
-    Constructor(String, DefId),
+    Constructor(SString, DefId),
     Field { type_def_id: DefId },
     Equivalence(ExprId, ExprId),
 }

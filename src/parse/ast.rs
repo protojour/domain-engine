@@ -5,7 +5,6 @@ use crate::parse::{tree::Tree, tree_stream::TreeStream, SString, Span, Spanned};
 pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
 pub enum Ast {
-    Nothing,
     Import(Path),
     List(Vec<Spanned<Ast>>),
     Data(Data),
@@ -82,12 +81,12 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
     Ok((ty, type_span))
 }
 
-fn parse_record_fields(input: &mut TreeStream) -> ParseResult<Vec<Spanned<RecordField>>> {
-    let span = input.span();
+fn parse_record_fields(record: &mut TreeStream) -> ParseResult<Vec<Spanned<RecordField>>> {
+    let span = record.span();
     let mut fields = vec![];
 
-    while input.peek_any() {
-        let mut field = input.next_list_msg("expected field s-expression")?;
+    while record.peek_any() {
+        let mut field = record.next_list_msg("expected field s-expression")?;
         let (keyword, kw_span) = field.next_sym_msg("expected field")?;
         if keyword != "field" {
             return Err(error(kw_span, "expected field keyword"));

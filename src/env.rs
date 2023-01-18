@@ -12,6 +12,7 @@ use crate::{
     mem::Mem,
     misc::{Package, PackageId, Source, SourceId},
     types::{TypeRef, Types},
+    SString,
 };
 
 pub struct Env<'m> {
@@ -21,7 +22,7 @@ pub struct Env<'m> {
     pub(crate) packages: HashMap<PackageId, Package>,
     pub(crate) sources: HashMap<SourceId, Source>,
 
-    pub(crate) namespace: HashMap<PackageId, HashMap<String, DefId>>,
+    pub(crate) namespace: HashMap<PackageId, HashMap<SString, DefId>>,
     pub(crate) defs: HashMap<DefId, Def>,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 

@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use chumsky::{chain::Chain, Parser};
+use chumsky::Parser;
+use env::Env;
+use lower::lower_ast;
+use misc::{PackageId, SourceId};
 use smartstring::{LazyCompact, SmartString};
 
 pub mod ena;
@@ -11,6 +14,7 @@ mod compile_error;
 mod def;
 mod expr;
 mod lambda;
+mod lower;
 mod misc;
 mod parse;
 mod type_check;
@@ -20,15 +24,31 @@ pub type SString = SmartString<LazyCompact>;
 pub type Span = Range<usize>;
 pub type Spanned<T> = (T, Span);
 
-pub fn compile(src: &str) -> Result<(), ()> {
-    let (trees, mut errs) = parse::tree::trees_parser().parse_recovery(src);
+pub fn compile<'m>(env: &mut Env<'m>, package: PackageId, src: &str) -> Result<(), ()> {
+    let source = SourceId(0);
+    let (trees, _lex_errors) = parse::tree::trees_parser().parse_recovery(src);
 
     if let Some(trees) = trees {
-        let len = src.chars().len();
+        let mut asts = vec![];
+        let mut parse_errors = vec![];
 
-        let (ast, parse_errs) = (1, 29);
-        // ast::ast_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
+        for tree in trees {
+            match crate::parse::ast::parse(tree) {
+                Ok(ast) => {
+                    asts.push(ast);
+                }
+                Err(error) => {
+                    parse_errors.push(error);
+                }
+            }
+        }
+
+        for ast in asts {
+            if lower_ast(env, package, source, ast).is_err() {
+                panic!()
+            }
+        }
     }
 
-    panic!()
+    Ok(())
 }

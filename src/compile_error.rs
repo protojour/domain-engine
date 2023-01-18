@@ -2,6 +2,7 @@
 pub enum CompileError {
     WrongNumberOfArguments,
     NotCallable,
+    TypeNotFound,
 }
 
 #[derive(Default)]
