@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::{tree::Tree, tree_stream::TreeStream, SString, Span, Spanned};
+use crate::parse::{tree::Tree, tree_stream::TreeStream, SString, Span, Spanned};
 
 pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
@@ -120,7 +120,7 @@ pub fn error(span: Span, msg: impl ToString) -> Simple<Tree> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tree::tree_parser;
+    use crate::parse::tree::tree_parser;
 
     use super::*;
 

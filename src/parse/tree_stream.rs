@@ -3,8 +3,8 @@ use std::iter::Peekable;
 use chumsky::prelude::Simple;
 
 use crate::{
-    ast::{error, ParseResult},
-    tree::Tree,
+    parse::ast::{error, ParseResult},
+    parse::tree::Tree,
     SString, Span, Spanned,
 };
 
