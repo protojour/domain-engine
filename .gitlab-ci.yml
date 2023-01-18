@@ -1,9 +1,14 @@
 stages:
   - check
 
-check:
+pretty:
+  stage: check
+  script:
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+
+test:
   stage: check
   image: rust:latest
   script:
-    - cargo fmt --check
     - cargo test
