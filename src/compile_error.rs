@@ -15,7 +15,7 @@ pub enum CompileError {
 
 #[derive(Default)]
 pub struct CompileErrors {
-    errors: Vec<CompileError>,
+    pub(crate) errors: Vec<CompileError>,
 }
 
 impl CompileErrors {

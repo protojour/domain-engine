@@ -9,23 +9,97 @@ use crate::{
     types::{Type, TypeRef, Types},
 };
 
-struct DefCtx<'e, 'm> {
+struct DefTck<'e, 'm> {
     types: &'e mut Types<'m>,
     def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
     errors: &'e mut CompileErrors,
     defs: &'e HashMap<DefId, Def>,
 }
 
-struct ExprCtx<'e, 'm> {
+impl<'e, 'm> DefTck<'e, 'm> {
+    fn check(&mut self, def_id: DefId) -> TypeRef<'m> {
+        if let Some(type_ref) = self.def_types.get(&def_id) {
+            return type_ref;
+        }
+
+        match &self.defs.get(&def_id).unwrap().kind {
+            DefKind::Constructor(_, field_def) => {
+                let ty = self.types.intern(Type::Data(def_id, *field_def));
+                self.def_types.insert(def_id, ty);
+
+                self.type_check_field(*field_def);
+
+                ty
+            }
+            DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
+            DefKind::Equivalence(_, _) => self.types.intern(Type::Tautology),
+            other => {
+                panic!("failed def typecheck: {other:?}");
+            }
+        }
+    }
+
+    fn type_check_field(&mut self, field_id: DefId) {
+        let field = self
+            .defs
+            .get(&field_id)
+            .expect("No field definition for {field_id:?}");
+        let DefKind::Field { type_def_id } = &field.kind else {
+            panic!("Field definition is not a field: {:?}", field.kind);
+        };
+
+        let type_ref = self.check(*type_def_id);
+        self.def_types.insert(field_id, type_ref);
+    }
+}
+
+struct ExprTck<'e, 'm> {
     types: &'e mut Types<'m>,
     errors: &'e mut CompileErrors,
     def_types: &'e HashMap<DefId, TypeRef<'m>>,
     defs: &'e HashMap<DefId, Def>,
 }
 
+impl<'e, 'm> ExprTck<'e, 'm> {
+    fn check(&mut self, expr: &Expr) -> TypeRef<'m> {
+        match &expr.kind {
+            ExprKind::Constant(_) => self.types.intern(Type::Number),
+            ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
+                Some(Type::Function { params, output }) => {
+                    if args.len() != params.len() {
+                        self.errors.push(CompileError::WrongNumberOfArguments);
+                        return self.types.intern(Type::Error);
+                    }
+                    for (arg, param_ty) in args.iter().zip(*params) {
+                        self.check(arg);
+                    }
+                    *output
+                }
+                Some(Type::Data(data_def_id, field_id)) => {
+                    if args.len() != 1 {
+                        self.errors.push(CompileError::WrongNumberOfArguments);
+                    }
+
+                    match self.def_types.get(data_def_id) {
+                        Some(ty) => ty,
+                        None => self.types.intern(Type::Error),
+                    }
+                }
+                _ => {
+                    self.errors.push(CompileError::NotCallable);
+                    self.types.intern(Type::Error)
+                }
+            },
+            ExprKind::Variable(id) => {
+                panic!()
+            }
+        }
+    }
+}
+
 impl<'m> Env<'m> {
-    fn def_type_check_ctx(&mut self) -> DefCtx<'_, 'm> {
-        DefCtx {
+    fn def_tck(&mut self) -> DefTck<'_, 'm> {
+        DefTck {
             types: &mut self.types,
             defs: &self.defs,
             errors: &mut self.errors,
@@ -33,82 +107,12 @@ impl<'m> Env<'m> {
         }
     }
 
-    fn expr_type_check_ctx(&mut self) -> ExprCtx<'_, 'm> {
-        ExprCtx {
+    fn expr_tck(&mut self) -> ExprTck<'_, 'm> {
+        ExprTck {
             types: &mut self.types,
             errors: &mut self.errors,
             defs: &self.defs,
             def_types: &self.def_types,
-        }
-    }
-}
-
-fn type_check_def<'e, 'm>(ctx: &mut DefCtx<'e, 'm>, def_id: DefId) -> TypeRef<'m> {
-    if let Some(type_ref) = ctx.def_types.get(&def_id) {
-        return type_ref;
-    }
-
-    match &ctx.defs.get(&def_id).unwrap().kind {
-        DefKind::Constructor(_, field_def) => {
-            let ty = ctx.types.intern(Type::Data(def_id, *field_def));
-            ctx.def_types.insert(def_id, ty);
-
-            type_check_field(ctx, *field_def);
-
-            ty
-        }
-        DefKind::Primitive(Primitive::Number) => ctx.types.intern(Type::Number),
-        DefKind::Equivalence(_, _) => ctx.types.intern(Type::Tautology),
-        other => {
-            panic!("failed def typecheck: {other:?}");
-        }
-    }
-}
-
-fn type_check_field<'e, 'm>(ctx: &mut DefCtx<'e, 'm>, field_id: DefId) {
-    let field = ctx
-        .defs
-        .get(&field_id)
-        .expect("No field definition for {field_id:?}");
-    let DefKind::Field { type_def_id } = &field.kind else {
-        panic!("Field definition is not a field: {:?}", field.kind);
-    };
-
-    let type_ref = type_check_def(ctx, *type_def_id);
-    ctx.def_types.insert(field_id, type_ref);
-}
-
-fn type_check_expr<'e, 'm>(ctx: &mut ExprCtx<'e, 'm>, expr: &Expr) -> TypeRef<'m> {
-    match &expr.kind {
-        ExprKind::Constant(_) => ctx.types.intern(Type::Number),
-        ExprKind::Call(def_id, args) => match ctx.def_types.get(&def_id) {
-            Some(Type::Function { params, output }) => {
-                if args.len() != params.len() {
-                    ctx.errors.push(CompileError::WrongNumberOfArguments);
-                    return ctx.types.intern(Type::Error);
-                }
-                for (arg, param_ty) in args.iter().zip(*params) {
-                    type_check_expr(ctx, arg);
-                }
-                *output
-            }
-            Some(Type::Data(data_def_id, field_id)) => {
-                if args.len() != 1 {
-                    ctx.errors.push(CompileError::WrongNumberOfArguments);
-                }
-
-                match ctx.def_types.get(data_def_id) {
-                    Some(ty) => ty,
-                    None => ctx.types.intern(Type::Error),
-                }
-            }
-            _ => {
-                ctx.errors.push(CompileError::NotCallable);
-                ctx.types.intern(Type::Error)
-            }
-        },
-        ExprKind::Variable(id) => {
-            panic!()
         }
     }
 }
@@ -124,8 +128,6 @@ mod tests {
         Compile,
     };
 
-    use super::{type_check_def, type_check_expr};
-
     #[test]
     fn type_check_data_call() -> Result<(), CompileError> {
         let mem = Mem::default();
@@ -137,11 +139,11 @@ mod tests {
             .namespaces
             .lookup(&[TEST_PKG], "m")
             .expect("m not found");
-        let type_of_m = type_check_def(&mut env.def_type_check_ctx(), m);
+        let type_of_m = env.def_tck().check(m);
 
         let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
         let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
-        let expr_type = type_check_expr(&mut env.expr_type_check_ctx(), &expr);
+        let expr_type = env.expr_tck().check(&expr);
 
         assert_eq!(expr_type, type_of_m);
 

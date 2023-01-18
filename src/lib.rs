@@ -65,6 +65,8 @@ impl Compile for &str {
             }
         }
 
+        compile_errors.append(&mut env.errors.errors);
+
         match compile_errors.len() {
             0 => Ok(()),
             1 => Err(compile_errors.into_iter().next().unwrap()),
