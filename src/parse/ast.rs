@@ -87,12 +87,16 @@ fn parse_record_fields(input: &mut TreeStream) -> ParseResult<Vec<Spanned<Record
     let mut fields = vec![];
 
     while input.peek_any() {
-        let mut field_stream = input.next_list_msg("expected field")?;
-        let ident = field_stream.next_sym_msg("expected field name")?;
-        let ty = parse_type(&mut field_stream)?;
-        field_stream.end()?;
+        let mut field = input.next_list_msg("expected field s-expression")?;
+        let (keyword, kw_span) = field.next_sym_msg("expected field")?;
+        if keyword != "field" {
+            return Err(error(kw_span, "expected field keyword"));
+        }
+        let ident = field.next_sym_msg("expected field identifier")?;
+        let ty = parse_type(&mut field)?;
+        field.end()?;
 
-        fields.push((RecordField { ident, ty }, field_stream.span()));
+        fields.push((RecordField { ident, ty }, field.span()));
     }
 
     Ok((fields, span))
