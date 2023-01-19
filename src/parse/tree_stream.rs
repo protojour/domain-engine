@@ -2,13 +2,9 @@ use std::iter::Peekable;
 
 use chumsky::prelude::Simple;
 
-use crate::{
-    parse::ast::{error, ParseResult},
-    parse::tree::Tree,
-    SString,
-};
+use crate::{parse::ast::ParseResult, parse::tree::Tree, SString};
 
-use super::{Span, Spanned};
+use super::{parse::error, Span, Spanned};
 
 /// A stream of token trees.
 ///

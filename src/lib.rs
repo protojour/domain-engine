@@ -48,7 +48,7 @@ impl Compile for CompileSrc {
             let mut parse_errors = vec![];
 
             for tree in trees {
-                match crate::parse::ast::parse(tree) {
+                match crate::parse::parse(tree) {
                     Ok(ast) => {
                         asts.push(ast);
                     }
