@@ -10,17 +10,17 @@ use crate::{
     def::{Def, DefId, Namespaces},
     expr::{Expr, ExprId},
     mem::Mem,
-    misc::{Package, PackageId, Source, SourceId},
+    source::{Package, PackageId, Sources},
     types::{TypeRef, Types},
-    SString,
 };
 
 pub struct Env<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
 
+    pub(crate) session: Sources,
+
     pub(crate) packages: HashMap<PackageId, Package>,
-    pub(crate) sources: HashMap<SourceId, Source>,
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: HashMap<DefId, Def>,
@@ -37,8 +37,8 @@ impl<'m> Env<'m> {
         Self {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
+            session: Default::default(),
             packages: Default::default(),
-            sources: Default::default(),
             types: Types::new(mem),
             namespaces: Default::default(),
             defs: Default::default(),

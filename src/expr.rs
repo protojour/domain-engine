@@ -1,4 +1,4 @@
-use crate::{def::DefId, env::Env, misc::SourceSpan};
+use crate::{def::DefId, env::Env, source::SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct ExprId(pub u32);

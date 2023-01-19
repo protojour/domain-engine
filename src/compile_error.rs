@@ -3,9 +3,8 @@ use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::{
-    env::Env,
-    misc::{CompileSrc, SourceSpan},
     parse::tree::Tree,
+    source::{CompileSrc, SourceSpan, Sources},
 };
 
 #[derive(Debug, Error, Diagnostic)]
@@ -22,15 +21,9 @@ pub struct SpannedCompileError {
 
     #[source_code]
     src: miette::NamedSource,
-}
 
-impl SpannedCompileError {
-    pub fn new(error: CompileError, source_code: &CompileSrc) -> Self {
-        Self {
-            error,
-            src: miette::NamedSource::new(source_code.name.to_string(), source_code.text.clone()),
-        }
-    }
+    #[label]
+    span: miette::SourceSpan,
 }
 
 #[derive(Debug, Error, Diagnostic)]
@@ -48,10 +41,18 @@ pub enum CompileError {
 }
 
 impl CompileError {
-    pub fn spanned(self, span: &SourceSpan) -> SpannedCompileError {
+    pub fn spanned(self, session: &Sources, span: &SourceSpan) -> SpannedCompileError {
+        let source = session
+            .get_compiled_source(span.source_id)
+            .expect("BUG: Source is not being compiled");
+
         SpannedCompileError {
             error: self,
-            src: miette::NamedSource::new("", ""),
+            src: miette::NamedSource::new(source.name.as_str().clone(), source.text.clone()),
+            span: miette::SourceSpan::new(
+                (span.range.start as usize).into(),
+                (span.range.end as usize).into(),
+            ),
         }
     }
 }

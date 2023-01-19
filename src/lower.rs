@@ -2,8 +2,8 @@ use crate::{
     compile_error::{CompileError, SpannedCompileError},
     def::{Def, DefId, DefKind},
     env::Env,
-    misc::{CompileSrc, CORE_PKG},
     parse::{ast, Span},
+    source::{CompileSrc, CORE_PKG},
 };
 
 pub fn lower_ast<'m>(
@@ -54,7 +54,7 @@ fn ast_type_to_def<'m>(
     match ast_ty {
         ast::Type::Sym(ident) => {
             let Some(type_def_id) = env.namespaces.lookup(&[src.package, CORE_PKG], &ident) else {
-                return Err(SpannedCompileError::new(CompileError::TypeNotFound, src));
+                return Err(CompileError::TypeNotFound.spanned(&env.session, &src.span(span)));
             };
             env.defs.insert(
                 def_id,

@@ -6,6 +6,7 @@ use crate::{
     env::Env,
     expr::{Expr, ExprKind},
     mem::Intern,
+    source::Sources,
     types::{Type, TypeRef, Types},
 };
 
@@ -58,6 +59,7 @@ struct ExprTck<'e, 'm> {
     errors: &'e mut CompileErrors,
     def_types: &'e HashMap<DefId, TypeRef<'m>>,
     defs: &'e HashMap<DefId, Def>,
+    session: &'e Sources,
 }
 
 impl<'e, 'm> ExprTck<'e, 'm> {
@@ -67,8 +69,9 @@ impl<'e, 'm> ExprTck<'e, 'm> {
             ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
-                        self.errors
-                            .push(CompileError::WrongNumberOfArguments.spanned(&expr.span));
+                        self.errors.push(
+                            CompileError::WrongNumberOfArguments.spanned(&self.session, &expr.span),
+                        );
                         return self.types.intern(Type::Error);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
@@ -78,8 +81,9 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 }
                 Some(Type::Data(data_def_id, field_id)) => {
                     if args.len() != 1 {
-                        self.errors
-                            .push(CompileError::WrongNumberOfArguments.spanned(&expr.span));
+                        self.errors.push(
+                            CompileError::WrongNumberOfArguments.spanned(&self.session, &expr.span),
+                        );
                     }
 
                     match self.def_types.get(data_def_id) {
@@ -89,7 +93,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 }
                 _ => {
                     self.errors
-                        .push(CompileError::NotCallable.spanned(&expr.span));
+                        .push(CompileError::NotCallable.spanned(&self.session, &expr.span));
                     self.types.intern(Type::Error)
                 }
             },
@@ -116,6 +120,7 @@ impl<'m> Env<'m> {
             errors: &mut self.errors,
             defs: &self.defs,
             def_types: &self.def_types,
+            session: &self.session,
         }
     }
 }
@@ -127,7 +132,7 @@ mod tests {
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,
-        misc::{SourceSpan, TEST_PKG},
+        source::{SourceSpan, TEST_PKG},
         Compile,
     };
 

@@ -4,7 +4,7 @@ use crate::{
     env::Env,
     expr::ExprId,
     mem::Intern,
-    misc::{Package, PackageId, SourceSpan, CORE_PKG},
+    source::{Package, PackageId, SourceSpan, CORE_PKG},
     types::Type,
     SString,
 };
