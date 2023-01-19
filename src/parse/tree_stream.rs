@@ -1,8 +1,9 @@
 use std::iter::Peekable;
 
 use chumsky::prelude::Simple;
+use smartstring::alias::String;
 
-use crate::{parse::ast::ParseResult, parse::tree::Tree, SString};
+use crate::{parse::ast::ParseResult, parse::tree::Tree};
 
 use super::{parse::error, Span, Spanned};
 
@@ -60,11 +61,11 @@ impl TreeStream {
         }
     }
 
-    pub fn next_sym(&mut self) -> ParseResult<SString> {
+    pub fn next_sym(&mut self) -> ParseResult<String> {
         self.next_sym_msg("Expected symbol")
     }
 
-    pub fn next_sym_msg(&mut self, msg: impl ToString) -> ParseResult<SString> {
+    pub fn next_sym_msg(&mut self, msg: impl ToString) -> ParseResult<String> {
         match self.next() {
             Some((Tree::Sym(sym), span)) => Ok((sym, span)),
             Some((_, span)) => Err(error(span, msg)),

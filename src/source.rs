@@ -1,7 +1,5 @@
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
-use crate::SString;
-
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct PackageId(pub u32);
 
@@ -11,7 +9,7 @@ pub const CORE_PKG: PackageId = PackageId(0);
 pub const TEST_PKG: PackageId = PackageId(1337);
 
 pub struct Package {
-    pub name: SString,
+    pub name: String,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]

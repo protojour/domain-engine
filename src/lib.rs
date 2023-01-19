@@ -1,5 +1,4 @@
 use ::chumsky::Parser;
-use ::smartstring::{LazyCompact, SmartString};
 use compile::{
     error::{CompileError, UnifiedCompileError},
     lower::lower_ast,
@@ -18,8 +17,6 @@ mod lambda;
 mod parse;
 mod source;
 mod types;
-
-pub type SString = SmartString<LazyCompact>;
 
 pub trait Compile {
     fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError>;

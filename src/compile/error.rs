@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     parse::tree::Tree,
-    source::{CompileSrc, SourceSpan, Sources},
+    source::{SourceSpan, Sources},
 };
 
 #[derive(Debug, Error, Diagnostic)]

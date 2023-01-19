@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use smartstring::alias::String;
+
 use crate::{
     env::Env,
     expr::ExprId,
     mem::Intern,
     source::{Package, PackageId, SourceSpan, CORE_PKG},
     types::Type,
-    SString,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -23,7 +24,7 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
-    Constructor(SString, DefId),
+    Constructor(String, DefId),
     Field { type_def_id: DefId },
     Equivalence(ExprId, ExprId),
 }
@@ -41,7 +42,7 @@ pub enum CoreFn {
 
 #[derive(Default)]
 pub struct Namespaces {
-    namespaces: HashMap<PackageId, HashMap<SString, DefId>>,
+    namespaces: HashMap<PackageId, HashMap<String, DefId>>,
 }
 
 impl Namespaces {
@@ -58,7 +59,7 @@ impl Namespaces {
         None
     }
 
-    pub fn get_mut(&mut self, package: PackageId) -> &mut HashMap<SString, DefId> {
+    pub fn get_mut(&mut self, package: PackageId) -> &mut HashMap<String, DefId> {
         self.namespaces.entry(package).or_default()
     }
 }

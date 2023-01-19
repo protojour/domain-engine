@@ -1,6 +1,5 @@
 use chumsky::prelude::*;
-
-use crate::SString;
+use smartstring::alias::String;
 
 use super::Spanned;
 
@@ -9,8 +8,8 @@ pub enum Tree {
     Paren(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
     Dot,
-    Sym(SString),
-    Num(SString),
+    Sym(String),
+    Num(String),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -53,7 +52,7 @@ fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
     filter(|c: &char| c.is_digit(10) && c != &'0' && !special_char(*c))
         .map(Some)
         .chain::<char, Vec<_>, _>(filter(|c: &char| c.is_digit(10) && !special_char(*c)).repeated())
-        .map(|vec| Tree::Num(SString::from_iter(vec.into_iter())))
+        .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
 }
 
 fn sym() -> impl Parser<char, Tree, Error = Simple<char>> {
@@ -62,7 +61,7 @@ fn sym() -> impl Parser<char, Tree, Error = Simple<char>> {
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
         )
-        .map(|vec| Tree::Sym(SString::from_iter(vec.into_iter())))
+        .map(|vec| Tree::Sym(String::from_iter(vec.into_iter())))
 }
 
 fn special_char(c: char) -> bool {

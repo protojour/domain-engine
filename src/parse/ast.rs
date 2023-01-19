@@ -1,8 +1,7 @@
 use chumsky::prelude::*;
+use smartstring::alias::String;
 
-use crate::parse::{tree::Tree, tree_stream::TreeStream, SString, Spanned};
-
-use super::Span;
+use crate::parse::{tree::Tree, SString, Spanned};
 
 pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
@@ -18,7 +17,7 @@ pub struct Data {
 }
 
 pub enum Type {
-    Sym(SString),
+    Sym(String),
     Record(Record),
 }
 
@@ -27,7 +26,7 @@ pub struct Record {
 }
 
 pub struct RecordField {
-    pub ident: Spanned<SString>,
+    pub ident: Spanned<String>,
     pub ty: Spanned<Type>,
 }
 
