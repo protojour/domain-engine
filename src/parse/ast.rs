@@ -7,8 +7,18 @@ pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
 pub enum Ast {
     Import(Path),
-    List(Vec<Spanned<Ast>>),
     Data(Data),
+    Equality(Equality),
+}
+
+pub struct Equality {
+    first: Expr,
+    second: Expr,
+}
+
+pub enum Expr {
+    Literal(Literal),
+    List(Vec<Spanned<Ast>>),
 }
 
 pub struct Data {
@@ -19,6 +29,12 @@ pub struct Data {
 pub enum Type {
     Sym(String),
     Record(Record),
+    Literal(Literal),
+}
+
+pub enum Literal {
+    String(String),
+    Number(String),
 }
 
 pub struct Record {

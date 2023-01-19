@@ -14,6 +14,7 @@ use crate::{
 pub struct DefId(pub u32);
 
 /// A definition in some package
+#[derive(Debug)]
 pub struct Def {
     pub package: PackageId,
     pub kind: DefKind,
@@ -25,7 +26,9 @@ pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
     Constructor(String, DefId),
-    Field { type_def_id: DefId },
+    Record { field_defs: Vec<DefId> },
+    AnonField { type_def_id: DefId },
+    NamedField { ident: String, type_def_id: DefId },
     Equivalence(ExprId, ExprId),
 }
 
@@ -40,7 +43,7 @@ pub enum CoreFn {
     Div,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Namespaces {
     namespaces: HashMap<PackageId, HashMap<String, DefId>>,
 }

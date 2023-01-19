@@ -1,6 +1,6 @@
-use std::{collections::HashMap, ops::Range, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct PackageId(pub u32);
 
 pub const CORE_PKG: PackageId = PackageId(0);
@@ -8,6 +8,7 @@ pub const CORE_PKG: PackageId = PackageId(0);
 #[cfg(test)]
 pub const TEST_PKG: PackageId = PackageId(1337);
 
+#[derive(Debug)]
 pub struct Package {
     pub name: String,
 }
@@ -15,6 +16,7 @@ pub struct Package {
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct SourceId(pub u32);
 
+#[derive(Debug)]
 pub struct Src {
     pub package_id: PackageId,
     pub name: Arc<String>,
@@ -23,14 +25,22 @@ pub struct Src {
 #[derive(Clone)]
 pub struct SourceSpan {
     pub source_id: SourceId,
-    pub range: Range<u32>,
+    pub start: u32,
+    pub end: u32,
+}
+
+impl Debug for SourceSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#({:?}):{}..{}", self.source_id, self.start, self.end)
+    }
 }
 
 impl SourceSpan {
     pub fn none() -> SourceSpan {
         Self {
             source_id: SourceId(0),
-            range: 0..0,
+            start: 0,
+            end: 0,
         }
     }
 }
@@ -43,19 +53,26 @@ pub struct CompileSrc {
     pub text: Arc<String>,
 }
 
+impl Debug for CompileSrc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompileSrc")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
 impl CompileSrc {
-    pub fn span(&self, span: Range<usize>) -> SourceSpan {
+    pub fn span(&self, range: &Range<usize>) -> SourceSpan {
         SourceSpan {
             source_id: self.id,
-            range: Range {
-                start: span.start as u32,
-                end: span.end as u32,
-            },
+            start: range.start as u32,
+            end: range.end as u32,
         }
     }
 }
 
 /// Sources currently being compiled
+#[derive(Debug)]
 pub struct Sources {
     next_source_id: SourceId,
     package: PackageId,

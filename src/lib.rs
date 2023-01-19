@@ -37,7 +37,7 @@ impl Compile for CompileSrc {
         for lex_error in lex_errors {
             let span = lex_error.span();
             compile_errors
-                .push(CompileError::Lex(lex_error).spanned(&env.sources, &self.span(span)));
+                .push(CompileError::Lex(lex_error).spanned(&env.sources, &self.span(&span)));
         }
 
         if let Some(trees) = trees {
@@ -57,8 +57,9 @@ impl Compile for CompileSrc {
 
             for parse_error in parse_errors {
                 let span = parse_error.span();
-                compile_errors
-                    .push(CompileError::Parse(parse_error).spanned(&env.sources, &self.span(span)));
+                compile_errors.push(
+                    CompileError::Parse(parse_error).spanned(&env.sources, &self.span(&span)),
+                );
             }
 
             for ast in asts {

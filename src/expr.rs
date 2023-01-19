@@ -3,12 +3,14 @@ use crate::{def::DefId, env::Env, source::SourceSpan};
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct ExprId(pub u32);
 
+#[derive(Debug)]
 pub struct Expr {
     pub id: ExprId,
     pub kind: ExprKind,
     pub span: SourceSpan,
 }
 
+#[derive(Debug)]
 pub enum ExprKind {
     Constant(i32),
     Call(DefId, Vec<Expr>),

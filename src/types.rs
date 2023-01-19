@@ -23,9 +23,11 @@ pub enum Type<'m> {
     },
     // TODO: Expand into proper user defined data types:
     Data(DefId, DefId),
+    Record(DefId),
     Error,
 }
 
+#[derive(Debug)]
 pub struct Types<'m> {
     mem: &'m Mem,
     pub(crate) types: HashSet<&'m Type<'m>>,

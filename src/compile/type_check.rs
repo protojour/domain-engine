@@ -29,11 +29,12 @@ impl<'e, 'm> DefTck<'e, 'm> {
                 let ty = self.types.intern(Type::Data(def_id, *field_def));
                 self.def_types.insert(def_id, ty);
 
-                self.type_check_field(*field_def);
+                self.type_check_anon_field(*field_def);
 
                 ty
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
+            DefKind::Record { .. } => self.types.intern(Type::Record(def_id)),
             DefKind::Equivalence(_, _) => self.types.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
@@ -41,12 +42,12 @@ impl<'e, 'm> DefTck<'e, 'm> {
         }
     }
 
-    fn type_check_field(&mut self, field_id: DefId) {
+    fn type_check_anon_field(&mut self, field_id: DefId) {
         let field = self
             .defs
             .get(&field_id)
             .expect("No field definition for {field_id:?}");
-        let DefKind::Field { type_def_id } = &field.kind else {
+        let DefKind::AnonField { type_def_id } = &field.kind else {
             panic!("Field definition is not a field: {:?}", field.kind);
         };
 
@@ -152,6 +153,28 @@ mod tests {
 
         let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
         let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
+        let expr_type = env.expr_tck().check(&expr);
+
+        assert_eq!(expr_type, type_of_m);
+
+        Ok(())
+    }
+
+    #[test]
+    fn type_check_record() -> Result<(), UnifiedCompileError> {
+        let mem = Mem::default();
+        let mut env = Env::new(&mem).with_core();
+
+        "(data foo (record (field bar (number))))".compile(&mut env, TEST_PKG)?;
+
+        let foo = env
+            .namespaces
+            .lookup(&[TEST_PKG], "foo")
+            .expect("foo not found");
+        let type_of_m = env.def_tck().check(foo);
+
+        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
+        let expr = env.expr(ExprKind::Call(foo, args), SourceSpan::none());
         let expr_type = env.expr_tck().check(&expr);
 
         assert_eq!(expr_type, type_of_m);

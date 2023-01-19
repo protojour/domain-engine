@@ -3,6 +3,7 @@ use smartstring::alias::String;
 
 use super::Spanned;
 
+/// A simple syntax tree consisting of S-expressions.
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Tree {
     Paren(Vec<Spanned<Tree>>),

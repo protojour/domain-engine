@@ -38,6 +38,8 @@ pub enum CompileError {
     NotCallable,
     #[error("type not found")]
     TypeNotFound,
+    #[error("invalid type")]
+    InvalidType,
 }
 
 impl CompileError {
@@ -49,15 +51,12 @@ impl CompileError {
         SpannedCompileError {
             error: self,
             src: miette::NamedSource::new(source.name.as_str().clone(), source.text.clone()),
-            span: miette::SourceSpan::new(
-                (span.range.start as usize).into(),
-                (span.range.end as usize).into(),
-            ),
+            span: miette::SourceSpan::new((span.start as usize).into(), (span.end as usize).into()),
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct CompileErrors {
     pub(crate) errors: Vec<SpannedCompileError>,
 }

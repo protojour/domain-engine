@@ -15,6 +15,7 @@ use crate::{
 };
 
 /// Runtime environment
+#[derive(Debug)]
 pub struct Env<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
