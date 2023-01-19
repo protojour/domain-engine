@@ -1,6 +1,8 @@
 use chumsky::prelude::*;
 
-use crate::{SString, Spanned};
+use crate::SString;
+
+use super::Spanned;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Tree {

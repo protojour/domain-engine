@@ -1,10 +1,10 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use chumsky::Parser;
-use compile_error::CompileError;
+use compile_error::{CompileError, SpannedCompileError, UnifiedCompileError};
 use env::Env;
 use lower::lower_ast;
-use misc::{PackageId, SourceId};
+use misc::{CompileSrc, PackageId, SourceId};
 use smartstring::{LazyCompact, SmartString};
 
 pub mod ena;
@@ -22,21 +22,34 @@ mod type_check;
 mod types;
 
 pub type SString = SmartString<LazyCompact>;
-pub type Span = Range<usize>;
-pub type Spanned<T> = (T, Span);
 
 pub trait Compile {
-    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), CompileError>;
+    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError>;
 }
 
 impl Compile for &str {
-    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), CompileError> {
+    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError> {
+        CompileSrc {
+            package,
+            id: SourceId(0),
+            name: Arc::new("str".to_string()),
+            text: Arc::new(self.to_string()),
+        }
+        .compile(env, package)
+    }
+}
+
+impl Compile for CompileSrc {
+    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError> {
         let source = SourceId(0);
         let mut compile_errors = vec![];
-        let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self);
+        let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self.text.as_str());
 
         for lex_error in lex_errors {
-            compile_errors.push(CompileError::Lex(lex_error));
+            compile_errors.push(SpannedCompileError::new(
+                CompileError::Lex(lex_error),
+                &self,
+            ));
         }
 
         if let Some(trees) = trees {
@@ -55,11 +68,14 @@ impl Compile for &str {
             }
 
             for parse_error in parse_errors {
-                compile_errors.push(CompileError::Parse(parse_error));
+                compile_errors.push(SpannedCompileError::new(
+                    CompileError::Parse(parse_error),
+                    &self,
+                ));
             }
 
             for ast in asts {
-                if let Err(error) = lower_ast(env, package, source, ast) {
+                if let Err(error) = lower_ast(env, &self, ast) {
                     compile_errors.push(error);
                 }
             }
@@ -67,10 +83,12 @@ impl Compile for &str {
 
         compile_errors.append(&mut env.errors.errors);
 
-        match compile_errors.len() {
-            0 => Ok(()),
-            1 => Err(compile_errors.into_iter().next().unwrap()),
-            _ => Err(CompileError::Multi(compile_errors)),
+        if compile_errors.is_empty() {
+            Ok(())
+        } else {
+            Err(UnifiedCompileError {
+                errors: compile_errors,
+            })
         }
     }
 }

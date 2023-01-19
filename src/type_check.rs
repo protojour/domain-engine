@@ -67,7 +67,8 @@ impl<'e, 'm> ExprTck<'e, 'm> {
             ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
-                        self.errors.push(CompileError::WrongNumberOfArguments);
+                        self.errors
+                            .push(CompileError::WrongNumberOfArguments.spanned(&expr.span));
                         return self.types.intern(Type::Error);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
@@ -77,7 +78,8 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 }
                 Some(Type::Data(data_def_id, field_id)) => {
                     if args.len() != 1 {
-                        self.errors.push(CompileError::WrongNumberOfArguments);
+                        self.errors
+                            .push(CompileError::WrongNumberOfArguments.spanned(&expr.span));
                     }
 
                     match self.def_types.get(data_def_id) {
@@ -86,7 +88,8 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                     }
                 }
                 _ => {
-                    self.errors.push(CompileError::NotCallable);
+                    self.errors
+                        .push(CompileError::NotCallable.spanned(&expr.span));
                     self.types.intern(Type::Error)
                 }
             },
@@ -120,7 +123,7 @@ impl<'m> Env<'m> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compile_error::CompileError,
+        compile_error::UnifiedCompileError,
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,
@@ -129,7 +132,7 @@ mod tests {
     };
 
     #[test]
-    fn type_check_data_call() -> Result<(), CompileError> {
+    fn type_check_data_call() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
         let mut env = Env::new(&mem).with_core();
 

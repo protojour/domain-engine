@@ -1,6 +1,8 @@
 use chumsky::prelude::*;
 
-use crate::parse::{tree::Tree, tree_stream::TreeStream, SString, Span, Spanned};
+use crate::parse::{tree::Tree, tree_stream::TreeStream, SString, Spanned};
+
+use super::Span;
 
 pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 

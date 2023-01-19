@@ -4,7 +4,7 @@ use crate::{
     env::Env,
     expr::ExprId,
     mem::Intern,
-    misc::{Package, PackageId},
+    misc::{Package, PackageId, SourceSpan, CORE_PKG},
     types::Type,
     SString,
 };
@@ -16,6 +16,7 @@ pub struct DefId(pub u32);
 pub struct Def {
     pub package: PackageId,
     pub kind: DefKind,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug)]
@@ -63,17 +64,37 @@ impl Namespaces {
 }
 
 impl<'m> Env<'m> {
-    pub fn add_def(&mut self, package: PackageId, kind: DefKind) -> DefId {
+    pub fn add_def(&mut self, kind: DefKind, package: PackageId, span: SourceSpan) -> DefId {
         let def_id = self.alloc_def_id();
-        self.defs.insert(def_id, Def { package, kind });
+        self.defs.insert(
+            def_id,
+            Def {
+                package,
+                span,
+                kind,
+            },
+        );
 
         def_id
     }
 
-    pub fn add_named_def(&mut self, package: PackageId, name: &str, kind: DefKind) -> DefId {
+    pub fn add_named_def(
+        &mut self,
+        name: &str,
+        kind: DefKind,
+        package: PackageId,
+        span: SourceSpan,
+    ) -> DefId {
         let def_id = self.alloc_def_id();
         self.namespaces.get_mut(package).insert(name.into(), def_id);
-        self.defs.insert(def_id, Def { package, kind });
+        self.defs.insert(
+            def_id,
+            Def {
+                package,
+                span,
+                kind,
+            },
+        );
 
         def_id
     }
@@ -115,7 +136,7 @@ impl<'m> Env<'m> {
     }
 
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
-        let def_id = self.add_named_def(PackageId(0), name, def_kind);
+        let def_id = self.add_named_def(name, def_kind, CORE_PKG, SourceSpan::none());
         self.def_types.insert(def_id, self.types.intern(type_kind));
 
         def_id

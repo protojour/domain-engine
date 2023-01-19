@@ -3,8 +3,6 @@ use std::ops::Range;
 use chumsky::prelude::Simple;
 use smartstring::{LazyCompact, SmartString};
 
-use self::tree::Tree;
-
 pub mod ast;
 pub mod tree;
 

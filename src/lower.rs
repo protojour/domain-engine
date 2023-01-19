@@ -1,44 +1,41 @@
-use std::ops::Range;
-
 use crate::{
-    compile_error::CompileError,
+    compile_error::{CompileError, SpannedCompileError},
     def::{Def, DefId, DefKind},
     env::Env,
-    misc::{PackageId, SourceId, CORE_PKG},
-    parse::ast,
-    Span,
+    misc::{CompileSrc, CORE_PKG},
+    parse::{ast, Span},
 };
 
 pub fn lower_ast<'m>(
     env: &mut Env<'m>,
-    package: PackageId,
-    source: SourceId,
-    ast: (ast::Ast, Range<usize>),
-) -> Result<(), CompileError> {
-    ast_to_def(env, package, ast)?;
+    src: &CompileSrc,
+    ast: (ast::Ast, Span),
+) -> Result<(), SpannedCompileError> {
+    ast_to_def(env, src, ast)?;
     Ok(())
 }
 
 fn ast_to_def<'m>(
     env: &mut Env<'m>,
-    package: PackageId,
+    src: &CompileSrc,
     (ast, span): (ast::Ast, Span),
-) -> Result<DefId, CompileError> {
+) -> Result<DefId, SpannedCompileError> {
     match ast {
         ast::Ast::Data(ast::Data { ident, ty: ast_ty }) => {
             let def_id = env.alloc_def_id();
 
             env.namespaces
-                .get_mut(package)
+                .get_mut(src.package)
                 .insert(ident.0.clone(), def_id);
 
-            let type_def = ast_type_to_def(env, package, ast_ty)?;
+            let type_def = ast_type_to_def(env, src, ast_ty)?;
 
             env.defs.insert(
                 def_id,
                 Def {
-                    package,
+                    package: src.package,
                     kind: DefKind::Constructor(ident.0, type_def),
+                    span: src.span(span),
                 },
             );
 
@@ -50,20 +47,21 @@ fn ast_to_def<'m>(
 
 fn ast_type_to_def<'m>(
     env: &mut Env<'m>,
-    package: PackageId,
+    src: &CompileSrc,
     (ast_ty, span): (ast::Type, Span),
-) -> Result<DefId, CompileError> {
+) -> Result<DefId, SpannedCompileError> {
     let def_id = env.alloc_def_id();
     match ast_ty {
         ast::Type::Sym(ident) => {
-            let Some(type_def_id) = env.namespaces.lookup(&[package, CORE_PKG], &ident) else {
-                return Err(CompileError::TypeNotFound);
+            let Some(type_def_id) = env.namespaces.lookup(&[src.package, CORE_PKG], &ident) else {
+                return Err(SpannedCompileError::new(CompileError::TypeNotFound, src));
             };
             env.defs.insert(
                 def_id,
                 Def {
-                    package,
+                    package: src.package,
                     kind: DefKind::Field { type_def_id },
+                    span: src.span(span),
                 },
             );
         }

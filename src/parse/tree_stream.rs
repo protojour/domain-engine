@@ -5,8 +5,10 @@ use chumsky::prelude::Simple;
 use crate::{
     parse::ast::{error, ParseResult},
     parse::tree::Tree,
-    SString, Span, Spanned,
+    SString,
 };
+
+use super::{Span, Spanned};
 
 /// A stream of token trees.
 ///
@@ -74,7 +76,7 @@ impl TreeStream {
         }
     }
 
-    pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree>> {
+    pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree, Span>> {
         match self.next() {
             Some((Tree::Paren(vec), span)) => Ok(Self::new(span, vec)),
             Some((_, span)) => Err(error(span, msg)),
