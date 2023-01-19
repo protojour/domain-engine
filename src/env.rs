@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    compile_error::CompileErrors,
+    compile::error::CompileErrors,
     def::{Def, DefId, Namespaces},
     expr::{Expr, ExprId},
     mem::Mem,
@@ -14,11 +14,12 @@ use crate::{
     types::{TypeRef, Types},
 };
 
+/// Runtime environment
 pub struct Env<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
 
-    pub(crate) session: Sources,
+    pub(crate) sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
 
@@ -37,7 +38,7 @@ impl<'m> Env<'m> {
         Self {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
-            session: Default::default(),
+            sources: Default::default(),
             packages: Default::default(),
             types: Types::new(mem),
             namespaces: Default::default(),

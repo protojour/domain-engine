@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::{
-    compile_error::{CompileError, CompileErrors},
     def::{Def, DefId, DefKind, Primitive},
     env::Env,
     expr::{Expr, ExprKind},
@@ -9,6 +8,8 @@ use crate::{
     source::Sources,
     types::{Type, TypeRef, Types},
 };
+
+use super::error::{CompileError, CompileErrors};
 
 struct DefTck<'e, 'm> {
     types: &'e mut Types<'m>,
@@ -59,7 +60,7 @@ struct ExprTck<'e, 'm> {
     errors: &'e mut CompileErrors,
     def_types: &'e HashMap<DefId, TypeRef<'m>>,
     defs: &'e HashMap<DefId, Def>,
-    session: &'e Sources,
+    sources: &'e Sources,
 }
 
 impl<'e, 'm> ExprTck<'e, 'm> {
@@ -70,7 +71,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
                         self.errors.push(
-                            CompileError::WrongNumberOfArguments.spanned(&self.session, &expr.span),
+                            CompileError::WrongNumberOfArguments.spanned(&self.sources, &expr.span),
                         );
                         return self.types.intern(Type::Error);
                     }
@@ -82,7 +83,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 Some(Type::Data(data_def_id, field_id)) => {
                     if args.len() != 1 {
                         self.errors.push(
-                            CompileError::WrongNumberOfArguments.spanned(&self.session, &expr.span),
+                            CompileError::WrongNumberOfArguments.spanned(&self.sources, &expr.span),
                         );
                     }
 
@@ -93,7 +94,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                 }
                 _ => {
                     self.errors
-                        .push(CompileError::NotCallable.spanned(&self.session, &expr.span));
+                        .push(CompileError::NotCallable.spanned(&self.sources, &expr.span));
                     self.types.intern(Type::Error)
                 }
             },
@@ -120,7 +121,7 @@ impl<'m> Env<'m> {
             errors: &mut self.errors,
             defs: &self.defs,
             def_types: &self.def_types,
-            session: &self.session,
+            sources: &self.sources,
         }
     }
 }
@@ -128,7 +129,7 @@ impl<'m> Env<'m> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compile_error::UnifiedCompileError,
+        compile::error::UnifiedCompileError,
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,

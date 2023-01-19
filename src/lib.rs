@@ -1,22 +1,22 @@
-use chumsky::Parser;
-use compile_error::{CompileError, SpannedCompileError, UnifiedCompileError};
+use ::chumsky::Parser;
+use ::smartstring::{LazyCompact, SmartString};
+use compile::{
+    error::{CompileError, UnifiedCompileError},
+    lower::lower_ast,
+};
 use env::Env;
-use lower::lower_ast;
-use smartstring::{LazyCompact, SmartString};
 use source::{CompileSrc, PackageId};
 
 pub mod ena;
 pub mod env;
 pub mod mem;
 
-mod compile_error;
+mod compile;
 mod def;
 mod expr;
 mod lambda;
-mod lower;
 mod parse;
 mod source;
-mod type_check;
 mod types;
 
 pub type SString = SmartString<LazyCompact>;
@@ -27,7 +27,7 @@ pub trait Compile {
 
 impl Compile for &str {
     fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError> {
-        let src = env.session.add(package, "str".into(), self.into());
+        let src = env.sources.add(package, "str".into(), self.into());
         src.compile(env, package)
     }
 }
@@ -40,7 +40,7 @@ impl Compile for CompileSrc {
         for lex_error in lex_errors {
             let span = lex_error.span();
             compile_errors
-                .push(CompileError::Lex(lex_error).spanned(&env.session, &self.span(span)));
+                .push(CompileError::Lex(lex_error).spanned(&env.sources, &self.span(span)));
         }
 
         if let Some(trees) = trees {
@@ -61,7 +61,7 @@ impl Compile for CompileSrc {
             for parse_error in parse_errors {
                 let span = parse_error.span();
                 compile_errors
-                    .push(CompileError::Parse(parse_error).spanned(&env.session, &self.span(span)));
+                    .push(CompileError::Parse(parse_error).spanned(&env.sources, &self.span(span)));
             }
 
             for ast in asts {
@@ -74,7 +74,7 @@ impl Compile for CompileSrc {
         compile_errors.append(&mut env.errors.errors);
 
         if compile_errors.is_empty() {
-            env.session.compile_finished();
+            env.sources.compile_finished();
             Ok(())
         } else {
             Err(UnifiedCompileError {

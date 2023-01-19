@@ -6,6 +6,8 @@ use crate::SString;
 pub struct PackageId(pub u32);
 
 pub const CORE_PKG: PackageId = PackageId(0);
+
+#[cfg(test)]
 pub const TEST_PKG: PackageId = PackageId(1337);
 
 pub struct Package {

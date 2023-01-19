@@ -41,8 +41,8 @@ pub enum CompileError {
 }
 
 impl CompileError {
-    pub fn spanned(self, session: &Sources, span: &SourceSpan) -> SpannedCompileError {
-        let source = session
+    pub fn spanned(self, sources: &Sources, span: &SourceSpan) -> SpannedCompileError {
+        let source = sources
             .get_compiled_source(span.source_id)
             .expect("BUG: Source is not being compiled");
 
