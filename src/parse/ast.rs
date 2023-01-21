@@ -8,17 +8,19 @@ pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 pub enum Ast {
     Import(Path),
     Data(Data),
-    Equality(Equality),
+    Eq(Eq),
 }
 
-pub struct Equality {
-    first: Expr,
-    second: Expr,
+pub struct Eq {
+    pub params: (),
+    pub first: Spanned<Expr>,
+    pub second: Spanned<Expr>,
 }
 
 pub enum Expr {
+    Sym(String),
     Literal(Literal),
-    List(Vec<Spanned<Ast>>),
+    Call(Spanned<String>, Vec<Spanned<Expr>>),
 }
 
 pub struct Data {

@@ -181,4 +181,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn type_check_eq() -> Result<(), UnifiedCompileError> {
+        let mem = Mem::default();
+        let mut env = Env::new(&mem).with_core();
+
+        "
+        (data foo (record (field bar (number))))
+        (eq! () (foo x) (foo x))
+        "
+        .compile(&mut env, TEST_PKG)?;
+
+        Ok(())
+    }
 }

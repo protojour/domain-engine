@@ -17,7 +17,7 @@ pub struct TreeStream {
 }
 
 impl TreeStream {
-    pub fn new(span: Span, trees: Vec<Spanned<Tree>>) -> Self {
+    pub fn new(trees: Vec<Spanned<Tree>>, span: Span) -> Self {
         Self {
             span: span.clone(),
             remain_span: span,
@@ -54,44 +54,55 @@ impl TreeStream {
         }
     }
 
-    pub fn next_msg(&mut self, msg: impl ToString) -> ParseResult<Tree> {
-        match self.next() {
-            Some(next) => Ok(next),
-            None => Err(error(self.remain_span(), msg)),
-        }
-    }
-
     pub fn next_sym(&mut self) -> ParseResult<String> {
-        self.next_sym_msg("Expected symbol")
+        self.next_sym_msg("expected symbol")
     }
 
     pub fn next_sym_msg(&mut self, msg: impl ToString) -> ParseResult<String> {
-        match self.next() {
-            Some((Tree::Sym(sym), span)) => Ok((sym, span)),
-            Some((_, span)) => Err(error(span, msg)),
-            None => Err(error(self.remain_span(), msg)),
-        }
+        self.next_msg(
+            |tree| {
+                if let Tree::Sym(sym) = tree {
+                    Some(sym)
+                } else {
+                    None
+                }
+            },
+            msg,
+        )
     }
 
     pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree, Span>> {
         match self.next() {
-            Some((Tree::Paren(vec), span)) => Ok(Self::new(span, vec)),
-            Some((_, span)) => Err(error(span, msg)),
-            None => Err(error(self.remain_span(), "Expected list")),
+            Some((Tree::Paren(vec), span)) => Ok(Self::new(vec, span)),
+            Some((_, span)) => Err(error(msg, span)),
+            None => Err(error(msg, self.remain_span())),
         }
     }
 
     pub fn next_dot(&mut self) -> ParseResult<()> {
+        self.next_msg(
+            |tree| if let Tree::Dot = tree { Some(()) } else { None },
+            "expected dot",
+        )
+    }
+
+    pub fn next_msg<T>(
+        &mut self,
+        f: impl FnOnce(Tree) -> Option<T>,
+        msg: impl ToString,
+    ) -> ParseResult<T> {
         match self.next() {
-            Some((Tree::Dot, span)) => Ok(((), span)),
-            Some((_, span)) => Err(error(span, "Expected dot")),
-            None => Err(error(self.remain_span(), "Expected dot")),
+            Some((tree, span)) => match f(tree) {
+                Some(value) => Ok((value, span)),
+                None => Err(error(msg, span)),
+            },
+            None => Err(error(msg, self.remain_span())),
         }
     }
 
     pub fn end(&mut self) -> Result<(), Simple<Tree>> {
         match self.next() {
-            Some((_, span)) => Err(error(span, "Expected end of list")),
+            Some((_, span)) => Err(error("expected end of list", span)),
             None => Ok(()),
         }
     }
