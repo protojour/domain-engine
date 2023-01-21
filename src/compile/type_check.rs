@@ -11,7 +11,7 @@ use crate::{
 
 use super::error::{CompileError, CompileErrors};
 
-struct DefTck<'e, 'm> {
+pub struct DefTck<'e, 'm> {
     types: &'e mut Types<'m>,
     def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
     errors: &'e mut CompileErrors,
@@ -19,7 +19,7 @@ struct DefTck<'e, 'm> {
 }
 
 impl<'e, 'm> DefTck<'e, 'm> {
-    fn check(&mut self, def_id: DefId) -> TypeRef<'m> {
+    pub fn check(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.get(&def_id) {
             return type_ref;
         }
@@ -107,7 +107,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
 }
 
 impl<'m> Env<'m> {
-    fn def_tck(&mut self) -> DefTck<'_, 'm> {
+    pub fn def_tck(&mut self) -> DefTck<'_, 'm> {
         DefTck {
             types: &mut self.types,
             defs: &self.defs,

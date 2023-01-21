@@ -1,7 +1,7 @@
 use ::chumsky::Parser;
 use compile::{
     error::{CompileError, UnifiedCompileError},
-    lower::lower_ast,
+    lowering::Lowering,
 };
 use env::Env;
 use source::{CompileSrc, PackageId};
@@ -62,10 +62,17 @@ impl Compile for CompileSrc {
                 );
             }
 
+            let mut lowering = Lowering::new(env, &self);
+
             for ast in asts {
-                if let Err(error) = lower_ast(env, &self, ast) {
+                if let Err(error) = lowering.lower_ast(ast) {
                     compile_errors.push(error);
                 }
+            }
+
+            let root_defs = lowering.finish();
+            for root_def in root_defs {
+                env.def_tck().check(root_def);
             }
         }
 
