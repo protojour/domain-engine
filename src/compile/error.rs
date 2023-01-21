@@ -40,6 +40,8 @@ pub enum CompileError {
     TypeNotFound,
     #[error("invalid type")]
     InvalidType,
+    #[error("invalid number")]
+    InvalidNumber,
 }
 
 impl CompileError {

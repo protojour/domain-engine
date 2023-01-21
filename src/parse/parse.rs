@@ -85,6 +85,7 @@ fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
 
         span.end = next_span.end;
     }
+    input.end()?;
 
     Ok((Path(symbols), span))
 }
@@ -108,7 +109,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_next_expr(input: &mut TreeStream) -> ParseResult<Expr> {
-    parse_expr(input.next_msg(|t| Some(t), "expected expression")?)
+    parse_expr(input.next_msg(Some, "expected expression")?)
 }
 
 fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {

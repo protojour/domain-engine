@@ -17,6 +17,7 @@ pub struct Eq {
     pub second: Spanned<Expr>,
 }
 
+#[derive(Debug)]
 pub enum Expr {
     Sym(String),
     Literal(Literal),
@@ -34,6 +35,7 @@ pub enum Type {
     Literal(Literal),
 }
 
+#[derive(Debug)]
 pub enum Literal {
     String(String),
     Number(String),

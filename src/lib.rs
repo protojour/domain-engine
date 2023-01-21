@@ -71,8 +71,9 @@ impl Compile for CompileSrc {
             }
 
             let root_defs = lowering.finish();
+            let mut type_check = env.type_check();
             for root_def in root_defs {
-                env.def_tck().check(root_def);
+                type_check.check_def(root_def);
             }
         }
 

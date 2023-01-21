@@ -11,15 +11,16 @@ use crate::{
 
 use super::error::{CompileError, CompileErrors};
 
-pub struct DefTck<'e, 'm> {
+pub struct TypeCheck<'e, 'm> {
     types: &'e mut Types<'m>,
     def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
     errors: &'e mut CompileErrors,
     defs: &'e HashMap<DefId, Def>,
+    sources: &'e Sources,
 }
 
-impl<'e, 'm> DefTck<'e, 'm> {
-    pub fn check(&mut self, def_id: DefId) -> TypeRef<'m> {
+impl<'e, 'm> TypeCheck<'e, 'm> {
+    pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.get(&def_id) {
             return type_ref;
         }
@@ -51,21 +52,11 @@ impl<'e, 'm> DefTck<'e, 'm> {
             panic!("Field definition is not a field: {:?}", field.kind);
         };
 
-        let type_ref = self.check(*type_def_id);
+        let type_ref = self.check_def(*type_def_id);
         self.def_types.insert(field_id, type_ref);
     }
-}
 
-struct ExprTck<'e, 'm> {
-    types: &'e mut Types<'m>,
-    errors: &'e mut CompileErrors,
-    def_types: &'e HashMap<DefId, TypeRef<'m>>,
-    defs: &'e HashMap<DefId, Def>,
-    sources: &'e Sources,
-}
-
-impl<'e, 'm> ExprTck<'e, 'm> {
-    fn check(&mut self, expr: &Expr) -> TypeRef<'m> {
+    fn check_expr(&mut self, expr: &Expr) -> TypeRef<'m> {
         match &expr.kind {
             ExprKind::Constant(_) => self.types.intern(Type::Number),
             ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
@@ -77,7 +68,7 @@ impl<'e, 'm> ExprTck<'e, 'm> {
                         return self.types.intern(Type::Error);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
-                        self.check(arg);
+                        self.check_expr(arg);
                     }
                     *output
                 }
@@ -107,21 +98,12 @@ impl<'e, 'm> ExprTck<'e, 'm> {
 }
 
 impl<'m> Env<'m> {
-    pub fn def_tck(&mut self) -> DefTck<'_, 'm> {
-        DefTck {
+    pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
+        TypeCheck {
             types: &mut self.types,
             defs: &self.defs,
             errors: &mut self.errors,
             def_types: &mut self.def_types,
-        }
-    }
-
-    fn expr_tck(&mut self) -> ExprTck<'_, 'm> {
-        ExprTck {
-            types: &mut self.types,
-            errors: &mut self.errors,
-            defs: &self.defs,
-            def_types: &self.def_types,
             sources: &self.sources,
         }
     }
@@ -149,11 +131,11 @@ mod tests {
             .namespaces
             .lookup(&[TEST_PKG], "m")
             .expect("m not found");
-        let type_of_m = env.def_tck().check(m);
+        let type_of_m = env.type_check().check_def(m);
 
         let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
         let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
-        let expr_type = env.expr_tck().check(&expr);
+        let expr_type = env.type_check().check_expr(&expr);
 
         assert_eq!(expr_type, type_of_m);
 
@@ -171,11 +153,11 @@ mod tests {
             .namespaces
             .lookup(&[TEST_PKG], "foo")
             .expect("foo not found");
-        let type_of_m = env.def_tck().check(foo);
+        let type_of_m = env.type_check().check_def(foo);
 
         let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
         let expr = env.expr(ExprKind::Call(foo, args), SourceSpan::none());
-        let expr_type = env.expr_tck().check(&expr);
+        let expr_type = env.type_check().check_expr(&expr);
 
         assert_eq!(expr_type, type_of_m);
 
