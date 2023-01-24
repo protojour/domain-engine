@@ -10,6 +10,7 @@ use crate::{
     def::{DefId, Defs, Namespaces},
     expr::{Expr, ExprId},
     mem::Mem,
+    relation::Relations,
     source::{Package, PackageId, Sources},
     types::{TypeRef, Types},
 };
@@ -27,6 +28,7 @@ pub struct Env<'m> {
 
     pub(crate) types: Types<'m>,
     pub(crate) def_types: HashMap<DefId, TypeRef<'m>>,
+    pub(crate) relations: Relations,
 
     pub(crate) errors: CompileErrors,
 }
@@ -41,6 +43,7 @@ impl<'m> Env<'m> {
             defs: Default::default(),
             expressions: Default::default(),
             def_types: Default::default(),
+            relations: Default::default(),
             errors: Default::default(),
         }
     }

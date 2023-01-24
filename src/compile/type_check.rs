@@ -5,7 +5,7 @@ use crate::{
     env::Env,
     expr::{Expr, ExprKind},
     mem::Intern,
-    relation::Role,
+    relation::{Relations, Role, SubjectProperties},
     source::Sources,
     types::{Type, TypeRef, Types},
 };
@@ -15,6 +15,7 @@ use super::error::{CompileError, CompileErrors};
 pub struct TypeCheck<'e, 'm> {
     types: &'e mut Types<'m>,
     def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
+    relations: &'e mut Relations,
     errors: &'e mut CompileErrors,
     defs: &'e Defs,
     sources: &'e Sources,
@@ -134,7 +135,39 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         type_def_id: DefId,
         role: Role,
     ) {
-        let ty = self.check_def(type_def_id);
+        let type_def_id = match self.check_def(type_def_id) {
+            Type::Domain(type_def_id) => *type_def_id,
+            _ => {
+                panic!("TODO: Not a domain type")
+            }
+        };
+
+        let properties = self.relations.properties_mut(type_def_id);
+        match role {
+            Role::Subject => match (&relation.ident, &mut properties.subject) {
+                (None, SubjectProperties::None) => {
+                    properties.subject = SubjectProperties::Anonymous(relation_id);
+                }
+                (None, SubjectProperties::Anonymous(_)) => {
+                    panic!("TODO: Two anonymous properties");
+                }
+                (None, SubjectProperties::Named(_)) => {
+                    panic!("TODO: Cannot mix anonymous and named properties");
+                }
+                (Some(_), SubjectProperties::None) => {
+                    properties.subject = SubjectProperties::Named([relation_id].into());
+                }
+                (Some(_), SubjectProperties::Anonymous(_)) => {
+                    panic!("TODO: Cannot add a named property when there is an anonymous property");
+                }
+                (Some(_), SubjectProperties::Named(relations)) => {
+                    relations.insert(relation_id);
+                }
+            },
+            Role::Object => {
+                properties.object.insert(relation_id);
+            }
+        }
     }
 }
 
@@ -145,6 +178,7 @@ impl<'m> Env<'m> {
             defs: &self.defs,
             errors: &mut self.errors,
             def_types: &mut self.def_types,
+            relations: &mut self.relations,
             sources: &self.sources,
         }
     }
