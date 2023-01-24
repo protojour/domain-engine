@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    def::{DefId, DefKind, Defs, Primitive},
+    def::{Def, DefId, DefKind, Defs, Primitive, Relation},
     env::Env,
     expr::{Expr, ExprKind},
     mem::Intern,
+    relation::Role,
     source::Sources,
     types::{Type, TypeRef, Types},
 };
@@ -38,6 +39,30 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 self.type_check_anon_field(*field_def);
 
                 ty
+            }
+            DefKind::Relationship(relationship) => {
+                let relation = match self.defs.map.get(&relationship.relation_def_id) {
+                    Some(Def {
+                        kind: DefKind::Relation(relation),
+                        ..
+                    }) => relation,
+                    _ => panic!("TODO: relation not found"),
+                };
+
+                self.check_relationship_role(
+                    relationship.relation_def_id,
+                    relation,
+                    relationship.subject,
+                    Role::Subject,
+                );
+                self.check_relationship_role(
+                    relationship.relation_def_id,
+                    relation,
+                    relationship.object,
+                    Role::Object,
+                );
+
+                self.types.intern(Type::Tautology)
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
             DefKind::Record { .. } => self.types.intern(Type::Record(def_id)),
@@ -100,6 +125,16 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 panic!()
             }
         }
+    }
+
+    fn check_relationship_role(
+        &mut self,
+        relation_id: DefId,
+        relation: &Relation,
+        type_def_id: DefId,
+        role: Role,
+    ) {
+        let ty = self.check_def(type_def_id);
     }
 }
 

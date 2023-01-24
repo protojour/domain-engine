@@ -25,6 +25,7 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
+    Relation(Relation),
     Relationship(Relationship),
     Type(String),
     Constructor(String, DefId),
@@ -45,14 +46,23 @@ pub enum CoreFn {
     Div,
 }
 
+/// This definition expresses that a relation _exists_
 #[derive(Debug)]
-pub struct Relationship {
+pub struct Relation {
     pub ident: Option<String>,
     pub subject_prop: Option<String>,
     pub object_prop: Option<String>,
 }
 
-impl Relationship {
+/// This definition expresses that a relation is a relationship between a subject and an object
+#[derive(Debug)]
+pub struct Relationship {
+    pub relation_def_id: DefId,
+    pub subject: DefId,
+    pub object: DefId,
+}
+
+impl Relation {
     fn subject_prop(&self) -> Option<&String> {
         self.subject_prop.as_ref().or(self.ident.as_ref())
     }

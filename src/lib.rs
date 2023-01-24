@@ -15,6 +15,7 @@ mod def;
 mod expr;
 mod lambda;
 mod parse;
+mod relation;
 mod source;
 mod types;
 

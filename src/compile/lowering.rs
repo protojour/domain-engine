@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     compile::error::{CompileError, SpannedCompileError},
-    def::{Def, DefId, DefKind, Relationship},
+    def::{Def, DefId, DefKind, Relation, Relationship},
     env::Env,
     expr::{Expr, ExprId, ExprKind},
     parse::{ast, Span},
@@ -47,27 +47,37 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Ast::Rel(ast::Rel {
                 subject,
-                ident,
+                ident: (ident, ident_span),
                 object,
             }) => {
                 // This syntax just defines the relation the first time it's used
-                let rel_def_id = match self.define_rel_if_undefined(ident.0.clone()) {
+                let relation_def_id = match self.define_relation_if_undefined(ident.clone()) {
                     ImplicitDefId::New(def_id) => {
                         self.set_def(
                             def_id,
-                            DefKind::Relationship(Relationship {
+                            DefKind::Relation(Relation {
                                 subject_prop: None,
-                                ident: ident.0,
+                                ident,
                                 object_prop: None,
                             }),
-                            &span,
+                            &ident_span,
                         );
                         def_id
                     }
                     ImplicitDefId::Reused(def_id) => def_id,
                 };
 
-                Ok(rel_def_id)
+                let subject = self.ast_type_to_def(subject)?;
+                let object = self.ast_type_to_def(object)?;
+
+                Ok(self.def(
+                    DefKind::Relationship(Relationship {
+                        relation_def_id,
+                        subject,
+                        object,
+                    }),
+                    &span,
+                ))
             }
             ast::Ast::Data(ast::Data {
                 ident,
@@ -169,7 +179,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_rel_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
+    fn define_relation_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
         match ident {
             Some(ident) => match self.env.namespaces.get_mut(self.src.package).entry(ident) {
                 Entry::Vacant(vacant) => {
