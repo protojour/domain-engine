@@ -110,8 +110,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
             ast::Type::Sym(ident) => {
                 let Some(type_def_id) = self.env.namespaces.lookup(&[self.src.package, CORE_PKG], &ident) else {
-                return Err(self.error(CompileError::TypeNotFound, &span));
-            };
+                    return Err(self.error(CompileError::TypeNotFound, &span));
+                };
                 Ok(type_def_id)
             }
             ast::Type::Record(ast_record) => {

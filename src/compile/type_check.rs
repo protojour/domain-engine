@@ -6,7 +6,7 @@ use crate::{
     expr::{Expr, ExprKind},
     mem::Intern,
     relation::{Relations, Role, SubjectProperties},
-    source::Sources,
+    source::{SourceSpan, Sources},
     types::{Type, TypeRef, Types},
 };
 
@@ -27,7 +27,13 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
             return type_ref;
         }
 
-        match &self.defs.map.get(&def_id).unwrap().kind {
+        let def = self
+            .defs
+            .map
+            .get(&def_id)
+            .expect("BUG: definition not found");
+
+        match &def.kind {
             DefKind::Type(_) => {
                 let ty = self.types.intern(Type::Domain(def_id));
                 self.def_types.insert(def_id, ty);
@@ -55,12 +61,14 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                     relation,
                     relationship.subject,
                     Role::Subject,
+                    &def.span,
                 );
                 self.check_relationship_role(
                     relationship.relation_def_id,
                     relation,
                     relationship.object,
                     Role::Object,
+                    &def.span,
                 );
 
                 self.types.intern(Type::Tautology)
@@ -134,12 +142,10 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         relation: &Relation,
         type_def_id: DefId,
         role: Role,
+        span: &SourceSpan,
     ) {
-        let type_def_id = match self.check_def(type_def_id) {
-            Type::Domain(type_def_id) => *type_def_id,
-            _ => {
-                panic!("TODO: Not a domain type")
-            }
+        let Ok(type_def_id) = self.expect_domain_type(type_def_id, span) else {
+            return;
         };
 
         let properties = self.relations.properties_mut(type_def_id);
@@ -166,6 +172,17 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
             },
             Role::Object => {
                 properties.object.insert(relation_id);
+            }
+        }
+    }
+
+    fn expect_domain_type(&mut self, def_id: DefId, span: &SourceSpan) -> Result<DefId, ()> {
+        match self.check_def(def_id) {
+            Type::Domain(type_def_id) => Ok(*type_def_id),
+            _ => {
+                self.errors
+                    .push(CompileError::DomainTypeExpected.spanned(&self.sources, span));
+                Err(())
             }
         }
     }

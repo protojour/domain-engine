@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use indexmap::IndexSet;
+
 use crate::def::DefId;
 
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub subject: SubjectProperties,
-    pub object: HashSet<DefId>,
+    pub object: IndexSet<DefId>,
 }
 
 #[derive(Default, Debug)]
@@ -30,5 +32,5 @@ pub enum SubjectProperties {
     #[default]
     None,
     Anonymous(DefId),
-    Named(HashSet<DefId>),
+    Named(IndexSet<DefId>),
 }

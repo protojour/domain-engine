@@ -42,6 +42,8 @@ pub enum CompileError {
     InvalidType,
     #[error("invalid number")]
     InvalidNumber,
+    #[error("expected domain type")]
+    DomainTypeExpected,
 }
 
 impl CompileError {
