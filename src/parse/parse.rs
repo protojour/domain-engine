@@ -88,8 +88,8 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let subject = parse_type(&mut stream)?;
     let (rel_ident, ident_span) = stream.next_sym_msg("expected relation identifier")?;
     let ident = match rel_ident.as_str() {
-        "_" => RelIdent::Unnamed,
-        _ => RelIdent::Named(rel_ident),
+        "_" => None,
+        _ => Some(rel_ident),
     };
     let object = parse_type(&mut stream)?;
     stream.end()?;

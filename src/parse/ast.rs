@@ -39,13 +39,8 @@ pub enum Type {
 
 pub struct Rel {
     pub subject: Spanned<Type>,
-    pub ident: Spanned<RelIdent>,
+    pub ident: Spanned<Option<String>>,
     pub object: Spanned<Type>,
-}
-
-pub enum RelIdent {
-    Named(String),
-    Unnamed,
 }
 
 #[derive(Debug)]

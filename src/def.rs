@@ -47,18 +47,18 @@ pub enum CoreFn {
 
 #[derive(Debug)]
 pub struct Relationship {
-    pub ident: String,
+    pub ident: Option<String>,
     pub subject_prop: Option<String>,
     pub object_prop: Option<String>,
 }
 
 impl Relationship {
-    fn subject_prop(&self) -> &String {
-        self.subject_prop.as_ref().unwrap_or(&self.ident)
+    fn subject_prop(&self) -> Option<&String> {
+        self.subject_prop.as_ref().or(self.ident.as_ref())
     }
 
-    fn object_prop(&self) -> &String {
-        self.object_prop.as_ref().unwrap_or(&self.ident)
+    fn object_prop(&self) -> Option<&String> {
+        self.object_prop.as_ref().or(self.ident.as_ref())
     }
 }
 

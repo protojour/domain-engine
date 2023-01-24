@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 use smartstring::alias::String;
 
 use crate::{
     compile::error::{CompileError, SpannedCompileError},
-    def::{Def, DefId, DefKind},
+    def::{Def, DefId, DefKind, Relationship},
     env::Env,
     expr::{Expr, ExprId, ExprKind},
     parse::{ast, Span},
@@ -50,9 +50,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident,
                 object,
             }) => {
-                // This syntax just defines the relation first time it's used
-                let rel_def_id = self.define_rel_if_undefined(ident.0);
-                panic!();
+                // This syntax just defines the relation the first time it's used
+                let rel_def_id = match self.define_rel_if_undefined(ident.0.clone()) {
+                    ImplicitDefId::New(def_id) => {
+                        self.set_def(
+                            def_id,
+                            DefKind::Relationship(Relationship {
+                                subject_prop: None,
+                                ident: ident.0,
+                                object_prop: None,
+                            }),
+                            &span,
+                        );
+                        def_id
+                    }
+                    ImplicitDefId::Reused(def_id) => def_id,
+                };
+
+                Ok(rel_def_id)
             }
             ast::Ast::Data(ast::Data {
                 ident,
@@ -154,16 +169,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_rel_if_undefined(&mut self, ident: ast::RelIdent) -> DefId {
+    fn define_rel_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
         match ident {
-            ast::RelIdent::Named(ident) => self
-                .env
-                .namespaces
-                .get_mut(self.src.package)
-                .entry(ident)
-                .or_insert_with(|| self.env.defs.alloc_def_id())
-                .clone(),
-            ast::RelIdent::Unnamed => self.env.defs.alloc_def_id(),
+            Some(ident) => match self.env.namespaces.get_mut(self.src.package).entry(ident) {
+                Entry::Vacant(vacant) => {
+                    ImplicitDefId::New(vacant.insert(self.env.defs.alloc_def_id()).clone())
+                }
+                Entry::Occupied(occupied) => ImplicitDefId::Reused(occupied.get().clone()),
+            },
+            None => ImplicitDefId::New(self.env.defs.alloc_def_id()),
         }
     }
 
@@ -204,6 +218,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn error(&self, compile_error: CompileError, span: &Span) -> SpannedCompileError {
         compile_error.spanned(&self.env.sources, &self.src.span(span))
     }
+}
+
+enum ImplicitDefId {
+    New(DefId),
+    Reused(DefId),
 }
 
 #[derive(Default)]
