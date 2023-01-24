@@ -15,6 +15,13 @@ fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
     match keyword.as_str() {
         "import" => parse_import(input),
         "data" => parse_data(input),
+        "type!" => {
+            let span = input.span();
+            let ident = input.next_sym_msg("expected ident")?;
+            input.end()?;
+            Ok((Ast::Type(ident), span))
+        }
+        "rel!" => parse_rel(input),
         "eq!" => parse_eq(input),
         _ => Err(error("unknown keyword", span)),
     }
@@ -41,12 +48,15 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
     let (kind, span) = ty_stream.next_sym_msg("")?;
 
     let ty = match kind.as_str() {
-        "number" => Type::Sym(kind),
         "record" => {
             let (fields, _) = parse_record_fields(&mut ty_stream)?;
             Type::Record(Record { fields })
         }
+        /*
+        "number" => Type::Sym(kind),
         _ => Err(error("Unrecognized type", span))?,
+        */
+        _ => Type::Sym(kind),
     };
 
     ty_stream.end()?;
@@ -71,6 +81,27 @@ fn parse_record_fields(record: &mut TreeStream) -> ParseResult<Vec<Spanned<Recor
     }
 
     Ok((fields, span))
+}
+
+fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
+    let span = stream.span();
+    let subject = parse_type(&mut stream)?;
+    let (rel_ident, ident_span) = stream.next_sym_msg("expected relation identifier")?;
+    let ident = match rel_ident.as_str() {
+        "_" => RelIdent::Unnamed,
+        _ => RelIdent::Named(rel_ident),
+    };
+    let object = parse_type(&mut stream)?;
+    stream.end()?;
+
+    Ok((
+        Ast::Rel(Rel {
+            subject,
+            ident: (ident, ident_span),
+            object,
+        }),
+        span,
+    ))
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {

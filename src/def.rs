@@ -25,6 +25,8 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
+    Relationship(Relationship),
+    Type(String),
     Constructor(String, DefId),
     Record { field_defs: Vec<DefId> },
     AnonField { type_def_id: DefId },
@@ -41,6 +43,23 @@ pub enum Primitive {
 pub enum CoreFn {
     Mul,
     Div,
+}
+
+#[derive(Debug)]
+pub struct Relationship {
+    pub ident: String,
+    pub subject_prop: Option<String>,
+    pub object_prop: Option<String>,
+}
+
+impl Relationship {
+    fn subject_prop(&self) -> &String {
+        self.subject_prop.as_ref().unwrap_or(&self.ident)
+    }
+
+    fn object_prop(&self) -> &String {
+        self.object_prop.as_ref().unwrap_or(&self.ident)
+    }
 }
 
 #[derive(Default, Debug)]
@@ -67,10 +86,39 @@ impl Namespaces {
     }
 }
 
-impl<'m> Env<'m> {
+#[derive(Debug)]
+pub struct Defs {
+    next_def_id: DefId,
+    next_expr_id: ExprId,
+    pub(crate) map: HashMap<DefId, Def>,
+}
+
+impl Default for Defs {
+    fn default() -> Self {
+        Self {
+            next_def_id: DefId(0),
+            next_expr_id: ExprId(0),
+            map: Default::default(),
+        }
+    }
+}
+
+impl Defs {
+    pub fn alloc_def_id(&mut self) -> DefId {
+        let id = self.next_def_id;
+        self.next_def_id.0 += 1;
+        id
+    }
+
+    pub fn alloc_expr_id(&mut self) -> ExprId {
+        let id = self.next_expr_id;
+        self.next_expr_id.0 += 1;
+        id
+    }
+
     pub fn add_def(&mut self, kind: DefKind, package: PackageId, span: SourceSpan) -> DefId {
         let def_id = self.alloc_def_id();
-        self.defs.insert(
+        self.map.insert(
             def_id,
             Def {
                 package,
@@ -81,7 +129,9 @@ impl<'m> Env<'m> {
 
         def_id
     }
+}
 
+impl<'m> Env<'m> {
     pub fn add_named_def(
         &mut self,
         name: &str,
@@ -89,9 +139,9 @@ impl<'m> Env<'m> {
         package: PackageId,
         span: SourceSpan,
     ) -> DefId {
-        let def_id = self.alloc_def_id();
+        let def_id = self.defs.alloc_def_id();
         self.namespaces.get_mut(package).insert(name.into(), def_id);
-        self.defs.insert(
+        self.defs.map.insert(
             def_id,
             Def {
                 package,

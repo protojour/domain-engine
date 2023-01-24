@@ -1,12 +1,14 @@
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::parse::{tree::Tree, SString, Spanned};
+use crate::parse::{tree::Tree, Spanned};
 
 pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 
 pub enum Ast {
     Import(Path),
+    Type(Spanned<String>),
+    Rel(Rel),
     Data(Data),
     Eq(Eq),
 }
@@ -25,7 +27,7 @@ pub enum Expr {
 }
 
 pub struct Data {
-    pub ident: Spanned<SString>,
+    pub ident: Spanned<String>,
     pub ty: Spanned<Type>,
 }
 
@@ -33,6 +35,17 @@ pub enum Type {
     Sym(String),
     Record(Record),
     Literal(Literal),
+}
+
+pub struct Rel {
+    pub subject: Spanned<Type>,
+    pub ident: Spanned<RelIdent>,
+    pub object: Spanned<Type>,
+}
+
+pub enum RelIdent {
+    Named(String),
+    Unnamed,
 }
 
 #[derive(Debug)]
@@ -50,4 +63,4 @@ pub struct RecordField {
     pub ty: Spanned<Type>,
 }
 
-pub struct Path(pub Vec<Spanned<SString>>);
+pub struct Path(pub Vec<Spanned<String>>);

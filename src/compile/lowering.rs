@@ -40,6 +40,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn ast_to_def(&mut self, (ast, span): (ast::Ast, Span)) -> Res<DefId> {
         match ast {
+            ast::Ast::Type((ident, _)) => {
+                let def_id = self.named_def_id(&ident);
+                self.set_def(def_id, DefKind::Type(ident), &span);
+                Ok(def_id)
+            }
+            ast::Ast::Rel(ast::Rel {
+                subject,
+                ident,
+                object,
+            }) => {
+                // This syntax just defines the relation first time it's used
+                let rel_def_id = self.define_rel_if_undefined(ident.0);
+                panic!();
+            }
             ast::Ast::Data(ast::Data {
                 ident,
                 ty: (ast_ty, ty_span),
@@ -100,7 +114,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_root_expr(&mut self, ast: (ast::Expr, Span), var_table: &mut VarTable) -> Res<ExprId> {
         let expr = self.lower_expr(ast, var_table)?;
-        let expr_id = self.env.alloc_expr_id();
+        let expr_id = self.env.defs.alloc_expr_id();
         self.env.expressions.insert(expr_id, expr);
         Ok(expr_id)
     }
@@ -140,8 +154,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
+    fn define_rel_if_undefined(&mut self, ident: ast::RelIdent) -> DefId {
+        match ident {
+            ast::RelIdent::Named(ident) => self
+                .env
+                .namespaces
+                .get_mut(self.src.package)
+                .entry(ident)
+                .or_insert_with(|| self.env.defs.alloc_def_id())
+                .clone(),
+            ast::RelIdent::Unnamed => self.env.defs.alloc_def_id(),
+        }
+    }
+
     fn named_def_id(&mut self, ident: &String) -> DefId {
-        let def_id = self.env.alloc_def_id();
+        let def_id = self.env.defs.alloc_def_id();
         self.env
             .namespaces
             .get_mut(self.src.package)
@@ -150,7 +177,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn set_def(&mut self, def_id: DefId, kind: DefKind, span: &Span) {
-        self.env.defs.insert(
+        self.env.defs.map.insert(
             def_id,
             Def {
                 package: self.src.package,
@@ -161,7 +188,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn def(&mut self, kind: DefKind, span: &Span) -> DefId {
-        let def_id = self.env.alloc_def_id();
+        let def_id = self.env.defs.alloc_def_id();
         self.set_def(def_id, kind, span);
         def_id
     }
@@ -188,7 +215,7 @@ impl VarTable {
     fn var_id(&mut self, ident: String, env: &mut Env) -> ExprId {
         self.variables
             .entry(ident)
-            .or_insert_with(|| env.alloc_expr_id())
+            .or_insert_with(|| env.defs.alloc_expr_id())
             .clone()
     }
 }

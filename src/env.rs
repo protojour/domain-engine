@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::{
     compile::error::CompileErrors,
-    def::{Def, DefId, Namespaces},
+    def::{DefId, Defs, Namespaces},
     expr::{Expr, ExprId},
     mem::Mem,
     source::{Package, PackageId, Sources},
@@ -17,15 +17,12 @@ use crate::{
 /// Runtime environment
 #[derive(Debug)]
 pub struct Env<'m> {
-    next_def_id: DefId,
-    next_expr_id: ExprId,
-
     pub(crate) sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
 
     pub(crate) namespaces: Namespaces,
-    pub(crate) defs: HashMap<DefId, Def>,
+    pub(crate) defs: Defs,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
     pub(crate) types: Types<'m>,
@@ -37,8 +34,6 @@ pub struct Env<'m> {
 impl<'m> Env<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
-            next_def_id: DefId(0),
-            next_expr_id: ExprId(0),
             sources: Default::default(),
             packages: Default::default(),
             types: Types::new(mem),
@@ -48,17 +43,5 @@ impl<'m> Env<'m> {
             def_types: Default::default(),
             errors: Default::default(),
         }
-    }
-
-    pub fn alloc_def_id(&mut self) -> DefId {
-        let id = self.next_def_id;
-        self.next_def_id.0 += 1;
-        id
-    }
-
-    pub fn alloc_expr_id(&mut self) -> ExprId {
-        let id = self.next_expr_id;
-        self.next_expr_id.0 += 1;
-        id
     }
 }

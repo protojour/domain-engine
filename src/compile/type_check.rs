@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    def::{Def, DefId, DefKind, Primitive},
+    def::{DefId, DefKind, Defs, Primitive},
     env::Env,
     expr::{Expr, ExprKind},
     mem::Intern,
@@ -15,7 +15,7 @@ pub struct TypeCheck<'e, 'm> {
     types: &'e mut Types<'m>,
     def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
     errors: &'e mut CompileErrors,
-    defs: &'e HashMap<DefId, Def>,
+    defs: &'e Defs,
     sources: &'e Sources,
 }
 
@@ -25,7 +25,12 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
             return type_ref;
         }
 
-        match &self.defs.get(&def_id).unwrap().kind {
+        match &self.defs.map.get(&def_id).unwrap().kind {
+            DefKind::Type(_) => {
+                let ty = self.types.intern(Type::Domain(def_id));
+                self.def_types.insert(def_id, ty);
+                ty
+            }
             DefKind::Constructor(_, field_def) => {
                 let ty = self.types.intern(Type::Data(def_id, *field_def));
                 self.def_types.insert(def_id, ty);
@@ -46,6 +51,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
     fn type_check_anon_field(&mut self, field_id: DefId) {
         let field = self
             .defs
+            .map
             .get(&field_id)
             .expect("No field definition for {field_id:?}");
         let DefKind::AnonField { type_def_id } = &field.kind else {
@@ -160,6 +166,20 @@ mod tests {
         let expr_type = env.type_check().check_expr(&expr);
 
         assert_eq!(expr_type, type_of_m);
+
+        Ok(())
+    }
+
+    #[test]
+    fn type_check_typedef() -> Result<(), UnifiedCompileError> {
+        let mem = Mem::default();
+        let mut env = Env::new(&mem).with_core();
+
+        "
+        (type! foo)
+        (rel! (foo) neighbour (foo))
+        "
+        .compile(&mut env, TEST_PKG)?;
 
         Ok(())
     }

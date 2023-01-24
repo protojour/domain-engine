@@ -20,7 +20,7 @@ pub enum ExprKind {
 impl<'m> Env<'m> {
     pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
         Expr {
-            id: self.alloc_expr_id(),
+            id: self.defs.alloc_expr_id(),
             kind,
             span,
         }
