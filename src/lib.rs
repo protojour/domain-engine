@@ -4,7 +4,7 @@ use compile::{
     lowering::Lowering,
 };
 use env::Env;
-use source::{CompileSrc, PackageId};
+pub use source::{CompileSrc, PackageId};
 
 pub mod ena;
 pub mod env;
