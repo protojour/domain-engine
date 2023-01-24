@@ -56,18 +56,20 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                     _ => panic!("TODO: relation not found"),
                 };
 
-                self.check_relationship_role(
-                    relationship.relation_def_id,
+                self.check_relationship_property(
+                    def_id,
                     relation,
                     relationship.subject,
                     Role::Subject,
+                    relationship.object,
                     &def.span,
                 );
-                self.check_relationship_role(
-                    relationship.relation_def_id,
+                self.check_relationship_property(
+                    def_id,
                     relation,
                     relationship.object,
                     Role::Object,
+                    relationship.subject,
                     &def.span,
                 );
 
@@ -136,23 +138,28 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         }
     }
 
-    fn check_relationship_role(
+    fn check_relationship_property(
         &mut self,
-        relation_id: DefId,
+        relationship_id: DefId,
         relation: &Relation,
-        type_def_id: DefId,
+        role_def_id: DefId,
         role: Role,
+        inverse_role_def_id: DefId,
         span: &SourceSpan,
-    ) {
-        let Ok(type_def_id) = self.expect_domain_type(type_def_id, span) else {
-            return;
+    ) -> TypeRef<'m> {
+        let Ok(role_def_id) = self.expect_domain_type(role_def_id, span) else {
+            return self.types.intern(Type::Error);
         };
 
-        let properties = self.relations.properties_mut(type_def_id);
+        let property_codomain = self.check_def(inverse_role_def_id);
+        let property_id = self.relations.new_property(relationship_id, role);
+        // Type of the property value/the property "range":
+
+        let properties = self.relations.properties_by_type_mut(role_def_id);
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
-                (None, SubjectProperties::None) => {
-                    properties.subject = SubjectProperties::Anonymous(relation_id);
+                (None, SubjectProperties::Unit) => {
+                    properties.subject = SubjectProperties::Anonymous(property_id);
                 }
                 (None, SubjectProperties::Anonymous(_)) => {
                     panic!("TODO: Two anonymous properties");
@@ -160,20 +167,22 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 (None, SubjectProperties::Named(_)) => {
                     panic!("TODO: Cannot mix anonymous and named properties");
                 }
-                (Some(_), SubjectProperties::None) => {
-                    properties.subject = SubjectProperties::Named([relation_id].into());
+                (Some(_), SubjectProperties::Unit) => {
+                    properties.subject = SubjectProperties::Named([property_id].into());
                 }
                 (Some(_), SubjectProperties::Anonymous(_)) => {
                     panic!("TODO: Cannot add a named property when there is an anonymous property");
                 }
-                (Some(_), SubjectProperties::Named(relations)) => {
-                    relations.insert(relation_id);
+                (Some(_), SubjectProperties::Named(properties)) => {
+                    properties.insert(property_id);
                 }
             },
             Role::Object => {
-                properties.object.insert(relation_id);
+                properties.object.insert(property_id);
             }
         }
+
+        property_codomain
     }
 
     fn expect_domain_type(&mut self, def_id: DefId, span: &SourceSpan) -> Result<DefId, ()> {
@@ -257,13 +266,14 @@ mod tests {
     }
 
     #[test]
-    fn type_check_typedef() -> Result<(), UnifiedCompileError> {
+    fn type_def_simple_relation() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
         let mut env = Env::new(&mem).with_core();
 
         "
         (type! foo)
-        (rel! (foo) neighbour (foo))
+        (type! bar)
+        (rel! (foo) has-a (bar))
         "
         .compile(&mut env, TEST_PKG)?;
 

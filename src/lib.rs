@@ -18,6 +18,7 @@ mod parse;
 mod relation;
 mod source;
 mod types;
+mod value;
 
 pub trait Compile {
     fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError>;

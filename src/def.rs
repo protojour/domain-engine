@@ -6,6 +6,7 @@ use crate::{
     env::Env,
     expr::ExprId,
     mem::Intern,
+    relation::Role,
     source::{Package, PackageId, SourceSpan, CORE_PKG},
     types::Type,
 };
@@ -25,9 +26,10 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     CoreFn(CoreFn),
+    Type(String),
     Relation(Relation),
     Relationship(Relationship),
-    Type(String),
+    Property(Property),
     Constructor(String, DefId),
     Record { field_defs: Vec<DefId> },
     AnonField { type_def_id: DefId },
@@ -60,6 +62,12 @@ pub struct Relationship {
     pub relation_def_id: DefId,
     pub subject: DefId,
     pub object: DefId,
+}
+
+#[derive(Debug)]
+pub struct Property {
+    pub relation_def_id: DefId,
+    pub role: Role,
 }
 
 impl Relation {
