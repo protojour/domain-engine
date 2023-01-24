@@ -18,7 +18,7 @@ use crate::{
 /// Runtime environment
 #[derive(Debug)]
 pub struct Env<'m> {
-    pub(crate) sources: Sources,
+    pub sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
 

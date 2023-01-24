@@ -1,10 +1,13 @@
 use ::chumsky::Parser;
+
 use compile::{
     error::{CompileError, UnifiedCompileError},
     lowering::Lowering,
 };
 use env::Env;
-pub use source::{CompileSrc, PackageId};
+
+pub use compile::error::*;
+pub use source::*;
 
 pub mod ena;
 pub mod env;

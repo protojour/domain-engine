@@ -1,6 +1,11 @@
-use crate::compile_fail;
+use crate::TestCompile;
 
 #[test]
-fn basic() {
-    compile_fail("()")
+fn lex_error() {
+    "( ;; ERROR parse error".fail()
+}
+
+#[test]
+fn parse_erorr() {
+    "() ;; ERROR parse error".fail()
 }

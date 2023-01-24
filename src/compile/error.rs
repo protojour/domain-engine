@@ -17,13 +17,15 @@ pub struct UnifiedCompileError {
 #[derive(Debug, Error, Diagnostic)]
 #[error("")]
 pub struct SpannedCompileError {
-    error: CompileError,
+    pub error: CompileError,
+
+    pub span: SourceSpan,
 
     #[source_code]
-    src: miette::NamedSource,
+    pub miette_source: miette::NamedSource,
 
     #[label]
-    span: miette::SourceSpan,
+    pub miette_span: miette::SourceSpan,
 }
 
 #[derive(Debug, Error, Diagnostic)]
@@ -54,8 +56,15 @@ impl CompileError {
 
         SpannedCompileError {
             error: self,
-            src: miette::NamedSource::new(source.name.as_str().clone(), source.text.clone()),
-            span: miette::SourceSpan::new((span.start as usize).into(), (span.end as usize).into()),
+            span: span.clone(),
+            miette_source: miette::NamedSource::new(
+                source.name.as_str().clone(),
+                source.text.clone(),
+            ),
+            miette_span: miette::SourceSpan::new(
+                (span.start as usize).into(),
+                (span.end as usize).into(),
+            ),
         }
     }
 }

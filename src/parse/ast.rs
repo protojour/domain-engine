@@ -11,6 +11,7 @@ pub enum Ast {
     Rel(Rel),
     Data(Data),
     Eq(Eq),
+    Comment(String),
 }
 
 pub struct Eq {

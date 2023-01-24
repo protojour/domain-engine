@@ -33,17 +33,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     pub fn lower_ast(&mut self, ast: (ast::Ast, Span)) -> Res<()> {
-        let root_def = self.ast_to_def(ast)?;
-        self.root_defs.push(root_def);
+        if let Some(root_def) = self.ast_to_def(ast)? {
+            self.root_defs.push(root_def);
+        }
         Ok(())
     }
 
-    fn ast_to_def(&mut self, (ast, span): (ast::Ast, Span)) -> Res<DefId> {
+    fn ast_to_def(&mut self, (ast, span): (ast::Ast, Span)) -> Res<Option<DefId>> {
         match ast {
+            ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Ast::Type((ident, _)) => {
                 let def_id = self.named_def_id(&ident);
                 self.set_def(def_id, DefKind::Type(ident), &span);
-                Ok(def_id)
+                Ok(Some(def_id))
             }
             ast::Ast::Rel(ast::Rel {
                 subject,
@@ -70,14 +72,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let subject = self.ast_type_to_def(subject)?;
                 let object = self.ast_type_to_def(object)?;
 
-                Ok(self.def(
+                Ok(Some(self.def(
                     DefKind::Relationship(Relationship {
                         relation_def_id,
                         subject,
                         object,
                     }),
                     &span,
-                ))
+                )))
             }
             ast::Ast::Data(ast::Data {
                 ident,
@@ -89,7 +91,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 self.set_def(def_id, DefKind::Constructor(ident.0, field_def_id), &span);
 
-                Ok(def_id)
+                Ok(Some(def_id))
             }
             ast::Ast::Eq(ast::Eq {
                 params: _,
@@ -99,9 +101,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut var_table = VarTable::default();
                 let first = self.lower_root_expr(first, &mut var_table)?;
                 let second = self.lower_root_expr(second, &mut var_table)?;
-                Ok(self.def(DefKind::Equivalence(first, second), &span))
+                Ok(Some(self.def(DefKind::Equivalence(first, second), &span)))
             }
-            _ => panic!(),
+            ast::Ast::Comment(_) => Ok(None), // _ => panic!(),
         }
     }
 

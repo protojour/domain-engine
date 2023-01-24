@@ -11,6 +11,7 @@ pub enum Tree {
     Dot,
     Sym(String),
     Num(String),
+    Comment(String),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -36,7 +37,8 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(bracket)
             .or(just(".").map(|_| Tree::Dot))
             .or(num())
-            .or(sym());
+            .or(sym())
+            .or(comment());
 
         combined_tree
             .map_with_span(|tok, span| (tok, span))
@@ -65,15 +67,24 @@ fn sym() -> impl Parser<char, Tree, Error = Simple<char>> {
         .map(|vec| Tree::Sym(String::from_iter(vec.into_iter())))
 }
 
+fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
+    filter(|c: &char| c == &';')
+        .map(Some)
+        .chain::<char, Vec<_>, _>(filter(|c: &char| c != &'\n').repeated())
+        .map(|vec| Tree::Comment(String::from_iter(vec.into_iter())))
+}
+
 fn special_char(c: char) -> bool {
     match c {
-        '(' | ')' | '[' | ']' | '{' | '}' | '.' => true,
+        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' => true,
         _ => false,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
+
     use super::*;
 
     fn test_one(input: &str) -> Spanned<Tree> {
@@ -149,7 +160,28 @@ mod tests {
 
     #[test]
     fn many() {
-        let tokens = trees_parser().parse(" a (1) ").unwrap();
-        assert_eq!(2, tokens.len());
+        let trees = trees_parser().parse(" a (1) ").unwrap();
+        assert_eq!(2, trees.len());
+    }
+
+    #[test]
+    fn comments() {
+        let trees = trees_parser()
+            .parse(
+                "
+                1 ; hallo
+                2 ; foo bar
+                ",
+            )
+            .unwrap();
+        assert_matches!(
+            trees.as_slice(),
+            &[
+                (Tree::Num(_), _),
+                (Tree::Comment(_), _),
+                (Tree::Num(_), _),
+                (Tree::Comment(_), _)
+            ]
+        );
     }
 }

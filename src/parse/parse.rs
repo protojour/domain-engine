@@ -5,6 +5,7 @@ use super::{ast::*, tree::Tree, tree_stream::TreeStream, Span, Spanned};
 pub fn parse((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
     match tree {
         Tree::Paren(list) => parse_ast(TreeStream::new(list, span)),
+        Tree::Comment(comment) => Ok((Ast::Comment(comment), span)),
         _ => Err(error("expected list", span)),
     }
 }

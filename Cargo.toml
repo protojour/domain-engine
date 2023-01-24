@@ -14,3 +14,7 @@ bumpalo = "3"
 thiserror = "1"
 miette = "5"
 indexmap = "1"
+
+[dev-dependencies]
+assert_matches = "1"
+pretty_assertions = "1"
