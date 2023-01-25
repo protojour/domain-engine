@@ -71,18 +71,18 @@ pub struct Property {
 }
 
 impl Relation {
-    fn subject_prop(&self) -> Option<&String> {
+    pub fn subject_prop(&self) -> Option<&String> {
         self.subject_prop.as_ref().or(self.ident.as_ref())
     }
 
-    fn object_prop(&self) -> Option<&String> {
+    pub fn object_prop(&self) -> Option<&String> {
         self.object_prop.as_ref().or(self.ident.as_ref())
     }
 }
 
 #[derive(Default, Debug)]
 pub struct Namespaces {
-    namespaces: HashMap<PackageId, HashMap<String, DefId>>,
+    pub(crate) namespaces: HashMap<PackageId, HashMap<String, DefId>>,
 }
 
 impl Namespaces {
@@ -122,6 +122,23 @@ impl Default for Defs {
 }
 
 impl Defs {
+    pub fn get_def_kind(&self, def_id: DefId) -> Option<&DefKind> {
+        self.map.get(&def_id).map(|def| &def.kind)
+    }
+
+    pub fn get_relationship_defs(
+        &self,
+        relationship_def_id: DefId,
+    ) -> Result<(&Relationship, &Relation), ()> {
+        let DefKind::Relationship(relationship) = self.get_def_kind(relationship_def_id).ok_or(())? else {
+            return Err(());
+        };
+        let DefKind::Relation(relation) = self.get_def_kind(relationship.relation_def_id).ok_or(())? else {
+            return Err(());
+        };
+        Ok((relationship, relation))
+    }
+
     pub fn alloc_def_id(&mut self) -> DefId {
         let id = self.next_def_id;
         self.next_def_id.0 += 1;
@@ -172,9 +189,8 @@ impl<'m> Env<'m> {
     }
 
     pub fn with_core(mut self) -> Self {
-        let core = PackageId(0);
         self.packages.insert(
-            core,
+            CORE_PKG,
             Package {
                 name: "core".into(),
             },

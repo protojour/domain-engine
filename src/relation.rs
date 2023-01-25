@@ -65,6 +65,6 @@ pub enum SubjectProperties {
 
 #[derive(Debug)]
 pub struct Property {
-    relationship_id: DefId,
-    role: Role,
+    pub relationship_id: DefId,
+    pub role: Role,
 }

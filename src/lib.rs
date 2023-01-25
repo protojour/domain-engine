@@ -8,7 +8,9 @@ use env::Env;
 
 pub use compile::error::*;
 pub use source::*;
+pub use value::*;
 
+pub mod binding;
 pub mod ena;
 pub mod env;
 pub mod mem;

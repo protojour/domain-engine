@@ -14,7 +14,10 @@ pub enum Type<'m> {
     // It has no specific meaning.
     Tautology,
     Constant(i32),
+    /// Any number
     Number,
+    /// Any string
+    String,
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
     Function {

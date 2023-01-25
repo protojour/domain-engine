@@ -1,6 +1,9 @@
 use ontol_lang::{env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
 
-mod compile_errors;
+mod test_compile_errors;
+mod test_simple_binding;
+
+const TEST_PKG: PackageId = PackageId(42);
 
 trait TestCompile {
     fn compile_ok(self, validator: impl Fn(Env));
@@ -23,7 +26,7 @@ impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(Env)) {
         let mut mem = Mem::default();
         let mut env = Env::new(&mut mem);
-        self.compile(&mut env, PackageId(1)).unwrap();
+        self.compile(&mut env, TEST_PKG).unwrap();
 
         validator(env);
     }

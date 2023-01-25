@@ -4,11 +4,10 @@ use smartstring::alias::String;
 
 use crate::relation::PropertyId;
 
+#[derive(Debug)]
 pub enum Value {
+    // TODO: Big rational numbers
+    Number(i64),
     String(String),
-    Compound(Compound),
-}
-
-pub struct Compound {
-    pub attributes: HashMap<PropertyId, Value>,
+    Compound(HashMap<PropertyId, Value>),
 }

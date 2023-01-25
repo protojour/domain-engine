@@ -148,8 +148,8 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
 
         let property_codomain = self.check_def(inverse_role_def_id);
         let property_id = self.relations.new_property(relationship_id, role);
-        // Type of the property value/the property "range":
 
+        // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(role_def_id);
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
@@ -217,7 +217,7 @@ mod tests {
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,
-        source::{SourceSpan, TEST_PKG},
+        source::{SourceSpan, UNIT_TEST_PKG},
         Compile,
     };
 
@@ -226,11 +226,11 @@ mod tests {
         let mem = Mem::default();
         let mut env = Env::new(&mem).with_core();
 
-        "(data m (number))".compile(&mut env, TEST_PKG)?;
+        "(data m (number))".compile(&mut env, UNIT_TEST_PKG)?;
 
         let m = env
             .namespaces
-            .lookup(&[TEST_PKG], "m")
+            .lookup(&[UNIT_TEST_PKG], "m")
             .expect("m not found");
         let type_of_m = env.type_check().check_def(m);
 
@@ -248,11 +248,11 @@ mod tests {
         let mem = Mem::default();
         let mut env = Env::new(&mem).with_core();
 
-        "(data foo (record (field bar (number))))".compile(&mut env, TEST_PKG)?;
+        "(data foo (record (field bar (number))))".compile(&mut env, UNIT_TEST_PKG)?;
 
         let foo = env
             .namespaces
-            .lookup(&[TEST_PKG], "foo")
+            .lookup(&[UNIT_TEST_PKG], "foo")
             .expect("foo not found");
         let type_of_m = env.type_check().check_def(foo);
 
@@ -275,7 +275,7 @@ mod tests {
         (type! bar)
         (rel! (foo) has-a (bar))
         "
-        .compile(&mut env, TEST_PKG)?;
+        .compile(&mut env, UNIT_TEST_PKG)?;
 
         Ok(())
     }
@@ -289,7 +289,7 @@ mod tests {
         (data foo (record (field bar (number))))
         (eq! () (foo x) (foo x))
         "
-        .compile(&mut env, TEST_PKG)?;
+        .compile(&mut env, UNIT_TEST_PKG)?;
 
         Ok(())
     }
