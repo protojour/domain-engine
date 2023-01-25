@@ -15,11 +15,11 @@ use crate::{
 
 /// A binding to a specific domain,
 /// so it may be interacted with from the external world
-pub struct DomainBinding2<'m> {
+pub struct DomainBinding<'m> {
     serde_operators: HashMap<String, SerdeOperator<'m>>,
 }
 
-impl<'m> DomainBinding2<'m> {
+impl<'m> DomainBinding<'m> {
     pub fn get_serde_operator(&self, type_name: &str) -> Option<SerdeOperator<'m>> {
         self.serde_operators.get(type_name).cloned()
     }
@@ -61,7 +61,7 @@ pub struct BindingsBuilder<'e, 'm> {
 }
 
 impl<'e, 'm> BindingsBuilder<'e, 'm> {
-    pub fn new_binding(&mut self, package_id: PackageId) -> DomainBinding2<'m> {
+    pub fn new_binding(&mut self, package_id: PackageId) -> DomainBinding<'m> {
         let namespace = self
             .namespaces
             .namespaces
@@ -78,7 +78,7 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             )
             .collect();
 
-        DomainBinding2 { serde_operators }
+        DomainBinding { serde_operators }
     }
 
     fn get_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {

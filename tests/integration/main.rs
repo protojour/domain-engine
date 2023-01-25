@@ -1,9 +1,23 @@
 use ontol_lang::{env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
 
 mod test_compile_errors;
-mod test_simple_binding;
+mod test_deserialize;
 
 const TEST_PKG: PackageId = PackageId(42);
+
+macro_rules! assert_error_msg {
+    ($e:expr, $msg:expr) => {
+        match $e {
+            Ok(v) => panic!("Expected error, was Ok({v:?})"),
+            Err(e) => {
+                let msg = format!("{e}");
+                assert_eq!(msg.as_str(), $msg);
+            }
+        }
+    };
+}
+
+pub(crate) use assert_error_msg;
 
 trait TestCompile {
     fn compile_ok(self, validator: impl Fn(Env));

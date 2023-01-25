@@ -100,7 +100,7 @@ impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "type {}", self.0.typename)
+        write!(f, "type `{}`", self.0.typename)
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
