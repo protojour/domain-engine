@@ -6,8 +6,10 @@ use thiserror::Error;
 use crate::{
     def::DefId,
     env::Env,
+    env_queries::{GetDefType, GetPropertyMeta},
+    mem::Mem,
     relation::{Properties, PropertyId, SubjectProperties},
-    serde::Serder,
+    serde::{SerdeOperator, Serder},
     types::Type,
     value::Value,
     PackageId,
@@ -18,8 +20,13 @@ use crate::{
 pub struct DomainBinding<'e, 'm> {
     env: &'e Env<'m>,
     namespace: &'e HashMap<String, DefId>,
-    serders: HashMap<String, Serder<'e>>,
 }
+
+pub struct DomainBinding2<'m> {
+    serders: HashMap<String, Serder<'m>>,
+}
+
+// pub struct DomainBinding2<'e, 'm> {}
 
 #[derive(Debug, Error)]
 pub enum InstantiateError {
@@ -136,8 +143,19 @@ impl<'e, 'm> DomainBinding<'e, 'm> {
     }
 }
 
+#[derive(Debug)]
+pub struct Bindings<'m> {
+    mem: &'m Mem,
+}
+
+impl<'m> Bindings<'m> {
+    pub fn new(mem: &'m Mem) -> Self {
+        Self { mem }
+    }
+}
+
 impl<'m> Env<'m> {
-    pub fn new_binding<'e>(&'e self, package_id: PackageId) -> DomainBinding {
+    pub fn new_binding<'e>(&'e self, package_id: PackageId) -> DomainBinding<'e, 'm> {
         DomainBinding {
             env: self,
             namespace: self
@@ -145,7 +163,42 @@ impl<'m> Env<'m> {
                 .namespaces
                 .get(&package_id)
                 .expect("package id does not exist, cannot create binding"),
-            serders: Default::default(),
+        }
+    }
+
+    pub fn new_binding2(&mut self, package_id: PackageId) -> DomainBinding2<'m> {
+        let bindings = &self.bindings;
+        let namespace = self
+            .namespaces
+            .namespaces
+            .get(&package_id)
+            .expect("package id does not exist, cannot create binding");
+
+        let serders = namespace
+            .iter()
+            .filter_map(|(typename, type_def_id)| {
+                match bindings.create_serder(*type_def_id, self) {
+                    Some(serder) => Some((typename.clone(), serder)),
+                    None => None,
+                }
+            })
+            .collect();
+
+        DomainBinding2 { serders }
+    }
+}
+
+struct BindingsBuilder<'m> {
+    lol: &'m String,
+}
+
+impl<'m> Bindings<'m> {
+    fn create_serder(&self, type_def_id: DefId, env: &Env) -> Option<Serder<'m>> {
+        match env.get_def_type(type_def_id) {
+            Type::Number => Some(Serder(self.mem.bump.alloc(SerdeOperator::Number))),
+            Type::String => Some(Serder(self.mem.bump.alloc(SerdeOperator::String))),
+            Type::Domain(def_id) => panic!(),
+            _ => None,
         }
     }
 }

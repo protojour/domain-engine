@@ -14,7 +14,7 @@ fn instantiate(
 
 #[test]
 fn instantiate_empty_type_expects_empty_object() {
-    "(type! foo)".compile_ok(|env| {
+    "(type! foo)".compile_ok(|_, env| {
         assert_matches!(
             instantiate(&env, "foo", json!(42)),
             Err(InstantiateError::ExpectedEmptyObject)
@@ -37,7 +37,7 @@ fn instantiate_anonymous() {
     (type! foo)
     (rel! (foo) _ (number))
     "
-    .compile_ok(|env| {
+    .compile_ok(|_, env| {
         assert_matches!(
             instantiate(&env, "foo", json!(42)),
             Err(InstantiateError::ExpectedEmptyObject)

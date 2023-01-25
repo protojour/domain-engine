@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     def::{Def, DefId, DefKind, Defs, Primitive, Relation},
     env::Env,
@@ -7,14 +5,14 @@ use crate::{
     mem::Intern,
     relation::{Relations, Role, SubjectProperties},
     source::{SourceSpan, Sources},
-    types::{Type, TypeRef, Types},
+    types::{DefTypes, Type, TypeRef, Types},
 };
 
 use super::error::{CompileError, CompileErrors};
 
 pub struct TypeCheck<'e, 'm> {
     types: &'e mut Types<'m>,
-    def_types: &'e mut HashMap<DefId, TypeRef<'m>>,
+    def_types: &'e mut DefTypes<'m>,
     relations: &'e mut Relations,
     errors: &'e mut CompileErrors,
     defs: &'e Defs,
@@ -23,7 +21,7 @@ pub struct TypeCheck<'e, 'm> {
 
 impl<'e, 'm> TypeCheck<'e, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
-        if let Some(type_ref) = self.def_types.get(&def_id) {
+        if let Some(type_ref) = self.def_types.map.get(&def_id) {
             return type_ref;
         }
 
@@ -36,12 +34,12 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         match &def.kind {
             DefKind::Type(_) => {
                 let ty = self.types.intern(Type::Domain(def_id));
-                self.def_types.insert(def_id, ty);
+                self.def_types.map.insert(def_id, ty);
                 ty
             }
             DefKind::Constructor(_, field_def) => {
                 let ty = self.types.intern(Type::Data(def_id, *field_def));
-                self.def_types.insert(def_id, ty);
+                self.def_types.map.insert(def_id, ty);
 
                 self.type_check_anon_field(*field_def);
 
@@ -95,13 +93,13 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         };
 
         let type_ref = self.check_def(*type_def_id);
-        self.def_types.insert(field_id, type_ref);
+        self.def_types.map.insert(field_id, type_ref);
     }
 
     fn check_expr(&mut self, expr: &Expr) -> TypeRef<'m> {
         match &expr.kind {
             ExprKind::Constant(_) => self.types.intern(Type::Number),
-            ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
+            ExprKind::Call(def_id, args) => match self.def_types.map.get(&def_id) {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
                         return self.error(CompileError::WrongNumberOfArguments, &expr.span);
@@ -116,7 +114,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                         self.error(CompileError::WrongNumberOfArguments, &expr.span);
                     }
 
-                    match self.def_types.get(data_def_id) {
+                    match self.def_types.map.get(data_def_id) {
                         Some(ty) => ty,
                         None => self.types.intern(Type::Error),
                     }

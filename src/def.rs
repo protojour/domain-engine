@@ -225,7 +225,9 @@ impl<'m> Env<'m> {
 
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
         let def_id = self.add_named_def(name, def_kind, CORE_PKG, SourceSpan::none());
-        self.def_types.insert(def_id, self.types.intern(type_kind));
+        self.def_types
+            .map
+            .insert(def_id, self.types.intern(type_kind));
 
         def_id
     }

@@ -4,44 +4,44 @@ use smartstring::alias::String;
 
 use crate::{relation::PropertyId, Value};
 
-pub struct Serder<'e>(&'e SerdeOperator<'e>);
+pub struct Serder<'m>(pub &'m SerdeOperator<'m>);
 
-enum SerdeOperator<'e> {
+pub enum SerdeOperator<'m> {
     Number,
     String,
     // A type with just one anonymous property
-    ValueType(ValueType<'e>),
+    ValueType(ValueType<'m>),
     // A type with
-    MapType(MapType<'e>),
+    MapType(MapType<'m>),
 }
 
-struct ValueType<'e> {
+pub struct ValueType<'m> {
     pub typename: String,
-    pub property: SerdeProperty<'e>,
+    pub property: SerdeProperty<'m>,
 }
 
-struct MapType<'e> {
+pub struct MapType<'m> {
     pub typename: String,
-    pub properties: HashMap<&'e str, SerdeProperty<'e>>,
+    pub properties: HashMap<&'m str, SerdeProperty<'m>>,
 }
 
 #[derive(Clone, Copy)]
-struct PropertySet<'s, 'e>(&'s HashMap<&'e str, SerdeProperty<'e>>);
-
-#[derive(Clone, Copy)]
-struct SerdeProperty<'e> {
+pub struct SerdeProperty<'m> {
     property_id: PropertyId,
-    operator: &'e SerdeOperator<'e>,
+    operator: &'m SerdeOperator<'m>,
 }
+
+#[derive(Clone, Copy)]
+struct PropertySet<'s, 'm>(&'s HashMap<&'m str, SerdeProperty<'m>>);
 
 struct NumberVisitor;
 
 /// Visitor accepting all strings
 struct StringVisitor;
 
-struct MapTypeVisitor<'e>(&'e MapType<'e>);
+struct MapTypeVisitor<'m>(&'m MapType<'m>);
 
-impl<'e, 'de> serde::de::DeserializeSeed<'de> for Serder<'e> {
+impl<'m, 'de> serde::de::DeserializeSeed<'de> for Serder<'m> {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -88,7 +88,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
     }
 }
 
-impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
+impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -127,8 +127,8 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     }
 }
 
-impl<'s, 'e, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s, 'e> {
-    type Value = SerdeProperty<'e>;
+impl<'s, 'm, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s, 'm> {
+    type Value = SerdeProperty<'m>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -138,8 +138,8 @@ impl<'s, 'e, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s, 'e> {
     }
 }
 
-impl<'s, 'e, 'de> serde::de::Visitor<'de> for PropertySet<'s, 'e> {
-    type Value = SerdeProperty<'e>;
+impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s, 'm> {
+    type Value = SerdeProperty<'m>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")

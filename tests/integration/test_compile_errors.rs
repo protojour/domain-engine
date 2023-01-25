@@ -3,7 +3,7 @@ use crate::TestCompile;
 #[test]
 fn lex_error() {
     // BUG: chumsky bug
-    "( ;; ERROR parse error".compile_ok(|_| {});
+    "( ;; ERROR parse error".compile_ok(|_, _| {});
 }
 
 #[test]

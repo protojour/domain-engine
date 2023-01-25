@@ -17,6 +17,7 @@ pub mod mem;
 
 mod compile;
 mod def;
+mod env_queries;
 mod expr;
 mod parse;
 mod relation;

@@ -6,7 +6,7 @@ mod test_simple_binding;
 const TEST_PKG: PackageId = PackageId(42);
 
 trait TestCompile {
-    fn compile_ok(self, validator: impl Fn(Env));
+    fn compile_ok(self, validator: impl Fn(&Mem, Env));
     fn compile_fail(self);
 }
 
@@ -23,12 +23,12 @@ struct DiagnosticsLine {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(Env)) {
-        let mut mem = Mem::default();
-        let mut env = Env::new(&mut mem);
+    fn compile_ok(self, validator: impl Fn(&Mem, Env)) {
+        let mem = Mem::default();
+        let mut env = Env::new(&mem);
         self.compile(&mut env, TEST_PKG).unwrap();
 
-        validator(env);
+        validator(&mem, env);
     }
 
     fn compile_fail(self) {

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     def::DefId,
@@ -77,6 +77,11 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
             }
         }
     }
+}
+
+#[derive(Default, Debug)]
+pub struct DefTypes<'m> {
+    pub map: HashMap<DefId, TypeRef<'m>>,
 }
 
 #[cfg(test)]
