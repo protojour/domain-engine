@@ -4,13 +4,13 @@ use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{
-    def::DefId,
+    def::{DefId, Defs, Namespaces},
     env::Env,
     env_queries::{GetDefType, GetPropertyMeta},
     mem::Mem,
-    relation::{Properties, PropertyId, SubjectProperties},
-    serde::{SerdeOperator, Serder},
-    types::Type,
+    relation::{Properties, PropertyId, Relations, SubjectProperties},
+    serde::{MapType, SerdeOperator, SerdeProperty, Serder, ValueType},
+    types::{DefTypes, Type},
     value::Value,
     PackageId,
 };
@@ -146,11 +146,15 @@ impl<'e, 'm> DomainBinding<'e, 'm> {
 #[derive(Debug)]
 pub struct Bindings<'m> {
     mem: &'m Mem,
+    serders: HashMap<DefId, Option<Serder<'m>>>,
 }
 
 impl<'m> Bindings<'m> {
     pub fn new(mem: &'m Mem) -> Self {
-        Self { mem }
+        Self {
+            mem,
+            serders: Default::default(),
+        }
     }
 }
 
@@ -166,8 +170,27 @@ impl<'m> Env<'m> {
         }
     }
 
-    pub fn new_binding2(&mut self, package_id: PackageId) -> DomainBinding2<'m> {
-        let bindings = &self.bindings;
+    fn bindings_builder<'e>(&'e mut self) -> BindingsBuilder<'e, 'm> {
+        BindingsBuilder {
+            bindings: &mut self.bindings,
+            namespaces: &self.namespaces,
+            defs: &self.defs,
+            def_types: &self.def_types,
+            relations: &self.relations,
+        }
+    }
+}
+
+struct BindingsBuilder<'e, 'm> {
+    bindings: &'e mut Bindings<'m>,
+    namespaces: &'e Namespaces,
+    defs: &'e Defs,
+    def_types: &'e DefTypes<'m>,
+    relations: &'e Relations,
+}
+
+impl<'e, 'm> BindingsBuilder<'e, 'm> {
+    pub fn new_binding(&mut self, package_id: PackageId) -> DomainBinding2<'m> {
         let namespace = self
             .namespaces
             .namespaces
@@ -176,29 +199,110 @@ impl<'m> Env<'m> {
 
         let serders = namespace
             .iter()
-            .filter_map(|(typename, type_def_id)| {
-                match bindings.create_serder(*type_def_id, self) {
+            .filter_map(
+                |(typename, type_def_id)| match self.get_serder(*type_def_id) {
                     Some(serder) => Some((typename.clone(), serder)),
                     None => None,
-                }
-            })
+                },
+            )
             .collect();
 
         DomainBinding2 { serders }
     }
-}
 
-struct BindingsBuilder<'m> {
-    lol: &'m String,
-}
+    fn get_serder(&mut self, type_def_id: DefId) -> Option<Serder<'m>> {
+        if let Some(serder) = self.bindings.serders.get(&type_def_id) {
+            return *serder;
+        }
 
-impl<'m> Bindings<'m> {
-    fn create_serder(&self, type_def_id: DefId, env: &Env) -> Option<Serder<'m>> {
-        match env.get_def_type(type_def_id) {
-            Type::Number => Some(Serder(self.mem.bump.alloc(SerdeOperator::Number))),
-            Type::String => Some(Serder(self.mem.bump.alloc(SerdeOperator::String))),
-            Type::Domain(def_id) => panic!(),
+        let serder = self.create_serder(type_def_id);
+        self.bindings.serders.insert(type_def_id, serder);
+        serder
+    }
+
+    fn create_serder(&mut self, type_def_id: DefId) -> Option<Serder<'m>> {
+        match self.get_def_type(type_def_id) {
+            Type::Number => Some(Serder(self.bump().alloc(SerdeOperator::Number))),
+            Type::String => Some(Serder(self.bump().alloc(SerdeOperator::String))),
+            Type::Domain(def_id) => {
+                let properties = self.relations.properties_by_type.get(def_id);
+                self.create_domain_type_serder(properties)
+            }
             _ => None,
         }
+    }
+
+    fn create_domain_type_serder(&mut self, properties: Option<&Properties>) -> Option<Serder<'m>> {
+        match properties.map(|prop| &prop.subject) {
+            Some(SubjectProperties::Unit) | None => {
+                panic!("TODO: Unit serder")
+            }
+            Some(SubjectProperties::Anonymous(property_id)) => {
+                let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
+                    panic!("Problem getting property meta");
+                };
+
+                let serder = self
+                    .get_serder(relationship.object)
+                    .expect("No inner serializer");
+
+                Some(Serder(self.bump().alloc(SerdeOperator::ValueType(
+                    ValueType {
+                        typename: "TODO".into(),
+                        property: SerdeProperty {
+                            property_id: *property_id,
+                            serder,
+                        },
+                    },
+                ))))
+            }
+            Some(SubjectProperties::Named(properties)) => {
+                let serde_properties = properties.iter().map(|property_id| {
+                    let Ok((_, relationship, relation)) = self.get_property_meta(*property_id) else {
+                        panic!("Problem getting property meta");
+                    };
+
+                    let object_key = relation.object_prop().expect("Property has no name").clone();
+                    let serder = self
+                        .get_serder(relationship.object)
+                        .expect("No inner serializer");
+
+                    (
+                        object_key,
+                        SerdeProperty {
+                            property_id: *property_id,
+                            serder,
+                        }
+                    )
+                }).collect::<HashMap<_, _>>();
+
+                Some(Serder(self.bump().alloc(SerdeOperator::MapType(MapType {
+                    typename: "TODO".into(),
+                    properties: serde_properties,
+                }))))
+            }
+        }
+    }
+
+    fn bump(&self) -> &'m bumpalo::Bump {
+        &self.bindings.mem.bump
+    }
+}
+
+impl<'e, 'm> AsRef<Defs> for BindingsBuilder<'e, 'm> {
+    fn as_ref(&self) -> &Defs {
+        &self.defs
+    }
+}
+
+impl<'e, 'm> AsRef<DefTypes<'m>> for BindingsBuilder<'e, 'm> {
+    fn as_ref(&self) -> &DefTypes<'m> {
+        &self.def_types
+    }
+}
+
+impl<'e, 'm> AsRef<Relations> for BindingsBuilder<'e, 'm> {
+    fn as_ref(&self) -> &Relations {
+        &self.relations
     }
 }

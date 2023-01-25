@@ -1,10 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
+use serde::Serializer;
 use smartstring::alias::String;
 
 use crate::{relation::PropertyId, Value};
 
+#[derive(Clone, Copy)]
 pub struct Serder<'m>(pub &'m SerdeOperator<'m>);
+
+impl<'m> Debug for Serder<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.serialize_unit_struct("Serder")
+    }
+}
 
 pub enum SerdeOperator<'m> {
     Number,
@@ -22,17 +30,17 @@ pub struct ValueType<'m> {
 
 pub struct MapType<'m> {
     pub typename: String,
-    pub properties: HashMap<&'m str, SerdeProperty<'m>>,
+    pub properties: HashMap<String, SerdeProperty<'m>>,
 }
 
 #[derive(Clone, Copy)]
 pub struct SerdeProperty<'m> {
-    property_id: PropertyId,
-    operator: &'m SerdeOperator<'m>,
+    pub property_id: PropertyId,
+    pub serder: Serder<'m>,
 }
 
 #[derive(Clone, Copy)]
-struct PropertySet<'s, 'm>(&'s HashMap<&'m str, SerdeProperty<'m>>);
+struct PropertySet<'s, 'm>(&'s HashMap<String, SerdeProperty<'m>>);
 
 struct NumberVisitor;
 
@@ -56,7 +64,7 @@ impl<'m, 'de> serde::de::DeserializeSeed<'de> for Serder<'m> {
                 serde::de::Deserializer::deserialize_str(deserializer, StringVisitor)
             }
             SerdeOperator::ValueType(value_type) => {
-                Serder(value_type.property.operator).deserialize(deserializer)
+                value_type.property.serder.deserialize(deserializer)
             }
             SerdeOperator::MapType(map_type) => {
                 serde::de::Deserializer::deserialize_map(deserializer, MapTypeVisitor(map_type))
@@ -102,7 +110,7 @@ impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
         let mut attributes = HashMap::with_capacity(self.0.properties.len());
 
         while let Some(serde_property) = map.next_key_seed(PropertySet(&self.0.properties))? {
-            let attribute_value = map.next_value_seed(Serder(&serde_property.operator))?;
+            let attribute_value = map.next_value_seed(serde_property.serder)?;
 
             attributes.insert(serde_property.property_id, attribute_value);
         }
