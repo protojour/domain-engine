@@ -6,15 +6,15 @@ use smartstring::alias::String;
 use crate::{relation::PropertyId, Value};
 
 #[derive(Clone, Copy)]
-pub struct Serder<'m>(pub &'m SerdeOperator<'m>);
+pub struct SerdeOperator<'m>(pub &'m SerdeOperatorKind<'m>);
 
-impl<'m> Debug for Serder<'m> {
+impl<'m> Debug for SerdeOperator<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.serialize_unit_struct("Serder")
+        f.serialize_unit_struct("SerdeOperator")
     }
 }
 
-pub enum SerdeOperator<'m> {
+pub enum SerdeOperatorKind<'m> {
     Number,
     String,
     // A type with just one anonymous property
@@ -36,7 +36,7 @@ pub struct MapType<'m> {
 #[derive(Clone, Copy)]
 pub struct SerdeProperty<'m> {
     pub property_id: PropertyId,
-    pub serder: Serder<'m>,
+    pub operator: SerdeOperator<'m>,
 }
 
 #[derive(Clone, Copy)]
@@ -49,7 +49,7 @@ struct StringVisitor;
 
 struct MapTypeVisitor<'m>(&'m MapType<'m>);
 
-impl<'m, 'de> serde::de::DeserializeSeed<'de> for Serder<'m> {
+impl<'m, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'m> {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -57,16 +57,16 @@ impl<'m, 'de> serde::de::DeserializeSeed<'de> for Serder<'m> {
         D: serde::Deserializer<'de>,
     {
         match self.0 {
-            SerdeOperator::Number => {
+            SerdeOperatorKind::Number => {
                 serde::de::Deserializer::deserialize_i64(deserializer, NumberVisitor)
             }
-            SerdeOperator::String => {
+            SerdeOperatorKind::String => {
                 serde::de::Deserializer::deserialize_str(deserializer, StringVisitor)
             }
-            SerdeOperator::ValueType(value_type) => {
-                value_type.property.serder.deserialize(deserializer)
+            SerdeOperatorKind::ValueType(value_type) => {
+                value_type.property.operator.deserialize(deserializer)
             }
-            SerdeOperator::MapType(map_type) => {
+            SerdeOperatorKind::MapType(map_type) => {
                 serde::de::Deserializer::deserialize_map(deserializer, MapTypeVisitor(map_type))
             }
         }
@@ -110,7 +110,7 @@ impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
         let mut attributes = HashMap::with_capacity(self.0.properties.len());
 
         while let Some(serde_property) = map.next_key_seed(PropertySet(&self.0.properties))? {
-            let attribute_value = map.next_value_seed(serde_property.serder)?;
+            let attribute_value = map.next_value_seed(serde_property.operator)?;
 
             attributes.insert(serde_property.property_id, attribute_value);
         }

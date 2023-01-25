@@ -4,12 +4,12 @@ use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{
-    def::{DefId, Defs, Namespaces},
+    def::{DefId, DefKind, Defs, Namespaces},
     env::Env,
     env_queries::{GetDefType, GetPropertyMeta},
     mem::Mem,
     relation::{Properties, PropertyId, Relations, SubjectProperties},
-    serde::{MapType, SerdeOperator, SerdeProperty, Serder, ValueType},
+    serde::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty, ValueType},
     types::{DefTypes, Type},
     value::Value,
     PackageId,
@@ -23,7 +23,7 @@ pub struct DomainBinding<'e, 'm> {
 }
 
 pub struct DomainBinding2<'m> {
-    serders: HashMap<String, Serder<'m>>,
+    serde_operators: HashMap<String, SerdeOperator<'m>>,
 }
 
 // pub struct DomainBinding2<'e, 'm> {}
@@ -146,14 +146,14 @@ impl<'e, 'm> DomainBinding<'e, 'm> {
 #[derive(Debug)]
 pub struct Bindings<'m> {
     mem: &'m Mem,
-    serders: HashMap<DefId, Option<Serder<'m>>>,
+    serde_operators: HashMap<DefId, Option<SerdeOperator<'m>>>,
 }
 
 impl<'m> Bindings<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
             mem,
-            serders: Default::default(),
+            serde_operators: Default::default(),
         }
     }
 }
@@ -197,64 +197,78 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             .get(&package_id)
             .expect("package id does not exist, cannot create binding");
 
-        let serders = namespace
+        let serde_operators = namespace
             .iter()
             .filter_map(
-                |(typename, type_def_id)| match self.get_serder(*type_def_id) {
-                    Some(serder) => Some((typename.clone(), serder)),
+                |(typename, type_def_id)| match self.get_serde_operator(*type_def_id) {
+                    Some(operator) => Some((typename.clone(), operator)),
                     None => None,
                 },
             )
             .collect();
 
-        DomainBinding2 { serders }
+        DomainBinding2 { serde_operators }
     }
 
-    fn get_serder(&mut self, type_def_id: DefId) -> Option<Serder<'m>> {
-        if let Some(serder) = self.bindings.serders.get(&type_def_id) {
-            return *serder;
+    fn get_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
+        if let Some(operator) = self.bindings.serde_operators.get(&type_def_id) {
+            return *operator;
         }
 
-        let serder = self.create_serder(type_def_id);
-        self.bindings.serders.insert(type_def_id, serder);
-        serder
+        let operator = self.create_serde_operator(type_def_id);
+        self.bindings.serde_operators.insert(type_def_id, operator);
+        operator
     }
 
-    fn create_serder(&mut self, type_def_id: DefId) -> Option<Serder<'m>> {
+    fn create_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
         match self.get_def_type(type_def_id) {
-            Type::Number => Some(Serder(self.bump().alloc(SerdeOperator::Number))),
-            Type::String => Some(Serder(self.bump().alloc(SerdeOperator::String))),
+            Type::Number => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::Number))),
+            Type::String => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::String))),
             Type::Domain(def_id) => {
                 let properties = self.relations.properties_by_type.get(def_id);
-                self.create_domain_type_serder(properties)
+                let typename = match self.defs.get_def_kind(*def_id) {
+                    Some(DefKind::Type(ident)) => ident.clone(),
+                    _ => "Unknown type".into(),
+                };
+                self.create_domain_type_serde_operator(typename, properties)
             }
             _ => None,
         }
     }
 
-    fn create_domain_type_serder(&mut self, properties: Option<&Properties>) -> Option<Serder<'m>> {
+    fn create_domain_type_serde_operator(
+        &mut self,
+        typename: String,
+        properties: Option<&Properties>,
+    ) -> Option<SerdeOperator<'m>> {
         match properties.map(|prop| &prop.subject) {
             Some(SubjectProperties::Unit) | None => {
-                panic!("TODO: Unit serder")
+                let lol = "";
+                Some(SerdeOperator(self.bump().alloc(
+                    SerdeOperatorKind::MapType(MapType {
+                        typename,
+                        properties: Default::default(),
+                    }),
+                )))
             }
             Some(SubjectProperties::Anonymous(property_id)) => {
                 let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
                     panic!("Problem getting property meta");
                 };
 
-                let serder = self
-                    .get_serder(relationship.object)
+                let operator = self
+                    .get_serde_operator(relationship.object)
                     .expect("No inner serializer");
 
-                Some(Serder(self.bump().alloc(SerdeOperator::ValueType(
-                    ValueType {
-                        typename: "TODO".into(),
+                Some(SerdeOperator(self.bump().alloc(
+                    SerdeOperatorKind::ValueType(ValueType {
+                        typename,
                         property: SerdeProperty {
                             property_id: *property_id,
-                            serder,
+                            operator,
                         },
-                    },
-                ))))
+                    }),
+                )))
             }
             Some(SubjectProperties::Named(properties)) => {
                 let serde_properties = properties.iter().map(|property_id| {
@@ -263,23 +277,25 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
                     };
 
                     let object_key = relation.object_prop().expect("Property has no name").clone();
-                    let serder = self
-                        .get_serder(relationship.object)
+                    let operator = self
+                        .get_serde_operator(relationship.object)
                         .expect("No inner serializer");
 
                     (
                         object_key,
                         SerdeProperty {
                             property_id: *property_id,
-                            serder,
+                            operator,
                         }
                     )
                 }).collect::<HashMap<_, _>>();
 
-                Some(Serder(self.bump().alloc(SerdeOperator::MapType(MapType {
-                    typename: "TODO".into(),
-                    properties: serde_properties,
-                }))))
+                Some(SerdeOperator(self.bump().alloc(
+                    SerdeOperatorKind::MapType(MapType {
+                        typename,
+                        properties: serde_properties,
+                    }),
+                )))
             }
         }
     }
