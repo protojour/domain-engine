@@ -1,0 +1,19 @@
+(class! shipment)
+(class! product)
+(class! customer)
+(class! location)
+
+(prop! name text)
+(has! product name)
+(has! destination name)
+
+(relation! fjdsklfd)
+(prop! destination)
+(range! destination location)
+(has! shipment destination)
+
+(has-id! location)
+
+// OWL (property)
+// domain: shipment
+// range(co-domain): location

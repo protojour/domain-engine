@@ -1,0 +1,27 @@
+(import geojson)
+
+(enum mun-type
+    (variant city)
+    (variant bygd)
+)
+
+(class (municipality)
+    (record
+        (field name text)
+        (field geometry (geojson.geometry))
+        (field type mun-type)
+    )
+)
+
+(entity mun
+    (key :text)
+    (data (municipality))
+)
+
+(instance mun
+    (key "krsand")
+    (data (municipality (
+        (name "Kristiansand")
+        (geometry (f64dsfdsklfdsjfkds))
+    )))
+)

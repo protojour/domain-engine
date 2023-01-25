@@ -1,0 +1,71 @@
+### structural equalities
+(eq! ($x:any) $x [$x])
+(eq! ($x:any) $x (some $x))
+
+### renaming
+(data (d1.facade)
+    (record (field foo :text))
+)
+
+(data (d2.internal)
+    (record (field bar :text))
+)
+
+(eq! ($x0:Text)
+    ((d1.facade)
+        (record (field foo $x0))
+    )
+    ((d2.internal)
+        (record (field bar $x0))
+    )
+)
+
+### number conversion
+(eq! ($x:Num, $c:(Num Const NonZero))
+    $x
+    (* (/ $x $c) $c)
+)
+
+(data (si.meters x:num))
+(data (si.millimeters x:num))
+
+(eq! ($x)
+    (si.meters $x)
+    (si.millimeters (* $x 1000))
+)
+
+### "cardinality conversion"
+(data (d1.outer)
+    (record
+        (field foo (text))
+        (field bars [(d1.inner)])
+    )
+)
+(data (d1.inner)
+    (record
+        (field bar (text))
+    )
+)
+(data (d2.unified)
+    (record
+        (field foo (text))
+        (field bar (text))
+    )
+)
+
+(eq! ($foo, [$bar])
+    ((d1.outer)
+        (field foo $foo)
+        (field bars [
+            ((d2.inner)
+                (field bar $bar)
+            )
+        ])
+    )
+    [
+        ((d2.unified)
+            (field foo $foo)
+            (field bar $bar)
+        )
+    ]
+)
