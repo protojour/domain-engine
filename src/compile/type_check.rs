@@ -104,10 +104,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
             ExprKind::Call(def_id, args) => match self.def_types.get(&def_id) {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
-                        self.errors.push(
-                            CompileError::WrongNumberOfArguments.spanned(&self.sources, &expr.span),
-                        );
-                        return self.types.intern(Type::Error);
+                        return self.error(CompileError::WrongNumberOfArguments, &expr.span);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
                         self.check_expr(arg);
@@ -116,9 +113,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 }
                 Some(Type::Data(data_def_id, field_id)) => {
                     if args.len() != 1 {
-                        self.errors.push(
-                            CompileError::WrongNumberOfArguments.spanned(&self.sources, &expr.span),
-                        );
+                        self.error(CompileError::WrongNumberOfArguments, &expr.span);
                     }
 
                     match self.def_types.get(data_def_id) {
@@ -162,16 +157,16 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                     properties.subject = SubjectProperties::Anonymous(property_id);
                 }
                 (None, SubjectProperties::Anonymous(_)) => {
-                    panic!("TODO: Two anonymous properties");
+                    return self.error(CompileError::DuplicateAnonymousRelation, span);
                 }
                 (None, SubjectProperties::Named(_)) => {
-                    panic!("TODO: Cannot mix anonymous and named properties");
+                    return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
                 (Some(_), SubjectProperties::Unit) => {
                     properties.subject = SubjectProperties::Named([property_id].into());
                 }
                 (Some(_), SubjectProperties::Anonymous(_)) => {
-                    panic!("TODO: Cannot add a named property when there is an anonymous property");
+                    return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
                 (Some(_), SubjectProperties::Named(properties)) => {
                     properties.insert(property_id);
@@ -194,6 +189,11 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 Err(())
             }
         }
+    }
+
+    fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
+        self.errors.push(error.spanned(&self.sources, span));
+        self.types.intern(Type::Error)
     }
 }
 

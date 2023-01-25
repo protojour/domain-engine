@@ -46,6 +46,10 @@ pub enum CompileError {
     InvalidNumber,
     #[error("expected domain type")]
     DomainTypeExpected,
+    #[error("duplicate anonymous relation")]
+    DuplicateAnonymousRelation,
+    #[error("cannot mix named and anonymous relations on the same type")]
+    CannotMixNamedAndAnonymousRelations,
 }
 
 impl CompileError {

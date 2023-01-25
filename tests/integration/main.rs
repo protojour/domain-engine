@@ -51,7 +51,7 @@ impl TestCompile for &'static str {
                     orig_stripped: orig_stripped.to_string(),
                     errors: vec![],
                 });
-                builder.cursor += line.len();
+                builder.cursor += line.len() + 1;
                 builder
             });
 
@@ -85,7 +85,7 @@ impl TestCompile for &'static str {
                     let joined_errors = line
                         .errors
                         .into_iter()
-                        .map(|error| format!(";; ERROR {}", error.error))
+                        .map(|spanned_error| format!(";; ERROR {}", spanned_error.error))
                         .collect::<Vec<_>>()
                         .join("");
                     format!("{original} {joined_errors}")

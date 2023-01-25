@@ -44,9 +44,9 @@ fn parse_data(mut input: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
-    let type_span = stream.span();
     let mut ty_stream = stream.next_list_msg("expected type")?;
-    let (kind, span) = ty_stream.next_sym_msg("")?;
+    let type_span = ty_stream.span();
+    let (kind, _) = ty_stream.next_sym_msg("")?;
 
     let ty = match kind.as_str() {
         "record" => {
