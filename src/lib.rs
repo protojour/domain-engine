@@ -16,7 +16,6 @@ pub mod mem;
 mod compile;
 mod def;
 mod expr;
-mod lambda;
 mod parse;
 mod relation;
 mod source;

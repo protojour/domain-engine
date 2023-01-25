@@ -56,7 +56,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                     _ => panic!("TODO: relation not found"),
                 };
 
-                self.check_relationship_property(
+                self.check_property(
                     def_id,
                     relation,
                     relationship.subject,
@@ -64,7 +64,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                     relationship.object,
                     &def.span,
                 );
-                self.check_relationship_property(
+                self.check_property(
                     def_id,
                     relation,
                     relationship.object,
@@ -133,7 +133,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         }
     }
 
-    fn check_relationship_property(
+    fn check_property(
         &mut self,
         relationship_id: DefId,
         relation: &Relation,
