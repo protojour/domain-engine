@@ -3,8 +3,8 @@ use ontol_lang::{env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
 mod compile_errors;
 
 trait TestCompile {
-    fn ok(self, validator: impl Fn(Env));
-    fn fail(self);
+    fn compile_ok(self, validator: impl Fn(Env));
+    fn compile_fail(self);
 }
 
 #[derive(Default)]
@@ -20,7 +20,7 @@ struct DiagnosticsLine {
 }
 
 impl TestCompile for &'static str {
-    fn ok(self, validator: impl Fn(Env)) {
+    fn compile_ok(self, validator: impl Fn(Env)) {
         let mut mem = Mem::default();
         let mut env = Env::new(&mut mem);
         self.compile(&mut env, PackageId(1)).unwrap();
@@ -28,7 +28,7 @@ impl TestCompile for &'static str {
         validator(env);
     }
 
-    fn fail(self) {
+    fn compile_fail(self) {
         let mut mem = Mem::default();
         let mut env = Env::new(&mut mem);
         let compile_src = env.sources.add(PackageId(666), "str".into(), self.into());

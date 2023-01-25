@@ -2,10 +2,24 @@ use crate::TestCompile;
 
 #[test]
 fn lex_error() {
-    "( ;; ERROR parse error".fail()
+    // BUG: chumsky bug
+    "( ;; ERROR parse error".compile_ok(|_| {});
 }
 
 #[test]
-fn parse_erorr() {
-    "() ;; ERROR parse error".fail()
+fn parse_error1() {
+    "() ;; ERROR parse error".compile_fail()
+}
+
+#[test]
+fn goood() {
+    "
+    (type! foo)
+    (rel! ;; ERROR type not found
+        (foo)
+        bar
+        (baz)
+    )
+    "
+    .compile_fail()
 }

@@ -41,7 +41,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(comment());
 
         combined_tree
-            .map_with_span(|tok, span| (tok, span))
+            .map_with_span(|tree, span| (tree, span))
             .padded()
     })
     .padded()
@@ -87,26 +87,30 @@ mod tests {
 
     use super::*;
 
-    fn test_one(input: &str) -> Spanned<Tree> {
-        let tokens = trees_parser().parse(input).unwrap();
-        tokens.into_iter().next().unwrap()
+    fn expect_one(input: &str) -> Spanned<Tree> {
+        trees_parser()
+            .parse(input)
+            .expect("Expected OK tree parse, got error")
+            .into_iter()
+            .next()
+            .expect("Expected one tree, got none")
     }
 
     #[test]
     fn paren1() {
-        assert_eq!((Tree::Paren(vec![]), 0..2), test_one("()"));
+        assert_eq!((Tree::Paren(vec![]), 0..2), expect_one("()"));
     }
 
     #[test]
     fn paren2() {
-        assert_eq!((Tree::Paren(vec![]), 1..4), test_one(" ( ) "));
+        assert_eq!((Tree::Paren(vec![]), 1..4), expect_one(" ( ) "));
     }
 
     #[test]
     fn paren3() {
         assert_eq!(
             (Tree::Paren(vec![(Tree::Sym("a".into()), 1..2)]), 0..3),
-            test_one("(a)")
+            expect_one("(a)")
         );
     }
 
@@ -120,7 +124,7 @@ mod tests {
                 ]),
                 1..8
             ),
-            test_one(" ( a b ) ")
+            expect_one(" ( a b ) ")
         );
     }
 
@@ -134,18 +138,18 @@ mod tests {
                 ]),
                 1..8
             ),
-            test_one(" [ a b ] ")
+            expect_one(" [ a b ] ")
         );
     }
 
     #[test]
     fn ident() {
-        assert_eq!((Tree::Sym("abc".into()), 0..3), test_one("abc"));
+        assert_eq!((Tree::Sym("abc".into()), 0..3), expect_one("abc"));
     }
 
     #[test]
     fn ident_utf8() {
-        let (Tree::Sym(ident), span) = test_one("bæ") else {
+        let (Tree::Sym(ident), span) = expect_one("bæ") else {
             panic!();
         };
         assert!(ident.is_inline());
@@ -155,7 +159,7 @@ mod tests {
 
     #[test]
     fn int() {
-        assert_eq!((Tree::Num("123".into()), 0..3), test_one("123"));
+        assert_eq!((Tree::Num("123".into()), 0..3), expect_one("123"));
     }
 
     #[test]
@@ -183,5 +187,13 @@ mod tests {
                 (Tree::Comment(_), _)
             ]
         );
+    }
+
+    #[test]
+    #[ignore = "bug in chumsky::repeated. It believes that the error is a recovery."]
+    fn chumsky_repeated_bug() {
+        let _ = tree_parser()
+            .parse("(")
+            .expect("Expected OK tree parse, got error");
     }
 }

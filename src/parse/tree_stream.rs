@@ -45,12 +45,17 @@ impl TreeStream {
     }
 
     pub fn next(&mut self) -> Option<Spanned<Tree>> {
-        match self.iterator.next() {
-            Some(next) => {
-                self.remain_span.start = next.1.end;
-                Some(next)
+        loop {
+            match self.iterator.next() {
+                Some((Tree::Comment(_), _)) => {}
+                Some(next) => {
+                    self.remain_span.start = next.1.end;
+                    return Some(next);
+                }
+                None => {
+                    return None;
+                }
             }
-            None => None,
         }
     }
 
