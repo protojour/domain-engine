@@ -20,6 +20,7 @@ mod def;
 mod expr;
 mod parse;
 mod relation;
+mod serde;
 mod source;
 mod types;
 mod value;

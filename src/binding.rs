@@ -7,6 +7,7 @@ use crate::{
     def::DefId,
     env::Env,
     relation::{Properties, PropertyId, SubjectProperties},
+    serde::Serder,
     types::Type,
     value::Value,
     PackageId,
@@ -17,6 +18,7 @@ use crate::{
 pub struct DomainBinding<'e, 'm> {
     env: &'e Env<'m>,
     namespace: &'e HashMap<String, DefId>,
+    serders: HashMap<String, Serder<'e>>,
 }
 
 #[derive(Debug, Error)]
@@ -143,6 +145,7 @@ impl<'m> Env<'m> {
                 .namespaces
                 .get(&package_id)
                 .expect("package id does not exist, cannot create binding"),
+            serders: Default::default(),
         }
     }
 }
