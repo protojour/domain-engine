@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use crate::{relation::PropertyId, Value};
 
 #[derive(Clone, Copy)]
-pub struct SerdeOperator<'m>(pub &'m SerdeOperatorKind<'m>);
+pub struct SerdeOperator<'m>(pub(crate) &'m SerdeOperatorKind<'m>);
 
 impl<'m> Debug for SerdeOperator<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

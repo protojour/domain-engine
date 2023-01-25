@@ -1,30 +1,48 @@
 use assert_matches::assert_matches;
-use ontol_lang::{binding::InstantiateError, env::Env, Value};
+use ontol_lang::{env::Env, Value};
+use serde::de::DeserializeSeed;
 use serde_json::json;
 
 use crate::{TestCompile, TEST_PKG};
 
 fn instantiate(
-    env: &Env,
+    env: &mut Env,
     type_name: &str,
     json: serde_json::Value,
-) -> Result<Value, InstantiateError> {
-    env.new_binding(TEST_PKG).instantiate_json(type_name, json)
+) -> Result<Value, serde_json::Error> {
+    let domain_binding = env.bindings_builder().new_binding(TEST_PKG);
+    let operator = domain_binding
+        .get_serde_operator(type_name)
+        .expect("No serde operator available");
+    let json_string = serde_json::to_string(&json).unwrap();
+    operator.deserialize(&mut serde_json::Deserializer::from_str(&json_string))
+}
+
+macro_rules! assert_error_msg {
+    ($e:expr, $msg:expr) => {
+        match $e {
+            Ok(v) => panic!("Expected error, was {v:?}"),
+            Err(e) => {
+                let msg = format!("{e}");
+                assert_eq!(msg.as_str(), $msg);
+            }
+        }
+    };
 }
 
 #[test]
 fn instantiate_empty_type_expects_empty_object() {
-    "(type! foo)".compile_ok(|_, env| {
-        assert_matches!(
-            instantiate(&env, "foo", json!(42)),
-            Err(InstantiateError::ExpectedEmptyObject)
+    "(type! foo)".compile_ok(|mut env| {
+        assert_error_msg!(
+            instantiate(&mut env, "foo", json!(42)),
+            "invalid type: integer `42`, expected type foo at line 1 column 2"
+        );
+        assert_error_msg!(
+            instantiate(&mut env, "foo", json!({ "bar": 5 })),
+            "unknown property `bar` at line 1 column 6"
         );
         assert_matches!(
-            instantiate(&env, "foo", json!({ "bar": 5 })),
-            Err(InstantiateError::ExpectedEmptyObject)
-        );
-        assert_matches!(
-            instantiate(&env, "foo", json!({})),
+            instantiate(&mut env, "foo", json!({})),
             Ok(Value::Compound(attrs)) if attrs.is_empty()
         );
     });
@@ -37,17 +55,11 @@ fn instantiate_anonymous() {
     (type! foo)
     (rel! (foo) _ (number))
     "
-    .compile_ok(|_, env| {
+    .compile_ok(|mut env| {
+        assert_error_msg!(instantiate(&mut env, "foo", json!(42)), "fdjskfdsljkl");
+        assert_error_msg!(instantiate(&mut env, "foo", json!({ "bar": 5 })), "");
         assert_matches!(
-            instantiate(&env, "foo", json!(42)),
-            Err(InstantiateError::ExpectedEmptyObject)
-        );
-        assert_matches!(
-            instantiate(&env, "foo", json!({ "bar": 5 })),
-            Err(InstantiateError::ExpectedEmptyObject)
-        );
-        assert_matches!(
-            instantiate(&env, "foo", json!({})),
+            instantiate(&mut env, "foo", json!({})),
             Ok(Value::Compound(attrs)) if attrs.is_empty()
         );
     });
