@@ -40,6 +40,7 @@ pub enum DefKind {
 #[derive(Debug)]
 pub enum Primitive {
     Number,
+    String,
 }
 
 #[derive(Debug)]
@@ -203,6 +204,11 @@ impl<'m> Env<'m> {
             "number",
             DefKind::Primitive(Primitive::Number),
             Type::Number,
+        );
+        self.add_core_def(
+            "string",
+            DefKind::Primitive(Primitive::String),
+            Type::String,
         );
         self.add_core_def(
             "*",

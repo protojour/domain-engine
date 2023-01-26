@@ -70,3 +70,23 @@ fn deserialize_number() {
         );
     });
 }
+
+#[test]
+fn deserialize_string() {
+    "
+    (type! foo)
+    (rel! (foo) _ (string))
+    "
+    .compile_ok(|mut env| {
+        let foo = TypeBinding::new(&mut env, "foo");
+        assert_matches!(
+            foo.deserialize(json!("hei")),
+            Ok(Value::String(s)) if s == "hei"
+        );
+
+        assert_error_msg!(
+            foo.deserialize(json!({})),
+            "invalid type: map, expected string at line 1 column 0"
+        );
+    });
+}
