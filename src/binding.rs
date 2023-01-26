@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}};
+use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use smartstring::alias::String;
@@ -22,11 +22,17 @@ pub struct DomainBinding<'m> {
 }
 
 impl<'m> DomainBinding<'m> {
-    pub fn get_serde_operator<'e>(&self, env: &'e Env<'m>, type_name: &str) -> Option<SerdeOperator<'e, 'm>> {
-        self.serde_operator_kinds.get(type_name).map(|kind| SerdeOperator {
-            kind,
-            bindings: &env.bindings
-        })
+    pub fn get_serde_operator<'e>(
+        &self,
+        env: &'e Env<'m>,
+        type_name: &str,
+    ) -> Option<SerdeOperator<'e, 'm>> {
+        self.serde_operator_kinds
+            .get(type_name)
+            .map(|kind| SerdeOperator {
+                kind,
+                bindings: &env.bindings,
+            })
     }
 }
 
@@ -84,7 +90,9 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             })
             .collect();
 
-        DomainBinding { serde_operator_kinds }
+        DomainBinding {
+            serde_operator_kinds,
+        }
     }
 
     fn get_or_create_serde_operator_kind(
@@ -92,7 +100,7 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
         type_def_id: DefId,
     ) -> Option<&'m SerdeOperatorKind<'m>> {
         if self.type_stack.contains(&type_def_id) {
-            return Some(self.bump().alloc(SerdeOperatorKind::Recursive(type_def_id)))
+            return Some(self.bump().alloc(SerdeOperatorKind::Recursive(type_def_id)));
         }
 
         if let Some(kind) = self.bindings.serde_operator_kinds.get(&type_def_id) {
@@ -162,10 +170,9 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
                     };
 
                     let object_key = relation.object_prop().expect("Property has no name").clone();
-                    let kind = 
+                    let kind =
                         self.get_or_create_serde_operator_kind(relationship.object)
                             .expect("No inner serializer");
-                    
 
                     (
                         object_key,
