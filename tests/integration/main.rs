@@ -2,6 +2,8 @@ use ontol_lang::{env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
 
 mod test_compile_errors;
 mod test_deserialize;
+mod test_serde;
+mod util;
 
 const TEST_PKG: PackageId = PackageId(42);
 

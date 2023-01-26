@@ -1,45 +1,10 @@
+//! Tests for deserialization, including errors
+
 use assert_matches::assert_matches;
-use ontol_lang::{binding::DomainBinding, env::Env, serde::SerdeOperator, Value};
-use serde::de::DeserializeSeed;
+use ontol_lang::Value;
 use serde_json::json;
-use smartstring::alias::String;
 
-use crate::{assert_error_msg, TestCompile, TEST_PKG};
-
-struct TypeBinding<'m> {
-    domain_binding: DomainBinding<'m>,
-    type_name: String,
-}
-
-impl<'m> TypeBinding<'m> {
-    fn new(env: &mut Env<'m>, type_name: &str) -> Self {
-        let binding = Self {
-            domain_binding: env.bindings_builder().new_binding(TEST_PKG),
-            type_name: type_name.into(),
-        };
-        println!(
-            "deserializing `{type_name}` with operator {:?}",
-            binding.operator(env)
-        );
-        binding
-    }
-
-    fn operator<'e>(&self, env: &'e Env<'m>) -> SerdeOperator<'e, 'm> {
-        self.domain_binding
-            .get_serde_operator(env, &self.type_name)
-            .expect("No serde operator available")
-    }
-
-    fn deserialize<'e>(
-        &self,
-        env: &'e Env<'m>,
-        json: serde_json::Value,
-    ) -> Result<Value, serde_json::Error> {
-        let json_string = serde_json::to_string(&json).unwrap();
-        self.operator(env)
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))
-    }
-}
+use crate::{assert_error_msg, util::TypeBinding, TestCompile};
 
 #[test]
 fn deserialize_empty_type() {

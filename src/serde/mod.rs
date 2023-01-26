@@ -1,9 +1,10 @@
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::{binding::Bindings, def::DefId, relation::PropertyId};
+use crate::{binding::Bindings, def::DefId, relation::PropertyId, Value};
 
 mod deserialize;
+mod serialize;
 
 /// SerdeOperator is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
@@ -12,6 +13,14 @@ mod deserialize;
 pub struct SerdeOperator<'e, 'm> {
     pub(crate) kind: &'m SerdeOperatorKind<'m>,
     pub(crate) bindings: &'e Bindings<'m>,
+}
+
+pub trait SerializeValue {
+    fn serialize_value<S: serde::Serializer>(
+        &self,
+        value: &Value,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>;
 }
 
 #[derive(Debug)]
