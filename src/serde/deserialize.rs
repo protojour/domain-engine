@@ -145,14 +145,16 @@ impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
         }
 
         if attributes.len() < self.map_type.properties.len() {
-            let missing_keys = OneOf(
-                self.map_type
+            let missing_keys = Missing {
+                items: self
+                    .map_type
                     .properties
                     .iter()
                     .filter(|(_, property)| !attributes.contains_key(&property.property_id))
                     .map(|(key, _)| -> Box<dyn Display> { Box::new(key.clone()) })
                     .collect(),
-            );
+                logic_op: LogicOp::And,
+            };
 
             return Err(serde::de::Error::custom(format!(
                 "missing properties, expected {missing_keys}"
@@ -199,17 +201,22 @@ impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s, 'm> {
     }
 }
 
-struct OneOf(Vec<Box<dyn Display>>);
+struct Missing {
+    items: Vec<Box<dyn Display>>,
+    logic_op: LogicOp,
+}
 
-impl Display for OneOf {
+impl Display for Missing {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0.len() {
-            0 => panic!("OneOf empty"),
-            1 => write!(f, "`{}`", self.0[0]),
-            2 => write!(f, "`{}` or `{}`", self.0[0], self.0[1]),
+        match self.items.as_slice() {
+            [] => panic!("BUG: Nothing is missing!"),
+            [single] => write!(f, "`{}`", single),
+            [a, b] => write!(f, "`{}` {} `{}`", a, self.logic_op.name(), b),
             _ => {
-                write!(f, "one of ")?;
-                let mut iter = self.0.iter().peekable();
+                match self.logic_op {
+                    LogicOp::And => write!(f, "all of ")?,
+                }
+                let mut iter = self.items.iter().peekable();
                 while let Some(next) = iter.next() {
                     write!(f, "`{}`", next)?;
                     if iter.peek().is_some() {
@@ -219,6 +226,18 @@ impl Display for OneOf {
 
                 Ok(())
             }
+        }
+    }
+}
+
+enum LogicOp {
+    And,
+}
+
+impl LogicOp {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::And => "and",
         }
     }
 }

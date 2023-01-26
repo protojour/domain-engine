@@ -48,7 +48,6 @@ impl<'m> Bindings<'m> {
 impl<'m> Env<'m> {
     pub fn bindings_builder<'e>(&'e mut self) -> BindingsBuilder<'e, 'm> {
         BindingsBuilder {
-            stack_size: 0,
             type_stack: Default::default(),
             bindings: &mut self.bindings,
             namespaces: &self.namespaces,
@@ -60,7 +59,6 @@ impl<'m> Env<'m> {
 }
 
 pub struct BindingsBuilder<'e, 'm> {
-    stack_size: usize,
     type_stack: HashSet<DefId>,
     bindings: &'e mut Bindings<'m>,
     namespaces: &'e Namespaces,
@@ -81,10 +79,8 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             .space(Space::Type)
             .iter()
             .filter_map(|(typename, type_def_id)| {
-                match self.get_or_create_serde_operator_kind(*type_def_id) {
-                    Some(kind) => Some((typename.clone(), kind)),
-                    None => None,
-                }
+                self.get_or_create_serde_operator_kind(*type_def_id)
+                    .map(|kind| (typename.clone(), kind))
             })
             .collect();
 
@@ -103,15 +99,10 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             return *kind;
         }
 
-        if self.stack_size >= 100 {
-            panic!("STACK OVERFLOW");
-        }
-
-        self.stack_size += 1;
         self.type_stack.insert(type_def_id);
         let kind = self.create_serde_operator_kind(type_def_id);
         self.type_stack.remove(&type_def_id);
-        self.stack_size -= 1;
+
         self.bindings.serde_operator_kinds.insert(type_def_id, kind);
         kind
     }

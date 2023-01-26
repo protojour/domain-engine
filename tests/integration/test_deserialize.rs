@@ -122,7 +122,7 @@ fn deserialize_object_properties() {
         );
         assert_error_msg!(
             obj.deserialize(&env, json!({})),
-            "missing properties, expected `a` or `b` at line 1 column 2"
+            "missing properties, expected `a` and `b` at line 1 column 2"
         );
     });
 }
