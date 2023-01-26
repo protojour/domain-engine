@@ -1,46 +1,16 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
 
 use smartstring::alias::String;
 
-use crate::{relation::PropertyId, Value};
+use crate::Value;
 
-#[derive(Clone, Copy, Debug)]
-pub struct SerdeOperator<'m>(pub(crate) &'m SerdeOperatorKind<'m>);
-
-#[derive(Debug)]
-pub enum SerdeOperatorKind<'m> {
-    Number,
-    String,
-    // A type with just one anonymous property
-    ValueType(ValueType<'m>),
-    // A type with
-    MapType(MapType<'m>),
-}
-
-#[derive(Debug)]
-pub struct ValueType<'m> {
-    pub typename: String,
-    pub property: SerdeProperty<'m>,
-}
-
-#[derive(Debug)]
-pub struct MapType<'m> {
-    pub typename: String,
-    pub properties: HashMap<String, SerdeProperty<'m>>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct SerdeProperty<'m> {
-    pub property_id: PropertyId,
-    pub operator: SerdeOperator<'m>,
-}
+use super::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty};
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s, 'm>(&'s HashMap<String, SerdeProperty<'m>>);
 
 struct NumberVisitor;
 
-/// Visitor accepting all strings
 struct StringVisitor;
 
 struct MapTypeVisitor<'m>(&'m MapType<'m>);
