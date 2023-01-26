@@ -140,9 +140,11 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
         inverse_role_def_id: DefId,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        /*
         let Ok(role_def_id) = self.expect_domain_type(role_def_id, span) else {
             return self.types.intern(Type::Error);
         };
+        */
 
         let property_codomain = self.check_def(inverse_role_def_id);
         let property_id = self.relations.new_property(relationship_id, role);

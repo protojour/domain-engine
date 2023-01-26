@@ -1,19 +1,13 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use serde::Serializer;
 use smartstring::alias::String;
 
 use crate::{relation::PropertyId, Value};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SerdeOperator<'m>(pub(crate) &'m SerdeOperatorKind<'m>);
 
-impl<'m> Debug for SerdeOperator<'m> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.serialize_unit_struct("SerdeOperator")
-    }
-}
-
+#[derive(Debug)]
 pub enum SerdeOperatorKind<'m> {
     Number,
     String,
@@ -23,17 +17,19 @@ pub enum SerdeOperatorKind<'m> {
     MapType(MapType<'m>),
 }
 
+#[derive(Debug)]
 pub struct ValueType<'m> {
     pub typename: String,
     pub property: SerdeProperty<'m>,
 }
 
+#[derive(Debug)]
 pub struct MapType<'m> {
     pub typename: String,
     pub properties: HashMap<String, SerdeProperty<'m>>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty<'m> {
     pub property_id: PropertyId,
     pub operator: SerdeOperator<'m>,
@@ -78,6 +74,43 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "number")
+    }
+
+    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.into()))
+    }
+
+    fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.into()))
+    }
+
+    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.into()))
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.try_into().map_err(|_| {
+            serde::de::Error::custom(format!("u64 overflow"))
+        })?))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v))
     }
 }
 

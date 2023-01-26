@@ -39,7 +39,7 @@ struct DiagnosticsLine {
 impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(Env)) {
         let mem = Mem::default();
-        let mut env = Env::new(&mem);
+        let mut env = Env::new(&mem).with_core();
         self.compile(&mut env, TEST_PKG).unwrap();
 
         validator(env);
@@ -47,7 +47,7 @@ impl TestCompile for &'static str {
 
     fn compile_fail(self) {
         let mut mem = Mem::default();
-        let mut env = Env::new(&mut mem);
+        let mut env = Env::new(&mut mem).with_core();
         let compile_src = env.sources.add(PackageId(666), "str".into(), self.into());
 
         let Err(errors) = compile_src.clone().compile(&mut env, PackageId(1)) else {
