@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::{HashMap, HashSet}};
 
 use indexmap::IndexMap;
 use smartstring::alias::String;
@@ -18,26 +18,29 @@ use crate::{
 /// A binding to a specific domain,
 /// so it may be interacted with from the external world
 pub struct DomainBinding<'m> {
-    serde_operators: HashMap<String, SerdeOperator<'m>>,
+    serde_operator_kinds: HashMap<String, &'m SerdeOperatorKind<'m>>,
 }
 
 impl<'m> DomainBinding<'m> {
-    pub fn get_serde_operator(&self, type_name: &str) -> Option<SerdeOperator<'m>> {
-        self.serde_operators.get(type_name).cloned()
+    pub fn get_serde_operator<'e>(&self, env: &'e Env<'m>, type_name: &str) -> Option<SerdeOperator<'e, 'm>> {
+        self.serde_operator_kinds.get(type_name).map(|kind| SerdeOperator {
+            kind,
+            bindings: &env.bindings
+        })
     }
 }
 
 #[derive(Debug)]
 pub struct Bindings<'m> {
     mem: &'m Mem,
-    serde_operators: HashMap<DefId, Option<SerdeOperator<'m>>>,
+    pub(crate) serde_operator_kinds: HashMap<DefId, Option<&'m SerdeOperatorKind<'m>>>,
 }
 
 impl<'m> Bindings<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
             mem,
-            serde_operators: Default::default(),
+            serde_operator_kinds: Default::default(),
         }
     }
 }
@@ -45,6 +48,8 @@ impl<'m> Bindings<'m> {
 impl<'m> Env<'m> {
     pub fn bindings_builder<'e>(&'e mut self) -> BindingsBuilder<'e, 'm> {
         BindingsBuilder {
+            stack_size: 0,
+            type_stack: Default::default(),
             bindings: &mut self.bindings,
             namespaces: &self.namespaces,
             defs: &self.defs,
@@ -55,6 +60,8 @@ impl<'m> Env<'m> {
 }
 
 pub struct BindingsBuilder<'e, 'm> {
+    stack_size: usize,
+    type_stack: HashSet<DefId>,
     bindings: &'e mut Bindings<'m>,
     namespaces: &'e Namespaces,
     defs: &'e Defs,
@@ -63,83 +70,99 @@ pub struct BindingsBuilder<'e, 'm> {
 }
 
 impl<'e, 'm> BindingsBuilder<'e, 'm> {
-    pub fn new_binding(&mut self, package_id: PackageId) -> DomainBinding<'m> {
+    pub fn new_binding(&'e mut self, package_id: PackageId) -> DomainBinding<'m> {
         let namespace = self
             .namespaces
             .namespaces
             .get(&package_id)
             .expect("package id does not exist, cannot create binding");
 
-        let serde_operators = namespace
+        let serde_operator_kinds = namespace
             .space(Space::Type)
             .iter()
             .filter_map(|(typename, type_def_id)| {
-                match self.get_or_create_serde_operator(*type_def_id) {
-                    Some(operator) => Some((typename.clone(), operator)),
+                match self.get_or_create_serde_operator_kind(*type_def_id) {
+                    Some(kind) => Some((typename.clone(), kind)),
                     None => None,
                 }
             })
             .collect();
 
-        DomainBinding { serde_operators }
+        DomainBinding { serde_operator_kinds }
     }
 
-    fn get_or_create_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
-        if let Some(operator) = self.bindings.serde_operators.get(&type_def_id) {
-            return *operator;
+    fn get_or_create_serde_operator_kind(
+        &mut self,
+        type_def_id: DefId,
+    ) -> Option<&'m SerdeOperatorKind<'m>> {
+        if self.type_stack.contains(&type_def_id) {
+            return Some(self.bump().alloc(SerdeOperatorKind::Recursive(type_def_id)))
         }
 
-        let operator = self.create_serde_operator(type_def_id);
-        self.bindings.serde_operators.insert(type_def_id, operator);
-        operator
+        if let Some(kind) = self.bindings.serde_operator_kinds.get(&type_def_id) {
+            return *kind;
+        }
+
+        if self.stack_size >= 100 {
+            panic!("STACK OVERFLOW");
+        }
+
+        self.stack_size += 1;
+        self.type_stack.insert(type_def_id);
+        let kind = self.create_serde_operator_kind(type_def_id);
+        self.type_stack.remove(&type_def_id);
+        self.stack_size -= 1;
+        self.bindings.serde_operator_kinds.insert(type_def_id, kind);
+        kind
     }
 
-    fn create_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
+    fn create_serde_operator_kind(
+        &mut self,
+        type_def_id: DefId,
+    ) -> Option<&'m SerdeOperatorKind<'m>> {
         match self.get_def_type(type_def_id) {
-            Some(Type::Number) => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::Number))),
-            Some(Type::String) => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::String))),
+            Some(Type::Number) => Some(self.bump().alloc(SerdeOperatorKind::Number)),
+            Some(Type::String) => Some(self.bump().alloc(SerdeOperatorKind::String)),
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(ident)) => ident.clone(),
                     _ => "Unknown type".into(),
                 };
-                self.create_domain_type_serde_operator(typename, properties)
+                self.create_domain_type_serde_operator_kind(typename, properties)
             }
             _ => None,
         }
     }
 
-    fn create_domain_type_serde_operator(
+    fn create_domain_type_serde_operator_kind(
         &mut self,
         typename: String,
         properties: Option<&Properties>,
-    ) -> Option<SerdeOperator<'m>> {
+    ) -> Option<&'m SerdeOperatorKind<'m>> {
         match properties.map(|prop| &prop.subject) {
-            Some(SubjectProperties::Unit) | None => Some(SerdeOperator(self.bump().alloc(
-                SerdeOperatorKind::MapType(MapType {
+            Some(SubjectProperties::Unit) | None => {
+                Some(self.bump().alloc(SerdeOperatorKind::MapType(MapType {
                     typename,
                     properties: Default::default(),
-                }),
-            ))),
+                })))
+            }
             Some(SubjectProperties::Anonymous(property_id)) => {
                 let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
                     panic!("Problem getting property meta");
                 };
 
-                let operator = self
-                    .get_or_create_serde_operator(relationship.object)
+                let kind = self
+                    .get_or_create_serde_operator_kind(relationship.object)
                     .expect("No inner serializer");
 
-                Some(SerdeOperator(self.bump().alloc(
-                    SerdeOperatorKind::ValueType(ValueType {
-                        typename,
-                        property: SerdeProperty {
-                            property_id: *property_id,
-                            operator,
-                        },
-                    }),
-                )))
+                Some(self.bump().alloc(SerdeOperatorKind::ValueType(ValueType {
+                    typename,
+                    property: SerdeProperty {
+                        property_id: *property_id,
+                        kind,
+                    },
+                })))
             }
             Some(SubjectProperties::Named(properties)) => {
                 let serde_properties = properties.iter().map(|property_id| {
@@ -148,25 +171,24 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
                     };
 
                     let object_key = relation.object_prop().expect("Property has no name").clone();
-                    let operator = self
-                        .get_or_create_serde_operator(relationship.object)
-                        .expect("No inner serializer");
+                    let kind = 
+                        self.get_or_create_serde_operator_kind(relationship.object)
+                            .expect("No inner serializer");
+                    
 
                     (
                         object_key,
                         SerdeProperty {
                             property_id: *property_id,
-                            operator,
+                            kind,
                         }
                     )
                 }).collect::<IndexMap<_, _>>();
 
-                Some(SerdeOperator(self.bump().alloc(
-                    SerdeOperatorKind::MapType(MapType {
-                        typename,
-                        properties: serde_properties,
-                    }),
-                )))
+                Some(self.bump().alloc(SerdeOperatorKind::MapType(MapType {
+                    typename,
+                    properties: serde_properties,
+                })))
             }
         }
     }

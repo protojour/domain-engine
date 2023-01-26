@@ -1,9 +1,7 @@
-use std::{collections::HashMap, fmt::Debug};
-
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::relation::PropertyId;
+use crate::{binding::Bindings, def::DefId, relation::PropertyId};
 
 mod deserialize;
 
@@ -11,7 +9,10 @@ mod deserialize;
 /// Each serde-enabled type has its own operator, which is cached
 /// in the environment.
 #[derive(Clone, Copy, Debug)]
-pub struct SerdeOperator<'m>(pub(crate) &'m SerdeOperatorKind<'m>);
+pub struct SerdeOperator<'e, 'm> {
+    pub(crate) kind: &'m SerdeOperatorKind<'m>,
+    pub(crate) bindings: &'e Bindings<'m>,
+}
 
 #[derive(Debug)]
 pub(crate) enum SerdeOperatorKind<'m> {
@@ -19,8 +20,9 @@ pub(crate) enum SerdeOperatorKind<'m> {
     String,
     // A type with just one anonymous property
     ValueType(ValueType<'m>),
-    // A type with
+    // A type with many properties
     MapType(MapType<'m>),
+    Recursive(DefId),
 }
 
 #[derive(Debug)]
@@ -38,5 +40,5 @@ pub(crate) struct MapType<'m> {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SerdeProperty<'m> {
     pub property_id: PropertyId,
-    pub operator: SerdeOperator<'m>,
+    pub kind: &'m SerdeOperatorKind<'m>,
 }

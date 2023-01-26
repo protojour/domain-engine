@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::Value;
+use crate::{binding::Bindings, Value};
 
 use super::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty};
 
@@ -14,27 +14,47 @@ struct NumberVisitor;
 
 struct StringVisitor;
 
-struct MapTypeVisitor<'m>(&'m MapType<'m>);
+struct MapTypeVisitor<'e, 'm> {
+    map_type: &'m MapType<'m>,
+    bindings: &'e Bindings<'m>,
+}
 
-impl<'m, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'m> {
+impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'e, 'm> {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match self.0 {
+        match self.kind {
             SerdeOperatorKind::Number => {
                 serde::de::Deserializer::deserialize_i64(deserializer, NumberVisitor)
             }
             SerdeOperatorKind::String => {
                 serde::de::Deserializer::deserialize_str(deserializer, StringVisitor)
             }
-            SerdeOperatorKind::ValueType(value_type) => {
-                value_type.property.operator.deserialize(deserializer)
+            SerdeOperatorKind::ValueType(value_type) => SerdeOperator {
+                kind: value_type.property.kind,
+                bindings: self.bindings,
             }
-            SerdeOperatorKind::MapType(map_type) => {
-                serde::de::Deserializer::deserialize_map(deserializer, MapTypeVisitor(map_type))
+            .deserialize(deserializer),
+            SerdeOperatorKind::MapType(map_type) => serde::de::Deserializer::deserialize_map(
+                deserializer,
+                MapTypeVisitor {
+                    map_type,
+                    bindings: self.bindings,
+                },
+            ),
+            SerdeOperatorKind::Recursive(def_id) => {
+                let kind = match self.bindings.serde_operator_kinds.get(&def_id) {
+                    Some(Some(kind)) => kind,
+                    _ => panic!("Could not resolve recursive serde operator"),
+                };
+                SerdeOperator {
+                    kind,
+                    bindings: self.bindings,
+                }
+                .deserialize(deserializer)
             }
         }
     }
@@ -100,28 +120,33 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
     }
 }
 
-impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
+impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "type `{}`", self.0.typename)
+        write!(f, "type `{}`", self.map_type.typename)
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut attributes = HashMap::with_capacity(self.0.properties.len());
+        let mut attributes = HashMap::with_capacity(self.map_type.properties.len());
 
-        while let Some(serde_property) = map.next_key_seed(PropertySet(&self.0.properties))? {
-            let attribute_value = map.next_value_seed(serde_property.operator)?;
+        while let Some(serde_property) =
+            map.next_key_seed(PropertySet(&self.map_type.properties))?
+        {
+            let attribute_value = map.next_value_seed(SerdeOperator {
+                kind: serde_property.kind,
+                bindings: self.bindings,
+            })?;
 
             attributes.insert(serde_property.property_id, attribute_value);
         }
 
-        if attributes.len() < self.0.properties.len() {
+        if attributes.len() < self.map_type.properties.len() {
             let missing_keys = OneOf(
-                self.0
+                self.map_type
                     .properties
                     .iter()
                     .filter(|(_, property)| !attributes.contains_key(&property.property_id))
