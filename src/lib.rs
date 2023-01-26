@@ -14,14 +14,15 @@ pub mod binding;
 pub mod ena;
 pub mod env;
 pub mod mem;
+pub mod serde;
 
 mod compile;
 mod def;
 mod env_queries;
 mod expr;
+mod namespace;
 mod parse;
 mod relation;
-mod serde;
 mod source;
 mod types;
 mod value;

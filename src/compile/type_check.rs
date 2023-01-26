@@ -51,7 +51,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                         kind: DefKind::Relation(relation),
                         ..
                     }) => relation,
-                    _ => panic!("TODO: relation not found"),
+                    other => panic!("TODO: relation not found, got {other:?}"),
                 };
 
                 self.check_property(
@@ -217,6 +217,7 @@ mod tests {
         env::Env,
         expr::{ExprId, ExprKind},
         mem::Mem,
+        namespace::Space,
         source::{SourceSpan, UNIT_TEST_PKG},
         Compile,
     };
@@ -230,7 +231,7 @@ mod tests {
 
         let m = env
             .namespaces
-            .lookup(&[UNIT_TEST_PKG], "m")
+            .lookup(&[UNIT_TEST_PKG], Space::Type, "m")
             .expect("m not found");
         let type_of_m = env.type_check().check_def(m);
 
@@ -252,7 +253,7 @@ mod tests {
 
         let foo = env
             .namespaces
-            .lookup(&[UNIT_TEST_PKG], "foo")
+            .lookup(&[UNIT_TEST_PKG], Space::Type, "foo")
             .expect("foo not found");
         let type_of_m = env.type_check().check_def(foo);
 

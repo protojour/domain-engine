@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
+use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::Value;
@@ -7,7 +8,7 @@ use crate::Value;
 use super::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty};
 
 #[derive(Clone, Copy)]
-struct PropertySet<'s, 'm>(&'s HashMap<String, SerdeProperty<'m>>);
+struct PropertySet<'s, 'm>(&'s IndexMap<String, SerdeProperty<'m>>);
 
 struct NumberVisitor;
 
@@ -119,19 +120,18 @@ impl<'m, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'m> {
         }
 
         if attributes.len() < self.0.properties.len() {
-            let missing_keys = self
-                .0
-                .properties
-                .iter()
-                .filter(|(_, property)| attributes.contains_key(&property.property_id))
-                .map(|(key, _)| key)
-                .collect::<Vec<_>>();
+            let missing_keys = OneOf(
+                self.0
+                    .properties
+                    .iter()
+                    .filter(|(_, property)| !attributes.contains_key(&property.property_id))
+                    .map(|(key, _)| -> Box<dyn Display> { Box::new(key.clone()) })
+                    .collect(),
+            );
 
-            return Err(serde::de::Error::custom(if missing_keys.is_empty() {
-                format!("missing properties `{missing_keys:?}`")
-            } else {
-                panic!("BUG: No missing properties")
-            }));
+            return Err(serde::de::Error::custom(format!(
+                "missing properties, expected {missing_keys}"
+            )));
         }
 
         Ok(Value::Compound(attributes))
@@ -169,6 +169,30 @@ impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s, 'm> {
                     "unknown property `{}`",
                     v
                 )))
+            }
+        }
+    }
+}
+
+struct OneOf(Vec<Box<dyn Display>>);
+
+impl Display for OneOf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0.len() {
+            0 => panic!("OneOf empty"),
+            1 => write!(f, "`{}`", self.0[0]),
+            2 => write!(f, "`{}` or `{}`", self.0[0], self.0[1]),
+            _ => {
+                write!(f, "one of ")?;
+                let mut iter = self.0.iter().peekable();
+                while let Some(next) = iter.next() {
+                    write!(f, "`{}`", next)?;
+                    if iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                Ok(())
             }
         }
     }

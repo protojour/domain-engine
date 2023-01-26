@@ -8,9 +8,10 @@ use std::collections::HashMap;
 use crate::{
     binding::Bindings,
     compile::error::CompileErrors,
-    def::{Defs, Namespaces},
+    def::Defs,
     expr::{Expr, ExprId},
     mem::Mem,
+    namespace::Namespaces,
     relation::Relations,
     source::{Package, PackageId, Sources},
     types::{DefTypes, Types},
@@ -19,7 +20,6 @@ use crate::{
 /// Runtime environment
 #[derive(Debug)]
 pub struct Env<'m> {
-    pub(crate) mem: &'m Mem,
     pub sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
@@ -39,7 +39,6 @@ pub struct Env<'m> {
 impl<'m> Env<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
-            mem,
             sources: Default::default(),
             packages: Default::default(),
             bindings: Bindings::new(mem),

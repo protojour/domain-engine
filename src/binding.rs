@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
-    def::{DefId, DefKind, Defs, Namespaces},
+    def::{DefId, DefKind, Defs},
     env::Env,
     env_queries::{GetDefType, GetPropertyMeta},
     mem::Mem,
+    namespace::{Namespaces, Space},
     relation::{Properties, Relations, SubjectProperties},
     serde::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty, ValueType},
     types::{DefTypes, Type},
@@ -69,19 +71,20 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
             .expect("package id does not exist, cannot create binding");
 
         let serde_operators = namespace
+            .space(Space::Type)
             .iter()
-            .filter_map(
-                |(typename, type_def_id)| match self.get_serde_operator(*type_def_id) {
+            .filter_map(|(typename, type_def_id)| {
+                match self.get_or_create_serde_operator(*type_def_id) {
                     Some(operator) => Some((typename.clone(), operator)),
                     None => None,
-                },
-            )
+                }
+            })
             .collect();
 
         DomainBinding { serde_operators }
     }
 
-    fn get_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
+    fn get_or_create_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
         if let Some(operator) = self.bindings.serde_operators.get(&type_def_id) {
             return *operator;
         }
@@ -93,9 +96,9 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
 
     fn create_serde_operator(&mut self, type_def_id: DefId) -> Option<SerdeOperator<'m>> {
         match self.get_def_type(type_def_id) {
-            Type::Number => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::Number))),
-            Type::String => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::String))),
-            Type::Domain(def_id) => {
+            Some(Type::Number) => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::Number))),
+            Some(Type::String) => Some(SerdeOperator(self.bump().alloc(SerdeOperatorKind::String))),
+            Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(ident)) => ident.clone(),
@@ -125,7 +128,7 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
                 };
 
                 let operator = self
-                    .get_serde_operator(relationship.object)
+                    .get_or_create_serde_operator(relationship.object)
                     .expect("No inner serializer");
 
                 Some(SerdeOperator(self.bump().alloc(
@@ -146,7 +149,7 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
 
                     let object_key = relation.object_prop().expect("Property has no name").clone();
                     let operator = self
-                        .get_serde_operator(relationship.object)
+                        .get_or_create_serde_operator(relationship.object)
                         .expect("No inner serializer");
 
                     (
@@ -156,7 +159,7 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
                             operator,
                         }
                     )
-                }).collect::<HashMap<_, _>>();
+                }).collect::<IndexMap<_, _>>();
 
                 Some(SerdeOperator(self.bump().alloc(
                     SerdeOperatorKind::MapType(MapType {

@@ -1,5 +1,5 @@
 use assert_matches::assert_matches;
-use ontol_lang::{binding::DomainBinding, env::Env, Value};
+use ontol_lang::{binding::DomainBinding, env::Env, serde::SerdeOperator, Value};
 use serde::de::DeserializeSeed;
 use serde_json::json;
 use smartstring::alias::String;
@@ -13,20 +13,27 @@ struct TypeBinding<'m> {
 
 impl<'m> TypeBinding<'m> {
     fn new(env: &mut Env<'m>, type_name: &str) -> Self {
-        Self {
+        let binding = Self {
             domain_binding: env.bindings_builder().new_binding(TEST_PKG),
             type_name: type_name.into(),
-        }
+        };
+        println!(
+            "deserializing `{type_name}` with operator {:?}",
+            binding.operator()
+        );
+        binding
+    }
+
+    fn operator(&self) -> SerdeOperator<'m> {
+        self.domain_binding
+            .get_serde_operator(&self.type_name)
+            .expect("No serde operator available")
     }
 
     fn deserialize(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let operator = self
-            .domain_binding
-            .get_serde_operator(&self.type_name)
-            .expect("No serde operator available");
-        println!("deserializing with operator {operator:?}");
         let json_string = serde_json::to_string(&json).unwrap();
-        operator.deserialize(&mut serde_json::Deserializer::from_str(&json_string))
+        self.operator()
+            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))
     }
 }
 
@@ -87,6 +94,56 @@ fn deserialize_string() {
         assert_error_msg!(
             foo.deserialize(json!({})),
             "invalid type: map, expected string at line 1 column 0"
+        );
+    });
+}
+
+#[test]
+fn deserialize_object_properties() {
+    "
+    (type! obj)
+    (rel! (obj) a (string))
+    (rel! (obj) b (number))
+    "
+    .compile_ok(|mut env| {
+        let obj = TypeBinding::new(&mut env, "obj");
+        assert_matches!(
+            obj.deserialize(json!({ "a": "hei", "b": 42 })),
+            Ok(Value::Compound(_))
+        );
+
+        assert_error_msg!(
+            obj.deserialize(json!({ "a": "hei", "b": 42, "c": false })),
+            "unknown property `c` at line 1 column 21"
+        );
+        assert_error_msg!(
+            obj.deserialize(json!({})),
+            "missing properties, expected `a` or `b` at line 1 column 2"
+        );
+    });
+}
+
+#[test]
+fn deserialize_nested() {
+    "
+    (type! one)
+    (type! two)
+    (type! three)
+    (rel! (one) two (two))
+    (rel! (one) three (three))
+    (rel! (two) three (three))
+    (rel! (three) _ (string))
+    "
+    .compile_ok(|mut env| {
+        let one = TypeBinding::new(&mut env, "one");
+        assert_matches!(
+            one.deserialize(json!({
+                "two": {
+                    "three": "a"
+                },
+                "three": "b"
+            })),
+            Ok(Value::Compound(a)) if a.len() == 2
         );
     });
 }

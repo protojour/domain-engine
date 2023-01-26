@@ -10,16 +10,23 @@ fn get<T: AsRef<U>, U>(owner: &T) -> &U {
 
 pub trait GetDefType<'m> {
     /// Look up the type of a definition.
+    fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>>;
+
+    /// Look up the type of a definition.
     /// This assumes that type checking has been performed.
     /// Crashes otherwise.
-    fn get_def_type(&self, def_id: DefId) -> TypeRef<'m>;
+    fn expect_def_type(&self, def_id: DefId) -> TypeRef<'m>;
 }
 
 impl<'m, T> GetDefType<'m> for T
 where
     T: AsRef<Defs> + AsRef<DefTypes<'m>>,
 {
-    fn get_def_type(&self, def_id: DefId) -> TypeRef<'m> {
+    fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
+        get::<_, DefTypes>(self).map.get(&def_id).map(|ty| *ty)
+    }
+
+    fn expect_def_type(&self, def_id: DefId) -> TypeRef<'m> {
         match get::<_, DefTypes>(self).map.get(&def_id) {
             Some(type_ref) => type_ref,
             None => match get::<_, Defs>(self).map.get(&def_id) {

@@ -6,6 +6,7 @@ use crate::{
     env::Env,
     expr::ExprId,
     mem::Intern,
+    namespace::Space,
     relation::Role,
     source::{Package, PackageId, SourceSpan, CORE_PKG},
     types::Type,
@@ -81,30 +82,6 @@ impl Relation {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct Namespaces {
-    pub(crate) namespaces: HashMap<PackageId, HashMap<String, DefId>>,
-}
-
-impl Namespaces {
-    pub fn lookup(&self, search_path: &[PackageId], ident: &str) -> Option<DefId> {
-        for package in search_path {
-            let Some(namespace) = self.namespaces.get(package) else {
-                continue
-            };
-            if let Some(def_id) = namespace.get(ident) {
-                return Some(*def_id);
-            };
-        }
-
-        None
-    }
-
-    pub fn get_mut(&mut self, package: PackageId) -> &mut HashMap<String, DefId> {
-        self.namespaces.entry(package).or_default()
-    }
-}
-
 #[derive(Debug)]
 pub struct Defs {
     next_def_id: DefId,
@@ -171,12 +148,15 @@ impl<'m> Env<'m> {
     pub fn add_named_def(
         &mut self,
         name: &str,
+        space: Space,
         kind: DefKind,
         package: PackageId,
         span: SourceSpan,
     ) -> DefId {
         let def_id = self.defs.alloc_def_id();
-        self.namespaces.get_mut(package).insert(name.into(), def_id);
+        self.namespaces
+            .get_mut(package, space)
+            .insert(name.into(), def_id);
         self.defs.map.insert(
             def_id,
             Def {
@@ -230,7 +210,7 @@ impl<'m> Env<'m> {
     }
 
     fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
-        let def_id = self.add_named_def(name, def_kind, CORE_PKG, SourceSpan::none());
+        let def_id = self.add_named_def(name, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
         self.def_types
             .map
             .insert(def_id, self.types.intern(type_kind));

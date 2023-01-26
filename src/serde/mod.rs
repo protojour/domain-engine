@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
+use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::relation::PropertyId;
@@ -31,7 +32,7 @@ pub(crate) struct ValueType<'m> {
 #[derive(Debug)]
 pub(crate) struct MapType<'m> {
     pub typename: String,
-    pub properties: HashMap<String, SerdeProperty<'m>>,
+    pub properties: IndexMap<String, SerdeProperty<'m>>,
 }
 
 #[derive(Clone, Copy, Debug)]

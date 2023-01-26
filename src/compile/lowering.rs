@@ -7,6 +7,7 @@ use crate::{
     def::{Def, DefId, DefKind, Relation, Relationship},
     env::Env,
     expr::{Expr, ExprId, ExprKind},
+    namespace::Space,
     parse::{ast, Span},
     source::{CompileSrc, CORE_PKG},
 };
@@ -43,7 +44,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match ast {
             ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Ast::Type((ident, _)) => {
-                let def_id = self.named_def_id(&ident);
+                let def_id = self.named_def_id(Space::Type, &ident);
                 self.set_def(def_id, DefKind::Type(ident), &span);
                 Ok(Some(def_id))
             }
@@ -85,7 +86,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident,
                 ty: (ast_ty, ty_span),
             }) => {
-                let def_id = self.named_def_id(&ident.0);
+                let def_id = self.named_def_id(Space::Type, &ident.0);
                 let type_def_id = self.ast_type_to_def((ast_ty, ty_span.clone()))?;
                 let field_def_id = self.def(DefKind::AnonField { type_def_id }, &ty_span);
 
@@ -111,10 +112,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match ast_ty {
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
             ast::Type::Sym(ident) => {
-                let Some(type_def_id) = self.env.namespaces.lookup(&[self.src.package, CORE_PKG], &ident) else {
-                    return Err(self.error(CompileError::TypeNotFound, &span));
-                };
-                Ok(type_def_id)
+                match self
+                    .env
+                    .namespaces
+                    .lookup(&[self.src.package, CORE_PKG], Space::Type, &ident)
+                {
+                    Some(type_def_id) => Ok(type_def_id),
+                    None => Err(self.error(CompileError::TypeNotFound, &span)),
+                }
             }
             ast::Type::Record(ast_record) => {
                 let mut record_defs = vec![];
@@ -164,11 +169,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map(|ast_arg| self.lower_expr(ast_arg, var_table))
                     .collect::<Result<_, _>>()?;
 
-                let Some(def_id) = self.env.namespaces.lookup(&[self.src.package, CORE_PKG], &ident) else {
-                    return Err(self.error(CompileError::TypeNotFound, &sym_span));
-                };
-
-                Ok(self.expr(ExprKind::Call(def_id, args), &span))
+                match self
+                    .env
+                    .namespaces
+                    .lookup(&[self.src.package, CORE_PKG], Space::Type, &ident)
+                {
+                    Some(def_id) => Ok(self.expr(ExprKind::Call(def_id, args), &span)),
+                    None => Err(self.error(CompileError::TypeNotFound, &sym_span)),
+                }
             }
             ast::Expr::Sym(var_ident) => {
                 let id = var_table.var_id(var_ident, self.env);
@@ -183,7 +191,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn define_relation_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
         match ident {
-            Some(ident) => match self.env.namespaces.get_mut(self.src.package).entry(ident) {
+            Some(ident) => match self
+                .env
+                .namespaces
+                .get_mut(self.src.package, Space::Rel)
+                .entry(ident)
+            {
                 Entry::Vacant(vacant) => {
                     ImplicitDefId::New(vacant.insert(self.env.defs.alloc_def_id()).clone())
                 }
@@ -193,11 +206,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_def_id(&mut self, ident: &String) -> DefId {
+    fn named_def_id(&mut self, space: Space, ident: &String) -> DefId {
         let def_id = self.env.defs.alloc_def_id();
         self.env
             .namespaces
-            .get_mut(self.src.package)
+            .get_mut(self.src.package, space)
             .insert(ident.clone(), def_id);
         def_id
     }
