@@ -2,18 +2,21 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use ontol_runtime::{
+    env::{Domain, Env, TypeInfo},
+    PackageId,
+};
 use smartstring::alias::String;
 
 use crate::{
     binding::Bindings,
     compile::error::CompileErrors,
     def::Defs,
-    env::{Domain, Env, TypeInfo},
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,
     relation::Relations,
-    source::{Package, PackageId, Sources},
+    source::{Package, Sources},
     types::{DefTypes, Types},
 };
 

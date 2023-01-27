@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use smartstring::alias::String;
 
-use crate::relation::PropertyId;
+use crate::PropertyId;
 
 #[derive(Debug)]
 pub enum Value {

@@ -1,6 +1,5 @@
-use ontol_compiler::{
-    compiler::Compiler, env::Env, mem::Mem, Compile, PackageId, SpannedCompileError,
-};
+use ontol_compiler::{compiler::Compiler, mem::Mem, Compile, SpannedCompileError};
+use ontol_runtime::{env::Env, PackageId};
 
 mod test_compile_errors;
 mod test_deserialize;

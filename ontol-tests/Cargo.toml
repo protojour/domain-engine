@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+ontol-runtime = { path = "../ontol-runtime" }
 ontol-compiler = { path = "../ontol-compiler" }
 assert_matches = "1"
 pretty_assertions = "1"

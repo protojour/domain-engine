@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
+use ontol_runtime::PropertyId;
 
 use crate::def::DefId;
 
@@ -9,9 +10,6 @@ pub enum Role {
     Subject,
     Object,
 }
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct PropertyId(u32);
 
 #[derive(Debug)]
 pub struct Relations {

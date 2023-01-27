@@ -1,6 +1,6 @@
 use serde::ser::SerializeMap;
 
-use crate::Value;
+use crate::value::Value;
 
 use super::{MapType, SerdeOperator, SerdeProcessor};
 

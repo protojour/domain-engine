@@ -1,4 +1,4 @@
-use ontol_compiler::{env::Env, serde::SerdeOperatorId, Value};
+use ontol_runtime::{env::Env, serde::SerdeOperatorId, value::Value};
 use serde::de::DeserializeSeed;
 
 use crate::TEST_PKG;

@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
-  "ontol-compiler",
-  "ontol-tests",
+    "ontol-runtime",
+    "ontol-compiler",
+    "ontol-tests",
 ]

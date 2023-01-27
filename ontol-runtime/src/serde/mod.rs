@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::relation::PropertyId;
+use crate::PropertyId;
 
 mod deserialize;
 mod serialize;
@@ -28,7 +28,7 @@ impl<'e> Debug for SerdeProcessor<'e> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SerdeRegistry<'e> {
+pub struct SerdeRegistry<'e> {
     operators: &'e [SerdeOperator],
 }
 
@@ -46,10 +46,10 @@ impl<'e> SerdeRegistry<'e> {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct SerdeOperatorId(pub(crate) u32);
+pub struct SerdeOperatorId(pub u32);
 
 #[derive(Debug)]
-pub(crate) enum SerdeOperator {
+pub enum SerdeOperator {
     Unit,
     Number,
     String,
@@ -60,19 +60,19 @@ pub(crate) enum SerdeOperator {
 }
 
 #[derive(Debug)]
-pub(crate) struct ValueType {
+pub struct ValueType {
     pub typename: String,
     pub property: SerdeProperty,
 }
 
 #[derive(Debug)]
-pub(crate) struct MapType {
+pub struct MapType {
     pub typename: String,
     pub properties: IndexMap<String, SerdeProperty>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SerdeProperty {
+pub struct SerdeProperty {
     pub property_id: PropertyId,
     pub operator_id: SerdeOperatorId,
 }

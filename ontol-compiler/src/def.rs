@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ontol_runtime::PackageId;
 use smartstring::alias::String;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
     mem::Intern,
     namespace::Space,
     relation::Role,
-    source::{Package, PackageId, SourceSpan, CORE_PKG},
+    source::{Package, SourceSpan, CORE_PKG},
     types::Type,
 };
 

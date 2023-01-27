@@ -9,8 +9,8 @@ use crate::{
 
 /// Runtime environment
 pub struct Env {
-    pub(crate) serde_operators: Vec<SerdeOperator>,
-    pub(crate) domains: HashMap<PackageId, Domain>,
+    pub serde_operators: Vec<SerdeOperator>,
+    pub domains: HashMap<PackageId, Domain>,
 }
 
 impl Env {
@@ -24,11 +24,11 @@ impl Env {
 }
 
 pub struct Domain {
-    pub(crate) types: HashMap<String, TypeInfo>,
+    pub types: HashMap<String, TypeInfo>,
 }
 
-pub(crate) struct TypeInfo {
-    pub(crate) serde_operator_id: Option<SerdeOperatorId>,
+pub struct TypeInfo {
+    pub serde_operator_id: Option<SerdeOperatorId>,
 }
 
 impl Domain {

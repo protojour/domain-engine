@@ -1,6 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
+use ontol_runtime::{
+    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType},
+    PackageId,
+};
 use smartstring::alias::String;
 
 use crate::{
@@ -9,9 +13,7 @@ use crate::{
     def::{DefId, DefKind, Defs},
     namespace::{Namespaces, Space},
     relation::{Properties, Relations, SubjectProperties},
-    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType},
     types::{DefTypes, Type},
-    PackageId,
 };
 
 /// A binding to a specific domain,

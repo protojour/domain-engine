@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct PackageId(pub u32);
+use ontol_runtime::PackageId;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 

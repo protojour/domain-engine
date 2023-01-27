@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::Value;
+use crate::value::Value;
 
 use super::{MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry};
 
