@@ -13,8 +13,8 @@ pub enum Space {
 
 #[derive(Default, Debug)]
 pub struct Namespace {
-    types: HashMap<String, DefId>,
-    relations: HashMap<String, DefId>,
+    pub(crate) types: HashMap<String, DefId>,
+    pub(crate) relations: HashMap<String, DefId>,
 }
 
 impl Namespace {

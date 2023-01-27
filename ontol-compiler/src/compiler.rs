@@ -1,13 +1,13 @@
 //! Central compiler data structure
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
     compile::error::CompileErrors,
     def::Defs,
     expr::{Expr, ExprId},
     mem::Mem,
-    namespace::{Namespaces, Space},
+    namespace::Namespaces,
     relation::Relations,
     source::{Package, Sources},
     types::{DefTypes, Types},
@@ -53,31 +53,36 @@ impl<'m> Compiler<'m> {
 
 impl<'m> Compiler<'m> {
     /// Finish compilation, turn into environment.
-    pub fn into_env(self) -> Arc<Env> {
-        let mut domains: HashMap<PackageId, Domain> = Default::default();
+    pub fn into_env(mut self) -> Env {
+        let package_ids = self.package_ids();
 
+        let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut serde_generator = self.serde_generator();
 
+        let mut out_domains: HashMap<PackageId, Domain> = Default::default();
+
         // For now, create serde operators for every domain
-        for package_id in self.package_ids() {
+        for package_id in package_ids {
             let mut types: HashMap<String, TypeInfo> = Default::default();
 
-            for (type_name, def_id) in self.namespaces.namespaces[&package_id].space(Space::Type) {
+            let type_namespace = namespaces.remove(&package_id).unwrap().types;
+
+            for (type_name, type_def_id) in type_namespace {
                 types.insert(
-                    type_name.clone(),
+                    type_name,
                     TypeInfo {
-                        serde_operator_id: serde_generator.get_serde_operator_id(*def_id),
+                        serde_operator_id: serde_generator.get_serde_operator_id(type_def_id),
                     },
                 );
             }
 
-            domains.insert(package_id, Domain { types });
+            out_domains.insert(package_id, Domain { types });
         }
 
-        Arc::new(Env {
+        Env {
             serde_operators: serde_generator.finish(),
-            domains,
-        })
+            domains: out_domains,
+        }
     }
 
     fn package_ids(&self) -> Vec<PackageId> {
