@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{binding::Bindings, Value};
 
-use super::{MapType, SerdeOperator, SerdeOperatorKind, SerdeProperty};
+use super::{MapType, SerdeOperatorKind, SerdeOperatorOld, SerdeProperty};
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s, 'm>(&'s IndexMap<String, SerdeProperty<'m>>);
@@ -19,7 +19,7 @@ struct MapTypeVisitor<'e, 'm> {
     bindings: &'e Bindings<'m>,
 }
 
-impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'e, 'm> {
+impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperatorOld<'e, 'm> {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -33,7 +33,7 @@ impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'e, 'm> {
             SerdeOperatorKind::String => {
                 serde::de::Deserializer::deserialize_str(deserializer, StringVisitor)
             }
-            SerdeOperatorKind::ValueType(value_type) => SerdeOperator {
+            SerdeOperatorKind::ValueType(value_type) => SerdeOperatorOld {
                 kind: value_type.property.kind,
                 bindings: self.bindings,
             }
@@ -50,7 +50,7 @@ impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperator<'e, 'm> {
                     Some(Some(kind)) => kind,
                     _ => panic!("Could not resolve recursive serde operator"),
                 };
-                SerdeOperator {
+                SerdeOperatorOld {
                     kind,
                     bindings: self.bindings,
                 }
@@ -136,7 +136,7 @@ impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
         while let Some(serde_property) =
             map.next_key_seed(PropertySet(&self.map_type.properties))?
         {
-            let attribute_value = map.next_value_seed(SerdeOperator {
+            let attribute_value = map.next_value_seed(SerdeOperatorOld {
                 kind: serde_property.kind,
                 bindings: self.bindings,
             })?;

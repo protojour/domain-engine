@@ -13,6 +13,7 @@ pub use value::*;
 pub mod binding;
 pub mod compiler;
 pub mod ena;
+pub mod env;
 pub mod mem;
 pub mod serde;
 

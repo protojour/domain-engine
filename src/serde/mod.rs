@@ -10,7 +10,7 @@ mod serialize;
 /// Each serde-enabled type has its own operator, which is cached
 /// in the compilerironment.
 #[derive(Clone, Copy, Debug)]
-pub struct SerdeOperator<'e, 'm> {
+pub struct SerdeOperatorOld<'e, 'm> {
     pub(crate) kind: &'m SerdeOperatorKind<'m>,
     pub(crate) bindings: &'e Bindings<'m>,
 }
@@ -50,4 +50,42 @@ pub(crate) struct MapType<'m> {
 pub(crate) struct SerdeProperty<'m> {
     pub property_id: PropertyId,
     pub kind: &'m SerdeOperatorKind<'m>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SerdeExecutor<'e> {
+    pub(crate) current: &'e SerdeOperator,
+    pub(crate) all_operators: &'e [SerdeOperator],
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct SerdeOperatorId(pub(crate) u32);
+
+#[derive(Debug)]
+pub(crate) enum SerdeOperator {
+    Unit,
+    Number,
+    String,
+    // A type with just one anonymous property
+    ValueType(ValueType2),
+    // A type with many properties
+    MapType(MapType2),
+}
+
+#[derive(Debug)]
+pub(crate) struct ValueType2 {
+    pub typename: String,
+    pub property: SerdeProperty2,
+}
+
+#[derive(Debug)]
+pub(crate) struct MapType2 {
+    pub typename: String,
+    pub properties: IndexMap<String, SerdeProperty2>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SerdeProperty2 {
+    pub property_id: PropertyId,
+    pub operator_id: SerdeOperatorId,
 }

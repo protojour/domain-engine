@@ -2,16 +2,16 @@ use serde::ser::SerializeMap;
 
 use crate::{binding::Bindings, Value};
 
-use super::{MapType, SerdeOperator, SerdeOperatorKind, SerializeValue};
+use super::{MapType, SerdeOperatorKind, SerdeOperatorOld, SerializeValue};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
-impl<'e, 'm> SerializeValue for SerdeOperator<'e, 'm> {
+impl<'e, 'm> SerializeValue for SerdeOperatorOld<'e, 'm> {
     fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match self.kind {
             SerdeOperatorKind::Number => self.serialize_number(value, serializer),
             SerdeOperatorKind::String => self.serialize_string(value, serializer),
-            SerdeOperatorKind::ValueType(value_type) => SerdeOperator {
+            SerdeOperatorKind::ValueType(value_type) => SerdeOperatorOld {
                 kind: value_type.property.kind,
                 bindings: self.bindings,
             }
@@ -22,7 +22,7 @@ impl<'e, 'm> SerializeValue for SerdeOperator<'e, 'm> {
                     Some(Some(kind)) => kind,
                     _ => panic!("Could not resolve recursive serde operator"),
                 };
-                SerdeOperator {
+                SerdeOperatorOld {
                     kind,
                     bindings: self.bindings,
                 }
@@ -32,7 +32,7 @@ impl<'e, 'm> SerializeValue for SerdeOperator<'e, 'm> {
     }
 }
 
-impl<'e, 'm> SerdeOperator<'e, 'm> {
+impl<'e, 'm> SerdeOperatorOld<'e, 'm> {
     fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match value {
             Value::Number(num) => serializer.serialize_i64(*num),
@@ -93,7 +93,7 @@ impl<'v, 'e, 'm> serde::Serialize for Proxy<'v, 'e, 'm> {
     where
         S: serde::Serializer,
     {
-        SerdeOperator {
+        SerdeOperatorOld {
             kind: self.kind,
             bindings: self.bindings,
         }

@@ -1,7 +1,7 @@
 use ontol_lang::{
     binding::DomainBinding,
     compiler::Compiler,
-    serde::{SerdeOperator, SerializeValue},
+    serde::{SerdeOperatorOld, SerializeValue},
     Value,
 };
 use serde::de::DeserializeSeed;
@@ -26,9 +26,9 @@ impl<'m> TypeBinding<'m> {
         binding
     }
 
-    fn operator<'e>(&self, compiler: &'e Compiler<'m>) -> SerdeOperator<'e, 'm> {
+    fn operator<'e>(&self, compiler: &'e Compiler<'m>) -> SerdeOperatorOld<'e, 'm> {
         self.domain_binding
-            .get_serde_operator(compiler, &self.type_name)
+            .get_serde_operator_old(compiler, &self.type_name)
             .expect("No serde operator available")
     }
 
