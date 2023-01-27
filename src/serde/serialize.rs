@@ -2,12 +2,13 @@ use serde::ser::SerializeMap;
 
 use crate::Value;
 
-use super::{MapType, SerdeOperator, SerdeProcessor, SerializeValue};
+use super::{MapType, SerdeOperator, SerdeProcessor};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
-impl<'e> SerializeValue for SerdeProcessor<'e> {
-    fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
+impl<'e> SerdeProcessor<'e> {
+    /// Serialize a value using this processor.
+    pub fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match self.current {
             SerdeOperator::Unit => {
                 panic!("Tried to serialize unit");

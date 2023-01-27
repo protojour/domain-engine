@@ -1,7 +1,9 @@
+use std::fmt::Debug;
+
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::{relation::PropertyId, Value};
+use crate::relation::PropertyId;
 
 mod deserialize;
 mod serialize;
@@ -9,18 +11,20 @@ mod serialize;
 /// SerdeOperator is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
 /// in the compilerironment.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
-    pub(crate) current: &'e SerdeOperator,
-    pub(crate) registry: SerdeRegistry<'e>,
+    current: &'e SerdeOperator,
+    registry: SerdeRegistry<'e>,
 }
 
-pub trait SerializeValue {
-    fn serialize_value<S: serde::Serializer>(
-        &self,
-        value: &Value,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>;
+impl<'e> Debug for SerdeProcessor<'e> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // This structure might contain cycles (through operator id),
+        // so just print the topmost level.
+        f.debug_struct("SerdeProcessor")
+            .field("current", self.current)
+            .finish()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

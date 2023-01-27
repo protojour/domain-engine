@@ -1,8 +1,4 @@
-use ontol_lang::{
-    env::Env,
-    serde::{SerdeOperatorId, SerializeValue},
-    Value,
-};
+use ontol_lang::{env::Env, serde::SerdeOperatorId, Value};
 use serde::de::DeserializeSeed;
 
 use crate::TEST_PKG;
