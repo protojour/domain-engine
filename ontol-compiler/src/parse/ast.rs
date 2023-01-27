@@ -9,7 +9,6 @@ pub enum Ast {
     Import(Path),
     Type(Spanned<String>),
     Rel(Rel),
-    Data(Data),
     Eq(Eq),
     Comment(String),
 }
@@ -27,14 +26,8 @@ pub enum Expr {
     Call(Spanned<String>, Vec<Spanned<Expr>>),
 }
 
-pub struct Data {
-    pub ident: Spanned<String>,
-    pub ty: Spanned<Type>,
-}
-
 pub enum Type {
     Sym(String),
-    Record(Record),
     Literal(Literal),
 }
 
@@ -48,15 +41,6 @@ pub struct Rel {
 pub enum Literal {
     String(String),
     Number(String),
-}
-
-pub struct Record {
-    pub fields: Vec<Spanned<RecordField>>,
-}
-
-pub struct RecordField {
-    pub ident: Spanned<String>,
-    pub ty: Spanned<Type>,
 }
 
 pub struct Path(pub Vec<Spanned<String>>);

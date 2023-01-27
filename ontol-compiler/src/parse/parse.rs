@@ -15,7 +15,6 @@ fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
 
     match keyword.as_str() {
         "import" => parse_import(input),
-        "data" => parse_data(input),
         "type!" => {
             let span = input.span();
             let ident = input.next_sym_msg("expected ident")?;
@@ -34,54 +33,17 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
     Ok((Ast::Import(path), span))
 }
 
-fn parse_data(mut input: TreeStream) -> ParseResult<Ast> {
-    let span = input.span();
-    let ident = input.next_sym_msg("expected identifier")?;
-    let ty = parse_type(&mut input)?;
-    input.end()?;
-
-    Ok((Ast::Data(Data { ident, ty }), span))
-}
-
 fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
     let mut ty_stream = stream.next_list_msg("expected type")?;
     let type_span = ty_stream.span();
     let (kind, _) = ty_stream.next_sym_msg("")?;
 
     let ty = match kind.as_str() {
-        "record" => {
-            let (fields, _) = parse_record_fields(&mut ty_stream)?;
-            Type::Record(Record { fields })
-        }
-        /*
-        "number" => Type::Sym(kind),
-        _ => Err(error("Unrecognized type", span))?,
-        */
         _ => Type::Sym(kind),
     };
 
     ty_stream.end()?;
     Ok((ty, type_span))
-}
-
-fn parse_record_fields(record: &mut TreeStream) -> ParseResult<Vec<Spanned<RecordField>>> {
-    let span = record.span();
-    let mut fields = vec![];
-
-    while record.peek_any() {
-        let mut field = record.next_list_msg("expected field s-expression")?;
-        let (keyword, kw_span) = field.next_sym_msg("expected field")?;
-        if keyword != "field" {
-            return Err(error("expected field keyword", kw_span));
-        }
-        let ident = field.next_sym_msg("expected field identifier")?;
-        let ty = parse_type(&mut field)?;
-        field.end()?;
-
-        fields.push((RecordField { ident, ty }, field.span()));
-    }
-
-    Ok((fields, span))
 }
 
 fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
@@ -189,25 +151,6 @@ mod tests {
         };
 
         assert_eq!(2, symbols.len());
-    }
-
-    #[test]
-    fn parse_data_record() {
-        let src = "
-            (data foobar (record (field name (number))))
-        ";
-        let Ast::Data(Data { ident, ty: (Type::Record(record), _), }) = test_parse(src) else {
-            panic!();
-        };
-
-        assert_eq!("foobar", ident.0);
-        assert_eq!(1, record.fields.len());
-
-        let (RecordField { ty: (Type::Sym(field_type), _), .. }, _) = &record.fields[0] else {
-            panic!();
-        };
-
-        assert_eq!(field_type, "number");
     }
 
     #[test]

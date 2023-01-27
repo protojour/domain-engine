@@ -10,16 +10,16 @@ use crate::{
 
 use super::error::{CompileError, CompileErrors};
 
-pub struct TypeCheck<'e, 'm> {
-    types: &'e mut Types<'m>,
-    def_types: &'e mut DefTypes<'m>,
-    relations: &'e mut Relations,
-    errors: &'e mut CompileErrors,
-    defs: &'e Defs,
-    sources: &'e Sources,
+pub struct TypeCheck<'c, 'm> {
+    types: &'c mut Types<'m>,
+    def_types: &'c mut DefTypes<'m>,
+    relations: &'c mut Relations,
+    errors: &'c mut CompileErrors,
+    defs: &'c Defs,
+    sources: &'c Sources,
 }
 
-impl<'e, 'm> TypeCheck<'e, 'm> {
+impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.map.get(&def_id) {
             return type_ref;
@@ -35,14 +35,6 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
             DefKind::Type(_) => {
                 let ty = self.types.intern(Type::Domain(def_id));
                 self.def_types.map.insert(def_id, ty);
-                ty
-            }
-            DefKind::Constructor(_, field_def) => {
-                let ty = self.types.intern(Type::Data(def_id, *field_def));
-                self.def_types.map.insert(def_id, ty);
-
-                self.type_check_anon_field(*field_def);
-
                 ty
             }
             DefKind::Relationship(relationship) => {
@@ -74,26 +66,11 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
                 self.types.intern(Type::Tautology)
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
-            DefKind::Record { .. } => self.types.intern(Type::Record(def_id)),
             DefKind::Equivalence(_, _) => self.types.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }
         }
-    }
-
-    fn type_check_anon_field(&mut self, field_id: DefId) {
-        let field = self
-            .defs
-            .map
-            .get(&field_id)
-            .expect("No field definition for {field_id:?}");
-        let DefKind::AnonField { type_def_id } = &field.kind else {
-            panic!("Field definition is not a field: {:?}", field.kind);
-        };
-
-        let type_ref = self.check_def(*type_def_id);
-        self.def_types.map.insert(field_id, type_ref);
     }
 
     fn check_expr(&mut self, expr: &Expr) -> TypeRef<'m> {
@@ -207,91 +184,5 @@ impl<'m> Compiler<'m> {
             relations: &mut self.relations,
             sources: &self.sources,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        compile::error::UnifiedCompileError,
-        compiler::Compiler,
-        expr::{ExprId, ExprKind},
-        mem::Mem,
-        namespace::Space,
-        source::{SourceSpan, UNIT_TEST_PKG},
-        Compile,
-    };
-
-    #[test]
-    fn type_check_data_call() -> Result<(), UnifiedCompileError> {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-
-        "(data m (number))".compile(&mut compiler, UNIT_TEST_PKG)?;
-
-        let m = compiler
-            .namespaces
-            .lookup(&[UNIT_TEST_PKG], Space::Type, "m")
-            .expect("m not found");
-        let type_of_m = compiler.type_check().check_def(m);
-
-        let args = vec![compiler.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
-        let expr = compiler.expr(ExprKind::Call(m, args), SourceSpan::none());
-        let expr_type = compiler.type_check().check_expr(&expr);
-
-        assert_eq!(expr_type, type_of_m);
-
-        Ok(())
-    }
-
-    #[test]
-    fn type_check_record() -> Result<(), UnifiedCompileError> {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-
-        "(data foo (record (field bar (number))))".compile(&mut compiler, UNIT_TEST_PKG)?;
-
-        let foo = compiler
-            .namespaces
-            .lookup(&[UNIT_TEST_PKG], Space::Type, "foo")
-            .expect("foo not found");
-        let type_of_m = compiler.type_check().check_def(foo);
-
-        let args = vec![compiler.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
-        let expr = compiler.expr(ExprKind::Call(foo, args), SourceSpan::none());
-        let expr_type = compiler.type_check().check_expr(&expr);
-
-        assert_eq!(expr_type, type_of_m);
-
-        Ok(())
-    }
-
-    #[test]
-    fn type_def_simple_relation() -> Result<(), UnifiedCompileError> {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-
-        "
-        (type! foo)
-        (type! bar)
-        (rel! (foo) has-a (bar))
-        "
-        .compile(&mut compiler, UNIT_TEST_PKG)?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn type_check_eq() -> Result<(), UnifiedCompileError> {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-
-        "
-        (data foo (record (field bar (number))))
-        (eq! () (foo x) (foo x))
-        "
-        .compile(&mut compiler, UNIT_TEST_PKG)?;
-
-        Ok(())
     }
 }

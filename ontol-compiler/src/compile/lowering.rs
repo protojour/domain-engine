@@ -82,18 +82,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &span,
                 )))
             }
-            ast::Ast::Data(ast::Data {
-                ident,
-                ty: (ast_ty, ty_span),
-            }) => {
-                let def_id = self.named_def_id(Space::Type, &ident.0);
-                let type_def_id = self.ast_type_to_def((ast_ty, ty_span.clone()))?;
-                let field_def_id = self.def(DefKind::AnonField { type_def_id }, &ty_span);
-
-                self.set_def(def_id, DefKind::Constructor(ident.0, field_def_id), &span);
-
-                Ok(Some(def_id))
-            }
             ast::Ast::Eq(ast::Eq {
                 params: _,
                 first,
@@ -120,26 +108,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Some(type_def_id) => Ok(type_def_id),
                     None => Err(self.error(CompileError::TypeNotFound, &span)),
                 }
-            }
-            ast::Type::Record(ast_record) => {
-                let mut record_defs = vec![];
-                for (ast_field, span) in ast_record.fields {
-                    let type_def_id = self.ast_type_to_def(ast_field.ty)?;
-                    record_defs.push(self.def(
-                        DefKind::NamedField {
-                            ident: ast_field.ident.0,
-                            type_def_id,
-                        },
-                        &span,
-                    ));
-                }
-
-                Ok(self.def(
-                    DefKind::Record {
-                        field_defs: record_defs,
-                    },
-                    &span,
-                ))
             }
         }
     }

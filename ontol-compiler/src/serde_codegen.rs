@@ -32,7 +32,7 @@ pub struct SerdeGenerator<'c, 'm> {
     serde_operator_def_cache: HashMap<DefId, SerdeOperatorId>,
 }
 
-impl<'e, 'm> SerdeGenerator<'e, 'm> {
+impl<'c, 'm> SerdeGenerator<'c, 'm> {
     pub fn finish(self) -> Vec<SerdeOperator> {
         self.serde_operators
     }
@@ -142,19 +142,19 @@ impl<'e, 'm> SerdeGenerator<'e, 'm> {
     }
 }
 
-impl<'e, 'm> AsRef<Defs> for SerdeGenerator<'e, 'm> {
+impl<'c, 'm> AsRef<Defs> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &Defs {
         &self.defs
     }
 }
 
-impl<'e, 'm> AsRef<DefTypes<'m>> for SerdeGenerator<'e, 'm> {
+impl<'c, 'm> AsRef<DefTypes<'m>> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &DefTypes<'m> {
         &self.def_types
     }
 }
 
-impl<'e, 'm> AsRef<Relations> for SerdeGenerator<'e, 'm> {
+impl<'c, 'm> AsRef<Relations> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &Relations {
         &self.relations
     }

@@ -32,8 +32,6 @@ pub enum DefKind {
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
-    Constructor(String, DefId),
-    Record { field_defs: Vec<DefId> },
     AnonField { type_def_id: DefId },
     NamedField { ident: String, type_def_id: DefId },
     Equivalence(ExprId, ExprId),
