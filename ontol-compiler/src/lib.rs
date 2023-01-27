@@ -10,10 +10,10 @@ pub use compile::error::*;
 use ontol_runtime::PackageId;
 pub use source::*;
 
-pub mod binding;
 pub mod compiler;
 pub mod ena;
 pub mod mem;
+pub mod serde_codegen;
 
 mod compile;
 mod compiler_queries;

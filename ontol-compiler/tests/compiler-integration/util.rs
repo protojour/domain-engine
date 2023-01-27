@@ -4,7 +4,6 @@ use serde::de::DeserializeSeed;
 use crate::TEST_PKG;
 
 pub struct TypeBinding {
-    // domain_binding: DomainBinding<'m>,
     serde_operator_id: SerdeOperatorId,
 }
 

@@ -2,30 +2,27 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::{
+    compile::error::CompileErrors,
+    def::Defs,
+    expr::{Expr, ExprId},
+    mem::Mem,
+    namespace::{Namespaces, Space},
+    relation::Relations,
+    source::{Package, Sources},
+    types::{DefTypes, Types},
+};
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
     PackageId,
 };
 use smartstring::alias::String;
 
-use crate::{
-    binding::Bindings,
-    compile::error::CompileErrors,
-    def::Defs,
-    expr::{Expr, ExprId},
-    mem::Mem,
-    namespace::Namespaces,
-    relation::Relations,
-    source::{Package, Sources},
-    types::{DefTypes, Types},
-};
-
 #[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
-    pub bindings: Bindings,
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs,
@@ -43,7 +40,6 @@ impl<'m> Compiler<'m> {
         Self {
             sources: Default::default(),
             packages: Default::default(),
-            bindings: Bindings::default(),
             types: Types::new(mem),
             namespaces: Default::default(),
             defs: Default::default(),
@@ -57,20 +53,20 @@ impl<'m> Compiler<'m> {
 
 impl<'m> Compiler<'m> {
     /// Finish compilation, turn into environment.
-    pub fn into_env(mut self) -> Arc<Env> {
+    pub fn into_env(self) -> Arc<Env> {
         let mut domains: HashMap<PackageId, Domain> = Default::default();
+
+        let mut serde_generator = self.serde_generator();
 
         // For now, create serde operators for every domain
         for package_id in self.package_ids() {
             let mut types: HashMap<String, TypeInfo> = Default::default();
 
-            let domain_binding = self.bindings_builder().new_binding(package_id);
-
-            for (type_name, operator_id) in domain_binding.serde_operators {
+            for (type_name, def_id) in self.namespaces.namespaces[&package_id].space(Space::Type) {
                 types.insert(
-                    type_name,
+                    type_name.clone(),
                     TypeInfo {
-                        serde_operator_id: Some(operator_id),
+                        serde_operator_id: serde_generator.get_serde_operator_id(*def_id),
                     },
                 );
             }
@@ -79,7 +75,7 @@ impl<'m> Compiler<'m> {
         }
 
         Arc::new(Env {
-            serde_operators: self.bindings.serde_operators,
+            serde_operators: serde_generator.finish(),
             domains,
         })
     }

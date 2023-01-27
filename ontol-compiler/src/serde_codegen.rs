@@ -1,63 +1,49 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use ontol_runtime::{
-    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType},
-    PackageId,
-};
+use ontol_runtime::serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType};
 use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{DefId, DefKind, Defs},
-    namespace::{Namespaces, Space},
     relation::{Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
 
-/// A binding to a specific domain,
-/// so it may be interacted with from the external world
-pub struct DomainBinding {
-    pub(crate) serde_operators: HashMap<String, SerdeOperatorId>,
-}
-
-#[derive(Default, Debug)]
-pub struct Bindings {
-    pub(crate) serde_operators: Vec<SerdeOperator>,
-    pub(crate) serde_operator_def_cache: HashMap<DefId, SerdeOperatorId>,
-}
-
 impl<'m> Compiler<'m> {
-    pub fn bindings_builder<'e>(&'e mut self) -> BindingsBuilder<'e, 'm> {
-        BindingsBuilder {
-            type_stack: Default::default(),
-            bindings: &mut self.bindings,
-            namespaces: &self.namespaces,
+    pub fn serde_generator(&self) -> SerdeGenerator<'_, 'm> {
+        SerdeGenerator {
             defs: &self.defs,
             def_types: &self.def_types,
             relations: &self.relations,
+            serde_operators: Default::default(),
+            serde_operator_def_cache: Default::default(),
         }
     }
 }
 
-pub struct BindingsBuilder<'e, 'm> {
-    type_stack: HashSet<DefId>,
-    bindings: &'e mut Bindings,
-    namespaces: &'e Namespaces,
-    defs: &'e Defs,
-    def_types: &'e DefTypes<'m>,
-    relations: &'e Relations,
+pub struct SerdeGenerator<'c, 'm> {
+    defs: &'c Defs,
+    def_types: &'c DefTypes<'m>,
+    relations: &'c Relations,
+    serde_operators: Vec<SerdeOperator>,
+    serde_operator_def_cache: HashMap<DefId, SerdeOperatorId>,
 }
 
-impl<'e, 'm> BindingsBuilder<'e, 'm> {
-    fn get_serde_operator_id(&mut self, type_def_id: DefId) -> Option<SerdeOperatorId> {
-        if let Some(id) = self.bindings.serde_operator_def_cache.get(&type_def_id) {
+impl<'e, 'm> SerdeGenerator<'e, 'm> {
+    pub fn finish(self) -> Vec<SerdeOperator> {
+        self.serde_operators
+    }
+
+    pub fn get_serde_operator_id(&mut self, type_def_id: DefId) -> Option<SerdeOperatorId> {
+        if let Some(id) = self.serde_operator_def_cache.get(&type_def_id) {
             return Some(*id);
         }
 
         if let Some((operator_id, kind)) = self.create_serde_operator(type_def_id) {
-            self.bindings.serde_operators[operator_id.0 as usize] = kind;
+            self.serde_operators[operator_id.0 as usize] = kind;
             Some(operator_id)
         } else {
             None
@@ -92,13 +78,11 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
     }
 
     fn alloc_operator_id(&mut self, def_id: DefId) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.bindings.serde_operators.len() as u32);
+        let operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
         // We just need a temporary placeholder for this operator kind,
         // this will be properly overwritten after it's created:
-        self.bindings.serde_operators.push(SerdeOperator::Unit);
-        self.bindings
-            .serde_operator_def_cache
-            .insert(def_id, operator_id);
+        self.serde_operators.push(SerdeOperator::Unit);
+        self.serde_operator_def_cache.insert(def_id, operator_id);
         operator_id
     }
 
@@ -158,40 +142,19 @@ impl<'e, 'm> BindingsBuilder<'e, 'm> {
     }
 }
 
-impl<'e, 'm> BindingsBuilder<'e, 'm> {
-    pub fn new_binding(&'e mut self, package_id: PackageId) -> DomainBinding {
-        let namespace = self
-            .namespaces
-            .namespaces
-            .get(&package_id)
-            .expect("package id does not exist, cannot create binding");
-
-        let serde_operators = namespace
-            .space(Space::Type)
-            .iter()
-            .filter_map(|(typename, type_def_id)| {
-                self.get_serde_operator_id(*type_def_id)
-                    .map(|kind| (typename.clone(), kind))
-            })
-            .collect();
-
-        DomainBinding { serde_operators }
-    }
-}
-
-impl<'e, 'm> AsRef<Defs> for BindingsBuilder<'e, 'm> {
+impl<'e, 'm> AsRef<Defs> for SerdeGenerator<'e, 'm> {
     fn as_ref(&self) -> &Defs {
         &self.defs
     }
 }
 
-impl<'e, 'm> AsRef<DefTypes<'m>> for BindingsBuilder<'e, 'm> {
+impl<'e, 'm> AsRef<DefTypes<'m>> for SerdeGenerator<'e, 'm> {
     fn as_ref(&self) -> &DefTypes<'m> {
         &self.def_types
     }
 }
 
-impl<'e, 'm> AsRef<Relations> for BindingsBuilder<'e, 'm> {
+impl<'e, 'm> AsRef<Relations> for SerdeGenerator<'e, 'm> {
     fn as_ref(&self) -> &Relations {
         &self.relations
     }
