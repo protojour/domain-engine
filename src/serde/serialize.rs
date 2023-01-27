@@ -1,38 +1,29 @@
 use serde::ser::SerializeMap;
 
-use crate::{binding::Bindings, Value};
+use crate::Value;
 
-use super::{MapType, SerdeOperatorKind, SerdeOperatorOld, SerializeValue};
+use super::{MapType, SerdeOperator, SerdeProcessor, SerializeValue};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
-impl<'e, 'm> SerializeValue for SerdeOperatorOld<'e, 'm> {
+impl<'e> SerializeValue for SerdeProcessor<'e> {
     fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match self.kind {
-            SerdeOperatorKind::Number => self.serialize_number(value, serializer),
-            SerdeOperatorKind::String => self.serialize_string(value, serializer),
-            SerdeOperatorKind::ValueType(value_type) => SerdeOperatorOld {
-                kind: value_type.property.kind,
-                bindings: self.bindings,
+        match self.current {
+            SerdeOperator::Unit => {
+                panic!("Tried to serialize unit");
             }
-            .serialize_value(value, serializer),
-            SerdeOperatorKind::MapType(map_type) => self.serialize_map(map_type, value, serializer),
-            SerdeOperatorKind::Recursive(def_id) => {
-                let kind = match self.bindings.serde_operator_kinds.get(&def_id) {
-                    Some(Some(kind)) => kind,
-                    _ => panic!("Could not resolve recursive serde operator"),
-                };
-                SerdeOperatorOld {
-                    kind,
-                    bindings: self.bindings,
-                }
-                .serialize_value(value, serializer)
-            }
+            SerdeOperator::Number => self.serialize_number(value, serializer),
+            SerdeOperator::String => self.serialize_string(value, serializer),
+            SerdeOperator::ValueType(value_type) => self
+                .registry
+                .make_processor(value_type.property.operator_id)
+                .serialize_value(value, serializer),
+            SerdeOperator::MapType(map_type) => self.serialize_map(map_type, value, serializer),
         }
     }
 }
 
-impl<'e, 'm> SerdeOperatorOld<'e, 'm> {
+impl<'e> SerdeProcessor<'e> {
     fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match value {
             Value::Number(num) => serializer.serialize_i64(*num),
@@ -73,8 +64,7 @@ impl<'e, 'm> SerdeOperatorOld<'e, 'm> {
                 name,
                 &Proxy {
                     value,
-                    kind: serde_prop.kind,
-                    bindings: self.bindings,
+                    processor: self.registry.make_processor(serde_prop.operator_id),
                 },
             )?;
         }
@@ -82,21 +72,16 @@ impl<'e, 'm> SerdeOperatorOld<'e, 'm> {
     }
 }
 
-struct Proxy<'v, 'e, 'm> {
+struct Proxy<'v, 'e> {
     value: &'v Value,
-    kind: &'m SerdeOperatorKind<'m>,
-    bindings: &'e Bindings<'m>,
+    processor: SerdeProcessor<'e>,
 }
 
-impl<'v, 'e, 'm> serde::Serialize for Proxy<'v, 'e, 'm> {
+impl<'v, 'e> serde::Serialize for Proxy<'v, 'e> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,
     {
-        SerdeOperatorOld {
-            kind: self.kind,
-            bindings: self.bindings,
-        }
-        .serialize_value(self.value, serializer)
+        self.processor.serialize_value(self.value, serializer)
     }
 }

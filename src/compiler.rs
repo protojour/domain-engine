@@ -7,7 +7,7 @@ use smartstring::alias::String;
 use crate::{
     binding::Bindings,
     compile::error::CompileErrors,
-    def::{DefId, Defs},
+    def::Defs,
     env::{Domain, Env, TypeInfo},
     expr::{Expr, ExprId},
     mem::Mem,
@@ -22,7 +22,7 @@ pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
-    pub bindings: Bindings<'m>,
+    pub bindings: Bindings,
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs,
@@ -40,7 +40,7 @@ impl<'m> Compiler<'m> {
         Self {
             sources: Default::default(),
             packages: Default::default(),
-            bindings: Bindings::new(mem),
+            bindings: Bindings::default(),
             types: Types::new(mem),
             namespaces: Default::default(),
             defs: Default::default(),

@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use smartstring::alias::String;
 
 use crate::{
-    def::DefId,
-    serde::{SerdeExecutor, SerdeOperator, SerdeOperatorId},
+    serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
     PackageId,
 };
 
@@ -19,11 +18,8 @@ impl Env {
         self.domains.get(&package_id)
     }
 
-    pub fn get_serde_executor(&self, serde_operator_id: SerdeOperatorId) -> SerdeExecutor {
-        SerdeExecutor {
-            current: &self.serde_operators[serde_operator_id.0 as usize],
-            all_operators: &self.serde_operators,
-        }
+    pub fn new_serde_processor(&self, serde_operator_id: SerdeOperatorId) -> SerdeProcessor {
+        SerdeRegistry::new(&self.serde_operators).make_processor(serde_operator_id)
     }
 }
 

@@ -1,4 +1,4 @@
-use ontol_lang::{compiler::Compiler, mem::Mem, Compile, PackageId, SpannedCompileError};
+use ontol_lang::{compiler::Compiler, env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
 
 mod test_compile_errors;
 mod test_deserialize;
@@ -19,7 +19,7 @@ macro_rules! assert_error_msg {
 pub(crate) use assert_error_msg;
 
 trait TestCompile {
-    fn compile_ok(self, validator: impl Fn(Compiler));
+    fn compile_ok(self, validator: impl Fn(&Env));
     fn compile_fail(self);
 }
 
@@ -36,12 +36,12 @@ struct DiagnosticsLine {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(Compiler)) {
+    fn compile_ok(self, validator: impl Fn(&Env)) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
         self.compile(&mut compiler, TEST_PKG).unwrap();
 
-        validator(compiler);
+        validator(&compiler.into_env());
     }
 
     fn compile_fail(self) {

@@ -3,59 +3,50 @@ use std::{collections::HashMap, fmt::Display};
 use indexmap::IndexMap;
 use smartstring::alias::String;
 
-use crate::{binding::Bindings, Value};
+use crate::Value;
 
-use super::{MapType, SerdeOperatorKind, SerdeOperatorOld, SerdeProperty};
+use super::{MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry};
 
 #[derive(Clone, Copy)]
-struct PropertySet<'s, 'm>(&'s IndexMap<String, SerdeProperty<'m>>);
+struct PropertySet<'s>(&'s IndexMap<String, SerdeProperty>);
 
 struct NumberVisitor;
 
 struct StringVisitor;
 
-struct MapTypeVisitor<'e, 'm> {
-    map_type: &'m MapType<'m>,
-    bindings: &'e Bindings<'m>,
+struct MapTypeVisitor<'e> {
+    map_type: &'e MapType,
+    registry: SerdeRegistry<'e>,
 }
 
-impl<'e, 'm, 'de> serde::de::DeserializeSeed<'de> for SerdeOperatorOld<'e, 'm> {
+impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match self.kind {
-            SerdeOperatorKind::Number => {
+        match self.current {
+            SerdeOperator::Unit => {
+                panic!("This should not be used");
+            }
+            SerdeOperator::Number => {
                 serde::de::Deserializer::deserialize_i64(deserializer, NumberVisitor)
             }
-            SerdeOperatorKind::String => {
+            SerdeOperator::String => {
                 serde::de::Deserializer::deserialize_str(deserializer, StringVisitor)
             }
-            SerdeOperatorKind::ValueType(value_type) => SerdeOperatorOld {
-                kind: value_type.property.kind,
-                bindings: self.bindings,
-            }
-            .deserialize(deserializer),
-            SerdeOperatorKind::MapType(map_type) => serde::de::Deserializer::deserialize_map(
+            SerdeOperator::ValueType(value_type) => self
+                .registry
+                .make_processor(value_type.property.operator_id)
+                .deserialize(deserializer),
+            SerdeOperator::MapType(map_type) => serde::de::Deserializer::deserialize_map(
                 deserializer,
                 MapTypeVisitor {
                     map_type,
-                    bindings: self.bindings,
+                    registry: self.registry,
                 },
             ),
-            SerdeOperatorKind::Recursive(def_id) => {
-                let kind = match self.bindings.serde_operator_kinds.get(&def_id) {
-                    Some(Some(kind)) => kind,
-                    _ => panic!("Could not resolve recursive serde operator"),
-                };
-                SerdeOperatorOld {
-                    kind,
-                    bindings: self.bindings,
-                }
-                .deserialize(deserializer)
-            }
         }
     }
 }
@@ -120,7 +111,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
     }
 }
 
-impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
+impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -136,10 +127,8 @@ impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
         while let Some(serde_property) =
             map.next_key_seed(PropertySet(&self.map_type.properties))?
         {
-            let attribute_value = map.next_value_seed(SerdeOperatorOld {
-                kind: serde_property.kind,
-                bindings: self.bindings,
-            })?;
+            let attribute_value =
+                map.next_value_seed(self.registry.make_processor(serde_property.operator_id))?;
 
             attributes.insert(serde_property.property_id, attribute_value);
         }
@@ -165,8 +154,8 @@ impl<'e, 'm, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e, 'm> {
     }
 }
 
-impl<'s, 'm, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s, 'm> {
-    type Value = SerdeProperty<'m>;
+impl<'s, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s> {
+    type Value = SerdeProperty;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -176,8 +165,8 @@ impl<'s, 'm, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s, 'm> {
     }
 }
 
-impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s, 'm> {
-    type Value = SerdeProperty<'m>;
+impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
+    type Value = SerdeProperty;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")

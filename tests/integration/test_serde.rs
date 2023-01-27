@@ -2,13 +2,13 @@ use crate::{util::TypeBinding, TestCompile};
 use serde_json::json;
 
 macro_rules! assert_json_io_matches {
-    ($compiler:expr, $binding:expr, $json:expr) => {
+    ($env:expr, $binding:expr, $json:expr) => {
         let input = $json;
-        let value = match $binding.deserialize($compiler, input.clone()) {
+        let value = match $binding.deserialize($env, input.clone()) {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };
-        let output = $binding.serialize_json($compiler, &value);
+        let output = $binding.serialize_json($env, &value);
 
         pretty_assertions::assert_eq!(input, output);
     };
@@ -16,9 +16,9 @@ macro_rules! assert_json_io_matches {
 
 #[test]
 fn test_serde_empty_type() {
-    "(type! foo)".compile_ok(|mut compiler| {
-        let foo = TypeBinding::new(&mut compiler, "foo");
-        assert_json_io_matches!(&compiler, foo, json!({}));
+    "(type! foo)".compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!({}));
     });
 }
 
@@ -28,9 +28,9 @@ fn test_serde_value_type() {
     (type! foo)
     (rel! (foo) _ (string))
     "
-    .compile_ok(|mut compiler| {
-        let foo = TypeBinding::new(&mut compiler, "foo");
-        assert_json_io_matches!(&compiler, foo, json!("string"));
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!("string"));
     });
 }
 
@@ -40,9 +40,9 @@ fn test_serde_map_type() {
     (type! foo)
     (rel! (foo) a (string))
     "
-    .compile_ok(|mut compiler| {
-        let foo = TypeBinding::new(&mut compiler, "foo");
-        assert_json_io_matches!(&compiler, foo, json!({ "a": "string" }));
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!({ "a": "string" }));
     });
 }
 
@@ -55,8 +55,8 @@ fn test_serde_complex_type() {
     (rel! (foo) b (bar))
     (rel! (bar) c (string))
     "
-    .compile_ok(|mut compiler| {
-        let foo = TypeBinding::new(&mut compiler, "foo");
-        assert_json_io_matches!(&compiler, foo, json!({ "a": "A", "b": { "c": "C" }}));
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!({ "a": "A", "b": { "c": "C" }}));
     });
 }
