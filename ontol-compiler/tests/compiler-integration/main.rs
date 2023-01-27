@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use ontol_compiler::{compiler::Compiler, mem::Mem, Compile, SpannedCompileError};
 use ontol_runtime::{env::Env, PackageId};
 
