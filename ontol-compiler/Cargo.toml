@@ -1,0 +1,22 @@
+[package]
+name = "ontol-compiler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chumsky = "0.8"
+smartstring = { version = "1", features = ["serde"] }
+fraction = "0.13"
+ena = "0.14"
+bumpalo = "3"
+thiserror = "1"
+miette = "5"
+indexmap = "1"
+serde = "1"
+serde_json = "1"
+
+[dev-dependencies]
+assert_matches = "1"
+pretty_assertions = "1"

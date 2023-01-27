@@ -1,7 +1,7 @@
 //! Tests for deserialization, including errors
 
 use assert_matches::assert_matches;
-use ontol_lang::Value;
+use ontol_compiler::Value;
 use serde_json::json;
 
 use crate::{assert_error_msg, util::TypeBinding, TestCompile};
