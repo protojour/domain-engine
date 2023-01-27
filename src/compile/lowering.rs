@@ -4,8 +4,8 @@ use smartstring::alias::String;
 
 use crate::{
     compile::error::{CompileError, SpannedCompileError},
+    compiler::Compiler,
     def::{Def, DefId, DefKind, Relation, Relationship},
-    env::Env,
     expr::{Expr, ExprId, ExprKind},
     namespace::Space,
     parse::{ast, Span},
@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub struct Lowering<'s, 'm> {
-    env: &'s mut Env<'m>,
+    compiler: &'s mut Compiler<'m>,
     src: &'s CompileSrc,
     root_defs: Vec<DefId>,
 }
@@ -21,9 +21,9 @@ pub struct Lowering<'s, 'm> {
 type Res<T> = Result<T, SpannedCompileError>;
 
 impl<'s, 'm> Lowering<'s, 'm> {
-    pub fn new(env: &'s mut Env<'m>, src: &'s CompileSrc) -> Self {
+    pub fn new(compiler: &'s mut Compiler<'m>, src: &'s CompileSrc) -> Self {
         Self {
-            env,
+            compiler,
             src,
             root_defs: Default::default(),
         }
@@ -112,11 +112,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match ast_ty {
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
             ast::Type::Sym(ident) => {
-                match self
-                    .env
-                    .namespaces
-                    .lookup(&[self.src.package, CORE_PKG], Space::Type, &ident)
-                {
+                match self.compiler.namespaces.lookup(
+                    &[self.src.package, CORE_PKG],
+                    Space::Type,
+                    &ident,
+                ) {
                     Some(type_def_id) => Ok(type_def_id),
                     None => Err(self.error(CompileError::TypeNotFound, &span)),
                 }
@@ -146,8 +146,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_root_expr(&mut self, ast: (ast::Expr, Span), var_table: &mut VarTable) -> Res<ExprId> {
         let expr = self.lower_expr(ast, var_table)?;
-        let expr_id = self.env.defs.alloc_expr_id();
-        self.env.expressions.insert(expr_id, expr);
+        let expr_id = self.compiler.defs.alloc_expr_id();
+        self.compiler.expressions.insert(expr_id, expr);
         Ok(expr_id)
     }
 
@@ -169,17 +169,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map(|ast_arg| self.lower_expr(ast_arg, var_table))
                     .collect::<Result<_, _>>()?;
 
-                match self
-                    .env
-                    .namespaces
-                    .lookup(&[self.src.package, CORE_PKG], Space::Type, &ident)
-                {
+                match self.compiler.namespaces.lookup(
+                    &[self.src.package, CORE_PKG],
+                    Space::Type,
+                    &ident,
+                ) {
                     Some(def_id) => Ok(self.expr(ExprKind::Call(def_id, args), &span)),
                     None => Err(self.error(CompileError::TypeNotFound, &sym_span)),
                 }
             }
             ast::Expr::Sym(var_ident) => {
-                let id = var_table.var_id(var_ident, self.env);
+                let id = var_table.var_id(var_ident, self.compiler);
                 Ok(self.expr(ExprKind::Variable(id), &span))
             }
             expr => panic!(
@@ -192,23 +192,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn define_relation_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
         match ident {
             Some(ident) => match self
-                .env
+                .compiler
                 .namespaces
                 .get_mut(self.src.package, Space::Rel)
                 .entry(ident)
             {
                 Entry::Vacant(vacant) => {
-                    ImplicitDefId::New(vacant.insert(self.env.defs.alloc_def_id()).clone())
+                    ImplicitDefId::New(vacant.insert(self.compiler.defs.alloc_def_id()).clone())
                 }
                 Entry::Occupied(occupied) => ImplicitDefId::Reused(occupied.get().clone()),
             },
-            None => ImplicitDefId::New(self.env.defs.alloc_def_id()),
+            None => ImplicitDefId::New(self.compiler.defs.alloc_def_id()),
         }
     }
 
     fn named_def_id(&mut self, space: Space, ident: &String) -> DefId {
-        let def_id = self.env.defs.alloc_def_id();
-        self.env
+        let def_id = self.compiler.defs.alloc_def_id();
+        self.compiler
             .namespaces
             .get_mut(self.src.package, space)
             .insert(ident.clone(), def_id);
@@ -216,7 +216,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn set_def(&mut self, def_id: DefId, kind: DefKind, span: &Span) {
-        self.env.defs.map.insert(
+        self.compiler.defs.map.insert(
             def_id,
             Def {
                 package: self.src.package,
@@ -227,7 +227,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn def(&mut self, kind: DefKind, span: &Span) -> DefId {
-        let def_id = self.env.defs.alloc_def_id();
+        let def_id = self.compiler.defs.alloc_def_id();
         self.set_def(def_id, kind, span);
         def_id
     }
@@ -241,7 +241,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn error(&self, compile_error: CompileError, span: &Span) -> SpannedCompileError {
-        compile_error.spanned(&self.env.sources, &self.src.span(span))
+        compile_error.spanned(&self.compiler.sources, &self.src.span(span))
     }
 }
 
@@ -256,10 +256,10 @@ struct VarTable {
 }
 
 impl VarTable {
-    fn var_id(&mut self, ident: String, env: &mut Env) -> ExprId {
+    fn var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
         self.variables
             .entry(ident)
-            .or_insert_with(|| env.defs.alloc_expr_id())
+            .or_insert_with(|| compiler.defs.alloc_expr_id())
             .clone()
     }
 }

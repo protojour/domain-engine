@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
+    compiler::Compiler,
+    compiler_queries::{GetDefType, GetPropertyMeta},
     def::{DefId, DefKind, Defs},
-    env::Env,
-    env_queries::{GetDefType, GetPropertyMeta},
     mem::Mem,
     namespace::{Namespaces, Space},
     relation::{Properties, Relations, SubjectProperties},
@@ -24,14 +24,14 @@ pub struct DomainBinding<'m> {
 impl<'m> DomainBinding<'m> {
     pub fn get_serde_operator<'e>(
         &self,
-        env: &'e Env<'m>,
+        compiler: &'e Compiler<'m>,
         type_name: &str,
     ) -> Option<SerdeOperator<'e, 'm>> {
         self.serde_operator_kinds
             .get(type_name)
             .map(|kind| SerdeOperator {
                 kind,
-                bindings: &env.bindings,
+                bindings: &compiler.bindings,
             })
     }
 }
@@ -51,7 +51,7 @@ impl<'m> Bindings<'m> {
     }
 }
 
-impl<'m> Env<'m> {
+impl<'m> Compiler<'m> {
     pub fn bindings_builder<'e>(&'e mut self) -> BindingsBuilder<'e, 'm> {
         BindingsBuilder {
             type_stack: Default::default(),

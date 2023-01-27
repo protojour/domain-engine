@@ -4,21 +4,21 @@ use compile::{
     error::{CompileError, UnifiedCompileError},
     lowering::Lowering,
 };
-use env::Env;
+use compiler::Compiler;
 
 pub use compile::error::*;
 pub use source::*;
 pub use value::*;
 
 pub mod binding;
+pub mod compiler;
 pub mod ena;
-pub mod env;
 pub mod mem;
 pub mod serde;
 
 mod compile;
+mod compiler_queries;
 mod def;
-mod env_queries;
 mod expr;
 mod namespace;
 mod parse;
@@ -28,25 +28,37 @@ mod types;
 mod value;
 
 pub trait Compile {
-    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError>;
+    fn compile<'m>(
+        self,
+        compiler: &mut Compiler<'m>,
+        package: PackageId,
+    ) -> Result<(), UnifiedCompileError>;
 }
 
 impl Compile for &str {
-    fn compile<'m>(self, env: &mut Env<'m>, package: PackageId) -> Result<(), UnifiedCompileError> {
-        let src = env.sources.add(package, "str".into(), self.into());
-        src.compile(env, package)
+    fn compile<'m>(
+        self,
+        compiler: &mut Compiler<'m>,
+        package: PackageId,
+    ) -> Result<(), UnifiedCompileError> {
+        let src = compiler.sources.add(package, "str".into(), self.into());
+        src.compile(compiler, package)
     }
 }
 
 impl Compile for CompileSrc {
-    fn compile<'m>(self, env: &mut Env<'m>, _: PackageId) -> Result<(), UnifiedCompileError> {
+    fn compile<'m>(
+        self,
+        compiler: &mut Compiler<'m>,
+        _: PackageId,
+    ) -> Result<(), UnifiedCompileError> {
         let mut compile_errors = vec![];
         let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self.text.as_str());
 
         for lex_error in lex_errors {
             let span = lex_error.span();
             compile_errors
-                .push(CompileError::Lex(lex_error).spanned(&env.sources, &self.span(&span)));
+                .push(CompileError::Lex(lex_error).spanned(&compiler.sources, &self.span(&span)));
         }
 
         if let Some(trees) = trees {
@@ -67,11 +79,11 @@ impl Compile for CompileSrc {
             for parse_error in parse_errors {
                 let span = parse_error.span();
                 compile_errors.push(
-                    CompileError::Parse(parse_error).spanned(&env.sources, &self.span(&span)),
+                    CompileError::Parse(parse_error).spanned(&compiler.sources, &self.span(&span)),
                 );
             }
 
-            let mut lowering = Lowering::new(env, &self);
+            let mut lowering = Lowering::new(compiler, &self);
 
             for ast in asts {
                 if let Err(error) = lowering.lower_ast(ast) {
@@ -80,16 +92,16 @@ impl Compile for CompileSrc {
             }
 
             let root_defs = lowering.finish();
-            let mut type_check = env.type_check();
+            let mut type_check = compiler.type_check();
             for root_def in root_defs {
                 type_check.check_def(root_def);
             }
         }
 
-        compile_errors.append(&mut env.errors.errors);
+        compile_errors.append(&mut compiler.errors.errors);
 
         if compile_errors.is_empty() {
-            env.sources.compile_finished();
+            compiler.sources.compile_finished();
             Ok(())
         } else {
             Err(UnifiedCompileError {

@@ -1,7 +1,4 @@
-//! Environment
-//!
-//! Not sure yet whether it's a compiler or runtime environment, let's see.
-//!
+//! Central compiler data structure
 
 use std::collections::HashMap;
 
@@ -17,9 +14,8 @@ use crate::{
     types::{DefTypes, Types},
 };
 
-/// Runtime environment
 #[derive(Debug)]
-pub struct Env<'m> {
+pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: HashMap<PackageId, Package>,
@@ -36,7 +32,7 @@ pub struct Env<'m> {
     pub(crate) errors: CompileErrors,
 }
 
-impl<'m> Env<'m> {
+impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
             sources: Default::default(),
@@ -53,19 +49,19 @@ impl<'m> Env<'m> {
     }
 }
 
-impl<'m> AsRef<Defs> for Env<'m> {
+impl<'m> AsRef<Defs> for Compiler<'m> {
     fn as_ref(&self) -> &Defs {
         &self.defs
     }
 }
 
-impl<'m> AsRef<DefTypes<'m>> for Env<'m> {
+impl<'m> AsRef<DefTypes<'m>> for Compiler<'m> {
     fn as_ref(&self) -> &DefTypes<'m> {
         &self.def_types
     }
 }
 
-impl<'m> AsRef<Relations> for Env<'m> {
+impl<'m> AsRef<Relations> for Compiler<'m> {
     fn as_ref(&self) -> &Relations {
         &self.relations
     }

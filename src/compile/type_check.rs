@@ -1,6 +1,6 @@
 use crate::{
+    compiler::Compiler,
     def::{Def, DefId, DefKind, Defs, Primitive, Relation},
-    env::Env,
     expr::{Expr, ExprKind},
     mem::Intern,
     relation::{Relations, Role, SubjectProperties},
@@ -197,7 +197,7 @@ impl<'e, 'm> TypeCheck<'e, 'm> {
     }
 }
 
-impl<'m> Env<'m> {
+impl<'m> Compiler<'m> {
     pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
         TypeCheck {
             types: &mut self.types,
@@ -214,7 +214,7 @@ impl<'m> Env<'m> {
 mod tests {
     use crate::{
         compile::error::UnifiedCompileError,
-        env::Env,
+        compiler::Compiler,
         expr::{ExprId, ExprKind},
         mem::Mem,
         namespace::Space,
@@ -225,19 +225,19 @@ mod tests {
     #[test]
     fn type_check_data_call() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
-        let mut env = Env::new(&mem).with_core();
+        let mut compiler = Compiler::new(&mem).with_core();
 
-        "(data m (number))".compile(&mut env, UNIT_TEST_PKG)?;
+        "(data m (number))".compile(&mut compiler, UNIT_TEST_PKG)?;
 
-        let m = env
+        let m = compiler
             .namespaces
             .lookup(&[UNIT_TEST_PKG], Space::Type, "m")
             .expect("m not found");
-        let type_of_m = env.type_check().check_def(m);
+        let type_of_m = compiler.type_check().check_def(m);
 
-        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
-        let expr = env.expr(ExprKind::Call(m, args), SourceSpan::none());
-        let expr_type = env.type_check().check_expr(&expr);
+        let args = vec![compiler.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
+        let expr = compiler.expr(ExprKind::Call(m, args), SourceSpan::none());
+        let expr_type = compiler.type_check().check_expr(&expr);
 
         assert_eq!(expr_type, type_of_m);
 
@@ -247,19 +247,19 @@ mod tests {
     #[test]
     fn type_check_record() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
-        let mut env = Env::new(&mem).with_core();
+        let mut compiler = Compiler::new(&mem).with_core();
 
-        "(data foo (record (field bar (number))))".compile(&mut env, UNIT_TEST_PKG)?;
+        "(data foo (record (field bar (number))))".compile(&mut compiler, UNIT_TEST_PKG)?;
 
-        let foo = env
+        let foo = compiler
             .namespaces
             .lookup(&[UNIT_TEST_PKG], Space::Type, "foo")
             .expect("foo not found");
-        let type_of_m = env.type_check().check_def(foo);
+        let type_of_m = compiler.type_check().check_def(foo);
 
-        let args = vec![env.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
-        let expr = env.expr(ExprKind::Call(foo, args), SourceSpan::none());
-        let expr_type = env.type_check().check_expr(&expr);
+        let args = vec![compiler.expr(ExprKind::Variable(ExprId(100)), SourceSpan::none())];
+        let expr = compiler.expr(ExprKind::Call(foo, args), SourceSpan::none());
+        let expr_type = compiler.type_check().check_expr(&expr);
 
         assert_eq!(expr_type, type_of_m);
 
@@ -269,14 +269,14 @@ mod tests {
     #[test]
     fn type_def_simple_relation() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
-        let mut env = Env::new(&mem).with_core();
+        let mut compiler = Compiler::new(&mem).with_core();
 
         "
         (type! foo)
         (type! bar)
         (rel! (foo) has-a (bar))
         "
-        .compile(&mut env, UNIT_TEST_PKG)?;
+        .compile(&mut compiler, UNIT_TEST_PKG)?;
 
         Ok(())
     }
@@ -284,13 +284,13 @@ mod tests {
     #[test]
     fn type_check_eq() -> Result<(), UnifiedCompileError> {
         let mem = Mem::default();
-        let mut env = Env::new(&mem).with_core();
+        let mut compiler = Compiler::new(&mem).with_core();
 
         "
         (data foo (record (field bar (number))))
         (eq! () (foo x) (foo x))
         "
-        .compile(&mut env, UNIT_TEST_PKG)?;
+        .compile(&mut compiler, UNIT_TEST_PKG)?;
 
         Ok(())
     }

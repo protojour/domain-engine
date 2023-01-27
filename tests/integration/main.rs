@@ -1,4 +1,4 @@
-use ontol_lang::{env::Env, mem::Mem, Compile, PackageId, SpannedCompileError};
+use ontol_lang::{compiler::Compiler, mem::Mem, Compile, PackageId, SpannedCompileError};
 
 mod test_compile_errors;
 mod test_deserialize;
@@ -19,7 +19,7 @@ macro_rules! assert_error_msg {
 pub(crate) use assert_error_msg;
 
 trait TestCompile {
-    fn compile_ok(self, validator: impl Fn(Env));
+    fn compile_ok(self, validator: impl Fn(Compiler));
     fn compile_fail(self);
 }
 
@@ -36,20 +36,22 @@ struct DiagnosticsLine {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(Env)) {
+    fn compile_ok(self, validator: impl Fn(Compiler)) {
         let mem = Mem::default();
-        let mut env = Env::new(&mem).with_core();
-        self.compile(&mut env, TEST_PKG).unwrap();
+        let mut compiler = Compiler::new(&mem).with_core();
+        self.compile(&mut compiler, TEST_PKG).unwrap();
 
-        validator(env);
+        validator(compiler);
     }
 
     fn compile_fail(self) {
         let mut mem = Mem::default();
-        let mut env = Env::new(&mut mem).with_core();
-        let compile_src = env.sources.add(PackageId(666), "str".into(), self.into());
+        let mut compiler = Compiler::new(&mut mem).with_core();
+        let compile_src = compiler
+            .sources
+            .add(PackageId(666), "str".into(), self.into());
 
-        let Err(errors) = compile_src.clone().compile(&mut env, PackageId(1)) else {
+        let Err(errors) = compile_src.clone().compile(&mut compiler, PackageId(1)) else {
             panic!("Script did not fail to compile");
         };
 

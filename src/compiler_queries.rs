@@ -1,3 +1,5 @@
+//! Traits that can be implemented for "variants" of the compiler
+
 use crate::{
     def::{DefId, Defs, Relation, Relationship},
     relation::{self, PropertyId, Relations},

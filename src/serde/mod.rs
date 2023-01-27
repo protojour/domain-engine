@@ -8,7 +8,7 @@ mod serialize;
 
 /// SerdeOperator is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
-/// in the environment.
+/// in the compilerironment.
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeOperator<'e, 'm> {
     pub(crate) kind: &'m SerdeOperatorKind<'m>,

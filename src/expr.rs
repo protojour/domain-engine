@@ -1,4 +1,4 @@
-use crate::{def::DefId, env::Env, source::SourceSpan};
+use crate::{compiler::Compiler, def::DefId, source::SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ExprId(pub u32);
@@ -17,7 +17,7 @@ pub enum ExprKind {
     Variable(ExprId),
 }
 
-impl<'m> Env<'m> {
+impl<'m> Compiler<'m> {
     pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
         Expr {
             id: self.defs.alloc_expr_id(),

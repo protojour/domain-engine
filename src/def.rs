@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use smartstring::alias::String;
 
 use crate::{
-    env::Env,
+    compiler::Compiler,
     expr::ExprId,
     mem::Intern,
     namespace::Space,
@@ -144,7 +144,7 @@ impl Defs {
     }
 }
 
-impl<'m> Env<'m> {
+impl<'m> Compiler<'m> {
     pub fn add_named_def(
         &mut self,
         name: &str,

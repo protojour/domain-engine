@@ -87,7 +87,7 @@ pub struct DefTypes<'m> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::Env;
+    use crate::compiler::Compiler;
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize
@@ -96,11 +96,11 @@ mod tests {
     #[test]
     fn dedup_types() {
         let mem = Mem::default();
-        let mut env = Env::new(&mem);
+        let mut compiler = Compiler::new(&mem);
 
-        let c0 = env.types.intern(Type::Constant(42));
-        let c1 = env.types.intern(Type::Constant(42));
-        let c2 = env.types.intern(Type::Constant(66));
+        let c0 = compiler.types.intern(Type::Constant(42));
+        let c1 = compiler.types.intern(Type::Constant(42));
+        let c2 = compiler.types.intern(Type::Constant(66));
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));
