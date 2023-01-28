@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use ontol_runtime::DefId;
+
 use crate::{
     compiler::Compiler,
-    def::{Def, DefId, DefKind, Defs, Primitive, Relation},
+    def::{Def, DefKind, Defs, Primitive, Relation},
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::{Relations, Role, SubjectProperties},

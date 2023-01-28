@@ -1,6 +1,7 @@
+use ontol_runtime::DefId;
 use smartstring::alias::String;
 
-use crate::{compiler::Compiler, def::DefId, source::SourceSpan};
+use crate::{compiler::Compiler, source::SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ExprId(pub u32);

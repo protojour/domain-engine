@@ -71,6 +71,7 @@ impl<'m> Compiler<'m> {
                 types.insert(
                     type_name,
                     TypeInfo {
+                        def_id: type_def_id,
                         serde_operator_id: serde_generator.get_serde_operator_id(type_def_id),
                     },
                 );
@@ -80,8 +81,9 @@ impl<'m> Compiler<'m> {
         }
 
         Env {
-            serde_operators: serde_generator.finish(),
             domains: out_domains,
+            program: Default::default(),
+            serde_operators: serde_generator.finish(),
         }
     }
 

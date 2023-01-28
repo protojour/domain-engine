@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use ontol_runtime::DefId;
 use smartstring::alias::String;
 
-use crate::{def::DefId, PackageId};
+use crate::PackageId;
 
 /// Namespace disambiguator
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
-use ontol_runtime::PropertyId;
-
-use crate::def::DefId;
+use ontol_runtime::{DefId, PropertyId};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Role {

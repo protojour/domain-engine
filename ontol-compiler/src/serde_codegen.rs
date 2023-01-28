@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use ontol_runtime::serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType};
+use ontol_runtime::{
+    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType},
+    DefId,
+};
 use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{DefId, DefKind, Defs},
+    def::{DefKind, Defs},
     relation::{Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };

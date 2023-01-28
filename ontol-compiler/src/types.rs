@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    def::DefId,
-    mem::{Intern, Mem},
-};
+use ontol_runtime::DefId;
+
+use crate::mem::{Intern, Mem};
 
 pub type TypeRef<'m> = &'m Type<'m>;
 

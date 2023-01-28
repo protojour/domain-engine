@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::PropertyId;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Value {
     // TODO: Big rational numbers
     Number(i64),

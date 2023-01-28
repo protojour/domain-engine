@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_runtime::PackageId;
+use ontol_runtime::{DefId, PackageId};
 use smartstring::alias::String;
 
 use crate::{
@@ -12,9 +12,6 @@ use crate::{
     source::{Package, SourceSpan, CORE_PKG},
     types::Type,
 };
-
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct DefId(pub u32);
 
 /// A definition in some package
 #[derive(Debug)]

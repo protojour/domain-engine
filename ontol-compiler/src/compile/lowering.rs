@@ -1,11 +1,12 @@
 use std::collections::{hash_map::Entry, HashMap};
 
+use ontol_runtime::DefId;
 use smartstring::alias::String;
 
 use crate::{
     compile::error::{CompileError, SpannedCompileError},
     compiler::Compiler,
-    def::{Def, DefId, DefKind, Relation, Relationship},
+    def::{Def, DefKind, Relation, Relationship},
     expr::{Expr, ExprId, ExprKind},
     namespace::Space,
     parse::{ast, Span},

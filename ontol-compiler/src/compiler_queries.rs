@@ -1,9 +1,9 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::PropertyId;
+use ontol_runtime::{DefId, PropertyId};
 
 use crate::{
-    def::{DefId, Defs, Relation, Relationship},
+    def::{Defs, Relation, Relationship},
     relation::{self, Relations},
     types::{DefTypes, TypeRef},
 };

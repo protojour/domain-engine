@@ -4,13 +4,15 @@ use smartstring::alias::String;
 
 use crate::{
     serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
-    PackageId,
+    vm::Program,
+    DefId, PackageId,
 };
 
 /// Runtime environment
 pub struct Env {
-    pub serde_operators: Vec<SerdeOperator>,
     pub domains: HashMap<PackageId, Domain>,
+    pub program: Program,
+    pub serde_operators: Vec<SerdeOperator>,
 }
 
 impl Env {
@@ -28,6 +30,7 @@ pub struct Domain {
 }
 
 pub struct TypeInfo {
+    pub def_id: DefId,
     pub serde_operator_id: Option<SerdeOperatorId>,
 }
 
