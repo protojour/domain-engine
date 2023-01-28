@@ -27,7 +27,7 @@ impl<'e> Debug for SerdeProcessor<'e> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct SerdeRegistry<'e> {
     operators: &'e [SerdeOperator],
 }

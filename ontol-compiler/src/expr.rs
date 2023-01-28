@@ -1,3 +1,5 @@
+use smartstring::alias::String;
+
 use crate::{compiler::Compiler, def::DefId, source::SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -12,9 +14,12 @@ pub struct Expr {
 
 #[derive(Debug)]
 pub enum ExprKind {
-    Constant(i32),
+    /// Function call
     Call(DefId, Vec<Expr>),
+    /// Object constructor
+    Obj(DefId, Vec<(String, Expr)>),
     Variable(ExprId),
+    Constant(i32),
 }
 
 impl<'m> Compiler<'m> {

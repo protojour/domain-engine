@@ -76,6 +76,19 @@ impl TreeStream {
         )
     }
 
+    pub fn next_var(&mut self) -> ParseResult<String> {
+        self.next_msg(
+            |tree| {
+                if let Tree::Variable(sym) = tree {
+                    Some(sym)
+                } else {
+                    None
+                }
+            },
+            "expected variable",
+        )
+    }
+
     pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree, Span>> {
         match self.next() {
             Some((Tree::Paren(vec), span)) => Ok(Self::new(vec, span)),

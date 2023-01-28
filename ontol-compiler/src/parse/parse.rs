@@ -86,7 +86,13 @@ fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
 
 fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
-    input.next_list_msg("expected param list")?.end()?;
+
+    let mut params = vec![];
+    let mut input_params = input.next_list_msg("expected param list")?;
+    while input_params.peek_any() {
+        let (var, span) = input_params.next_var()?;
+        params.push((var, span));
+    }
 
     let first = parse_next_expr(&mut input)?;
     let second = parse_next_expr(&mut input)?;
@@ -94,7 +100,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 
     Ok((
         Ast::Eq(Eq {
-            params: (),
+            params: vec![],
             first,
             second,
         }),
@@ -109,22 +115,45 @@ fn parse_next_expr(input: &mut TreeStream) -> ParseResult<Expr> {
 fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {
     match tree {
         Tree::Sym(string) => Ok((Expr::Sym(string), span)),
+        Tree::Variable(string) => Ok((Expr::Variable(string), span)),
         Tree::Num(string) => Ok((Expr::Literal(Literal::Number(string)), span)),
-        Tree::Paren(list) => parse_expr_call(TreeStream::new(list, span)),
+        Tree::Paren(list) => parse_list_expr(TreeStream::new(list, span)),
         _ => Err(error("invalid expression", span)),
     }
 }
 
-fn parse_expr_call(mut input: TreeStream) -> ParseResult<Expr> {
+fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     let span = input.span();
     let sym = input.next_sym()?;
-    let mut args = vec![];
 
-    while input.peek_any() {
-        args.push(parse_next_expr(&mut input)?);
+    match sym.0.as_str() {
+        "obj!" => {
+            let typename = input.next_sym_msg("expected type name")?;
+
+            let mut attributes = vec![];
+
+            while input.peek_any() {
+                let mut list = input.next_list_msg("expected attribute")?;
+                let span = list.span();
+                let property = list.next_sym_msg("expected property")?;
+                let value = parse_next_expr(&mut list)?;
+                list.end()?;
+
+                attributes.push((Attribute { property, value }, span));
+            }
+
+            Ok((Expr::Obj(typename, attributes), span))
+        }
+        _ => {
+            let mut args = vec![];
+
+            while input.peek_any() {
+                args.push(parse_next_expr(&mut input)?);
+            }
+
+            Ok((Expr::Call(sym, args), span))
+        }
     }
-
-    Ok((Expr::Call(sym, args), span))
 }
 
 pub fn error(msg: impl ToString, span: Span) -> Simple<Tree> {

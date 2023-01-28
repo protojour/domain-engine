@@ -9,16 +9,12 @@ pub enum Tree {
     Paren(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
     Dot,
+    /// Any unquoted string
     Sym(String),
+    /// String starting with ":"
+    Variable(String),
     Num(String),
     Comment(String),
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Hash)]
-pub enum Keyword {
-    True,
-    False,
-    Struct,
 }
 
 pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
@@ -37,7 +33,8 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(bracket)
             .or(just(".").map(|_| Tree::Dot))
             .or(num())
-            .or(sym())
+            .or(just(":").ignore_then(ident().map(Tree::Variable)))
+            .or(ident().map(Tree::Sym))
             .or(comment());
 
         combined_tree
@@ -58,13 +55,13 @@ fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
         .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
 }
 
-fn sym() -> impl Parser<char, Tree, Error = Simple<char>> {
+fn ident() -> impl Parser<char, String, Error = Simple<char>> {
     filter(|c: &char| !c.is_whitespace() && !special_char(*c))
         .map(Some)
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
         )
-        .map(|vec| Tree::Sym(String::from_iter(vec.into_iter())))
+        .map(|vec| String::from_iter(vec.into_iter()))
 }
 
 fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
@@ -76,7 +73,7 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
 
 fn special_char(c: char) -> bool {
     match c {
-        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' => true,
+        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' => true,
         _ => false,
     }
 }

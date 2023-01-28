@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::{
     compiler::Compiler,
     def::{Def, DefId, DefKind, Defs, Primitive, Relation},
-    expr::{Expr, ExprKind},
+    expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::{Relations, Role, SubjectProperties},
     source::{SourceSpan, Sources},
@@ -15,6 +17,7 @@ pub struct TypeCheck<'c, 'm> {
     def_types: &'c mut DefTypes<'m>,
     relations: &'c mut Relations,
     errors: &'c mut CompileErrors,
+    expressions: &'c HashMap<ExprId, Expr>,
     defs: &'c Defs,
     sources: &'c Sources,
 }
@@ -66,16 +69,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.types.intern(Type::Tautology)
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
-            DefKind::Equivalence(_, _) => self.types.intern(Type::Tautology),
+            DefKind::Equivalence(first_id, second_id) => {
+                let first = self.check_expr_id(*first_id);
+                let second = self.check_expr_id(*second_id);
+                self.types.intern(Type::Tautology)
+            }
             other => {
                 panic!("failed def typecheck: {other:?}");
             }
         }
     }
 
+    fn check_expr_id(&mut self, expr_id: ExprId) -> TypeRef<'m> {
+        match self.expressions.get(&expr_id) {
+            Some(expr) => self.check_expr(expr),
+            None => panic!("Expression {expr_id:?} not found"),
+        }
+    }
+
     fn check_expr(&mut self, expr: &Expr) -> TypeRef<'m> {
         match &expr.kind {
-            ExprKind::Constant(_) => self.types.intern(Type::Number),
             ExprKind::Call(def_id, args) => match self.def_types.map.get(&def_id) {
                 Some(Type::Function { params, output }) => {
                     if args.len() != params.len() {
@@ -86,22 +99,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     *output
                 }
-                Some(Type::Data(data_def_id, field_id)) => {
-                    if args.len() != 1 {
-                        self.error(CompileError::WrongNumberOfArguments, &expr.span);
-                    }
-
-                    match self.def_types.map.get(data_def_id) {
-                        Some(ty) => ty,
-                        None => self.types.intern(Type::Error),
-                    }
-                }
-                _ => {
-                    self.errors
-                        .push(CompileError::NotCallable.spanned(&self.sources, &expr.span));
-                    self.types.intern(Type::Error)
-                }
+                _ => self.error(CompileError::NotCallable, &expr.span),
             },
+            ExprKind::Obj(def_id, attributes) => {
+                panic!()
+            }
+            ExprKind::Constant(_) => self.types.intern(Type::Number),
             ExprKind::Variable(id) => {
                 panic!()
             }
@@ -178,10 +181,11 @@ impl<'m> Compiler<'m> {
     pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
         TypeCheck {
             types: &mut self.types,
-            defs: &self.defs,
             errors: &mut self.errors,
             def_types: &mut self.def_types,
             relations: &mut self.relations,
+            expressions: &self.expressions,
+            defs: &self.defs,
             sources: &self.sources,
         }
     }

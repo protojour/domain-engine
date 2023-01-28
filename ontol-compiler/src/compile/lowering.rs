@@ -83,11 +83,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 )))
             }
             ast::Ast::Eq(ast::Eq {
-                params: _,
+                params,
                 first,
                 second,
             }) => {
                 let mut var_table = VarTable::default();
+                for (param, _span) in params {
+                    var_table.var_id(param, self.compiler);
+                }
                 let first = self.lower_root_expr(first, &mut var_table)?;
                 let second = self.lower_root_expr(second, &mut var_table)?;
                 Ok(Some(self.def(DefKind::Equivalence(first, second), &span)))
@@ -131,22 +134,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|_| self.error(CompileError::InvalidNumber, &span))?;
                 Ok(self.expr(ExprKind::Constant(num), &span))
             }
-            ast::Expr::Call((ident, sym_span), ast_args) => {
+            ast::Expr::Call((ident, ident_span), ast_args) => {
                 let args = ast_args
                     .into_iter()
                     .map(|ast_arg| self.lower_expr(ast_arg, var_table))
                     .collect::<Result<_, _>>()?;
 
-                match self.compiler.namespaces.lookup(
-                    &[self.src.package, CORE_PKG],
-                    Space::Type,
-                    &ident,
-                ) {
-                    Some(def_id) => Ok(self.expr(ExprKind::Call(def_id, args), &span)),
-                    None => Err(self.error(CompileError::TypeNotFound, &sym_span)),
-                }
+                let def_id = self.lookup_ident(&ident, &ident_span)?;
+                Ok(self.expr(ExprKind::Call(def_id, args), &span))
             }
-            ast::Expr::Sym(var_ident) => {
+            ast::Expr::Obj((ident, ident_span), ast_attributes) => {
+                let attributes = ast_attributes
+                    .into_iter()
+                    .map(|(ast_attr, _)| {
+                        self.lower_expr(ast_attr.value, var_table)
+                            .map(|expr| (ast_attr.property.0, expr))
+                    })
+                    .collect::<Result<_, _>>()?;
+
+                let type_def_id = self.lookup_ident(&ident, &ident_span)?;
+                Ok(self.expr(ExprKind::Obj(type_def_id, attributes), &span))
+            }
+            ast::Expr::Variable(var_ident) => {
                 let id = var_table.var_id(var_ident, self.compiler);
                 Ok(self.expr(ExprKind::Variable(id), &span))
             }
@@ -154,6 +163,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 "BUG: Unable to lower expression {expr:?} at {:?}",
                 self.src.span(&span)
             ),
+        }
+    }
+
+    fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, SpannedCompileError> {
+        match self
+            .compiler
+            .namespaces
+            .lookup(&[self.src.package, CORE_PKG], Space::Type, ident)
+        {
+            Some(def_id) => Ok(def_id),
+            None => Err(self.error(CompileError::TypeNotFound, &span)),
         }
     }
 

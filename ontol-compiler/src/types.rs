@@ -26,9 +26,6 @@ pub enum Type<'m> {
     },
     // User-defined data type from a domain:
     Domain(DefId),
-    // TODO: Expand into proper user defined data types:
-    Data(DefId, DefId),
-    Record(DefId),
     Error,
 }
 

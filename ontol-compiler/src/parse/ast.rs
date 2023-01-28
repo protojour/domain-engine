@@ -14,16 +14,24 @@ pub enum Ast {
 }
 
 pub struct Eq {
-    pub params: (),
+    pub params: Vec<Spanned<String>>,
     pub first: Spanned<Expr>,
     pub second: Spanned<Expr>,
 }
 
 #[derive(Debug)]
 pub enum Expr {
+    Variable(String),
     Sym(String),
     Literal(Literal),
     Call(Spanned<String>, Vec<Spanned<Expr>>),
+    Obj(Spanned<String>, Vec<Spanned<Attribute>>),
+}
+
+#[derive(Debug)]
+pub struct Attribute {
+    pub property: Spanned<String>,
+    pub value: Spanned<Expr>,
 }
 
 pub enum Type {
