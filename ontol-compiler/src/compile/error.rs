@@ -67,6 +67,8 @@ pub enum CompileError {
     MismatchedType,
     #[error("missing property `{0}`")]
     MissingProperty(String),
+    #[error("undeclared variable")]
+    UndeclaredVariable,
 }
 
 #[derive(Debug)]

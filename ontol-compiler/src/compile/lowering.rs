@@ -90,7 +90,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }) => {
                 let mut var_table = VarTable::default();
                 for (param, _span) in params.into_iter() {
-                    var_table.var_id(param, self.compiler);
+                    var_table.new_var_id(param, self.compiler);
                 }
                 let first = self.lower_root_expr(first, &mut var_table)?;
                 let second = self.lower_root_expr(second, &mut var_table)?;
@@ -126,7 +126,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn lower_expr(
         &mut self,
         (ast_expr, span): (ast::Expr, Span),
-        var_table: &mut VarTable,
+        var_table: &VarTable,
     ) -> Res<Expr> {
         match ast_expr {
             ast::Expr::Literal(ast::Literal::Number(num)) => {
@@ -176,7 +176,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ))
             }
             ast::Expr::Variable(var_ident) => {
-                let id = var_table.var_id(var_ident, self.compiler);
+                let id = var_table
+                    .get_var_id(var_ident.as_str())
+                    .ok_or_else(|| self.error(CompileError::UndeclaredVariable, &span))?;
                 Ok(self.expr(ExprKind::Variable(id), &span))
             }
             expr => panic!(
@@ -264,10 +266,14 @@ struct VarTable {
 }
 
 impl VarTable {
-    fn var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
+    fn new_var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
         self.variables
             .entry(ident)
             .or_insert_with(|| compiler.defs.alloc_expr_id())
             .clone()
+    }
+
+    fn get_var_id(&self, ident: &str) -> Option<ExprId> {
+        self.variables.get(ident).cloned()
     }
 }

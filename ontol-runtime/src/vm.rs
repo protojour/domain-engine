@@ -9,6 +9,9 @@ pub struct ProcId(u32);
 #[derive(Clone, Copy, Debug)]
 pub struct Local(u32);
 
+#[derive(Clone, Copy, Debug)]
+pub struct NArgs(u8);
+
 #[derive(Default)]
 pub struct Program {
     opcodes: Vec<OpCode>,
@@ -17,21 +20,22 @@ pub struct Program {
 #[derive(Clone, Copy, Debug)]
 pub struct EntryPoint {
     start: u32,
+    n_args: NArgs,
 }
 
 impl Program {
-    pub fn add_procedure(&mut self, mut opcodes: Vec<OpCode>) -> EntryPoint {
+    pub fn add_procedure(&mut self, n_args: NArgs, mut opcodes: Vec<OpCode>) -> EntryPoint {
         let start = self.opcodes.len() as u32;
 
         self.opcodes.append(&mut opcodes);
-        EntryPoint { start }
+        EntryPoint { start, n_args }
     }
 }
 
 #[derive(Debug)]
 pub enum OpCode {
-    /// Return from a procedure. The argument is how many locals to pop.
-    Call(EntryPoint, Local),
+    /// Call a procedure. Its arguments must be top of the stack.
+    Call(EntryPoint),
     /// Return a specific local
     Return(Local),
     /// Optimization: Return Local(0)
@@ -109,17 +113,14 @@ impl<'p> Vm<'p> {
             debug.tick(self);
 
             match &opcodes[self.program_counter] {
-                OpCode::Call(entry_point, stack_start) => {
+                OpCode::Call(entry_point) => {
                     self.call_stack
                         .push((self.program_counter + 1, self.stack_pos));
-                    self.stack_pos += stack_start.0 as usize;
+                    self.stack_pos = self.value_stack.len() - entry_point.n_args.0 as usize;
                     self.program_counter = entry_point.start as usize;
                 }
                 OpCode::Return(local) => {
-                    let source = self.local_pos(*local);
-                    let target = self.local_pos(Local(0));
-                    self.value_stack.swap(source, target);
-
+                    self.swap(*local, Local(0));
                     return0!(self);
                 }
                 OpCode::Return0 => {
@@ -173,11 +174,6 @@ impl<'p> Vm<'p> {
     }
 
     #[inline(always)]
-    fn local_pos(&self, local: Local) -> usize {
-        self.stack_pos + local.0 as usize
-    }
-
-    #[inline(always)]
     fn local(&self, local: Local) -> &Value {
         &self.value_stack[self.stack_pos + local.0 as usize]
     }
@@ -185,6 +181,13 @@ impl<'p> Vm<'p> {
     #[inline(always)]
     fn local_mut(&mut self, local: Local) -> &mut Value {
         &mut self.value_stack[self.stack_pos + local.0 as usize]
+    }
+
+    #[inline(always)]
+    fn swap(&mut self, a: Local, b: Local) {
+        let stack_pos = self.stack_pos;
+        self.value_stack
+            .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
     }
 
     fn compound_local_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, Value> {
@@ -272,14 +275,17 @@ mod tests {
     #[test]
     fn translate_map() {
         let mut program = Program::default();
-        let proc = program.add_procedure(vec![
-            OpCode::CallBuiltin(BuiltinProc::NewCompound),
-            OpCode::TakeAttr(Local(0), PropertyId(1)),
-            OpCode::PutAttr(Local(1), PropertyId(3)),
-            OpCode::TakeAttr(Local(0), PropertyId(2)),
-            OpCode::PutAttr(Local(1), PropertyId(4)),
-            OpCode::Return(Local(1)),
-        ]);
+        let proc = program.add_procedure(
+            NArgs(1),
+            vec![
+                OpCode::CallBuiltin(BuiltinProc::NewCompound),
+                OpCode::TakeAttr(Local(0), PropertyId(1)),
+                OpCode::PutAttr(Local(1), PropertyId(3)),
+                OpCode::TakeAttr(Local(0), PropertyId(2)),
+                OpCode::PutAttr(Local(1), PropertyId(4)),
+                OpCode::Return(Local(1)),
+            ],
+        );
 
         let mut vm = Vm::new(&program);
         let output = vm.eval_log(
@@ -303,21 +309,36 @@ mod tests {
     #[test]
     fn call_stack() {
         let mut program = Program::default();
-        let double_number = program.add_procedure(vec![
-            OpCode::Clone(Local(0)),
-            OpCode::CallBuiltin(BuiltinProc::Add),
-            OpCode::Return(Local(0)),
-        ]);
-        let translate = program.add_procedure(vec![
-            OpCode::CallBuiltin(BuiltinProc::NewCompound),
-            OpCode::TakeAttr(Local(0), PropertyId(1)),
-            OpCode::Call(double_number, Local(2)),
-            OpCode::PutAttr(Local(1), PropertyId(3)),
-            OpCode::TakeAttr(Local(0), PropertyId(2)),
-            OpCode::Call(double_number, Local(2)),
-            OpCode::PutAttr(Local(1), PropertyId(4)),
-            OpCode::Return(Local(1)),
-        ]);
+        let double = program.add_procedure(
+            NArgs(1),
+            vec![
+                OpCode::Clone(Local(0)),
+                OpCode::CallBuiltin(BuiltinProc::Add),
+                OpCode::Return0,
+            ],
+        );
+        let add_then_double = program.add_procedure(
+            NArgs(2),
+            vec![
+                OpCode::CallBuiltin(BuiltinProc::Add),
+                OpCode::Call(double),
+                OpCode::Return0,
+            ],
+        );
+        let translate = program.add_procedure(
+            NArgs(1),
+            vec![
+                OpCode::CallBuiltin(BuiltinProc::NewCompound),
+                OpCode::TakeAttr(Local(0), PropertyId(1)),
+                OpCode::Call(double),
+                OpCode::PutAttr(Local(1), PropertyId(4)),
+                OpCode::TakeAttr(Local(0), PropertyId(2)),
+                OpCode::TakeAttr(Local(0), PropertyId(3)),
+                OpCode::Call(add_then_double),
+                OpCode::PutAttr(Local(1), PropertyId(5)),
+                OpCode::Return(Local(1)),
+            ],
+        );
 
         let mut vm = Vm::new(&program);
         let output = vm.eval_log(
@@ -325,7 +346,8 @@ mod tests {
             vec![Value::Compound(
                 [
                     (PropertyId(1), Value::Number(333)),
-                    (PropertyId(2), Value::Number(21)),
+                    (PropertyId(2), Value::Number(10)),
+                    (PropertyId(3), Value::Number(11)),
                 ]
                 .into(),
             )],
@@ -334,10 +356,10 @@ mod tests {
         let Value::Compound(mut map) = output else {
             panic!();
         };
-        let Value::Number(a) = map.remove(&PropertyId(3)).unwrap() else {
+        let Value::Number(a) = map.remove(&PropertyId(4)).unwrap() else {
             panic!();
         };
-        let Value::Number(b) = map.remove(&PropertyId(4)).unwrap() else {
+        let Value::Number(b) = map.remove(&PropertyId(5)).unwrap() else {
             panic!();
         };
         assert_eq!(666, a);

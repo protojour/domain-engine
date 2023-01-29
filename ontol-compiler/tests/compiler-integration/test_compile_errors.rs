@@ -49,10 +49,21 @@ fn rel_mix_anonymous_and_named() {
 }
 
 #[test]
+fn eq_undeclared_variable() {
+    "
+    (eq! ()
+        :x ;; ERROR undeclared variable
+        42
+    )
+    "
+    .compile_fail()
+}
+
+#[test]
 fn eq_obj_non_domain_type_and_unit_type() {
     "
     (type! foo)
-    (eq! ()
+    (eq! (:x)
         (obj!
             number ;; ERROR expected domain type
         )

@@ -106,7 +106,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
-                let Type::Domain(_) = domain_type else {
+                let Type::Domain(type_def_id) = domain_type else {
                     return self.error(CompileError::DomainTypeExpected, &type_path.span);
                 };
 
@@ -121,8 +121,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             return self.error(CompileError::NoPropertiesExpected, &expr.span);
                         }
                     }
-                    Some(SubjectProperties::Value(_)) => match attributes.deref() {
-                        [((property, _), _)] if property.is_none() => {}
+                    Some(SubjectProperties::Value(property_id)) => match attributes.deref() {
+                        [((ast_prop, _), value)] if ast_prop.is_none() => {
+                            let (_, relationship, _) = self
+                                .get_property_meta(*property_id)
+                                .expect("BUG: problem getting anonymous property meta");
+
+                            let object_ty = self.check_def(relationship.object);
+                            self.check_expr_expect(value, object_ty);
+                        }
                         _ => {
                             return self.error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
