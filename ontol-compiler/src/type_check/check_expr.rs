@@ -11,17 +11,24 @@ use crate::{
     types::{Type, TypeRef},
 };
 
-use super::TypeCheck;
+use super::{
+    inference::{Inference, UnifyValue},
+    TypeCheck, TypeError,
+};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn check_expr_id(&mut self, expr_id: ExprId) -> TypeRef<'m> {
+    pub(super) fn check_expr_id(
+        &mut self,
+        expr_id: ExprId,
+        inf: &mut Inference<'m>,
+    ) -> TypeRef<'m> {
         match self.expressions.get(&expr_id) {
-            Some(expr) => self.check_expr(expr),
+            Some(expr) => self.check_expr(expr, inf),
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    fn check_expr(&mut self, expr: &Expr) -> TypeRef<'m> {
+    fn check_expr(&mut self, expr: &Expr, inf: &mut Inference<'m>) -> TypeRef<'m> {
         match &expr.kind {
             ExprKind::Call(def_id, args) => match self.def_types.map.get(&def_id) {
                 Some(Type::Function { params, output }) => {
@@ -29,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         return self.error(CompileError::WrongNumberOfArguments, &expr.span);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
-                        self.check_expr(arg);
+                        self.check_expr_expect(arg, param_ty, inf);
                     }
                     *output
                 }
@@ -59,7 +66,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expect("BUG: problem getting anonymous property meta");
 
                             let object_ty = self.check_def(relationship.object);
-                            self.check_expr_expect(value, object_ty);
+                            self.check_expr_expect(value, object_ty, inf);
                         }
                         _ => {
                             return self.error(CompileError::AnonymousPropertyExpected, &expr.span)
@@ -113,7 +120,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let object_ty = self.check_def(match_property.object_def);
-                            self.check_expr_expect(value, object_ty);
+                            self.check_expr_expect(value, object_ty, inf);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -127,21 +134,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 domain_type
             }
             ExprKind::Constant(_) => self.types.intern(Type::Number),
-            ExprKind::Variable(_) => self.types.intern(Type::Variable),
+            ExprKind::Variable(expr_id) => self
+                .types
+                .intern(Type::Infer(inf.new_type_variable(*expr_id))),
         }
     }
 
-    fn check_expr_expect(&mut self, expr: &Expr, expected: TypeRef) {
-        let ty = self.check_expr(expr);
+    fn check_expr_expect(&mut self, expr: &Expr, expected: TypeRef<'m>, inf: &mut Inference<'m>) {
+        let ty = self.check_expr(expr, inf);
         match (ty, expected) {
             (Type::Error, _) => {}
             (_, Type::Error) => {}
-            (Type::Variable, Type::Variable) => {
+            (Type::Infer(..), Type::Infer(..)) => {
                 panic!("FIXME: equate variable with variable?");
             }
-            (Type::Variable, expected) => {}
+            (Type::Infer(type_var), expected) => {
+                if let Err(error) = inf
+                    .eq_relations
+                    .unify_var_value(*type_var, UnifyValue::Known(expected))
+                {
+                    self.type_error(error, &expr.span);
+                }
+            }
+            (ty, expected) if ty != expected => {
+                self.type_error(
+                    TypeError::Mismatch {
+                        actual: ty,
+                        expected,
+                    },
+                    &expr.span,
+                );
+            }
             _ => {
-                self.error(CompileError::MismatchedType, &expr.span);
+                // OK
             }
         }
     }

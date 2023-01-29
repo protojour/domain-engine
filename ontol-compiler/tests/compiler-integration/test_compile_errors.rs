@@ -92,3 +92,44 @@ fn eq_attribute_mismatch() {
     "
     .compile_fail()
 }
+
+#[test]
+fn eq_type_mismatch() {
+    "
+    (type! foo)
+    (type! bar)
+    (rel! (foo) prop (string))
+    (rel! (bar) prop (number))
+    (eq! (:x)
+        (obj! foo (prop :x))
+        (obj! bar
+            (prop
+                :x ;; ERROR type mismatch: expected `number`, found `string`
+            )
+        )
+    )
+    "
+    .compile_fail()
+}
+
+#[test]
+fn eq_type_mismatch_in_func() {
+    "
+    (type! foo)
+    (type! bar)
+    (rel! (foo) prop (string))
+    (rel! (bar) prop (number))
+    (eq! (:x)
+        (obj! foo (prop :x))
+        (obj! bar
+            (prop
+                (*
+                    :x ;; ERROR type mismatch: expected `number`, found `string`
+                    2
+                )
+            )
+        )
+    )
+    "
+    .compile_fail()
+}

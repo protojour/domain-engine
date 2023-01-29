@@ -22,7 +22,7 @@ fn test_eq_simple() {
 }
 
 #[test]
-fn test_meters_tmp() {
+fn test_meters() {
     "
     (type! meters)
     (type! millimeters)
@@ -33,9 +33,9 @@ fn test_meters_tmp() {
             (_ :x)
         )
         (obj! millimeters
-            (_ (* :x 1000)) ;; ERROR mismatched type
+            (_ (* :x 1000))
         )
     )
     "
-    .compile_fail()
+    .compile_ok(|env| {})
 }

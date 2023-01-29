@@ -63,8 +63,8 @@ pub enum CompileError {
     UnknownProperty,
     #[error("duplicate property")]
     DuplicateProperty,
-    #[error("mismatched type")]
-    MismatchedType,
+    #[error("type mismatch: expected `{expected}`, found `{actual}`")]
+    TypeMismatch { actual: String, expected: String },
     #[error("missing property `{0}`")]
     MissingProperty(String),
     #[error("undeclared variable")]

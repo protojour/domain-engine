@@ -9,7 +9,6 @@ use ontol_runtime::PackageId;
 pub use source::*;
 
 pub mod compiler;
-pub mod ena;
 pub mod error;
 pub mod mem;
 pub mod serde_codegen;

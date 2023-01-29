@@ -9,7 +9,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::TypeCheck;
+use super::{inference::Inference, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
@@ -59,8 +59,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
             DefKind::Equivalence(first_id, second_id) => {
-                let first = self.check_expr_id(*first_id);
-                let second = self.check_expr_id(*second_id);
+                let mut inf = Inference::new();
+                let first = self.check_expr_id(*first_id, &mut inf);
+                let second = self.check_expr_id(*second_id, &mut inf);
                 self.types.intern(Type::Tautology)
             }
             other => {

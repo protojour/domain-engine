@@ -1,8 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use ontol_runtime::DefId;
+use smartstring::alias::String;
 
-use crate::mem::{Intern, Mem};
+use crate::{
+    mem::{Intern, Mem},
+    type_check::inference::TypeVar,
+};
 
 pub type TypeRef<'m> = &'m Type<'m>;
 
@@ -25,7 +29,7 @@ pub enum Type<'m> {
     },
     // User-defined data type from a domain:
     Domain(DefId),
-    Variable,
+    Infer(TypeVar<'m>),
     Error,
 }
 
@@ -79,6 +83,20 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
     pub map: HashMap<DefId, TypeRef<'m>>,
+}
+
+pub(crate) fn format_type(ty: TypeRef) -> String {
+    match ty {
+        Type::Tautology => format!("tautology"),
+        Type::Constant(val) => format!("number({})", val),
+        Type::Number => format!("number"),
+        Type::String => format!("string"),
+        Type::Function { .. } => format!("function"),
+        Type::Domain(_) => format!("domain(FIXME)"),
+        Type::Infer(_) => format!("?infer"),
+        Type::Error => format!("error!"),
+    }
+    .into()
 }
 
 #[cfg(test)]
