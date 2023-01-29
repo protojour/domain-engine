@@ -4,9 +4,9 @@ use ontol_runtime::DefId;
 use smartstring::alias::String;
 
 use crate::{
-    compile::error::{CompileError, SpannedCompileError},
     compiler::Compiler,
     def::{Def, DefKind, Relation, Relationship},
+    error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     parse::{ast, Span},

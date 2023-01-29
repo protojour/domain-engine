@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    compile::error::CompileErrors,
     def::Defs,
+    error::CompileErrors,
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,

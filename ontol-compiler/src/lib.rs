@@ -1,28 +1,28 @@
 use ::chumsky::Parser;
 
-use compile::{
-    error::{CompileError, UnifiedCompileError},
-    lowering::Lowering,
-};
 use compiler::Compiler;
+use error::{ChumskyError, CompileError, UnifiedCompileError};
 
-pub use compile::error::*;
+pub use error::*;
+use lowering::Lowering;
 use ontol_runtime::PackageId;
 pub use source::*;
 
 pub mod compiler;
 pub mod ena;
+pub mod error;
 pub mod mem;
 pub mod serde_codegen;
 
-mod compile;
 mod compiler_queries;
 mod def;
 mod expr;
+mod lowering;
 mod namespace;
 mod parse;
 mod relation;
 mod source;
+mod type_check;
 mod types;
 
 pub trait Compile {
