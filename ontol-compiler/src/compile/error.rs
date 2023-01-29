@@ -2,6 +2,7 @@ use std::{fmt::Display, hash::Hash};
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use miette::Diagnostic;
+use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{
@@ -52,12 +53,20 @@ pub enum CompileError {
     DuplicateAnonymousRelation,
     #[error("cannot mix named and anonymous relations on the same type")]
     CannotMixNamedAndAnonymousRelations,
-    #[error("no attributes expected")]
-    NoAttributesExpected,
-    #[error("expected anonymous attribute")]
-    AnonymousAttributeExpected,
-    #[error("mismatched attributes")]
-    MismatchedAttributes,
+    #[error("no properties expected")]
+    NoPropertiesExpected,
+    #[error("expected anonymous property")]
+    AnonymousPropertyExpected,
+    #[error("expected named property")]
+    NamedPropertyExpected,
+    #[error("unknown property")]
+    UnknownProperty,
+    #[error("duplicate property")]
+    DuplicateProperty,
+    #[error("mismatched type")]
+    MismatchedType,
+    #[error("missing property `{0}`")]
+    MissingProperty(String),
 }
 
 #[derive(Debug)]

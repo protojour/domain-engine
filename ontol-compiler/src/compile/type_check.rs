@@ -4,6 +4,7 @@ use ontol_runtime::DefId;
 
 use crate::{
     compiler::Compiler,
+    compiler_queries::GetPropertyMeta,
     def::{Def, DefKind, Defs, Primitive, Relation},
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
@@ -109,30 +110,100 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::DomainTypeExpected, &type_path.span);
                 };
 
-                let subject_properties = &self
+                let subject_properties = self
                     .relations
-                    .properties_by_type_mut(type_path.def_id)
-                    .subject;
+                    .properties_by_type(type_path.def_id)
+                    .map(|props| &props.subject);
+
                 match subject_properties {
-                    SubjectProperties::Unit => {
+                    Some(SubjectProperties::Unit) | None => {
                         if !attributes.is_empty() {
-                            return self.error(CompileError::NoAttributesExpected, &expr.span);
+                            return self.error(CompileError::NoPropertiesExpected, &expr.span);
                         }
                     }
-                    SubjectProperties::Value(_) => match attributes.deref() {
-                        [(property, _)] if property.is_none() => {}
+                    Some(SubjectProperties::Value(_)) => match attributes.deref() {
+                        [((property, _), _)] if property.is_none() => {}
                         _ => {
-                            return self.error(CompileError::AnonymousAttributeExpected, &expr.span)
+                            return self.error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
                     },
-                    SubjectProperties::Map(property_set) => {}
+                    Some(SubjectProperties::Map(property_set)) => {
+                        struct MatchProperty {
+                            object_def: DefId,
+                            used: bool,
+                        }
+                        let mut match_properties = property_set
+                            .iter()
+                            .map(|property_id| {
+                                let (_, relationship, relation) = self
+                                    .get_property_meta(*property_id)
+                                    .expect("BUG: problem getting property meta");
+                                let property_name = relation
+                                    .subject_prop()
+                                    .expect("BUG: Expected named subject property");
+
+                                (
+                                    property_name.clone(),
+                                    MatchProperty {
+                                        object_def: relationship.object,
+                                        used: false,
+                                    },
+                                )
+                            })
+                            .collect::<HashMap<_, _>>();
+
+                        for ((attr_prop, prop_span), value) in attributes.iter() {
+                            let attr_prop = match attr_prop {
+                                Some(attr_prop) => attr_prop,
+                                None => {
+                                    self.error(CompileError::NamedPropertyExpected, &prop_span);
+                                    continue;
+                                }
+                            };
+                            let match_property = match match_properties.get_mut(attr_prop.as_str())
+                            {
+                                Some(match_properties) => match_properties,
+                                None => {
+                                    self.error(CompileError::UnknownProperty, &prop_span);
+                                    continue;
+                                }
+                            };
+                            if match_property.used {
+                                self.error(CompileError::DuplicateProperty, &prop_span);
+                                continue;
+                            }
+                            match_property.used = true;
+
+                            let object_ty = self.check_def(match_property.object_def);
+                            self.check_expr_expect(value, object_ty);
+                        }
+
+                        for (prop_name, match_property) in match_properties.into_iter() {
+                            if !match_property.used {
+                                self.error(CompileError::MissingProperty(prop_name), &expr.span);
+                            }
+                        }
+                    }
                 }
 
                 domain_type
             }
             ExprKind::Constant(_) => self.types.intern(Type::Number),
-            ExprKind::Variable(id) => {
-                panic!()
+            ExprKind::Variable(_) => self.types.intern(Type::Variable),
+        }
+    }
+
+    fn check_expr_expect(&mut self, expr: &Expr, expected: TypeRef) {
+        let ty = self.check_expr(expr);
+        match (ty, expected) {
+            (Type::Error, _) => {}
+            (_, Type::Error) => {}
+            (Type::Variable, Type::Variable) => {
+                panic!("FIXME: equate variable with variable?");
+            }
+            (Type::Variable, expected) => {}
+            _ => {
+                self.error(CompileError::MismatchedType, &expr.span);
             }
         }
     }
@@ -146,12 +217,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         inverse_role_def_id: DefId,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        /*
-        let Ok(role_def_id) = self.expect_domain_type(role_def_id, span) else {
-            return self.types.intern(Type::Error);
-        };
-        */
-
         let property_codomain = self.check_def(inverse_role_def_id);
         let property_id = self.relations.new_property(relationship_id, role);
 
@@ -186,20 +251,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         property_codomain
     }
 
-    fn expect_domain_type(&mut self, def_id: DefId, span: &SourceSpan) -> Result<DefId, ()> {
-        match self.check_def(def_id) {
-            Type::Domain(type_def_id) => Ok(*type_def_id),
-            _ => {
-                self.errors
-                    .push(CompileError::DomainTypeExpected.spanned(&self.sources, span));
-                Err(())
-            }
-        }
-    }
-
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
         self.errors.push(error.spanned(&self.sources, span));
         self.types.intern(Type::Error)
+    }
+}
+
+impl<'c, 'm> AsRef<Defs> for TypeCheck<'c, 'm> {
+    fn as_ref(&self) -> &Defs {
+        &self.defs
+    }
+}
+
+impl<'c, 'm> AsRef<Relations> for TypeCheck<'c, 'm> {
+    fn as_ref(&self) -> &Relations {
+        &self.relations
     }
 }
 

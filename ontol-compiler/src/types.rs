@@ -25,6 +25,7 @@ pub enum Type<'m> {
     },
     // User-defined data type from a domain:
     Domain(DefId),
+    Variable,
     Error,
 }
 

@@ -150,10 +150,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map(|(ast_attr, _)| {
                         self.lower_expr(ast_attr.value, var_table).map(|expr| {
                             (
-                                match ast_attr.property.0 {
-                                    ast::Property::Named(name) => Some(name),
-                                    ast::Property::Wildcard => None,
-                                },
+                                (
+                                    match ast_attr.property.0 {
+                                        ast::Property::Named(name) => Some(name),
+                                        ast::Property::Wildcard => None,
+                                    },
+                                    self.src.span(&ast_attr.property.1),
+                                ),
                                 expr,
                             )
                         })

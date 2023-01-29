@@ -56,7 +56,7 @@ fn eq_obj_non_domain_type_and_unit_type() {
         (obj!
             number ;; ERROR expected domain type
         )
-        (obj! ;; ERROR no attributes expected
+        (obj! ;; ERROR no properties expected
             foo (prop :x)
         )
     )
@@ -72,10 +72,11 @@ fn eq_attribute_mismatch() {
     (rel! (foo) prop (bar))
     (rel! (bar) _ (number))
     (eq! (:x)
-        (obj! foo
-            (_ :x)
+        (obj! ;; ERROR missing property `prop`
+            foo
+            (_ :x) ;; ERROR expected named property
         )
-        (obj! bar) ;; ERROR expected anonymous attribute
+        (obj! bar) ;; ERROR expected anonymous property
     )
     "
     .compile_fail()

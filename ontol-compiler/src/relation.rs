@@ -40,6 +40,10 @@ impl Relations {
         property_id
     }
 
+    pub fn properties_by_type(&self, domain_type_id: DefId) -> Option<&Properties> {
+        self.properties_by_type.get(&domain_type_id)
+    }
+
     pub fn properties_by_type_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
         self.properties_by_type.entry(domain_type_id).or_default()
     }

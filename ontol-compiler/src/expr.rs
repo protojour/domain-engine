@@ -18,7 +18,7 @@ pub enum ExprKind {
     /// Function call
     Call(DefId, Box<[Expr]>),
     /// Object constructor
-    Obj(TypePath, Box<[(Option<String>, Expr)]>),
+    Obj(TypePath, Box<[((Option<String>, SourceSpan), Expr)]>),
     Variable(ExprId),
     Constant(i32),
 }
