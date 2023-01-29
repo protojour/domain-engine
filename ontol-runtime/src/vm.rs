@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{array, collections::HashMap};
 
 use smartstring::alias::String;
 
@@ -50,6 +50,8 @@ pub enum OpCode {
 pub enum BuiltinProc {
     Add,
     Sub,
+    Mul,
+    Div,
     Append,
     NewCompound,
 }
@@ -155,18 +157,23 @@ impl<'p> Vm<'p> {
     fn call_builtin(&mut self, proc: BuiltinProc) -> Value {
         match proc {
             BuiltinProc::Add => {
-                let b = self.pop_number();
-                let a = self.pop_number();
+                let [a, b]: [i64; 2] = self.pop_n();
                 Value::Number(a + b)
             }
             BuiltinProc::Sub => {
-                let b = self.pop_number();
-                let a = self.pop_number();
+                let [a, b]: [i64; 2] = self.pop_n();
                 Value::Number(a - b)
             }
+            BuiltinProc::Mul => {
+                let [a, b]: [i64; 2] = self.pop_n();
+                Value::Number(a * b)
+            }
+            BuiltinProc::Div => {
+                let [a, b]: [i64; 2] = self.pop_n();
+                Value::Number(a / b)
+            }
             BuiltinProc::Append => {
-                let b = self.pop_string();
-                let a = self.pop_string();
+                let [a, b]: [String; 2] = self.pop_n();
                 Value::String(a + b)
             }
             BuiltinProc::NewCompound => Value::Compound([].into()),
@@ -198,21 +205,20 @@ impl<'p> Vm<'p> {
     }
 
     #[inline(always)]
-    fn pop_value(&mut self) -> Value {
+    fn pop_one(&mut self) -> Value {
         match self.value_stack.pop() {
             Some(value) => value,
             None => panic!("Nothing to pop"),
         }
     }
 
-    #[inline(always)]
-    fn pop_number(&mut self) -> i64 {
-        self.pop_value().to_number()
-    }
-
-    #[inline(always)]
-    fn pop_string(&mut self) -> String {
-        self.pop_value().to_string()
+    fn pop_n<T, const N: usize>(&mut self) -> [T; N]
+    where
+        Value: Cast<T>,
+    {
+        let mut arr = array::from_fn(|_| self.pop_one().cast());
+        arr.reverse();
+        arr
     }
 }
 
@@ -237,15 +243,28 @@ macro_rules! return0 {
 
 pub(crate) use return0;
 
-impl Value {
-    fn to_number(self) -> i64 {
+/// Cast a value into T, panic if this fails.
+trait Cast<T> {
+    fn cast(self) -> T;
+}
+
+impl Cast<Value> for Value {
+    fn cast(self) -> Value {
+        self
+    }
+}
+
+impl Cast<i64> for Value {
+    fn cast(self) -> i64 {
         match self {
             Self::Number(n) => n,
             _ => panic!("not a number"),
         }
     }
+}
 
-    fn to_string(self) -> String {
+impl Cast<String> for Value {
+    fn cast(self) -> String {
         match self {
             Self::String(s) => s,
             _ => panic!("not a string"),

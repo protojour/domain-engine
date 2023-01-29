@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_runtime::{DefId, PackageId};
+use ontol_runtime::{vm::BuiltinProc, DefId, PackageId};
 use smartstring::alias::String;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     namespace::Space,
     relation::Role,
     source::{Package, SourceSpan, CORE_PKG},
-    types::Type,
+    types::{Type, TypeRef},
 };
 
 /// A definition in some package
@@ -24,7 +24,7 @@ pub struct Def {
 #[derive(Debug)]
 pub enum DefKind {
     Primitive(Primitive),
-    CoreFn(CoreFn),
+    CoreFn(BuiltinProc),
     Type(String),
     Relation(Relation),
     Relationship(Relationship),
@@ -36,12 +36,6 @@ pub enum DefKind {
 pub enum Primitive {
     Number,
     String,
-}
-
-#[derive(Debug)]
-pub enum CoreFn {
-    Mul,
-    Div,
 }
 
 /// This definition expresses that a relation _exists_
@@ -173,41 +167,42 @@ impl<'m> Compiler<'m> {
 
         let num = self.types.intern(Type::Number);
         let num_num = self.types.intern([num, num]);
+        let str = self.types.intern(Type::String);
+        let str_str = self.types.intern([str, str]);
 
+        let num_num_to_num = self.types.intern(Type::Function {
+            params: num_num,
+            output: num,
+        });
+        let str_str_to_str = self.types.intern(Type::Function {
+            params: str_str,
+            output: str,
+        });
+
+        // Built-in types
+        self.add_core_def("number", DefKind::Primitive(Primitive::Number), num);
+        self.add_core_def("string", DefKind::Primitive(Primitive::String), str);
+
+        // Built-in functions
+        // arithmetic
+        self.add_core_def("+", DefKind::CoreFn(BuiltinProc::Add), num_num_to_num);
+        self.add_core_def("-", DefKind::CoreFn(BuiltinProc::Sub), num_num_to_num);
+        self.add_core_def("*", DefKind::CoreFn(BuiltinProc::Mul), num_num_to_num);
+        self.add_core_def("/", DefKind::CoreFn(BuiltinProc::Div), num_num_to_num);
+
+        // string manipulation
         self.add_core_def(
-            "number",
-            DefKind::Primitive(Primitive::Number),
-            Type::Number,
+            "append",
+            DefKind::CoreFn(BuiltinProc::Append),
+            str_str_to_str,
         );
-        self.add_core_def(
-            "string",
-            DefKind::Primitive(Primitive::String),
-            Type::String,
-        );
-        self.add_core_def(
-            "*",
-            DefKind::CoreFn(CoreFn::Mul),
-            Type::Function {
-                params: num_num,
-                output: num,
-            },
-        );
-        self.add_core_def(
-            "/",
-            DefKind::CoreFn(CoreFn::Div),
-            Type::Function {
-                params: num_num,
-                output: num,
-            },
-        );
+
         self
     }
 
-    fn add_core_def(&mut self, name: &str, def_kind: DefKind, type_kind: Type<'m>) -> DefId {
+    fn add_core_def(&mut self, name: &str, def_kind: DefKind, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(name, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
-        self.def_types
-            .map
-            .insert(def_id, self.types.intern(type_kind));
+        self.def_types.map.insert(def_id, ty);
 
         def_id
     }
