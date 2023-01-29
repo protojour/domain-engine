@@ -34,11 +34,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
         self.root_defs
     }
 
-    pub fn lower_ast(&mut self, ast: (ast::Ast, Span)) -> Res<()> {
-        if let Some(root_def) = self.ast_to_def(ast)? {
-            self.root_defs.push(root_def);
+    pub fn lower_ast(&mut self, ast: (ast::Ast, Span)) -> Result<(), ()> {
+        match self.ast_to_def(ast) {
+            Ok(Some(root_def)) => {
+                self.root_defs.push(root_def);
+                Ok(())
+            }
+            Ok(None) => Ok(()),
+            Err(error) => {
+                self.compiler.push_error(error);
+                Err(())
+            }
         }
-        Ok(())
     }
 
     fn ast_to_def(&mut self, (ast, span): (ast::Ast, Span)) -> Res<Option<DefId>> {

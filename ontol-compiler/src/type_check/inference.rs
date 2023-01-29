@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData};
 
-use crate::{error::CompileError, expr::ExprId, types::TypeRef};
+use crate::{expr::ExprId, types::TypeRef};
 
 use super::TypeError;
 

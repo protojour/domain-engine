@@ -1,6 +1,7 @@
 use ontol_runtime::DefId;
 
 use crate::{
+    codegen::{CodegenTask, EqArm, EqCodegenTask},
     def::{Def, DefKind, Primitive, Relation},
     error::CompileError,
     mem::Intern,
@@ -62,6 +63,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut inf = Inference::new();
                 let first = self.check_expr_id(*first_id, &mut inf);
                 let second = self.check_expr_id(*second_id, &mut inf);
+
+                self.codegen_tasks.push(CodegenTask::Eq(EqCodegenTask {
+                    arm1: EqArm {
+                        expr_id: *first_id,
+                        ty: first,
+                    },
+                    arm2: EqArm {
+                        expr_id: *second_id,
+                        ty: second,
+                    },
+                }));
+
                 self.types.intern(Type::Tautology)
             }
             other => {

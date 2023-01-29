@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    codegen::CodegenTasks,
     compiler::Compiler,
     def::Defs,
     error::CompileError,
@@ -21,6 +22,7 @@ pub struct TypeCheck<'c, 'm> {
     def_types: &'c mut DefTypes<'m>,
     relations: &'c mut Relations,
     errors: &'c mut CompileErrors,
+    codegen_tasks: &'c mut CodegenTasks<'m>,
     expressions: &'c HashMap<ExprId, Expr>,
     defs: &'c Defs,
     sources: &'c Sources,
@@ -70,6 +72,7 @@ impl<'m> Compiler<'m> {
             errors: &mut self.errors,
             def_types: &mut self.def_types,
             relations: &mut self.relations,
+            codegen_tasks: &mut self.codegen_tasks,
             expressions: &self.expressions,
             defs: &self.defs,
             sources: &self.sources,

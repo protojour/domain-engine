@@ -1,5 +1,6 @@
 use ::chumsky::Parser;
 
+use codegen::do_codegen;
 use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
 
@@ -13,6 +14,7 @@ pub mod error;
 pub mod mem;
 pub mod serde_codegen;
 
+mod codegen;
 mod compiler_queries;
 mod def;
 mod expr;
@@ -49,12 +51,11 @@ impl Compile for CompileSrc {
         compiler: &mut Compiler<'m>,
         _: PackageId,
     ) -> Result<(), UnifiedCompileError> {
-        let mut compile_errors = vec![];
         let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self.text.as_str());
 
         for lex_error in lex_errors {
             let span = lex_error.span();
-            compile_errors.push(
+            compiler.push_error(
                 CompileError::Lex(ChumskyError::new(lex_error))
                     .spanned(&compiler.sources, &self.span(&span)),
             );
@@ -77,7 +78,7 @@ impl Compile for CompileSrc {
 
             for parse_error in parse_errors {
                 let span = parse_error.span();
-                compile_errors.push(
+                compiler.push_error(
                     CompileError::Parse(ChumskyError::new(parse_error))
                         .spanned(&compiler.sources, &self.span(&span)),
                 );
@@ -86,9 +87,7 @@ impl Compile for CompileSrc {
             let mut lowering = Lowering::new(compiler, &self);
 
             for ast in asts {
-                if let Err(error) = lowering.lower_ast(ast) {
-                    compile_errors.push(error);
-                }
+                let _ignored = lowering.lower_ast(ast);
             }
 
             let root_defs = lowering.finish();
@@ -96,17 +95,14 @@ impl Compile for CompileSrc {
             for root_def in root_defs {
                 type_check.check_def(root_def);
             }
+
+            compiler.check_error()?;
+
+            do_codegen(compiler);
         }
 
-        compile_errors.append(&mut compiler.errors.errors);
-
-        if compile_errors.is_empty() {
-            compiler.sources.compile_finished();
-            Ok(())
-        } else {
-            Err(UnifiedCompileError {
-                errors: compile_errors,
-            })
-        }
+        compiler.check_error()?;
+        compiler.sources.compile_finished();
+        Ok(())
     }
 }

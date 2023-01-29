@@ -3,14 +3,16 @@
 use std::collections::HashMap;
 
 use crate::{
+    codegen::CodegenTasks,
     def::Defs,
-    error::CompileErrors,
+    error::{CompileErrors, UnifiedCompileError},
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,
     relation::Relations,
     source::{Package, Sources},
     types::{DefTypes, Types},
+    SpannedCompileError,
 };
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
@@ -32,6 +34,8 @@ pub struct Compiler<'m> {
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
 
+    pub(crate) codegen_tasks: CodegenTasks<'m>,
+
     pub(crate) errors: CompileErrors,
 }
 
@@ -46,6 +50,7 @@ impl<'m> Compiler<'m> {
             expressions: Default::default(),
             def_types: Default::default(),
             relations: Default::default(),
+            codegen_tasks: Default::default(),
             errors: Default::default(),
         }
     }
@@ -89,6 +94,21 @@ impl<'m> Compiler<'m> {
 
     fn package_ids(&self) -> Vec<PackageId> {
         self.namespaces.namespaces.keys().map(|id| *id).collect()
+    }
+
+    ///
+    pub(crate) fn check_error(&mut self) -> Result<(), UnifiedCompileError> {
+        if self.errors.errors.is_empty() {
+            Ok(())
+        } else {
+            let mut errors = vec![];
+            errors.append(&mut self.errors.errors);
+            Err(UnifiedCompileError { errors })
+        }
+    }
+
+    pub(crate) fn push_error(&mut self, error: SpannedCompileError) {
+        self.errors.errors.push(error);
     }
 }
 
