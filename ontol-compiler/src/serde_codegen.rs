@@ -99,7 +99,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 typename,
                 properties: Default::default(),
             }),
-            Some(SubjectProperties::Anonymous(property_id)) => {
+            Some(SubjectProperties::Value(property_id)) => {
                 let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
                     panic!("Problem getting property meta");
                 };
@@ -116,7 +116,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     },
                 })
             }
-            Some(SubjectProperties::Named(properties)) => {
+            Some(SubjectProperties::Map(properties)) => {
                 let serde_properties = properties.iter().map(|property_id| {
                     let Ok((_, relationship, relation)) = self.get_property_meta(*property_id) else {
                         panic!("Problem getting property meta");

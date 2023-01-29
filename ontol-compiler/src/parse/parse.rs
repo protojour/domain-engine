@@ -100,7 +100,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 
     Ok((
         Ast::Eq(Eq {
-            params: vec![],
+            params: params.into(),
             first,
             second,
         }),
@@ -135,14 +135,26 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
             while input.peek_any() {
                 let mut list = input.next_list_msg("expected attribute")?;
                 let span = list.span();
-                let property = list.next_sym_msg("expected property")?;
+                let (property, prop_span) = list.next_sym_msg("expected property")?;
                 let value = parse_next_expr(&mut list)?;
                 list.end()?;
 
-                attributes.push((Attribute { property, value }, span));
+                attributes.push((
+                    Attribute {
+                        property: (
+                            match property.as_str() {
+                                "_" => Property::Wildcard,
+                                _ => Property::Named(property),
+                            },
+                            prop_span,
+                        ),
+                        value,
+                    },
+                    span,
+                ));
             }
 
-            Ok((Expr::Obj(typename, attributes), span))
+            Ok((Expr::Obj(typename, attributes.into()), span))
         }
         _ => {
             let mut args = vec![];
@@ -151,7 +163,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
                 args.push(parse_next_expr(&mut input)?);
             }
 
-            Ok((Expr::Call(sym, args), span))
+            Ok((Expr::Call(sym, args.into()), span))
         }
     }
 }

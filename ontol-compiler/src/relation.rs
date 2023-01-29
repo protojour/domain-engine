@@ -53,10 +53,11 @@ pub struct Properties {
 
 #[derive(Default, Debug)]
 pub enum SubjectProperties {
+    /// A type with no properties
     #[default]
     Unit,
-    Anonymous(PropertyId),
-    Named(IndexSet<PropertyId>),
+    Value(PropertyId),
+    Map(IndexSet<PropertyId>),
 }
 
 #[derive(Debug)]

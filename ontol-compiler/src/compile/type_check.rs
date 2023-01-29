@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use ontol_runtime::DefId;
 
@@ -103,8 +103,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => self.error(CompileError::NotCallable, &expr.span),
             },
-            ExprKind::Obj(def_id, attributes) => {
-                panic!()
+            ExprKind::Obj(type_path, attributes) => {
+                let domain_type = self.check_def(type_path.def_id);
+                let Type::Domain(_) = domain_type else {
+                    return self.error(CompileError::DomainTypeExpected, &type_path.span);
+                };
+
+                let subject_properties = &self
+                    .relations
+                    .properties_by_type_mut(type_path.def_id)
+                    .subject;
+                match subject_properties {
+                    SubjectProperties::Unit => {
+                        if !attributes.is_empty() {
+                            return self.error(CompileError::NoAttributesExpected, &expr.span);
+                        }
+                    }
+                    SubjectProperties::Value(_) => match attributes.deref() {
+                        [(property, _)] if property.is_none() => {}
+                        _ => {
+                            return self.error(CompileError::AnonymousAttributeExpected, &expr.span)
+                        }
+                    },
+                    SubjectProperties::Map(property_set) => {}
+                }
+
+                domain_type
             }
             ExprKind::Constant(_) => self.types.intern(Type::Number),
             ExprKind::Variable(id) => {
@@ -136,21 +160,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
                 (None, SubjectProperties::Unit) => {
-                    properties.subject = SubjectProperties::Anonymous(property_id);
+                    properties.subject = SubjectProperties::Value(property_id);
                 }
-                (None, SubjectProperties::Anonymous(_)) => {
+                (None, SubjectProperties::Value(_)) => {
                     return self.error(CompileError::DuplicateAnonymousRelation, span);
                 }
-                (None, SubjectProperties::Named(_)) => {
+                (None, SubjectProperties::Map(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
                 (Some(_), SubjectProperties::Unit) => {
-                    properties.subject = SubjectProperties::Named([property_id].into());
+                    properties.subject = SubjectProperties::Map([property_id].into());
                 }
-                (Some(_), SubjectProperties::Anonymous(_)) => {
+                (Some(_), SubjectProperties::Value(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
-                (Some(_), SubjectProperties::Named(properties)) => {
+                (Some(_), SubjectProperties::Map(properties)) => {
                     properties.insert(property_id);
                 }
             },

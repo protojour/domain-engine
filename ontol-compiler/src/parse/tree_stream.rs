@@ -34,7 +34,19 @@ impl TreeStream {
     }
 
     pub fn peek_any(&mut self) -> bool {
-        self.iterator.peek().is_some()
+        loop {
+            match self.iterator.peek() {
+                Some((Tree::Comment(_), _)) => {
+                    self.iterator.next();
+                }
+                Some(_) => {
+                    return true;
+                }
+                None => {
+                    return false;
+                }
+            }
+        }
     }
 
     pub fn peek_dot(&mut self) -> bool {

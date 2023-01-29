@@ -29,8 +29,6 @@ pub enum DefKind {
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
-    AnonField { type_def_id: DefId },
-    NamedField { ident: String, type_def_id: DefId },
     Equivalence(ExprId, ExprId),
 }
 

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
@@ -15,6 +17,20 @@ pub enum Tree {
     Variable(String),
     Num(String),
     Comment(String),
+}
+
+impl Display for Tree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Paren(_) => write!(f, "parentheses"),
+            Self::Bracket(_) => write!(f, "square brackets"),
+            Self::Dot => write!(f, "`.`"),
+            Self::Sym(_) => write!(f, "symbol"),
+            Self::Variable(_) => write!(f, "variable"),
+            Self::Num(_) => write!(f, "number"),
+            Self::Comment(_) => write!(f, "comment"),
+        }
+    }
 }
 
 pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
@@ -184,6 +200,20 @@ mod tests {
                 (Tree::Comment(_), _)
             ]
         );
+    }
+
+    #[test]
+    fn comments2() {
+        let trees = trees_parser()
+            .parse(
+                "
+                (yo
+                    number ;; comment
+                )
+                ",
+            )
+            .unwrap();
+        assert_matches!(trees.as_slice(), &[(Tree::Paren(ref elems), _),] if elems.len() == 3);
     }
 
     #[test]

@@ -1,4 +1,6 @@
-use chumsky::prelude::Simple;
+use std::{fmt::Display, hash::Hash};
+
+use chumsky::{error::SimpleReason, prelude::Simple};
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -31,9 +33,9 @@ pub struct SpannedCompileError {
 #[derive(Debug, Error, Diagnostic)]
 pub enum CompileError {
     #[error("lex error")]
-    Lex(Simple<char>),
-    #[error("parse error")]
-    Parse(Simple<Tree>),
+    Lex(ChumskyError<char>),
+    #[error("parse error: {0}")]
+    Parse(ChumskyError<Tree>),
     #[error("wrong number of arguments")]
     WrongNumberOfArguments,
     #[error("not callable")]
@@ -50,6 +52,33 @@ pub enum CompileError {
     DuplicateAnonymousRelation,
     #[error("cannot mix named and anonymous relations on the same type")]
     CannotMixNamedAndAnonymousRelations,
+    #[error("no attributes expected")]
+    NoAttributesExpected,
+    #[error("expected anonymous attribute")]
+    AnonymousAttributeExpected,
+    #[error("mismatched attributes")]
+    MismatchedAttributes,
+}
+
+#[derive(Debug)]
+pub struct ChumskyError<I: Hash> {
+    inner: Simple<I>,
+}
+
+impl<I: Hash> ChumskyError<I> {
+    pub fn new(inner: Simple<I>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<I: Hash + Eq> Display for ChumskyError<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.inner.reason() {
+            SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
+            SimpleReason::Unexpected => write!(f, "unexpected"),
+            SimpleReason::Custom(str) => write!(f, "{str}"),
+        }
+    }
 }
 
 impl CompileError {

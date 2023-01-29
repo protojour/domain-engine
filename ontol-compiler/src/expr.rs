@@ -16,11 +16,17 @@ pub struct Expr {
 #[derive(Debug)]
 pub enum ExprKind {
     /// Function call
-    Call(DefId, Vec<Expr>),
+    Call(DefId, Box<[Expr]>),
     /// Object constructor
-    Obj(DefId, Vec<(String, Expr)>),
+    Obj(TypePath, Box<[(Option<String>, Expr)]>),
     Variable(ExprId),
     Constant(i32),
+}
+
+#[derive(Debug)]
+pub struct TypePath {
+    pub def_id: DefId,
+    pub span: SourceSpan,
 }
 
 impl<'m> Compiler<'m> {

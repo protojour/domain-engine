@@ -7,7 +7,7 @@ use crate::{
     compile::error::{CompileError, SpannedCompileError},
     compiler::Compiler,
     def::{Def, DefKind, Relation, Relationship},
-    expr::{Expr, ExprId, ExprKind},
+    expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     parse::{ast, Span},
     source::{CompileSrc, CORE_PKG},
@@ -89,7 +89,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 second,
             }) => {
                 let mut var_table = VarTable::default();
-                for (param, _span) in params {
+                for (param, _span) in params.into_iter() {
                     var_table.var_id(param, self.compiler);
                 }
                 let first = self.lower_root_expr(first, &mut var_table)?;
@@ -148,13 +148,29 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let attributes = ast_attributes
                     .into_iter()
                     .map(|(ast_attr, _)| {
-                        self.lower_expr(ast_attr.value, var_table)
-                            .map(|expr| (ast_attr.property.0, expr))
+                        self.lower_expr(ast_attr.value, var_table).map(|expr| {
+                            (
+                                match ast_attr.property.0 {
+                                    ast::Property::Named(name) => Some(name),
+                                    ast::Property::Wildcard => None,
+                                },
+                                expr,
+                            )
+                        })
                     })
                     .collect::<Result<_, _>>()?;
 
                 let type_def_id = self.lookup_ident(&ident, &ident_span)?;
-                Ok(self.expr(ExprKind::Obj(type_def_id, attributes), &span))
+                Ok(self.expr(
+                    ExprKind::Obj(
+                        TypePath {
+                            def_id: type_def_id,
+                            span: self.src.span(&ident_span),
+                        },
+                        attributes,
+                    ),
+                    &span,
+                ))
             }
             ast::Expr::Variable(var_ident) => {
                 let id = var_table.var_id(var_ident, self.compiler);
