@@ -31,7 +31,8 @@ pub struct TypedExpr<'m> {
 pub enum TypedExprKind {
     Unit,
     Call(BuiltinProc, Box<[NodeId]>),
-    Obj(HashMap<PropertyId, NodeId>),
+    ValueObj(NodeId),
+    MapObj(HashMap<PropertyId, NodeId>),
     Variable(SyntaxVar),
     Constant(i64),
 }
@@ -103,7 +104,10 @@ impl<'m> TypedExprTable<'m> {
                     self.find_variables(rewrites, *param, variables);
                 }
             }
-            TypedExprKind::Obj(attributes) => {
+            TypedExprKind::ValueObj(value_id) => {
+                self.find_variables(rewrites, *value_id, variables);
+            }
+            TypedExprKind::MapObj(attributes) => {
                 for (_, val) in attributes.iter() {
                     self.find_variables(rewrites, *val, variables);
                 }
@@ -127,7 +131,10 @@ impl<'m> TypedExprTable<'m> {
                     .join(" ");
                 format!("({proc:?} {param_strings})")
             }
-            TypedExprKind::Obj(attributes) => {
+            TypedExprKind::ValueObj(node_id) => {
+                format!("(obj! {})", self.debug_tree(rewrites, *node_id))
+            }
+            TypedExprKind::MapObj(attributes) => {
                 let attr_strings = attributes
                     .iter()
                     .map(|(prop, node_id)| {

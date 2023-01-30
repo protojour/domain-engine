@@ -14,13 +14,17 @@ fn assert_translate(
 
     let value = input_binding.deserialize(env, input).unwrap();
 
-    let entry_point = env
-        .get_translator(input_binding.def_id, output_binding.def_id)
-        .unwrap();
+    let entry_point = match env.get_translator(input_binding.def_id, output_binding.def_id) {
+        Some(entry_point) => entry_point,
+        None => panic!(
+            "No translator found for ({:?}, {:?})",
+            input_binding.def_id, output_binding.def_id
+        ),
+    };
 
     let mut vm = Vm::new(&env.program);
 
-    let value = vm.eval(entry_point, vec![value]);
+    let value = vm.eval_log(entry_point, vec![value]);
 
     let output_json = output_binding.serialize_json(env, &value);
 
@@ -50,6 +54,14 @@ fn test_eq_simple() {
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
+        /*
+        assert_translate(
+            env,
+            ("bar", "foo"),
+            json!({ "b": "my_value"}),
+            json!({ "f": "my_value"}),
+        );
+        */
     })
 }
 
@@ -69,5 +81,7 @@ fn test_meters() {
         )
     )
     "
-    .compile_ok(|env| {})
+    .compile_ok(|env| {
+        assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
+    })
 }

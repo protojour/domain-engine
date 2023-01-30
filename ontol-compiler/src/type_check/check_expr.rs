@@ -97,7 +97,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expect("BUG: problem getting anonymous property meta");
 
                             let object_ty = self.check_def(relationship.object);
-                            self.check_expr_expect(value, object_ty, ctx).1
+                            let node_id = self.check_expr_expect(value, object_ty, ctx).1;
+
+                            ctx.typed_expr_table.add_expr(TypedExpr {
+                                ty: domain_type,
+                                kind: TypedExprKind::ValueObj(node_id),
+                            })
                         }
                         _ => {
                             return self
@@ -169,7 +174,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         ctx.typed_expr_table.add_expr(TypedExpr {
                             ty: domain_type,
-                            kind: TypedExprKind::Obj(typed_properties),
+                            kind: TypedExprKind::MapObj(typed_properties),
                         })
                     }
                 };

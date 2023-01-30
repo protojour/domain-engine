@@ -1,8 +1,6 @@
-use std::collections::HashSet;
-
 use smartstring::alias::String;
 
-use crate::typed_expr::{NodeId, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable};
+use crate::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
 
 #[derive(Default)]
 pub struct RewriteTable(Vec<NodeId>);
@@ -94,7 +92,8 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteEr
 
             Err(RewriteError::NoRulesMatchedCall)
         }
-        TypedExprKind::Obj(property_map) => {
+        TypedExprKind::ValueObj(node) => rewrite(table, *node),
+        TypedExprKind::MapObj(property_map) => {
             let nodes: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
             for node in nodes {
                 rewrite(table, node)?;

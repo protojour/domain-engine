@@ -67,18 +67,22 @@ pub fn do_codegen(compiler: &mut Compiler) {
                             find_program_key(&typed_expr_table.expr_norewrite(eq_task.node_a).ty);
                         let key_b =
                             find_program_key(&typed_expr_table.expr_norewrite(eq_task.node_b).ty);
-                        if let (Some(a), Some(b)) = (key_a, key_b) {
-                            let entry_point = codegen_translate(
-                                compiler,
-                                &mut program,
-                                typed_expr_table,
-                                eq_task.node_a,
-                                eq_task.node_b,
-                            );
+                        match (key_a, key_b) {
+                            (Some(a), Some(b)) => {
+                                println!("codegen entry point for ({a:?}, {b:?}");
+                                let entry_point = codegen_translate(
+                                    compiler,
+                                    &mut program,
+                                    typed_expr_table,
+                                    eq_task.node_a,
+                                    eq_task.node_b,
+                                );
 
-                            translations.insert((a, b), entry_point);
-                        } else {
-                            println!("Unable to save translation");
+                                translations.insert((a, b), entry_point);
+                            }
+                            other => {
+                                println!("unable to save translation: key = {other:?}");
+                            }
                         }
                     }
                     Err(error) => {
@@ -96,7 +100,10 @@ pub fn do_codegen(compiler: &mut Compiler) {
 fn find_program_key(ty: &TypeRef) -> Option<DefId> {
     match ty {
         Type::Domain(def_id) => Some(*def_id),
-        _ => None,
+        other => {
+            println!("unable to get program key: {other:?}");
+            None
+        }
     }
 }
 
@@ -116,15 +123,51 @@ fn codegen_translate<'m>(
     );
 
     match &src_expr.kind {
-        TypedExprKind::Obj(attributes) => {
-            codegen_obj_source(compiler, program, table, attributes, target_node)
+        TypedExprKind::ValueObj(attr_node_id) => {
+            codegen_value_obj_source(program, table, target_node)
         }
-        _ => program.add_procedure(NArgs(1), vec![]),
+        TypedExprKind::MapObj(attributes) => {
+            codegen_map_obj_source(program, table, attributes, target_node)
+        }
+        other => panic!("unable to generate translation: {other:?}"),
     }
 }
 
-fn codegen_obj_source<'m>(
-    compiler: &mut Compiler<'m>,
+fn codegen_value_obj_source<'m>(
+    program: &mut Program,
+    table: &TypedExprTable<'m>,
+    target_node: NodeId,
+) -> EntryPoint {
+    let (_, target_expr) = table.fetch_expr(&table.target_rewrites, target_node);
+
+    let mut opcodes = vec![];
+
+    match &target_expr.kind {
+        TypedExprKind::ValueObj(node_id) => {
+            codegen_expr(table, *node_id, &mut opcodes, |var| Local(var.0));
+            opcodes.push(OpCode::Return(Local(1)));
+        }
+        TypedExprKind::MapObj(target_attrs) => {
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
+
+            for (property_id, node) in target_attrs {
+                codegen_expr(table, *node, &mut opcodes, |var| Local(var.0 + 1));
+                opcodes.push(OpCode::PutAttr(Local(1), *property_id));
+            }
+
+            opcodes.push(OpCode::Return(Local(1)));
+        }
+        kind => {
+            todo!("target: {kind:?}");
+        }
+    }
+
+    println!("{opcodes:#?}");
+
+    program.add_procedure(NArgs(1), opcodes)
+}
+
+fn codegen_map_obj_source<'m>(
     program: &mut Program,
     table: &TypedExprTable<'m>,
     source_properties: &HashMap<PropertyId, NodeId>,
@@ -151,7 +194,7 @@ fn codegen_obj_source<'m>(
     let mut opcodes = vec![];
 
     match &target_expr.kind {
-        TypedExprKind::Obj(target_attrs) => {
+        TypedExprKind::MapObj(target_attrs) => {
             opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
 
             // Add property unpack
@@ -169,8 +212,8 @@ fn codegen_obj_source<'m>(
 
             println!("{opcodes:#?}");
         }
-        _ => {
-            todo!()
+        kind => {
+            todo!("target: {kind:?}");
         }
     }
     program.add_procedure(NArgs(1), opcodes)
@@ -197,7 +240,10 @@ fn codegen_expr<'m>(
         TypedExprKind::Variable(var) => {
             opcodes.push(OpCode::Clone(var_local(*var)));
         }
-        TypedExprKind::Obj(_) => {
+        TypedExprKind::ValueObj(_) => {
+            todo!()
+        }
+        TypedExprKind::MapObj(_) => {
             todo!()
         }
         TypedExprKind::Unit => {
