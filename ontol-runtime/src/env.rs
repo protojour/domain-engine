@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
-    vm::Program,
+    vm::{EntryPoint, Program},
     DefId, PackageId,
 };
 
@@ -12,6 +12,7 @@ use crate::{
 pub struct Env {
     pub domains: HashMap<PackageId, Domain>,
     pub program: Program,
+    pub translations: HashMap<(DefId, DefId), EntryPoint>,
     pub serde_operators: Vec<SerdeOperator>,
 }
 

@@ -1,19 +1,30 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use ontol_runtime::{
     vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
-    PropertyId,
+    DefId, PropertyId,
 };
 
 use crate::{
     compiler::Compiler,
     rewrite::rewrite,
     typed_expr::{NodeId, SyntaxVar, TypedExprKind, TypedExprTable},
+    types::{Type, TypeRef},
 };
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
+    pub result_program: Program,
+    pub result_translations: HashMap<(DefId, DefId), EntryPoint>,
+}
+
+impl<'m> Debug for CodegenTasks<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CodegenTasks")
+            .field("tasks", &self.tasks)
+            .finish()
+    }
 }
 
 impl<'m> CodegenTasks<'m> {
@@ -39,6 +50,7 @@ pub fn do_codegen(compiler: &mut Compiler) {
     tasks.append(&mut compiler.codegen_tasks.tasks);
 
     let mut program = Program::default();
+    let mut translations = HashMap::default();
 
     // FIXME: Do we need do topological sort of tasks?
     // At least in the beginning there is no support for recursive eq
@@ -49,13 +61,25 @@ pub fn do_codegen(compiler: &mut Compiler) {
                 // rewrite "with regards" to node_a:
                 match rewrite(&mut eq_task.typed_expr_table, eq_task.node_a) {
                     Ok(()) => {
-                        codegen_translate(
-                            compiler,
-                            &mut program,
-                            &eq_task.typed_expr_table,
-                            eq_task.node_a,
-                            eq_task.node_b,
-                        );
+                        let typed_expr_table = &eq_task.typed_expr_table;
+
+                        let key_a =
+                            find_program_key(&typed_expr_table.expr_norewrite(eq_task.node_a).ty);
+                        let key_b =
+                            find_program_key(&typed_expr_table.expr_norewrite(eq_task.node_b).ty);
+                        if let (Some(a), Some(b)) = (key_a, key_b) {
+                            let entry_point = codegen_translate(
+                                compiler,
+                                &mut program,
+                                typed_expr_table,
+                                eq_task.node_a,
+                                eq_task.node_b,
+                            );
+
+                            translations.insert((a, b), entry_point);
+                        } else {
+                            println!("Unable to save translation");
+                        }
                     }
                     Err(error) => {
                         panic!("TODO: could not rewrite: {error:?}");
@@ -63,6 +87,16 @@ pub fn do_codegen(compiler: &mut Compiler) {
                 }
             }
         }
+    }
+
+    compiler.codegen_tasks.result_program = program;
+    compiler.codegen_tasks.result_translations = translations;
+}
+
+fn find_program_key(ty: &TypeRef) -> Option<DefId> {
+    match ty {
+        Type::Domain(def_id) => Some(*def_id),
+        _ => None,
     }
 }
 
@@ -108,6 +142,11 @@ fn codegen_obj_source<'m>(
         )
         .collect();
     property_unpack.sort_by_key(|(_, var)| *var);
+
+    if !property_unpack.is_empty() {
+        // must start with SyntaxVar(0)
+        assert!(property_unpack[0].1 == &SyntaxVar(0));
+    }
 
     let mut opcodes = vec![];
 

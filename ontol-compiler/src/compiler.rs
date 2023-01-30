@@ -85,10 +85,13 @@ impl<'m> Compiler<'m> {
             out_domains.insert(package_id, Domain { types });
         }
 
+        let serde_operators = serde_generator.finish();
+
         Env {
             domains: out_domains,
-            program: Default::default(),
-            serde_operators: serde_generator.finish(),
+            program: self.codegen_tasks.result_program,
+            translations: self.codegen_tasks.result_translations,
+            serde_operators,
         }
     }
 
