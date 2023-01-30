@@ -11,7 +11,7 @@ pub struct TypeBinding {
 impl TypeBinding {
     pub fn new(env: &Env, type_name: &str) -> Self {
         let domain = env.get_domain(&TEST_PKG).unwrap();
-        let def_id = domain.get_def_id(type_name).unwrap();
+        let def_id = domain.get_def_id(type_name).expect("typename not found");
         let serde_operator_id = domain.get_serde_operator_id(type_name).unwrap();
         let binding = Self {
             def_id,

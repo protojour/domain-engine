@@ -8,6 +8,7 @@ use ontol_runtime::{
 pub mod typed_expr;
 
 mod codegen;
+mod codegen_map_obj;
 mod rewrite;
 
 pub use codegen::execute_codegen_tasks;

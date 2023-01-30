@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use ontol_runtime::{
     vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
-    DefId, PropertyId,
+    DefId,
 };
+use smallvec::{smallvec, SmallVec};
 
 use crate::{
-    codegen::typed_expr::TypedExprKind,
+    codegen::{codegen_map_obj::codegen_map_obj_origin, typed_expr::TypedExprKind},
     compiler::Compiler,
     types::{Type, TypeRef},
 };
@@ -16,6 +17,9 @@ use super::{
     typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprTable},
     CodegenTask,
 };
+
+/// A small part of a procedure, a "slice" of instructions
+pub type Snippet = SmallVec<[OpCode; 8]>;
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
@@ -105,7 +109,7 @@ fn codegen_translate<'m>(
     origin_node: NodeId,
     dest_node: NodeId,
 ) -> EntryPoint {
-    let (_, src_expr) = table.get_expr(&table.source_rewrites, origin_node);
+    let (_, origin_expr) = table.get_expr(&table.source_rewrites, origin_node);
 
     println!(
         "codegen origin: {} dest: {}",
@@ -113,16 +117,16 @@ fn codegen_translate<'m>(
         table.debug_tree(&table.target_rewrites, dest_node),
     );
 
-    match &src_expr.kind {
-        TypedExprKind::ValueObj(_) => codegen_value_obj_source(program, table, dest_node),
+    match &origin_expr.kind {
+        TypedExprKind::ValueObj(_) => codegen_value_obj_origin(program, table, dest_node),
         TypedExprKind::MapObj(attributes) => {
-            codegen_map_obj_source(program, table, attributes, dest_node)
+            codegen_map_obj_origin(program, table, attributes, dest_node)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
 }
 
-fn codegen_value_obj_source<'m>(
+fn codegen_value_obj_origin<'m>(
     program: &mut Program,
     table: &TypedExprTable<'m>,
     target_node: NodeId,
@@ -133,14 +137,18 @@ fn codegen_value_obj_source<'m>(
 
     match &target_expr.kind {
         TypedExprKind::ValueObj(node_id) => {
-            codegen_expr(table, *node_id, &mut opcodes, |var| Local(var.0));
+            let mut snippet = smallvec![];
+            codegen_expr(table, *node_id, &mut snippet, |var| Local(var.0));
+            opcodes.extend(snippet);
             opcodes.push(OpCode::Return(Local(1)));
         }
         TypedExprKind::MapObj(target_attrs) => {
             opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
 
             for (property_id, node) in target_attrs {
-                codegen_expr(table, *node, &mut opcodes, |var| Local(var.0 + 1));
+                let mut snippet = smallvec![];
+                codegen_expr(table, *node, &mut snippet, |var| Local(var.0 + 1));
+                opcodes.extend(snippet);
                 opcodes.push(OpCode::PutAttr(Local(1), *property_id));
             }
 
@@ -156,78 +164,63 @@ fn codegen_value_obj_source<'m>(
     program.add_procedure(NArgs(1), opcodes)
 }
 
-fn codegen_map_obj_source<'m>(
-    program: &mut Program,
-    table: &TypedExprTable<'m>,
-    source_properties: &HashMap<PropertyId, NodeId>,
-    target_node: NodeId,
-) -> EntryPoint {
-    let (_, target_expr) = table.get_expr(&table.target_rewrites, target_node);
+pub trait Codegen {
+    fn codegen_expr<'m>(
+        &mut self,
+        table: &TypedExprTable<'m>,
+        expr_id: NodeId,
+        snippet: &mut Snippet,
+    ) {
+        let (_, expr) = table.get_expr(&table.target_rewrites, expr_id);
+        match &expr.kind {
+            TypedExprKind::Call(proc, params) => {
+                for param in params.iter() {
+                    self.codegen_expr(table, *param, snippet);
+                }
 
-    let mut property_unpack: Vec<_> = source_properties
-        .iter()
-        .map(
-            |(prop_id, node_id)| match &table.get_expr_no_rewrite(*node_id).kind {
-                TypedExprKind::Variable(var) => (*prop_id, var),
-                _ => panic!("source property not a variable"),
-            },
-        )
-        .collect();
-    property_unpack.sort_by_key(|(_, var)| *var);
-
-    if !property_unpack.is_empty() {
-        // must start with SyntaxVar(0)
-        assert!(property_unpack[0].1 == &SyntaxVar(0));
-    }
-
-    let mut opcodes = vec![];
-
-    match &target_expr.kind {
-        TypedExprKind::MapObj(target_attrs) => {
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
-
-            // Add property unpack
-            // this generates pretty inefficient code, let's fix that later..
-            for (property_id, _) in property_unpack {
-                opcodes.push(OpCode::TakeAttr(Local(0), property_id));
+                snippet.push(OpCode::CallBuiltin(*proc));
             }
-
-            for (property_id, node) in target_attrs {
-                codegen_expr(table, *node, &mut opcodes, |var| Local(var.0 + 2));
-                opcodes.push(OpCode::PutAttr(Local(1), *property_id));
+            TypedExprKind::Constant(k) => {
+                snippet.push(OpCode::Constant(*k));
             }
-
-            opcodes.push(OpCode::Return(Local(1)));
-
-            println!("{opcodes:#?}");
-        }
-        kind => {
-            todo!("target: {kind:?}");
+            TypedExprKind::Variable(var) => {
+                self.codegen_variable(*var, snippet);
+            }
+            TypedExprKind::ValueObj(_) => {
+                todo!()
+            }
+            TypedExprKind::MapObj(_) => {
+                todo!()
+            }
+            TypedExprKind::Unit => {
+                todo!()
+            }
         }
     }
-    program.add_procedure(NArgs(1), opcodes)
+
+    fn codegen_variable(&mut self, var: SyntaxVar, snippet: &mut Snippet);
 }
 
 fn codegen_expr<'m>(
     table: &TypedExprTable<'m>,
     expr_id: NodeId,
-    opcodes: &mut Vec<OpCode>,
-    var_local: impl Fn(SyntaxVar) -> Local + Copy,
+    snippet: &mut Snippet,
+    mut var_local: impl FnMut(SyntaxVar) -> Local + Copy,
 ) {
     let (_, expr) = table.get_expr(&table.target_rewrites, expr_id);
     match &expr.kind {
         TypedExprKind::Call(proc, params) => {
             for param in params.iter() {
-                codegen_expr(table, *param, opcodes, var_local);
+                codegen_expr(table, *param, snippet, var_local);
             }
 
-            opcodes.push(OpCode::CallBuiltin(*proc));
+            snippet.push(OpCode::CallBuiltin(*proc));
         }
         TypedExprKind::Constant(k) => {
-            opcodes.push(OpCode::Constant(*k));
+            snippet.push(OpCode::Constant(*k));
         }
         TypedExprKind::Variable(var) => {
-            opcodes.push(OpCode::Clone(var_local(*var)));
+            snippet.push(OpCode::Clone(var_local(*var)));
         }
         TypedExprKind::ValueObj(_) => {
             todo!()

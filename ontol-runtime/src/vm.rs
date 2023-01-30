@@ -1,19 +1,14 @@
 use std::{array, collections::HashMap, fmt::Debug};
 
+use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
 use crate::{value::Value, PropertyId};
 
 pub struct ProcId(u32);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, DebugExtras)]
 pub struct Local(pub u32);
-
-impl Debug for Local {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Local({})", self.0)
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct NArgs(pub u8);
@@ -38,7 +33,7 @@ impl Program {
     }
 }
 
-#[derive(Debug)]
+#[derive(DebugExtras)]
 pub enum OpCode {
     /// Call a procedure. Its arguments must be top of the stack.
     Call(EntryPoint),
@@ -48,6 +43,7 @@ pub enum OpCode {
     Return0,
     CallBuiltin(BuiltinProc),
     Clone(Local),
+    Swap(Local, Local),
     TakeAttr(Local, PropertyId),
     PutAttr(Local, PropertyId),
     Constant(i64),
@@ -143,6 +139,10 @@ impl<'p> Vm<'p> {
                 OpCode::Clone(source) => {
                     let value = self.local(*source).clone();
                     self.value_stack.push(value);
+                    self.program_counter += 1;
+                }
+                OpCode::Swap(a, b) => {
+                    self.swap(*a, *b);
                     self.program_counter += 1;
                 }
                 OpCode::TakeAttr(source, property_id) => {

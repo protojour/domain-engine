@@ -84,3 +84,31 @@ fn test_meters() {
         assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
     })
 }
+
+#[test]
+fn test_eq_complex_flow() {
+    // FIXME: This should be a one-way translation.
+    // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot.
+    "
+    (type! one)
+    (type! two)
+    (rel! (one) a (string))
+    (rel! (one) b (string))
+    (rel! (two) a (string))
+    (rel! (two) b (string))
+    (rel! (two) c (string))
+    (rel! (two) d (string))
+    (eq! (:x :y)
+        (obj! one (a :x) (b :y))
+        (obj! two (a :x) (b :y) (c :x) (d :y))
+    )
+    "
+    .compile_ok(|env| {
+        assert_translate(
+            env,
+            ("one", "two"),
+            json!({ "a": "A", "b": "B" }),
+            json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
+        );
+    })
+}

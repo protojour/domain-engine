@@ -9,6 +9,7 @@ edition = "2021"
 ontol-runtime = { path = "../ontol-runtime" }
 chumsky = "0.8"
 smartstring = { version = "1", features = ["serde"] }
+smallvec = "1"
 fraction = "0.13"
 ena = "0.14"
 bumpalo = "3"
