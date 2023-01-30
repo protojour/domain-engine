@@ -1,4 +1,4 @@
-use std::{array, collections::HashMap};
+use std::{array, collections::HashMap, fmt::Debug};
 
 use smartstring::alias::String;
 
@@ -6,11 +6,17 @@ use crate::{value::Value, PropertyId};
 
 pub struct ProcId(u32);
 
-#[derive(Clone, Copy, Debug)]
-pub struct Local(u32);
+#[derive(Clone, Copy)]
+pub struct Local(pub u32);
+
+impl Debug for Local {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Local({})", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
-pub struct NArgs(u8);
+pub struct NArgs(pub u8);
 
 #[derive(Default)]
 pub struct Program {
@@ -44,6 +50,7 @@ pub enum OpCode {
     Clone(Local),
     TakeAttr(Local, PropertyId),
     PutAttr(Local, PropertyId),
+    Constant(i64),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -148,6 +155,10 @@ impl<'p> Vm<'p> {
                     let value = self.value_stack.pop().unwrap();
                     let compound = self.compound_local_mut(*target);
                     compound.insert(*property_id, value);
+                    self.program_counter += 1;
+                }
+                OpCode::Constant(k) => {
+                    self.value_stack.push(Value::Number(*k));
                     self.program_counter += 1;
                 }
             }

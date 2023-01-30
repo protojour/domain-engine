@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, PropertyId};
 
 use crate::{
     compiler_queries::GetPropertyMeta,
@@ -106,6 +106,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                     Some(SubjectProperties::Map(property_set)) => {
                         struct MatchProperty {
+                            property_id: PropertyId,
                             object_def: DefId,
                             used: bool,
                         }
@@ -122,12 +123,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 (
                                     property_name.clone(),
                                     MatchProperty {
+                                        property_id: *property_id,
                                         object_def: relationship.object,
                                         used: false,
                                     },
                                 )
                             })
                             .collect::<HashMap<_, _>>();
+
+                        let mut typed_properties = HashMap::new();
 
                         for ((attr_prop, prop_span), value) in attributes.iter() {
                             let attr_prop = match attr_prop {
@@ -152,7 +156,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let object_ty = self.check_def(match_property.object_def);
-                            self.check_expr_expect(value, object_ty, ctx);
+                            let (_, node_id) = self.check_expr_expect(value, object_ty, ctx);
+
+                            typed_properties.insert(match_property.property_id, node_id);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -163,7 +169,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         ctx.typed_expr_table.add_expr(TypedExpr {
                             ty: domain_type,
-                            kind: TypedExprKind::Unit,
+                            kind: TypedExprKind::Obj(typed_properties),
                         })
                     }
                 };

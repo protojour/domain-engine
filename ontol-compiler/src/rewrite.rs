@@ -1,4 +1,8 @@
-use crate::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
+use std::collections::HashSet;
+
+use smartstring::alias::String;
+
+use crate::typed_expr::{NodeId, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable};
 
 #[derive(Default)]
 pub struct RewriteTable(Vec<NodeId>);
@@ -24,7 +28,15 @@ impl RewriteTable {
     }
 }
 
-pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
+#[derive(Debug)]
+pub enum RewriteError {
+    UnhandledExpr(String),
+    NoRulesMatchedCall,
+    MultipleVariablesInCall,
+    NoVariablesInCall,
+}
+
+pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteError> {
     let expr = table.expr_norewrite(node);
     let mut expr_params: Vec<(NodeId, &TypedExpr)> = vec![];
     match &expr.kind {
@@ -36,7 +48,7 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
             for (index, (var_node, param)) in expr_params.iter().enumerate() {
                 if let TypedExprKind::Variable(_) = &param.kind {
                     if var_param.is_some() {
-                        return false;
+                        return Err(RewriteError::MultipleVariablesInCall);
                     }
                     var_param = Some((*var_node, index));
                 }
@@ -45,7 +57,7 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
             let (var_node, var_index) = match var_param {
                 Some(var_param) => var_param,
                 None => {
-                    return false;
+                    return Err(RewriteError::NoVariablesInCall);
                 }
             };
 
@@ -77,12 +89,20 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
                 table.target_rewrites.rewrite(node, target_expr_id);
                 table.source_rewrites.rewrite(node, var_node);
 
-                return true;
+                return Ok(());
             }
 
-            false
+            Err(RewriteError::NoRulesMatchedCall)
         }
-        _ => false,
+        TypedExprKind::Obj(property_map) => {
+            let nodes: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
+            for node in nodes {
+                rewrite(table, node)?;
+            }
+            Ok(())
+        }
+        TypedExprKind::Variable(_) => Ok(()),
+        kind => Err(RewriteError::UnhandledExpr(format!("{kind:?}").into())),
     }
 }
 

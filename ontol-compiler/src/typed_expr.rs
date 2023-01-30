@@ -9,13 +9,16 @@
 //! (a 3@:x)                          | (a 5@(/ 4@(- 3@:x 42) 1000))
 //!
 
-use std::fmt::Debug;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
-use ontol_runtime::vm::BuiltinProc;
+use ontol_runtime::{vm::BuiltinProc, PropertyId};
 
 use crate::{rewrite::RewriteTable, types::TypeRef};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SyntaxVar(pub u32);
 
 #[derive(Debug)]
@@ -28,6 +31,7 @@ pub struct TypedExpr<'m> {
 pub enum TypedExprKind {
     Unit,
     Call(BuiltinProc, Box<[NodeId]>),
+    Obj(HashMap<PropertyId, NodeId>),
     Variable(SyntaxVar),
     Constant(i64),
 }
@@ -85,17 +89,54 @@ impl<'m> TypedExprTable<'m> {
         }
     }
 
-    pub fn debug_tree(&self, rewrites: &RewriteTable, id: NodeId) -> String {
-        let (_, expr) = self.fetch_expr(rewrites, id);
+    pub fn find_variables(
+        &self,
+        rewrites: &RewriteTable,
+        node_id: NodeId,
+        variables: &mut HashSet<SyntaxVar>,
+    ) {
+        let (_, expr) = self.fetch_expr(rewrites, node_id);
+        match &expr.kind {
+            TypedExprKind::Unit => {}
+            TypedExprKind::Call(_, params) => {
+                for param in params.iter() {
+                    self.find_variables(rewrites, *param, variables);
+                }
+            }
+            TypedExprKind::Obj(attributes) => {
+                for (_, val) in attributes.iter() {
+                    self.find_variables(rewrites, *val, variables);
+                }
+            }
+            TypedExprKind::Constant(_) => {}
+            TypedExprKind::Variable(var) => {
+                variables.insert(*var);
+            }
+        }
+    }
+
+    pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
+        let (_, expr) = self.fetch_expr(rewrites, node_id);
         match &expr.kind {
             TypedExprKind::Unit => format!("{{}}"),
             TypedExprKind::Call(proc, params) => {
                 let param_strings = params
                     .iter()
-                    .map(|id| self.debug_tree(rewrites, *id))
+                    .map(|node_id| self.debug_tree(rewrites, *node_id))
                     .collect::<Vec<_>>()
                     .join(" ");
                 format!("({proc:?} {param_strings})")
+            }
+            TypedExprKind::Obj(attributes) => {
+                let attr_strings = attributes
+                    .iter()
+                    .map(|(prop, node_id)| {
+                        let val = self.debug_tree(rewrites, *node_id);
+                        format!("({} {})", prop.0, val)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                format!("(obj! {attr_strings})")
             }
             TypedExprKind::Constant(c) => format!("{c}"),
             TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),

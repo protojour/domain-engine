@@ -1,7 +1,14 @@
+use std::collections::HashMap;
+
+use ontol_runtime::{
+    vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
+    PropertyId,
+};
+
 use crate::{
     compiler::Compiler,
     rewrite::rewrite,
-    typed_expr::{NodeId, TypedExprTable},
+    typed_expr::{NodeId, SyntaxVar, TypedExprKind, TypedExprTable},
 };
 
 #[derive(Default, Debug)]
@@ -31,6 +38,8 @@ pub fn do_codegen(compiler: &mut Compiler) {
     let mut tasks = vec![];
     tasks.append(&mut compiler.codegen_tasks.tasks);
 
+    let mut program = Program::default();
+
     // FIXME: Do we need do topological sort of tasks?
     // At least in the beginning there is no support for recursive eq
     // (since there are no "monads" (option or iterators, etc) yet)
@@ -38,30 +47,122 @@ pub fn do_codegen(compiler: &mut Compiler) {
         match task {
             CodegenTask::Eq(mut eq_task) => {
                 // rewrite "with regards" to node_a:
-                rewrite(&mut eq_task.typed_expr_table, eq_task.node_a);
-                codegen_translate(
-                    compiler,
-                    &eq_task.typed_expr_table,
-                    eq_task.node_a,
-                    eq_task.node_b,
-                );
+                match rewrite(&mut eq_task.typed_expr_table, eq_task.node_a) {
+                    Ok(()) => {
+                        codegen_translate(
+                            compiler,
+                            &mut program,
+                            &eq_task.typed_expr_table,
+                            eq_task.node_a,
+                            eq_task.node_b,
+                        );
+                    }
+                    Err(error) => {
+                        panic!("TODO: could not rewrite: {error:?}");
+                    }
+                }
             }
         }
     }
 }
 
 fn codegen_translate<'m>(
-    _: &mut Compiler<'m>,
+    compiler: &mut Compiler<'m>,
+    program: &mut Program,
     table: &TypedExprTable<'m>,
     source_node: NodeId,
     target_node: NodeId,
-) {
+) -> EntryPoint {
     let (_, src_expr) = table.fetch_expr(&table.source_rewrites, source_node);
-    let (_, target_expr) = table.fetch_expr(&table.target_rewrites, target_node);
 
     println!(
-        "src: {} trg: {}",
+        "codegen src: {} trg: {}",
         table.debug_tree(&table.source_rewrites, source_node),
         table.debug_tree(&table.target_rewrites, target_node),
     );
+
+    match &src_expr.kind {
+        TypedExprKind::Obj(attributes) => {
+            codegen_obj_source(compiler, program, table, attributes, target_node)
+        }
+        _ => program.add_procedure(NArgs(1), vec![]),
+    }
+}
+
+fn codegen_obj_source<'m>(
+    compiler: &mut Compiler<'m>,
+    program: &mut Program,
+    table: &TypedExprTable<'m>,
+    source_properties: &HashMap<PropertyId, NodeId>,
+    target_node: NodeId,
+) -> EntryPoint {
+    let (_, target_expr) = table.fetch_expr(&table.target_rewrites, target_node);
+
+    let mut property_unpack: Vec<_> = source_properties
+        .iter()
+        .map(
+            |(prop_id, node_id)| match &table.expr_norewrite(*node_id).kind {
+                TypedExprKind::Variable(var) => (*prop_id, var),
+                _ => panic!("source property not a variable"),
+            },
+        )
+        .collect();
+    property_unpack.sort_by_key(|(_, var)| *var);
+
+    let mut opcodes = vec![];
+
+    match &target_expr.kind {
+        TypedExprKind::Obj(target_attrs) => {
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
+
+            // Add property unpack
+            // this generates pretty inefficient code, let's fix that later..
+            for (property_id, _) in property_unpack {
+                opcodes.push(OpCode::TakeAttr(Local(0), property_id));
+            }
+
+            for (property_id, node) in target_attrs {
+                codegen_expr(table, *node, &mut opcodes, |var| Local(var.0 + 2));
+                opcodes.push(OpCode::PutAttr(Local(1), *property_id));
+            }
+
+            opcodes.push(OpCode::Return(Local(1)));
+
+            println!("{opcodes:#?}");
+        }
+        _ => {
+            todo!()
+        }
+    }
+    program.add_procedure(NArgs(1), opcodes)
+}
+
+fn codegen_expr<'m>(
+    table: &TypedExprTable<'m>,
+    expr_id: NodeId,
+    opcodes: &mut Vec<OpCode>,
+    var_local: impl Fn(SyntaxVar) -> Local + Copy,
+) {
+    let (_, expr) = table.fetch_expr(&table.target_rewrites, expr_id);
+    match &expr.kind {
+        TypedExprKind::Call(proc, params) => {
+            for param in params.iter() {
+                codegen_expr(table, *param, opcodes, var_local);
+            }
+
+            opcodes.push(OpCode::CallBuiltin(*proc));
+        }
+        TypedExprKind::Constant(k) => {
+            opcodes.push(OpCode::Constant(*k));
+        }
+        TypedExprKind::Variable(var) => {
+            opcodes.push(OpCode::Clone(var_local(*var)));
+        }
+        TypedExprKind::Obj(_) => {
+            todo!()
+        }
+        TypedExprKind::Unit => {
+            todo!()
+        }
+    }
 }

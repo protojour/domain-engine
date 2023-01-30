@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 pub mod env;
 pub mod serde;
 pub mod translation;
@@ -16,5 +18,11 @@ pub struct PackageId(pub u32);
 pub struct DefId(pub u32);
 
 /// A domain-specific property of a type.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct PropertyId(pub u32);
+
+impl Debug for PropertyId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PropertyId({})", self.0)
+    }
+}
