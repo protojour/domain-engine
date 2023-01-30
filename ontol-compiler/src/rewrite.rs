@@ -2,12 +2,20 @@ use smartstring::alias::String;
 
 use crate::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RewriteTable(Vec<NodeId>);
 
 impl RewriteTable {
     pub fn push_node(&mut self, node: NodeId) {
         self.0.push(node);
+    }
+
+    /// Reset all rewrites
+    pub fn reset(&mut self, size: usize) {
+        self.0.truncate(size);
+        for (idx, node) in self.0.iter_mut().enumerate() {
+            node.0 = idx as u32;
+        }
     }
 
     pub fn rewrite(&mut self, source: NodeId, target: NodeId) {
@@ -35,11 +43,12 @@ pub enum RewriteError {
 }
 
 pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteError> {
-    let expr = table.expr_norewrite(node);
+    let expr = table.get_expr_no_rewrite(node);
     let mut expr_params: Vec<(NodeId, &TypedExpr)> = vec![];
+
     match &expr.kind {
         TypedExprKind::Call(proc, params) => {
-            table.fetch_exprs(&table.source_rewrites, params, &mut expr_params);
+            table.get_exprs(&table.source_rewrites, params, &mut expr_params);
 
             let mut var_param = None;
 
@@ -70,29 +79,43 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteEr
                     // TODO: Check constraints
                 }
 
+                let expr_ty = expr.ty;
+
+                let mut cloned_params: Vec<_> = rule
+                    .1
+                    .params()
+                    .iter()
+                    .map(|index| params[*index as usize])
+                    .collect();
+
+                // Make sure the expr node representing the variable
+                // doesn't get recursively rewritten.
+                // e.g. if the node `:v` gets rewritten to `(* :v 2)`,
+                // we only want to do this once.
+                // The left `:v` cannot be the same node as the right `:v`.
+                let var_expr = table.get_expr_no_rewrite(var_node);
+                let cloned_var_node = table.add_expr(var_expr.clone());
+                cloned_params[var_index] = cloned_var_node;
+
                 let target_expr = TypedExpr {
-                    ty: expr.ty,
-                    kind: TypedExprKind::Call(
-                        rule.1.proc(),
-                        rule.1
-                            .params()
-                            .iter()
-                            .map(|index| params[*index as usize])
-                            .collect(),
-                    ),
+                    ty: expr_ty,
+                    kind: TypedExprKind::Call(rule.1.proc(), cloned_params.into()),
                 };
                 let target_expr_id = table.add_expr(target_expr);
 
                 // rewrites
-                table.target_rewrites.rewrite(node, target_expr_id);
+                table.target_rewrites.rewrite(var_node, target_expr_id);
                 table.source_rewrites.rewrite(node, var_node);
+
+                println!("target rewrite: {node:?}->{target_expr_id:?}");
+                println!("source rewrite: {node:?}->{var_node:?}");
 
                 return Ok(());
             }
 
             Err(RewriteError::NoRulesMatchedCall)
         }
-        TypedExprKind::ValueObj(node) => rewrite(table, *node),
+        TypedExprKind::ValueObj(value_node) => rewrite(table, *value_node),
         TypedExprKind::MapObj(property_map) => {
             let nodes: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
             for node in nodes {
@@ -165,7 +188,7 @@ mod tests {
     };
 
     #[test]
-    fn eh() {
+    fn rewrite_test() {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
         let number = compiler.types.intern(Type::Number);
@@ -184,7 +207,7 @@ mod tests {
             kind: TypedExprKind::Call(BuiltinProc::Mul, [var, constant].into()),
         });
 
-        rewrite(&mut table, call);
+        rewrite(&mut table, call).unwrap();
 
         println!("source: {}", table.debug_tree(&table.source_rewrites, call));
         println!("target: {}", table.debug_tree(&table.target_rewrites, call));

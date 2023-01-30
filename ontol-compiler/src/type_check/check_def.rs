@@ -79,7 +79,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let (_, node_b) = self.check_expr_id(*second_id, &mut ctx);
 
                 self.codegen_tasks.push(CodegenTask::Eq(EqCodegenTask {
-                    typed_expr_table: ctx.typed_expr_table,
+                    typed_expr_table: ctx.typed_expr_table.seal(),
                     node_a,
                     node_b,
                 }));

@@ -1,18 +1,4 @@
-//! (a (/ :x :y)) <- (a :x)(b :y) unpack=> ERROR
-//!
-//! (a (* :x 1000)) <- (a :x) unpack=> (a :x) <- (a (/ :x 1000))
-//!
-//!
-//!
-//! (a 1@(* 2@(+ 3@:x 42) 1000)) 2=>3 | (a 3@:x)          | 3=>4
-//! (a 1@(* 3@:x 1000))          1=>3 | (a 4@(- 3@:x 42)) | 4=>5
-//! (a 3@:x)                          | (a 5@(/ 4@(- 3@:x 42) 1000))
-//!
-
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::{collections::HashMap, fmt::Debug};
 
 use ontol_runtime::{vm::BuiltinProc, PropertyId};
 
@@ -21,13 +7,13 @@ use crate::{rewrite::RewriteTable, types::TypeRef};
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SyntaxVar(pub u32);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TypedExpr<'m> {
     pub ty: TypeRef<'m>,
     pub kind: TypedExprKind,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypedExprKind {
     Unit,
     Call(BuiltinProc, Box<[NodeId]>),
@@ -35,13 +21,6 @@ pub enum TypedExprKind {
     MapObj(HashMap<PropertyId, NodeId>),
     Variable(SyntaxVar),
     Constant(i64),
-}
-
-#[derive(Default)]
-pub struct TypedExprTable<'m> {
-    exprs: Vec<TypedExpr<'m>>,
-    pub source_rewrites: RewriteTable,
-    pub target_rewrites: RewriteTable,
 }
 
 impl<'m> Debug for TypedExprTable<'m> {
@@ -55,6 +34,15 @@ pub struct NodeId(pub u32);
 
 pub const ERROR_NODE: NodeId = NodeId(u32::MAX);
 
+/// Table used to store expression trees
+/// suitable for equation-style rewriting.
+#[derive(Default)]
+pub struct TypedExprTable<'m> {
+    exprs: Vec<TypedExpr<'m>>,
+    pub source_rewrites: RewriteTable,
+    pub target_rewrites: RewriteTable,
+}
+
 impl<'m> TypedExprTable<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
         let id = NodeId(self.exprs.len() as u32);
@@ -64,11 +52,18 @@ impl<'m> TypedExprTable<'m> {
         id
     }
 
-    pub fn expr_norewrite(&self, id: NodeId) -> &TypedExpr<'m> {
+    /// Mark the table as "sealed".
+    /// A sealed table can be reset to its original state.
+    pub fn seal(self) -> SealedTypedExprTable<'m> {
+        let size = self.exprs.len();
+        SealedTypedExprTable { size, inner: self }
+    }
+
+    pub fn get_expr_no_rewrite(&self, id: NodeId) -> &TypedExpr<'m> {
         &self.exprs[id.0 as usize]
     }
 
-    pub fn fetch_expr<'t>(
+    pub fn get_expr<'t>(
         &'t self,
         rewrite_table: &RewriteTable,
         source_node: NodeId,
@@ -77,7 +72,7 @@ impl<'m> TypedExprTable<'m> {
         (root_node, &self.exprs[root_node.0 as usize])
     }
 
-    pub fn fetch_exprs<'t>(
+    pub fn get_exprs<'t>(
         &'t self,
         rewrite_table: &RewriteTable,
         node_ids: &[NodeId],
@@ -90,55 +85,36 @@ impl<'m> TypedExprTable<'m> {
         }
     }
 
-    pub fn find_variables(
-        &self,
-        rewrites: &RewriteTable,
-        node_id: NodeId,
-        variables: &mut HashSet<SyntaxVar>,
-    ) {
-        let (_, expr) = self.fetch_expr(rewrites, node_id);
-        match &expr.kind {
-            TypedExprKind::Unit => {}
-            TypedExprKind::Call(_, params) => {
-                for param in params.iter() {
-                    self.find_variables(rewrites, *param, variables);
-                }
-            }
-            TypedExprKind::ValueObj(value_id) => {
-                self.find_variables(rewrites, *value_id, variables);
-            }
-            TypedExprKind::MapObj(attributes) => {
-                for (_, val) in attributes.iter() {
-                    self.find_variables(rewrites, *val, variables);
-                }
-            }
-            TypedExprKind::Constant(_) => {}
-            TypedExprKind::Variable(var) => {
-                variables.insert(*var);
-            }
-        }
+    pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
+        self.debug_tree_guard(rewrites, node_id, 0)
     }
 
-    pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
-        let (_, expr) = self.fetch_expr(rewrites, node_id);
-        match &expr.kind {
+    fn debug_tree_guard(&self, rewrites: &RewriteTable, node_id: NodeId, depth: usize) -> String {
+        if depth > 20 {
+            return format!("[ERROR depth exceeded]");
+        }
+        let (target_node_id, expr) = self.get_expr(rewrites, node_id);
+        let s = match &expr.kind {
             TypedExprKind::Unit => format!("{{}}"),
             TypedExprKind::Call(proc, params) => {
                 let param_strings = params
                     .iter()
-                    .map(|node_id| self.debug_tree(rewrites, *node_id))
+                    .map(|node_id| self.debug_tree_guard(rewrites, *node_id, depth + 1))
                     .collect::<Vec<_>>()
                     .join(" ");
                 format!("({proc:?} {param_strings})")
             }
             TypedExprKind::ValueObj(node_id) => {
-                format!("(obj! {})", self.debug_tree(rewrites, *node_id))
+                format!(
+                    "(obj! {})",
+                    self.debug_tree_guard(rewrites, *node_id, depth + 1)
+                )
             }
             TypedExprKind::MapObj(attributes) => {
                 let attr_strings = attributes
                     .iter()
                     .map(|(prop, node_id)| {
-                        let val = self.debug_tree(rewrites, *node_id);
+                        let val = self.debug_tree_guard(rewrites, *node_id, depth + 1);
                         format!("({} {})", prop.0, val)
                     })
                     .collect::<Vec<_>>()
@@ -147,6 +123,26 @@ impl<'m> TypedExprTable<'m> {
             }
             TypedExprKind::Constant(c) => format!("{c}"),
             TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),
+        };
+        if node_id != target_node_id {
+            format!("[{}=>{}]@{}", node_id.0, target_node_id.0, s)
+        } else {
+            format!("{}@{}", node_id.0, s)
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct SealedTypedExprTable<'m> {
+    size: usize,
+    pub inner: TypedExprTable<'m>,
+}
+
+impl<'m> SealedTypedExprTable<'m> {
+    /// Reset all rewrites, which backtracks to original state
+    pub fn reset(&mut self) {
+        self.inner.exprs.truncate(self.size);
+        self.inner.source_rewrites.reset(self.size);
+        self.inner.target_rewrites.reset(self.size);
     }
 }

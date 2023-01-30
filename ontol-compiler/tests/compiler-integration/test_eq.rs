@@ -83,5 +83,6 @@ fn test_meters() {
     "
     .compile_ok(|env| {
         assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
+        assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
     })
 }
