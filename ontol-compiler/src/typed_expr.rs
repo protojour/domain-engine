@@ -9,18 +9,24 @@
 //! (a 3@:x)                          | (a 5@(/ 4@(- 3@:x 42) 1000))
 //!
 
+use std::fmt::Debug;
+
 use ontol_runtime::vm::BuiltinProc;
 
 use crate::{rewrite::RewriteTable, types::TypeRef};
 
+#[derive(Debug)]
 pub struct SyntaxVar(pub u32);
 
+#[derive(Debug)]
 pub struct TypedExpr<'m> {
     pub ty: TypeRef<'m>,
     pub kind: TypedExprKind,
 }
 
+#[derive(Debug)]
 pub enum TypedExprKind {
+    Unit,
     Call(BuiltinProc, Box<[NodeId]>),
     Variable(SyntaxVar),
     Constant(i64),
@@ -33,8 +39,16 @@ pub struct TypedExprTable<'m> {
     pub target_rewrites: RewriteTable,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+impl<'m> Debug for TypedExprTable<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TypedExprTable").finish()
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct NodeId(pub u32);
+
+pub const ERROR_NODE: NodeId = NodeId(u32::MAX);
 
 impl<'m> TypedExprTable<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
@@ -68,6 +82,23 @@ impl<'m> TypedExprTable<'m> {
         for source_node in node_ids {
             let root_node = rewrite_table.find_root(*source_node);
             target.push((root_node, &self.exprs[root_node.0 as usize]));
+        }
+    }
+
+    pub fn debug_tree(&self, rewrites: &RewriteTable, id: NodeId) -> String {
+        let (_, expr) = self.fetch_expr(rewrites, id);
+        match &expr.kind {
+            TypedExprKind::Unit => format!("{{}}"),
+            TypedExprKind::Call(proc, params) => {
+                let param_strings = params
+                    .iter()
+                    .map(|id| self.debug_tree(rewrites, *id))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                format!("({proc:?} {param_strings})")
+            }
+            TypedExprKind::Constant(c) => format!("{c}"),
+            TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),
         }
     }
 }

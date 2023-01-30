@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
-    def::{Def, DefKind, Relation, Relationship},
+    def::{Def, DefKind, Relation, Relationship, Variables},
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
@@ -96,12 +96,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 second,
             }) => {
                 let mut var_table = VarTable::default();
+                let mut variables = vec![];
                 for (param, _span) in params.into_iter() {
-                    var_table.new_var_id(param, self.compiler);
+                    variables.push(var_table.new_var_id(param, self.compiler));
                 }
                 let first = self.lower_root_expr(first, &mut var_table)?;
                 let second = self.lower_root_expr(second, &mut var_table)?;
-                Ok(Some(self.def(DefKind::Equivalence(first, second), &span)))
+                Ok(Some(self.def(
+                    DefKind::Equivalence(Variables(variables.into()), first, second),
+                    &span,
+                )))
             }
             ast::Ast::Comment(_) => Ok(None), // _ => panic!(),
         }

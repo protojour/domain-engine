@@ -24,7 +24,7 @@ impl RewriteTable {
     }
 }
 
-fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
+pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> bool {
     let expr = table.expr_norewrite(node);
     let mut expr_params: Vec<(NodeId, &TypedExpr)> = vec![];
     match &expr.kind {
@@ -137,11 +137,11 @@ mod rules {
 mod tests {
     use ontol_runtime::vm::BuiltinProc;
 
-    use super::{rewrite, RewriteTable};
+    use super::rewrite;
     use crate::{
         compiler::Compiler,
         mem::{Intern, Mem},
-        typed_expr::{NodeId, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
     };
 
@@ -167,29 +167,7 @@ mod tests {
 
         rewrite(&mut table, call);
 
-        println!(
-            "source: {}",
-            print_tree(&table, &table.source_rewrites, call)
-        );
-        println!(
-            "target: {}",
-            print_tree(&table, &table.target_rewrites, call)
-        );
-    }
-
-    fn print_tree(table: &TypedExprTable, rewrites: &RewriteTable, id: NodeId) -> String {
-        let (_, expr) = table.fetch_expr(rewrites, id);
-        match &expr.kind {
-            TypedExprKind::Call(proc, params) => {
-                let param_strings = params
-                    .iter()
-                    .map(|id| print_tree(table, rewrites, *id))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!("({proc:?} {param_strings})")
-            }
-            TypedExprKind::Constant(c) => format!("{c}"),
-            TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),
-        }
+        println!("source: {}", table.debug_tree(&table.source_rewrites, call));
+        println!("target: {}", table.debug_tree(&table.target_rewrites, call));
     }
 }

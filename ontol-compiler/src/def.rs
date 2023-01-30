@@ -29,8 +29,11 @@ pub enum DefKind {
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
-    Equivalence(ExprId, ExprId),
+    Equivalence(Variables, ExprId, ExprId),
 }
+
+#[derive(Debug)]
+pub struct Variables(pub Box<[ExprId]>);
 
 #[derive(Debug)]
 pub enum Primitive {

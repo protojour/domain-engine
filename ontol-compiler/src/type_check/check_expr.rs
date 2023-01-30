@@ -4,12 +4,14 @@ use ontol_runtime::DefId;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
+    def::{Def, DefKind},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::SubjectProperties,
-    typed_expr::TypedExprTable,
+    typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     types::{Type, TypeRef},
+    SourceSpan,
 };
 
 use super::{
@@ -20,6 +22,7 @@ use super::{
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
     pub typed_expr_table: TypedExprTable<'m>,
+    pub variable_nodes: HashMap<ExprId, NodeId>,
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -27,31 +30,49 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr_id: ExprId,
         ctx: &mut CheckExprContext<'m>,
-    ) -> TypeRef<'m> {
+    ) -> (TypeRef<'m>, NodeId) {
         match self.expressions.get(&expr_id) {
             Some(expr) => self.check_expr(expr, ctx),
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    fn check_expr(&mut self, expr: &Expr, ctx: &mut CheckExprContext<'m>) -> TypeRef<'m> {
+    fn check_expr(&mut self, expr: &Expr, ctx: &mut CheckExprContext<'m>) -> (TypeRef<'m>, NodeId) {
         match &expr.kind {
-            ExprKind::Call(def_id, args) => match self.def_types.map.get(&def_id) {
-                Some(Type::Function { params, output }) => {
-                    if args.len() != params.len() {
-                        return self.error(CompileError::WrongNumberOfArguments, &expr.span);
+            ExprKind::Call(def_id, args) => {
+                match (self.defs.map.get(&def_id), self.def_types.map.get(&def_id)) {
+                    (
+                        Some(Def {
+                            kind: DefKind::CoreFn(proc),
+                            ..
+                        }),
+                        Some(Type::Function { params, output }),
+                    ) => {
+                        if args.len() != params.len() {
+                            return self
+                                .expr_error(CompileError::WrongNumberOfArguments, &expr.span);
+                        }
+
+                        let mut param_nodes = vec![];
+                        for (arg, param_ty) in args.iter().zip(*params) {
+                            let (_, node_id) = self.check_expr_expect(arg, param_ty, ctx);
+                            param_nodes.push(node_id);
+                        }
+
+                        let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
+                            ty: *output,
+                            kind: TypedExprKind::Call(*proc, param_nodes.into()),
+                        });
+
+                        (*output, node_id)
                     }
-                    for (arg, param_ty) in args.iter().zip(*params) {
-                        self.check_expr_expect(arg, param_ty, ctx);
-                    }
-                    *output
+                    _ => self.expr_error(CompileError::NotCallable, &expr.span),
                 }
-                _ => self.error(CompileError::NotCallable, &expr.span),
-            },
+            }
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
                 let Type::Domain(_) = domain_type else {
-                    return self.error(CompileError::DomainTypeExpected, &type_path.span);
+                    return self.expr_error(CompileError::DomainTypeExpected, &type_path.span);
                 };
 
                 let subject_properties = self
@@ -59,11 +80,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_type(type_path.def_id)
                     .map(|props| &props.subject);
 
-                match subject_properties {
+                let node_id = match subject_properties {
                     Some(SubjectProperties::Unit) | None => {
                         if !attributes.is_empty() {
-                            return self.error(CompileError::NoPropertiesExpected, &expr.span);
+                            return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
                         }
+                        ctx.typed_expr_table.add_expr(TypedExpr {
+                            ty: domain_type,
+                            kind: TypedExprKind::Unit,
+                        })
                     }
                     Some(SubjectProperties::Value(property_id)) => match attributes.deref() {
                         [((ast_prop, _), value)] if ast_prop.is_none() => {
@@ -72,10 +97,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expect("BUG: problem getting anonymous property meta");
 
                             let object_ty = self.check_def(relationship.object);
-                            self.check_expr_expect(value, object_ty, ctx);
+                            self.check_expr_expect(value, object_ty, ctx).1
                         }
                         _ => {
-                            return self.error(CompileError::AnonymousPropertyExpected, &expr.span)
+                            return self
+                                .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
                     },
                     Some(SubjectProperties::Map(property_set)) => {
@@ -134,15 +160,34 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 self.error(CompileError::MissingProperty(prop_name), &expr.span);
                             }
                         }
-                    }
-                }
 
-                domain_type
+                        ctx.typed_expr_table.add_expr(TypedExpr {
+                            ty: domain_type,
+                            kind: TypedExprKind::Unit,
+                        })
+                    }
+                };
+
+                (domain_type, node_id)
             }
-            ExprKind::Constant(_) => self.types.intern(Type::Number),
-            ExprKind::Variable(expr_id) => self
-                .types
-                .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id))),
+            ExprKind::Constant(k) => {
+                let ty = self.types.intern(Type::Number);
+                let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
+                    ty,
+                    kind: TypedExprKind::Constant(*k),
+                });
+                (ty, node_id)
+            }
+            ExprKind::Variable(expr_id) => {
+                let ty = self
+                    .types
+                    .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
+                let node_id = ctx
+                    .variable_nodes
+                    .get(expr_id)
+                    .expect("variable node not found");
+                (ty, *node_id)
+            }
         }
     }
 
@@ -151,11 +196,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr: &Expr,
         expected: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
-    ) {
-        let ty = self.check_expr(expr, ctx);
+    ) -> (TypeRef<'m>, NodeId) {
+        let (ty, node_id) = self.check_expr(expr, ctx);
         match (ty, expected) {
-            (Type::Error, _) => {}
-            (_, Type::Error) => {}
+            (Type::Error, _) => (ty, ERROR_NODE),
+            (_, Type::Error) => (expected, ERROR_NODE),
             (Type::Infer(..), Type::Infer(..)) => {
                 panic!("FIXME: equate variable with variable?");
             }
@@ -165,21 +210,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {
-                    self.type_error(error, &expr.span);
+                    let err = self.type_error(error, &expr.span);
+                    (err, ERROR_NODE)
+                } else {
+                    println!("TODO: resolve var?");
+                    (ty, node_id)
                 }
             }
             (ty, expected) if ty != expected => {
-                self.type_error(
+                let err = self.type_error(
                     TypeError::Mismatch {
                         actual: ty,
                         expected,
                     },
                     &expr.span,
                 );
+                (err, ERROR_NODE)
             }
             _ => {
-                // OK
+                // Ok
+                (ty, node_id)
             }
         }
+    }
+
+    fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, NodeId) {
+        self.errors.push(error.spanned(&self.sources, span));
+        (self.types.intern(Type::Error), ERROR_NODE)
     }
 }

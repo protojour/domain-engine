@@ -1,12 +1,12 @@
 use ontol_runtime::DefId;
 
 use crate::{
-    codegen::{CodegenTask, EqArm, EqCodegenTask},
+    codegen::{CodegenTask, EqCodegenTask},
     def::{Def, DefKind, Primitive, Relation},
     error::CompileError,
     mem::Intern,
     relation::{Role, SubjectProperties},
-    typed_expr::TypedExprTable,
+    typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -60,23 +60,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.types.intern(Type::Tautology)
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
-            DefKind::Equivalence(first_id, second_id) => {
+            DefKind::Equivalence(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),
                     typed_expr_table: TypedExprTable::default(),
+                    variable_nodes: Default::default(),
                 };
-                let first = self.check_expr_id(*first_id, &mut ctx);
-                let second = self.check_expr_id(*second_id, &mut ctx);
+
+                for (index, variable_expr_id) in variables.0.iter().enumerate() {
+                    let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
+                        ty: self.types.intern(Type::Tautology),
+                        kind: TypedExprKind::Variable(SyntaxVar(index as u32)),
+                    });
+                    ctx.variable_nodes.insert(*variable_expr_id, node_id);
+                }
+
+                let (_, node_a) = self.check_expr_id(*first_id, &mut ctx);
+                let (_, node_b) = self.check_expr_id(*second_id, &mut ctx);
 
                 self.codegen_tasks.push(CodegenTask::Eq(EqCodegenTask {
-                    arm1: EqArm {
-                        expr_id: *first_id,
-                        ty: first,
-                    },
-                    arm2: EqArm {
-                        expr_id: *second_id,
-                        ty: second,
-                    },
+                    typed_expr_table: ctx.typed_expr_table,
+                    node_a,
+                    node_b,
                 }));
 
                 self.types.intern(Type::Tautology)

@@ -20,7 +20,7 @@ pub enum ExprKind {
     /// Object constructor
     Obj(TypePath, Box<[((Option<String>, SourceSpan), Expr)]>),
     Variable(ExprId),
-    Constant(i32),
+    Constant(i64),
 }
 
 #[derive(Debug)]
