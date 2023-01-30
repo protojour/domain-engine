@@ -1,20 +1,22 @@
-use ontol_runtime::{env::Env, serde::SerdeOperatorId, value::Value};
+use ontol_runtime::{env::Env, serde::SerdeOperatorId, value::Value, DefId};
 use serde::de::DeserializeSeed;
 
 use crate::TEST_PKG;
 
 pub struct TypeBinding {
+    pub def_id: DefId,
     serde_operator_id: SerdeOperatorId,
 }
 
 impl TypeBinding {
     pub fn new(env: &Env, type_name: &str) -> Self {
-        let serde_operator_id = env
-            .get_domain(&TEST_PKG)
-            .unwrap()
-            .get_serde_operator_id(type_name)
-            .unwrap();
-        let binding = Self { serde_operator_id };
+        let domain = env.get_domain(&TEST_PKG).unwrap();
+        let def_id = domain.get_def_id(type_name).unwrap();
+        let serde_operator_id = domain.get_serde_operator_id(type_name).unwrap();
+        let binding = Self {
+            def_id,
+            serde_operator_id,
+        };
         println!(
             "deserializing `{type_name}` with processor {:?}",
             env.new_serde_processor(serde_operator_id)

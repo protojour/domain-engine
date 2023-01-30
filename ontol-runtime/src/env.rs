@@ -21,6 +21,10 @@ impl Env {
         self.domains.get(&package_id)
     }
 
+    pub fn get_translator(&self, from: DefId, to: DefId) -> Option<EntryPoint> {
+        self.translations.get(&(from, to)).cloned()
+    }
+
     pub fn new_serde_processor(&self, serde_operator_id: SerdeOperatorId) -> SerdeProcessor {
         SerdeRegistry::new(&self.serde_operators).make_processor(serde_operator_id)
     }
@@ -36,6 +40,11 @@ pub struct TypeInfo {
 }
 
 impl Domain {
+    pub fn get_def_id(&self, type_name: &str) -> Option<DefId> {
+        let type_info = self.types.get(type_name)?;
+        Some(type_info.def_id)
+    }
+
     pub fn get_serde_operator_id(&self, type_name: &str) -> Option<SerdeOperatorId> {
         let type_info = self.types.get(type_name)?;
         type_info.serde_operator_id

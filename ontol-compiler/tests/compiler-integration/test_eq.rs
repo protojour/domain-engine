@@ -1,4 +1,31 @@
+use ontol_runtime::{env::Env, vm::Vm};
+use serde_json::json;
+
 use crate::{util::TypeBinding, TestCompile};
+
+fn assert_translate(
+    env: &Env,
+    translation: (&str, &str),
+    input: serde_json::Value,
+    expected: serde_json::Value,
+) {
+    let input_binding = TypeBinding::new(env, translation.0);
+    let output_binding = TypeBinding::new(env, translation.1);
+
+    let value = input_binding.deserialize(env, input).unwrap();
+
+    let entry_point = env
+        .get_translator(input_binding.def_id, output_binding.def_id)
+        .unwrap();
+
+    let mut vm = Vm::new(&env.program);
+
+    let value = vm.eval(entry_point, vec![value]);
+
+    let output_json = output_binding.serialize_json(env, &value);
+
+    assert_eq!(output_json, expected);
+}
 
 #[test]
 fn test_eq_simple() {
@@ -17,7 +44,12 @@ fn test_eq_simple() {
     )
     "
     .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
+        assert_translate(
+            env,
+            ("foo", "bar"),
+            json!({ "f": "my_value"}),
+            json!({ "b": "my_value"}),
+        );
     })
 }
 
