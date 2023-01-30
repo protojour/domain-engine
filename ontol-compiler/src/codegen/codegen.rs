@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
 
 use ontol_runtime::{
     vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
@@ -6,46 +6,19 @@ use ontol_runtime::{
 };
 
 use crate::{
+    codegen::typed_expr::TypedExprKind,
     compiler::Compiler,
-    rewrite::rewrite,
-    typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
 };
 
-#[derive(Default)]
-pub struct CodegenTasks<'m> {
-    tasks: Vec<CodegenTask<'m>>,
-    pub result_program: Program,
-    pub result_translations: HashMap<(DefId, DefId), EntryPoint>,
-}
+use super::{
+    rewrite::rewrite,
+    typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprTable},
+    CodegenTask,
+};
 
-impl<'m> Debug for CodegenTasks<'m> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodegenTasks")
-            .field("tasks", &self.tasks)
-            .finish()
-    }
-}
-
-impl<'m> CodegenTasks<'m> {
-    pub fn push(&mut self, task: CodegenTask<'m>) {
-        self.tasks.push(task);
-    }
-}
-
-#[derive(Debug)]
-pub enum CodegenTask<'m> {
-    Eq(EqCodegenTask<'m>),
-}
-
-#[derive(Debug)]
-pub struct EqCodegenTask<'m> {
-    pub typed_expr_table: SealedTypedExprTable<'m>,
-    pub node_a: NodeId,
-    pub node_b: NodeId,
-}
-
-pub fn do_codegen(compiler: &mut Compiler) {
+/// Perform all codegen tasks
+pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let mut tasks = vec![];
     tasks.append(&mut compiler.codegen_tasks.tasks);
 
@@ -141,9 +114,7 @@ fn codegen_translate<'m>(
     );
 
     match &src_expr.kind {
-        TypedExprKind::ValueObj(attr_node_id) => {
-            codegen_value_obj_source(program, table, dest_node)
-        }
+        TypedExprKind::ValueObj(_) => codegen_value_obj_source(program, table, dest_node),
         TypedExprKind::MapObj(attributes) => {
             codegen_map_obj_source(program, table, attributes, dest_node)
         }

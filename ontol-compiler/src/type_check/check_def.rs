@@ -1,12 +1,14 @@
 use ontol_runtime::DefId;
 
 use crate::{
-    codegen::{CodegenTask, EqCodegenTask},
+    codegen::{
+        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+        CodegenTask, EqCodegenTask,
+    },
     def::{Def, DefKind, Primitive, Relation},
     error::CompileError,
     mem::Intern,
     relation::{Role, SubjectProperties},
-    typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
 };

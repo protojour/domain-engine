@@ -1,6 +1,6 @@
 use ::chumsky::Parser;
 
-use codegen::do_codegen;
+use codegen::execute_codegen_tasks;
 use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
 
@@ -22,10 +22,8 @@ mod lowering;
 mod namespace;
 mod parse;
 mod relation;
-mod rewrite;
 mod source;
 mod type_check;
-mod typed_expr;
 mod types;
 
 pub trait Compile {
@@ -100,7 +98,7 @@ impl Compile for CompileSrc {
 
             compiler.check_error()?;
 
-            do_codegen(compiler);
+            execute_codegen_tasks(compiler);
         }
 
         compiler.check_error()?;

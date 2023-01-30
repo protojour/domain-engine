@@ -2,7 +2,9 @@ use std::{collections::HashMap, fmt::Debug};
 
 use ontol_runtime::{vm::BuiltinProc, PropertyId};
 
-use crate::{rewrite::RewriteTable, types::TypeRef};
+use crate::types::TypeRef;
+
+use super::rewrite::RewriteTable;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SyntaxVar(pub u32);

@@ -3,13 +3,13 @@ use std::{collections::HashMap, ops::Deref};
 use ontol_runtime::{DefId, PropertyId};
 
 use crate::{
+    codegen::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     compiler_queries::GetPropertyMeta,
     def::{Def, DefKind},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::SubjectProperties,
-    typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     types::{Type, TypeRef},
     SourceSpan,
 };

@@ -1,6 +1,6 @@
 use smartstring::alias::String;
 
-use crate::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
+use super::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
 
 #[derive(Default, Debug)]
 pub struct RewriteTable(Vec<NodeId>);
@@ -181,9 +181,9 @@ mod tests {
 
     use super::rewrite;
     use crate::{
+        codegen::typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         compiler::Compiler,
         mem::{Intern, Mem},
-        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
     };
 

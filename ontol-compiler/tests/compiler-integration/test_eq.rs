@@ -54,14 +54,12 @@ fn test_eq_simple() {
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
-        /*
         assert_translate(
             env,
             ("bar", "foo"),
             json!({ "b": "my_value"}),
             json!({ "f": "my_value"}),
         );
-        */
     })
 }
 
