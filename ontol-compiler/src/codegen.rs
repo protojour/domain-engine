@@ -1,4 +1,8 @@
-use crate::{compiler::Compiler, expr::ExprId, types::TypeRef};
+use crate::{
+    compiler::Compiler,
+    expr::{ExprId, ExprKind},
+    types::TypeRef,
+};
 
 #[derive(Default, Debug)]
 pub struct CodegenTasks<'m> {
@@ -28,4 +32,27 @@ pub struct EqArm<'m> {
     pub ty: TypeRef<'m>,
 }
 
-pub fn do_codegen(compiler: &mut Compiler) {}
+pub fn do_codegen(compiler: &mut Compiler) {
+    let mut tasks = vec![];
+    tasks.append(&mut compiler.codegen_tasks.tasks);
+
+    // FIXME: Do we need do topological sort of tasks?
+    // At least in the beginning there is no support for recursive eq
+    // (since there are no "monads" (option or iterators, etc) yet)
+    for task in tasks {
+        match task {
+            CodegenTask::Eq(eq_task) => {
+                // TODO: "mirror" this also
+                eq_codegen(compiler, &eq_task.arm1, &eq_task.arm2);
+            }
+        }
+    }
+}
+
+fn eq_codegen<'m>(compiler: &mut Compiler<'m>, from: &EqArm<'m>, to: &EqArm<'m>) {
+    let from_expr = compiler.expressions.get(&from.expr_id).unwrap();
+    match from_expr.kind {
+        ExprKind::Obj(_, _) => {}
+        _ => panic!(),
+    }
+}

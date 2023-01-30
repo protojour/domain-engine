@@ -6,11 +6,12 @@ use crate::{
     error::CompileError,
     mem::Intern,
     relation::{Role, SubjectProperties},
+    typed_expr::TypedExprTable,
     types::{Type, TypeRef},
     SourceSpan,
 };
 
-use super::{inference::Inference, TypeCheck};
+use super::{check_expr::CheckExprContext, inference::Inference, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
@@ -60,9 +61,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
             DefKind::Equivalence(first_id, second_id) => {
-                let mut inf = Inference::new();
-                let first = self.check_expr_id(*first_id, &mut inf);
-                let second = self.check_expr_id(*second_id, &mut inf);
+                let mut ctx = CheckExprContext {
+                    inference: Inference::new(),
+                    typed_expr_table: TypedExprTable::default(),
+                };
+                let first = self.check_expr_id(*first_id, &mut ctx);
+                let second = self.check_expr_id(*second_id, &mut ctx);
 
                 self.codegen_tasks.push(CodegenTask::Eq(EqCodegenTask {
                     arm1: EqArm {

@@ -8,6 +8,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::SubjectProperties,
+    typed_expr::TypedExprTable,
     types::{Type, TypeRef},
 };
 
@@ -16,19 +17,24 @@ use super::{
     TypeCheck, TypeError,
 };
 
+pub struct CheckExprContext<'m> {
+    pub inference: Inference<'m>,
+    pub typed_expr_table: TypedExprTable<'m>,
+}
+
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn check_expr_id(
         &mut self,
         expr_id: ExprId,
-        inf: &mut Inference<'m>,
+        ctx: &mut CheckExprContext<'m>,
     ) -> TypeRef<'m> {
         match self.expressions.get(&expr_id) {
-            Some(expr) => self.check_expr(expr, inf),
+            Some(expr) => self.check_expr(expr, ctx),
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    fn check_expr(&mut self, expr: &Expr, inf: &mut Inference<'m>) -> TypeRef<'m> {
+    fn check_expr(&mut self, expr: &Expr, ctx: &mut CheckExprContext<'m>) -> TypeRef<'m> {
         match &expr.kind {
             ExprKind::Call(def_id, args) => match self.def_types.map.get(&def_id) {
                 Some(Type::Function { params, output }) => {
@@ -36,7 +42,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         return self.error(CompileError::WrongNumberOfArguments, &expr.span);
                     }
                     for (arg, param_ty) in args.iter().zip(*params) {
-                        self.check_expr_expect(arg, param_ty, inf);
+                        self.check_expr_expect(arg, param_ty, ctx);
                     }
                     *output
                 }
@@ -44,9 +50,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
-                let Type::Domain(type_def_id) = domain_type else {
-                return self.error(CompileError::DomainTypeExpected, &type_path.span);
-            };
+                let Type::Domain(_) = domain_type else {
+                    return self.error(CompileError::DomainTypeExpected, &type_path.span);
+                };
 
                 let subject_properties = self
                     .relations
@@ -66,7 +72,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expect("BUG: problem getting anonymous property meta");
 
                             let object_ty = self.check_def(relationship.object);
-                            self.check_expr_expect(value, object_ty, inf);
+                            self.check_expr_expect(value, object_ty, ctx);
                         }
                         _ => {
                             return self.error(CompileError::AnonymousPropertyExpected, &expr.span)
@@ -120,7 +126,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let object_ty = self.check_def(match_property.object_def);
-                            self.check_expr_expect(value, object_ty, inf);
+                            self.check_expr_expect(value, object_ty, ctx);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -136,12 +142,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Constant(_) => self.types.intern(Type::Number),
             ExprKind::Variable(expr_id) => self
                 .types
-                .intern(Type::Infer(inf.new_type_variable(*expr_id))),
+                .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id))),
         }
     }
 
-    fn check_expr_expect(&mut self, expr: &Expr, expected: TypeRef<'m>, inf: &mut Inference<'m>) {
-        let ty = self.check_expr(expr, inf);
+    fn check_expr_expect(
+        &mut self,
+        expr: &Expr,
+        expected: TypeRef<'m>,
+        ctx: &mut CheckExprContext<'m>,
+    ) {
+        let ty = self.check_expr(expr, ctx);
         match (ty, expected) {
             (Type::Error, _) => {}
             (_, Type::Error) => {}
@@ -149,7 +160,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("FIXME: equate variable with variable?");
             }
             (Type::Infer(type_var), expected) => {
-                if let Err(error) = inf
+                if let Err(error) = ctx
+                    .inference
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {

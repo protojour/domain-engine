@@ -22,8 +22,10 @@ mod lowering;
 mod namespace;
 mod parse;
 mod relation;
+mod rewrite;
 mod source;
 mod type_check;
+mod typed_expr;
 mod types;
 
 pub trait Compile {

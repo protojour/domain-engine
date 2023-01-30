@@ -46,7 +46,7 @@ pub enum OpCode {
     PutAttr(Local, PropertyId),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BuiltinProc {
     Add,
     Sub,

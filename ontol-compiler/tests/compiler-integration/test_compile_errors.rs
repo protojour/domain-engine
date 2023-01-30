@@ -94,6 +94,24 @@ fn eq_attribute_mismatch() {
 }
 
 #[test]
+fn eq_duplicate_unknown_property() {
+    "
+    (type! foo)
+    (type! bar)
+    (rel! (foo) a (bar))
+    (eq! (:x)
+        (obj! foo
+            (a :x)
+            (a :x) ;; ERROR duplicate property
+            (b :x) ;; ERROR unknown property
+        )
+        (obj! bar)
+    )
+    "
+    .compile_fail()
+}
+
+#[test]
 fn eq_type_mismatch() {
     "
     (type! foo)
