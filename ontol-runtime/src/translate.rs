@@ -37,14 +37,13 @@ impl<'l> Translator<'l> {
         procedure: Procedure,
         args: impl IntoIterator<Item = Value>,
         debug: &mut impl VmDebug<ValueStack>,
-        // debug: &mut D,
     ) -> Value {
         for arg in args {
             self.value_stack.stack.push(arg);
         }
 
-        self.abstract_vm.program_counter = procedure.start as usize;
-        self.abstract_vm.run(&mut self.value_stack, debug);
+        self.abstract_vm
+            .execute(procedure, &mut self.value_stack, debug);
 
         let value_stack = std::mem::take(&mut self.value_stack);
         if value_stack.stack.len() != 1 {
@@ -206,7 +205,7 @@ struct Tracer;
 impl VmDebug<ValueStack> for Tracer {
     fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
         debug!("   -> {:?}", stack.stack);
-        debug!("{:?}", vm.lib.opcodes[vm.program_counter]);
+        debug!("{:?}", vm.pending_opcode());
     }
 }
 

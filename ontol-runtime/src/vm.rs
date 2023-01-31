@@ -1,5 +1,5 @@
 use crate::{
-    proc::{BuiltinProc, Lib, Local, OpCode},
+    proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
     PropertyId,
 };
 
@@ -10,7 +10,7 @@ use crate::{
 /// The abstract machine is in charge of the program counter and the call stack.
 pub struct AbstractVm<'l> {
     /// The position of the pending program opcode
-    pub(crate) program_counter: usize,
+    program_counter: usize,
     /// Stack for restoring state when returning from a subroutine.
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
     call_stack: Vec<CallStackFrame>,
@@ -52,7 +52,18 @@ impl<'l> AbstractVm<'l> {
         }
     }
 
-    pub fn run<S: Stack>(&mut self, stack: &mut S, debug: &mut impl VmDebug<S>) {
+    pub fn pending_opcode(&self) -> &OpCode {
+        &self.lib.opcodes[self.program_counter]
+    }
+
+    pub fn execute<S: Stack>(
+        &mut self,
+        procedure: Procedure,
+        stack: &mut S,
+        debug: &mut impl VmDebug<S>,
+    ) {
+        self.program_counter = procedure.start as usize;
+
         let opcodes = self.lib.opcodes.as_slice();
 
         loop {

@@ -1,8 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use tracing::debug;
+
 use crate::{
-    proc::{BuiltinProc, Local},
-    vm::{AbstractVm, Stack},
+    env::{Env, TypeInfo},
+    proc::{BuiltinProc, Lib, Local},
+    serde::SerdeOperator,
+    vm::{AbstractVm, Stack, VmDebug},
     PropertyId,
 };
 
@@ -11,9 +15,57 @@ pub struct PropertyProbe<'l> {
     prop_stack: PropStack,
 }
 
-impl<'l> PropertyProbe<'l> {}
+impl<'l> PropertyProbe<'l> {
+    pub fn new(lib: &'l Lib) -> Self {
+        Self {
+            abstract_vm: AbstractVm::new(lib),
+            prop_stack: PropStack::default(),
+        }
+    }
 
-#[derive(Clone)]
+    pub fn probe_from_serde_operator(
+        &mut self,
+        env: &Env,
+        origin: &TypeInfo,
+        destination: &TypeInfo,
+    ) -> Option<HashMap<PropertyId, HashSet<PropertyId>>> {
+        let dest_serde_operator_id = destination.serde_operator_id?;
+        let serde_operator = &env.serde_operators[dest_serde_operator_id.0 as usize];
+
+        let translation_proc = env.translations.get(&(destination.def_id, origin.def_id))?;
+
+        match serde_operator {
+            SerdeOperator::MapType(map_type) => {
+                let start_map = map_type
+                    .properties
+                    .iter()
+                    .map(|(_, serde_property)| {
+                        (
+                            serde_property.property_id,
+                            HashSet::from([serde_property.property_id]),
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+
+                self.prop_stack.stack.push(Props::Map(start_map));
+                self.abstract_vm
+                    .execute(*translation_proc, &mut self.prop_stack, &mut Tracer);
+
+                let prop_stack = std::mem::take(&mut self.prop_stack);
+                if prop_stack.stack.len() != 1 {
+                    panic!("expected one value");
+                }
+                match prop_stack.stack.into_iter().next() {
+                    Some(Props::Map(map)) => Some(map),
+                    _ => panic!("error"),
+                }
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 enum Props {
     Set(HashSet<PropertyId>),
     Map(HashMap<PropertyId, HashSet<PropertyId>>),
@@ -109,5 +161,14 @@ impl PropStack {
             Some(Props::Set(set)) => set,
             _ => panic!("expected set"),
         }
+    }
+}
+
+struct Tracer;
+
+impl VmDebug<PropStack> for Tracer {
+    fn tick(&mut self, vm: &AbstractVm, stack: &PropStack) {
+        debug!("   -> {:?}", stack.stack);
+        debug!("{:?}", vm.pending_opcode());
     }
 }
