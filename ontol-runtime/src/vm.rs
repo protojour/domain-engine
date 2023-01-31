@@ -15,7 +15,7 @@ pub struct Vm<'l> {
     local0_pos: usize,
     /// The position of the pending program opcode
     program_counter: usize,
-    /// Stack for storing function parameters and locals
+    /// Stack for storing function arguments and locals
     value_stack: Vec<Value>,
     /// Stack for restoring state when returning from a subroutine.
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
