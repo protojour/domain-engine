@@ -124,7 +124,9 @@ fn test_eq_value_to_map_func() {
 #[test]
 fn test_eq_complex_flow() {
     // FIXME: This should be a one-way translation.
-    // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot.
+    // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
+    // But perheps let's accept that this might be what the user wants.
+    // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     (type! one)
     (type! two)
