@@ -111,10 +111,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
                 (None, SubjectProperties::Unit) => {
-                    properties.subject = SubjectProperties::Value(property_id);
+                    properties.subject = SubjectProperties::Value(property_id, *span);
                 }
-                (None, SubjectProperties::Value(_)) => {
-                    return self.error(CompileError::DuplicateAnonymousRelation, span);
+                (None, SubjectProperties::Value(existing_property_id, existing_span)) => {
+                    properties.subject = SubjectProperties::ValueUnion(
+                        [
+                            (*existing_property_id, *existing_span),
+                            (property_id, *span),
+                        ]
+                        .into(),
+                    );
+
+                    // Register union for check later
+                    self.relations.value_unions.insert(role_def_id);
+                }
+                (None, SubjectProperties::ValueUnion(properties)) => {
+                    properties.push((property_id, *span));
                 }
                 (None, SubjectProperties::Map(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
@@ -122,7 +134,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (Some(_), SubjectProperties::Unit) => {
                     properties.subject = SubjectProperties::Map([property_id].into());
                 }
-                (Some(_), SubjectProperties::Value(_)) => {
+                (Some(_), SubjectProperties::Value(_, _) | SubjectProperties::ValueUnion(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
                 (Some(_), SubjectProperties::Map(properties)) => {

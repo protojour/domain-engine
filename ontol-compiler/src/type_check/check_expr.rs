@@ -91,7 +91,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             kind: TypedExprKind::Unit,
                         })
                     }
-                    Some(SubjectProperties::Value(property_id)) => match attributes.deref() {
+                    Some(SubjectProperties::Value(property_id, _)) => match attributes.deref() {
                         [((ast_prop, _), value)] if ast_prop.is_none() => {
                             let (_, relationship, _) = self
                                 .get_property_meta(*property_id)
@@ -110,6 +110,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
                     },
+                    Some(SubjectProperties::ValueUnion(property_set)) => {
+                        todo!()
+                    }
                     Some(SubjectProperties::Map(property_set)) => {
                         struct MatchProperty {
                             property_id: PropertyId,

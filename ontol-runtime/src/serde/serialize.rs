@@ -19,6 +19,7 @@ impl<'e> SerdeProcessor<'e> {
                 .registry
                 .make_processor(value_type.property.operator_id)
                 .serialize_value(value, serializer),
+            SerdeOperator::ValueUnionType(_) => todo!(),
             SerdeOperator::MapType(map_type) => self.serialize_map(map_type, value, serializer),
         }
     }

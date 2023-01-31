@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType},
+    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType},
     DefId,
 };
 use smartstring::alias::String;
@@ -99,7 +99,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 typename,
                 properties: Default::default(),
             }),
-            Some(SubjectProperties::Value(property_id)) => {
+            Some(SubjectProperties::Value(property_id, _)) => {
                 let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
                     panic!("Problem getting property meta");
                 };
@@ -116,8 +116,32 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     },
                 })
             }
-            Some(SubjectProperties::Map(properties)) => {
-                let serde_properties = properties.iter().map(|property_id| {
+            Some(SubjectProperties::ValueUnion(properties)) => {
+                let serde_properties = properties
+                    .iter()
+                    .map(|(property_id, _)| {
+                        let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
+                            panic!("Problem getting property meta");
+                        };
+
+                        let operator_id = self
+                            .get_serde_operator_id(relationship.object)
+                            .expect("No inner operator");
+
+                        SerdeProperty {
+                            property_id: *property_id,
+                            operator_id,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                SerdeOperator::ValueUnionType(ValueUnionType {
+                    typename,
+                    properties: serde_properties,
+                })
+            }
+            Some(SubjectProperties::Map(property_set)) => {
+                let serde_properties = property_set.iter().map(|property_id| {
                     let Ok((_, relationship, relation)) = self.get_property_meta(*property_id) else {
                         panic!("Problem getting property meta");
                     };

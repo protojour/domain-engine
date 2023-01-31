@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexSet;
 use ontol_runtime::{DefId, PropertyId};
+
+use crate::SourceSpan;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Role {
@@ -14,6 +16,8 @@ pub struct Relations {
     next_property_id: PropertyId,
     pub properties: HashMap<PropertyId, Property>,
     pub properties_by_type: HashMap<DefId, Properties>,
+
+    pub value_unions: HashSet<DefId>,
 }
 
 impl Default for Relations {
@@ -22,6 +26,7 @@ impl Default for Relations {
             next_property_id: PropertyId(0),
             properties: Default::default(),
             properties_by_type: Default::default(),
+            value_unions: Default::default(),
         }
     }
 }
@@ -60,7 +65,10 @@ pub enum SubjectProperties {
     /// A type with no properties
     #[default]
     Unit,
-    Value(PropertyId),
+    Value(PropertyId, SourceSpan),
+    /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
+    /// serializers etc should try things in sequence anyway.
+    ValueUnion(Vec<(PropertyId, SourceSpan)>),
     Map(IndexSet<PropertyId>),
 }
 

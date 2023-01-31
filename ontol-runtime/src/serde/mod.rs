@@ -55,6 +55,8 @@ pub enum SerdeOperator {
     String,
     // A type with just one anonymous property
     ValueType(ValueType),
+    // A type with multiple anonymous properties, equivalent to a union of types
+    ValueUnionType(ValueUnionType),
     // A type with many properties
     MapType(MapType),
 }
@@ -63,6 +65,12 @@ pub enum SerdeOperator {
 pub struct ValueType {
     pub typename: String,
     pub property: SerdeProperty,
+}
+
+#[derive(Debug)]
+pub struct ValueUnionType {
+    pub typename: String,
+    pub properties: Vec<SerdeProperty>,
 }
 
 #[derive(Debug)]

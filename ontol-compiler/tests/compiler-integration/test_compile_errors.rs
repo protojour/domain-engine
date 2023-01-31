@@ -28,7 +28,9 @@ fn rel_duplicate_anonymous_relation() {
     "
     (type! foo)
     (type! bar)
-    (rel! (foo) _ (bar))
+    (rel! ;; ERROR unit type `bar` cannot be part of a union
+        (foo) _ (bar)
+    )
     (rel! ;; ERROR duplicate anonymous relation
         (foo) _ (bar)
     )

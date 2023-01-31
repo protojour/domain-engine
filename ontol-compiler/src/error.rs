@@ -69,6 +69,12 @@ pub enum CompileError {
     MissingProperty(String),
     #[error("undeclared variable")]
     UndeclaredVariable,
+    #[error("cannot discriminate type")]
+    CannotDiscriminateType,
+    #[error("union tree not supported")]
+    UnionTreeNotSupported,
+    #[error("unit type `{0}` cannot be part of a union")]
+    UnitTypePartOfUnion(String),
 }
 
 #[derive(Debug)]

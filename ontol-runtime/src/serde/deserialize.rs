@@ -40,6 +40,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 .registry
                 .make_processor(value_type.property.operator_id)
                 .deserialize(deserializer),
+            SerdeOperator::ValueUnionType(_) => todo!(),
             SerdeOperator::MapType(map_type) => serde::de::Deserializer::deserialize_map(
                 deserializer,
                 MapTypeVisitor {

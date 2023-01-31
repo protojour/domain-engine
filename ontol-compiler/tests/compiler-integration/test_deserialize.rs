@@ -143,3 +143,29 @@ fn deserialize_recursive() {
         );
     });
 }
+
+#[test]
+#[ignore]
+fn deserialize_disjoint() {
+    "
+    (type! foo)
+    (rel! (foo) _ (string))
+    (rel! (foo) _ (number))
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_error_msg!(
+            foo.deserialize(
+                env,
+                json!({
+                    "b": {
+                        "f": {
+                            "b": 42
+                        }
+                    },
+                })
+            ),
+            "invalid type: integer `42`, expected type `bar` at line 1 column 17"
+        );
+    });
+}

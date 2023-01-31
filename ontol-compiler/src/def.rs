@@ -32,6 +32,21 @@ pub enum DefKind {
     Equivalence(Variables, ExprId, ExprId),
 }
 
+impl DefKind {
+    pub fn diagnostics_identifier(&self) -> Option<&str> {
+        match self {
+            Self::Primitive(Primitive::Number) => Some("number"),
+            Self::Primitive(Primitive::String) => Some("string"),
+            Self::CoreFn(_) => None,
+            Self::Type(ident) => Some(&ident),
+            Self::Relation(relation) => relation.ident.as_deref(),
+            Self::Relationship(_) => None,
+            Self::Property(_) => None,
+            Self::Equivalence(_, _, _) => Some("eq!"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Variables(pub Box<[ExprId]>);
 

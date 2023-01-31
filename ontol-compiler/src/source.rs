@@ -21,7 +21,7 @@ pub struct Src {
     pub name: Arc<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct SourceSpan {
     pub source_id: SourceId,
     pub start: u32,

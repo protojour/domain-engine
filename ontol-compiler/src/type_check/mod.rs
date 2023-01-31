@@ -13,10 +13,14 @@ use crate::{
 };
 
 pub mod check_def;
+pub mod check_union;
 pub mod inference;
 
 mod check_expr;
 
+/// Type checking is a stage in compilation.
+/// It is not only an immutable "check" of typing,
+/// but also actually produces more output for later compile stages.
 pub struct TypeCheck<'c, 'm> {
     types: &'c mut Types<'m>,
     def_types: &'c mut DefTypes<'m>,

@@ -96,6 +96,9 @@ impl Compile for CompileSrc {
                 type_check.check_def(root_def);
             }
 
+            // Call this after all source files have been compiled
+            type_check.check_unions();
+
             compiler.check_error()?;
 
             execute_codegen_tasks(compiler);
