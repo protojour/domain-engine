@@ -104,7 +104,6 @@ fn test_eq_value_to_map() {
 }
 
 #[test]
-#[ignore = "BUG"]
 fn test_eq_value_to_map_func() {
     "
     (type! one)

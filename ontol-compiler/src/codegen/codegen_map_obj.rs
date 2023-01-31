@@ -25,7 +25,7 @@ pub fn codegen_map_obj_origin<'m>(
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
         .map(
-            |(prop_id, node_id)| match &table.get_expr_no_rewrite(*node_id).kind {
+            |(prop_id, node_id)| match &table.get_expr(&table.source_rewrites, *node_id).1.kind {
                 TypedExprKind::Variable(var) => (*prop_id, *var),
                 _ => panic!("source property not a variable"),
             },
