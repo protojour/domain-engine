@@ -1,4 +1,5 @@
 use crate::TestCompile;
+use test_log::test;
 
 #[test]
 fn lex_error() {

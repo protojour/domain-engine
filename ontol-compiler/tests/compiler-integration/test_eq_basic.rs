@@ -1,5 +1,6 @@
 use ontol_runtime::{env::Env, vm::Vm};
 use serde_json::json;
+use test_log::test;
 
 use crate::{util::TypeBinding, TestCompile};
 
@@ -24,7 +25,7 @@ fn assert_translate(
 
     let mut vm = Vm::new(&env.program);
 
-    let value = vm.eval_log(entry_point, vec![value]);
+    let value = vm.trace_eval(entry_point, vec![value]);
 
     let output_json = output_binding.serialize_json(env, &value);
 
@@ -52,7 +53,7 @@ fn test_eq_simple() {
             env,
             ("foo", "bar"),
             json!({ "f": "my_value"}),
-            json!({ "b": "my_value"}),
+            json!({ "b": "my_value2"}),
         );
         assert_translate(
             env,

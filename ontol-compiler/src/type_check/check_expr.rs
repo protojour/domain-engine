@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use ontol_runtime::{DefId, PropertyId};
+use tracing::warn;
 
 use crate::{
     codegen::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
@@ -224,7 +225,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let err = self.type_error(error, &expr.span);
                     (err, ERROR_NODE)
                 } else {
-                    println!("TODO: resolve var?");
+                    warn!("TODO: resolve var?");
                     (ty, node_id)
                 }
             }

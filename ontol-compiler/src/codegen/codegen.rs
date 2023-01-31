@@ -5,6 +5,7 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::{smallvec, SmallVec};
+use tracing::{debug, warn};
 
 use crate::{
     codegen::{codegen_map_obj::codegen_map_obj_origin, typed_expr::TypedExprKind},
@@ -82,7 +83,7 @@ fn codegen_translate_rewrite(
                     true
                 }
                 other => {
-                    println!("unable to save translation: key = {other:?}");
+                    warn!("unable to save translation: key = {other:?}");
                     false
                 }
             }
@@ -97,7 +98,7 @@ fn find_program_key(ty: &TypeRef) -> Option<DefId> {
     match ty {
         Type::Domain(def_id) => Some(*def_id),
         other => {
-            println!("unable to get program key: {other:?}");
+            warn!("unable to get program key: {other:?}");
             None
         }
     }
@@ -111,7 +112,7 @@ fn codegen_translate<'m>(
 ) -> EntryPoint {
     let (_, origin_expr) = table.get_expr(&table.source_rewrites, origin_node);
 
-    println!(
+    debug!(
         "codegen origin: {} dest: {}",
         table.debug_tree(&table.source_rewrites, origin_node),
         table.debug_tree(&table.target_rewrites, dest_node),
@@ -197,7 +198,7 @@ fn codegen_value_obj_origin<'m>(
         })
         .collect::<OpCodes>();
 
-    println!("{opcodes:#?}");
+    debug!("{opcodes:#?}");
 
     program.add_procedure(NArgs(1), opcodes)
 }

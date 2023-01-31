@@ -3,6 +3,7 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Value;
 use serde_json::json;
+use test_log::test;
 
 use crate::{assert_error_msg, util::TypeBinding, TestCompile};
 

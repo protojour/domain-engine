@@ -2,6 +2,7 @@ use std::{array, collections::HashMap, fmt::Debug};
 
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{value::Value, PropertyId};
 
@@ -87,18 +88,18 @@ impl<'p> Vm<'p> {
         }
     }
 
-    pub fn eval(&mut self, proc: EntryPoint, args: Vec<Value>) -> Value {
+    pub fn eval(&mut self, proc: EntryPoint, args: impl IntoIterator<Item = Value>) -> Value {
         self.eval_debug(proc, args, &mut ())
     }
 
-    pub fn eval_log(&mut self, proc: EntryPoint, args: Vec<Value>) -> Value {
-        self.eval_debug(proc, args, &mut VmLogger)
+    pub fn trace_eval(&mut self, proc: EntryPoint, args: impl IntoIterator<Item = Value>) -> Value {
+        self.eval_debug(proc, args, &mut VmTracer)
     }
 
     pub fn eval_debug<D: VmDebug>(
         &mut self,
         entry_point: EntryPoint,
-        args: Vec<Value>,
+        args: impl IntoIterator<Item = Value>,
         debug: &mut D,
     ) -> Value {
         for arg in args {
@@ -291,12 +292,12 @@ impl VmDebug for () {
     fn tick(&mut self, _: &Vm) {}
 }
 
-struct VmLogger;
+struct VmTracer;
 
-impl VmDebug for VmLogger {
+impl VmDebug for VmTracer {
     fn tick(&mut self, vm: &Vm) {
-        println!("   -> {:?}", vm.value_stack);
-        println!("{:?}", vm.program.opcodes[vm.program_counter]);
+        debug!("   -> {:?}", vm.value_stack);
+        debug!("{:?}", vm.program.opcodes[vm.program_counter]);
     }
 }
 
@@ -322,7 +323,7 @@ mod tests {
         );
 
         let mut vm = Vm::new(&program);
-        let output = vm.eval_log(
+        let output = vm.trace_eval(
             proc,
             vec![Value::Compound(
                 [
@@ -375,7 +376,7 @@ mod tests {
         );
 
         let mut vm = Vm::new(&program);
-        let output = vm.eval_log(
+        let output = vm.trace_eval(
             translate,
             vec![Value::Compound(
                 [

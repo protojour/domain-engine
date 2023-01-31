@@ -5,6 +5,7 @@ use ontol_runtime::{
     PropertyId,
 };
 use smallvec::{smallvec, SmallVec};
+use tracing::debug;
 
 use crate::codegen::{
     codegen::{Codegen, OpCodes, VarFlowTracker},
@@ -125,7 +126,7 @@ pub fn codegen_map_obj_origin<'m>(
             opcodes
         });
 
-    println!("{opcodes:#?}");
+    debug!("{opcodes:#?}");
 
     program.add_procedure(NArgs(1), opcodes)
 }

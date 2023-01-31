@@ -1,5 +1,6 @@
 use crate::{util::TypeBinding, TestCompile};
 use serde_json::json;
+use test_log::test;
 
 macro_rules! assert_json_io_matches {
     ($env:expr, $binding:expr, $json:expr) => {

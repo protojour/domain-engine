@@ -16,9 +16,12 @@ bumpalo = "3"
 thiserror = "1"
 miette = "5"
 indexmap = "1"
+tracing = "0.1"
 
 [dev-dependencies]
 assert_matches = "1"
 pretty_assertions = "1"
 serde = "1"
 serde_json = "1"
+tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
+test-log = { version = "0.2", default-features = false, features = ["trace"] }

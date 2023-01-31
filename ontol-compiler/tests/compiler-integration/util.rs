@@ -1,5 +1,6 @@
 use ontol_runtime::{env::Env, serde::SerdeOperatorId, value::Value, DefId};
 use serde::de::DeserializeSeed;
+use tracing::debug;
 
 use crate::TEST_PKG;
 
@@ -17,7 +18,7 @@ impl TypeBinding {
             def_id,
             serde_operator_id,
         };
-        println!(
+        debug!(
             "deserializing `{type_name}` with processor {:?}",
             env.new_serde_processor(serde_operator_id)
         );

@@ -1,4 +1,5 @@
 use smartstring::alias::String;
+use tracing::debug;
 
 use super::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable};
 
@@ -107,8 +108,8 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteEr
                 table.target_rewrites.rewrite(var_node, target_expr_id);
                 table.source_rewrites.rewrite(node, var_node);
 
-                println!("target rewrite: {node:?}->{target_expr_id:?}");
-                println!("source rewrite: {node:?}->{var_node:?}");
+                debug!("target rewrite: {node:?}->{target_expr_id:?}");
+                debug!("source rewrite: {node:?}->{var_node:?}");
 
                 return Ok(());
             }
@@ -178,6 +179,7 @@ mod rules {
 #[cfg(test)]
 mod tests {
     use ontol_runtime::vm::BuiltinProc;
+    use tracing::info;
 
     use super::rewrite;
     use crate::{
@@ -209,7 +211,7 @@ mod tests {
 
         rewrite(&mut table, call).unwrap();
 
-        println!("source: {}", table.debug_tree(&table.source_rewrites, call));
-        println!("target: {}", table.debug_tree(&table.target_rewrites, call));
+        info!("source: {}", table.debug_tree(&table.source_rewrites, call));
+        info!("target: {}", table.debug_tree(&table.target_rewrites, call));
     }
 }
