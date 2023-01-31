@@ -19,7 +19,7 @@ use super::{
 };
 
 /// A small part of a procedure, a "slice" of instructions
-pub type Snippet = SmallVec<[OpCode; 8]>;
+pub type OpCodes = SmallVec<[OpCode; 8]>;
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
@@ -129,35 +129,73 @@ fn codegen_translate<'m>(
 fn codegen_value_obj_origin<'m>(
     program: &mut Program,
     table: &TypedExprTable<'m>,
-    target_node: NodeId,
+    dest_node: NodeId,
 ) -> EntryPoint {
-    let (_, target_expr) = table.get_expr(&table.target_rewrites, target_node);
+    let (_, dest_expr) = table.get_expr(&table.target_rewrites, dest_node);
 
-    let mut opcodes = vec![];
+    struct ValueCodegen {
+        input_local: Local,
+        var_tracker: VarFlowTracker,
+    }
 
-    match &target_expr.kind {
-        TypedExprKind::ValueObj(node_id) => {
-            let mut snippet = smallvec![];
-            codegen_expr(table, *node_id, &mut snippet, |var| Local(var.0));
-            opcodes.extend(snippet);
-            opcodes.push(OpCode::Return(Local(1)));
+    impl Codegen for ValueCodegen {
+        fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut OpCodes) {
+            // There should only be one origin variable (but can flow into several slots)
+            assert!(var.0 == 0);
+            self.var_tracker.count_use(var);
+            opcodes.push(OpCode::Clone(self.input_local));
         }
-        TypedExprKind::MapObj(target_attrs) => {
+    }
+
+    let mut value_codegen = ValueCodegen {
+        input_local: Local(0),
+        var_tracker: Default::default(),
+    };
+    let mut opcodes = smallvec![];
+
+    match &dest_expr.kind {
+        TypedExprKind::ValueObj(node_id) => {
+            value_codegen.codegen_expr(table, *node_id, &mut opcodes);
+            opcodes.push(OpCode::Return0);
+        }
+        TypedExprKind::MapObj(dest_attrs) => {
             opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
 
-            for (property_id, node) in target_attrs {
-                let mut snippet = smallvec![];
-                codegen_expr(table, *node, &mut snippet, |var| Local(var.0 + 1));
-                opcodes.extend(snippet);
-                opcodes.push(OpCode::PutAttr(Local(1), *property_id));
+            // the input value is not compound, so it will be consumed.
+            // Therefore it must be top of the stack:
+            opcodes.push(OpCode::Swap(Local(0), Local(1)));
+            value_codegen.input_local = Local(1);
+
+            for (property_id, node) in dest_attrs {
+                value_codegen.codegen_expr(table, *node, &mut opcodes);
+                opcodes.push(OpCode::PutAttr(Local(0), *property_id));
             }
 
-            opcodes.push(OpCode::Return(Local(1)));
+            opcodes.push(OpCode::Return0);
         }
         kind => {
             todo!("target: {kind:?}");
         }
     }
+
+    let opcodes = opcodes
+        .into_iter()
+        .filter(|opcode| {
+            match opcode {
+                OpCode::Clone(local) if *local == value_codegen.input_local => {
+                    if value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1 {
+                        // Keep cloning until the last use of the variable,
+                        // which must pop it off the stack. (i.e. keep the clone instruction)
+                        true
+                    } else {
+                        // drop clone instruction. Stack should only contain the return value.
+                        false
+                    }
+                }
+                _ => true,
+            }
+        })
+        .collect::<OpCodes>();
 
     println!("{opcodes:#?}");
 
@@ -169,22 +207,22 @@ pub trait Codegen {
         &mut self,
         table: &TypedExprTable<'m>,
         expr_id: NodeId,
-        snippet: &mut Snippet,
+        opcodes: &mut OpCodes,
     ) {
         let (_, expr) = table.get_expr(&table.target_rewrites, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
                 for param in params.iter() {
-                    self.codegen_expr(table, *param, snippet);
+                    self.codegen_expr(table, *param, opcodes);
                 }
 
-                snippet.push(OpCode::CallBuiltin(*proc));
+                opcodes.push(OpCode::CallBuiltin(*proc));
             }
             TypedExprKind::Constant(k) => {
-                snippet.push(OpCode::Constant(*k));
+                opcodes.push(OpCode::Constant(*k));
             }
             TypedExprKind::Variable(var) => {
-                self.codegen_variable(*var, snippet);
+                self.codegen_variable(*var, opcodes);
             }
             TypedExprKind::ValueObj(_) => {
                 todo!()
@@ -198,38 +236,33 @@ pub trait Codegen {
         }
     }
 
-    fn codegen_variable(&mut self, var: SyntaxVar, snippet: &mut Snippet);
+    fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut OpCodes);
 }
 
-fn codegen_expr<'m>(
-    table: &TypedExprTable<'m>,
-    expr_id: NodeId,
-    snippet: &mut Snippet,
-    mut var_local: impl FnMut(SyntaxVar) -> Local + Copy,
-) {
-    let (_, expr) = table.get_expr(&table.target_rewrites, expr_id);
-    match &expr.kind {
-        TypedExprKind::Call(proc, params) => {
-            for param in params.iter() {
-                codegen_expr(table, *param, snippet, var_local);
-            }
+#[derive(Default)]
+pub struct VarFlowTracker {
+    // for determining whether to clone
+    states: HashMap<SyntaxVar, VarFlowState>,
+}
 
-            snippet.push(OpCode::CallBuiltin(*proc));
-        }
-        TypedExprKind::Constant(k) => {
-            snippet.push(OpCode::Constant(*k));
-        }
-        TypedExprKind::Variable(var) => {
-            snippet.push(OpCode::Clone(var_local(*var)));
-        }
-        TypedExprKind::ValueObj(_) => {
-            todo!()
-        }
-        TypedExprKind::MapObj(_) => {
-            todo!()
-        }
-        TypedExprKind::Unit => {
-            todo!()
-        }
+impl VarFlowTracker {
+    /// count usages when building up the full state
+    pub fn count_use(&mut self, var: SyntaxVar) {
+        self.states.entry(var).or_default().use_count += 1;
     }
+
+    /// actually use the variable. Returns previous state.
+    pub fn do_use(&mut self, var: SyntaxVar) -> VarFlowState {
+        let stored_state = self.states.entry(var).or_default();
+        let clone = stored_state.clone();
+        stored_state.use_count -= 1;
+        stored_state.reused = true;
+        clone
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct VarFlowState {
+    pub use_count: usize,
+    pub reused: bool,
 }

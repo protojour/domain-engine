@@ -86,6 +86,43 @@ fn test_meters() {
 }
 
 #[test]
+fn test_eq_value_to_map() {
+    "
+    (type! one)
+    (type! two)
+    (rel! (one) _ (string))
+    (rel! (two) a (string))
+    (eq! (:x)
+        (obj! one (_ :x))
+        (obj! two (a :x))
+    )
+    "
+    .compile_ok(|env| {
+        assert_translate(env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
+        assert_translate(env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
+    })
+}
+
+#[test]
+#[ignore = "BUG"]
+fn test_eq_value_to_map_func() {
+    "
+    (type! one)
+    (type! two)
+    (rel! (one) _ (number))
+    (rel! (two) a (number))
+    (eq! (:x)
+        (obj! one (_ :x))
+        (obj! two (a (* :x 2)))
+    )
+    "
+    .compile_ok(|env| {
+        assert_translate(env, ("one", "two"), json!(2), json!({ "a": 4 }));
+        assert_translate(env, ("two", "one"), json!({ "a": 4 }), json!(2));
+    })
+}
+
+#[test]
 fn test_eq_complex_flow() {
     // FIXME: This should be a one-way translation.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot.

@@ -7,7 +7,7 @@ use crate::{value::Value, PropertyId};
 
 pub struct ProcId(u32);
 
-#[derive(Clone, Copy, DebugExtras)]
+#[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
 pub struct Local(pub u32);
 
 #[derive(Clone, Copy, Debug)]
@@ -25,10 +25,14 @@ pub struct EntryPoint {
 }
 
 impl Program {
-    pub fn add_procedure(&mut self, n_args: NArgs, mut opcodes: Vec<OpCode>) -> EntryPoint {
+    pub fn add_procedure(
+        &mut self,
+        n_args: NArgs,
+        opcodes: impl IntoIterator<Item = OpCode>,
+    ) -> EntryPoint {
         let start = self.opcodes.len() as u32;
 
-        self.opcodes.append(&mut opcodes);
+        self.opcodes.extend(opcodes.into_iter());
         EntryPoint { start, n_args }
     }
 }
