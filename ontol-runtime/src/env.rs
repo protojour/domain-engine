@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use smartstring::alias::String;
 
 use crate::{
+    proc::{Lib, Procedure},
     serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
-    vm::{Procedure, Program},
     DefId, PackageId,
 };
 
 /// Runtime environment
 pub struct Env {
     pub domains: HashMap<PackageId, Domain>,
-    pub program: Program,
+    pub lib: Lib,
     pub translations: HashMap<(DefId, DefId), Procedure>,
     pub serde_operators: Vec<SerdeOperator>,
 }

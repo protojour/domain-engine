@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_runtime::{
-    vm::{BuiltinProc, Local, NParams, OpCode, Procedure, Program},
+    proc::{BuiltinProc, Lib, Local, NParams, OpCode, Procedure},
     PropertyId,
 };
 use smallvec::{smallvec, SmallVec};
@@ -16,7 +16,7 @@ use super::typed_expr::{NodeId, TypedExprKind, TypedExprTable};
 
 /// Generate code originating from a map obj destructuring
 pub fn codegen_map_obj_origin<'m>(
-    program: &mut Program,
+    lib: &mut Lib,
     table: &TypedExprTable<'m>,
     origin_attrs: &HashMap<PropertyId, NodeId>,
     dest_node: NodeId,
@@ -128,7 +128,7 @@ pub fn codegen_map_obj_origin<'m>(
 
     debug!("{opcodes:#?}");
 
-    program.add_procedure(NParams(1), opcodes)
+    lib.add_procedure(NParams(1), opcodes)
 }
 
 #[derive(Default)]

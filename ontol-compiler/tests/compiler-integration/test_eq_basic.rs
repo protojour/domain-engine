@@ -23,7 +23,7 @@ fn assert_translate(
         ),
     };
 
-    let mut vm = Vm::new(&env.program);
+    let mut vm = Vm::new(&env.lib);
     let value = vm.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(env, &value);

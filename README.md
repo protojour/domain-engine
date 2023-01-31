@@ -36,6 +36,6 @@ Tests must use the `test_log::test` attribute for proper tracing.
 
 * Run all the tests with `cargo test`.
 * Run a specific test with `cargo test {test_name}`.
-* To enable traces in a specific test, use `RUST_LOG=debug cargo test {test_name}`.
+* To enable traces, use `RUST_LOG=debug cargo test {test_name}`.
 
-Only failed tests print their log.
+Trace logs are only shown for failed tests.

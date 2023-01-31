@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use derive_debug_extras::DebugExtras;
 
 pub mod env;
+pub mod proc;
 pub mod serde;
 pub mod value;
 pub mod vm;
@@ -22,3 +23,5 @@ pub struct DefId(pub u32);
 /// A domain-specific property of a type.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
 pub struct PropertyId(pub u32);
+
+pub struct ProcId(u32);

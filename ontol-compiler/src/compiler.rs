@@ -89,7 +89,7 @@ impl<'m> Compiler<'m> {
 
         Env {
             domains: out_domains,
-            program: self.codegen_tasks.result_program,
+            lib: self.codegen_tasks.result_lib,
             translations: self.codegen_tasks.result_translations,
             serde_operators,
         }

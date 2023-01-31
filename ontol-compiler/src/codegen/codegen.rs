@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_runtime::{
-    vm::{BuiltinProc, Local, NParams, OpCode, Procedure, Program},
+    proc::{BuiltinProc, Lib, Local, NParams, OpCode, Procedure},
     DefId,
 };
 use smallvec::{smallvec, SmallVec};
@@ -27,7 +27,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let mut tasks = vec![];
     tasks.append(&mut compiler.codegen_tasks.tasks);
 
-    let mut program = Program::default();
+    let mut lib = Lib::default();
     let mut translations = HashMap::default();
 
     // FIXME: Do we need do topological sort of tasks?
@@ -38,7 +38,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
             CodegenTask::Eq(mut eq_task) => {
                 // a -> b
                 codegen_translate_rewrite(
-                    &mut program,
+                    &mut lib,
                     &mut translations,
                     &mut eq_task.typed_expr_table,
                     eq_task.node_a,
@@ -49,7 +49,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
                 // b -> a
                 codegen_translate_rewrite(
-                    &mut program,
+                    &mut lib,
                     &mut translations,
                     &mut eq_task.typed_expr_table,
                     eq_task.node_b,
@@ -59,12 +59,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         }
     }
 
-    compiler.codegen_tasks.result_program = program;
+    compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_translations = translations;
 }
 
 fn codegen_translate_rewrite(
-    program: &mut Program,
+    lib: &mut Lib,
     translations: &mut HashMap<(DefId, DefId), Procedure>,
     table: &mut SealedTypedExprTable,
     origin_node: NodeId,
@@ -72,12 +72,11 @@ fn codegen_translate_rewrite(
 ) -> bool {
     match rewrite(&mut table.inner, origin_node) {
         Ok(()) => {
-            let key_a = find_program_key(&table.inner.get_expr_no_rewrite(origin_node).ty);
-            let key_b = find_program_key(&table.inner.get_expr_no_rewrite(dest_node).ty);
+            let key_a = find_translation_key(&table.inner.get_expr_no_rewrite(origin_node).ty);
+            let key_b = find_translation_key(&table.inner.get_expr_no_rewrite(dest_node).ty);
             match (key_a, key_b) {
                 (Some(a), Some(b)) => {
-                    let procedure =
-                        codegen_translate(program, &table.inner, origin_node, dest_node);
+                    let procedure = codegen_translate(lib, &table.inner, origin_node, dest_node);
 
                     translations.insert((a, b), procedure);
                     true
@@ -94,18 +93,18 @@ fn codegen_translate_rewrite(
     }
 }
 
-fn find_program_key(ty: &TypeRef) -> Option<DefId> {
+fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
     match ty {
         Type::Domain(def_id) => Some(*def_id),
         other => {
-            warn!("unable to get program key: {other:?}");
+            warn!("unable to get translation key: {other:?}");
             None
         }
     }
 }
 
 fn codegen_translate<'m>(
-    program: &mut Program,
+    lib: &mut Lib,
     table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
@@ -119,16 +118,16 @@ fn codegen_translate<'m>(
     );
 
     match &origin_expr.kind {
-        TypedExprKind::ValueObj(_) => codegen_value_obj_origin(program, table, dest_node),
+        TypedExprKind::ValueObj(_) => codegen_value_obj_origin(lib, table, dest_node),
         TypedExprKind::MapObj(attributes) => {
-            codegen_map_obj_origin(program, table, attributes, dest_node)
+            codegen_map_obj_origin(lib, table, attributes, dest_node)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
 }
 
 fn codegen_value_obj_origin<'m>(
-    program: &mut Program,
+    lib: &mut Lib,
     table: &TypedExprTable<'m>,
     dest_node: NodeId,
 ) -> Procedure {
@@ -200,7 +199,7 @@ fn codegen_value_obj_origin<'m>(
 
     debug!("{opcodes:#?}");
 
-    program.add_procedure(NParams(1), opcodes)
+    lib.add_procedure(NParams(1), opcodes)
 }
 
 pub trait Codegen {

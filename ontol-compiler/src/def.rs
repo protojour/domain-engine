@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_runtime::{vm::BuiltinProc, DefId, PackageId};
+use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
 use smartstring::alias::String;
 
 use crate::{

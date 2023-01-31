@@ -130,7 +130,7 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteEr
 }
 
 mod rules {
-    use ontol_runtime::vm::BuiltinProc;
+    use ontol_runtime::proc::BuiltinProc;
 
     pub struct Pattern(BuiltinProc, &'static [Match]);
     pub struct Rewrite(BuiltinProc, &'static [u8]);
@@ -178,7 +178,7 @@ mod rules {
 
 #[cfg(test)]
 mod tests {
-    use ontol_runtime::vm::BuiltinProc;
+    use ontol_runtime::proc::BuiltinProc;
     use tracing::info;
 
     use super::rewrite;

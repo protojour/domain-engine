@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use ontol_runtime::{
-    vm::{Procedure, Program},
+    proc::{Lib, Procedure},
     DefId,
 };
 
@@ -18,7 +18,7 @@ use self::typed_expr::{NodeId, SealedTypedExprTable};
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
-    pub result_program: Program,
+    pub result_lib: Lib,
     pub result_translations: HashMap<(DefId, DefId), Procedure>,
 }
 

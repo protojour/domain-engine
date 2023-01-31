@@ -1,80 +1,16 @@
-use std::{array, collections::HashMap, fmt::Debug};
+use std::{array, collections::HashMap};
 
-use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::{value::Value, PropertyId};
+use crate::{
+    proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
+    value::Value,
+    PropertyId,
+};
 
-pub struct ProcId(u32);
-
-#[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
-pub struct Local(pub u32);
-
-#[derive(Clone, Copy, Debug)]
-pub struct NParams(pub u8);
-
-#[derive(Default)]
-pub struct Program {
-    opcodes: Vec<OpCode>,
-}
-
-/// Handle to an ONTOL procedure.
-///
-/// The VM is a stack machine, the arguments to the called procedure
-/// must be top of the stack when it's called.
-#[derive(Clone, Copy, Debug)]
-pub struct Procedure {
-    start: u32,
-    n_params: NParams,
-}
-
-impl Program {
-    pub fn add_procedure(
-        &mut self,
-        n_params: NParams,
-        opcodes: impl IntoIterator<Item = OpCode>,
-    ) -> Procedure {
-        let start = self.opcodes.len() as u32;
-
-        self.opcodes.extend(opcodes.into_iter());
-        Procedure { start, n_params }
-    }
-}
-
-#[derive(DebugExtras)]
-pub enum OpCode {
-    /// Call a procedure. Its arguments must be top of the value stack.
-    Call(Procedure),
-    /// Return a specific local
-    Return(Local),
-    /// Optimization: Return Local(0)
-    Return0,
-    /// Call a builtin procedure
-    CallBuiltin(BuiltinProc),
-    /// Clone a specific local, putting its clone on the top of the stack.
-    Clone(Local),
-    /// Swap the position of two locals.
-    Swap(Local, Local),
-    /// Take an attribute from local compound, and put its value on the top of the stack.
-    TakeAttr(Local, PropertyId),
-    /// Pop value from stack, and move it into the specified compound local.
-    PutAttr(Local, PropertyId),
-    /// Push a constant to the stack.
-    Constant(i64),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BuiltinProc {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Append,
-    NewCompound,
-}
-
-pub struct Vm<'p> {
+/// Virtual machine for executing ONTOL procedures
+pub struct Vm<'l> {
     /// The position of Local(0) on the value stack
     local0_pos: usize,
     /// The position of the pending program opcode
@@ -85,8 +21,8 @@ pub struct Vm<'p> {
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
     call_stack: Vec<StackFrame>,
 
-    /// Reference to the program being executed
-    program: &'p Program,
+    /// Reference to the ONTOL library being executed
+    lib: &'l Lib,
 }
 
 /// A stack frame indicating a procedure called another procedure.
@@ -102,12 +38,12 @@ pub trait VmDebug {
     fn tick(&mut self, vm: &Vm);
 }
 
-impl<'p> Vm<'p> {
-    pub fn new(program: &'p Program) -> Self {
+impl<'l> Vm<'l> {
+    pub fn new(lib: &'l Lib) -> Self {
         Self {
             local0_pos: 0,
             program_counter: 0,
-            program,
+            lib,
             value_stack: vec![],
             call_stack: vec![],
         }
@@ -142,7 +78,7 @@ impl<'p> Vm<'p> {
     }
 
     fn run<D: VmDebug>(&mut self, debug: &mut D) {
-        let opcodes = self.program.opcodes.as_slice();
+        let opcodes = self.lib.opcodes.as_slice();
 
         loop {
             debug.tick(self);
@@ -327,7 +263,7 @@ struct VmTracer;
 impl VmDebug for VmTracer {
     fn tick(&mut self, vm: &Vm) {
         debug!("   -> {:?}", vm.value_stack);
-        debug!("{:?}", vm.program.opcodes[vm.program_counter]);
+        debug!("{:?}", vm.lib.opcodes[vm.program_counter]);
     }
 }
 
@@ -335,12 +271,14 @@ impl VmDebug for VmTracer {
 mod tests {
     use std::collections::HashSet;
 
+    use crate::proc::NParams;
+
     use super::*;
 
     #[test]
     fn translate_map() {
-        let mut program = Program::default();
-        let proc = program.add_procedure(
+        let mut lib = Lib::default();
+        let proc = lib.add_procedure(
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewCompound),
@@ -352,7 +290,7 @@ mod tests {
             ],
         );
 
-        let mut vm = Vm::new(&program);
+        let mut vm = Vm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::Compound(
@@ -373,8 +311,8 @@ mod tests {
 
     #[test]
     fn call_stack() {
-        let mut program = Program::default();
-        let double = program.add_procedure(
+        let mut lib = Lib::default();
+        let double = lib.add_procedure(
             NParams(1),
             [
                 OpCode::Clone(Local(0)),
@@ -382,7 +320,7 @@ mod tests {
                 OpCode::Return0,
             ],
         );
-        let add_then_double = program.add_procedure(
+        let add_then_double = lib.add_procedure(
             NParams(2),
             [
                 OpCode::CallBuiltin(BuiltinProc::Add),
@@ -390,7 +328,7 @@ mod tests {
                 OpCode::Return0,
             ],
         );
-        let translate = program.add_procedure(
+        let translate = lib.add_procedure(
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewCompound),
@@ -405,7 +343,7 @@ mod tests {
             ],
         );
 
-        let mut vm = Vm::new(&program);
+        let mut vm = Vm::new(&lib);
         let output = vm.trace_eval(
             translate,
             [Value::Compound(
