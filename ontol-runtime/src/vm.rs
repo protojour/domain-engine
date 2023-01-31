@@ -12,45 +12,55 @@ pub struct ProcId(u32);
 pub struct Local(pub u32);
 
 #[derive(Clone, Copy, Debug)]
-pub struct NArgs(pub u8);
+pub struct NParams(pub u8);
 
 #[derive(Default)]
 pub struct Program {
     opcodes: Vec<OpCode>,
 }
 
+/// Handle to an ONTOL procedure.
+///
+/// The VM is a stack machine, the arguments to the called procedure
+/// must be top of the stack when it's called.
 #[derive(Clone, Copy, Debug)]
-pub struct EntryPoint {
+pub struct Procedure {
     start: u32,
-    n_args: NArgs,
+    n_params: NParams,
 }
 
 impl Program {
     pub fn add_procedure(
         &mut self,
-        n_args: NArgs,
+        n_params: NParams,
         opcodes: impl IntoIterator<Item = OpCode>,
-    ) -> EntryPoint {
+    ) -> Procedure {
         let start = self.opcodes.len() as u32;
 
         self.opcodes.extend(opcodes.into_iter());
-        EntryPoint { start, n_args }
+        Procedure { start, n_params }
     }
 }
 
 #[derive(DebugExtras)]
 pub enum OpCode {
-    /// Call a procedure. Its arguments must be top of the stack.
-    Call(EntryPoint),
+    /// Call a procedure. Its arguments must be top of the value stack.
+    Call(Procedure),
     /// Return a specific local
     Return(Local),
     /// Optimization: Return Local(0)
     Return0,
+    /// Call a builtin procedure
     CallBuiltin(BuiltinProc),
+    /// Clone a specific local, putting its clone on the top of the stack.
     Clone(Local),
+    /// Swap the position of two locals.
     Swap(Local, Local),
+    /// Take an attribute from local compound, and put its value on the top of the stack.
     TakeAttr(Local, PropertyId),
+    /// Pop value from stack, and move it into the specified compound local.
     PutAttr(Local, PropertyId),
+    /// Push a constant to the stack.
     Constant(i64),
 }
 
@@ -65,12 +75,27 @@ pub enum BuiltinProc {
 }
 
 pub struct Vm<'p> {
-    stack_pos: usize,
+    /// The position of Local(0) on the value stack
+    local0_pos: usize,
+    /// The position of the pending program opcode
     program_counter: usize,
-
-    program: &'p Program,
+    /// Stack for storing function parameters and locals
     value_stack: Vec<Value>,
-    call_stack: Vec<(usize, usize)>,
+    /// Stack for restoring state when returning from a subroutine.
+    /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
+    call_stack: Vec<StackFrame>,
+
+    /// Reference to the program being executed
+    program: &'p Program,
+}
+
+/// A stack frame indicating a procedure called another procedure.
+/// The currently executing procedure is _not_ on the stack.
+struct StackFrame {
+    /// The stack position to restore when this frame is popped.
+    local0_pos: usize,
+    /// The program position to resume when this frame is popped.
+    program_counter: usize,
 }
 
 pub trait VmDebug {
@@ -80,7 +105,7 @@ pub trait VmDebug {
 impl<'p> Vm<'p> {
     pub fn new(program: &'p Program) -> Self {
         Self {
-            stack_pos: 0,
+            local0_pos: 0,
             program_counter: 0,
             program,
             value_stack: vec![],
@@ -88,17 +113,17 @@ impl<'p> Vm<'p> {
         }
     }
 
-    pub fn eval(&mut self, proc: EntryPoint, args: impl IntoIterator<Item = Value>) -> Value {
+    pub fn eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
         self.eval_debug(proc, args, &mut ())
     }
 
-    pub fn trace_eval(&mut self, proc: EntryPoint, args: impl IntoIterator<Item = Value>) -> Value {
+    pub fn trace_eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
         self.eval_debug(proc, args, &mut VmTracer)
     }
 
     pub fn eval_debug<D: VmDebug>(
         &mut self,
-        entry_point: EntryPoint,
+        procedure: Procedure,
         args: impl IntoIterator<Item = Value>,
         debug: &mut D,
     ) -> Value {
@@ -106,7 +131,7 @@ impl<'p> Vm<'p> {
             self.value_stack.push(arg);
         }
 
-        self.program_counter = entry_point.start as usize;
+        self.program_counter = procedure.start as usize;
         self.run(debug);
 
         let stack = std::mem::take(&mut self.value_stack);
@@ -123,11 +148,13 @@ impl<'p> Vm<'p> {
             debug.tick(self);
 
             match &opcodes[self.program_counter] {
-                OpCode::Call(entry_point) => {
-                    self.call_stack
-                        .push((self.program_counter + 1, self.stack_pos));
-                    self.stack_pos = self.value_stack.len() - entry_point.n_args.0 as usize;
-                    self.program_counter = entry_point.start as usize;
+                OpCode::Call(procedure) => {
+                    self.call_stack.push(StackFrame {
+                        program_counter: self.program_counter + 1,
+                        local0_pos: self.local0_pos,
+                    });
+                    self.local0_pos = self.value_stack.len() - procedure.n_params.0 as usize;
+                    self.program_counter = procedure.start as usize;
                 }
                 OpCode::Return(local) => {
                     self.swap(*local, Local(0));
@@ -198,17 +225,17 @@ impl<'p> Vm<'p> {
 
     #[inline(always)]
     fn local(&self, local: Local) -> &Value {
-        &self.value_stack[self.stack_pos + local.0 as usize]
+        &self.value_stack[self.local0_pos + local.0 as usize]
     }
 
     #[inline(always)]
     fn local_mut(&mut self, local: Local) -> &mut Value {
-        &mut self.value_stack[self.stack_pos + local.0 as usize]
+        &mut self.value_stack[self.local0_pos + local.0 as usize]
     }
 
     #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
-        let stack_pos = self.stack_pos;
+        let stack_pos = self.local0_pos;
         self.value_stack
             .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
     }
@@ -240,15 +267,18 @@ impl<'p> Vm<'p> {
 
 macro_rules! return0 {
     ($vm:ident) => {
-        let pop = $vm.value_stack.len() - ($vm.stack_pos + 1);
+        let pop = $vm.value_stack.len() - ($vm.local0_pos + 1);
         for _ in 0..pop {
             $vm.value_stack.pop();
         }
 
         match $vm.call_stack.pop() {
-            Some((program_counter, stack_pos)) => {
+            Some(StackFrame {
+                program_counter,
+                local0_pos,
+            }) => {
                 $vm.program_counter = program_counter;
-                $vm.stack_pos = stack_pos;
+                $vm.local0_pos = local0_pos;
             }
             None => {
                 return;
@@ -311,8 +341,8 @@ mod tests {
     fn translate_map() {
         let mut program = Program::default();
         let proc = program.add_procedure(
-            NArgs(1),
-            vec![
+            NParams(1),
+            [
                 OpCode::CallBuiltin(BuiltinProc::NewCompound),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::PutAttr(Local(1), PropertyId(3)),
@@ -325,7 +355,7 @@ mod tests {
         let mut vm = Vm::new(&program);
         let output = vm.trace_eval(
             proc,
-            vec![Value::Compound(
+            [Value::Compound(
                 [
                     (PropertyId(1), Value::String("foo".into())),
                     (PropertyId(2), Value::String("bar".into())),
@@ -345,24 +375,24 @@ mod tests {
     fn call_stack() {
         let mut program = Program::default();
         let double = program.add_procedure(
-            NArgs(1),
-            vec![
+            NParams(1),
+            [
                 OpCode::Clone(Local(0)),
                 OpCode::CallBuiltin(BuiltinProc::Add),
                 OpCode::Return0,
             ],
         );
         let add_then_double = program.add_procedure(
-            NArgs(2),
-            vec![
+            NParams(2),
+            [
                 OpCode::CallBuiltin(BuiltinProc::Add),
                 OpCode::Call(double),
                 OpCode::Return0,
             ],
         );
         let translate = program.add_procedure(
-            NArgs(1),
-            vec![
+            NParams(1),
+            [
                 OpCode::CallBuiltin(BuiltinProc::NewCompound),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::Call(double),
@@ -378,7 +408,7 @@ mod tests {
         let mut vm = Vm::new(&program);
         let output = vm.trace_eval(
             translate,
-            vec![Value::Compound(
+            [Value::Compound(
                 [
                     (PropertyId(1), Value::Number(333)),
                     (PropertyId(2), Value::Number(10)),

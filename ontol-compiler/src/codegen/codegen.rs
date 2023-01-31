@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_runtime::{
-    vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
+    vm::{BuiltinProc, Local, NParams, OpCode, Procedure, Program},
     DefId,
 };
 use smallvec::{smallvec, SmallVec};
@@ -65,7 +65,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
 fn codegen_translate_rewrite(
     program: &mut Program,
-    translations: &mut HashMap<(DefId, DefId), EntryPoint>,
+    translations: &mut HashMap<(DefId, DefId), Procedure>,
     table: &mut SealedTypedExprTable,
     origin_node: NodeId,
     dest_node: NodeId,
@@ -76,10 +76,10 @@ fn codegen_translate_rewrite(
             let key_b = find_program_key(&table.inner.get_expr_no_rewrite(dest_node).ty);
             match (key_a, key_b) {
                 (Some(a), Some(b)) => {
-                    let entry_point =
+                    let procedure =
                         codegen_translate(program, &table.inner, origin_node, dest_node);
 
-                    translations.insert((a, b), entry_point);
+                    translations.insert((a, b), procedure);
                     true
                 }
                 other => {
@@ -109,7 +109,7 @@ fn codegen_translate<'m>(
     table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
-) -> EntryPoint {
+) -> Procedure {
     let (_, origin_expr) = table.get_expr(&table.source_rewrites, origin_node);
 
     debug!(
@@ -131,7 +131,7 @@ fn codegen_value_obj_origin<'m>(
     program: &mut Program,
     table: &TypedExprTable<'m>,
     dest_node: NodeId,
-) -> EntryPoint {
+) -> Procedure {
     let (_, dest_expr) = table.get_expr(&table.target_rewrites, dest_node);
 
     struct ValueCodegen {
@@ -200,7 +200,7 @@ fn codegen_value_obj_origin<'m>(
 
     debug!("{opcodes:#?}");
 
-    program.add_procedure(NArgs(1), opcodes)
+    program.add_procedure(NParams(1), opcodes)
 }
 
 pub trait Codegen {

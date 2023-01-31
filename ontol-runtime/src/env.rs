@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
-    vm::{EntryPoint, Program},
+    vm::{Procedure, Program},
     DefId, PackageId,
 };
 
@@ -12,7 +12,7 @@ use crate::{
 pub struct Env {
     pub domains: HashMap<PackageId, Domain>,
     pub program: Program,
-    pub translations: HashMap<(DefId, DefId), EntryPoint>,
+    pub translations: HashMap<(DefId, DefId), Procedure>,
     pub serde_operators: Vec<SerdeOperator>,
 }
 
@@ -21,7 +21,7 @@ impl Env {
         self.domains.get(&package_id)
     }
 
-    pub fn get_translator(&self, from: DefId, to: DefId) -> Option<EntryPoint> {
+    pub fn get_translator(&self, from: DefId, to: DefId) -> Option<Procedure> {
         self.translations.get(&(from, to)).cloned()
     }
 

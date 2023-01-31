@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use ontol_runtime::{
-    vm::{EntryPoint, Program},
+    vm::{Procedure, Program},
     DefId,
 };
 
@@ -19,7 +19,7 @@ use self::typed_expr::{NodeId, SealedTypedExprTable};
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
     pub result_program: Program,
-    pub result_translations: HashMap<(DefId, DefId), EntryPoint>,
+    pub result_translations: HashMap<(DefId, DefId), Procedure>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {

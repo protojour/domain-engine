@@ -15,8 +15,8 @@ fn assert_translate(
 
     let value = input_binding.deserialize(env, input).unwrap();
 
-    let entry_point = match env.get_translator(input_binding.def_id, output_binding.def_id) {
-        Some(entry_point) => entry_point,
+    let procedure = match env.get_translator(input_binding.def_id, output_binding.def_id) {
+        Some(procedure) => procedure,
         None => panic!(
             "No translator found for ({:?}, {:?})",
             input_binding.def_id, output_binding.def_id
@@ -24,12 +24,11 @@ fn assert_translate(
     };
 
     let mut vm = Vm::new(&env.program);
-
-    let value = vm.trace_eval(entry_point, vec![value]);
+    let value = vm.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(env, &value);
 
-    assert_eq!(output_json, expected);
+    assert_eq!(expected, output_json);
 }
 
 #[test]
@@ -53,7 +52,7 @@ fn test_eq_simple() {
             env,
             ("foo", "bar"),
             json!({ "f": "my_value"}),
-            json!({ "b": "my_value2"}),
+            json!({ "b": "my_value"}),
         );
         assert_translate(
             env,

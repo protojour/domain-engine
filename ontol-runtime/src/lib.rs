@@ -4,7 +4,6 @@ use derive_debug_extras::DebugExtras;
 
 pub mod env;
 pub mod serde;
-pub mod translation;
 pub mod value;
 pub mod vm;
 

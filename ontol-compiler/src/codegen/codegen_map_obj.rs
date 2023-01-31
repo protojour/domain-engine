@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_runtime::{
-    vm::{BuiltinProc, EntryPoint, Local, NArgs, OpCode, Program},
+    vm::{BuiltinProc, Local, NParams, OpCode, Procedure, Program},
     PropertyId,
 };
 use smallvec::{smallvec, SmallVec};
@@ -20,7 +20,7 @@ pub fn codegen_map_obj_origin<'m>(
     table: &TypedExprTable<'m>,
     origin_attrs: &HashMap<PropertyId, NodeId>,
     dest_node: NodeId,
-) -> EntryPoint {
+) -> Procedure {
     let (_, dest_expr) = table.get_expr(&table.target_rewrites, dest_node);
 
     let mut origin_properties: Vec<_> = origin_attrs
@@ -128,7 +128,7 @@ pub fn codegen_map_obj_origin<'m>(
 
     debug!("{opcodes:#?}");
 
-    program.add_procedure(NArgs(1), opcodes)
+    program.add_procedure(NParams(1), opcodes)
 }
 
 #[derive(Default)]
