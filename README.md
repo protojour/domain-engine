@@ -23,3 +23,19 @@ Ideal high level data flow:
 Any number of virtual machines may be created and executed in parallel, because of the immutable environment.
 
 In the future, we may support precompiled environments.
+
+## Testing
+
+Every feature must be properly tested and every encountered bug must have a regression test.
+
+Every language feature must have a test in `ontol-compiler/tests/compiler-integration`.
+
+Tests must use the `test_log::test` attribute for proper tracing.
+
+### Running tests and debugging
+
+* Run all the tests with `cargo test`.
+* Run a specific test with `cargo test {test_name}`.
+* To enable traces in a specific test, use `RUST_LOG=debug cargo test {test_name}`.
+
+Only failed tests print their log.
