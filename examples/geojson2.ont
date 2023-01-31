@@ -22,9 +22,9 @@
 ((type! n) (MultiPoint n))
 ((type! n) (MultiLineString n))
 
-(is! Point Geometry)
-(is! MultiPoint Geometry)
-(is! MultiLineString Geometry)
+(rel! Geometry _ Point)
+(rel! Geometry _ MultiPoint)
+(rel! Geometry _ MultiLineString)
 
 (rel! Point type "Point")
 (rel! MultiPoint type "MultiPoint")

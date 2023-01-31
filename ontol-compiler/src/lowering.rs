@@ -223,7 +223,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
                 Entry::Occupied(occupied) => ImplicitDefId::Reused(occupied.get().clone()),
             },
-            None => ImplicitDefId::New(self.compiler.defs.alloc_def_id()),
+            None => ImplicitDefId::Reused(self.compiler.defs.anonymous_relation()),
         }
     }
 

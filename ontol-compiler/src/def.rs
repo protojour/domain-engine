@@ -77,20 +77,42 @@ impl Relation {
 pub struct Defs {
     next_def_id: DefId,
     next_expr_id: ExprId,
+    anonymous_relation: DefId,
     pub(crate) map: HashMap<DefId, Def>,
 }
 
 impl Default for Defs {
     fn default() -> Self {
-        Self {
+        let mut defs = Self {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
+            anonymous_relation: DefId(0),
             map: Default::default(),
-        }
+        };
+
+        // Add some extremely fundamental definitions here already.
+        // These are even independent from CORE being defined.
+
+        // The anonymous / "manifested-as" relation
+        defs.anonymous_relation = defs.add_def(
+            DefKind::Relation(Relation {
+                ident: None,
+                subject_prop: None,
+                object_prop: None,
+            }),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
+
+        defs
     }
 }
 
 impl Defs {
+    pub fn anonymous_relation(&self) -> DefId {
+        self.anonymous_relation
+    }
+
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&DefKind> {
         self.map.get(&def_id).map(|def| &def.kind)
     }
