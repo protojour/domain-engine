@@ -1,4 +1,4 @@
-use ontol_runtime::{env::Env, vm::Vm};
+use ontol_runtime::{env::Env, translate::Translator};
 use serde_json::json;
 use test_log::test;
 
@@ -23,8 +23,8 @@ fn assert_translate(
         ),
     };
 
-    let mut vm = Vm::new(&env.lib);
-    let value = vm.trace_eval(procedure, [value]);
+    let mut translator = Translator::new(&env.lib);
+    let value = translator.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(env, &value);
 

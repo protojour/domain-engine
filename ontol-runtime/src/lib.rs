@@ -4,9 +4,12 @@ use derive_debug_extras::DebugExtras;
 
 pub mod env;
 pub mod proc;
+pub mod property_probe;
 pub mod serde;
+pub mod translate;
 pub mod value;
-pub mod vm;
+
+mod vm;
 
 /// Identifies one "package" of ONTOL code.
 /// One package represents a domain,

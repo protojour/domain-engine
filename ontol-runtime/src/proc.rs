@@ -2,12 +2,6 @@ use derive_debug_extras::DebugExtras;
 
 use crate::PropertyId;
 
-#[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
-pub struct Local(pub u32);
-
-#[derive(Clone, Copy, Debug)]
-pub struct NParams(pub u8);
-
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
 /// Handles to procedures are held outside the Lib itself.
@@ -39,6 +33,10 @@ pub struct Procedure {
     pub(crate) n_params: NParams,
 }
 
+/// The number of parameters to a procedure.
+#[derive(Clone, Copy, Debug)]
+pub struct NParams(pub u8);
+
 /// ONTOL opcode.
 #[derive(DebugExtras)]
 pub enum OpCode {
@@ -61,6 +59,10 @@ pub enum OpCode {
     /// Push a constant to the stack.
     Constant(i64),
 }
+
+/// A reference to a local on the value stack during procedure execution.
+#[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
+pub struct Local(pub u32);
 
 /// Builtin procedures.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
