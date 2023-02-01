@@ -9,8 +9,8 @@ use crate::{value::Value, DefId};
 
 use super::{
     deserialize_matcher::{
-        ConstantStringMatcher, MapMatchError, NumberMatcher, StringMatcher, UnionMatcher,
-        ValueMatcher,
+        ConstantStringMatcher, MapMatchError, NumberMatcher, StringMatcher, TupleMatcher,
+        UnionMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry,
 };
@@ -59,6 +59,16 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 MatcherVisitor {
                     matcher: ConstantStringMatcher {
                         literal: &lit,
+                        def_id: *def_id,
+                    },
+                    registry: self.registry,
+                },
+            ),
+            SerdeOperator::Tuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
+                deserializer,
+                MatcherVisitor {
+                    matcher: TupleMatcher {
+                        elements: elems,
                         def_id: *def_id,
                     },
                     registry: self.registry,
@@ -143,6 +153,36 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
 
         Ok((Value::String(v.into()), def_id))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let vec_def_id = self
+            .matcher
+            .match_seq()
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
+
+        let mut index = 0;
+        let mut output = vec![];
+
+        loop {
+            let processor = match self.matcher.match_seq_element(index) {
+                Some(operator_id) => self.registry.make_processor(operator_id),
+                None => {
+                    return Ok((Value::Vec(output), vec_def_id));
+                }
+            };
+
+            match seq.next_element_seed(processor)? {
+                Some((value, _elem_def_id)) => {
+                    output.push(value);
+                    index += 1;
+                }
+                None => return Err(serde::de::Error::invalid_length(index, &self)),
+            }
+        }
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -256,7 +296,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             )));
         }
 
-        Ok((Value::Compound(attributes), self.map_type.type_def_id))
+        Ok((Value::Map(attributes), self.map_type.type_def_id))
     }
 }
 

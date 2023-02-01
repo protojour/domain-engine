@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
+use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
@@ -25,8 +26,9 @@ pub struct Def {
 pub enum DefKind {
     Primitive(Primitive),
     StringLiteral(String),
+    Tuple(SmallVec<[DefId; 4]>),
     CoreFn(BuiltinProc),
-    Type(String),
+    DomainType(String),
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
@@ -34,17 +36,18 @@ pub enum DefKind {
 }
 
 impl DefKind {
-    pub fn diagnostics_identifier(&self) -> Option<Cow<str>> {
+    pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
+            Self::Tuple(_) => None,
             Self::CoreFn(_) => None,
-            Self::Type(ident) => Some(ident.as_str().into()),
+            Self::DomainType(ident) => Some(ident.as_str().into()),
             Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
             Self::Property(_) => None,
-            Self::Equivalence(_, _, _) => Some("eq!".into()),
+            Self::Equivalence(_, _, _) => None,
         }
     }
 }
@@ -95,8 +98,11 @@ pub struct Defs {
     next_def_id: DefId,
     next_expr_id: ExprId,
     anonymous_relation: DefId,
+    number: DefId,
+    string: DefId,
     pub(crate) map: HashMap<DefId, Def>,
     pub(crate) string_literals: HashMap<String, DefId>,
+    pub(crate) tuples: HashMap<SmallVec<[DefId; 4]>, DefId>,
 }
 
 impl Default for Defs {
@@ -105,8 +111,11 @@ impl Default for Defs {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             anonymous_relation: DefId(0),
+            number: DefId(0),
+            string: DefId(0),
             map: Default::default(),
             string_literals: Default::default(),
+            tuples: Default::default(),
         };
 
         // Add some extremely fundamental definitions here already.
@@ -122,6 +131,16 @@ impl Default for Defs {
             CORE_PKG,
             SourceSpan::none(),
         );
+        defs.number = defs.add_def(
+            DefKind::Primitive(Primitive::Number),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
+        defs.string = defs.add_def(
+            DefKind::Primitive(Primitive::String),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
 
         defs
     }
@@ -130,6 +149,14 @@ impl Default for Defs {
 impl Defs {
     pub fn anonymous_relation(&self) -> DefId {
         self.anonymous_relation
+    }
+
+    pub fn number(&self) -> DefId {
+        self.number
+    }
+
+    pub fn string(&self) -> DefId {
+        self.string
     }
 
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&DefKind> {
@@ -190,6 +217,21 @@ impl Defs {
         }
     }
 
+    pub fn def_tuple(&mut self, elements: SmallVec<[DefId; 4]>) -> DefId {
+        match self.tuples.get(elements.as_slice()) {
+            Some(def_id) => *def_id,
+            None => {
+                let def_id = self.add_def(
+                    DefKind::Tuple(elements.clone()),
+                    CORE_PKG,
+                    SourceSpan::none(),
+                );
+                self.tuples.insert(elements, def_id);
+                def_id
+            }
+        }
+    }
+
     pub fn get_string_literal(&self, def_id: DefId) -> &str {
         match self.get_def_kind(def_id) {
             Some(DefKind::StringLiteral(lit)) => &lit,
@@ -231,43 +273,53 @@ impl<'m> Compiler<'m> {
             },
         );
 
-        let num = self.types.intern(Type::Number);
+        // fundamental types
+        let num_ty = self.types.intern(Type::Number(self.defs.number));
+        let string_ty = self.types.intern(Type::String(self.defs.string));
+
+        // add fundamental types to core namespace
+        let num = self.def_core_type("number", self.defs.number, num_ty);
+        let string = self.def_core_type("string", self.defs.string, string_ty);
+
         let num_num = self.types.intern([num, num]);
-        let str = self.types.intern(Type::String);
-        let str_str = self.types.intern([str, str]);
+        let string_string = self.types.intern([string, string]);
 
         let num_num_to_num = self.types.intern(Type::Function {
             params: num_num,
             output: num,
         });
-        let str_str_to_str = self.types.intern(Type::Function {
-            params: str_str,
-            output: str,
+        let string_string_to_string = self.types.intern(Type::Function {
+            params: string_string,
+            output: string,
         });
-
-        // Built-in types
-        self.add_core_def("number", DefKind::Primitive(Primitive::Number), num);
-        self.add_core_def("string", DefKind::Primitive(Primitive::String), str);
 
         // Built-in functions
         // arithmetic
-        self.add_core_def("+", DefKind::CoreFn(BuiltinProc::Add), num_num_to_num);
-        self.add_core_def("-", DefKind::CoreFn(BuiltinProc::Sub), num_num_to_num);
-        self.add_core_def("*", DefKind::CoreFn(BuiltinProc::Mul), num_num_to_num);
-        self.add_core_def("/", DefKind::CoreFn(BuiltinProc::Div), num_num_to_num);
+        self.def_core_proc("+", DefKind::CoreFn(BuiltinProc::Add), num_num_to_num);
+        self.def_core_proc("-", DefKind::CoreFn(BuiltinProc::Sub), num_num_to_num);
+        self.def_core_proc("*", DefKind::CoreFn(BuiltinProc::Mul), num_num_to_num);
+        self.def_core_proc("/", DefKind::CoreFn(BuiltinProc::Div), num_num_to_num);
 
         // string manipulation
-        self.add_core_def(
+        self.def_core_proc(
             "append",
             DefKind::CoreFn(BuiltinProc::Append),
-            str_str_to_str,
+            string_string_to_string,
         );
 
         self
     }
 
-    fn add_core_def(&mut self, name: &str, def_kind: DefKind, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(name, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
+    fn def_core_type(&mut self, ident: &str, def_id: DefId, ty: TypeRef<'m>) -> TypeRef<'m> {
+        self.namespaces
+            .get_mut(CORE_PKG, Space::Type)
+            .insert(ident.into(), def_id);
+        self.def_types.map.insert(def_id, ty);
+        ty
+    }
+
+    fn def_core_proc(&mut self, ident: &str, def_kind: DefKind, ty: TypeRef<'m>) -> DefId {
+        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
         self.def_types.map.insert(def_id, ty);
 
         def_id

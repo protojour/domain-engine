@@ -186,7 +186,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (domain_type, node_id)
             }
             ExprKind::Constant(k) => {
-                let ty = self.types.intern(Type::Number);
+                let ty = self.def_types.map.get(&self.defs.number()).unwrap();
                 let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
                     ty,
                     kind: TypedExprKind::Constant(*k),

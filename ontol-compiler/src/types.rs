@@ -19,11 +19,12 @@ pub enum Type<'m> {
     Tautology,
     NumericConstant(i32),
     /// Any number
-    Number,
+    Number(DefId),
     /// Any string
-    String,
+    String(DefId),
     /// A specific string
     StringConstant(DefId),
+    Tuple(&'m [TypeRef<'m>]),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
     Function {
@@ -34,6 +35,23 @@ pub enum Type<'m> {
     Domain(DefId),
     Infer(TypeVar<'m>),
     Error,
+}
+
+impl<'m> Type<'m> {
+    pub fn get_single_def_id(&self) -> Option<DefId> {
+        match self {
+            Self::Tautology => None,
+            Self::NumericConstant(_) => todo!(),
+            Self::Number(def_id) => Some(*def_id),
+            Self::String(def_id) => Some(*def_id),
+            Self::StringConstant(def_id) => Some(*def_id),
+            Self::Tuple(_) => None,
+            Self::Function { .. } => None,
+            Self::Domain(def_id) => Some(*def_id),
+            Self::Infer(_) => None,
+            Self::Error => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -83,6 +101,21 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
     }
 }
 
+impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
+    type Facade = &'m [TypeRef<'m>];
+
+    fn intern(&mut self, types: Vec<TypeRef<'m>>) -> Self::Facade {
+        match self.slices.get(types.as_slice()) {
+            Some(slice) => slice,
+            None => {
+                let slice = self.mem.bump.alloc_slice_fill_iter(types.into_iter());
+                self.slices.insert(slice);
+                slice
+            }
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
     pub map: HashMap<DefId, TypeRef<'m>>,
@@ -92,8 +125,8 @@ pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
     match ty {
         Type::Tautology => format!("tautology"),
         Type::NumericConstant(val) => format!("number({})", val),
-        Type::Number => format!("number"),
-        Type::String => format!("string"),
+        Type::Number(_) => format!("number"),
+        Type::String(_) => format!("string"),
         Type::StringConstant(def_id) => {
             let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
                 panic!();
@@ -101,8 +134,22 @@ pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
 
             format!("\"{lit}\"")
         }
+        Type::Tuple(elements) => {
+            let elements = elements
+                .iter()
+                .map(|element| format_type(element, defs))
+                .collect::<Vec<_>>()
+                .join("");
+
+            format!("[{elements}]")
+        }
         Type::Function { .. } => format!("function"),
-        Type::Domain(_) => format!("domain(FIXME)"),
+        Type::Domain(def_id) => defs
+            .get_def_kind(*def_id)
+            .unwrap()
+            .opt_identifier()
+            .unwrap()
+            .into(),
         Type::Infer(_) => format!("?infer"),
         Type::Error => format!("error!"),
     }

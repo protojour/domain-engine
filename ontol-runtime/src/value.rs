@@ -9,5 +9,7 @@ pub enum Value {
     // TODO: Big rational numbers
     Number(i64),
     String(String),
-    Compound(HashMap<PropertyId, Value>),
+    Map(HashMap<PropertyId, Value>),
+    // Represents both dynamic lists and static tuples at runtime:
+    Vec(Vec<Value>),
 }

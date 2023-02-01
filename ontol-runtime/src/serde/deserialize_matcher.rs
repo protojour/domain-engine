@@ -4,7 +4,8 @@ use crate::{discriminator::Discriminant, DefId};
 
 use super::{
     deserialize::{LogicOp, Missing},
-    MapType, SerdeOperator, SerdeRegistry, ValueUnionDiscriminator, ValueUnionType,
+    MapType, SerdeOperator, SerdeOperatorId, SerdeRegistry, ValueUnionDiscriminator,
+    ValueUnionType,
 };
 
 /// Trait for matching incoming types for deserialization
@@ -21,6 +22,14 @@ pub trait ValueMatcher {
 
     fn match_str(&self, _: &str) -> Result<DefId, ()> {
         Err(())
+    }
+
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Err(())
+    }
+
+    fn match_seq_element(&self, _: usize) -> Option<SerdeOperatorId> {
+        None
     }
 
     fn match_map(&self) -> Result<MapMatcher, ()> {
@@ -74,6 +83,30 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
             Ok(self.def_id)
         } else {
             Err(())
+        }
+    }
+}
+
+/// match a tuple
+pub struct TupleMatcher<'e> {
+    pub elements: &'e [SerdeOperatorId],
+    pub def_id: DefId,
+}
+
+impl<'e> ValueMatcher for TupleMatcher<'e> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "tuple with length {}", self.elements.len())
+    }
+
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.def_id)
+    }
+
+    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+        if index < self.elements.len() {
+            Some(self.elements[index])
+        } else {
+            None
         }
     }
 }

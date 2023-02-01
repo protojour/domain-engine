@@ -178,7 +178,7 @@ mod rules {
 
 #[cfg(test)]
 mod tests {
-    use ontol_runtime::proc::BuiltinProc;
+    use ontol_runtime::{proc::BuiltinProc, DefId};
     use tracing::info;
 
     use super::rewrite;
@@ -193,7 +193,7 @@ mod tests {
     fn rewrite_test() {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
-        let number = compiler.types.intern(Type::Number);
+        let number = compiler.types.intern(Type::Number(DefId(42)));
 
         let mut table = TypedExprTable::default();
         let var = table.add_expr(TypedExpr {

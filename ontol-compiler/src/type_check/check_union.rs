@@ -9,8 +9,12 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta, def::Def, error::CompileError, relation::SubjectProperties,
-    types::Type, SourceSpan, SpannedCompileError,
+    compiler_queries::GetPropertyMeta,
+    def::Def,
+    error::CompileError,
+    relation::SubjectProperties,
+    types::{format_type, Type},
+    SourceSpan, SpannedCompileError,
 };
 
 use super::TypeCheck;
@@ -61,8 +65,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_ty = self.def_types.map.get(&object_def).unwrap();
 
             match object_ty {
-                Type::Number => builder.number = Some(NumberDiscriminator(object_def)),
-                Type::String => {
+                Type::Number(_) => builder.number = Some(NumberDiscriminator(object_def)),
+                Type::String(_) => {
                     builder.string = StringDiscriminator::Any(object_def);
                 }
                 Type::StringConstant(def_id) => {
@@ -175,7 +179,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("trying rel {relationship:?} {relation:?} ty: {object_ty:?}");
 
             match object_ty {
-                Type::NumericConstant(num) => {
+                Type::NumericConstant(_) => {
                     todo!("Cannot match against numeric constants yet");
                 }
                 Type::StringConstant(def_id) => {
@@ -296,12 +300,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
-                let def = self.defs.map.get(&def_id);
-                CompileError::UnitTypePartOfUnion(
-                    def.and_then(|def| def.kind.diagnostics_identifier())
-                        .unwrap_or_else(|| "?".into())
-                        .into(),
-                )
+                let ty = self.def_types.map.get(&def_id).unwrap();
+                CompileError::UnitTypePartOfUnion(format_type(ty, self.defs))
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,

@@ -28,13 +28,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .expect("BUG: definition not found");
 
         match &def.kind {
-            DefKind::Type(_) => {
+            DefKind::DomainType(_) => {
                 let ty = self.types.intern(Type::Domain(def_id));
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
             DefKind::StringLiteral(_) => {
                 let ty = self.types.intern(Type::StringConstant(def_id));
+                self.def_types.map.insert(def_id, ty);
+                ty
+            }
+            DefKind::Tuple(element_defs) => {
+                let element_types = element_defs
+                    .iter()
+                    .map(|e| self.check_def(*e))
+                    .collect::<Vec<_>>();
+                let element_types = self.types.intern(element_types);
+                let ty = self.types.intern(Type::Tuple(element_types));
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
@@ -66,7 +76,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.types.intern(Type::Tautology)
             }
-            DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number),
+            DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number(def_id)),
             DefKind::Equivalence(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),

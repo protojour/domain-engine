@@ -1,8 +1,8 @@
-use serde::ser::SerializeMap;
+use serde::ser::{SerializeMap, SerializeSeq};
 
 use crate::value::Value;
 
-use super::{MapType, SerdeOperator, SerdeProcessor};
+use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
@@ -16,6 +16,9 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Number(_) => self.serialize_number(value, serializer),
             SerdeOperator::String(_) => self.serialize_string(value, serializer),
             SerdeOperator::StringConstant(_, _) => self.serialize_string(value, serializer),
+            SerdeOperator::Tuple(operator_ids, _) => {
+                self.serialize_vec(value, operator_ids, serializer)
+            }
             SerdeOperator::ValueType(value_type) => self
                 .registry
                 .make_processor(value_type.property.operator_id)
@@ -41,6 +44,28 @@ impl<'e> SerdeProcessor<'e> {
         }
     }
 
+    fn serialize_vec<S: serde::Serializer>(
+        &self,
+        value: &Value,
+        operator_ids: &[SerdeOperatorId],
+        serializer: S,
+    ) -> Res<S> {
+        match value {
+            Value::Vec(elements) => {
+                let mut seq = serializer.serialize_seq(Some(elements.len()))?;
+                for (value, operator_id) in elements.iter().zip(operator_ids) {
+                    seq.serialize_element(&Proxy {
+                        value,
+                        processor: self.registry.make_processor(*operator_id),
+                    })?;
+                }
+
+                todo!()
+            }
+            other => panic!("BUG: Serialize expected vector, got {other:?}"),
+        }
+    }
+
     fn serialize_map<S: serde::Serializer>(
         &self,
         map_type: &MapType,
@@ -48,7 +73,7 @@ impl<'e> SerdeProcessor<'e> {
         serializer: S,
     ) -> Res<S> {
         let attributes = match value {
-            Value::Compound(attributes) => attributes,
+            Value::Map(attributes) => attributes,
             other => panic!("BUG: Serialize expected compound attributes, got {other:?}"),
         };
 

@@ -42,6 +42,14 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
             let (kind, _) = ty_stream.next_sym_msg("")?;
 
             let ty = match kind.as_str() {
+                "tuple!" => {
+                    let mut elems = vec![];
+                    while ty_stream.peek_any() {
+                        elems.push(parse_type(&mut ty_stream)?);
+                    }
+
+                    Type::Tuple(elems)
+                }
                 _ => Type::Sym(kind),
             };
 

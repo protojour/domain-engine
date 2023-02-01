@@ -53,7 +53,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Ast::Type((ident, _)) => {
                 let def_id = self.named_def_id(Space::Type, &ident);
-                self.set_def(def_id, DefKind::Type(ident), &span);
+                self.set_def(def_id, DefKind::DomainType(ident), &span);
                 Ok(Some(def_id))
             }
             ast::Ast::Rel(ast::Rel {
@@ -127,6 +127,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.compiler.defs.def_string_literal(lit))
             }
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
+            ast::Type::Tuple(elements) => {
+                let element_defs = elements
+                    .into_iter()
+                    .map(|element| self.ast_type_to_def(element))
+                    .collect::<Result<_, _>>()?;
+
+                Ok(self.compiler.defs.def_tuple(element_defs))
+            }
         }
     }
 

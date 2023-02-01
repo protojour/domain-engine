@@ -59,7 +59,7 @@ pub fn codegen_map_obj_origin<'m>(
     match &dest_expr.kind {
         TypedExprKind::MapObj(dest_attrs) => {
             // Local(1), this is the return value:
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap));
 
             for (property_id, node) in dest_attrs {
                 map_codegen.codegen_expr(table, *node, &mut opcodes);

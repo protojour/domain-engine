@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt::Debug};
 
 use indexmap::IndexMap;
+use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{discriminator::VariantDiscriminator, DefId, PropertyId};
@@ -55,6 +56,7 @@ pub enum SerdeOperator {
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),
+    Tuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
     // A type with just one anonymous property
     ValueType(ValueType),
     // A type with multiple anonymous properties, equivalent to a union of types
@@ -70,6 +72,7 @@ impl SerdeOperator {
             Self::Number(_) => "number".into(),
             Self::String(_) => "string".into(),
             Self::StringConstant(lit, _) => format!("\"{lit}\"").into(),
+            Self::Tuple(_, _) => "tuple".into(),
             Self::ValueType(value_type) => value_type.typename.as_str().into(),
             Self::ValueUnionType(_) => "union".into(),
             Self::MapType(map_type) => map_type.typename.as_str().into(),

@@ -72,5 +72,5 @@ pub enum BuiltinProc {
     Mul,
     Div,
     Append,
-    NewCompound,
+    NewMap,
 }

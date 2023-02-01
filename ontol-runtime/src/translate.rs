@@ -132,7 +132,7 @@ impl ValueStack {
                 let [a, b]: [String; 2] = self.pop_n();
                 Value::String(a + b)
             }
-            BuiltinProc::NewCompound => Value::Compound([].into()),
+            BuiltinProc::NewMap => Value::Map([].into()),
         }
     }
 
@@ -148,7 +148,7 @@ impl ValueStack {
 
     fn compound_local_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, Value> {
         match self.local_mut(local) {
-            Value::Compound(hash_map) => hash_map,
+            Value::Map(hash_map) => hash_map,
             _ => panic!("Value at {local:?} is not a compound value"),
         }
     }
@@ -223,7 +223,7 @@ mod tests {
         let proc = lib.add_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewCompound),
+                OpCode::CallBuiltin(BuiltinProc::NewMap),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::PutAttr(Local(1), PropertyId(3)),
                 OpCode::TakeAttr(Local(0), PropertyId(2)),
@@ -235,7 +235,7 @@ mod tests {
         let mut vm = Translator::new(&lib);
         let output = vm.trace_eval(
             proc,
-            [Value::Compound(
+            [Value::Map(
                 [
                     (PropertyId(1), Value::String("foo".into())),
                     (PropertyId(2), Value::String("bar".into())),
@@ -244,7 +244,7 @@ mod tests {
             )],
         );
 
-        let Value::Compound(map) = output else {
+        let Value::Map(map) = output else {
             panic!();
         };
         let properties = map.keys().cloned().collect::<HashSet<_>>();
@@ -273,7 +273,7 @@ mod tests {
         let translate = lib.add_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewCompound),
+                OpCode::CallBuiltin(BuiltinProc::NewMap),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::Call(double),
                 OpCode::PutAttr(Local(1), PropertyId(4)),
@@ -288,7 +288,7 @@ mod tests {
         let mut vm = Translator::new(&lib);
         let output = vm.trace_eval(
             translate,
-            [Value::Compound(
+            [Value::Map(
                 [
                     (PropertyId(1), Value::Number(333)),
                     (PropertyId(2), Value::Number(10)),
@@ -298,7 +298,7 @@ mod tests {
             )],
         );
 
-        let Value::Compound(mut map) = output else {
+        let Value::Map(mut map) = output else {
             panic!();
         };
         let Value::Number(a) = map.remove(&PropertyId(4)).unwrap() else {

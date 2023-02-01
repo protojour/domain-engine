@@ -8,6 +8,7 @@ use ontol_runtime::{
     },
     DefId,
 };
+use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -16,7 +17,7 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{DefKind, Defs},
     relation::{Properties, Relations, SubjectProperties},
-    types::{DefTypes, Type},
+    types::{DefTypes, Type, TypeRef},
 };
 
 impl<'m> Compiler<'m> {
@@ -62,11 +63,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match self.get_def_type(type_def_id) {
-            Some(Type::Number) => Some((
+            Some(Type::NumericConstant(_)) => todo!(),
+            Some(Type::Number(_)) => Some((
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::Number(type_def_id),
             )),
-            Some(Type::String) => Some((
+            Some(Type::String(_)) => Some((
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::String(type_def_id),
             )),
@@ -79,10 +81,24 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
+            Some(Type::Tuple(types)) => {
+                let operator_ids = types
+                    .iter()
+                    .map(|ty| {
+                        ty.get_single_def_id()
+                            .and_then(|def_id| self.get_serde_operator_id(def_id))
+                    })
+                    .collect::<Option<SmallVec<_>>>()?;
+
+                Some((
+                    self.alloc_operator_id(type_def_id),
+                    SerdeOperator::Tuple(operator_ids, type_def_id),
+                ))
+            }
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::Type(ident)) => ident.clone(),
+                    Some(DefKind::DomainType(ident)) => ident.clone(),
                     _ => "Unknown type".into(),
                 };
                 let operator_id = self.alloc_operator_id(type_def_id);
@@ -91,10 +107,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.create_domain_type_serde_operator(typename, *def_id, properties),
                 ))
             }
-            ty => {
-                debug!("No serde operator for {ty:?}");
-                None
+            Some(Type::Function { .. }) => None,
+            Some(Type::Tautology | Type::Infer(_) | Type::Error) => {
+                panic!("crap: {:?}", self.get_def_type(type_def_id));
             }
+            None => panic!("No type available"),
         }
     }
 

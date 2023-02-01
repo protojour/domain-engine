@@ -159,7 +159,7 @@ fn codegen_value_obj_origin<'m>(
             opcodes.push(OpCode::Return0);
         }
         TypedExprKind::MapObj(dest_attrs) => {
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewCompound));
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap));
 
             // the input value is not compound, so it will be consumed.
             // Therefore it must be top of the stack:

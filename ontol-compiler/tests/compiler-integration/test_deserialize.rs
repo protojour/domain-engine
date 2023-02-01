@@ -21,7 +21,7 @@ fn deserialize_empty_type() {
         );
         assert_matches!(
             foo.deserialize(env, json!({})),
-            Ok(Value::Compound(attrs)) if attrs.is_empty()
+            Ok(Value::Map(attrs)) if attrs.is_empty()
         );
     });
 }
@@ -79,7 +79,7 @@ fn deserialize_object_properties() {
         let obj = TypeBinding::new(env, "obj");
         assert_matches!(
             obj.deserialize(env, json!({ "a": "hei", "b": 42 })),
-            Ok(Value::Compound(_))
+            Ok(Value::Map(_))
         );
 
         assert_error_msg!(
@@ -113,7 +113,7 @@ fn deserialize_nested() {
                 },
                 "three": "b"
             })),
-            Ok(Value::Compound(a)) if a.len() == 2
+            Ok(Value::Map(a)) if a.len() == 2
         );
     });
 }
@@ -189,6 +189,33 @@ fn deserialize_string_constant() {
 }
 
 #[test]
+fn deserialize_tuple() {
+    r#"
+    (type! foo)
+    (rel! (foo) _ (tuple! (number) "a"))
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize(env, json!([42, "a"])),
+            Ok(Value::Vec(vector)) if vector.len() == 2
+        );
+        assert_error_msg!(
+            foo.deserialize(env, json!([77])),
+            "invalid length 1, expected tuple with length 2 at line 1 column 4"
+        );
+        assert_error_msg!(
+            foo.deserialize(env, json!([11, "a", "boom"])),
+            "trailing characters at line 1 column 9"
+        );
+        assert_error_msg!(
+            foo.deserialize(env, json!([14, "b"])),
+            r#"invalid type: string "b", expected "a" at line 1 column 7"#
+        );
+    });
+}
+
+#[test]
 fn deserialize_string_union() {
     r#"
     (type! foo)
@@ -208,7 +235,7 @@ fn deserialize_string_union() {
     });
 }
 
-#[test_log::test]
+#[test]
 fn deserialize_map_union() {
     r#"
     (type! foo)
@@ -225,14 +252,15 @@ fn deserialize_map_union() {
         let union = TypeBinding::new(env, "union");
         assert_matches!(
             union.deserialize_variant(env, json!({ "variant": "foo" })),
-            Ok(Value::Compound(map)) if map.len() == 1
+            Ok(Value::Map(map)) if map.len() == 1
         );
         assert_matches!(
             union.deserialize_variant(env, json!({ "variant": "bar", "prop": 42 })),
-            Ok(Value::Compound(map)) if map.len() == 2
+            Ok(Value::Map(map)) if map.len() == 2
         );
         assert_error_msg!(
             union.deserialize_variant(env, json!("junk")),
+            // FIXME: This error: should be about `union` instead of foo or bar?
             r#"invalid type: string "junk", expected `foo` or `bar` at line 1 column 6"#
         );
         assert_error_msg!(
