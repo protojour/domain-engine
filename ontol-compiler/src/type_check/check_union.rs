@@ -51,6 +51,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     UnionCheckError::DuplicateAnonymousRelation,
                     span,
                 );
+                continue;
             }
 
             let object_ty = self.def_types.map.get(&object_def).unwrap();

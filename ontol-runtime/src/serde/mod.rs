@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use crate::{discriminator::VariantDiscriminator, DefId, PropertyId};
 
 mod deserialize;
-mod deserialize_union;
+mod deserialize_matcher;
 mod serialize;
 
 /// SerdeOperator is handle serializing and deserializing domain types in an optimized way.

@@ -1,25 +1,26 @@
 use std::{collections::HashMap, fmt::Display};
 
 use indexmap::IndexMap;
+use serde::de::Unexpected;
 use smartstring::alias::String;
 
 use crate::{value::Value, DefId};
 
 use super::{
-    deserialize_union::UnionVisitor, MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
-    SerdeRegistry,
+    deserialize_matcher::{Matcher, NumberMatcher, StringMatcher, UnionMatcher},
+    MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry,
 };
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s>(&'s IndexMap<String, SerdeProperty>);
 
-struct NumberVisitor(DefId);
-
-struct StringVisitor(DefId);
-
 struct MapTypeVisitor<'e> {
     map_type: &'e MapType,
     registry: SerdeRegistry<'e>,
+}
+
+struct TypeVisitor<M> {
+    matcher: M,
 }
 
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
@@ -33,12 +34,18 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Unit => {
                 panic!("This should not be used");
             }
-            SerdeOperator::Number(def_id) => {
-                serde::de::Deserializer::deserialize_i64(deserializer, NumberVisitor(*def_id))
-            }
-            SerdeOperator::String(def_id) => {
-                serde::de::Deserializer::deserialize_str(deserializer, StringVisitor(*def_id))
-            }
+            SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
+                deserializer,
+                TypeVisitor {
+                    matcher: NumberMatcher(*def_id),
+                },
+            ),
+            SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
+                deserializer,
+                TypeVisitor {
+                    matcher: StringMatcher(*def_id),
+                },
+            ),
             SerdeOperator::ValueType(value_type) => {
                 let (value, _value_def_id) = self
                     .registry
@@ -50,9 +57,11 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::ValueUnionType(value_union_type) => {
                 serde::de::Deserializer::deserialize_any(
                     deserializer,
-                    UnionVisitor {
-                        value_union_type,
-                        registry: self.registry,
+                    TypeVisitor {
+                        matcher: UnionMatcher {
+                            value_union_type,
+                            registry: self.registry,
+                        },
                     },
                 )
             }
@@ -67,23 +76,28 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     }
 }
 
-impl<'de> serde::de::Visitor<'de> for NumberVisitor {
+impl<'de, M: Matcher> serde::de::Visitor<'de> for TypeVisitor<M> {
     type Value = (Value, DefId);
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "number")
+        self.matcher.expecting(f)
     }
 
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
+        let def_id = self
+            .matcher
+            .match_u64(v)
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unsigned(v), &self))?;
+
         Ok((
             Value::Number(
                 v.try_into()
                     .map_err(|_| serde::de::Error::custom(format!("u64 overflow")))?,
             ),
-            self.0,
+            def_id,
         ))
     }
 
@@ -91,22 +105,24 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
     where
         E: serde::de::Error,
     {
-        Ok((Value::Number(v), self.0))
-    }
-}
+        let def_id = self
+            .matcher
+            .match_i64(v)
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Signed(v), &self))?;
 
-impl<'de> serde::de::Visitor<'de> for StringVisitor {
-    type Value = (Value, DefId);
-
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "string")
+        Ok((Value::Number(v), def_id))
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok((Value::String(v.into()), self.0))
+        let def_id = self
+            .matcher
+            .match_str(v)
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
+
+        Ok((Value::String(v.into()), def_id))
     }
 }
 
@@ -164,7 +180,7 @@ impl<'s, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s> {
     }
 }
 
-impl<'s, 'm, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
+impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
     type Value = SerdeProperty;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
