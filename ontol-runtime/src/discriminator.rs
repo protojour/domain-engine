@@ -18,4 +18,5 @@ pub enum Discriminant {
     IsNumber,
     IsString,
     HasProperty(PropertyId, String),
+    HasStringAttribute(PropertyId, String, String),
 }

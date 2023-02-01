@@ -1,26 +1,30 @@
 use std::{collections::HashMap, fmt::Display};
 
 use indexmap::IndexMap;
-use serde::de::Unexpected;
+use serde::de::{DeserializeSeed, Unexpected};
 use smartstring::alias::String;
 
 use crate::{value::Value, DefId};
 
 use super::{
-    deserialize_matcher::{Matcher, NumberMatcher, StringMatcher, UnionMatcher},
+    deserialize_matcher::{
+        MapMatchError, NumberMatcher, StringMatcher, UnionMatcher, ValueMatcher,
+    },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry,
 };
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s>(&'s IndexMap<String, SerdeProperty>);
 
-struct MapTypeVisitor<'e> {
-    map_type: &'e MapType,
+struct MatcherVisitor<'e, M> {
+    matcher: M,
     registry: SerdeRegistry<'e>,
 }
 
-struct TypeVisitor<M> {
-    matcher: M,
+struct MapTypeVisitor<'e> {
+    tmp_values: IndexMap<String, serde_value::Value>,
+    map_type: &'e MapType,
+    registry: SerdeRegistry<'e>,
 }
 
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
@@ -36,14 +40,16 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             }
             SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
-                TypeVisitor {
+                MatcherVisitor {
                     matcher: NumberMatcher(*def_id),
+                    registry: self.registry,
                 },
             ),
             SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
                 deserializer,
-                TypeVisitor {
+                MatcherVisitor {
                     matcher: StringMatcher(*def_id),
+                    registry: self.registry,
                 },
             ),
             SerdeOperator::ValueType(value_type) => {
@@ -57,17 +63,19 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::ValueUnionType(value_union_type) => {
                 serde::de::Deserializer::deserialize_any(
                     deserializer,
-                    TypeVisitor {
+                    MatcherVisitor {
                         matcher: UnionMatcher {
                             value_union_type,
                             registry: self.registry,
                         },
+                        registry: self.registry,
                     },
                 )
             }
             SerdeOperator::MapType(map_type) => serde::de::Deserializer::deserialize_map(
                 deserializer,
                 MapTypeVisitor {
+                    tmp_values: IndexMap::new(),
                     map_type,
                     registry: self.registry,
                 },
@@ -76,7 +84,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     }
 }
 
-impl<'de, M: Matcher> serde::de::Visitor<'de> for TypeVisitor<M> {
+impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M> {
     type Value = (Value, DefId);
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -124,6 +132,60 @@ impl<'de, M: Matcher> serde::de::Visitor<'de> for TypeVisitor<M> {
 
         Ok((Value::String(v.into()), def_id))
     }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let map_matcher = self
+            .matcher
+            .match_map()
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
+
+        // Because serde is stream-oriented, we need to start storing temporary values
+        // until we can recognize the type
+        let mut tmp_values: IndexMap<String, serde_value::Value> = Default::default();
+
+        while let Some(key) = map.next_key::<String>()? {
+            match map_matcher.match_property(&key) {
+                Ok(map_type) => {
+                    let value: serde_value::Value = map.next_value()?;
+                    tmp_values.insert(key, value);
+
+                    // delegate to actual map type visitor
+                    return MapTypeVisitor {
+                        tmp_values,
+                        map_type,
+                        registry: self.registry,
+                    }
+                    .visit_map(map);
+                }
+                Err(MapMatchError::Indecisive) => {}
+            }
+
+            let value: serde_value::Value = map.next_value()?;
+
+            match map_matcher.match_attribute(&key, &value) {
+                Ok(map_type) => {
+                    tmp_values.insert(key, value);
+
+                    // delegate to actual map type visitor
+                    return MapTypeVisitor {
+                        tmp_values,
+                        map_type,
+                        registry: self.registry,
+                    }
+                    .visit_map(map);
+                }
+                Err(MapMatchError::Indecisive) => {
+                    tmp_values.insert(key, value);
+                }
+            }
+        }
+
+        // FIXME: better error message?
+        Err(serde::de::Error::custom(format!("invalid type")))
+    }
 }
 
 impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
@@ -139,6 +201,21 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     {
         let mut attributes = HashMap::with_capacity(self.map_type.properties.len());
 
+        // first parse tmp values, if any
+        for (key, value) in self.tmp_values {
+            let serde_property = PropertySet(&self.map_type.properties).visit_str(&key)?;
+            let value_deserializer: serde_value::ValueDeserializer<A::Error> =
+                serde_value::ValueDeserializer::new(value);
+
+            let (attribute_value, _def_id) = self
+                .registry
+                .make_processor(serde_property.operator_id)
+                .deserialize(value_deserializer)?;
+
+            attributes.insert(serde_property.property_id, attribute_value);
+        }
+
+        // parse rest of map
         while let Some(serde_property) =
             map.next_key_seed(PropertySet(&self.map_type.properties))?
         {
