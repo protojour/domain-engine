@@ -113,8 +113,20 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         self.match_discriminant(Discriminant::IsNumber)
     }
 
-    fn match_str(&self, _: &str) -> Result<DefId, ()> {
-        self.match_discriminant(Discriminant::IsString)
+    fn match_str(&self, v: &str) -> Result<DefId, ()> {
+        for discriminator in &self.value_union_type.discriminators {
+            match &discriminator.discriminator.discriminant {
+                Discriminant::IsString => {
+                    return Ok(discriminator.discriminator.result_type);
+                }
+                Discriminant::IsStringLiteral(lit) if lit == v => {
+                    return Ok(discriminator.discriminator.result_type);
+                }
+                _ => {}
+            }
+        }
+
+        Err(())
     }
 
     fn match_map(&self) -> Result<MapMatcher, ()> {

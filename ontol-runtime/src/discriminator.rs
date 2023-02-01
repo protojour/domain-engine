@@ -17,6 +17,7 @@ pub struct VariantDiscriminator {
 pub enum Discriminant {
     IsNumber,
     IsString,
+    IsStringLiteral(String),
     HasProperty(PropertyId, String),
     HasStringAttribute(PropertyId, String, String),
 }

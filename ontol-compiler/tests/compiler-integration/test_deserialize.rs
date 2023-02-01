@@ -187,3 +187,23 @@ fn deserialize_string_constant() {
         );
     });
 }
+
+#[test]
+fn deserialize_string_union() {
+    r#"
+    (type! foo)
+    (rel! (foo) _ "a")
+    (rel! (foo) _ "b")
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize_variant(env, json!("a")),
+            Ok(Value::String(a)) if a == "a"
+        );
+        assert_error_msg!(
+            foo.deserialize_variant(env, json!("junk")),
+            r#"invalid type: string "junk", expected `"a"` or `"b"` at line 1 column 6"#
+        );
+    });
+}

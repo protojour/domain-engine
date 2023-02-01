@@ -5,6 +5,7 @@ use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
     DefId, PropertyId,
 };
+use smartstring::alias::String;
 
 use crate::{
     compiler_queries::GetPropertyMeta, error::CompileError, relation::SubjectProperties,
@@ -61,7 +62,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     discriminator_builder.number = Some(NumberDiscriminator(object_def))
                 }
                 Type::String => {
-                    discriminator_builder.string = Some(StringDiscriminator(object_def))
+                    discriminator_builder.string = StringDiscriminator::Any(object_def);
+                }
+                Type::StringConstant(def_id) => {
+                    let string_literal = self.defs.get_string_literal(*def_id);
+                    discriminator_builder.add_string_literal(string_literal, *def_id);
                 }
                 Type::Domain(domain_def_id) => {
                     match self.find_subject_map_properties(*domain_def_id) {
@@ -93,11 +98,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 result_type: number.0,
             })
         }
-        if let Some(string) = discriminator_builder.string {
-            union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsString,
-                result_type: string.0,
-            })
+        match discriminator_builder.string {
+            StringDiscriminator::None => {}
+            StringDiscriminator::Any(def_id) => {
+                union_discriminator.variants.push(VariantDiscriminator {
+                    discriminant: Discriminant::IsString,
+                    result_type: def_id,
+                });
+            }
+            StringDiscriminator::Literals(literals) => {
+                for (literal, def_id) in literals {
+                    union_discriminator.variants.push(VariantDiscriminator {
+                        discriminant: Discriminant::IsStringLiteral(literal),
+                        result_type: def_id,
+                    });
+                }
+            }
         }
 
         self.relations
@@ -183,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 #[derive(Default)]
 struct DiscriminatorBuilder {
     number: Option<NumberDiscriminator>,
-    string: Option<StringDiscriminator>,
+    string: StringDiscriminator,
     property: Option<PropertyDiscriminator>,
 }
 
@@ -191,10 +207,29 @@ impl DiscriminatorBuilder {
     fn add_property_set(&mut self, def_id: DefId, property_set: &IndexSet<PropertyId>) {
         // let map_discriminator = self.property.get_or_insert_with(Default::default);
     }
+
+    fn add_string_literal(&mut self, lit: &str, def_id: DefId) {
+        match &mut self.string {
+            StringDiscriminator::None => {
+                self.string = StringDiscriminator::Literals([(lit.into(), def_id)].into());
+            }
+            StringDiscriminator::Any(_) => {}
+            StringDiscriminator::Literals(set) => {
+                set.insert((lit.into(), def_id));
+            }
+        }
+    }
 }
 
 struct NumberDiscriminator(DefId);
-struct StringDiscriminator(DefId);
+
+#[derive(Default)]
+enum StringDiscriminator {
+    #[default]
+    None,
+    Any(DefId),
+    Literals(IndexSet<(String, DefId)>),
+}
 
 #[derive(Default)]
 struct PropertyDiscriminator {}
