@@ -9,6 +9,7 @@ use ontol_runtime::{
     DefId,
 };
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -69,6 +70,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::String(type_def_id),
             )),
+            Some(Type::StringConstant(def_id)) => {
+                assert_eq!(type_def_id, *def_id);
+
+                let literal = self.defs.get_string_literal(*def_id);
+                Some((
+                    self.alloc_operator_id(*def_id),
+                    SerdeOperator::StringConstant(literal.into(), type_def_id),
+                ))
+            }
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
@@ -81,7 +91,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.create_domain_type_serde_operator(typename, *def_id, properties),
                 ))
             }
-            _ => None,
+            ty => {
+                debug!("No serde operator for {ty:?}");
+                None
+            }
         }
     }
 

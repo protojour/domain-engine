@@ -164,3 +164,26 @@ fn deserialize_union_of_primitives() {
         );
     });
 }
+
+#[test]
+fn deserialize_string_constant() {
+    r#"
+    (type! foo)
+    (rel! (foo) _ "my_value")
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize(env, json!("my_value")),
+            Ok(Value::String(s)) if s == "my_value"
+        );
+        assert_error_msg!(
+            foo.deserialize(env, json!("other value")),
+            r#"invalid type: string "other value", expected "my_value" at line 1 column 13"#
+        );
+        assert_error_msg!(
+            foo.deserialize(env, json!(42)),
+            r#"invalid type: integer `42`, expected "my_value" at line 1 column 2"#
+        );
+    });
+}

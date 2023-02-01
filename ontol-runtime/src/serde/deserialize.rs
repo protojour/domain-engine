@@ -8,7 +8,8 @@ use crate::{value::Value, DefId};
 
 use super::{
     deserialize_matcher::{
-        MapMatchError, NumberMatcher, StringMatcher, UnionMatcher, ValueMatcher,
+        ConstantStringMatcher, MapMatchError, NumberMatcher, StringMatcher, UnionMatcher,
+        ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry,
 };
@@ -49,6 +50,16 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer,
                 MatcherVisitor {
                     matcher: StringMatcher(*def_id),
+                    registry: self.registry,
+                },
+            ),
+            SerdeOperator::StringConstant(lit, def_id) => serde::de::Deserializer::deserialize_str(
+                deserializer,
+                MatcherVisitor {
+                    matcher: ConstantStringMatcher {
+                        literal: &lit,
+                        def_id: *def_id,
+                    },
                     registry: self.registry,
                 },
             ),

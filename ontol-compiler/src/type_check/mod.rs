@@ -41,8 +41,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
             TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: format_type(actual),
-                expected: format_type(expected),
+                actual: format_type(actual, &self.defs),
+                expected: format_type(expected, &self.defs),
             },
         };
         self.error(compile_error, span)

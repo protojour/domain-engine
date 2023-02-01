@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
 use smartstring::alias::String;
@@ -24,6 +24,7 @@ pub struct Def {
 #[derive(Debug)]
 pub enum DefKind {
     Primitive(Primitive),
+    StringLiteral(String),
     CoreFn(BuiltinProc),
     Type(String),
     Relation(Relation),
@@ -33,16 +34,17 @@ pub enum DefKind {
 }
 
 impl DefKind {
-    pub fn diagnostics_identifier(&self) -> Option<&str> {
+    pub fn diagnostics_identifier(&self) -> Option<Cow<str>> {
         match self {
-            Self::Primitive(Primitive::Number) => Some("number"),
-            Self::Primitive(Primitive::String) => Some("string"),
+            Self::Primitive(Primitive::Number) => Some("number".into()),
+            Self::Primitive(Primitive::String) => Some("string".into()),
+            Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::CoreFn(_) => None,
-            Self::Type(ident) => Some(&ident),
-            Self::Relation(relation) => relation.ident.as_deref(),
+            Self::Type(ident) => Some(ident.as_str().into()),
+            Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
             Self::Property(_) => None,
-            Self::Equivalence(_, _, _) => Some("eq!"),
+            Self::Equivalence(_, _, _) => Some("eq!".into()),
         }
     }
 }
@@ -94,6 +96,7 @@ pub struct Defs {
     next_expr_id: ExprId,
     anonymous_relation: DefId,
     pub(crate) map: HashMap<DefId, Def>,
+    pub(crate) string_literals: HashMap<String, DefId>,
 }
 
 impl Default for Defs {
@@ -103,6 +106,7 @@ impl Default for Defs {
             next_expr_id: ExprId(0),
             anonymous_relation: DefId(0),
             map: Default::default(),
+            string_literals: Default::default(),
         };
 
         // Add some extremely fundamental definitions here already.
@@ -169,6 +173,28 @@ impl Defs {
         );
 
         def_id
+    }
+
+    pub fn def_string_literal(&mut self, lit: String) -> DefId {
+        match self.string_literals.get(&lit) {
+            Some(def_id) => *def_id,
+            None => {
+                let def_id = self.add_def(
+                    DefKind::StringLiteral(lit.clone()),
+                    CORE_PKG,
+                    SourceSpan::none(),
+                );
+                self.string_literals.insert(lit, def_id);
+                def_id
+            }
+        }
+    }
+
+    pub fn get_string_literal(&self, def_id: DefId) -> &str {
+        match self.get_def_kind(def_id) {
+            Some(DefKind::StringLiteral(lit)) => &lit,
+            kind => panic!("BUG: not a string literal: {kind:?}"),
+        }
     }
 }
 

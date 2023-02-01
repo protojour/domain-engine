@@ -4,6 +4,7 @@ use ontol_runtime::DefId;
 use smartstring::alias::String;
 
 use crate::{
+    def::{DefKind, Defs},
     mem::{Intern, Mem},
     type_check::inference::TypeVar,
 };
@@ -21,6 +22,8 @@ pub enum Type<'m> {
     Number,
     /// Any string
     String,
+    /// A specific string
+    StringConstant(DefId),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
     Function {
@@ -85,12 +88,19 @@ pub struct DefTypes<'m> {
     pub map: HashMap<DefId, TypeRef<'m>>,
 }
 
-pub(crate) fn format_type(ty: TypeRef) -> String {
+pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
     match ty {
         Type::Tautology => format!("tautology"),
         Type::Constant(val) => format!("number({})", val),
         Type::Number => format!("number"),
         Type::String => format!("string"),
+        Type::StringConstant(def_id) => {
+            let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
+                panic!();
+            };
+
+            format!("\"{lit}\"")
+        }
         Type::Function { .. } => format!("function"),
         Type::Domain(_) => format!("domain(FIXME)"),
         Type::Infer(_) => format!("?infer"),

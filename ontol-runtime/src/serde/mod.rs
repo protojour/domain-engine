@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{borrow::Cow, fmt::Debug};
 
 use indexmap::IndexMap;
 use smartstring::alias::String;
@@ -54,6 +54,7 @@ pub enum SerdeOperator {
     Unit,
     Number(DefId),
     String(DefId),
+    StringConstant(String, DefId),
     // A type with just one anonymous property
     ValueType(ValueType),
     // A type with multiple anonymous properties, equivalent to a union of types
@@ -63,14 +64,15 @@ pub enum SerdeOperator {
 }
 
 impl SerdeOperator {
-    fn typename(&self) -> &str {
+    fn typename(&self) -> Cow<str> {
         match self {
-            Self::Unit => "unit",
-            Self::Number(_) => "number",
-            Self::String(_) => "string",
-            Self::ValueType(value_type) => &value_type.typename,
-            Self::ValueUnionType(_) => "union",
-            Self::MapType(map_type) => &map_type.typename,
+            Self::Unit => "unit".into(),
+            Self::Number(_) => "number".into(),
+            Self::String(_) => "string".into(),
+            Self::StringConstant(lit, _) => format!("\"{lit}\"").into(),
+            Self::ValueType(value_type) => value_type.typename.as_str().into(),
+            Self::ValueUnionType(_) => "union".into(),
+            Self::MapType(map_type) => map_type.typename.as_str().into(),
         }
     }
 }

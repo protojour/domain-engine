@@ -169,7 +169,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let def = self.defs.map.get(&def_id);
                 CompileError::UnitTypePartOfUnion(
                     def.and_then(|def| def.kind.diagnostics_identifier())
-                        .unwrap_or_else(|| "?")
+                        .unwrap_or_else(|| "?".into())
                         .into(),
                 )
             }

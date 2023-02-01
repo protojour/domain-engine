@@ -16,6 +16,7 @@ pub enum Tree {
     /// String starting with ":"
     Variable(String),
     Num(String),
+    StringLiteral(String),
     Comment(String),
 }
 
@@ -28,6 +29,7 @@ impl Display for Tree {
             Self::Sym(_) => write!(f, "symbol"),
             Self::Variable(_) => write!(f, "variable"),
             Self::Num(_) => write!(f, "number"),
+            Self::StringLiteral(_) => write!(f, "string literal"),
             Self::Comment(_) => write!(f, "comment"),
         }
     }
@@ -50,6 +52,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(just(".").map(|_| Tree::Dot))
             .or(num())
             .or(just(":").ignore_then(ident().map(Tree::Variable)))
+            .or(string_literal().map(Tree::StringLiteral))
             .or(ident().map(Tree::Sym))
             .or(comment());
 
@@ -65,7 +68,7 @@ pub fn trees_parser() -> impl Parser<char, Vec<Spanned<Tree>>, Error = Simple<ch
 }
 
 fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
-    filter(|c: &char| c.is_digit(10) && c != &'0' && !special_char(*c))
+    filter(|c: &char| c.is_digit(10) && *c != '0' && !special_char(*c))
         .map(Some)
         .chain::<char, Vec<_>, _>(filter(|c: &char| c.is_digit(10) && !special_char(*c)).repeated())
         .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
@@ -77,6 +80,15 @@ fn ident() -> impl Parser<char, String, Error = Simple<char>> {
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
         )
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+    // FIXME: other escape codes?
+    // see https://github.com/zesterer/chumsky/blob/940d531a7b4bc63062284bec6888fc5dae10a3d2/benches/json.rs
+    just('"')
+        .ignore_then(filter(|c: &char| *c != '\\' && *c != '"').repeated())
+        .then_ignore(just('"'))
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
@@ -214,6 +226,18 @@ mod tests {
             )
             .unwrap();
         assert_matches!(trees.as_slice(), &[(Tree::Paren(ref elems), _),] if elems.len() == 3);
+    }
+
+    #[test]
+    fn string_literal() {
+        let trees = trees_parser()
+            .parse(
+                r#"
+                "literal"
+                "#,
+            )
+            .unwrap();
+        assert_matches!(trees.as_slice(), &[(Tree::StringLiteral(ref lit), _),] if lit == "literal");
     }
 
     #[test]

@@ -113,7 +113,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn ast_type_to_def(&mut self, (ast_ty, span): (ast::Type, Span)) -> Res<DefId> {
         match ast_ty {
-            ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
             ast::Type::Sym(ident) => {
                 match self.compiler.namespaces.lookup(
                     &[self.src.package, CORE_PKG],
@@ -124,6 +123,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     None => Err(self.error(CompileError::TypeNotFound, &span)),
                 }
             }
+            ast::Type::Literal(ast::Literal::String(lit)) => {
+                Ok(self.compiler.defs.def_string_literal(lit))
+            }
+            ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
         }
     }
 

@@ -58,6 +58,26 @@ impl ValueMatcher for StringMatcher {
     }
 }
 
+/// match a constant string
+pub struct ConstantStringMatcher<'e> {
+    pub literal: &'e str,
+    pub def_id: DefId,
+}
+
+impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.literal)
+    }
+
+    fn match_str(&self, str: &str) -> Result<DefId, ()> {
+        if str == self.literal {
+            Ok(self.def_id)
+        } else {
+            Err(())
+        }
+    }
+}
+
 pub struct UnionMatcher<'e> {
     pub value_union_type: &'e ValueUnionType,
     pub registry: SerdeRegistry<'e>,

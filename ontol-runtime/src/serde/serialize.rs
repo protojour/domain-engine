@@ -15,6 +15,7 @@ impl<'e> SerdeProcessor<'e> {
             }
             SerdeOperator::Number(_) => self.serialize_number(value, serializer),
             SerdeOperator::String(_) => self.serialize_string(value, serializer),
+            SerdeOperator::StringConstant(_, _) => self.serialize_string(value, serializer),
             SerdeOperator::ValueType(value_type) => self
                 .registry
                 .make_processor(value_type.property.operator_id)

@@ -33,6 +33,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
+            DefKind::StringLiteral(_) => {
+                let ty = self.types.intern(Type::StringConstant(def_id));
+                self.def_types.map.insert(def_id, ty);
+                ty
+            }
             DefKind::Relationship(relationship) => {
                 let relation = match self.defs.map.get(&relationship.relation_def_id) {
                     Some(Def {
