@@ -6,6 +6,7 @@ use ontol_runtime::{
     DefId, PropertyId,
 };
 use smartstring::alias::String;
+use tracing::{debug, info};
 
 use crate::{
     compiler_queries::GetPropertyMeta, error::CompileError, relation::SubjectProperties,
@@ -37,7 +38,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             panic!("not a union");
         };
 
-        let mut discriminator_builder = DiscriminatorBuilder::default();
+        let mut builder = DiscriminatorBuilder::default();
         let mut used_objects: HashSet<DefId> = Default::default();
 
         for (property_id, span) in property_ids {
@@ -58,23 +59,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_ty = self.def_types.map.get(&object_def).unwrap();
 
             match object_ty {
-                Type::Number => {
-                    discriminator_builder.number = Some(NumberDiscriminator(object_def))
-                }
+                Type::Number => builder.number = Some(NumberDiscriminator(object_def)),
                 Type::String => {
-                    discriminator_builder.string = StringDiscriminator::Any(object_def);
+                    builder.string = StringDiscriminator::Any(object_def);
                 }
                 Type::StringConstant(def_id) => {
                     let string_literal = self.defs.get_string_literal(*def_id);
-                    discriminator_builder.add_string_literal(string_literal, *def_id);
+                    builder.add_string_literal(string_literal, *def_id);
                 }
                 Type::Domain(domain_def_id) => {
                     match self.find_subject_map_properties(*domain_def_id) {
                         Ok(property_set) => {
                             self.add_property_set_to_discriminator(
-                                &mut discriminator_builder,
+                                &mut builder,
                                 object_def,
                                 property_set,
+                                span,
+                                &mut error_set,
                             );
                         }
                         Err(error) => {
@@ -90,32 +91,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             used_objects.insert(object_def);
         }
 
-        let mut union_discriminator = UnionDiscriminator { variants: vec![] };
+        self.limit_property_discriminators(&mut builder, &mut error_set);
 
-        if let Some(number) = discriminator_builder.number {
-            union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsNumber,
-                result_type: number.0,
-            })
-        }
-        match discriminator_builder.string {
-            StringDiscriminator::None => {}
-            StringDiscriminator::Any(def_id) => {
-                union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: Discriminant::IsString,
-                    result_type: def_id,
-                });
-            }
-            StringDiscriminator::Literals(literals) => {
-                for (literal, def_id) in literals {
-                    union_discriminator.variants.push(VariantDiscriminator {
-                        discriminant: Discriminant::IsStringLiteral(literal),
-                        result_type: def_id,
-                    });
-                }
-            }
-        }
-
+        let union_discriminator = self.make_union_discriminator(builder, &error_set);
         self.relations
             .union_discriminators
             .insert(value_union_def_id, union_discriminator);
@@ -129,22 +107,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .spanned(&self.sources, &span)
             })
             .collect()
-    }
-
-    fn add_property_set_to_discriminator(
-        &self,
-        discriminator_builder: &mut DiscriminatorBuilder,
-        object_def: DefId,
-        property_set: &IndexSet<PropertyId>,
-    ) {
-        for property_id in property_set {
-            let (_, _, _) = self
-                .get_property_meta(*property_id)
-                .expect("BUG: problem getting property meta");
-        }
-        discriminator_builder.add_property_set(object_def, property_set);
-
-        todo!()
     }
 
     fn find_subject_map_properties(
@@ -179,6 +141,141 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
+    fn add_property_set_to_discriminator(
+        &self,
+        discriminator_builder: &mut DiscriminatorBuilder,
+        object_def: DefId,
+        property_set: &IndexSet<PropertyId>,
+        span: &SourceSpan,
+        error_set: &mut ErrorSet,
+    ) {
+        let mut map_discriminator_candidate = MapDiscriminatorCandidate {
+            result_type: object_def,
+            property_candidates: vec![],
+        };
+
+        for property_id in property_set {
+            let (_, relationship, relation) = self
+                .get_property_meta(*property_id)
+                .expect("BUG: problem getting property meta");
+
+            let object_def = relationship.object;
+            let object_ty = self.def_types.map.get(&object_def).unwrap();
+            let Some(property_name) = relation.object_prop() else {
+                continue;
+            };
+
+            match object_ty {
+                Type::NumericConstant(num) => {
+                    todo!("Cannot match against numeric constants yet");
+                }
+                Type::StringConstant(def_id) => {
+                    let string_literal = self.defs.get_string_literal(*def_id);
+                    map_discriminator_candidate.property_candidates.push(
+                        PropertyDiscriminatorCandidate {
+                            relation_def_id: relationship.relation_def_id,
+                            discriminant: Discriminant::HasStringAttribute(
+                                *property_id,
+                                property_name.clone(),
+                                string_literal.into(),
+                            ),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        if map_discriminator_candidate.property_candidates.is_empty() {
+            error_set.report(object_def, UnionCheckError::CannotDiscriminateType, &span);
+        }
+    }
+
+    fn limit_property_discriminators(
+        &self,
+        builder: &mut DiscriminatorBuilder,
+        error_set: &mut ErrorSet,
+    ) {
+        let total_candidates = builder.map_discriminator_candidates.len();
+        if total_candidates == 0 {
+            debug!("no candidates");
+            return;
+        }
+
+        let mut relation_counters: HashMap<DefId, usize> = Default::default();
+
+        for discriminator in &builder.map_discriminator_candidates {
+            for property_candidate in &discriminator.property_candidates {
+                *relation_counters
+                    .entry(property_candidate.relation_def_id)
+                    .or_default() += 1;
+            }
+        }
+
+        let Some((selected_relation, _)) = relation_counters
+            .into_iter()
+            .find(|(_, count)| *count == total_candidates) else {
+            todo!("report error about this");
+        };
+
+        println!("selected relation {selected_relation:?}");
+
+        for discriminator in &mut builder.map_discriminator_candidates {
+            discriminator
+                .property_candidates
+                .retain(|property_candidate| {
+                    property_candidate.relation_def_id == selected_relation
+                })
+        }
+    }
+
+    fn make_union_discriminator(
+        &self,
+        builder: DiscriminatorBuilder,
+        error_set: &ErrorSet,
+    ) -> UnionDiscriminator {
+        let mut union_discriminator = UnionDiscriminator { variants: vec![] };
+
+        if let Some(number) = builder.number {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::IsNumber,
+                result_type: number.0,
+            })
+        }
+        match builder.string {
+            StringDiscriminator::None => {}
+            StringDiscriminator::Any(def_id) => {
+                union_discriminator.variants.push(VariantDiscriminator {
+                    discriminant: Discriminant::IsString,
+                    result_type: def_id,
+                });
+            }
+            StringDiscriminator::Literals(literals) => {
+                for (literal, def_id) in literals {
+                    union_discriminator.variants.push(VariantDiscriminator {
+                        discriminant: Discriminant::IsStringLiteral(literal),
+                        result_type: def_id,
+                    });
+                }
+            }
+        }
+
+        for map_discriminator in builder.map_discriminator_candidates {
+            for candidate in map_discriminator.property_candidates {
+                union_discriminator.variants.push(VariantDiscriminator {
+                    discriminant: candidate.discriminant,
+                    result_type: map_discriminator.result_type,
+                })
+            }
+        }
+
+        if union_discriminator.variants.is_empty() {
+            assert!(!error_set.errors.is_empty());
+        }
+
+        union_discriminator
+    }
+
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
@@ -200,14 +297,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 struct DiscriminatorBuilder {
     number: Option<NumberDiscriminator>,
     string: StringDiscriminator,
-    property: Option<PropertyDiscriminator>,
+    map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 
 impl DiscriminatorBuilder {
-    fn add_property_set(&mut self, def_id: DefId, property_set: &IndexSet<PropertyId>) {
-        // let map_discriminator = self.property.get_or_insert_with(Default::default);
-    }
-
     fn add_string_literal(&mut self, lit: &str, def_id: DefId) {
         match &mut self.string {
             StringDiscriminator::None => {
@@ -231,8 +324,15 @@ enum StringDiscriminator {
     Literals(IndexSet<(String, DefId)>),
 }
 
-#[derive(Default)]
-struct PropertyDiscriminator {}
+struct MapDiscriminatorCandidate {
+    result_type: DefId,
+    property_candidates: Vec<PropertyDiscriminatorCandidate>,
+}
+
+struct PropertyDiscriminatorCandidate {
+    relation_def_id: DefId,
+    discriminant: Discriminant,
+}
 
 #[derive(Default)]
 struct ErrorSet {

@@ -207,3 +207,29 @@ fn deserialize_string_union() {
         );
     });
 }
+
+#[test_log::test]
+#[ignore = "not working yet"]
+fn deserialize_map_union() {
+    r#"
+    (type! foo)
+    (type! bar)
+    (rel! (foo) variant "foo")
+    (rel! (bar) variant "bar")
+
+    (type! union)
+    (rel! (union) _ (foo))
+    (rel! (union) _ (bar))
+    "#
+    .compile_ok(|env| {
+        let union = TypeBinding::new(env, "union");
+        assert_matches!(
+            union.deserialize_variant(env, json!({ "variant": "foo" })),
+            Ok(Value::String(a)) if a == "a"
+        );
+        assert_error_msg!(
+            union.deserialize_variant(env, json!("junk")),
+            r#"invalid type: string "junk", expected `"a"` or `"b"` at line 1 column 6"#
+        );
+    });
+}

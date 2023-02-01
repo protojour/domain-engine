@@ -17,7 +17,7 @@ pub enum Type<'m> {
     // This is the "type" of an equivalence assertion.
     // It has no specific meaning.
     Tautology,
-    Constant(i32),
+    NumericConstant(i32),
     /// Any number
     Number,
     /// Any string
@@ -91,7 +91,7 @@ pub struct DefTypes<'m> {
 pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
     match ty {
         Type::Tautology => format!("tautology"),
-        Type::Constant(val) => format!("number({})", val),
+        Type::NumericConstant(val) => format!("number({})", val),
         Type::Number => format!("number"),
         Type::String => format!("string"),
         Type::StringConstant(def_id) => {
@@ -123,9 +123,9 @@ mod tests {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem);
 
-        let c0 = compiler.types.intern(Type::Constant(42));
-        let c1 = compiler.types.intern(Type::Constant(42));
-        let c2 = compiler.types.intern(Type::Constant(66));
+        let c0 = compiler.types.intern(Type::NumericConstant(42));
+        let c1 = compiler.types.intern(Type::NumericConstant(42));
+        let c2 = compiler.types.intern(Type::NumericConstant(66));
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));

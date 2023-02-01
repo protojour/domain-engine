@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, Unexpected};
 use smartstring::alias::String;
+use tracing::warn;
 
 use crate::{value::Value, DefId};
 
@@ -237,6 +238,8 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         }
 
         if attributes.len() < self.map_type.properties.len() {
+            warn!("Missing attributes: {attributes:?}");
+
             let missing_keys = Missing {
                 items: self
                     .map_type
