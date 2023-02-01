@@ -145,8 +145,7 @@ fn deserialize_recursive() {
 }
 
 #[test]
-#[ignore]
-fn deserialize_disjoint() {
+fn deserialize_union_of_primitives() {
     "
     (type! foo)
     (rel! (foo) _ (string))
@@ -154,18 +153,14 @@ fn deserialize_disjoint() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize_variant(env, json!(42)),
+            Ok(Value::Number(42))
+        );
+        assert_matches!(foo.deserialize_variant(env, json!("qux")), Ok(Value::String(s)) if s == "qux");
         assert_error_msg!(
-            foo.deserialize(
-                env,
-                json!({
-                    "b": {
-                        "f": {
-                            "b": 42
-                        }
-                    },
-                })
-            ),
-            "invalid type: integer `42`, expected type `bar` at line 1 column 17"
+            foo.deserialize(env, json!({})),
+            "invalid type: map, expected `number` or `string` at line 1 column 2"
         );
     });
 }

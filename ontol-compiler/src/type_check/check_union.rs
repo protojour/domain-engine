@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexSet;
-use ontol_runtime::{DefId, PropertyId};
+use ontol_runtime::{
+    discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
+    DefId, PropertyId,
+};
 
 use crate::{
     compiler_queries::GetPropertyMeta, error::CompileError, relation::SubjectProperties,
@@ -53,8 +56,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_ty = self.def_types.map.get(&object_def).unwrap();
 
             match object_ty {
-                Type::Number => discriminator_builder.number = Some(NumberDiscriminator {}),
-                Type::String => discriminator_builder.string = Some(StringDiscriminator {}),
+                Type::Number => {
+                    discriminator_builder.number = Some(NumberDiscriminator(object_def))
+                }
+                Type::String => {
+                    discriminator_builder.string = Some(StringDiscriminator(object_def))
+                }
                 Type::Domain(domain_def_id) => {
                     match self.find_subject_map_properties(*domain_def_id) {
                         Ok(property_set) => {
@@ -77,6 +84,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             used_objects.insert(object_def);
         }
 
+        let mut union_discriminator = UnionDiscriminator { variants: vec![] };
+
+        if let Some(number) = discriminator_builder.number {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::IsNumber,
+                result_type: number.0,
+            })
+        }
+        if let Some(string) = discriminator_builder.string {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::IsString,
+                result_type: string.0,
+            })
+        }
+
+        self.relations
+            .union_discriminators
+            .insert(value_union_def_id, union_discriminator);
+
         error_set
             .errors
             .into_iter()
@@ -95,7 +121,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         property_set: &IndexSet<PropertyId>,
     ) {
         for property_id in property_set {
-            let (_, _, relation) = self
+            let (_, _, _) = self
                 .get_property_meta(*property_id)
                 .expect("BUG: problem getting property meta");
         }
@@ -162,12 +188,12 @@ struct DiscriminatorBuilder {
 
 impl DiscriminatorBuilder {
     fn add_property_set(&mut self, def_id: DefId, property_set: &IndexSet<PropertyId>) {
-        let map_discriminator = self.property.get_or_insert_with(Default::default);
+        // let map_discriminator = self.property.get_or_insert_with(Default::default);
     }
 }
 
-struct NumberDiscriminator {}
-struct StringDiscriminator {}
+struct NumberDiscriminator(DefId);
+struct StringDiscriminator(DefId);
 
 #[derive(Default)]
 struct PropertyDiscriminator {}

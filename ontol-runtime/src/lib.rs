@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use derive_debug_extras::DebugExtras;
 
+pub mod discriminator;
 pub mod env;
 pub mod proc;
 pub mod property_probe;

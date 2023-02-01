@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    serde::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType},
+    serde::{
+        MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionDiscriminator,
+        ValueUnionType,
+    },
     DefId,
 };
 use smartstring::alias::String;
@@ -58,12 +61,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match self.get_def_type(type_def_id) {
-            Some(Type::Number) => {
-                Some((self.alloc_operator_id(type_def_id), SerdeOperator::Number))
-            }
-            Some(Type::String) => {
-                Some((self.alloc_operator_id(type_def_id), SerdeOperator::String))
-            }
+            Some(Type::Number) => Some((
+                self.alloc_operator_id(type_def_id),
+                SerdeOperator::Number(type_def_id),
+            )),
+            Some(Type::String) => Some((
+                self.alloc_operator_id(type_def_id),
+                SerdeOperator::String(type_def_id),
+            )),
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
@@ -73,7 +78,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let operator_id = self.alloc_operator_id(type_def_id);
                 Some((
                     operator_id,
-                    self.create_domain_type_serde_operator(typename, properties),
+                    self.create_domain_type_serde_operator(typename, *def_id, properties),
                 ))
             }
             _ => None,
@@ -92,11 +97,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn create_domain_type_serde_operator(
         &mut self,
         typename: String,
+        type_def_id: DefId,
         properties: Option<&Properties>,
     ) -> SerdeOperator {
         match properties.map(|prop| &prop.subject) {
             Some(SubjectProperties::Unit) | None => SerdeOperator::MapType(MapType {
                 typename,
+                type_def_id,
                 properties: Default::default(),
             }),
             Some(SubjectProperties::Value(property_id, _)) => {
@@ -110,34 +117,36 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 SerdeOperator::ValueType(ValueType {
                     typename,
+                    type_def_id,
                     property: SerdeProperty {
                         property_id: *property_id,
                         operator_id,
                     },
                 })
             }
-            Some(SubjectProperties::ValueUnion(properties)) => {
-                let serde_properties = properties
-                    .iter()
-                    .map(|(property_id, _)| {
-                        let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
-                            panic!("Problem getting property meta");
-                        };
-
-                        let operator_id = self
-                            .get_serde_operator_id(relationship.object)
-                            .expect("No inner operator");
-
-                        SerdeProperty {
-                            property_id: *property_id,
-                            operator_id,
-                        }
-                    })
-                    .collect::<Vec<_>>();
+            Some(SubjectProperties::ValueUnion(_)) => {
+                let union_disciminator = self
+                    .relations
+                    .union_discriminators
+                    .get(&type_def_id)
+                    .expect("no union discriminator available. Should fail earlier");
 
                 SerdeOperator::ValueUnionType(ValueUnionType {
                     typename,
-                    properties: serde_properties,
+                    discriminators: union_disciminator
+                        .variants
+                        .iter()
+                        .map(|discriminator| {
+                            let operator_id = self
+                                .get_serde_operator_id(discriminator.result_type)
+                                .expect("No inner operator");
+
+                            ValueUnionDiscriminator {
+                                discriminator: discriminator.clone(),
+                                operator_id,
+                            }
+                        })
+                        .collect(),
                 })
             }
             Some(SubjectProperties::Map(property_set)) => {
@@ -162,6 +171,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 SerdeOperator::MapType(MapType {
                     typename,
+                    type_def_id,
                     properties: serde_properties,
                 })
             }

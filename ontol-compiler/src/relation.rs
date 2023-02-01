@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexSet;
-use ontol_runtime::{DefId, PropertyId};
+use ontol_runtime::{discriminator::UnionDiscriminator, DefId, PropertyId};
 
 use crate::SourceSpan;
 
@@ -18,6 +18,7 @@ pub struct Relations {
     pub properties_by_type: HashMap<DefId, Properties>,
 
     pub value_unions: HashSet<DefId>,
+    pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
 }
 
 impl Default for Relations {
@@ -27,6 +28,7 @@ impl Default for Relations {
             properties: Default::default(),
             properties_by_type: Default::default(),
             value_unions: Default::default(),
+            union_discriminators: Default::default(),
         }
     }
 }

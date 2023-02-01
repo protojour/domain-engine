@@ -31,8 +31,30 @@ impl TypeBinding {
         json: serde_json::Value,
     ) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
-        env.new_serde_processor(self.serde_operator_id)
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))
+        let (value, serde_def_id) = env
+            .new_serde_processor(self.serde_operator_id)
+            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
+
+        assert_eq!(serde_def_id, self.def_id);
+
+        Ok(value)
+    }
+
+    /// Special case deserialize where the assertion is that the result DefId
+    /// represents the _variant_ instead of the parent type
+    pub fn deserialize_variant(
+        &self,
+        env: &Env,
+        json: serde_json::Value,
+    ) -> Result<Value, serde_json::Error> {
+        let json_string = serde_json::to_string(&json).unwrap();
+        let (value, serde_def_id) = env
+            .new_serde_processor(self.serde_operator_id)
+            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
+
+        assert_ne!(serde_def_id, self.def_id);
+
+        Ok(value)
     }
 
     pub fn serialize_json(&self, env: &Env, value: &Value) -> serde_json::Value {
