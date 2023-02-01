@@ -209,13 +209,13 @@ fn deserialize_string_union() {
 }
 
 #[test_log::test]
-#[ignore = "not working yet"]
 fn deserialize_map_union() {
     r#"
     (type! foo)
     (type! bar)
     (rel! (foo) variant "foo")
     (rel! (bar) variant "bar")
+    (rel! (bar) prop (number))
 
     (type! union)
     (rel! (union) _ (foo))
@@ -225,11 +225,19 @@ fn deserialize_map_union() {
         let union = TypeBinding::new(env, "union");
         assert_matches!(
             union.deserialize_variant(env, json!({ "variant": "foo" })),
-            Ok(Value::String(a)) if a == "a"
+            Ok(Value::Compound(map)) if map.len() == 1
+        );
+        assert_matches!(
+            union.deserialize_variant(env, json!({ "variant": "bar", "prop": 42 })),
+            Ok(Value::Compound(map)) if map.len() == 2
         );
         assert_error_msg!(
             union.deserialize_variant(env, json!("junk")),
-            r#"invalid type: string "junk", expected `"a"` or `"b"` at line 1 column 6"#
+            r#"invalid type: string "junk", expected `foo` or `bar` at line 1 column 6"#
+        );
+        assert_error_msg!(
+            union.deserialize_variant(env, json!({ "variant": "bar" })),
+            r#"missing properties, expected `prop` at line 1 column 17"#
         );
     });
 }

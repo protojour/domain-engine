@@ -52,6 +52,46 @@ fn rel_mix_anonymous_and_named() {
 }
 
 #[test]
+fn map_union_unit_type() {
+    "
+    (type! foo)
+    (type! bar)
+    (type! u)
+    (rel! (u) _ (foo)) ;; ERROR unit type `foo` cannot be part of a union
+    (rel! (u) _ (bar)) ;; ERROR unit type `bar` cannot be part of a union
+    "
+    .compile_fail()
+}
+
+#[test]
+fn map_union_missing_discriminator() {
+    r#"
+    (type! foo)
+    (type! bar)
+    (rel! (foo) a "constant")
+    (rel! (bar) b (string))
+    (type! u)
+    (rel! (u) _ (foo))
+    (rel! (u) _ (bar)) ;; ERROR cannot discriminate type
+    "#
+    .compile_fail()
+}
+
+#[test]
+fn map_union_non_uniform_discriminators() {
+    r#"
+    (type! foo)
+    (type! bar)
+    (rel! (foo) a "constant")
+    (rel! (bar) b "other-constant")
+    (type! u) ;; ERROR no uniform discriminator found for union variants
+    (rel! (u) _ (foo))
+    (rel! (u) _ (bar))
+    "#
+    .compile_fail()
+}
+
+#[test]
 fn eq_undeclared_variable() {
     "
     (eq! ()

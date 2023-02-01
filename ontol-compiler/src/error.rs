@@ -75,6 +75,8 @@ pub enum CompileError {
     UnionTreeNotSupported,
     #[error("unit type `{0}` cannot be part of a union")]
     UnitTypePartOfUnion(String),
+    #[error("no uniform discriminator found for union variants")]
+    NoUniformDiscriminatorFound,
 }
 
 #[derive(Debug)]

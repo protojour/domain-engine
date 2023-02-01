@@ -6,10 +6,10 @@ use ontol_runtime::{
     DefId, PropertyId,
 };
 use smartstring::alias::String;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta, error::CompileError, relation::SubjectProperties,
+    compiler_queries::GetPropertyMeta, def::Def, error::CompileError, relation::SubjectProperties,
     types::Type, SourceSpan, SpannedCompileError,
 };
 
@@ -29,6 +29,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
+
+        let union_def = self.defs.map.get(&value_union_def_id).unwrap();
 
         let properties = self
             .relations
@@ -91,7 +93,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             used_objects.insert(object_def);
         }
 
-        self.limit_property_discriminators(&mut builder, &mut error_set);
+        self.limit_property_discriminators(
+            value_union_def_id,
+            union_def,
+            &mut builder,
+            &mut error_set,
+        );
 
         let union_discriminator = self.make_union_discriminator(builder, &error_set);
         self.relations
@@ -165,6 +172,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 continue;
             };
 
+            debug!("trying rel {relationship:?} {relation:?} ty: {object_ty:?}");
+
             match object_ty {
                 Type::NumericConstant(num) => {
                     todo!("Cannot match against numeric constants yet");
@@ -187,12 +196,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         if map_discriminator_candidate.property_candidates.is_empty() {
+            debug!("no prop candidates for variant");
             error_set.report(object_def, UnionCheckError::CannotDiscriminateType, &span);
+        } else {
+            discriminator_builder
+                .map_discriminator_candidates
+                .push(map_discriminator_candidate);
         }
     }
 
     fn limit_property_discriminators(
         &self,
+        union_def_id: DefId,
+        union_def: &Def,
         builder: &mut DiscriminatorBuilder,
         error_set: &mut ErrorSet,
     ) {
@@ -215,7 +231,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let Some((selected_relation, _)) = relation_counters
             .into_iter()
             .find(|(_, count)| *count == total_candidates) else {
-            todo!("report error about this");
+            error_set.report(union_def_id, UnionCheckError::NoUniformDiscriminatorFound, &union_def.span);
+            return;
         };
 
         println!("selected relation {selected_relation:?}");
@@ -289,6 +306,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,
             UnionCheckError::DuplicateAnonymousRelation => CompileError::DuplicateAnonymousRelation,
+            UnionCheckError::NoUniformDiscriminatorFound => {
+                CompileError::NoUniformDiscriminatorFound
+            }
         }
     }
 }
@@ -355,4 +375,5 @@ enum UnionCheckError {
     CannotDiscriminateType,
     UnionTreeNotSupported,
     DuplicateAnonymousRelation,
+    NoUniformDiscriminatorFound,
 }
