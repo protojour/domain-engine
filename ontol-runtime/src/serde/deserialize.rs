@@ -5,14 +5,17 @@ use serde::de::{DeserializeSeed, Unexpected};
 use smartstring::alias::String;
 use tracing::warn;
 
-use crate::value::{Data, Value};
+use crate::{
+    env::Env,
+    value::{Data, Value},
+};
 
 use super::{
     deserialize_matcher::{
         ConstantStringMatcher, MapMatchError, NumberMatcher, StringMatcher, TupleMatcher,
         UnionMatcher, ValueMatcher,
     },
-    MapType, SerdeOperator, SerdeProcessor, SerdeProperty, SerdeRegistry,
+    MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
 };
 
 #[derive(Clone, Copy)]
@@ -20,13 +23,13 @@ struct PropertySet<'s>(&'s IndexMap<String, SerdeProperty>);
 
 struct MatcherVisitor<'e, M> {
     matcher: M,
-    registry: SerdeRegistry<'e>,
+    env: &'e Env,
 }
 
 struct MapTypeVisitor<'e> {
     tmp_values: IndexMap<String, serde_value::Value>,
     map_type: &'e MapType,
-    registry: SerdeRegistry<'e>,
+    env: &'e Env,
 }
 
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
@@ -44,14 +47,14 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer,
                 MatcherVisitor {
                     matcher: NumberMatcher(*def_id),
-                    registry: self.registry,
+                    env: self.env,
                 },
             ),
             SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
                 deserializer,
                 MatcherVisitor {
                     matcher: StringMatcher(*def_id),
-                    registry: self.registry,
+                    env: self.env,
                 },
             ),
             SerdeOperator::StringConstant(lit, def_id) => serde::de::Deserializer::deserialize_str(
@@ -61,7 +64,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                         literal: &lit,
                         def_id: *def_id,
                     },
-                    registry: self.registry,
+                    env: self.env,
                 },
             ),
             SerdeOperator::Tuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
@@ -71,13 +74,13 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                         elements: elems,
                         def_id: *def_id,
                     },
-                    registry: self.registry,
+                    env: self.env,
                 },
             ),
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
-                    .registry
-                    .make_processor(value_type.property.operator_id)
+                    .env
+                    .new_serde_processor(value_type.property.operator_id)
                     .deserialize(deserializer)?;
 
                 Ok(typed_value)
@@ -88,9 +91,9 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     MatcherVisitor {
                         matcher: UnionMatcher {
                             value_union_type,
-                            registry: self.registry,
+                            env: self.env,
                         },
-                        registry: self.registry,
+                        env: self.env,
                     },
                 )
             }
@@ -99,7 +102,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 MapTypeVisitor {
                     tmp_values: IndexMap::new(),
                     map_type,
-                    registry: self.registry,
+                    env: self.env,
                 },
             ),
         }
@@ -175,7 +178,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         loop {
             let processor = match self.matcher.match_seq_element(index) {
-                Some(operator_id) => self.registry.make_processor(operator_id),
+                Some(operator_id) => self.env.new_serde_processor(operator_id),
                 None => {
                     return Ok(Value {
                         data: Data::Vec(output),
@@ -217,7 +220,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     return MapTypeVisitor {
                         tmp_values,
                         map_type,
-                        registry: self.registry,
+                        env: self.env,
                     }
                     .visit_map(map);
                 }
@@ -234,7 +237,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     return MapTypeVisitor {
                         tmp_values,
                         map_type,
-                        registry: self.registry,
+                        env: self.env,
                     }
                     .visit_map(map);
                 }
@@ -269,8 +272,8 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 serde_value::ValueDeserializer::new(value);
 
             let typed_value = self
-                .registry
-                .make_processor(serde_property.operator_id)
+                .env
+                .new_serde_processor(serde_property.operator_id)
                 .deserialize(value_deserializer)?;
 
             attributes.insert(serde_property.property_id, typed_value);
@@ -281,7 +284,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             map.next_key_seed(PropertySet(&self.map_type.properties))?
         {
             let typed_value =
-                map.next_value_seed(self.registry.make_processor(serde_property.operator_id))?;
+                map.next_value_seed(self.env.new_serde_processor(serde_property.operator_id))?;
 
             attributes.insert(serde_property.property_id, typed_value);
         }

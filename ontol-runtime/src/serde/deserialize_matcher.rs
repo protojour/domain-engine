@@ -1,11 +1,10 @@
 use std::fmt::Display;
 
-use crate::{discriminator::Discriminant, DefId};
+use crate::{discriminator::Discriminant, env::Env, DefId};
 
 use super::{
     deserialize::{LogicOp, Missing},
-    MapType, SerdeOperator, SerdeOperatorId, SerdeRegistry, ValueUnionDiscriminator,
-    ValueUnionType,
+    MapType, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator, ValueUnionType,
 };
 
 /// Trait for matching incoming types for deserialization
@@ -113,7 +112,7 @@ impl<'e> ValueMatcher for TupleMatcher<'e> {
 
 pub struct UnionMatcher<'e> {
     pub value_union_type: &'e ValueUnionType,
-    pub registry: SerdeRegistry<'e>,
+    pub env: &'e Env,
 }
 
 impl<'e> ValueMatcher for UnionMatcher<'e> {
@@ -125,8 +124,8 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 .iter()
                 .map(|discriminator| -> Box<dyn Display> {
                     Box::new(String::from(
-                        self.registry
-                            .make_processor(discriminator.operator_id)
+                        self.env
+                            .new_serde_processor(discriminator.operator_id)
                             .current
                             .typename(),
                     ))
@@ -182,7 +181,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
         Ok(MapMatcher {
             value_union_type: self.value_union_type,
-            registry: self.registry,
+            env: self.env,
         })
     }
 }
@@ -201,7 +200,7 @@ impl<'e> UnionMatcher<'e> {
 
 pub struct MapMatcher<'e> {
     value_union_type: &'e ValueUnionType,
-    registry: SerdeRegistry<'e>,
+    env: &'e Env,
 }
 
 impl<'e> MapMatcher<'e> {
@@ -245,8 +244,8 @@ impl<'e> MapMatcher<'e> {
 
     fn get_map_type(&self, discriminator: &ValueUnionDiscriminator) -> &'e MapType {
         match self
-            .registry
-            .make_processor(discriminator.operator_id)
+            .env
+            .new_serde_processor(discriminator.operator_id)
             .current
         {
             SerdeOperator::MapType(map_type) => map_type,

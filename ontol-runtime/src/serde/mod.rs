@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
-use crate::{discriminator::VariantDiscriminator, DefId, PropertyId};
+use crate::{discriminator::VariantDiscriminator, env::Env, DefId, PropertyId};
 
 mod deserialize;
 mod deserialize_matcher;
@@ -15,8 +15,8 @@ mod serialize;
 /// in the compilerironment.
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
-    current: &'e SerdeOperator,
-    registry: SerdeRegistry<'e>,
+    pub(crate) current: &'e SerdeOperator,
+    pub(crate) env: &'e Env,
 }
 
 impl<'e> Debug for SerdeProcessor<'e> {
@@ -26,24 +26,6 @@ impl<'e> Debug for SerdeProcessor<'e> {
         f.debug_struct("SerdeProcessor")
             .field("current", self.current)
             .finish()
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct SerdeRegistry<'e> {
-    operators: &'e [SerdeOperator],
-}
-
-impl<'e> SerdeRegistry<'e> {
-    pub fn new(operators: &'e [SerdeOperator]) -> Self {
-        Self { operators }
-    }
-
-    pub fn make_processor(self, operator_id: SerdeOperatorId) -> SerdeProcessor<'e> {
-        SerdeProcessor {
-            current: &self.operators[operator_id.0 as usize],
-            registry: self,
-        }
     }
 }
 

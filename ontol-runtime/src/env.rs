@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     proc::{Lib, Procedure},
-    serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeRegistry},
+    serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor},
     DefId, PackageId,
 };
 
@@ -27,7 +27,10 @@ impl Env {
     }
 
     pub fn new_serde_processor(&self, serde_operator_id: SerdeOperatorId) -> SerdeProcessor {
-        SerdeRegistry::new(&self.serde_operators).make_processor(serde_operator_id)
+        SerdeProcessor {
+            current: &self.serde_operators[serde_operator_id.0 as usize],
+            env: self,
+        }
     }
 }
 

@@ -20,8 +20,8 @@ impl<'e> SerdeProcessor<'e> {
                 self.serialize_tuple(value, operator_ids, serializer)
             }
             SerdeOperator::ValueType(value_type) => self
-                .registry
-                .make_processor(value_type.property.operator_id)
+                .env
+                .new_serde_processor(value_type.property.operator_id)
                 .serialize_value(value, serializer),
             SerdeOperator::ValueUnionType(_) => {
                 panic!("Should not happen: Serialized value should be a concrete type, not a union type");
@@ -58,7 +58,7 @@ impl<'e> SerdeProcessor<'e> {
                 for (value, operator_id) in elements.iter().zip(operator_ids) {
                     seq.serialize_element(&Proxy {
                         value,
-                        processor: self.registry.make_processor(*operator_id),
+                        processor: self.env.new_serde_processor(*operator_id),
                     })?;
                 }
 
@@ -94,7 +94,7 @@ impl<'e> SerdeProcessor<'e> {
                 name,
                 &Proxy {
                     value,
-                    processor: self.registry.make_processor(serde_prop.operator_id),
+                    processor: self.env.new_serde_processor(serde_prop.operator_id),
                 },
             )?;
         }
