@@ -53,6 +53,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Ast::Type((ident, _)) => {
                 let def_id = self.named_def_id(Space::Type, &ident);
+                let ident = self.compiler.strings.intern(&ident);
                 self.set_def(def_id, DefKind::DomainType(ident), &span);
                 Ok(Some(def_id))
             }
@@ -124,6 +125,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
             }
             ast::Type::Literal(ast::Literal::String(lit)) => {
+                let lit = self.compiler.strings.intern(&lit);
                 Ok(self.compiler.defs.def_string_literal(lit))
             }
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
@@ -247,7 +249,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         def_id
     }
 
-    fn set_def(&mut self, def_id: DefId, kind: DefKind, span: &Span) {
+    fn set_def(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
         self.compiler.defs.map.insert(
             def_id,
             self.compiler.defs.mem.bump.alloc(Def {
@@ -259,7 +261,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         );
     }
 
-    fn def(&mut self, kind: DefKind, span: &Span) -> DefId {
+    fn def(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
         let def_id = self.compiler.defs.alloc_def_id();
         self.set_def(def_id, kind, span);
         def_id

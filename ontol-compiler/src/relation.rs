@@ -74,7 +74,7 @@ pub enum SubjectProperties {
     Map(IndexSet<PropertyId>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Property {
     pub relationship_id: DefId,
     pub role: Role,

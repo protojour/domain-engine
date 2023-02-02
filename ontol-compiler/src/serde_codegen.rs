@@ -9,7 +9,6 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::SmallVec;
-use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
@@ -129,13 +128,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn create_domain_type_serde_operator(
         &mut self,
-        typename: String,
+        typename: &str,
         type_def_id: DefId,
         properties: Option<&Properties>,
     ) -> SerdeOperator {
         match properties.map(|prop| &prop.subject) {
             Some(SubjectProperties::Unit) | None => SerdeOperator::MapType(MapType {
-                typename,
+                typename: typename.into(),
                 type_def_id,
                 properties: Default::default(),
             }),
@@ -149,7 +148,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .expect("No inner operator");
 
                 SerdeOperator::ValueType(ValueType {
-                    typename,
+                    typename: typename.into(),
                     type_def_id,
                     property: SerdeProperty {
                         property_id: *property_id,
@@ -165,7 +164,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .expect("no union discriminator available. Should fail earlier");
 
                 SerdeOperator::ValueUnionType(ValueUnionType {
-                    typename,
+                    typename: typename.into(),
                     discriminators: union_disciminator
                         .variants
                         .iter()
@@ -203,7 +202,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }).collect::<IndexMap<_, _>>();
 
                 SerdeOperator::MapType(MapType {
-                    typename,
+                    typename: typename.into(),
                     type_def_id,
                     properties: serde_properties,
                 })

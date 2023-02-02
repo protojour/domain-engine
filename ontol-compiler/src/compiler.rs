@@ -11,6 +11,7 @@ use crate::{
     namespace::Namespaces,
     relation::Relations,
     source::{Package, Sources},
+    strings::Strings,
     types::{DefTypes, Types},
     SpannedCompileError,
 };
@@ -30,6 +31,7 @@ pub struct Compiler<'m> {
     pub(crate) defs: Defs<'m>,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
+    pub(crate) strings: Strings<'m>,
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
@@ -44,12 +46,13 @@ impl<'m> Compiler<'m> {
         Self {
             sources: Default::default(),
             packages: Default::default(),
+            strings: Strings::new(mem),
             types: Types::new(mem),
             namespaces: Default::default(),
             defs: Defs::new(mem),
             expressions: Default::default(),
             def_types: Default::default(),
-            relations: Default::default(),
+            relations: Relations::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }

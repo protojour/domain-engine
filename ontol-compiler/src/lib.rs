@@ -23,6 +23,7 @@ mod namespace;
 mod parse;
 mod relation;
 mod source;
+mod strings;
 mod type_check;
 mod types;
 

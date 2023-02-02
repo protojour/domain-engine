@@ -16,19 +16,19 @@ use crate::{
 
 /// A definition in some package
 #[derive(Debug)]
-pub struct Def {
+pub struct Def<'m> {
     pub id: DefId,
     pub package: PackageId,
-    pub kind: DefKind,
+    pub kind: DefKind<'m>,
     pub span: SourceSpan,
 }
 
 #[derive(Debug)]
-pub enum DefKind {
+pub enum DefKind<'m> {
     Primitive(Primitive),
-    StringLiteral(String),
+    StringLiteral(&'m str),
     Tuple(SmallVec<[DefId; 4]>),
-    DomainType(String),
+    DomainType(&'m str),
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
@@ -39,7 +39,7 @@ pub enum DefKind {
     Equivalence(Variables, ExprId, ExprId),
 }
 
-impl DefKind {
+impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Primitive(Primitive::Int) => Some("int".into()),
@@ -48,7 +48,7 @@ impl DefKind {
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Tuple(_) => None,
             Self::CoreFn(_) => None,
-            Self::DomainType(ident) => Some(ident.as_str().into()),
+            Self::DomainType(ident) => Some((*ident).into()),
             Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
             Self::Property(_) => None,
@@ -110,8 +110,8 @@ pub struct Defs<'m> {
     int: DefId,
     number: DefId,
     string: DefId,
-    pub(crate) map: HashMap<DefId, &'m Def>,
-    pub(crate) string_literals: HashMap<String, DefId>,
+    pub(crate) map: HashMap<DefId, &'m Def<'m>>,
+    pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) tuples: HashMap<SmallVec<[DefId; 4]>, DefId>,
 }
 
@@ -165,7 +165,7 @@ impl<'m> Defs<'m> {
         self.string
     }
 
-    pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind> {
+    pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
         self.map.get(&def_id).map(|def| &def.kind)
     }
 
@@ -194,7 +194,7 @@ impl<'m> Defs<'m> {
         id
     }
 
-    pub fn add_def(&mut self, kind: DefKind, package: PackageId, span: SourceSpan) -> DefId {
+    pub fn add_def(&mut self, kind: DefKind<'m>, package: PackageId, span: SourceSpan) -> DefId {
         let def_id = self.alloc_def_id();
         self.map.insert(
             def_id,
@@ -209,7 +209,7 @@ impl<'m> Defs<'m> {
         def_id
     }
 
-    pub fn def_string_literal(&mut self, lit: String) -> DefId {
+    pub fn def_string_literal(&mut self, lit: &'m str) -> DefId {
         match self.string_literals.get(&lit) {
             Some(def_id) => *def_id,
             None => {
@@ -256,7 +256,7 @@ impl<'m> Compiler<'m> {
         &mut self,
         name: &str,
         space: Space,
-        kind: DefKind,
+        kind: DefKind<'m>,
         package: PackageId,
         span: SourceSpan,
     ) -> DefId {
@@ -332,7 +332,7 @@ impl<'m> Compiler<'m> {
         ty
     }
 
-    fn def_core_proc(&mut self, ident: &str, def_kind: DefKind, ty: TypeRef<'m>) -> DefId {
+    fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
         self.def_types.map.insert(def_id, ty);
 
