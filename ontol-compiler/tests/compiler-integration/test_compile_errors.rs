@@ -31,7 +31,7 @@ fn rel_duplicate_anonymous_relation() {
     (rel! ;; ERROR unit type `bar` cannot be part of a union
         (foo) _ (bar)
     )
-    (rel! ;; ERROR duplicate anonymous relation
+    (rel! ;; ERROR duplicate anonymous relationship
         (foo) _ (bar)
     )
     "
@@ -89,6 +89,42 @@ fn map_union_non_uniform_discriminators() {
     (rel! (u) _ (bar))
     "#
     .compile_fail()
+}
+
+#[test]
+fn non_disjoint_string_union() {
+    r#"
+    (type! u1)
+    (rel! (u1) _ "a")
+    (rel! (u1) _ "a") ;; ERROR duplicate anonymous relationship
+    "#
+    .compile_fail()
+}
+
+#[test]
+fn union_tree() {
+    r#"
+    (type! u1)
+    (rel! (u1) _ "1a")
+    (rel! (u1) _ "1b")
+    (type! u2)
+    (rel! (u2) _ "2a")
+    (rel! (u2) _ "2b")
+    (type! u3)
+    (rel! (u3) _ (u1)) ;; ERROR union tree not supported
+    (rel! (u3) _ (u2)) ;; ERROR union tree not supported
+    "#
+    .compile_fail()
+}
+
+#[test]
+fn tuple_in_union() {
+    r#"
+    (type! u)
+    (rel! (u) _ (tuple! "a")) ;; ERROR cannot discriminate type
+    (rel! (u) _ "b")
+    "#
+    .compile_fail();
 }
 
 #[test]

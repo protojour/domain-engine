@@ -305,7 +305,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,
-            UnionCheckError::DuplicateAnonymousRelation => CompileError::DuplicateAnonymousRelation,
+            UnionCheckError::DuplicateAnonymousRelation => {
+                CompileError::DuplicateAnonymousRelationship
+            }
             UnionCheckError::NoUniformDiscriminatorFound => {
                 CompileError::NoUniformDiscriminatorFound
             }

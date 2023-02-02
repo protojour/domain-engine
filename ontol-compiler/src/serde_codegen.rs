@@ -26,7 +26,7 @@ impl<'m> Compiler<'m> {
             def_types: &self.def_types,
             relations: &self.relations,
             serde_operators: Default::default(),
-            serde_operator_def_cache: Default::default(),
+            serde_operators_per_def: Default::default(),
         }
     }
 }
@@ -36,16 +36,16 @@ pub struct SerdeGenerator<'c, 'm> {
     def_types: &'c DefTypes<'m>,
     relations: &'c Relations,
     serde_operators: Vec<SerdeOperator>,
-    serde_operator_def_cache: HashMap<DefId, SerdeOperatorId>,
+    serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
     pub fn finish(self) -> (Vec<SerdeOperator>, HashMap<DefId, SerdeOperatorId>) {
-        (self.serde_operators, self.serde_operator_def_cache)
+        (self.serde_operators, self.serde_operators_per_def)
     }
 
     pub fn get_serde_operator_id(&mut self, type_def_id: DefId) -> Option<SerdeOperatorId> {
-        if let Some(id) = self.serde_operator_def_cache.get(&type_def_id) {
+        if let Some(id) = self.serde_operators_per_def.get(&type_def_id) {
             return Some(*id);
         }
 
@@ -119,7 +119,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         // We just need a temporary placeholder for this operator kind,
         // this will be properly overwritten after it's created:
         self.serde_operators.push(SerdeOperator::Unit);
-        self.serde_operator_def_cache.insert(def_id, operator_id);
+        self.serde_operators_per_def.insert(def_id, operator_id);
         operator_id
     }
 

@@ -88,20 +88,6 @@ fn test_serde_value_union1() {
 }
 
 #[test]
-#[ignore = "need to implement on-demand discriminator per DefId"]
-fn test_serde_value_union2() {
-    r#"
-    (type! u)
-    (rel! (u) _ (tuple! "a"))
-    (rel! (u) _ "b")
-    "#
-    .compile_ok(|env| {
-        let u = TypeBinding::new(env, "u");
-        assert_json_io_matches!(env, u, json!(["a"]));
-    });
-}
-
-#[test]
 fn test_serde_map_union() {
     r#"
     (type! foo)
