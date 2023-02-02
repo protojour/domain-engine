@@ -2,10 +2,22 @@ use std::collections::HashMap;
 
 use smartstring::alias::String;
 
-use crate::PropertyId;
+use crate::{DefId, PropertyId};
 
 #[derive(Clone, Debug)]
-pub enum Value {
+pub struct Value {
+    pub data: Data,
+    pub type_def_id: DefId,
+}
+
+impl Value {
+    pub fn new(data: Data, type_def_id: DefId) -> Self {
+        Self { data, type_def_id }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Data {
     // TODO: Big rational numbers
     Number(i64),
     String(String),

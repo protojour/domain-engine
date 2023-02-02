@@ -10,14 +10,13 @@ use ontol_runtime::{
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
-use tracing::debug;
 
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{DefKind, Defs},
     relation::{Properties, Relations, SubjectProperties},
-    types::{DefTypes, Type, TypeRef},
+    types::{DefTypes, Type},
 };
 
 impl<'m> Compiler<'m> {
@@ -41,8 +40,8 @@ pub struct SerdeGenerator<'c, 'm> {
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
-    pub fn finish(self) -> Vec<SerdeOperator> {
-        self.serde_operators
+    pub fn finish(self) -> (Vec<SerdeOperator>, HashMap<DefId, SerdeOperatorId>) {
+        (self.serde_operators, self.serde_operator_def_cache)
     }
 
     pub fn get_serde_operator_id(&mut self, type_def_id: DefId) -> Option<SerdeOperatorId> {

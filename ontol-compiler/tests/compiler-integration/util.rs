@@ -1,4 +1,9 @@
-use ontol_runtime::{env::Env, serde::SerdeOperatorId, value::Value, DefId};
+use ontol_runtime::{
+    env::Env,
+    serde::SerdeOperatorId,
+    value::{Data, Value},
+    DefId,
+};
 use serde::de::DeserializeSeed;
 use tracing::debug;
 
@@ -25,43 +30,53 @@ impl TypeBinding {
         binding
     }
 
-    pub fn deserialize(
+    pub fn deserialize_data(
         &self,
         env: &Env,
         json: serde_json::Value,
-    ) -> Result<Value, serde_json::Error> {
-        let json_string = serde_json::to_string(&json).unwrap();
-        let (value, serde_def_id) = env
-            .new_serde_processor(self.serde_operator_id)
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
-
-        assert_eq!(serde_def_id, self.def_id);
-
-        Ok(value)
+    ) -> Result<Data, serde_json::Error> {
+        let value = self.deserialize_value(env, json)?;
+        assert_eq!(value.type_def_id, self.def_id);
+        Ok(value.data)
     }
 
-    /// Special case deserialize where the assertion is that the result DefId
-    /// represents the _variant_ instead of the parent type
-    pub fn deserialize_variant(
+    /// Deserialize data, but expect that the resulting type DefId
+    /// is not the same as the nominal one for the TypeBinding.
+    /// (i.e. it should deserialize to a _variant_ of the type)
+    pub fn deserialize_data_variant(
+        &self,
+        env: &Env,
+        json: serde_json::Value,
+    ) -> Result<Data, serde_json::Error> {
+        let value = self.deserialize_value(env, json)?;
+        assert_ne!(value.type_def_id, self.def_id);
+        Ok(value.data)
+    }
+
+    pub fn deserialize_value(
         &self,
         env: &Env,
         json: serde_json::Value,
     ) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
-        let (value, serde_def_id) = env
-            .new_serde_processor(self.serde_operator_id)
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
-
-        assert_ne!(serde_def_id, self.def_id);
-
-        Ok(value)
+        env.new_serde_processor(self.serde_operator_id)
+            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))
     }
 
     pub fn serialize_json(&self, env: &Env, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         env.new_serde_processor(self.serde_operator_id)
-            .serialize_value(value, &mut serde_json::Serializer::new(&mut buf))
+            .serialize_value(&value, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }
+}
+
+pub fn serialize_json(env: &Env, value: &Value) -> serde_json::Value {
+    let serde_operator_id = env.serde_operators_per_def.get(&value.type_def_id).unwrap();
+    let mut buf: Vec<u8> = vec![];
+    env.new_serde_processor(*serde_operator_id)
+        .serialize_value(&value, &mut serde_json::Serializer::new(&mut buf))
+        .expect("serialization failed");
+    serde_json::from_slice(&buf).unwrap()
 }

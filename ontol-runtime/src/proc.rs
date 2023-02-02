@@ -1,6 +1,6 @@
 use derive_debug_extras::DebugExtras;
 
-use crate::PropertyId;
+use crate::{DefId, PropertyId};
 
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
@@ -47,7 +47,7 @@ pub enum OpCode {
     /// Optimization: Return Local(0)
     Return0,
     /// Call a builtin procedure
-    CallBuiltin(BuiltinProc),
+    CallBuiltin(BuiltinProc, DefId),
     /// Clone a specific local, putting its clone on the top of the stack.
     Clone(Local),
     /// Swap the position of two locals.
@@ -57,7 +57,7 @@ pub enum OpCode {
     /// Pop value from stack, and move it into the specified compound local.
     PutAttr(Local, PropertyId),
     /// Push a constant to the stack.
-    Constant(i64),
+    Constant(i64, DefId),
 }
 
 /// A reference to a local on the value stack during procedure execution.

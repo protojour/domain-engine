@@ -13,6 +13,7 @@ pub struct Env {
     pub domains: HashMap<PackageId, Domain>,
     pub lib: Lib,
     pub translations: HashMap<(DefId, DefId), Procedure>,
+    pub serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     pub serde_operators: Vec<SerdeOperator>,
 }
 

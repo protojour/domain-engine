@@ -5,7 +5,7 @@ use serde::de::{DeserializeSeed, Unexpected};
 use smartstring::alias::String;
 use tracing::warn;
 
-use crate::{value::Value, DefId};
+use crate::value::{Data, Value};
 
 use super::{
     deserialize_matcher::{
@@ -30,7 +30,7 @@ struct MapTypeVisitor<'e> {
 }
 
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
-    type Value = (Value, DefId);
+    type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -75,12 +75,12 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 },
             ),
             SerdeOperator::ValueType(value_type) => {
-                let (value, _value_def_id) = self
+                let typed_value = self
                     .registry
                     .make_processor(value_type.property.operator_id)
                     .deserialize(deserializer)?;
 
-                Ok((value, value_type.type_def_id))
+                Ok(typed_value)
             }
             SerdeOperator::ValueUnionType(value_union_type) => {
                 serde::de::Deserializer::deserialize_any(
@@ -107,7 +107,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
 }
 
 impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M> {
-    type Value = (Value, DefId);
+    type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.matcher.expecting(f)
@@ -117,49 +117,55 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
     where
         E: serde::de::Error,
     {
-        let def_id = self
+        let type_def_id = self
             .matcher
             .match_u64(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
-        Ok((
-            Value::Number(
+        Ok(Value {
+            data: Data::Number(
                 v.try_into()
                     .map_err(|_| serde::de::Error::custom(format!("u64 overflow")))?,
             ),
-            def_id,
-        ))
+            type_def_id,
+        })
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        let def_id = self
+        let type_def_id = self
             .matcher
             .match_i64(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Signed(v), &self))?;
 
-        Ok((Value::Number(v), def_id))
+        Ok(Value {
+            data: Data::Number(v),
+            type_def_id,
+        })
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        let def_id = self
+        let type_def_id = self
             .matcher
             .match_str(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
 
-        Ok((Value::String(v.into()), def_id))
+        Ok(Value {
+            data: Data::String(v.into()),
+            type_def_id,
+        })
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let vec_def_id = self
+        let type_def_id = self
             .matcher
             .match_seq()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
@@ -171,13 +177,16 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             let processor = match self.matcher.match_seq_element(index) {
                 Some(operator_id) => self.registry.make_processor(operator_id),
                 None => {
-                    return Ok((Value::Vec(output), vec_def_id));
+                    return Ok(Value {
+                        data: Data::Vec(output),
+                        type_def_id,
+                    });
                 }
             };
 
             match seq.next_element_seed(processor)? {
-                Some((value, _elem_def_id)) => {
-                    output.push(value);
+                Some(typed_value) => {
+                    output.push(typed_value);
                     index += 1;
                 }
                 None => return Err(serde::de::Error::invalid_length(index, &self)),
@@ -241,7 +250,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 }
 
 impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
-    type Value = (Value, DefId);
+    type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "type `{}`", self.map_type.typename)
@@ -259,22 +268,22 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             let value_deserializer: serde_value::ValueDeserializer<A::Error> =
                 serde_value::ValueDeserializer::new(value);
 
-            let (attribute_value, _def_id) = self
+            let typed_value = self
                 .registry
                 .make_processor(serde_property.operator_id)
                 .deserialize(value_deserializer)?;
 
-            attributes.insert(serde_property.property_id, attribute_value);
+            attributes.insert(serde_property.property_id, typed_value);
         }
 
         // parse rest of map
         while let Some(serde_property) =
             map.next_key_seed(PropertySet(&self.map_type.properties))?
         {
-            let (attribute_value, _def_id) =
+            let typed_value =
                 map.next_value_seed(self.registry.make_processor(serde_property.operator_id))?;
 
-            attributes.insert(serde_property.property_id, attribute_value);
+            attributes.insert(serde_property.property_id, typed_value);
         }
 
         if attributes.len() < self.map_type.properties.len() {
@@ -296,7 +305,10 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             )));
         }
 
-        Ok((Value::Map(attributes), self.map_type.type_def_id))
+        Ok(Value {
+            data: Data::Map(attributes),
+            type_def_id: self.map_type.type_def_id,
+        })
     }
 }
 

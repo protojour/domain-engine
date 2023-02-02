@@ -58,8 +58,10 @@ pub fn codegen_map_obj_origin<'m>(
 
     match &dest_expr.kind {
         TypedExprKind::MapObj(dest_attrs) => {
+            let return_def_id = dest_expr.ty.get_single_def_id().unwrap();
+
             // Local(1), this is the return value:
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap));
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
 
             for (property_id, node) in dest_attrs {
                 map_codegen.codegen_expr(table, *node, &mut opcodes);

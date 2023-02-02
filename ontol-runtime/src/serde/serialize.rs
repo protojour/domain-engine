@@ -1,6 +1,6 @@
 use serde::ser::{SerializeMap, SerializeSeq};
 
-use crate::value::Value;
+use crate::value::{Data, Value};
 
 use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor};
 
@@ -31,15 +31,15 @@ impl<'e> SerdeProcessor<'e> {
 
 impl<'e> SerdeProcessor<'e> {
     fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match value {
-            Value::Number(num) => serializer.serialize_i64(*num),
+        match &value.data {
+            Data::Number(num) => serializer.serialize_i64(*num),
             other => panic!("BUG: Serialize expected number, got {other:?}"),
         }
     }
 
     fn serialize_string<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match value {
-            Value::String(string) => serializer.serialize_str(string),
+        match &value.data {
+            Data::String(string) => serializer.serialize_str(string),
             other => panic!("BUG: Serialize expected string, got {other:?}"),
         }
     }
@@ -50,8 +50,8 @@ impl<'e> SerdeProcessor<'e> {
         operator_ids: &[SerdeOperatorId],
         serializer: S,
     ) -> Res<S> {
-        match value {
-            Value::Vec(elements) => {
+        match &value.data {
+            Data::Vec(elements) => {
                 let mut seq = serializer.serialize_seq(Some(elements.len()))?;
                 for (value, operator_id) in elements.iter().zip(operator_ids) {
                     seq.serialize_element(&Proxy {
@@ -72,8 +72,8 @@ impl<'e> SerdeProcessor<'e> {
         value: &Value,
         serializer: S,
     ) -> Res<S> {
-        let attributes = match value {
-            Value::Map(attributes) => attributes,
+        let attributes = match &value.data {
+            Data::Map(attributes) => attributes,
             other => panic!("BUG: Serialize expected compound attributes, got {other:?}"),
         };
 

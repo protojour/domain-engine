@@ -5,9 +5,9 @@ use tracing::debug;
 
 use crate::{
     proc::{BuiltinProc, Lib, Local, Procedure},
-    value::Value,
+    value::{Data, Value},
     vm::{AbstractVm, Stack, VmDebug},
-    PropertyId,
+    DefId, PropertyId,
 };
 
 /// Virtual machine for executing ONTOL procedures
@@ -76,9 +76,9 @@ impl Stack for ValueStack {
         self.stack.truncate(self.local0_pos + n_locals);
     }
 
-    fn call_builtin(&mut self, proc: BuiltinProc) {
-        let value = self.eval_builtin(proc);
-        self.stack.push(value);
+    fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) {
+        let data = self.eval_builtin(proc);
+        self.stack.push(Value::new(data, result_type));
     }
 
     fn clone(&mut self, source: Local) {
@@ -104,35 +104,35 @@ impl Stack for ValueStack {
         compound.insert(property_id, value);
     }
 
-    fn constant(&mut self, k: i64) {
-        self.stack.push(Value::Number(k));
+    fn constant(&mut self, k: i64, result_type: DefId) {
+        self.stack.push(Value::new(Data::Number(k), result_type));
     }
 }
 
 impl ValueStack {
-    fn eval_builtin(&mut self, proc: BuiltinProc) -> Value {
+    fn eval_builtin(&mut self, proc: BuiltinProc) -> Data {
         match proc {
             BuiltinProc::Add => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Value::Number(a + b)
+                Data::Number(a + b)
             }
             BuiltinProc::Sub => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Value::Number(a - b)
+                Data::Number(a - b)
             }
             BuiltinProc::Mul => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Value::Number(a * b)
+                Data::Number(a * b)
             }
             BuiltinProc::Div => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Value::Number(a / b)
+                Data::Number(a / b)
             }
             BuiltinProc::Append => {
                 let [a, b]: [String; 2] = self.pop_n();
-                Value::String(a + b)
+                Data::String(a + b)
             }
-            BuiltinProc::NewMap => Value::Map([].into()),
+            BuiltinProc::NewMap => Data::Map([].into()),
         }
     }
 
@@ -147,8 +147,8 @@ impl ValueStack {
     }
 
     fn compound_local_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, Value> {
-        match self.local_mut(local) {
-            Value::Map(hash_map) => hash_map,
+        match &mut self.local_mut(local).data {
+            Data::Map(hash_map) => hash_map,
             _ => panic!("Value at {local:?} is not a compound value"),
         }
     }
@@ -184,8 +184,8 @@ impl Cast<Value> for Value {
 
 impl Cast<i64> for Value {
     fn cast(self) -> i64 {
-        match self {
-            Self::Number(n) => n,
+        match self.data {
+            Data::Number(n) => n,
             _ => panic!("not a number"),
         }
     }
@@ -193,8 +193,8 @@ impl Cast<i64> for Value {
 
 impl Cast<String> for Value {
     fn cast(self) -> String {
-        match self {
-            Self::String(s) => s,
+        match self.data {
+            Data::String(s) => s,
             _ => panic!("not a string"),
         }
     }
@@ -213,7 +213,11 @@ impl VmDebug<ValueStack> for Tracer {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::proc::{NParams, OpCode};
+    use crate::{
+        proc::{NParams, OpCode},
+        value::Value,
+        DefId,
+    };
 
     use super::*;
 
@@ -223,7 +227,7 @@ mod tests {
         let proc = lib.add_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap),
+                OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(42)),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::PutAttr(Local(1), PropertyId(3)),
                 OpCode::TakeAttr(Local(0), PropertyId(2)),
@@ -235,16 +239,25 @@ mod tests {
         let mut vm = Translator::new(&lib);
         let output = vm.trace_eval(
             proc,
-            [Value::Map(
-                [
-                    (PropertyId(1), Value::String("foo".into())),
-                    (PropertyId(2), Value::String("bar".into())),
-                ]
-                .into(),
+            [Value::new(
+                Data::Map(
+                    [
+                        (
+                            PropertyId(1),
+                            Value::new(Data::String("foo".into()), DefId(0)),
+                        ),
+                        (
+                            PropertyId(2),
+                            Value::new(Data::String("bar".into()), DefId(0)),
+                        ),
+                    ]
+                    .into(),
+                ),
+                DefId(0),
             )],
         );
 
-        let Value::Map(map) = output else {
+        let Data::Map(map) = output.data else {
             panic!();
         };
         let properties = map.keys().cloned().collect::<HashSet<_>>();
@@ -258,14 +271,14 @@ mod tests {
             NParams(1),
             [
                 OpCode::Clone(Local(0)),
-                OpCode::CallBuiltin(BuiltinProc::Add),
+                OpCode::CallBuiltin(BuiltinProc::Add, DefId(0)),
                 OpCode::Return0,
             ],
         );
         let add_then_double = lib.add_procedure(
             NParams(2),
             [
-                OpCode::CallBuiltin(BuiltinProc::Add),
+                OpCode::CallBuiltin(BuiltinProc::Add, DefId(0)),
                 OpCode::Call(double),
                 OpCode::Return0,
             ],
@@ -273,7 +286,7 @@ mod tests {
         let translate = lib.add_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap),
+                OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(0)),
                 OpCode::TakeAttr(Local(0), PropertyId(1)),
                 OpCode::Call(double),
                 OpCode::PutAttr(Local(1), PropertyId(4)),
@@ -288,23 +301,26 @@ mod tests {
         let mut vm = Translator::new(&lib);
         let output = vm.trace_eval(
             translate,
-            [Value::Map(
-                [
-                    (PropertyId(1), Value::Number(333)),
-                    (PropertyId(2), Value::Number(10)),
-                    (PropertyId(3), Value::Number(11)),
-                ]
-                .into(),
+            [Value::new(
+                Data::Map(
+                    [
+                        (PropertyId(1), Value::new(Data::Number(333), DefId(0))),
+                        (PropertyId(2), Value::new(Data::Number(10), DefId(0))),
+                        (PropertyId(3), Value::new(Data::Number(11), DefId(0))),
+                    ]
+                    .into(),
+                ),
+                DefId(0),
             )],
         );
 
-        let Value::Map(mut map) = output else {
+        let Data::Map(mut map) = output.data else {
             panic!();
         };
-        let Value::Number(a) = map.remove(&PropertyId(4)).unwrap() else {
+        let Data::Number(a) = map.remove(&PropertyId(4)).unwrap().data else {
             panic!();
         };
-        let Value::Number(b) = map.remove(&PropertyId(5)).unwrap() else {
+        let Data::Number(b) = map.remove(&PropertyId(5)).unwrap().data else {
             panic!();
         };
         assert_eq!(666, a);

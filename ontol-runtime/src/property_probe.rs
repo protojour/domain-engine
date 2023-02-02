@@ -7,7 +7,7 @@ use crate::{
     proc::{BuiltinProc, Lib, Local},
     serde::SerdeOperator,
     vm::{AbstractVm, Stack, VmDebug},
-    PropertyId,
+    DefId, PropertyId,
 };
 
 pub struct PropertyProbe<'l> {
@@ -94,7 +94,7 @@ impl Stack for PropStack {
         self.stack.truncate(self.local0_pos + n_locals);
     }
 
-    fn call_builtin(&mut self, proc: BuiltinProc) {
+    fn call_builtin(&mut self, proc: BuiltinProc, _: DefId) {
         let value = match proc {
             BuiltinProc::NewMap => Props::Map(Default::default()),
             _ => {
@@ -131,7 +131,7 @@ impl Stack for PropStack {
         target_set.extend(source_set.into_iter());
     }
 
-    fn constant(&mut self, k: i64) {
+    fn constant(&mut self, k: i64, _: DefId) {
         self.stack.push(Props::Set([].into()));
     }
 }

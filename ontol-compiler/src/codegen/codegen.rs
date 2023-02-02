@@ -76,7 +76,7 @@ fn codegen_translate_rewrite(
             let key_b = find_translation_key(&table.inner.get_expr_no_rewrite(dest_node).ty);
             match (key_a, key_b) {
                 (Some(a), Some(b)) => {
-                    let procedure = codegen_translate(lib, &table.inner, origin_node, dest_node);
+                    let procedure = codegen_translate(lib, b, &table.inner, origin_node, dest_node);
 
                     translations.insert((a, b), procedure);
                     true
@@ -105,6 +105,7 @@ fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
 
 fn codegen_translate<'m>(
     lib: &mut Lib,
+    return_def_id: DefId,
     table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
@@ -118,7 +119,9 @@ fn codegen_translate<'m>(
     );
 
     match &origin_expr.kind {
-        TypedExprKind::ValueObj(_) => codegen_value_obj_origin(lib, table, dest_node),
+        TypedExprKind::ValueObj(_) => {
+            codegen_value_obj_origin(lib, return_def_id, table, dest_node)
+        }
         TypedExprKind::MapObj(attributes) => {
             codegen_map_obj_origin(lib, table, attributes, dest_node)
         }
@@ -128,6 +131,7 @@ fn codegen_translate<'m>(
 
 fn codegen_value_obj_origin<'m>(
     lib: &mut Lib,
+    return_def_id: DefId,
     table: &TypedExprTable<'m>,
     dest_node: NodeId,
 ) -> Procedure {
@@ -159,7 +163,7 @@ fn codegen_value_obj_origin<'m>(
             opcodes.push(OpCode::Return0);
         }
         TypedExprKind::MapObj(dest_attrs) => {
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap));
+            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
 
             // the input value is not compound, so it will be consumed.
             // Therefore it must be top of the stack:
@@ -216,10 +220,13 @@ pub trait Codegen {
                     self.codegen_expr(table, *param, opcodes);
                 }
 
-                opcodes.push(OpCode::CallBuiltin(*proc));
+                let return_def_id = expr.ty.get_single_def_id().unwrap();
+
+                opcodes.push(OpCode::CallBuiltin(*proc, return_def_id));
             }
             TypedExprKind::Constant(k) => {
-                opcodes.push(OpCode::Constant(*k));
+                let return_def_id = expr.ty.get_single_def_id().unwrap();
+                opcodes.push(OpCode::Constant(*k, return_def_id));
             }
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(*var, opcodes);
