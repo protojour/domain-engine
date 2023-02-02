@@ -94,7 +94,7 @@ fn deserialize_object_properties() {
         );
         assert_error_msg!(
             obj.deserialize_data(env, json!({})),
-            "missing properties, expected `a` and `b` at line 1 column 2"
+            r#"missing properties, expected "a" and "b" at line 1 column 2"#
         );
     });
 }
@@ -166,7 +166,7 @@ fn deserialize_union_of_primitives() {
         assert_matches!(foo.deserialize_data_variant(env, json!("qux")), Ok(Data::String(s)) if s == "qux");
         assert_error_msg!(
             foo.deserialize_data(env, json!({})),
-            "invalid type: map, expected `number` or `string` at line 1 column 2"
+            "invalid type: map, expected `foo` (`number` or `string`) at line 1 column 2"
         );
     });
 }
@@ -236,7 +236,7 @@ fn deserialize_string_union() {
         );
         assert_error_msg!(
             foo.deserialize_data_variant(env, json!("junk")),
-            r#"invalid type: string "junk", expected `"a"` or `"b"` at line 1 column 6"#
+            r#"invalid type: string "junk", expected `foo` ("a" or "b") at line 1 column 6"#
         );
     });
 }
@@ -267,11 +267,11 @@ fn deserialize_map_union() {
         assert_error_msg!(
             union.deserialize_data_variant(env, json!("junk")),
             // FIXME: This error: should be about `union` instead of foo or bar?
-            r#"invalid type: string "junk", expected `foo` or `bar` at line 1 column 6"#
+            r#"invalid type: string "junk", expected `union` (`foo` or `bar`) at line 1 column 6"#
         );
         assert_error_msg!(
             union.deserialize_data_variant(env, json!({ "variant": "bar" })),
-            r#"missing properties, expected `prop` at line 1 column 17"#
+            r#"missing properties, expected "prop" at line 1 column 17"#
         );
     });
 }

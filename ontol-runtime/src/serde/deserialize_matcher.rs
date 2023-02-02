@@ -1,11 +1,21 @@
 use std::fmt::Display;
 
-use crate::{discriminator::Discriminant, env::Env, DefId};
-
-use super::{
-    deserialize::{LogicOp, Missing},
-    MapType, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator, ValueUnionType,
+use crate::{
+    discriminator::Discriminant,
+    env::Env,
+    format_utils::{Backticks, LogicOp, Missing},
+    DefId,
 };
+
+use super::{MapType, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator, ValueUnionType};
+
+pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
+
+impl<'v> Display for ExpectingMatching<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.expecting(f)
+    }
+}
 
 /// Trait for matching incoming types for deserialization
 pub trait ValueMatcher {
@@ -117,24 +127,20 @@ pub struct UnionMatcher<'e> {
 
 impl<'e> ValueMatcher for UnionMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let missing = Missing {
-            items: self
-                .value_union_type
-                .discriminators
-                .iter()
-                .map(|discriminator| -> Box<dyn Display> {
-                    Box::new(String::from(
-                        self.env
-                            .new_serde_processor(discriminator.operator_id)
-                            .current
-                            .typename(),
-                    ))
-                })
-                .collect(),
-            logic_op: LogicOp::Or,
-        };
-
-        write!(f, "{missing}")
+        write!(
+            f,
+            "{} ({})",
+            Backticks(&self.value_union_type.typename),
+            Missing {
+                items: self
+                    .value_union_type
+                    .discriminators
+                    .iter()
+                    .map(|discriminator| self.env.new_serde_processor(discriminator.operator_id))
+                    .collect(),
+                logic_op: LogicOp::Or,
+            }
+        )
     }
 
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {

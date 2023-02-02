@@ -1,10 +1,15 @@
-use std::{borrow::Cow, fmt::Debug};
+use std::fmt::{Debug, Display};
 
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
-use crate::{discriminator::VariantDiscriminator, env::Env, DefId, PropertyId};
+use crate::{
+    discriminator::VariantDiscriminator,
+    env::Env,
+    format_utils::{Backticks, CommaSeparated, DoubleQuote},
+    DefId, PropertyId,
+};
 
 mod deserialize;
 mod deserialize_matcher;
@@ -29,6 +34,27 @@ impl<'e> Debug for SerdeProcessor<'e> {
     }
 }
 
+impl<'e> Display for SerdeProcessor<'e> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.current {
+            SerdeOperator::Unit => write!(f, "unit"),
+            SerdeOperator::Number(_) => write!(f, "`number`"),
+            SerdeOperator::String(_) => write!(f, "`string`"),
+            SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
+            SerdeOperator::Tuple(ids, _) => {
+                let processors = ids
+                    .iter()
+                    .map(|id| self.env.new_serde_processor(*id))
+                    .collect::<Vec<_>>();
+                write!(f, "[{}]", CommaSeparated(&processors))
+            }
+            SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
+            SerdeOperator::ValueUnionType(_) => write!(f, "union"),
+            SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct SerdeOperatorId(pub u32);
 
@@ -45,21 +71,6 @@ pub enum SerdeOperator {
     ValueUnionType(ValueUnionType),
     // A type with many properties
     MapType(MapType),
-}
-
-impl SerdeOperator {
-    fn typename(&self) -> Cow<str> {
-        match self {
-            Self::Unit => "unit".into(),
-            Self::Number(_) => "number".into(),
-            Self::String(_) => "string".into(),
-            Self::StringConstant(lit, _) => format!("\"{lit}\"").into(),
-            Self::Tuple(_, _) => "tuple".into(),
-            Self::ValueType(value_type) => value_type.typename.as_str().into(),
-            Self::ValueUnionType(_) => "union".into(),
-            Self::MapType(map_type) => map_type.typename.as_str().into(),
-        }
-    }
 }
 
 #[derive(Debug)]

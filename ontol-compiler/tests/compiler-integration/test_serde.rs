@@ -1,4 +1,4 @@
-use crate::{util::serialize_json, util::TypeBinding, TestCompile};
+use crate::{assert_error_msg, util::serialize_json, util::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -104,5 +104,47 @@ fn test_serde_map_union() {
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(env, u, json!({ "type": "foo", "c": 7}));
+    });
+}
+
+#[test]
+fn test_serde_geojson() {
+    r#"
+    (type! position)
+    (rel! (position) _ (tuple! (number) (number)))
+
+    (type! Point)
+    (rel! (Point) type "Point")
+    (rel! (Point) coordinates (position))
+
+    (type! Polygon)
+    (rel! (Polygon) type "Polygon")
+    ; BUG: need to store in list:
+    (rel! (Polygon) coordinates (tuple! (position) (position)))
+
+    (type! Geometry)
+    (rel! (Geometry) _ (Point))
+    (rel! (Geometry) _ (Polygon))
+    "#
+    .compile_ok(|env| {
+        let geometry = TypeBinding::new(env, "Geometry");
+        assert_json_io_matches!(
+            env,
+            geometry,
+            json!({ "type": "Point", "coordinates": [1, 2]})
+        );
+        assert_json_io_matches!(
+            env,
+            geometry,
+            json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4]]})
+        );
+        assert_error_msg!(
+            geometry.deserialize_data_variant(env, json!([])),
+            "invalid type: sequence, expected `Geometry` (`Point` or `Polygon`) at line 1 column 2"
+        );
+        assert_error_msg!(
+            geometry.deserialize_data_variant(env, json!({ "type": "bogus" })),
+            "invalid map value, expected `Geometry` (`Point` or `Polygon`) at line 1 column 16"
+        );
     });
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, Unexpected};
@@ -7,13 +7,14 @@ use tracing::warn;
 
 use crate::{
     env::Env,
+    format_utils::{DoubleQuote, LogicOp, Missing},
     value::{Data, Value},
 };
 
 use super::{
     deserialize_matcher::{
-        ConstantStringMatcher, MapMatchError, NumberMatcher, StringMatcher, TupleMatcher,
-        UnionMatcher, ValueMatcher,
+        ConstantStringMatcher, ExpectingMatching, MapMatchError, NumberMatcher, StringMatcher,
+        TupleMatcher, UnionMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
 };
@@ -171,7 +172,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         let type_def_id = self
             .matcher
             .match_seq()
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
 
         let mut index = 0;
         let mut output = vec![];
@@ -247,8 +248,10 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             }
         }
 
-        // FIXME: better error message?
-        Err(serde::de::Error::custom(format!("invalid type")))
+        Err(serde::de::Error::custom(format!(
+            "invalid map value, expected {}",
+            ExpectingMatching(&self.matcher)
+        )))
     }
 }
 
@@ -298,7 +301,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                     .properties
                     .iter()
                     .filter(|(_, property)| !attributes.contains_key(&property.property_id))
-                    .map(|(key, _)| -> Box<dyn Display> { Box::new(key.clone()) })
+                    .map(|(key, _)| DoubleQuote(key))
                     .collect(),
                 logic_op: LogicOp::And,
             };
@@ -347,50 +350,6 @@ impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
                     v
                 )))
             }
-        }
-    }
-}
-
-pub(super) struct Missing {
-    pub items: Vec<Box<dyn Display>>,
-    pub logic_op: LogicOp,
-}
-
-impl Display for Missing {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.items.as_slice() {
-            [] => panic!("BUG: Nothing is missing!"),
-            [single] => write!(f, "`{}`", single),
-            [a, b] => write!(f, "`{}` {} `{}`", a, self.logic_op.name(), b),
-            _ => {
-                match self.logic_op {
-                    LogicOp::And => write!(f, "all of ")?,
-                    LogicOp::Or => write!(f, "any of ")?,
-                }
-                let mut iter = self.items.iter().peekable();
-                while let Some(next) = iter.next() {
-                    write!(f, "`{}`", next)?;
-                    if iter.peek().is_some() {
-                        write!(f, ", ")?;
-                    }
-                }
-
-                Ok(())
-            }
-        }
-    }
-}
-
-pub enum LogicOp {
-    And,
-    Or,
-}
-
-impl LogicOp {
-    fn name(&self) -> &'static str {
-        match self {
-            Self::And => "and",
-            Self::Or => "or",
         }
     }
 }
