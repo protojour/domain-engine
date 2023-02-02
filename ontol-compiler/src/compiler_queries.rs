@@ -49,7 +49,7 @@ pub trait GetPropertyMeta<'m> {
     fn get_property_meta(
         &self,
         property_id: PropertyId,
-    ) -> Result<(relation::Property, &'m Relationship, &'m Relation), ()>;
+    ) -> Result<(relation::Property, &'m Relationship, &'m Relation<'m>), ()>;
 }
 
 impl<'m, T> GetPropertyMeta<'m> for T
@@ -59,13 +59,13 @@ where
     fn get_property_meta(
         &self,
         property_id: PropertyId,
-    ) -> Result<(relation::Property, &'m Relationship, &'m Relation), ()> {
+    ) -> Result<(relation::Property, &'m Relationship, &'m Relation<'m>), ()> {
         let property = get::<_, Relations>(self)
             .properties
             .get(&property_id)
             .ok_or(())?;
         let (relationship, relation) =
-            get::<_, Defs>(self).get_relationship_defs(property.relationship_id)?;
+            get::<_, Defs<'m>>(self).get_relationship_defs(property.relationship_id)?;
         Ok((property.clone(), relationship, relation))
     }
 }

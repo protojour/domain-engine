@@ -62,6 +62,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident: (ident, ident_span),
                 object,
             }) => {
+                let ident = ident.map(|i| self.compiler.strings.intern(&i));
                 // This syntax just defines the relation the first time it's used
                 let relation_def_id = match self.define_relation_if_undefined(ident.clone()) {
                     ImplicitDefId::New(def_id) => {
@@ -223,13 +224,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, ident: Option<String>) -> ImplicitDefId {
+    fn define_relation_if_undefined(&mut self, ident: Option<&'m str>) -> ImplicitDefId {
         match ident {
             Some(ident) => match self
                 .compiler
                 .namespaces
                 .get_mut(self.src.package, Space::Rel)
-                .entry(ident)
+                .entry(ident.into())
             {
                 Entry::Vacant(vacant) => {
                     ImplicitDefId::New(vacant.insert(self.compiler.defs.alloc_def_id()).clone())

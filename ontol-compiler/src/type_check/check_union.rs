@@ -189,7 +189,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             relation_def_id: relationship.relation_def_id,
                             discriminant: Discriminant::HasStringAttribute(
                                 *property_id,
-                                property_name.clone(),
+                                property_name.into(),
                                 string_literal.into(),
                             ),
                         },

@@ -2,7 +2,6 @@ use std::{borrow::Cow, collections::HashMap};
 
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
 use smallvec::SmallVec;
-use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
@@ -29,7 +28,7 @@ pub enum DefKind<'m> {
     StringLiteral(&'m str),
     Tuple(SmallVec<[DefId; 4]>),
     DomainType(&'m str),
-    Relation(Relation),
+    Relation(Relation<'m>),
     Relationship(Relationship),
     Property(Property),
     // FIXME: This should not be builtin proc directly.
@@ -71,10 +70,10 @@ pub enum Primitive {
 
 /// This definition expresses that a relation _exists_
 #[derive(Debug)]
-pub struct Relation {
-    pub ident: Option<String>,
-    pub subject_prop: Option<String>,
-    pub object_prop: Option<String>,
+pub struct Relation<'m> {
+    pub ident: Option<&'m str>,
+    pub subject_prop: Option<&'m str>,
+    pub object_prop: Option<&'m str>,
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
@@ -91,13 +90,13 @@ pub struct Property {
     pub role: Role,
 }
 
-impl Relation {
-    pub fn subject_prop(&self) -> Option<&String> {
-        self.subject_prop.as_ref().or(self.ident.as_ref())
+impl<'m> Relation<'m> {
+    pub fn subject_prop(&self) -> Option<&'m str> {
+        self.subject_prop.or(self.ident)
     }
 
-    pub fn object_prop(&self) -> Option<&String> {
-        self.object_prop.as_ref().or(self.ident.as_ref())
+    pub fn object_prop(&self) -> Option<&'m str> {
+        self.object_prop.or(self.ident)
     }
 }
 
@@ -172,7 +171,7 @@ impl<'m> Defs<'m> {
     pub fn get_relationship_defs(
         &self,
         relationship_def_id: DefId,
-    ) -> Result<(&'m Relationship, &'m Relation), ()> {
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
         let DefKind::Relationship(relationship) = self.get_def_kind(relationship_def_id).ok_or(())? else {
             return Err(());
         };

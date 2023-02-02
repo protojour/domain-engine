@@ -177,7 +177,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for (prop_name, match_property) in match_properties.into_iter() {
                             if !match_property.used {
-                                self.error(CompileError::MissingProperty(prop_name), &expr.span);
+                                self.error(
+                                    CompileError::MissingProperty(prop_name.into()),
+                                    &expr.span,
+                                );
                             }
                         }
 

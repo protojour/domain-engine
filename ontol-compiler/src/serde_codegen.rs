@@ -193,7 +193,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .expect("No inner operator");
 
                     (
-                        object_key,
+                        object_key.into(),
                         SerdeProperty {
                             property_id: *property_id,
                             operator_id,
