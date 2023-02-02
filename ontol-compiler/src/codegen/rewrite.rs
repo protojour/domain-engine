@@ -160,7 +160,7 @@ mod rules {
         }
     }
 
-    pub static RULES: [(Pattern, Rewrite); 3] = [
+    pub static RULES: [(Pattern, Rewrite); 4] = [
         (
             Pattern(BuiltinProc::Add, &[Match::Any, Match::Any]),
             Rewrite(BuiltinProc::Sub, &[0, 1]),
@@ -172,6 +172,10 @@ mod rules {
         (
             Pattern(BuiltinProc::Mul, &[Match::NonZero, Match::Any]),
             Rewrite(BuiltinProc::Div, &[1, 0]),
+        ),
+        (
+            Pattern(BuiltinProc::Div, &[Match::Any, Match::NonZero]),
+            Rewrite(BuiltinProc::Mul, &[0, 1]),
         ),
     ];
 }

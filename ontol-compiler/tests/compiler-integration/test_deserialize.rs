@@ -105,19 +105,19 @@ fn deserialize_nested() {
     (type! one)
     (type! two)
     (type! three)
-    (rel! (one) two (two))
-    (rel! (one) three (three))
-    (rel! (two) three (three))
+    (rel! (one) x (two))
+    (rel! (one) y (three))
+    (rel! (two) y (three))
     (rel! (three) _ (string))
     "
     .compile_ok(|env| {
         let one = TypeBinding::new(env, "one");
         assert_matches!(
             one.deserialize_data(env, json!({
-                "two": {
-                    "three": "a"
+                "x": {
+                    "y": "a"
                 },
-                "three": "b"
+                "y": "b"
             })),
             Ok(Data::Map(a)) if a.len() == 2
         );
@@ -266,7 +266,6 @@ fn deserialize_map_union() {
         );
         assert_error_msg!(
             union.deserialize_data_variant(env, json!("junk")),
-            // FIXME: This error: should be about `union` instead of foo or bar?
             r#"invalid type: string "junk", expected `union` (`foo` or `bar`) at line 1 column 6"#
         );
         assert_error_msg!(

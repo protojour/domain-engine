@@ -76,16 +76,39 @@ fn test_meters() {
     (rel! (millimeters) _ (number))
     (eq! (:x)
         (obj! meters
-            (_ :x)
+            (_ (/ :x 1000))
         )
         (obj! millimeters
-            (_ (* :x 1000))
+            (_ :x)
         )
     )
     "
     .compile_ok(|env| {
         assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
         assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
+    })
+}
+
+#[test]
+#[ignore = "support this!"]
+fn test_temperature() {
+    "
+    (type! celsius)
+    (type! fahrenheit)
+    (rel! (celsius) _ (number))
+    (rel! (fahrenheit) _ (number))
+    (eq! (:x)
+        (obj! celsius
+            (_ (+ (* :x (/ 9 5)) 32))
+        )
+        (obj! fahrenheit
+            (_ :x)
+        )
+    )
+    "
+    .compile_ok(|env| {
+        assert_translate(env, ("c", "f"), json!(10), json!(50));
+        assert_translate(env, ("f", "c"), json!(50), json!(10));
     })
 }
 
@@ -126,12 +149,27 @@ fn test_eq_value_to_map_func() {
 }
 
 #[test]
+#[ignore = "find a solution for default values"]
+fn test_eq_default() {
+    r#"
+    (type! default)
+    (rel! (default) _ (string))
+    (rel! (default) _)
+    (eq! (:x)
+        (obj! default)
+        (obj! default (_ "default value!"))
+    )
+    "#
+    .compile_ok(|env| {})
+}
+
+#[test]
 fn test_eq_complex_flow() {
     // FIXME: This should be a one-way translation.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
-    // But perheps let's accept that this might be what the user wants.
+    // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
-    "
+    r#"
     (type! one)
     (type! two)
     (rel! (one) a (string))
@@ -144,7 +182,7 @@ fn test_eq_complex_flow() {
         (obj! one (a :x) (b :y))
         (obj! two (a :x) (b :y) (c :x) (d :y))
     )
-    "
+    "#
     .compile_ok(|env| {
         assert_translate(
             env,
