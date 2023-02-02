@@ -27,11 +27,14 @@ pub enum DefKind {
     Primitive(Primitive),
     StringLiteral(String),
     Tuple(SmallVec<[DefId; 4]>),
-    CoreFn(BuiltinProc),
     DomainType(String),
     Relation(Relation),
     Relationship(Relationship),
     Property(Property),
+    // FIXME: This should not be builtin proc directly.
+    // we may find the _actual_ builtin proc to call during type check,
+    // if there are different variants per type.
+    CoreFn(BuiltinProc),
     Equivalence(Variables, ExprId, ExprId),
 }
 

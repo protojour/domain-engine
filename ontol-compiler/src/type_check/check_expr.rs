@@ -50,8 +50,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Some(Type::Function { params, output }),
                     ) => {
                         if args.len() != params.len() {
-                            return self
-                                .expr_error(CompileError::WrongNumberOfArguments, &expr.span);
+                            return self.expr_error(
+                                CompileError::IncorrectNumberOfArguments {
+                                    expected: u8::try_from(params.len()).unwrap(),
+                                    actual: u8::try_from(args.len()).unwrap(),
+                                },
+                                &expr.span,
+                            );
                         }
 
                         let mut param_nodes = vec![];

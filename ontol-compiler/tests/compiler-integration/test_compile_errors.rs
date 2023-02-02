@@ -139,6 +139,19 @@ fn eq_undeclared_variable() {
 }
 
 #[test]
+fn eq_incorrect_function_arguments() {
+    "
+    (eq! (:x)
+        (+ ;; ERROR function takes 2 parameters, but 1 was supplied
+            :x
+        )
+        42
+    )
+    "
+    .compile_fail()
+}
+
+#[test]
 fn eq_obj_non_domain_type_and_unit_type() {
     "
     (type! foo)

@@ -37,8 +37,8 @@ pub enum CompileError {
     Lex(ChumskyError<char>),
     #[error("parse error: {0}")]
     Parse(ChumskyError<Tree>),
-    #[error("wrong number of arguments")]
-    WrongNumberOfArguments,
+    #[error("function takes {expected} parameters, but {actual} was supplied")]
+    IncorrectNumberOfArguments { expected: u8, actual: u8 },
     #[error("not callable")]
     NotCallable,
     #[error("type not found")]
