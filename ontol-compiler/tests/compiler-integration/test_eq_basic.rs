@@ -72,8 +72,8 @@ fn test_meters() {
     "
     (type! meters)
     (type! millimeters)
-    (rel! (meters) _ (number))
-    (rel! (millimeters) _ (number))
+    (rel! (meters) _ (int))
+    (rel! (millimeters) _ (int))
     (eq! (:x)
         (obj! meters
             (_ (/ :x 1000))
@@ -95,8 +95,8 @@ fn test_temperature() {
     "
     (type! celsius)
     (type! fahrenheit)
-    (rel! (celsius) _ (number))
-    (rel! (fahrenheit) _ (number))
+    (rel! (celsius) _ (int))
+    (rel! (fahrenheit) _ (int))
     (eq! (:x)
         (obj! celsius
             (_ (+ (* :x (/ 9 5)) 32))
@@ -135,8 +135,8 @@ fn test_eq_value_to_map_func() {
     "
     (type! one)
     (type! two)
-    (rel! (one) _ (number))
-    (rel! (two) a (number))
+    (rel! (one) _ (int))
+    (rel! (two) a (int))
     (eq! (:x)
         (obj! one (_ :x))
         (obj! two (a (* :x 2)))

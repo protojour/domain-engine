@@ -46,6 +46,23 @@ pub trait ValueMatcher {
     }
 }
 
+/// match any integer
+pub struct IntMatcher(pub DefId);
+
+impl ValueMatcher for IntMatcher {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "integer")
+    }
+
+    fn match_u64(&self, _: u64) -> Result<DefId, ()> {
+        Ok(self.0)
+    }
+
+    fn match_i64(&self, _: i64) -> Result<DefId, ()> {
+        Ok(self.0)
+    }
+}
+
 /// match any number
 pub struct NumberMatcher(pub DefId);
 
@@ -144,11 +161,11 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {
-        self.match_discriminant(Discriminant::IsNumber)
+        self.match_discriminant(Discriminant::IsInt)
     }
 
     fn match_i64(&self, _: i64) -> Result<DefId, ()> {
-        self.match_discriminant(Discriminant::IsNumber)
+        self.match_discriminant(Discriminant::IsInt)
     }
 
     fn match_str(&self, v: &str) -> Result<DefId, ()> {

@@ -55,7 +55,7 @@ pub struct Rel {
 #[derive(Debug)]
 pub enum Literal {
     String(String),
-    Number(String),
+    Int(String),
 }
 
 pub struct Path(pub Vec<Spanned<String>>);

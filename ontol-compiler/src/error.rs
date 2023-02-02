@@ -45,8 +45,8 @@ pub enum CompileError {
     TypeNotFound,
     #[error("invalid type")]
     InvalidType,
-    #[error("invalid number")]
-    InvalidNumber,
+    #[error("invalid integer")]
+    InvalidInteger,
     #[error("expected domain type")]
     DomainTypeExpected,
     #[error("duplicate anonymous relationship")]

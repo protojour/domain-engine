@@ -15,7 +15,7 @@ pub struct VariantDiscriminator {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Discriminant {
-    IsNumber,
+    IsInt,
     IsString,
     IsStringLiteral(String),
     HasProperty(PropertyId, String),

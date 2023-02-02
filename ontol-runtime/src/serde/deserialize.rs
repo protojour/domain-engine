@@ -13,7 +13,7 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ConstantStringMatcher, ExpectingMatching, MapMatchError, NumberMatcher, StringMatcher,
+        ConstantStringMatcher, ExpectingMatching, IntMatcher, MapMatchError, StringMatcher,
         TupleMatcher, UnionMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
@@ -44,10 +44,17 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Unit => {
                 panic!("This should not be used");
             }
+            SerdeOperator::Int(def_id) => serde::de::Deserializer::deserialize_i64(
+                deserializer,
+                MatcherVisitor {
+                    matcher: IntMatcher(*def_id),
+                    env: self.env,
+                },
+            ),
             SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
                 MatcherVisitor {
-                    matcher: NumberMatcher(*def_id),
+                    matcher: IntMatcher(*def_id),
                     env: self.env,
                 },
             ),
@@ -127,7 +134,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
         Ok(Value {
-            data: Data::Number(
+            data: Data::Int(
                 v.try_into()
                     .map_err(|_| serde::de::Error::custom(format!("u64 overflow")))?,
             ),
@@ -145,7 +152,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Signed(v), &self))?;
 
         Ok(Value {
-            data: Data::Number(v),
+            data: Data::Int(v),
             type_def_id,
         })
     }

@@ -38,6 +38,7 @@ impl<'e> Display for SerdeProcessor<'e> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.current {
             SerdeOperator::Unit => write!(f, "unit"),
+            SerdeOperator::Int(_) => write!(f, "`int`"),
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
@@ -61,6 +62,7 @@ pub struct SerdeOperatorId(pub u32);
 #[derive(Debug)]
 pub enum SerdeOperator {
     Unit,
+    Int(DefId),
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),

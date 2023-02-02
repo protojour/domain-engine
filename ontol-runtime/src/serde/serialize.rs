@@ -13,9 +13,12 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Unit => {
                 panic!("Tried to serialize unit");
             }
-            SerdeOperator::Number(_) => self.serialize_number(value, serializer),
-            SerdeOperator::String(_) => self.serialize_string(value, serializer),
-            SerdeOperator::StringConstant(_, _) => self.serialize_string(value, serializer),
+            SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
+                self.serialize_number(value, serializer)
+            }
+            SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => {
+                self.serialize_string(value, serializer)
+            }
             SerdeOperator::Tuple(operator_ids, _) => {
                 self.serialize_tuple(value, operator_ids, serializer)
             }
@@ -34,7 +37,8 @@ impl<'e> SerdeProcessor<'e> {
 impl<'e> SerdeProcessor<'e> {
     fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match &value.data {
-            Data::Number(num) => serializer.serialize_i64(*num),
+            Data::Int(num) => serializer.serialize_i64(*num),
+            Data::Float(f) => serializer.serialize_f64(*f),
             other => panic!("BUG: Serialize expected number, got {other:?}"),
         }
     }

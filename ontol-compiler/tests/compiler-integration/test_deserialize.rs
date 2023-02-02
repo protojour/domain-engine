@@ -27,29 +27,29 @@ fn deserialize_empty_type() {
 }
 
 #[test]
-fn deserialize_number() {
+fn deserialize_int() {
     "
     (type! foo)
-    (rel! (foo) _ (number))
+    (rel! (foo) _ (int))
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(env, json!(42)),
-            Ok(Data::Number(42))
+            Ok(Data::Int(42))
         );
         assert_matches!(
             foo.deserialize_data_variant(env, json!(-42)),
-            Ok(Data::Number(-42))
+            Ok(Data::Int(-42))
         );
 
         assert_error_msg!(
             foo.deserialize_data(env, json!({})),
-            "invalid type: map, expected number at line 1 column 0"
+            "invalid type: map, expected integer at line 1 column 0"
         );
         assert_error_msg!(
             foo.deserialize_data(env, json!("boom")),
-            "invalid type: string \"boom\", expected number at line 1 column 6"
+            "invalid type: string \"boom\", expected integer at line 1 column 6"
         );
     });
 }
@@ -79,7 +79,7 @@ fn deserialize_object_properties() {
     "
     (type! obj)
     (rel! (obj) a (string))
-    (rel! (obj) b (number))
+    (rel! (obj) b (int))
     "
     .compile_ok(|env| {
         let obj = TypeBinding::new(env, "obj");
@@ -155,18 +155,18 @@ fn deserialize_union_of_primitives() {
     "
     (type! foo)
     (rel! (foo) _ (string))
-    (rel! (foo) _ (number))
+    (rel! (foo) _ (int))
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(env, json!(42)),
-            Ok(Data::Number(42))
+            Ok(Data::Int(42))
         );
         assert_matches!(foo.deserialize_data_variant(env, json!("qux")), Ok(Data::String(s)) if s == "qux");
         assert_error_msg!(
             foo.deserialize_data(env, json!({})),
-            "invalid type: map, expected `foo` (`number` or `string`) at line 1 column 2"
+            "invalid type: map, expected `foo` (`int` or `string`) at line 1 column 2"
         );
     });
 }
@@ -198,7 +198,7 @@ fn deserialize_string_constant() {
 fn deserialize_tuple() {
     r#"
     (type! foo)
-    (rel! (foo) _ (tuple! (number) "a"))
+    (rel! (foo) _ (tuple! (int) "a"))
     "#
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -248,7 +248,7 @@ fn deserialize_map_union() {
     (type! bar)
     (rel! (foo) variant "foo")
     (rel! (bar) variant "bar")
-    (rel! (bar) prop (number))
+    (rel! (bar) prop (int))
 
     (type! union)
     (rel! (union) _ (foo))

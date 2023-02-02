@@ -105,7 +105,7 @@ impl Stack for ValueStack {
     }
 
     fn constant(&mut self, k: i64, result_type: DefId) {
-        self.stack.push(Value::new(Data::Number(k), result_type));
+        self.stack.push(Value::new(Data::Int(k), result_type));
     }
 }
 
@@ -114,19 +114,19 @@ impl ValueStack {
         match proc {
             BuiltinProc::Add => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Data::Number(a + b)
+                Data::Int(a + b)
             }
             BuiltinProc::Sub => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Data::Number(a - b)
+                Data::Int(a - b)
             }
             BuiltinProc::Mul => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Data::Number(a * b)
+                Data::Int(a * b)
             }
             BuiltinProc::Div => {
                 let [a, b]: [i64; 2] = self.pop_n();
-                Data::Number(a / b)
+                Data::Int(a / b)
             }
             BuiltinProc::Append => {
                 let [a, b]: [String; 2] = self.pop_n();
@@ -185,8 +185,8 @@ impl Cast<Value> for Value {
 impl Cast<i64> for Value {
     fn cast(self) -> i64 {
         match self.data {
-            Data::Number(n) => n,
-            _ => panic!("not a number"),
+            Data::Int(n) => n,
+            _ => panic!("not an integer"),
         }
     }
 }
@@ -304,9 +304,9 @@ mod tests {
             [Value::new(
                 Data::Map(
                     [
-                        (PropertyId(1), Value::new(Data::Number(333), DefId(0))),
-                        (PropertyId(2), Value::new(Data::Number(10), DefId(0))),
-                        (PropertyId(3), Value::new(Data::Number(11), DefId(0))),
+                        (PropertyId(1), Value::new(Data::Int(333), DefId(0))),
+                        (PropertyId(2), Value::new(Data::Int(10), DefId(0))),
+                        (PropertyId(3), Value::new(Data::Int(11), DefId(0))),
                     ]
                     .into(),
                 ),
@@ -317,10 +317,10 @@ mod tests {
         let Data::Map(mut map) = output.data else {
             panic!();
         };
-        let Data::Number(a) = map.remove(&PropertyId(4)).unwrap().data else {
+        let Data::Int(a) = map.remove(&PropertyId(4)).unwrap().data else {
             panic!();
         };
-        let Data::Number(b) = map.remove(&PropertyId(5)).unwrap().data else {
+        let Data::Int(b) = map.remove(&PropertyId(5)).unwrap().data else {
             panic!();
         };
         assert_eq!(666, a);

@@ -18,10 +18,26 @@ impl Value {
 
 #[derive(Clone, Debug)]
 pub enum Data {
-    // TODO: Big rational numbers
-    Number(i64),
+    Int(i64),
+    Float(f64),
+    Rational(num::rational::BigRational),
     String(String),
     Map(HashMap<PropertyId, Value>),
     // Represents both dynamic lists and static tuples at runtime:
     Vec(Vec<Value>),
+}
+
+#[cfg(test)]
+mod tests {
+    use num::rational::BigRational;
+
+    #[test]
+    fn rational_arithmetic() {
+        let a = BigRational::new(9.into(), 1.into());
+        let b = BigRational::new(5.into(), 1.into());
+
+        let c = a / b;
+
+        assert_eq!(BigRational::new(9.into(), 5.into()), c);
+    }
 }

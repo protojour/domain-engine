@@ -1,4 +1,5 @@
 use ontol_runtime::DefId;
+use tracing::debug;
 
 use crate::{
     codegen::{
@@ -76,6 +77,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.types.intern(Type::Tautology)
             }
+            DefKind::Primitive(Primitive::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number(def_id)),
             DefKind::Equivalence(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {

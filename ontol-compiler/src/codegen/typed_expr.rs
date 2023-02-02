@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use ontol_runtime::{proc::BuiltinProc, DefId, PropertyId};
+use ontol_runtime::{proc::BuiltinProc, PropertyId};
 
 use crate::types::TypeRef;
 

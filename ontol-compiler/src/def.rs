@@ -38,6 +38,7 @@ pub enum DefKind {
 impl DefKind {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
+            Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
@@ -57,6 +58,9 @@ pub struct Variables(pub Box<[ExprId]>);
 
 #[derive(Debug)]
 pub enum Primitive {
+    /// All the integers
+    Int,
+    /// All numbers (realistically all rational numbers as all computer numbers are rational)
     Number,
     String,
 }
@@ -98,6 +102,7 @@ pub struct Defs {
     next_def_id: DefId,
     next_expr_id: ExprId,
     anonymous_relation: DefId,
+    int: DefId,
     number: DefId,
     string: DefId,
     pub(crate) map: HashMap<DefId, Def>,
@@ -111,6 +116,7 @@ impl Default for Defs {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             anonymous_relation: DefId(0),
+            int: DefId(0),
             number: DefId(0),
             string: DefId(0),
             map: Default::default(),
@@ -131,16 +137,9 @@ impl Default for Defs {
             CORE_PKG,
             SourceSpan::none(),
         );
-        defs.number = defs.add_def(
-            DefKind::Primitive(Primitive::Number),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
-        defs.string = defs.add_def(
-            DefKind::Primitive(Primitive::String),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
+        defs.int = defs.add_primitive(Primitive::Int);
+        defs.number = defs.add_primitive(Primitive::Number);
+        defs.string = defs.add_primitive(Primitive::String);
 
         defs
     }
@@ -149,6 +148,10 @@ impl Default for Defs {
 impl Defs {
     pub fn anonymous_relation(&self) -> DefId {
         self.anonymous_relation
+    }
+
+    pub fn int(&self) -> DefId {
+        self.int
     }
 
     pub fn number(&self) -> DefId {
@@ -238,6 +241,10 @@ impl Defs {
             kind => panic!("BUG: not a string literal: {kind:?}"),
         }
     }
+
+    fn add_primitive(&mut self, primitive: Primitive) -> DefId {
+        self.add_def(DefKind::Primitive(primitive), CORE_PKG, SourceSpan::none())
+    }
 }
 
 impl<'m> Compiler<'m> {
@@ -274,19 +281,21 @@ impl<'m> Compiler<'m> {
         );
 
         // fundamental types
+        let int_ty = self.types.intern(Type::Int(self.defs.int));
         let num_ty = self.types.intern(Type::Number(self.defs.number));
         let string_ty = self.types.intern(Type::String(self.defs.string));
 
         // add fundamental types to core namespace
-        let num = self.def_core_type("number", self.defs.number, num_ty);
+        let int = self.def_core_type("int", self.defs.int, int_ty);
+        let number = self.def_core_type("number", self.defs.number, num_ty);
         let string = self.def_core_type("string", self.defs.string, string_ty);
 
-        let num_num = self.types.intern([num, num]);
+        let int_int = self.types.intern([int, int]);
         let string_string = self.types.intern([string, string]);
 
-        let num_num_to_num = self.types.intern(Type::Function {
-            params: num_num,
-            output: num,
+        let int_int_to_int = self.types.intern(Type::Function {
+            params: int_int,
+            output: int,
         });
         let string_string_to_string = self.types.intern(Type::Function {
             params: string_string,
@@ -295,10 +304,10 @@ impl<'m> Compiler<'m> {
 
         // Built-in functions
         // arithmetic
-        self.def_core_proc("+", DefKind::CoreFn(BuiltinProc::Add), num_num_to_num);
-        self.def_core_proc("-", DefKind::CoreFn(BuiltinProc::Sub), num_num_to_num);
-        self.def_core_proc("*", DefKind::CoreFn(BuiltinProc::Mul), num_num_to_num);
-        self.def_core_proc("/", DefKind::CoreFn(BuiltinProc::Div), num_num_to_num);
+        self.def_core_proc("+", DefKind::CoreFn(BuiltinProc::Add), int_int_to_int);
+        self.def_core_proc("-", DefKind::CoreFn(BuiltinProc::Sub), int_int_to_int);
+        self.def_core_proc("*", DefKind::CoreFn(BuiltinProc::Mul), int_int_to_int);
+        self.def_core_proc("/", DefKind::CoreFn(BuiltinProc::Div), int_int_to_int);
 
         // string manipulation
         self.def_core_proc(

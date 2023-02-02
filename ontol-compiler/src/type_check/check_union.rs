@@ -65,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_ty = self.def_types.map.get(&object_def).unwrap();
 
             match object_ty {
-                Type::Number(_) => builder.number = Some(NumberDiscriminator(object_def)),
+                Type::Int(_) => builder.number = Some(IntDiscriminator(object_def)),
                 Type::String(_) => {
                     builder.string = StringDiscriminator::Any(object_def);
                 }
@@ -179,7 +179,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("trying rel {relationship:?} {relation:?} ty: {object_ty:?}");
 
             match object_ty {
-                Type::NumericConstant(_) => {
+                Type::IntConstant(_) => {
                     todo!("Cannot match against numeric constants yet");
                 }
                 Type::StringConstant(def_id) => {
@@ -259,7 +259,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         if let Some(number) = builder.number {
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsNumber,
+                discriminant: Discriminant::IsInt,
                 result_type: number.0,
             })
         }
@@ -317,7 +317,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
 #[derive(Default)]
 struct DiscriminatorBuilder {
-    number: Option<NumberDiscriminator>,
+    number: Option<IntDiscriminator>,
     string: StringDiscriminator,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
@@ -336,7 +336,7 @@ impl DiscriminatorBuilder {
     }
 }
 
-struct NumberDiscriminator(DefId);
+struct IntDiscriminator(DefId);
 
 #[derive(Default)]
 enum StringDiscriminator {

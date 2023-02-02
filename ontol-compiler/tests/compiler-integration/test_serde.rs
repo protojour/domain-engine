@@ -66,7 +66,7 @@ fn test_serde_complex_type() {
 fn test_serde_tuple() {
     "
     (type! t)
-    (rel! (t) _ (tuple! (string) (number)))
+    (rel! (t) _ (tuple! (string) (int)))
     "
     .compile_ok(|env| {
         let t = TypeBinding::new(env, "t");
@@ -93,9 +93,9 @@ fn test_serde_map_union() {
     (type! foo)
     (type! bar)
     (rel! (foo) type "foo")
-    (rel! (foo) c (number))
+    (rel! (foo) c (int))
     (rel! (bar) type "bar")
-    (rel! (bar) d (number))
+    (rel! (bar) d (int))
 
     (type! u)
     (rel! (u) _ (foo))
@@ -111,7 +111,7 @@ fn test_serde_map_union() {
 fn test_serde_geojson() {
     r#"
     (type! position)
-    (rel! (position) _ (tuple! (number) (number)))
+    (rel! (position) _ (tuple! (int) (int)))
 
     (type! Point)
     (rel! (Point) type "Point")

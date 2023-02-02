@@ -17,7 +17,9 @@ pub enum Type<'m> {
     // This is the "type" of an equivalence assertion.
     // It has no specific meaning.
     Tautology,
-    NumericConstant(i32),
+    IntConstant(i32),
+    /// Any integer
+    Int(DefId),
     /// Any number
     Number(DefId),
     /// Any string
@@ -41,7 +43,8 @@ impl<'m> Type<'m> {
     pub fn get_single_def_id(&self) -> Option<DefId> {
         match self {
             Self::Tautology => None,
-            Self::NumericConstant(_) => todo!(),
+            Self::IntConstant(_) => todo!(),
+            Self::Int(def_id) => Some(*def_id),
             Self::Number(def_id) => Some(*def_id),
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
@@ -124,7 +127,8 @@ pub struct DefTypes<'m> {
 pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
     match ty {
         Type::Tautology => format!("tautology"),
-        Type::NumericConstant(val) => format!("number({})", val),
+        Type::IntConstant(val) => format!("int({})", val),
+        Type::Int(_) => format!("int"),
         Type::Number(_) => format!("number"),
         Type::String(_) => format!("string"),
         Type::StringConstant(def_id) => {
@@ -170,9 +174,9 @@ mod tests {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem);
 
-        let c0 = compiler.types.intern(Type::NumericConstant(42));
-        let c1 = compiler.types.intern(Type::NumericConstant(42));
-        let c2 = compiler.types.intern(Type::NumericConstant(66));
+        let c0 = compiler.types.intern(Type::IntConstant(42));
+        let c1 = compiler.types.intern(Type::IntConstant(42));
+        let c2 = compiler.types.intern(Type::IntConstant(66));
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));

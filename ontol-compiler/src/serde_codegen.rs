@@ -62,7 +62,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match self.get_def_type(type_def_id) {
-            Some(Type::NumericConstant(_)) => todo!(),
+            Some(Type::IntConstant(_)) => todo!(),
+            Some(Type::Int(_)) => Some((
+                self.alloc_operator_id(type_def_id),
+                SerdeOperator::Int(type_def_id),
+            )),
             Some(Type::Number(_)) => Some((
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::Number(type_def_id),

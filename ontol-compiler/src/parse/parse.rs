@@ -131,7 +131,7 @@ fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {
     match tree {
         Tree::Sym(string) => Ok((Expr::Sym(string), span)),
         Tree::Variable(string) => Ok((Expr::Variable(string), span)),
-        Tree::Num(string) => Ok((Expr::Literal(Literal::Number(string)), span)),
+        Tree::Num(string) => Ok((Expr::Literal(Literal::Int(string)), span)),
         Tree::Paren(list) => parse_list_expr(TreeStream::new(list, span)),
         _ => Err(error("invalid expression", span)),
     }
@@ -219,7 +219,7 @@ mod tests {
         let Expr::Call(_, _) = first.0 else {
             panic!("not a call");
         };
-        let Expr::Literal(Literal::Number(_)) = second.0 else {
+        let Expr::Literal(Literal::Int(_)) = second.0 else {
             panic!("not a number");
         };
     }

@@ -151,11 +151,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &VarTable,
     ) -> Res<Expr> {
         match ast_expr {
-            ast::Expr::Literal(ast::Literal::Number(num)) => {
-                let num = num
+            ast::Expr::Literal(ast::Literal::Int(int)) => {
+                let int = int
                     .parse()
-                    .map_err(|_| self.error(CompileError::InvalidNumber, &span))?;
-                Ok(self.expr(ExprKind::Constant(num), &span))
+                    .map_err(|_| self.error(CompileError::InvalidInteger, &span))?;
+                Ok(self.expr(ExprKind::Constant(int), &span))
             }
             ast::Expr::Call((ident, ident_span), ast_args) => {
                 let args = ast_args

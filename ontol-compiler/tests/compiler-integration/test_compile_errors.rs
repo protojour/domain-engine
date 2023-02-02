@@ -160,7 +160,7 @@ fn eq_attribute_mismatch() {
     (type! foo)
     (type! bar)
     (rel! (foo) prop (bar))
-    (rel! (bar) _ (number))
+    (rel! (bar) _ (int))
     (eq! (:x)
         (obj! ;; ERROR missing property `prop`
             foo
@@ -196,12 +196,12 @@ fn eq_type_mismatch() {
     (type! foo)
     (type! bar)
     (rel! (foo) prop (string))
-    (rel! (bar) prop (number))
+    (rel! (bar) prop (int))
     (eq! (:x)
         (obj! foo (prop :x))
         (obj! bar
             (prop
-                :x ;; ERROR type mismatch: expected `number`, found `string`
+                :x ;; ERROR type mismatch: expected `int`, found `string`
             )
         )
     )
@@ -215,13 +215,13 @@ fn eq_type_mismatch_in_func() {
     (type! foo)
     (type! bar)
     (rel! (foo) prop (string))
-    (rel! (bar) prop (number))
+    (rel! (bar) prop (int))
     (eq! (:x)
         (obj! foo (prop :x))
         (obj! bar
             (prop
                 (*
-                    :x ;; ERROR type mismatch: expected `number`, found `string`
+                    :x ;; ERROR type mismatch: expected `int`, found `string`
                     2
                 )
             )

@@ -197,19 +197,19 @@ mod tests {
     fn rewrite_test() {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
-        let number = compiler.types.intern(Type::Number(DefId(42)));
+        let int = compiler.types.intern(Type::Int(DefId(42)));
 
         let mut table = TypedExprTable::default();
         let var = table.add_expr(TypedExpr {
-            ty: number,
+            ty: int,
             kind: TypedExprKind::Variable(SyntaxVar(42)),
         });
         let constant = table.add_expr(TypedExpr {
-            ty: number,
+            ty: int,
             kind: TypedExprKind::Constant(1000),
         });
         let call = table.add_expr(TypedExpr {
-            ty: number,
+            ty: int,
             kind: TypedExprKind::Call(BuiltinProc::Mul, [var, constant].into()),
         });
 
