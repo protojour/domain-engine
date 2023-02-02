@@ -24,7 +24,7 @@ pub trait GetDefType<'m> {
 
 impl<'m, T> GetDefType<'m> for T
 where
-    T: AsRef<Defs> + AsRef<DefTypes<'m>>,
+    T: AsRef<Defs<'m>> + AsRef<DefTypes<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
         get::<_, DefTypes>(self).map.get(&def_id).map(|ty| *ty)
@@ -45,21 +45,21 @@ where
     }
 }
 
-pub trait GetPropertyMeta {
+pub trait GetPropertyMeta<'m> {
     fn get_property_meta(
         &self,
         property_id: PropertyId,
-    ) -> Result<(&relation::Property, &Relationship, &Relation), ()>;
+    ) -> Result<(&relation::Property, &'m Relationship, &'m Relation), ()>;
 }
 
-impl<T> GetPropertyMeta for T
+impl<'m, T> GetPropertyMeta<'m> for T
 where
-    T: AsRef<Relations> + AsRef<Defs>,
+    T: AsRef<Relations> + AsRef<Defs<'m>>,
 {
     fn get_property_meta(
         &self,
         property_id: PropertyId,
-    ) -> Result<(&relation::Property, &Relationship, &Relation), ()> {
+    ) -> Result<(&relation::Property, &'m Relationship, &'m Relation), ()> {
         let property = get::<_, Relations>(self)
             .properties
             .get(&property_id)

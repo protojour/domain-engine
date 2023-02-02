@@ -7,7 +7,7 @@ use smartstring::alias::String;
 use crate::{
     compiler::Compiler,
     expr::ExprId,
-    mem::Intern,
+    mem::{Intern, Mem},
     namespace::Space,
     relation::Role,
     source::{Package, SourceSpan, CORE_PKG},
@@ -17,6 +17,7 @@ use crate::{
 /// A definition in some package
 #[derive(Debug)]
 pub struct Def {
+    pub id: DefId,
     pub package: PackageId,
     pub kind: DefKind,
     pub span: SourceSpan,
@@ -101,21 +102,23 @@ impl Relation {
 }
 
 #[derive(Debug)]
-pub struct Defs {
+pub struct Defs<'m> {
+    pub(crate) mem: &'m Mem,
     next_def_id: DefId,
     next_expr_id: ExprId,
     anonymous_relation: DefId,
     int: DefId,
     number: DefId,
     string: DefId,
-    pub(crate) map: HashMap<DefId, Def>,
+    pub(crate) map: HashMap<DefId, &'m Def>,
     pub(crate) string_literals: HashMap<String, DefId>,
     pub(crate) tuples: HashMap<SmallVec<[DefId; 4]>, DefId>,
 }
 
-impl Default for Defs {
-    fn default() -> Self {
+impl<'m> Defs<'m> {
+    pub fn new(mem: &'m Mem) -> Self {
         let mut defs = Self {
+            mem,
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             anonymous_relation: DefId(0),
@@ -146,9 +149,6 @@ impl Default for Defs {
 
         defs
     }
-}
-
-impl Defs {
     pub fn anonymous_relation(&self) -> DefId {
         self.anonymous_relation
     }
@@ -165,14 +165,14 @@ impl Defs {
         self.string
     }
 
-    pub fn get_def_kind(&self, def_id: DefId) -> Option<&DefKind> {
+    pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind> {
         self.map.get(&def_id).map(|def| &def.kind)
     }
 
     pub fn get_relationship_defs(
         &self,
         relationship_def_id: DefId,
-    ) -> Result<(&Relationship, &Relation), ()> {
+    ) -> Result<(&'m Relationship, &'m Relation), ()> {
         let DefKind::Relationship(relationship) = self.get_def_kind(relationship_def_id).ok_or(())? else {
             return Err(());
         };
@@ -198,11 +198,12 @@ impl Defs {
         let def_id = self.alloc_def_id();
         self.map.insert(
             def_id,
-            Def {
+            self.mem.bump.alloc(Def {
+                id: def_id,
                 package,
                 span,
                 kind,
-            },
+            }),
         );
 
         def_id
@@ -265,11 +266,12 @@ impl<'m> Compiler<'m> {
             .insert(name.into(), def_id);
         self.defs.map.insert(
             def_id,
-            Def {
+            self.defs.mem.bump.alloc(Def {
+                id: def_id,
                 package,
                 span,
                 kind,
-            },
+            }),
         );
 
         def_id

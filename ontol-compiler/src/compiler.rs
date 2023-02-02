@@ -27,7 +27,7 @@ pub struct Compiler<'m> {
     pub(crate) packages: HashMap<PackageId, Package>,
 
     pub(crate) namespaces: Namespaces,
-    pub(crate) defs: Defs,
+    pub(crate) defs: Defs<'m>,
     pub(crate) expressions: HashMap<ExprId, Expr>,
 
     pub(crate) types: Types<'m>,
@@ -46,7 +46,7 @@ impl<'m> Compiler<'m> {
             packages: Default::default(),
             types: Types::new(mem),
             namespaces: Default::default(),
-            defs: Default::default(),
+            defs: Defs::new(mem),
             expressions: Default::default(),
             def_types: Default::default(),
             relations: Default::default(),
@@ -116,8 +116,8 @@ impl<'m> Compiler<'m> {
     }
 }
 
-impl<'m> AsRef<Defs> for Compiler<'m> {
-    fn as_ref(&self) -> &Defs {
+impl<'m> AsRef<Defs<'m>> for Compiler<'m> {
+    fn as_ref(&self) -> &Defs<'m> {
         &self.defs
     }
 }

@@ -28,7 +28,7 @@ pub struct TypeCheck<'c, 'm> {
     errors: &'c mut CompileErrors,
     codegen_tasks: &'c mut CodegenTasks<'m>,
     expressions: &'c HashMap<ExprId, Expr>,
-    defs: &'c Defs,
+    defs: &'c Defs<'m>,
     sources: &'c Sources,
 }
 
@@ -57,8 +57,8 @@ pub enum TypeError<'m> {
     },
 }
 
-impl<'c, 'm> AsRef<Defs> for TypeCheck<'c, 'm> {
-    fn as_ref(&self) -> &Defs {
+impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
+    fn as_ref(&self) -> &Defs<'m> {
         &self.defs
     }
 }

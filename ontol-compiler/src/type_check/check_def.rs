@@ -1,5 +1,4 @@
 use ontol_runtime::DefId;
-use tracing::debug;
 
 use crate::{
     codegen::{

@@ -250,11 +250,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn set_def(&mut self, def_id: DefId, kind: DefKind, span: &Span) {
         self.compiler.defs.map.insert(
             def_id,
-            Def {
+            self.compiler.defs.mem.bump.alloc(Def {
+                id: def_id,
                 package: self.src.package,
                 kind,
                 span: self.src.span(&span),
-            },
+            }),
         );
     }
 

@@ -32,7 +32,7 @@ impl<'m> Compiler<'m> {
 }
 
 pub struct SerdeGenerator<'c, 'm> {
-    defs: &'c Defs,
+    defs: &'c Defs<'m>,
     def_types: &'c DefTypes<'m>,
     relations: &'c Relations,
     serde_operators: Vec<SerdeOperator>,
@@ -212,8 +212,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<Defs> for SerdeGenerator<'c, 'm> {
-    fn as_ref(&self) -> &Defs {
+impl<'c, 'm> AsRef<Defs<'m>> for SerdeGenerator<'c, 'm> {
+    fn as_ref(&self) -> &Defs<'m> {
         &self.defs
     }
 }
