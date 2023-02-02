@@ -17,13 +17,15 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::String(_) => self.serialize_string(value, serializer),
             SerdeOperator::StringConstant(_, _) => self.serialize_string(value, serializer),
             SerdeOperator::Tuple(operator_ids, _) => {
-                self.serialize_vec(value, operator_ids, serializer)
+                self.serialize_tuple(value, operator_ids, serializer)
             }
             SerdeOperator::ValueType(value_type) => self
                 .registry
                 .make_processor(value_type.property.operator_id)
                 .serialize_value(value, serializer),
-            SerdeOperator::ValueUnionType(_) => todo!(),
+            SerdeOperator::ValueUnionType(_) => {
+                panic!("Should not happen: Serialized value should be a concrete type, not a union type");
+            }
             SerdeOperator::MapType(map_type) => self.serialize_map(map_type, value, serializer),
         }
     }
@@ -44,7 +46,7 @@ impl<'e> SerdeProcessor<'e> {
         }
     }
 
-    fn serialize_vec<S: serde::Serializer>(
+    fn serialize_tuple<S: serde::Serializer>(
         &self,
         value: &Value,
         operator_ids: &[SerdeOperatorId],
@@ -60,7 +62,7 @@ impl<'e> SerdeProcessor<'e> {
                     })?;
                 }
 
-                todo!()
+                seq.end()
             }
             other => panic!("BUG: Serialize expected vector, got {other:?}"),
         }

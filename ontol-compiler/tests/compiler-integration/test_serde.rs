@@ -63,6 +63,45 @@ fn test_serde_complex_type() {
 }
 
 #[test]
+fn test_serde_tuple() {
+    "
+    (type! t)
+    (rel! (t) _ (tuple! (string) (number)))
+    "
+    .compile_ok(|env| {
+        let t = TypeBinding::new(env, "t");
+        assert_json_io_matches!(env, t, json!(["a", 1]));
+    });
+}
+
+#[test]
+fn test_serde_value_union1() {
+    r#"
+    (type! u)
+    (rel! (u) _ "a")
+    (rel! (u) _ "b")
+    "#
+    .compile_ok(|env| {
+        let u = TypeBinding::new(env, "u");
+        assert_json_io_matches!(env, u, json!("a"));
+    });
+}
+
+#[test]
+#[ignore = "need to implement on-demand discriminator per DefId"]
+fn test_serde_value_union2() {
+    r#"
+    (type! u)
+    (rel! (u) _ (tuple! "a"))
+    (rel! (u) _ "b")
+    "#
+    .compile_ok(|env| {
+        let u = TypeBinding::new(env, "u");
+        assert_json_io_matches!(env, u, json!(["a"]));
+    });
+}
+
+#[test]
 fn test_serde_map_union() {
     r#"
     (type! foo)
