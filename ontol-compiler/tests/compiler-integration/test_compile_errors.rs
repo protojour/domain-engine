@@ -245,15 +245,22 @@ fn eq_type_mismatch_in_func() {
 }
 
 #[test]
-fn eq_cardinality_mismatch() {
+fn eq_array_mismatch() {
     r#"
     (type! foo)
-    (type! bar)
     (rel! (foo) a[] (string))
+    (rel! (foo) b[] (string))
+
+    (type! bar)
     (rel! (bar) a (string))
-    (eq! (:x)
-        (obj! foo (a :x))
-        (obj! bar (a :x)) ;; ERROR type mismatch: expected `string`, found `string[]`
+    (rel! (bar) b[] (int))
+
+    (eq! (:x :y)
+        (obj! foo (a :x) (b :y))
+        (obj! bar
+            (a :x) ;; ERROR type mismatch: expected `string`, found `string[]`
+            (b :y) ;; ERROR type mismatch: expected `int[]`, found `string[]`
+        )
     )
     "#
     .compile_fail();
