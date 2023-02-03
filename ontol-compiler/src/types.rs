@@ -18,6 +18,7 @@ pub enum Type<'m> {
     // It has no specific meaning.
     Tautology,
     IntConstant(i32),
+    Unit(DefId),
     /// Any integer
     Int(DefId),
     /// Any number
@@ -43,6 +44,7 @@ impl<'m> Type<'m> {
     pub fn get_single_def_id(&self) -> Option<DefId> {
         match self {
             Self::Tautology => None,
+            Self::Unit(def_id) => Some(*def_id),
             Self::IntConstant(_) => todo!(),
             Self::Int(def_id) => Some(*def_id),
             Self::Number(def_id) => Some(*def_id),
@@ -128,6 +130,7 @@ pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
     match ty {
         Type::Tautology => format!("tautology"),
         Type::IntConstant(val) => format!("int({})", val),
+        Type::Unit(_) => format!("unit"),
         Type::Int(_) => format!("int"),
         Type::Number(_) => format!("number"),
         Type::String(_) => format!("string"),

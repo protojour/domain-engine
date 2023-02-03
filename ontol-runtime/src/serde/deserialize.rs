@@ -88,7 +88,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
                     .env
-                    .new_serde_processor(value_type.property.operator_id)
+                    .new_serde_processor(value_type.inner_operator_id)
                     .deserialize(deserializer)?;
 
                 Ok(typed_value)
@@ -286,7 +286,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 .new_serde_processor(serde_property.operator_id)
                 .deserialize(value_deserializer)?;
 
-            attributes.insert(serde_property.property_id, typed_value);
+            attributes.insert(serde_property.relation_id, typed_value);
         }
 
         // parse rest of map
@@ -296,7 +296,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             let typed_value =
                 map.next_value_seed(self.env.new_serde_processor(serde_property.operator_id))?;
 
-            attributes.insert(serde_property.property_id, typed_value);
+            attributes.insert(serde_property.relation_id, typed_value);
         }
 
         if attributes.len() < self.map_type.properties.len() {
@@ -307,7 +307,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                     .map_type
                     .properties
                     .iter()
-                    .filter(|(_, property)| !attributes.contains_key(&property.property_id))
+                    .filter(|(_, property)| !attributes.contains_key(&property.relation_id))
                     .map(|(key, _)| DoubleQuote(key))
                     .collect(),
                 logic_op: LogicOp::And,

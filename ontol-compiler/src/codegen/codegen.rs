@@ -170,9 +170,9 @@ fn codegen_value_obj_origin<'m>(
             opcodes.push(OpCode::Swap(Local(0), Local(1)));
             value_codegen.input_local = Local(1);
 
-            for (property_id, node) in dest_attrs {
+            for (relation_id, node) in dest_attrs {
                 value_codegen.codegen_expr(table, *node, &mut opcodes);
-                opcodes.push(OpCode::PutAttr(Local(0), *property_id));
+                opcodes.push(OpCode::PutAttr(Local(0), *relation_id));
             }
 
             opcodes.push(OpCode::Return0);

@@ -1,4 +1,4 @@
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, RelationId};
 
 use crate::{
     codegen::{
@@ -8,7 +8,7 @@ use crate::{
     def::{Def, DefKind, Primitive, Relation},
     error::CompileError,
     mem::Intern,
-    relation::{Role, SubjectProperties},
+    relation::{RelationshipId, Role, SubjectProperties},
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -49,7 +49,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ty
             }
             DefKind::Relationship(relationship) => {
-                let relation = match self.defs.map.get(&relationship.relation_def_id) {
+                let relation = match self.defs.map.get(&relationship.relation_id.0) {
                     Some(Def {
                         kind: DefKind::Relation(relation),
                         ..
@@ -57,8 +57,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     other => panic!("TODO: relation not found, got {other:?}"),
                 };
 
+                self.relations.relationships_by_subject.insert(
+                    (relationship.subject, relationship.relation_id),
+                    RelationshipId(def_id),
+                );
+
                 self.check_property(
-                    def_id,
+                    RelationshipId(def_id),
+                    relationship.relation_id,
                     relation,
                     relationship.subject,
                     Role::Subject,
@@ -66,7 +72,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     &def.span,
                 );
                 self.check_property(
-                    def_id,
+                    RelationshipId(def_id),
+                    relationship.relation_id,
                     relation,
                     relationship.object,
                     Role::Object,
@@ -112,28 +119,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_property(
         &mut self,
-        relationship_id: DefId,
+        relationship_id: RelationshipId,
+        relation_id: RelationId,
         relation: &Relation,
         role_def_id: DefId,
         role: Role,
         inverse_role_def_id: DefId,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let property_codomain = self.check_def(inverse_role_def_id);
-        let property_id = self.relations.new_property(relationship_id, role);
+        let property_codomain_ty = self.check_def(inverse_role_def_id);
 
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(role_def_id);
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
-                (None, SubjectProperties::Unit) => {
-                    properties.subject = SubjectProperties::Value(property_id, *span);
+                (None, SubjectProperties::Empty) => {
+                    properties.subject = SubjectProperties::Value(relationship_id, *span);
                 }
-                (None, SubjectProperties::Value(existing_property_id, existing_span)) => {
+                (None, SubjectProperties::Value(existing_relationship_id, existing_span)) => {
                     properties.subject = SubjectProperties::ValueUnion(
                         [
-                            (*existing_property_id, *existing_span),
-                            (property_id, *span),
+                            (*existing_relationship_id, *existing_span),
+                            (relationship_id, *span),
                         ]
                         .into(),
                     );
@@ -142,26 +149,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     self.relations.value_unions.insert(role_def_id);
                 }
                 (None, SubjectProperties::ValueUnion(properties)) => {
-                    properties.push((property_id, *span));
+                    properties.push((relationship_id, *span));
+                }
+                (Some(_), SubjectProperties::Empty) => {
+                    properties.subject = SubjectProperties::Map([relation_id].into());
+                }
+                (Some(_), SubjectProperties::Map(properties)) => {
+                    if !properties.insert(relation_id) {
+                        panic!("duplicate property");
+                    }
                 }
                 (None, SubjectProperties::Map(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
-                (Some(_), SubjectProperties::Unit) => {
-                    properties.subject = SubjectProperties::Map([property_id].into());
-                }
                 (Some(_), SubjectProperties::Value(_, _) | SubjectProperties::ValueUnion(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
-                (Some(_), SubjectProperties::Map(properties)) => {
-                    properties.insert(property_id);
-                }
             },
             Role::Object => {
-                properties.object.insert(property_id);
+                properties.object.insert(relation_id);
             }
         }
 
-        property_codomain
+        property_codomain_ty
     }
 }

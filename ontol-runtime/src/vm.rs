@@ -1,6 +1,6 @@
 use crate::{
     proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
-    DefId, PropertyId,
+    DefId, RelationId,
 };
 
 /// Abstract virtual machine for executing ONTOL procedures.
@@ -38,8 +38,8 @@ pub trait Stack {
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
     fn swap(&mut self, a: Local, b: Local);
-    fn take_attr(&mut self, source: Local, property_id: PropertyId);
-    fn put_attr(&mut self, target: Local, property_id: PropertyId);
+    fn take_attr(&mut self, source: Local, relation_id: RelationId);
+    fn put_attr(&mut self, target: Local, relation_id: RelationId);
     fn constant(&mut self, k: i64, result_type: DefId);
 }
 
@@ -97,12 +97,12 @@ impl<'l> AbstractVm<'l> {
                     stack.swap(*a, *b);
                     self.program_counter += 1;
                 }
-                OpCode::TakeAttr(source, property_id) => {
-                    stack.take_attr(*source, *property_id);
+                OpCode::TakeAttr(source, relation_id) => {
+                    stack.take_attr(*source, *relation_id);
                     self.program_counter += 1;
                 }
-                OpCode::PutAttr(target, property_id) => {
-                    stack.put_attr(*target, *property_id);
+                OpCode::PutAttr(target, relation_id) => {
+                    stack.put_attr(*target, *relation_id);
                     self.program_counter += 1;
                 }
                 OpCode::Constant(k, result_type) => {

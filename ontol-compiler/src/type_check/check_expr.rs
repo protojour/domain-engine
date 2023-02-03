@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use ontol_runtime::{DefId, PropertyId};
+use ontol_runtime::{DefId, RelationId};
 use tracing::warn;
 
 use crate::{
@@ -77,7 +77,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
-                let Type::Domain(_) = domain_type else {
+                let Type::Domain(subject_id) = domain_type else {
                     return self.expr_error(CompileError::DomainTypeExpected, &type_path.span);
                 };
 
@@ -87,7 +87,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .map(|props| &props.subject);
 
                 let node_id = match subject_properties {
-                    Some(SubjectProperties::Unit) | None => {
+                    Some(SubjectProperties::Empty) | None => {
                         if !attributes.is_empty() {
                             return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
                         }
@@ -96,39 +96,43 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             kind: TypedExprKind::Unit,
                         })
                     }
-                    Some(SubjectProperties::Value(property_id, _)) => match attributes.deref() {
-                        [((ast_prop, _), value)] if ast_prop.is_none() => {
-                            let (_, relationship, _) = self
-                                .get_property_meta(*property_id)
-                                .expect("BUG: problem getting anonymous property meta");
+                    Some(SubjectProperties::Value(relationship_id, _)) => {
+                        match attributes.deref() {
+                            [((ast_prop, _), value)] if ast_prop.is_none() => {
+                                let (relationship, _) = self
+                                    .get_relationship_meta(*relationship_id)
+                                    .expect("BUG: problem getting anonymous property meta");
 
-                            let object_ty = self.check_def(relationship.object);
-                            let node_id = self.check_expr_expect(value, object_ty, ctx).1;
+                                let object_ty = self.check_def(relationship.object);
+                                let node_id = self.check_expr_expect(value, object_ty, ctx).1;
 
-                            ctx.typed_expr_table.add_expr(TypedExpr {
-                                ty: domain_type,
-                                kind: TypedExprKind::ValueObj(node_id),
-                            })
+                                ctx.typed_expr_table.add_expr(TypedExpr {
+                                    ty: domain_type,
+                                    kind: TypedExprKind::ValueObj(node_id),
+                                })
+                            }
+                            _ => {
+                                return self.expr_error(
+                                    CompileError::AnonymousPropertyExpected,
+                                    &expr.span,
+                                )
+                            }
                         }
-                        _ => {
-                            return self
-                                .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
-                        }
-                    },
+                    }
                     Some(SubjectProperties::ValueUnion(property_set)) => {
                         todo!()
                     }
                     Some(SubjectProperties::Map(property_set)) => {
                         struct MatchProperty {
-                            property_id: PropertyId,
+                            relation_id: RelationId,
                             object_def: DefId,
                             used: bool,
                         }
                         let mut match_properties = property_set
                             .iter()
-                            .map(|property_id| {
-                                let (_, relationship, relation) = self
-                                    .get_property_meta(*property_id)
+                            .map(|relation_id| {
+                                let (relationship, relation) = self
+                                    .get_property_meta(*subject_id, *relation_id)
                                     .expect("BUG: problem getting property meta");
                                 let property_name = relation
                                     .subject_prop()
@@ -137,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 (
                                     property_name.clone(),
                                     MatchProperty {
-                                        property_id: *property_id,
+                                        relation_id: *relation_id,
                                         object_def: relationship.object,
                                         used: false,
                                     },
@@ -172,7 +176,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             let (_, node_id) = self.check_expr_expect(value, object_ty, ctx);
 
-                            typed_properties.insert(match_property.property_id, node_id);
+                            typed_properties.insert(match_property.relation_id, node_id);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {

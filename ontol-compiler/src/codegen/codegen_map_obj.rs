@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ontol_runtime::{
     proc::{BuiltinProc, Lib, Local, NParams, OpCode, Procedure},
-    PropertyId,
+    RelationId,
 };
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
@@ -18,7 +18,7 @@ use super::typed_expr::{NodeId, TypedExprKind, TypedExprTable};
 pub fn codegen_map_obj_origin<'m>(
     lib: &mut Lib,
     table: &TypedExprTable<'m>,
-    origin_attrs: &HashMap<PropertyId, NodeId>,
+    origin_attrs: &HashMap<RelationId, NodeId>,
     dest_node: NodeId,
 ) -> Procedure {
     let (_, dest_expr) = table.get_expr(&table.target_rewrites, dest_node);
@@ -63,9 +63,9 @@ pub fn codegen_map_obj_origin<'m>(
             // Local(1), this is the return value:
             opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
 
-            for (property_id, node) in dest_attrs {
+            for (relation_id, node) in dest_attrs {
                 map_codegen.codegen_expr(table, *node, &mut opcodes);
-                opcodes.push(OpCode::PutAttr(Local(1), *property_id));
+                opcodes.push(OpCode::PutAttr(Local(1), *relation_id));
             }
 
             opcodes.push(OpCode::Return(Local(1)));

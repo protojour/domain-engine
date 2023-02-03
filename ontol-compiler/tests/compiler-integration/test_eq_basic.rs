@@ -149,21 +149,6 @@ fn test_eq_value_to_map_func() {
 }
 
 #[test]
-#[ignore = "find a solution for default values"]
-fn test_eq_default() {
-    r#"
-    (type! default)
-    (rel! (default) _ (string))
-    (rel! (default) _)
-    (eq! (:x)
-        (obj! default)
-        (obj! default (_ "default value!"))
-    )
-    "#
-    .compile_ok(|env| {})
-}
-
-#[test]
 fn test_eq_complex_flow() {
     // FIXME: This should be a one-way translation.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.

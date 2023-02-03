@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use smartstring::alias::String;
 
-use crate::{DefId, PropertyId};
+use crate::{DefId, RelationId};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -22,7 +22,7 @@ pub enum Data {
     Float(f64),
     Rational(num::rational::BigRational),
     String(String),
-    Map(HashMap<PropertyId, Value>),
+    Map(HashMap<RelationId, Value>),
     // Represents both dynamic lists and static tuples at runtime:
     Vec(Vec<Value>),
 }

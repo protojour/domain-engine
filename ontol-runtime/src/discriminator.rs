@@ -1,6 +1,6 @@
 use smartstring::alias::String;
 
-use crate::{DefId, PropertyId};
+use crate::{DefId, RelationId};
 
 #[derive(Debug)]
 pub struct UnionDiscriminator {
@@ -18,6 +18,6 @@ pub enum Discriminant {
     IsInt,
     IsString,
     IsStringLiteral(String),
-    HasProperty(PropertyId, String),
-    HasStringAttribute(PropertyId, String, String),
+    HasProperty(RelationId, String),
+    HasStringAttribute(RelationId, String, String),
 }

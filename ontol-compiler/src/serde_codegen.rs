@@ -61,6 +61,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match self.get_def_type(type_def_id) {
+            Some(Type::Unit(_)) => Some((self.alloc_operator_id(type_def_id), SerdeOperator::Unit)),
             Some(Type::IntConstant(_)) => todo!(),
             Some(Type::Int(_)) => Some((
                 self.alloc_operator_id(type_def_id),
@@ -133,13 +134,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         properties: Option<&Properties>,
     ) -> SerdeOperator {
         match properties.map(|prop| &prop.subject) {
-            Some(SubjectProperties::Unit) | None => SerdeOperator::MapType(MapType {
+            Some(SubjectProperties::Empty) | None => SerdeOperator::MapType(MapType {
                 typename: typename.into(),
                 type_def_id,
                 properties: Default::default(),
             }),
-            Some(SubjectProperties::Value(property_id, _)) => {
-                let Ok((_, relationship, _)) = self.get_property_meta(*property_id) else {
+            Some(SubjectProperties::Value(relationship_id, _)) => {
+                let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
 
@@ -150,10 +151,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 SerdeOperator::ValueType(ValueType {
                     typename: typename.into(),
                     type_def_id,
-                    property: SerdeProperty {
-                        property_id: *property_id,
-                        operator_id,
-                    },
+                    inner_operator_id: operator_id,
                 })
             }
             Some(SubjectProperties::ValueUnion(_)) => {
@@ -182,8 +180,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 })
             }
             Some(SubjectProperties::Map(property_set)) => {
-                let serde_properties = property_set.iter().map(|property_id| {
-                    let Ok((_, relationship, relation)) = self.get_property_meta(*property_id) else {
+                let serde_properties = property_set.iter().map(|relation_id| {
+                    let Ok((relationship, relation)) = self.get_property_meta(type_def_id, *relation_id) else {
                         panic!("Problem getting property meta");
                     };
 
@@ -195,7 +193,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         object_key.into(),
                         SerdeProperty {
-                            property_id: *property_id,
+                            relation_id: *relation_id,
                             operator_id,
                         }
                     )

@@ -1,6 +1,6 @@
 use std::collections::{hash_map::Entry, HashMap};
 
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, RelationId};
 use smartstring::alias::String;
 
 use crate::{
@@ -85,7 +85,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(Some(self.def(
                     DefKind::Relationship(Relationship {
-                        relation_def_id,
+                        relation_id: RelationId(relation_def_id),
                         subject,
                         object,
                     }),

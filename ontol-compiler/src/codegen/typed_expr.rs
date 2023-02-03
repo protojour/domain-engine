@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use ontol_runtime::{proc::BuiltinProc, PropertyId};
+use ontol_runtime::{proc::BuiltinProc, RelationId};
 
 use crate::types::TypeRef;
 
@@ -20,7 +20,7 @@ pub enum TypedExprKind {
     Unit,
     Call(BuiltinProc, Box<[NodeId]>),
     ValueObj(NodeId),
-    MapObj(HashMap<PropertyId, NodeId>),
+    MapObj(HashMap<RelationId, NodeId>),
     Variable(SyntaxVar),
     Constant(i64),
 }
@@ -115,9 +115,9 @@ impl<'m> TypedExprTable<'m> {
             TypedExprKind::MapObj(attributes) => {
                 let attr_strings = attributes
                     .iter()
-                    .map(|(prop, node_id)| {
+                    .map(|(relation_id, node_id)| {
                         let val = self.debug_tree_guard(rewrites, *node_id, depth + 1);
-                        format!("({} {})", prop.0, val)
+                        format!("({} {})", (relation_id.0 .0), val)
                     })
                     .collect::<Vec<_>>()
                     .join(" ");

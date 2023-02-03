@@ -24,7 +24,7 @@ impl<'e> SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_type) => self
                 .env
-                .new_serde_processor(value_type.property.operator_id)
+                .new_serde_processor(value_type.inner_operator_id)
                 .serialize_value(value, serializer),
             SerdeOperator::ValueUnionType(_) => {
                 panic!("Should not happen: Serialized value should be a concrete type, not a union type");
@@ -86,7 +86,7 @@ impl<'e> SerdeProcessor<'e> {
         let mut serialize_map = serializer.serialize_map(Some(attributes.len()))?;
 
         for (name, serde_prop) in &map_type.properties {
-            let value = match attributes.get(&serde_prop.property_id) {
+            let value = match attributes.get(&serde_prop.relation_id) {
                 Some(value) => value,
                 None => panic!(
                     "While serializing `{}`, property `{}` was not found",

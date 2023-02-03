@@ -7,7 +7,7 @@ use crate::{
     proc::{BuiltinProc, Lib, Local, Procedure},
     value::{Data, Value},
     vm::{AbstractVm, Stack, VmDebug},
-    DefId, PropertyId,
+    DefId, RelationId,
 };
 
 /// Virtual machine for executing ONTOL procedures
@@ -92,16 +92,16 @@ impl Stack for ValueStack {
             .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
     }
 
-    fn take_attr(&mut self, source: Local, property_id: PropertyId) {
-        let compound = self.compound_local_mut(source);
-        let value = compound.remove(&property_id).expect("Attribute not found");
+    fn take_attr(&mut self, source: Local, relation_id: RelationId) {
+        let compound = self.map_local_mut(source);
+        let value = compound.remove(&relation_id).expect("Attribute not found");
         self.stack.push(value);
     }
 
-    fn put_attr(&mut self, target: Local, property_id: PropertyId) {
+    fn put_attr(&mut self, target: Local, relation_id: RelationId) {
         let value = self.stack.pop().unwrap();
-        let compound = self.compound_local_mut(target);
-        compound.insert(property_id, value);
+        let compound = self.map_local_mut(target);
+        compound.insert(relation_id, value);
     }
 
     fn constant(&mut self, k: i64, result_type: DefId) {
@@ -146,7 +146,7 @@ impl ValueStack {
         &mut self.stack[self.local0_pos + local.0 as usize]
     }
 
-    fn compound_local_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, Value> {
+    fn map_local_mut(&mut self, local: Local) -> &mut HashMap<RelationId, Value> {
         match &mut self.local_mut(local).data {
             Data::Map(hash_map) => hash_map,
             _ => panic!("Value at {local:?} is not a compound value"),
@@ -228,10 +228,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(42)),
-                OpCode::TakeAttr(Local(0), PropertyId(1)),
-                OpCode::PutAttr(Local(1), PropertyId(3)),
-                OpCode::TakeAttr(Local(0), PropertyId(2)),
-                OpCode::PutAttr(Local(1), PropertyId(4)),
+                OpCode::TakeAttr(Local(0), RelationId(DefId(1))),
+                OpCode::PutAttr(Local(1), RelationId(DefId(3))),
+                OpCode::TakeAttr(Local(0), RelationId(DefId(2))),
+                OpCode::PutAttr(Local(1), RelationId(DefId(4))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -243,11 +243,11 @@ mod tests {
                 Data::Map(
                     [
                         (
-                            PropertyId(1),
+                            RelationId(DefId(1)),
                             Value::new(Data::String("foo".into()), DefId(0)),
                         ),
                         (
-                            PropertyId(2),
+                            RelationId(DefId(2)),
                             Value::new(Data::String("bar".into()), DefId(0)),
                         ),
                     ]
@@ -261,7 +261,10 @@ mod tests {
             panic!();
         };
         let properties = map.keys().cloned().collect::<HashSet<_>>();
-        assert_eq!(HashSet::from([PropertyId(3), PropertyId(4)]), properties);
+        assert_eq!(
+            HashSet::from([RelationId(DefId(3)), RelationId(DefId(4))]),
+            properties
+        );
     }
 
     #[test]
@@ -287,13 +290,13 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(0)),
-                OpCode::TakeAttr(Local(0), PropertyId(1)),
+                OpCode::TakeAttr(Local(0), RelationId(DefId(1))),
                 OpCode::Call(double),
-                OpCode::PutAttr(Local(1), PropertyId(4)),
-                OpCode::TakeAttr(Local(0), PropertyId(2)),
-                OpCode::TakeAttr(Local(0), PropertyId(3)),
+                OpCode::PutAttr(Local(1), RelationId(DefId(4))),
+                OpCode::TakeAttr(Local(0), RelationId(DefId(2))),
+                OpCode::TakeAttr(Local(0), RelationId(DefId(3))),
                 OpCode::Call(add_then_double),
-                OpCode::PutAttr(Local(1), PropertyId(5)),
+                OpCode::PutAttr(Local(1), RelationId(DefId(5))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -304,9 +307,9 @@ mod tests {
             [Value::new(
                 Data::Map(
                     [
-                        (PropertyId(1), Value::new(Data::Int(333), DefId(0))),
-                        (PropertyId(2), Value::new(Data::Int(10), DefId(0))),
-                        (PropertyId(3), Value::new(Data::Int(11), DefId(0))),
+                        (RelationId(DefId(1)), Value::new(Data::Int(333), DefId(0))),
+                        (RelationId(DefId(2)), Value::new(Data::Int(10), DefId(0))),
+                        (RelationId(DefId(3)), Value::new(Data::Int(11), DefId(0))),
                     ]
                     .into(),
                 ),
@@ -317,10 +320,10 @@ mod tests {
         let Data::Map(mut map) = output.data else {
             panic!();
         };
-        let Data::Int(a) = map.remove(&PropertyId(4)).unwrap().data else {
+        let Data::Int(a) = map.remove(&RelationId(DefId(4))).unwrap().data else {
             panic!();
         };
-        let Data::Int(b) = map.remove(&PropertyId(5)).unwrap().data else {
+        let Data::Int(b) = map.remove(&RelationId(DefId(5))).unwrap().data else {
             panic!();
         };
         assert_eq!(666, a);

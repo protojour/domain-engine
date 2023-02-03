@@ -1,10 +1,10 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::{DefId, PropertyId};
+use ontol_runtime::{DefId, RelationId};
 
 use crate::{
     def::{Defs, Relation, Relationship},
-    relation::{self, Relations},
+    relation::{Relations, RelationshipId},
     types::{DefTypes, TypeRef},
 };
 
@@ -46,26 +46,40 @@ where
 }
 
 pub trait GetPropertyMeta<'m> {
+    fn get_relationship_meta(
+        &self,
+        relationship_id: RelationshipId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
+
     fn get_property_meta(
         &self,
-        property_id: PropertyId,
-    ) -> Result<(relation::Property, &'m Relationship, &'m Relation<'m>), ()>;
+        subject_id: DefId,
+        relation_id: RelationId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
 }
 
 impl<'m, T> GetPropertyMeta<'m> for T
 where
     T: AsRef<Relations> + AsRef<Defs<'m>>,
 {
+    fn get_relationship_meta(
+        &self,
+        relationship_id: RelationshipId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
+    }
+
     fn get_property_meta(
         &self,
-        property_id: PropertyId,
-    ) -> Result<(relation::Property, &'m Relationship, &'m Relation<'m>), ()> {
-        let property = get::<_, Relations>(self)
-            .properties
-            .get(&property_id)
-            .ok_or(())?;
-        let (relationship, relation) =
-            get::<_, Defs<'m>>(self).get_relationship_defs(property.relationship_id)?;
-        Ok((property.clone(), relationship, relation))
+        subject_id: DefId,
+        relation_id: RelationId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+        let relationship_id = get::<_, Relations>(self)
+            .relationships_by_subject
+            .get(&(subject_id, relation_id))
+            .cloned()
+            .ok_or_else(|| ())?;
+
+        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
     }
 }

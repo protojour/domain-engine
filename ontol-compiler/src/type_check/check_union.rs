@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexSet;
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
-    DefId, PropertyId,
+    DefId, RelationId,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -40,16 +40,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .relations
             .properties_by_type(value_union_def_id)
             .unwrap();
-        let SubjectProperties::ValueUnion(property_ids) = &properties.subject else {
+        let SubjectProperties::ValueUnion(relationship_ids) = &properties.subject else {
             panic!("not a union");
         };
 
         let mut builder = DiscriminatorBuilder::default();
         let mut used_objects: HashSet<DefId> = Default::default();
 
-        for (property_id, span) in property_ids {
-            let (_, relationship, _) = self
-                .get_property_meta(*property_id)
+        for (relationship_id, span) in relationship_ids {
+            let (relationship, _) = self
+                .get_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting property meta");
             let object_def = relationship.object;
 
@@ -123,16 +123,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn find_subject_map_properties(
         &self,
         mut def_id: DefId,
-    ) -> Result<&IndexSet<PropertyId>, UnionCheckError> {
+    ) -> Result<&IndexSet<RelationId>, UnionCheckError> {
         loop {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.subject {
-                    SubjectProperties::Unit => {
+                    SubjectProperties::Empty => {
                         return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                     }
-                    SubjectProperties::Value(property_id, _) => {
-                        let (_, relationship, _) = self
-                            .get_property_meta(*property_id)
+                    SubjectProperties::Value(relationship_id, _) => {
+                        let (relationship, _) = self
+                            .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");
 
                         def_id = relationship.object;
@@ -156,7 +156,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         object_def: DefId,
-        property_set: &IndexSet<PropertyId>,
+        property_set: &IndexSet<RelationId>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
     ) {
@@ -165,9 +165,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             property_candidates: vec![],
         };
 
-        for property_id in property_set {
-            let (_, relationship, relation) = self
-                .get_property_meta(*property_id)
+        for relation_id in property_set {
+            let (relationship, relation) = self
+                .get_property_meta(object_def, *relation_id)
                 .expect("BUG: problem getting property meta");
 
             let object_def = relationship.object;
@@ -186,9 +186,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let string_literal = self.defs.get_string_literal(*def_id);
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
-                            relation_def_id: relationship.relation_def_id,
+                            relation_id: relationship.relation_id,
                             discriminant: Discriminant::HasStringAttribute(
-                                *property_id,
+                                *relation_id,
                                 property_name.into(),
                                 string_literal.into(),
                             ),
@@ -222,12 +222,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         }
 
-        let mut relation_counters: HashMap<DefId, usize> = Default::default();
+        let mut relation_counters: HashMap<RelationId, usize> = Default::default();
 
         for discriminator in &builder.map_discriminator_candidates {
             for property_candidate in &discriminator.property_candidates {
                 *relation_counters
-                    .entry(property_candidate.relation_def_id)
+                    .entry(property_candidate.relation_id)
                     .or_default() += 1;
             }
         }
@@ -244,9 +244,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for discriminator in &mut builder.map_discriminator_candidates {
             discriminator
                 .property_candidates
-                .retain(|property_candidate| {
-                    property_candidate.relation_def_id == selected_relation
-                })
+                .retain(|property_candidate| property_candidate.relation_id == selected_relation)
         }
     }
 
@@ -352,7 +350,7 @@ struct MapDiscriminatorCandidate {
 }
 
 struct PropertyDiscriminatorCandidate {
-    relation_def_id: DefId,
+    relation_id: RelationId,
     discriminant: Discriminant,
 }
 

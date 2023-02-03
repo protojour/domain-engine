@@ -274,3 +274,45 @@ fn deserialize_map_union() {
         );
     });
 }
+
+#[test]
+#[ignore = "find a way to define a property union inline"]
+fn deserialize_string_or_null() {
+    r#"
+    (type! foo)
+    (rel! (foo) a (string))
+    (rel! (foo) a (int))
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize_data(env, json!({ "a": "string" })),
+            Ok(Data::Map(m)) if m.len() == 1
+        );
+    })
+}
+
+#[test]
+#[ignore = "must implement"]
+fn deserialize_monads() {
+    r#"
+    (type! foo)
+    (rel! (foo) a (string))
+    (default! (foo) a "default")
+
+    (type! bar)
+    ; a is either a string or not present
+    (rel! (bar) maybe? (string))
+
+    ; bar and string may be related via b many times
+    (rel! (bar) array[] (string))
+
+    ; bar and string may be related via c many times, minimum 1
+    (rel! (bar) maybe-array[1..]? (string))
+
+    ; a is either a string or null
+    (rel! (bar) nullable (string))
+    (rel! (bar) nullable (null))
+    "#
+    .compile_ok(|env| {})
+}

@@ -25,8 +25,7 @@ pub struct PackageId(pub u32);
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct DefId(pub u32);
 
-/// A domain-specific property of a type.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
-pub struct PropertyId(pub u32);
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct RelationId(pub DefId);
 
 pub struct ProcId(u32);

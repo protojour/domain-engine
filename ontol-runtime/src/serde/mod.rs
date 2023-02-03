@@ -8,7 +8,7 @@ use crate::{
     discriminator::VariantDiscriminator,
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    DefId, PropertyId,
+    DefId, RelationId,
 };
 
 mod deserialize;
@@ -79,7 +79,7 @@ pub enum SerdeOperator {
 pub struct ValueType {
     pub typename: String,
     pub type_def_id: DefId,
-    pub property: SerdeProperty,
+    pub inner_operator_id: SerdeOperatorId,
 }
 
 #[derive(Debug)]
@@ -103,6 +103,6 @@ pub struct MapType {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
-    pub property_id: PropertyId,
+    pub relation_id: RelationId,
     pub operator_id: SerdeOperatorId,
 }

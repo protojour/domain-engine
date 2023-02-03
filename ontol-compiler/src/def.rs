@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
+use ontol_runtime::{proc::BuiltinProc, DefId, PackageId, RelationId};
 use smallvec::SmallVec;
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    relation::Role,
+    relation::{RelationshipId, Role},
     source::{Package, SourceSpan, CORE_PKG},
     types::{Type, TypeRef},
 };
@@ -41,6 +41,7 @@ pub enum DefKind<'m> {
 impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
+            Self::Primitive(Primitive::Unit) => Some("unit".into()),
             Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
@@ -61,6 +62,8 @@ pub struct Variables(pub Box<[ExprId]>);
 
 #[derive(Debug)]
 pub enum Primitive {
+    /// The unit data type which contains no information
+    Unit,
     /// All the integers
     Int,
     /// All numbers (realistically all rational numbers as all computer numbers are rational)
@@ -79,7 +82,7 @@ pub struct Relation<'m> {
 /// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]
 pub struct Relationship {
-    pub relation_def_id: DefId,
+    pub relation_id: RelationId,
     pub subject: DefId,
     pub object: DefId,
 }
@@ -106,6 +109,7 @@ pub struct Defs<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
     anonymous_relation: DefId,
+    unit: DefId,
     int: DefId,
     number: DefId,
     string: DefId,
@@ -121,6 +125,7 @@ impl<'m> Defs<'m> {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             anonymous_relation: DefId(0),
+            unit: DefId(0),
             int: DefId(0),
             number: DefId(0),
             string: DefId(0),
@@ -142,6 +147,7 @@ impl<'m> Defs<'m> {
             CORE_PKG,
             SourceSpan::none(),
         );
+        defs.unit = defs.add_primitive(Primitive::Unit);
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
         defs.string = defs.add_primitive(Primitive::String);
@@ -170,12 +176,12 @@ impl<'m> Defs<'m> {
 
     pub fn get_relationship_defs(
         &self,
-        relationship_def_id: DefId,
+        relationship_id: RelationshipId,
     ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
-        let DefKind::Relationship(relationship) = self.get_def_kind(relationship_def_id).ok_or(())? else {
+        let DefKind::Relationship(relationship) = self.get_def_kind(relationship_id.0).ok_or(())? else {
             return Err(());
         };
-        let DefKind::Relation(relation) = self.get_def_kind(relationship.relation_def_id).ok_or(())? else {
+        let DefKind::Relation(relation) = self.get_def_kind(relationship.relation_id.0).ok_or(())? else {
             return Err(());
         };
         Ok((relationship, relation))
@@ -285,11 +291,15 @@ impl<'m> Compiler<'m> {
         );
 
         // fundamental types
+        let unit_ty = self.types.intern(Type::Unit(self.defs.unit));
         let int_ty = self.types.intern(Type::Int(self.defs.int));
         let num_ty = self.types.intern(Type::Number(self.defs.number));
         let string_ty = self.types.intern(Type::String(self.defs.string));
 
         // add fundamental types to core namespace
+        self.def_core_type("unit", self.defs.unit, unit_ty);
+        self.def_core_pun(self.defs.unit, "null");
+
         let int = self.def_core_type("int", self.defs.int, int_ty);
         let number = self.def_core_type("number", self.defs.number, num_ty);
         let string = self.def_core_type("string", self.defs.string, string_ty);
@@ -329,6 +339,12 @@ impl<'m> Compiler<'m> {
             .insert(ident.into(), def_id);
         self.def_types.map.insert(def_id, ty);
         ty
+    }
+
+    fn def_core_pun(&mut self, def_id: DefId, pun: &str) {
+        self.namespaces
+            .get_mut(CORE_PKG, Space::Type)
+            .insert(pun.into(), def_id);
     }
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
