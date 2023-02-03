@@ -49,6 +49,10 @@ impl<'e> Display for SerdeProcessor<'e> {
                     .collect::<Vec<_>>();
                 write!(f, "[{}]", CommaSeparated(&processors))
             }
+            SerdeOperator::Array(_, element_operator_id) => {
+                let inner_processor = self.env.new_serde_processor(*element_operator_id);
+                write!(f, "{}[]", inner_processor)
+            }
             SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
             SerdeOperator::ValueUnionType(_) => write!(f, "union"),
             SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
@@ -67,6 +71,7 @@ pub enum SerdeOperator {
     String(DefId),
     StringConstant(String, DefId),
     Tuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
+    Array(DefId, SerdeOperatorId),
     // A type with just one anonymous property
     ValueType(ValueType),
     // A type with multiple anonymous properties, equivalent to a union of types

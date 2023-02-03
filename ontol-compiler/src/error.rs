@@ -79,6 +79,8 @@ pub enum CompileError {
     NoUniformDiscriminatorFound,
     #[error("union in named relationship is not supported yet. Make a union type instead.")]
     UnionInNamedRelationshipNotSupported,
+    #[error("unsupported cardinality")]
+    UnsupportedCardinality,
 }
 
 #[derive(Debug)]

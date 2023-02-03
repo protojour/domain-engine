@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
-    def::{Def, DefKind, Relation, Relationship, Variables},
+    def::{Cardinality, Def, DefKind, Relation, Relationship, Variables},
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
@@ -60,6 +60,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Rel(ast::Rel {
                 subject,
                 ident: (ident, ident_span),
+                cardinality,
                 object,
             }) => {
                 let ident = ident.map(|i| self.compiler.strings.intern(&i));
@@ -87,6 +88,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     DefKind::Relationship(Relationship {
                         relation_id: RelationId(relation_def_id),
                         subject,
+                        cardinality: match cardinality {
+                            ast::Cardinality::One => Cardinality::One,
+                            ast::Cardinality::Many => Cardinality::Any,
+                        },
                         object,
                     }),
                     &span,

@@ -45,6 +45,10 @@ pub trait ValueMatcher {
         None
     }
 
+    fn match_seq_end(&self, _: usize) -> Result<(), ()> {
+        Err(())
+    }
+
     fn match_map(&self) -> Result<MapMatcher, ()> {
         Err(())
     }
@@ -138,6 +142,37 @@ impl<'e> ValueMatcher for TupleMatcher<'e> {
         } else {
             None
         }
+    }
+
+    fn match_seq_end(&self, end: usize) -> Result<(), ()> {
+        if end == self.elements.len() {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+pub struct ArrayMatcher {
+    pub element_def_id: DefId,
+    pub element_operator_id: SerdeOperatorId,
+}
+
+impl ValueMatcher for ArrayMatcher {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "array")
+    }
+
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.element_def_id)
+    }
+
+    fn match_seq_element(&self, _: usize) -> Option<SerdeOperatorId> {
+        Some(self.element_operator_id)
+    }
+
+    fn match_seq_end(&self, _: usize) -> Result<(), ()> {
+        Ok(())
     }
 }
 

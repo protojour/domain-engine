@@ -6,7 +6,11 @@ use crate::{DefId, RelationId};
 
 #[derive(Clone, Debug)]
 pub struct Value {
+    /// The data associated with this value
     pub data: Data,
+    /// The runtime type associated with this value.
+    /// This is used to make quick type checks,
+    /// as well as figuring out how to serialize.
     pub type_def_id: DefId,
 }
 

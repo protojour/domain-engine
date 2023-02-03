@@ -69,6 +69,17 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         "_" => None,
         _ => Some(rel_ident),
     };
+
+    let mut cardinality = Cardinality::One;
+
+    if let Some(_) = stream.peek(|tree| match tree {
+        Tree::Bracket(v) if v.len() == 0 => Some(&()),
+        _ => None,
+    }) {
+        stream.next().unwrap();
+        cardinality = Cardinality::Many;
+    }
+
     let object = parse_type(&mut stream)?;
     stream.end()?;
 
@@ -76,6 +87,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         Ast::Rel(Rel {
             subject,
             ident: (ident, ident_span),
+            cardinality,
             object,
         }),
         span,

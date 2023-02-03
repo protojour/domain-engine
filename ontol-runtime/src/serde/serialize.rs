@@ -20,6 +20,9 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Tuple(operator_ids, _) => {
                 self.serialize_tuple(value, operator_ids, serializer)
             }
+            SerdeOperator::Array(_, element_operator_id) => {
+                self.serialize_array(value, *element_operator_id, serializer)
+            }
             SerdeOperator::ValueType(value_type) => self
                 .env
                 .new_serde_processor(value_type.inner_operator_id)
@@ -84,6 +87,26 @@ impl<'e> SerdeProcessor<'e> {
                         value,
                         processor: self.env.new_serde_processor(*operator_id),
                     })?;
+                }
+
+                seq.end()
+            }
+            other => panic!("BUG: Serialize expected vector, got {other:?}"),
+        }
+    }
+
+    fn serialize_array<S: serde::Serializer>(
+        &self,
+        value: &Value,
+        element_operator_id: SerdeOperatorId,
+        serializer: S,
+    ) -> Res<S> {
+        match &value.data {
+            Data::Vec(elements) => {
+                let processor = self.env.new_serde_processor(element_operator_id);
+                let mut seq = serializer.serialize_seq(Some(elements.len()))?;
+                for value in elements.iter() {
+                    seq.serialize_element(&Proxy { value, processor })?;
                 }
 
                 seq.end()

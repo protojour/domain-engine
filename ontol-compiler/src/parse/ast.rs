@@ -49,7 +49,13 @@ pub enum Type {
 pub struct Rel {
     pub subject: Spanned<Type>,
     pub ident: Spanned<Option<String>>,
+    pub cardinality: Cardinality,
     pub object: Spanned<Type>,
+}
+
+pub enum Cardinality {
+    One,
+    Many,
 }
 
 #[derive(Debug)]

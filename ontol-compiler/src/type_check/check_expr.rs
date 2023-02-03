@@ -119,7 +119,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
                     }
-                    Some(SubjectProperties::ValueUnion(property_set)) => {
+                    Some(SubjectProperties::ValueUnion(_property_set)) => {
                         todo!()
                     }
                     Some(SubjectProperties::Map(property_set)) => {
@@ -130,7 +130,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                         let mut match_properties = property_set
                             .iter()
-                            .map(|relation_id| {
+                            .map(|(relation_id, _cardinality)| {
                                 let (relationship, relation) = self
                                     .get_property_meta(*subject_id, *relation_id)
                                     .expect("BUG: problem getting property meta");

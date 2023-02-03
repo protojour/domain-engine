@@ -8,7 +8,7 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    relation::{RelationshipId, Role},
+    relation::RelationshipId,
     source::{Package, SourceSpan, CORE_PKG},
     types::{Type, TypeRef},
 };
@@ -30,7 +30,6 @@ pub enum DefKind<'m> {
     DomainType(&'m str),
     Relation(Relation<'m>),
     Relationship(Relationship),
-    Property(Property),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
@@ -51,7 +50,6 @@ impl<'m> DefKind<'m> {
             Self::DomainType(ident) => Some((*ident).into()),
             Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
-            Self::Property(_) => None,
             Self::Equivalence(_, _, _) => None,
         }
     }
@@ -84,13 +82,16 @@ pub struct Relation<'m> {
 pub struct Relationship {
     pub relation_id: RelationId,
     pub subject: DefId,
+    // The cardinality of the relationship, i.e. how many objects are related to the subject
+    pub cardinality: Cardinality,
     pub object: DefId,
 }
 
-#[derive(Debug)]
-pub struct Property {
-    pub relation_def_id: DefId,
-    pub role: Role,
+#[derive(Clone, Copy, Debug)]
+pub enum Cardinality {
+    One,
+    AtLeastOne,
+    Any,
 }
 
 impl<'m> Relation<'m> {
@@ -301,7 +302,7 @@ impl<'m> Compiler<'m> {
         self.def_core_pun(self.defs.unit, "null");
 
         let int = self.def_core_type("int", self.defs.int, int_ty);
-        let number = self.def_core_type("number", self.defs.number, num_ty);
+        let _number = self.def_core_type("number", self.defs.number, num_ty);
         let string = self.def_core_type("string", self.defs.string, string_ty);
 
         let int_int = self.types.intern([int, int]);

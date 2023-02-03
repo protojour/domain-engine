@@ -5,7 +5,7 @@ use crate::{
         typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         CodegenTask, EqCodegenTask,
     },
-    def::{Def, DefKind, Primitive, Relation},
+    def::{Cardinality, Def, DefKind, Primitive, Relation, Relationship},
     error::CompileError,
     mem::Intern,
     relation::{RelationshipId, Role, SubjectProperties},
@@ -64,6 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_property(
                     RelationshipId(def_id),
+                    relationship,
                     relationship.relation_id,
                     relation,
                     relationship.subject,
@@ -73,6 +74,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
                 self.check_property(
                     RelationshipId(def_id),
+                    relationship,
                     relationship.relation_id,
                     relation,
                     relationship.object,
@@ -120,6 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_property(
         &mut self,
         relationship_id: RelationshipId,
+        relationship: &Relationship,
         relation_id: RelationId,
         relation: &Relation,
         role_def_id: DefId,
@@ -134,6 +137,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
                 (None, SubjectProperties::Empty) => {
+                    let Cardinality::One = relationship.cardinality else {
+                        return self.error(CompileError::UnsupportedCardinality, span);
+                    };
                     properties.subject = SubjectProperties::Value(relationship_id, *span);
                 }
                 (None, SubjectProperties::Value(existing_relationship_id, existing_span)) => {
@@ -152,10 +158,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     properties.push((relationship_id, *span));
                 }
                 (Some(_), SubjectProperties::Empty) => {
-                    properties.subject = SubjectProperties::Map([relation_id].into());
+                    properties.subject =
+                        SubjectProperties::Map([(relation_id, relationship.cardinality)].into());
                 }
                 (Some(_), SubjectProperties::Map(properties)) => {
-                    if !properties.insert(relation_id) {
+                    if properties
+                        .insert(relation_id, relationship.cardinality)
+                        .is_some()
+                    {
                         return self
                             .error(CompileError::UnionInNamedRelationshipNotSupported, span);
                     }

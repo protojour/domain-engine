@@ -49,6 +49,18 @@ impl TreeStream {
         }
     }
 
+    pub fn peek<T>(&mut self, matcher: impl Fn(&Tree) -> Option<&T>) -> Option<Spanned<&T>> {
+        if !self.peek_any() {
+            return None;
+        }
+        match self.iterator.peek() {
+            Some((tree, span)) => return matcher(tree).map(|t| (t, span.clone())),
+            None => {
+                return None;
+            }
+        }
+    }
+
     pub fn peek_dot(&mut self) -> bool {
         match self.iterator.peek() {
             Some((Tree::Dot, _)) => true,

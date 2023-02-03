@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ConstantStringMatcher, ExpectingMatching, IntMatcher, MapMatchError, StringMatcher,
-        TupleMatcher, UnionMatcher, ValueMatcher,
+        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher, MapMatchError,
+        StringMatcher, TupleMatcher, UnionMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
 };
@@ -85,6 +85,18 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     env: self.env,
                 },
             ),
+            SerdeOperator::Array(element_def_id, element_operator_id) => {
+                serde::de::Deserializer::deserialize_seq(
+                    deserializer,
+                    MatcherVisitor {
+                        matcher: ArrayMatcher {
+                            element_def_id: *element_def_id,
+                            element_operator_id: *element_operator_id,
+                        },
+                        env: self.env,
+                    },
+                )
+            }
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
                     .env
@@ -215,7 +227,15 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     output.push(typed_value);
                     index += 1;
                 }
-                None => return Err(serde::de::Error::invalid_length(index, &self)),
+                None => {
+                    return match self.matcher.match_seq_end(index) {
+                        Ok(_) => Ok(Value {
+                            data: Data::Vec(output),
+                            type_def_id,
+                        }),
+                        Err(_) => Err(serde::de::Error::invalid_length(index, &self)),
+                    }
+                }
             }
         }
     }

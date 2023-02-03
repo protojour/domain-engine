@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{discriminator::UnionDiscriminator, DefId, RelationId};
 
-use crate::SourceSpan;
+use crate::{def::Cardinality, SourceSpan};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Role {
@@ -59,5 +59,5 @@ pub enum SubjectProperties {
     /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
-    Map(IndexSet<RelationId>),
+    Map(IndexMap<RelationId, Cardinality>),
 }

@@ -13,10 +13,20 @@ use smallvec::SmallVec;
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{DefKind, Defs},
+    def::{Cardinality, DefKind, Defs},
     relation::{Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
+
+pub struct SerdeGenerator<'c, 'm> {
+    defs: &'c Defs<'m>,
+    def_types: &'c DefTypes<'m>,
+    relations: &'c Relations,
+    serde_operators: Vec<SerdeOperator>,
+    serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
+    /// TODO: Need to key these based on the specific cardinality
+    array_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
+}
 
 impl<'m> Compiler<'m> {
     pub fn serde_generator(&self) -> SerdeGenerator<'_, 'm> {
@@ -26,16 +36,9 @@ impl<'m> Compiler<'m> {
             relations: &self.relations,
             serde_operators: Default::default(),
             serde_operators_per_def: Default::default(),
+            array_operators: Default::default(),
         }
     }
-}
-
-pub struct SerdeGenerator<'c, 'm> {
-    defs: &'c Defs<'m>,
-    def_types: &'c DefTypes<'m>,
-    relations: &'c Relations,
-    serde_operators: Vec<SerdeOperator>,
-    serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
@@ -180,7 +183,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 })
             }
             Some(SubjectProperties::Map(property_set)) => {
-                let serde_properties = property_set.iter().map(|relation_id| {
+                let serde_properties = property_set.iter().map(|(relation_id, cardinality)| {
                     let Ok((relationship, relation)) = self.get_property_meta(type_def_id, *relation_id) else {
                         panic!("Problem getting property meta");
                     };
@@ -189,6 +192,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let operator_id =
                         self.get_serde_operator_id(relationship.object)
                             .expect("No inner operator");
+                    let operator_id = self.cardinality_operator(operator_id, relationship.object, *cardinality);
 
                     (
                         object_key.into(),
@@ -204,6 +208,29 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     type_def_id,
                     properties: serde_properties,
                 })
+            }
+        }
+    }
+
+    fn cardinality_operator(
+        &mut self,
+        operator_id: SerdeOperatorId,
+        element_def_id: DefId,
+        cardinality: Cardinality,
+    ) -> SerdeOperatorId {
+        match cardinality {
+            Cardinality::One => operator_id,
+            Cardinality::AtLeastOne => todo!(),
+            Cardinality::Any => {
+                if let Some(array_operator_id) = self.array_operators.get(&operator_id) {
+                    return *array_operator_id;
+                }
+
+                let array_operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
+                self.serde_operators
+                    .push(SerdeOperator::Array(element_def_id, operator_id));
+                self.array_operators.insert(operator_id, array_operator_id);
+                array_operator_id
             }
         }
     }

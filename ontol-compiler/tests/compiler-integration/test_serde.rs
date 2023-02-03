@@ -125,6 +125,24 @@ fn test_serde_map_union() {
 }
 
 #[test]
+fn test_serde_many_cardinality() {
+    "
+    (type! foo)
+    (rel! (foo) s[] (string))
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!({ "s": ["a", "b" ]}));
+        /*
+        assert_matches!(
+            foo.deserialize_data(env, json!({ "s": ["a", "b"] })),
+            Ok(Data::Map(map)) if map.len() == 1
+        );
+        */
+    });
+}
+
+#[test]
 fn test_serde_geojson() {
     r#"
     (type! position)

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
     DefId, RelationId,
@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::Def,
+    def::{Cardinality, Def},
     error::CompileError,
     relation::SubjectProperties,
     types::{format_type, Type},
@@ -124,7 +124,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn find_subject_map_properties(
         &self,
         mut def_id: DefId,
-    ) -> Result<&IndexSet<RelationId>, UnionCheckError> {
+    ) -> Result<&IndexMap<RelationId, Cardinality>, UnionCheckError> {
         loop {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.subject {
@@ -157,7 +157,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         object_def: DefId,
-        property_set: &IndexSet<RelationId>,
+        property_set: &IndexMap<RelationId, Cardinality>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
     ) {
@@ -166,7 +166,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             property_candidates: vec![],
         };
 
-        for relation_id in property_set {
+        for (relation_id, _cardinality) in property_set {
             let (relationship, relation) = self
                 .get_property_meta(object_def, *relation_id)
                 .expect("BUG: problem getting property meta");
