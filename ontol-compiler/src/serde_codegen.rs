@@ -101,6 +101,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::Tuple(operator_ids, type_def_id),
                 ))
             }
+            Some(Type::Array(_)) => {
+                panic!("not handled here")
+            }
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {

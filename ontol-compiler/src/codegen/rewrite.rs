@@ -1,3 +1,4 @@
+use ontol_runtime::smart_format;
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -125,7 +126,7 @@ pub fn rewrite(table: &mut TypedExprTable, node: NodeId) -> Result<(), RewriteEr
             Ok(())
         }
         TypedExprKind::Variable(_) => Ok(()),
-        kind => Err(RewriteError::UnhandledExpr(format!("{kind:?}").into())),
+        kind => Err(RewriteError::UnhandledExpr(smart_format!("{kind:?}"))),
     }
 }
 

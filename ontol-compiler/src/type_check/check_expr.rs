@@ -6,7 +6,7 @@ use tracing::warn;
 use crate::{
     codegen::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     compiler_queries::GetPropertyMeta,
-    def::{Def, DefKind},
+    def::{Cardinality, Def, DefKind},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
@@ -125,6 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(SubjectProperties::Map(property_set)) => {
                         struct MatchProperty {
                             relation_id: RelationId,
+                            cardinality: Cardinality,
                             object_def: DefId,
                             used: bool,
                         }
@@ -142,6 +143,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     property_name.clone(),
                                     MatchProperty {
                                         relation_id: *relation_id,
+                                        cardinality: relationship.cardinality,
                                         object_def: relationship.object,
                                         used: false,
                                     },
@@ -174,6 +176,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let object_ty = self.check_def(match_property.object_def);
+                            let object_ty = match match_property.cardinality {
+                                Cardinality::One => object_ty,
+                                Cardinality::Any => self.types.intern(Type::Array(object_ty)),
+                                Cardinality::AtLeastOne => todo!(),
+                            };
                             let (_, node_id) = self.check_expr_expect(value, object_ty, ctx);
 
                             typed_properties.insert(match_property.relation_id, node_id);

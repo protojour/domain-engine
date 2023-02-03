@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
-    DefId, RelationId,
+    smart_format, DefId, RelationId,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -13,7 +13,7 @@ use crate::{
     def::{Cardinality, Def},
     error::CompileError,
     relation::SubjectProperties,
-    types::{format_type, Type},
+    types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
 };
 
@@ -307,7 +307,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
                 let ty = self.def_types.map.get(&def_id).unwrap();
-                CompileError::UnitTypePartOfUnion(format_type(ty, self.defs))
+                CompileError::UnitTypePartOfUnion(smart_format!("{}", FormatType(ty, self.defs)))
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,

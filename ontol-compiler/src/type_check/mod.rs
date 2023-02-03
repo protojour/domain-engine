@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use ontol_runtime::smart_format;
+
 use crate::{
     codegen::CodegenTasks,
     compiler::Compiler,
@@ -8,7 +10,7 @@ use crate::{
     expr::{Expr, ExprId},
     mem::Intern,
     relation::Relations,
-    types::{format_type, DefTypes, Type, TypeRef, Types},
+    types::{DefTypes, FormatType, Type, TypeRef, Types},
     CompileErrors, SourceSpan, Sources,
 };
 
@@ -41,8 +43,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
             TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: format_type(actual, &self.defs),
-                expected: format_type(expected, &self.defs),
+                actual: smart_format!("{}", FormatType(actual, &self.defs)),
+                expected: smart_format!("{}", FormatType(expected, &self.defs)),
             },
         };
         self.error(compile_error, span)

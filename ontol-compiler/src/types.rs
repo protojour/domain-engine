@@ -1,7 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use ontol_runtime::DefId;
-use smartstring::alias::String;
 
 use crate::{
     def::{DefKind, Defs},
@@ -28,6 +30,7 @@ pub enum Type<'m> {
     /// A specific string
     StringConstant(DefId),
     Tuple(&'m [TypeRef<'m>]),
+    Array(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
     Function {
@@ -51,6 +54,7 @@ impl<'m> Type<'m> {
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Tuple(_) => None,
+            Self::Array(_) => None,
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
             Self::Infer(_) => None,
@@ -126,41 +130,54 @@ pub struct DefTypes<'m> {
     pub map: HashMap<DefId, TypeRef<'m>>,
 }
 
-pub(crate) fn format_type(ty: TypeRef, defs: &Defs) -> String {
-    match ty {
-        Type::Tautology => format!("tautology"),
-        Type::IntConstant(val) => format!("int({})", val),
-        Type::Unit(_) => format!("unit"),
-        Type::Int(_) => format!("int"),
-        Type::Number(_) => format!("number"),
-        Type::String(_) => format!("string"),
-        Type::StringConstant(def_id) => {
-            let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
-                panic!();
-            };
+pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>);
 
-            format!("\"{lit}\"")
-        }
-        Type::Tuple(elements) => {
-            let elements = elements
-                .iter()
-                .map(|element| format_type(element, defs))
-                .collect::<Vec<_>>()
-                .join("");
+impl<'m, 'c> Display for FormatType<'m, 'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ty = self.0;
+        let defs = self.1;
 
-            format!("[{elements}]")
+        match ty {
+            Type::Tautology => write!(f, "tautology"),
+            Type::IntConstant(val) => write!(f, "int({})", val),
+            Type::Unit(_) => write!(f, "unit"),
+            Type::Int(_) => write!(f, "int"),
+            Type::Number(_) => write!(f, "number"),
+            Type::String(_) => write!(f, "string"),
+            Type::StringConstant(def_id) => {
+                let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
+                    panic!();
+                };
+
+                write!(f, "\"{lit}\"")
+            }
+            Type::Tuple(elements) => {
+                write!(f, "[")?;
+                let mut iterator = elements.iter().peekable();
+                while let Some(next) = iterator.next() {
+                    write!(f, "{}", FormatType(*next, defs))?;
+                    if iterator.peek().is_some() {
+                        write!(f, " ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Type::Array(ty) => {
+                write!(f, "{}[]", FormatType(ty, defs))
+            }
+            Type::Function { .. } => write!(f, "function"),
+            Type::Domain(def_id) => {
+                let ident = defs
+                    .get_def_kind(*def_id)
+                    .unwrap()
+                    .opt_identifier()
+                    .unwrap();
+                write!(f, "{ident}")
+            }
+            Type::Infer(_) => write!(f, "?infer"),
+            Type::Error => write!(f, "error!"),
         }
-        Type::Function { .. } => format!("function"),
-        Type::Domain(def_id) => defs
-            .get_def_kind(*def_id)
-            .unwrap()
-            .opt_identifier()
-            .unwrap()
-            .into(),
-        Type::Infer(_) => format!("?infer"),
-        Type::Error => format!("error!"),
     }
-    .into()
 }
 
 #[cfg(test)]
