@@ -149,6 +149,34 @@ fn test_eq_value_to_map_func() {
 }
 
 #[test]
+fn test_eq_simple_array() {
+    "
+    (type! foo)
+    (type! bar)
+    (rel! (foo) a[] (int))
+    (rel! (bar) b[] (int))
+    (eq! (:x)
+        (obj! foo (a :x))
+        (obj! bar (b :x))
+    )
+    "
+    .compile_ok(|env| {
+        assert_translate(
+            env,
+            ("foo", "bar"),
+            json!({ "a": [42] }),
+            json!({ "b": [42] }),
+        );
+        assert_translate(
+            env,
+            ("bar", "foo"),
+            json!({ "b": [42] }),
+            json!({ "a": [42] }),
+        );
+    })
+}
+
+#[test]
 fn test_eq_complex_flow() {
     // FIXME: This should be a one-way translation.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
