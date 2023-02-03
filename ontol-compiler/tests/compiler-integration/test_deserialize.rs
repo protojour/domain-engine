@@ -264,6 +264,10 @@ fn deserialize_map_union() {
             union.deserialize_data_variant(env, json!({ "variant": "bar", "prop": 42 })),
             Ok(Data::Map(map)) if map.len() == 2
         );
+        assert_matches!(
+            union.deserialize_data_variant(env, json!({ "prop": 42, "variant": "bar" })),
+            Ok(Data::Map(map)) if map.len() == 2
+        );
         assert_error_msg!(
             union.deserialize_data_variant(env, json!("junk")),
             r#"invalid type: string "junk", expected `union` (`foo` or `bar`) at line 1 column 6"#

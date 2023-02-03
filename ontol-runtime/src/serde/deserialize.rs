@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher, MapMatchError,
-        StringMatcher, TupleMatcher, UnionMatcher, ValueMatcher,
+        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher, StringMatcher,
+        TupleMatcher, UnionMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
 };
@@ -28,7 +28,7 @@ struct MatcherVisitor<'e, M> {
 }
 
 struct MapTypeVisitor<'e> {
-    tmp_values: IndexMap<String, serde_value::Value>,
+    buffered_attrs: Vec<(String, serde_value::Value)>,
     map_type: &'e MapType,
     env: &'e Env,
 }
@@ -120,7 +120,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::MapType(map_type) => serde::de::Deserializer::deserialize_map(
                 deserializer,
                 MapTypeVisitor {
-                    tmp_values: IndexMap::new(),
+                    buffered_attrs: Default::default(),
                     map_type,
                     env: self.env,
                 },
@@ -215,6 +215,8 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             let processor = match self.matcher.match_seq_element(index) {
                 Some(operator_id) => self.env.new_serde_processor(operator_id),
                 None => {
+                    // note: if there are more elements to deserialize,
+                    // serde will automatically generate a 'trailing characters' error after returning:
                     return Ok(Value {
                         data: Data::Vec(output),
                         type_def_id,
@@ -249,51 +251,37 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_map()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
 
-        // Because serde is stream-oriented, we need to start storing temporary values
-        // until we can recognize the type
-        let mut tmp_values: IndexMap<String, serde_value::Value> = Default::default();
+        // Because serde is stream-oriented, we need to start storing attributes
+        // into a buffer until the type can be properly recognized
+        let mut buffered_attrs: Vec<(String, serde_value::Value)> = Default::default();
 
-        while let Some(key) = map.next_key::<String>()? {
-            match map_matcher.match_property(&key) {
-                Ok(map_type) => {
-                    let value: serde_value::Value = map.next_value()?;
-                    tmp_values.insert(key, value);
-
-                    // delegate to actual map type visitor
-                    return MapTypeVisitor {
-                        tmp_values,
-                        map_type,
-                        env: self.env,
-                    }
-                    .visit_map(map);
-                }
-                Err(MapMatchError::Indecisive) => {}
-            }
+        let map_type = loop {
+            let property = map.next_key::<String>()?.ok_or_else(|| {
+                // key/property was None, i.e. the whole map was read
+                // without being able to recognize the type
+                serde::de::Error::custom(format!(
+                    "invalid map value, expected {}",
+                    ExpectingMatching(&self.matcher)
+                ))
+            })?;
 
             let value: serde_value::Value = map.next_value()?;
 
-            match map_matcher.match_attribute(&key, &value) {
-                Ok(map_type) => {
-                    tmp_values.insert(key, value);
-
-                    // delegate to actual map type visitor
-                    return MapTypeVisitor {
-                        tmp_values,
-                        map_type,
-                        env: self.env,
-                    }
-                    .visit_map(map);
-                }
-                Err(MapMatchError::Indecisive) => {
-                    tmp_values.insert(key, value);
-                }
+            if let Ok(map_type) = map_matcher.match_attribute(&property, &value) {
+                buffered_attrs.push((property, value));
+                break map_type;
             }
-        }
 
-        Err(serde::de::Error::custom(format!(
-            "invalid map value, expected {}",
-            ExpectingMatching(&self.matcher)
-        )))
+            buffered_attrs.push((property, value));
+        };
+
+        // delegate to the real map visitor
+        MapTypeVisitor {
+            buffered_attrs,
+            map_type,
+            env: self.env,
+        }
+        .visit_map(map)
     }
 }
 
@@ -310,16 +298,13 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     {
         let mut attributes = HashMap::with_capacity(self.map_type.properties.len());
 
-        // first parse tmp values, if any
-        for (key, value) in self.tmp_values {
-            let serde_property = PropertySet(&self.map_type.properties).visit_str(&key)?;
-            let value_deserializer: serde_value::ValueDeserializer<A::Error> =
-                serde_value::ValueDeserializer::new(value);
-
+        // first parse buffered attributes, if any
+        for (serde_key, serde_value) in self.buffered_attrs {
+            let serde_property = PropertySet(&self.map_type.properties).visit_str(&serde_key)?;
             let typed_value = self
                 .env
                 .new_serde_processor(serde_property.operator_id)
-                .deserialize(value_deserializer)?;
+                .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
             attributes.insert(serde_property.relation_id, typed_value);
         }

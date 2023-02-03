@@ -7,7 +7,7 @@ use crate::{
     DefId,
 };
 
-use super::{MapType, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator, ValueUnionType};
+use super::{MapType, SerdeOperator, SerdeOperatorId, ValueUnionType};
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
 
@@ -270,53 +270,37 @@ pub struct MapMatcher<'e> {
 }
 
 impl<'e> MapMatcher<'e> {
-    /// Match a property name without a value
-    pub fn match_property(&self, property: &str) -> Result<&'e MapType, MapMatchError> {
-        for discriminator in &self.value_union_type.discriminators {
-            if let Discriminant::HasProperty(_, match_name) =
-                &discriminator.discriminator.discriminant
-            {
-                if property == match_name {
-                    return Ok(self.get_map_type(discriminator));
-                }
-            }
-        }
-
-        Err(MapMatchError::Indecisive)
-    }
-
-    /// Match a full attribute; property + value
     pub fn match_attribute(
         &self,
         property: &str,
         value: &serde_value::Value,
     ) -> Result<&'e MapType, MapMatchError> {
-        for discriminator in &self.value_union_type.discriminators {
-            match (&discriminator.discriminator.discriminant, value) {
+        let match_fn = |discriminant: &Discriminant| -> bool {
+            match (discriminant, value) {
                 (
                     Discriminant::HasStringAttribute(_, match_name, match_value),
                     serde_value::Value::String(value),
-                ) => {
-                    if property == match_name && value == match_value {
-                        return Ok(self.get_map_type(discriminator));
-                    }
-                }
-                _ => {}
+                ) => property == match_name && value == match_value,
+                (Discriminant::HasProperty(_, match_name), _) => property == match_name,
+                _ => false,
             }
-        }
+        };
 
-        Err(MapMatchError::Indecisive)
-    }
-
-    fn get_map_type(&self, discriminator: &ValueUnionDiscriminator) -> &'e MapType {
-        match self
-            .env
-            .new_serde_processor(discriminator.operator_id)
-            .current
-        {
-            SerdeOperator::MapType(map_type) => map_type,
-            _ => panic!("Matched discriminator is not a map type"),
-        }
+        self.value_union_type
+            .discriminators
+            .iter()
+            .find(|discriminator| match_fn(&discriminator.discriminator.discriminant))
+            .map(|discriminator| {
+                match self
+                    .env
+                    .new_serde_processor(discriminator.operator_id)
+                    .current
+                {
+                    SerdeOperator::MapType(map_type) => map_type,
+                    _ => panic!("Matched discriminator is not a map type"),
+                }
+            })
+            .ok_or(MapMatchError::Indecisive)
     }
 }
 
