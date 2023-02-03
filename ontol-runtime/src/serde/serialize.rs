@@ -10,9 +10,7 @@ impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match self.current {
-            SerdeOperator::Unit => {
-                panic!("Tried to serialize unit");
-            }
+            SerdeOperator::Unit => self.serialize_unit(value, serializer),
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)
             }
@@ -26,8 +24,23 @@ impl<'e> SerdeProcessor<'e> {
                 .env
                 .new_serde_processor(value_type.inner_operator_id)
                 .serialize_value(value, serializer),
-            SerdeOperator::ValueUnionType(_) => {
-                panic!("Should not happen: Serialized value should be a concrete type, not a union type");
+            SerdeOperator::ValueUnionType(value_union_type) => {
+                let discriminator = value_union_type
+                    .discriminators
+                    .iter()
+                    .find(|discriminator| {
+                        value.type_def_id == discriminator.discriminator.result_type
+                    });
+
+                match discriminator {
+                    Some(discriminator) => self
+                        .env
+                        .new_serde_processor(discriminator.operator_id)
+                        .serialize_value(value, serializer),
+                    None => {
+                        panic!("Discriminator not found while serializing union type");
+                    }
+                }
             }
             SerdeOperator::MapType(map_type) => self.serialize_map(map_type, value, serializer),
         }
@@ -35,6 +48,13 @@ impl<'e> SerdeProcessor<'e> {
 }
 
 impl<'e> SerdeProcessor<'e> {
+    fn serialize_unit<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
+        match &value.data {
+            Data::Unit => serializer.serialize_unit(),
+            other => panic!("BUG: Serialize expected unit, got {other:?}"),
+        }
+    }
+
     fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match &value.data {
             Data::Int(num) => serializer.serialize_i64(*num),

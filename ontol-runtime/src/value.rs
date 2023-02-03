@@ -18,6 +18,7 @@ impl Value {
 
 #[derive(Clone, Debug)]
 pub enum Data {
+    Unit,
     Int(i64),
     Float(f64),
     Rational(num::rational::BigRational),

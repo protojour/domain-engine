@@ -21,6 +21,10 @@ impl<'v> Display for ExpectingMatching<'v> {
 pub trait ValueMatcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
 
+    fn match_unit(&self) -> Result<DefId, ()> {
+        Err(())
+    }
+
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {
         Err(())
     }
@@ -158,6 +162,10 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 logic_op: LogicOp::Or,
             }
         )
+    }
+
+    fn match_unit(&self) -> Result<DefId, ()> {
+        self.match_discriminant(Discriminant::IsUnit)
     }
 
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {

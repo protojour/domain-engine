@@ -243,3 +243,13 @@ fn eq_type_mismatch_in_func() {
     "
     .compile_fail()
 }
+
+#[test]
+fn union_in_named_relationship() {
+    r#"
+    (type! foo)
+    (rel! (foo) a (string))
+    (rel! (foo) a (int)) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    "#
+    .compile_fail();
+}

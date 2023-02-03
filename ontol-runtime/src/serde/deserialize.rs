@@ -124,6 +124,21 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         self.matcher.expecting(f)
     }
 
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let type_def_id = self
+            .matcher
+            .match_unit()
+            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unit, &self))?;
+
+        Ok(Value {
+            data: Data::Unit,
+            type_def_id,
+        })
+    }
+
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,

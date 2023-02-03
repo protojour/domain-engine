@@ -77,6 +77,8 @@ pub enum CompileError {
     UnitTypePartOfUnion(String),
     #[error("no uniform discriminator found for union variants")]
     NoUniformDiscriminatorFound,
+    #[error("union in named relationship is not supported yet. Make a union type instead.")]
+    UnionInNamedRelationshipNotSupported,
 }
 
 #[derive(Debug)]

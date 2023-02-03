@@ -156,7 +156,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 (Some(_), SubjectProperties::Map(properties)) => {
                     if !properties.insert(relation_id) {
-                        panic!("duplicate property");
+                        return self
+                            .error(CompileError::UnionInNamedRelationshipNotSupported, span);
                     }
                 }
                 (None, SubjectProperties::Map(_)) => {

@@ -276,23 +276,6 @@ fn deserialize_map_union() {
 }
 
 #[test]
-#[ignore = "find a way to define a property union inline"]
-fn deserialize_string_or_null() {
-    r#"
-    (type! foo)
-    (rel! (foo) a (string))
-    (rel! (foo) a (int))
-    "#
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
-        assert_matches!(
-            foo.deserialize_data(env, json!({ "a": "string" })),
-            Ok(Data::Map(m)) if m.len() == 1
-        );
-    })
-}
-
-#[test]
 #[ignore = "must implement"]
 fn deserialize_monads() {
     r#"

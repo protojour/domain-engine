@@ -65,6 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_ty = self.def_types.map.get(&object_def).unwrap();
 
             match object_ty {
+                Type::Unit(def_id) => builder.unit = Some(*def_id),
                 Type::Int(_) => builder.number = Some(IntDiscriminator(object_def)),
                 Type::String(_) => {
                     builder.string = StringDiscriminator::Any(object_def);
@@ -239,7 +240,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         };
 
-        println!("selected relation {selected_relation:?}");
+        debug!("selected relation {selected_relation:?}");
 
         for discriminator in &mut builder.map_discriminator_candidates {
             discriminator
@@ -254,6 +255,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         error_set: &ErrorSet,
     ) -> UnionDiscriminator {
         let mut union_discriminator = UnionDiscriminator { variants: vec![] };
+
+        if let Some(def_id) = builder.unit {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::IsUnit,
+                result_type: def_id,
+            })
+        }
 
         if let Some(number) = builder.number {
             union_discriminator.variants.push(VariantDiscriminator {
@@ -315,6 +323,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
 #[derive(Default)]
 struct DiscriminatorBuilder {
+    unit: Option<DefId>,
     number: Option<IntDiscriminator>,
     string: StringDiscriminator,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,

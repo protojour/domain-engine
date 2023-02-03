@@ -88,6 +88,23 @@ fn test_serde_value_union1() {
 }
 
 #[test]
+fn test_serde_string_or_null() {
+    r#"
+    (type! string-or-null)
+    (rel! (string-or-null) _ (string))
+    (rel! (string-or-null) _ (null))
+
+    (type! foo)
+    (rel! (foo) a (string-or-null))
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(env, foo, json!({ "a": "string" }));
+        assert_json_io_matches!(env, foo, json!({ "a": null }));
+    });
+}
+
+#[test]
 fn test_serde_map_union() {
     r#"
     (type! foo)
