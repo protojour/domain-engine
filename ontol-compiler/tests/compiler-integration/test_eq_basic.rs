@@ -230,9 +230,9 @@ fn test_eq_delegation() {
     (type! millimeters)
     (rel! (millimeters) _ (int))
 
-    (eq! (:x)
-        (obj! meters (_ :x))
-        (obj! millimeters (_ (* :x 1000)))
+    (eq! (:m)
+        (obj! meters (_ :m))
+        (obj! millimeters (_ (* :m 1000)))
     )
 
     (type! car)
@@ -252,6 +252,12 @@ fn test_eq_delegation() {
             ("car", "vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
+        );
+        assert_translate(
+            env,
+            ("vehicle", "car"),
+            json!({ "length": 2000 }),
+            json!({ "length": 2 }),
         );
     })
 }
