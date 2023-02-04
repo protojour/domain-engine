@@ -109,6 +109,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     typed_expr_table: ctx.typed_expr_table.seal(),
                     node_a,
                     node_b,
+                    span: def.span,
                 }));
 
                 self.types.intern(Type::Tautology)

@@ -7,9 +7,12 @@ use ontol_runtime::{
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
-use crate::codegen::{
-    codegen::{Codegen, OpCodes, VarFlowTracker},
-    typed_expr::SyntaxVar,
+use crate::{
+    codegen::{
+        codegen::{Codegen, OpCodes, VarFlowTracker},
+        typed_expr::SyntaxVar,
+    },
+    SourceSpan,
 };
 
 use super::{
@@ -23,6 +26,7 @@ pub(super) fn codegen_map_obj_origin<'m>(
     expr_table: &TypedExprTable<'m>,
     origin_attrs: &HashMap<RelationId, NodeId>,
     dest_node: NodeId,
+    eq_span: &SourceSpan,
 ) -> UnlinkedProc {
     let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
 
@@ -71,14 +75,14 @@ pub(super) fn codegen_map_obj_origin<'m>(
             ops.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
 
             for (relation_id, node) in dest_attrs {
-                map_codegen.codegen_expr(proc_table, expr_table, *node, &mut ops);
+                map_codegen.codegen_expr(proc_table, expr_table, *node, &mut ops, eq_span);
                 ops.push(OpCode::PutAttr(Local(1), *relation_id));
             }
 
             ops.push(OpCode::Return(Local(1)));
         }
         TypedExprKind::ValueObj(node_id) => {
-            map_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut ops);
+            map_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut ops, eq_span);
             ops.push(OpCode::Return(Local(1)));
         }
         kind => {

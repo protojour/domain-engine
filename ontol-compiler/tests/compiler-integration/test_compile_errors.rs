@@ -275,3 +275,27 @@ fn union_in_named_relationship() {
     "#
     .compile_fail();
 }
+
+#[test]
+fn unresolved_eq_fixme() {
+    r#"
+    (type! a)
+    (type! b)
+    (rel! (a) _ (int))
+    (rel! (b) _ (int))
+
+    (type! c)
+    (type! d)
+    (rel! (c) p0 (a))
+    (rel! (d) p1 (b))
+
+    ; FIXME: these compile errors are pretty bad,
+    ; need to fix them to point to the correct culprit:
+
+    (eq! (:x) ;; ERROR cannot equate;; ERROR cannot equate
+        (obj! c (p0 :x))
+        (obj! d (p1 :x))
+    )
+    "#
+    .compile_fail();
+}

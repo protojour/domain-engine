@@ -14,6 +14,8 @@ mod rewrite;
 
 pub use codegen::execute_codegen_tasks;
 
+use crate::SourceSpan;
+
 use self::typed_expr::{NodeId, SealedTypedExprTable};
 
 #[derive(Default)]
@@ -47,4 +49,5 @@ pub struct EqCodegenTask<'m> {
     pub typed_expr_table: SealedTypedExprTable<'m>,
     pub node_a: NodeId,
     pub node_b: NodeId,
+    pub span: SourceSpan,
 }

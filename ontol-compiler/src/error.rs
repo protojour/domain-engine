@@ -81,6 +81,8 @@ pub enum CompileError {
     UnionInNamedRelationshipNotSupported,
     #[error("unsupported cardinality")]
     UnsupportedCardinality,
+    #[error("cannot equate")]
+    CannotEquate,
 }
 
 #[derive(Debug)]

@@ -11,10 +11,11 @@ use crate::{
     codegen::{codegen_map_obj::codegen_map_obj_origin, typed_expr::TypedExprKind},
     compiler::Compiler,
     types::{Type, TypeRef},
+    SourceSpan,
 };
 
 use super::{
-    link::link,
+    link::{link, LinkResult},
     typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprTable},
     CodegenTask,
 };
@@ -24,20 +25,31 @@ pub type OpCodes = SmallVec<[OpCode; 32]>;
 #[derive(Default)]
 pub(super) struct ProcTable {
     pub procs: HashMap<(DefId, DefId), UnlinkedProc>,
-    pub translate_calls: HashMap<u32, (DefId, DefId)>,
+    pub translate_calls: HashMap<u32, TranslateCall>,
 }
 
 impl ProcTable {
     /// Allocate a temporary procedure id for a translate call.
     /// This will be resolved to final "physical" ID in the link phase.
-    fn gen_translate_call(&mut self, from: DefId, to: DefId) -> OpCode {
+    fn gen_translate_call(&mut self, from: DefId, to: DefId, span: &SourceSpan) -> OpCode {
         let id = self.translate_calls.len() as u32;
-        self.translate_calls.insert(id, (from, to));
+        self.translate_calls.insert(
+            id,
+            TranslateCall {
+                translation: (from, to),
+                span: *span,
+            },
+        );
         OpCode::Call(Procedure {
             start: id,
             n_params: NParams(1),
         })
     }
+}
+
+pub(super) struct TranslateCall {
+    pub translation: (DefId, DefId),
+    pub span: SourceSpan,
 }
 
 /// Procedure that has been generated but not linked.
@@ -63,6 +75,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_a,
                     eq_task.node_b,
+                    &eq_task.span,
                     DebugDirection::Forward,
                 );
 
@@ -74,13 +87,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_b,
                     eq_task.node_a,
+                    &eq_task.span,
                     DebugDirection::Backward,
                 );
             }
         }
     }
 
-    let (lib, translations) = link(compiler, proc_table);
+    let LinkResult { lib, translations } = link(compiler, &mut proc_table);
 
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_translations = translations;
@@ -96,6 +110,7 @@ fn codegen_translate_rewrite(
     table: &mut SealedTypedExprTable,
     origin_node: NodeId,
     dest_node: NodeId,
+    eq_span: &SourceSpan,
     direction: DebugDirection,
 ) -> bool {
     match table.inner.rewriter().rewrite_expr(origin_node) {
@@ -110,6 +125,7 @@ fn codegen_translate_rewrite(
                         &table.inner,
                         origin_node,
                         dest_node,
+                        eq_span,
                         direction,
                     );
 
@@ -144,6 +160,7 @@ fn codegen_translate<'m>(
     expr_table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
+    eq_span: &SourceSpan,
     direction: DebugDirection,
 ) -> UnlinkedProc {
     let (_, origin_expr) = expr_table.get_expr(&expr_table.source_rewrites, origin_node);
@@ -164,10 +181,10 @@ fn codegen_translate<'m>(
 
     match &origin_expr.kind {
         TypedExprKind::ValueObj(_) => {
-            codegen_value_obj_origin(proc_table, return_def_id, expr_table, dest_node)
+            codegen_value_obj_origin(proc_table, return_def_id, expr_table, dest_node, eq_span)
         }
         TypedExprKind::MapObj(attributes) => {
-            codegen_map_obj_origin(proc_table, expr_table, attributes, dest_node)
+            codegen_map_obj_origin(proc_table, expr_table, attributes, dest_node, eq_span)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
@@ -178,6 +195,7 @@ fn codegen_value_obj_origin<'m>(
     return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
     dest_node: NodeId,
+    eq_span: &SourceSpan,
 ) -> UnlinkedProc {
     let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
 
@@ -203,7 +221,7 @@ fn codegen_value_obj_origin<'m>(
 
     match &dest_expr.kind {
         TypedExprKind::ValueObj(node_id) => {
-            value_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut opcodes);
+            value_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut opcodes, eq_span);
             opcodes.push(OpCode::Return0);
         }
         TypedExprKind::MapObj(dest_attrs) => {
@@ -215,7 +233,7 @@ fn codegen_value_obj_origin<'m>(
             value_codegen.input_local = Local(1);
 
             for (relation_id, node) in dest_attrs {
-                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes);
+                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes, eq_span);
                 opcodes.push(OpCode::PutAttr(Local(0), *relation_id));
             }
 
@@ -260,12 +278,13 @@ pub(super) trait Codegen {
         expr_table: &TypedExprTable<'m>,
         expr_id: NodeId,
         opcodes: &mut OpCodes,
+        span: &SourceSpan,
     ) {
         let (_, expr) = expr_table.get_expr(&expr_table.target_rewrites, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
                 for param in params.iter() {
-                    self.codegen_expr(proc_table, expr_table, *param, opcodes);
+                    self.codegen_expr(proc_table, expr_table, *param, opcodes, span);
                 }
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
@@ -280,13 +299,12 @@ pub(super) trait Codegen {
                 self.codegen_variable(*var, opcodes);
             }
             TypedExprKind::Translate(param_id, from_ty) => {
-                self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
+                self.codegen_expr(proc_table, expr_table, *param_id, opcodes, span);
 
                 debug!("translate from {from_ty:?} to {:?}", expr.ty);
                 let from = find_translation_key(from_ty).unwrap();
                 let to = find_translation_key(&expr.ty).unwrap();
-                let opcode = proc_table.gen_translate_call(from, to);
-                opcodes.push(opcode);
+                opcodes.push(proc_table.gen_translate_call(from, to, span));
             }
             TypedExprKind::ValueObj(_) => {
                 todo!()

@@ -5,39 +5,45 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::compiler::Compiler;
+use crate::{compiler::Compiler, error::CompileError, SourceSpan};
 
 use super::codegen::ProcTable;
 
-pub(super) fn link(
-    _compiler: &mut Compiler,
-    proc_table: ProcTable,
-) -> (Lib, HashMap<(DefId, DefId), Procedure>) {
-    let mut translate_procs: HashMap<(DefId, DefId), Procedure> = Default::default();
+pub struct LinkResult {
+    pub lib: Lib,
+    pub translations: HashMap<(DefId, DefId), Procedure>,
+}
+
+pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
+    let mut translations: HashMap<(DefId, DefId), Procedure> = Default::default();
     let mut lib = Lib::default();
 
-    for ((from, to), unlinked_proc) in proc_table.procs {
+    for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procs) {
         let procedure = lib.add_procedure(unlinked_proc.n_params, unlinked_proc.opcodes);
-        translate_procs.insert((from, to), procedure);
+        translations.insert((from, to), procedure);
     }
 
+    // correct "call" opcodes to point to correct address
     for opcode in &mut lib.opcodes {
-        if let OpCode::Call(procedure) = opcode {
-            match proc_table.translate_calls.get(&procedure.start) {
-                Some((from, to)) => match translate_procs.get(&(*from, *to)) {
-                    Some(procedure_ref) => {
-                        procedure.start = procedure_ref.start;
+        if let OpCode::Call(call_procedure) = opcode {
+            match proc_table.translate_calls.get(&call_procedure.start) {
+                Some(translate_call) => match translations.get(&translate_call.translation) {
+                    Some(translation_procedure) => {
+                        call_procedure.start = translation_procedure.start;
                     }
                     None => {
-                        todo!("Cannot translate 1");
+                        compiler.push_error(
+                            CompileError::CannotEquate
+                                .spanned(&compiler.sources, &translate_call.span),
+                        );
                     }
                 },
                 None => {
-                    todo!("Cannot translate 2");
+                    todo!("BUG! Something weird happened");
                 }
             }
         }
     }
 
-    (lib, translate_procs)
+    LinkResult { lib, translations }
 }

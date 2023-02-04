@@ -99,10 +99,10 @@ impl Compile for CompileSrc {
 
             // Call this after all source files have been compiled
             type_check.check_unions();
-
             compiler.check_error()?;
 
             execute_codegen_tasks(compiler);
+            compiler.check_error()?;
         }
 
         compiler.check_error()?;
