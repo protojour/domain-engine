@@ -64,6 +64,18 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Eq(mut eq_task) => {
+                debug!("codegen eq:");
+                for (i, typed_expr) in eq_task
+                    .typed_expr_table
+                    .inner
+                    .expressions
+                    .0
+                    .iter()
+                    .enumerate()
+                {
+                    debug!("{i} {typed_expr:?}");
+                }
+
                 // a -> b
                 codegen_translate_rewrite(
                     &mut proc_table,
@@ -153,7 +165,7 @@ fn codegen_translate<'m>(
     dest_node: NodeId,
     direction: DebugDirection,
 ) -> UnlinkedProc {
-    let (_, origin_expr) = expr_table.get_expr(&expr_table.source_rewrites, origin_node);
+    let (_, origin_expr) = expr_table.resolve_expr(&expr_table.source_rewrites, origin_node);
 
     // for easier readability:
     match direction {
@@ -186,7 +198,7 @@ fn codegen_value_obj_origin<'m>(
     expr_table: &TypedExprTable<'m>,
     dest_node: NodeId,
 ) -> UnlinkedProc {
-    let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
+    let (_, dest_expr) = expr_table.resolve_expr(&expr_table.target_rewrites, dest_node);
 
     struct ValueCodegen {
         input_local: Local,
@@ -277,7 +289,7 @@ pub(super) trait Codegen {
         expr_id: NodeId,
         opcodes: &mut SpannedOpCodes,
     ) {
-        let (_, expr) = expr_table.get_expr(&expr_table.target_rewrites, expr_id);
+        let (_, expr) = expr_table.resolve_expr(&expr_table.target_rewrites, expr_id);
         let span = expr.span;
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
@@ -299,7 +311,10 @@ pub(super) trait Codegen {
             TypedExprKind::Translate(param_id, from_ty) => {
                 self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
 
-                debug!("translate from {from_ty:?} to {:?}", expr.ty);
+                debug!(
+                    "translate from {from_ty:?} to {:?}, span = {span:?}",
+                    expr.ty
+                );
                 let from = find_translation_key(from_ty).unwrap();
                 let to = find_translation_key(&expr.ty).unwrap();
                 opcodes.push((proc_table.gen_translate_call(from, to), span));

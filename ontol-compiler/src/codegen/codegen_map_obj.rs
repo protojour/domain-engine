@@ -27,13 +27,13 @@ pub(super) fn codegen_map_obj_origin<'m>(
     origin_attrs: &HashMap<RelationId, NodeId>,
     dest_node: NodeId,
 ) -> UnlinkedProc {
-    let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
+    let (_, dest_expr) = expr_table.resolve_expr(&expr_table.target_rewrites, dest_node);
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
         .map(|(prop_id, node_id)| {
             match &expr_table
-                .get_expr(&expr_table.source_rewrites, *node_id)
+                .resolve_expr(&expr_table.source_rewrites, *node_id)
                 .1
                 .kind
             {

@@ -5,27 +5,31 @@ use tracing::debug;
 
 use super::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, TypedExpressions};
 
+/// A rewrite table tracks rewrites of node indices.
+///
+/// Each node id in the vector is a pointer to some node.
+/// If a node points to itself, it is not rewritten.
+/// Rewrites are resolved by following pointers until
+/// a "root" is found that is not rewritten.
+///
+/// Be careful to not introduce circular rewrites.
 #[derive(Default, Debug)]
-pub struct RewriteTable(Vec<NodeId>);
+pub struct RewriteTable(SmallVec<[NodeId; 32]>);
 
 impl RewriteTable {
-    pub fn push_node(&mut self, node: NodeId) {
-        self.0.push(node);
+    pub fn push(&mut self) {
+        let len = self.0.len();
+        self.0.push(NodeId(len as u32));
     }
 
-    /// Reset all rewrites
-    pub fn reset(&mut self, size: usize) {
-        self.0.truncate(size);
-        for (idx, node) in self.0.iter_mut().enumerate() {
-            node.0 = idx as u32;
-        }
-    }
-
+    /// Register a rewrite.
+    /// All occurences of `source` should be rewritten to `target`.
     pub fn rewrite(&mut self, source: NodeId, target: NodeId) {
         self.0[source.0 as usize] = target;
     }
 
-    pub fn find_root(&self, mut node_id: NodeId) -> NodeId {
+    /// Resolve any node to its rewritten form.
+    pub fn resolve(&self, mut node_id: NodeId) -> NodeId {
         loop {
             let entry = self.0[node_id.0 as usize];
             if entry == node_id {
@@ -33,6 +37,14 @@ impl RewriteTable {
             }
 
             node_id = entry;
+        }
+    }
+
+    /// Reset all rewrites, so that nothing is rewritten.
+    pub fn reset(&mut self, size: usize) {
+        self.0.truncate(size);
+        for (index, node) in self.0.iter_mut().enumerate() {
+            node.0 = index as u32;
         }
     }
 }
@@ -78,7 +90,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             TypedExprKind::Call(proc, params) => {
                 let params_ids = params
                     .into_iter()
-                    .map(|param_id| self.source_rewrites.find_root(*param_id))
+                    .map(|param_id| self.source_rewrites.resolve(*param_id))
                     .collect();
 
                 self.rewrite_call(node_id, *proc, params_ids, indent)
@@ -102,16 +114,21 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                     RewriteResult::Constant => return Ok(RewriteResult::Constant),
                 };
 
-                let cloned_param_id = self.clone_expr(param_id);
+                let (cloned_param_id, cloned_param) = self.clone_expr(param_id);
+                let cloned_param_span = cloned_param.span;
                 let expr = &self.expressions[node_id];
 
+                debug!(
+                    "rewrite TypedExprKind::Call with span {:?}, param_id: {:?}",
+                    expr.span, param_id.0
+                );
+
                 // invert translation:
-                let inverted_translation = TypedExpr {
-                    ty: param_ty,
+                let (inverted_translation_id, _) = self.add_expr(TypedExpr {
                     kind: TypedExprKind::Translate(cloned_param_id, expr.ty),
-                    span: expr.span,
-                };
-                let inverted_translation_id = self.add_expr(inverted_translation);
+                    ty: param_ty,
+                    span: cloned_param_span,
+                });
 
                 // remove the translation call from the source
                 self.source_rewrites.rewrite(node_id, param_id);
@@ -186,15 +203,15 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             // e.g. if the node `:v` gets rewritten to `(* :v 2)`,
             // we only want to do this once.
             // The left `:v` cannot be the same node as the right `:v`.
-            let cloned_var_id = self.clone_expr(param_var_id);
+            let (cloned_var_id, _) = self.clone_expr(param_var_id);
             cloned_params[var_index] = cloned_var_id;
 
             let target_expr = TypedExpr {
-                ty: expr_ty,
                 kind: TypedExprKind::Call(rule.1.proc(), cloned_params.into()),
+                ty: expr_ty,
                 span,
             };
-            let target_expr_id = self.add_expr(target_expr);
+            let (target_expr_id, _) = self.add_expr(target_expr);
 
             // rewrites
             self.source_rewrites.rewrite(node_id, param_var_id);
@@ -209,15 +226,15 @@ impl<'t, 'm> Rewriter<'t, 'm> {
         Err(RewriteError::NoRulesMatchedCall)
     }
 
-    fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
+    fn add_expr(&mut self, expr: TypedExpr<'m>) -> (NodeId, &TypedExpr<'m>) {
         let id = NodeId(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
-        self.source_rewrites.push_node(id);
-        self.target_rewrites.push_node(id);
-        id
+        self.source_rewrites.push();
+        self.target_rewrites.push();
+        (id, &self.expressions[id])
     }
 
-    fn clone_expr(&mut self, node_id: NodeId) -> NodeId {
+    fn clone_expr(&mut self, node_id: NodeId) -> (NodeId, &TypedExpr<'m>) {
         let expr = &self.expressions[node_id];
         self.add_expr(expr.clone())
     }
@@ -299,18 +316,18 @@ mod tests {
 
         let mut table = TypedExprTable::default();
         let var = table.add_expr(TypedExpr {
-            ty: int,
             kind: TypedExprKind::Variable(SyntaxVar(42)),
+            ty: int,
             span: SourceSpan::none(),
         });
         let constant = table.add_expr(TypedExpr {
-            ty: int,
             kind: TypedExprKind::Constant(1000),
+            ty: int,
             span: SourceSpan::none(),
         });
         let call = table.add_expr(TypedExpr {
-            ty: int,
             kind: TypedExprKind::Call(BuiltinProc::Mul, [var, constant].into()),
+            ty: int,
             span: SourceSpan::none(),
         });
 

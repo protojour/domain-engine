@@ -11,8 +11,8 @@ pub struct SyntaxVar(pub u32);
 
 #[derive(Clone, Debug)]
 pub struct TypedExpr<'m> {
-    pub ty: TypeRef<'m>,
     pub kind: TypedExprKind<'m>,
+    pub ty: TypeRef<'m>,
     pub span: SourceSpan,
 }
 
@@ -62,8 +62,8 @@ impl<'m> TypedExprTable<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
         let id = NodeId(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
-        self.source_rewrites.push_node(id);
-        self.target_rewrites.push_node(id);
+        self.source_rewrites.push();
+        self.target_rewrites.push();
         id
     }
 
@@ -74,16 +74,17 @@ impl<'m> TypedExprTable<'m> {
         SealedTypedExprTable { size, inner: self }
     }
 
+    /// Create a new rewriter
     pub fn rewriter<'c>(&'c mut self) -> Rewriter<'c, 'm> {
         Rewriter::new(self)
     }
 
-    pub fn get_expr<'t>(
+    pub fn resolve_expr<'t>(
         &'t self,
         rewrite_table: &RewriteTable,
         source_node: NodeId,
     ) -> (NodeId, &'t TypedExpr<'m>) {
-        let root_node = rewrite_table.find_root(source_node);
+        let root_node = rewrite_table.resolve(source_node);
         (root_node, &self.expressions[root_node])
     }
 
@@ -95,7 +96,7 @@ impl<'m> TypedExprTable<'m> {
         if depth > 20 {
             return format!("[ERROR depth exceeded]");
         }
-        let (target_node_id, expr) = self.get_expr(rewrites, node_id);
+        let (target_node_id, expr) = self.resolve_expr(rewrites, node_id);
         let s = match &expr.kind {
             TypedExprKind::Unit => format!("{{}}"),
             TypedExprKind::Call(proc, params) => {
