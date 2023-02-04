@@ -14,7 +14,7 @@ pub enum Ast {
 }
 
 pub struct Eq {
-    pub params: Vec<Spanned<String>>,
+    pub variables: Vec<Spanned<String>>,
     pub first: Spanned<Expr>,
     pub second: Spanned<Expr>,
 }

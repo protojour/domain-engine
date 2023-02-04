@@ -68,6 +68,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
                             ty: *output,
                             kind: TypedExprKind::Call(*proc, param_nodes.into()),
+                            span: expr.span,
                         });
 
                         (*output, node_id)
@@ -94,6 +95,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.typed_expr_table.add_expr(TypedExpr {
                             ty: domain_type,
                             kind: TypedExprKind::Unit,
+                            span: expr.span,
                         })
                     }
                     Some(SubjectProperties::Value(relationship_id, _)) => {
@@ -109,6 +111,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ctx.typed_expr_table.add_expr(TypedExpr {
                                     ty: domain_type,
                                     kind: TypedExprKind::ValueObj(node_id),
+                                    span: expr.span,
                                 })
                             }
                             _ => {
@@ -198,6 +201,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.typed_expr_table.add_expr(TypedExpr {
                             ty: domain_type,
                             kind: TypedExprKind::MapObj(typed_properties),
+                            span: expr.span,
                         })
                     }
                 };
@@ -209,6 +213,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
                     ty,
                     kind: TypedExprKind::Constant(*k),
+                    span: expr.span,
                 });
                 (ty, node_id)
             }
@@ -273,6 +278,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let translation_node = ctx.typed_expr_table.add_expr(TypedExpr {
                     ty: expected,
                     kind: TypedExprKind::Translate(node_id, actual),
+                    span: expr.span,
                 });
                 (expected, translation_node)
             }

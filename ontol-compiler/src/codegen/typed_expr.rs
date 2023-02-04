@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use ontol_runtime::{proc::BuiltinProc, RelationId};
 
-use crate::types::TypeRef;
+use crate::{types::TypeRef, SourceSpan};
 
 use super::rewrite::{RewriteTable, Rewriter};
 
@@ -13,6 +13,7 @@ pub struct SyntaxVar(pub u32);
 pub struct TypedExpr<'m> {
     pub ty: TypeRef<'m>,
     pub kind: TypedExprKind<'m>,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug)]

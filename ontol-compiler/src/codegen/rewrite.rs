@@ -103,11 +103,13 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                 };
 
                 let cloned_param_id = self.clone_expr(param_id);
+                let expr = &self.expressions[node_id];
 
                 // invert translation:
                 let inverted_translation = TypedExpr {
                     ty: param_ty,
-                    kind: TypedExprKind::Translate(cloned_param_id, self.expressions[node_id].ty),
+                    kind: TypedExprKind::Translate(cloned_param_id, expr.ty),
+                    span: expr.span,
                 };
                 let inverted_translation_id = self.add_expr(inverted_translation);
 
@@ -157,6 +159,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
         };
 
         let expr = &self.expressions[node_id];
+        let span = expr.span;
 
         for rule in &rules::RULES {
             if rule.0.proc() != proc || rule.0.params().len() != params_len {
@@ -189,6 +192,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             let target_expr = TypedExpr {
                 ty: expr_ty,
                 kind: TypedExprKind::Call(rule.1.proc(), cloned_params.into()),
+                span,
             };
             let target_expr_id = self.add_expr(target_expr);
 
@@ -284,6 +288,7 @@ mod tests {
         compiler::Compiler,
         mem::{Intern, Mem},
         types::Type,
+        SourceSpan,
     };
 
     #[test]
@@ -296,14 +301,17 @@ mod tests {
         let var = table.add_expr(TypedExpr {
             ty: int,
             kind: TypedExprKind::Variable(SyntaxVar(42)),
+            span: SourceSpan::none(),
         });
         let constant = table.add_expr(TypedExpr {
             ty: int,
             kind: TypedExprKind::Constant(1000),
+            span: SourceSpan::none(),
         });
         let call = table.add_expr(TypedExpr {
             ty: int,
             kind: TypedExprKind::Call(BuiltinProc::Mul, [var, constant].into()),
+            span: SourceSpan::none(),
         });
 
         table.rewriter().rewrite_expr(call).unwrap();

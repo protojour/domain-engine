@@ -127,7 +127,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 
     Ok((
         Ast::Eq(Eq {
-            params: params.into(),
+            variables: params.into(),
             first,
             second,
         }),

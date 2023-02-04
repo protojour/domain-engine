@@ -34,7 +34,7 @@ pub enum DefKind<'m> {
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
     CoreFn(BuiltinProc),
-    Equivalence(Variables, ExprId, ExprId),
+    Equation(Variables, ExprId, ExprId),
 }
 
 impl<'m> DefKind<'m> {
@@ -50,13 +50,13 @@ impl<'m> DefKind<'m> {
             Self::DomainType(ident) => Some((*ident).into()),
             Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
-            Self::Equivalence(_, _, _) => None,
+            Self::Equation(_, _, _) => None,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct Variables(pub Box<[ExprId]>);
+pub struct Variables(pub Box<[(ExprId, SourceSpan)]>);
 
 #[derive(Debug)]
 pub enum Primitive {

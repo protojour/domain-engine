@@ -98,19 +98,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 )))
             }
             ast::Ast::Eq(ast::Eq {
-                params,
+                variables: ast_variables,
                 first,
                 second,
             }) => {
                 let mut var_table = VarTable::default();
                 let mut variables = vec![];
-                for (param, _span) in params.into_iter() {
-                    variables.push(var_table.new_var_id(param, self.compiler));
+                for (param, span) in ast_variables.into_iter() {
+                    variables.push((
+                        var_table.new_var_id(param, self.compiler),
+                        self.src.span(&span),
+                    ));
                 }
                 let first = self.lower_root_expr(first, &mut var_table)?;
                 let second = self.lower_root_expr(second, &mut var_table)?;
                 Ok(Some(self.def(
-                    DefKind::Equivalence(Variables(variables.into()), first, second),
+                    DefKind::Equation(Variables(variables.into()), first, second),
                     &span,
                 )))
             }

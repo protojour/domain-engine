@@ -87,17 +87,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(Primitive::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number(def_id)),
-            DefKind::Equivalence(variables, first_id, second_id) => {
+            DefKind::Equation(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),
                     typed_expr_table: TypedExprTable::default(),
                     variable_nodes: Default::default(),
                 };
 
-                for (index, variable_expr_id) in variables.0.iter().enumerate() {
+                for (index, (variable_expr_id, variable_span)) in variables.0.iter().enumerate() {
                     let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
                         kind: TypedExprKind::Variable(SyntaxVar(index as u32)),
+                        span: *variable_span,
                     });
                     ctx.variable_nodes.insert(*variable_expr_id, node_id);
                 }

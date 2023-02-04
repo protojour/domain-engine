@@ -292,9 +292,12 @@ fn unresolved_eq_fixme() {
     ; FIXME: these compile errors are pretty bad,
     ; need to fix them to point to the correct culprit:
 
-    (eq! (:x) ;; ERROR cannot equate;; ERROR cannot equate
+    (eq! (:x)
         (obj! c (p0 :x))
-        (obj! d (p1 :x))
+        (obj! d (
+            p1
+            :x ;; ERROR cannot equate;; ERROR cannot equate
+        ))
     )
     "#
     .compile_fail();

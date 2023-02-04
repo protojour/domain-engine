@@ -20,26 +20,22 @@ use super::{
     CodegenTask,
 };
 
-pub type OpCodes = SmallVec<[OpCode; 32]>;
+pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
 
 #[derive(Default)]
 pub(super) struct ProcTable {
     pub procs: HashMap<(DefId, DefId), UnlinkedProc>,
-    pub translate_calls: HashMap<u32, TranslateCall>,
+    pub translate_calls: Vec<TranslateCall>,
 }
 
 impl ProcTable {
     /// Allocate a temporary procedure id for a translate call.
     /// This will be resolved to final "physical" ID in the link phase.
-    fn gen_translate_call(&mut self, from: DefId, to: DefId, span: &SourceSpan) -> OpCode {
+    fn gen_translate_call(&mut self, from: DefId, to: DefId) -> OpCode {
         let id = self.translate_calls.len() as u32;
-        self.translate_calls.insert(
-            id,
-            TranslateCall {
-                translation: (from, to),
-                span: *span,
-            },
-        );
+        self.translate_calls.push(TranslateCall {
+            translation: (from, to),
+        });
         OpCode::Call(Procedure {
             start: id,
             n_params: NParams(1),
@@ -49,7 +45,6 @@ impl ProcTable {
 
 pub(super) struct TranslateCall {
     pub translation: (DefId, DefId),
-    pub span: SourceSpan,
 }
 
 /// Procedure that has been generated but not linked.
@@ -57,7 +52,7 @@ pub(super) struct TranslateCall {
 /// we need to look up a table to resolve that in the link phase.
 pub(super) struct UnlinkedProc {
     pub n_params: NParams,
-    pub opcodes: OpCodes,
+    pub opcodes: SpannedOpCodes,
 }
 
 /// Perform all codegen tasks
@@ -75,7 +70,6 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_a,
                     eq_task.node_b,
-                    &eq_task.span,
                     DebugDirection::Forward,
                 );
 
@@ -87,7 +81,6 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_b,
                     eq_task.node_a,
-                    &eq_task.span,
                     DebugDirection::Backward,
                 );
             }
@@ -110,7 +103,6 @@ fn codegen_translate_rewrite(
     table: &mut SealedTypedExprTable,
     origin_node: NodeId,
     dest_node: NodeId,
-    eq_span: &SourceSpan,
     direction: DebugDirection,
 ) -> bool {
     match table.inner.rewriter().rewrite_expr(origin_node) {
@@ -125,7 +117,6 @@ fn codegen_translate_rewrite(
                         &table.inner,
                         origin_node,
                         dest_node,
-                        eq_span,
                         direction,
                     );
 
@@ -160,7 +151,6 @@ fn codegen_translate<'m>(
     expr_table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
-    eq_span: &SourceSpan,
     direction: DebugDirection,
 ) -> UnlinkedProc {
     let (_, origin_expr) = expr_table.get_expr(&expr_table.source_rewrites, origin_node);
@@ -181,10 +171,10 @@ fn codegen_translate<'m>(
 
     match &origin_expr.kind {
         TypedExprKind::ValueObj(_) => {
-            codegen_value_obj_origin(proc_table, return_def_id, expr_table, dest_node, eq_span)
+            codegen_value_obj_origin(proc_table, return_def_id, expr_table, dest_node)
         }
         TypedExprKind::MapObj(attributes) => {
-            codegen_map_obj_origin(proc_table, expr_table, attributes, dest_node, eq_span)
+            codegen_map_obj_origin(proc_table, expr_table, attributes, dest_node)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
@@ -195,7 +185,6 @@ fn codegen_value_obj_origin<'m>(
     return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
     dest_node: NodeId,
-    eq_span: &SourceSpan,
 ) -> UnlinkedProc {
     let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
 
@@ -205,11 +194,16 @@ fn codegen_value_obj_origin<'m>(
     }
 
     impl Codegen for ValueCodegen {
-        fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut OpCodes) {
+        fn codegen_variable(
+            &mut self,
+            var: SyntaxVar,
+            opcodes: &mut SpannedOpCodes,
+            span: &SourceSpan,
+        ) {
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
             self.var_tracker.count_use(var);
-            opcodes.push(OpCode::Clone(self.input_local));
+            opcodes.push((OpCode::Clone(self.input_local), *span));
         }
     }
 
@@ -218,26 +212,30 @@ fn codegen_value_obj_origin<'m>(
         var_tracker: Default::default(),
     };
     let mut opcodes = smallvec![];
+    let span = dest_expr.span;
 
     match &dest_expr.kind {
         TypedExprKind::ValueObj(node_id) => {
-            value_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut opcodes, eq_span);
-            opcodes.push(OpCode::Return0);
+            value_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut opcodes);
+            opcodes.push((OpCode::Return0, dest_expr.span));
         }
         TypedExprKind::MapObj(dest_attrs) => {
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
+            opcodes.push((
+                OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                span,
+            ));
 
             // the input value is not compound, so it will be consumed.
             // Therefore it must be top of the stack:
-            opcodes.push(OpCode::Swap(Local(0), Local(1)));
+            opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
             value_codegen.input_local = Local(1);
 
             for (relation_id, node) in dest_attrs {
-                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes, eq_span);
-                opcodes.push(OpCode::PutAttr(Local(0), *relation_id));
+                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes);
+                opcodes.push((OpCode::PutAttr(Local(0), *relation_id), span));
             }
 
-            opcodes.push(OpCode::Return0);
+            opcodes.push((OpCode::Return0, span));
         }
         kind => {
             todo!("target: {kind:?}");
@@ -248,7 +246,7 @@ fn codegen_value_obj_origin<'m>(
         .into_iter()
         .filter(|op| {
             match op {
-                OpCode::Clone(local) if *local == value_codegen.input_local => {
+                (OpCode::Clone(local), _) if *local == value_codegen.input_local => {
                     if value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1 {
                         // Keep cloning until the last use of the variable,
                         // which must pop it off the stack. (i.e. keep the clone instruction)
@@ -261,7 +259,7 @@ fn codegen_value_obj_origin<'m>(
                 _ => true,
             }
         })
-        .collect::<OpCodes>();
+        .collect::<SpannedOpCodes>();
 
     debug!("{opcodes:#?}");
 
@@ -277,34 +275,34 @@ pub(super) trait Codegen {
         proc_table: &mut ProcTable,
         expr_table: &TypedExprTable<'m>,
         expr_id: NodeId,
-        opcodes: &mut OpCodes,
-        span: &SourceSpan,
+        opcodes: &mut SpannedOpCodes,
     ) {
         let (_, expr) = expr_table.get_expr(&expr_table.target_rewrites, expr_id);
+        let span = expr.span;
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
                 for param in params.iter() {
-                    self.codegen_expr(proc_table, expr_table, *param, opcodes, span);
+                    self.codegen_expr(proc_table, expr_table, *param, opcodes);
                 }
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                opcodes.push(OpCode::CallBuiltin(*proc, return_def_id));
+                opcodes.push((OpCode::CallBuiltin(*proc, return_def_id), span));
             }
             TypedExprKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
-                opcodes.push(OpCode::Constant(*k, return_def_id));
+                opcodes.push((OpCode::Constant(*k, return_def_id), span));
             }
             TypedExprKind::Variable(var) => {
-                self.codegen_variable(*var, opcodes);
+                self.codegen_variable(*var, opcodes, &span);
             }
             TypedExprKind::Translate(param_id, from_ty) => {
-                self.codegen_expr(proc_table, expr_table, *param_id, opcodes, span);
+                self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
 
                 debug!("translate from {from_ty:?} to {:?}", expr.ty);
                 let from = find_translation_key(from_ty).unwrap();
                 let to = find_translation_key(&expr.ty).unwrap();
-                opcodes.push(proc_table.gen_translate_call(from, to, span));
+                opcodes.push((proc_table.gen_translate_call(from, to), span));
             }
             TypedExprKind::ValueObj(_) => {
                 todo!()
@@ -318,7 +316,7 @@ pub(super) trait Codegen {
         }
     }
 
-    fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut OpCodes);
+    fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut SpannedOpCodes, span: &SourceSpan);
 }
 
 #[derive(Default)]
