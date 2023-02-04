@@ -239,31 +239,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("FIXME: equate variable with variable?");
             }
             (Type::Infer(type_var), expected) => {
-                if let Err(error) = ctx
+                if let Err(TypeError::Mismatch { actual, expected }) = ctx
                     .inference
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {
-                    let err = self.type_error(error, &expr.span);
-                    (err, ERROR_NODE)
+                    self.translate_if_possible(ctx, expr, node_id, actual, expected)
                 } else {
                     warn!("TODO: resolve var?");
                     (ty, node_id)
                 }
             }
             (ty, expected) if ty != expected => {
-                let err = self.type_error(
-                    TypeError::Mismatch {
-                        actual: ty,
-                        expected,
-                    },
-                    &expr.span,
-                );
-                (err, ERROR_NODE)
+                self.translate_if_possible(ctx, expr, node_id, ty, expected)
             }
             _ => {
                 // Ok
                 (ty, node_id)
+            }
+        }
+    }
+
+    fn translate_if_possible(
+        &mut self,
+        ctx: &mut CheckExprContext<'m>,
+        expr: &Expr,
+        node_id: NodeId,
+        actual: TypeRef<'m>,
+        expected: TypeRef<'m>,
+    ) -> (TypeRef<'m>, NodeId) {
+        match (actual, expected) {
+            (Type::Domain(_), Type::Domain(_)) => {
+                let translation_node = ctx.typed_expr_table.add_expr(TypedExpr {
+                    ty: expected,
+                    kind: TypedExprKind::Translate(node_id, actual),
+                });
+                (expected, translation_node)
+            }
+            _ => {
+                let err = self.type_error(TypeError::Mismatch { actual, expected }, &expr.span);
+                (err, ERROR_NODE)
             }
         }
     }

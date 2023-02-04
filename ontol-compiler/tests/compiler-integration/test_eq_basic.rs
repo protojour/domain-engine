@@ -220,3 +220,38 @@ fn test_eq_complex_flow() {
         println!("{property_map:?}");
     })
 }
+
+#[test]
+fn test_eq_delegation() {
+    r#"
+    (type! meters)
+    (rel! (meters) _ (int))
+
+    (type! millimeters)
+    (rel! (millimeters) _ (int))
+
+    (eq! (:x)
+        (obj! meters (_ :x))
+        (obj! millimeters (_ (* :x 1000)))
+    )
+
+    (type! car)
+    (rel! (car) length (meters))
+
+    (type! vehicle)
+    (rel! (vehicle) length (millimeters))
+    
+    (eq! (:l)
+        (obj! car (length :l))
+        (obj! vehicle (length :l))
+    )
+    "#
+    .compile_ok(|env| {
+        assert_translate(
+            env,
+            ("car", "vehicle"),
+            json!({ "length": 3 }),
+            json!({ "length": 3000 }),
+        );
+    })
+}

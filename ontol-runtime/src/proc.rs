@@ -29,8 +29,8 @@ impl Lib {
 /// must be top of the stack when it's called.
 #[derive(Clone, Copy, Debug)]
 pub struct Procedure {
-    pub(crate) start: u32,
-    pub(crate) n_params: NParams,
+    pub start: u32,
+    pub n_params: NParams,
 }
 
 /// The number of parameters to a procedure.

@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use ontol_runtime::{format_utils::Indent, proc::BuiltinProc, smart_format};
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -85,7 +83,9 @@ impl<'t, 'm> Rewriter<'t, 'm> {
 
                 self.rewrite_call(node_id, *proc, params_ids, indent)
             }
-            TypedExprKind::ValueObj(value_node) => self.rewrite_expr(*value_node),
+            TypedExprKind::ValueObj(value_node) => {
+                self.rewrite_expr_inner(*value_node, indent.inc())
+            }
             TypedExprKind::MapObj(property_map) => {
                 let nodes: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
                 for node in nodes {
@@ -95,6 +95,30 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             }
             TypedExprKind::Variable(_) => Ok(RewriteResult::Variable(node_id)),
             TypedExprKind::Constant(_) => Ok(RewriteResult::Constant),
+            TypedExprKind::Translate(param_id, param_ty) => {
+                let param_ty = *param_ty;
+                let param_id = match self.rewrite_expr_inner(*param_id, indent.inc())? {
+                    RewriteResult::Variable(var_id) => var_id,
+                    RewriteResult::Constant => return Ok(RewriteResult::Constant),
+                };
+
+                let cloned_param_id = self.clone_expr(param_id);
+
+                // invert translation:
+                let inverted_translation = TypedExpr {
+                    ty: param_ty,
+                    kind: TypedExprKind::Translate(cloned_param_id, self.expressions[node_id].ty),
+                };
+                let inverted_translation_id = self.add_expr(inverted_translation);
+
+                // remove the translation call from the source
+                self.source_rewrites.rewrite(node_id, param_id);
+                // add inverted translation call to the target
+                self.target_rewrites
+                    .rewrite(param_id, inverted_translation_id);
+
+                Ok(RewriteResult::Variable(cloned_param_id))
+            }
             kind => Err(RewriteError::UnhandledExpr(smart_format!("{kind:?}"))),
         }
     }
@@ -159,8 +183,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             // e.g. if the node `:v` gets rewritten to `(* :v 2)`,
             // we only want to do this once.
             // The left `:v` cannot be the same node as the right `:v`.
-            let var_expr = &self.expressions[param_var_id];
-            let cloned_var_id = self.add_expr(var_expr.clone());
+            let cloned_var_id = self.clone_expr(param_var_id);
             cloned_params[var_index] = cloned_var_id;
 
             let target_expr = TypedExpr {
@@ -188,6 +211,11 @@ impl<'t, 'm> Rewriter<'t, 'm> {
         self.source_rewrites.push_node(id);
         self.target_rewrites.push_node(id);
         id
+    }
+
+    fn clone_expr(&mut self, node_id: NodeId) -> NodeId {
+        let expr = &self.expressions[node_id];
+        self.add_expr(expr.clone())
     }
 }
 

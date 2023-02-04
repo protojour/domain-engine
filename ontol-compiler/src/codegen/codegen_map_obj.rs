@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_runtime::{
-    proc::{BuiltinProc, Lib, Local, NParams, OpCode, Procedure},
+    proc::{BuiltinProc, Local, NParams, OpCode},
     RelationId,
 };
 use smallvec::{smallvec, SmallVec};
@@ -12,25 +12,32 @@ use crate::codegen::{
     typed_expr::SyntaxVar,
 };
 
-use super::typed_expr::{NodeId, TypedExprKind, TypedExprTable};
+use super::{
+    codegen::{ProcTable, UnlinkedProc},
+    typed_expr::{NodeId, TypedExprKind, TypedExprTable},
+};
 
 /// Generate code originating from a map obj destructuring
-pub fn codegen_map_obj_origin<'m>(
-    lib: &mut Lib,
-    table: &TypedExprTable<'m>,
+pub(super) fn codegen_map_obj_origin<'m>(
+    proc_table: &mut ProcTable,
+    expr_table: &TypedExprTable<'m>,
     origin_attrs: &HashMap<RelationId, NodeId>,
     dest_node: NodeId,
-) -> Procedure {
-    let (_, dest_expr) = table.get_expr(&table.target_rewrites, dest_node);
+) -> UnlinkedProc {
+    let (_, dest_expr) = expr_table.get_expr(&expr_table.target_rewrites, dest_node);
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
-        .map(
-            |(prop_id, node_id)| match &table.get_expr(&table.source_rewrites, *node_id).1.kind {
+        .map(|(prop_id, node_id)| {
+            match &expr_table
+                .get_expr(&expr_table.source_rewrites, *node_id)
+                .1
+                .kind
+            {
                 TypedExprKind::Variable(var) => (*prop_id, *var),
                 _ => panic!("source property not a variable"),
-            },
-        )
+            }
+        })
         .collect();
     origin_properties.sort_by_key(|(_, var)| *var);
 
@@ -54,25 +61,25 @@ pub fn codegen_map_obj_origin<'m>(
     }
 
     let mut map_codegen = MapCodegen::default();
-    let mut opcodes = smallvec![];
+    let mut ops = smallvec![];
 
     match &dest_expr.kind {
         TypedExprKind::MapObj(dest_attrs) => {
             let return_def_id = dest_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
-            opcodes.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
+            ops.push(OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id));
 
             for (relation_id, node) in dest_attrs {
-                map_codegen.codegen_expr(table, *node, &mut opcodes);
-                opcodes.push(OpCode::PutAttr(Local(1), *relation_id));
+                map_codegen.codegen_expr(proc_table, expr_table, *node, &mut ops);
+                ops.push(OpCode::PutAttr(Local(1), *relation_id));
             }
 
-            opcodes.push(OpCode::Return(Local(1)));
+            ops.push(OpCode::Return(Local(1)));
         }
         TypedExprKind::ValueObj(node_id) => {
-            map_codegen.codegen_expr(table, *node_id, &mut opcodes);
-            opcodes.push(OpCode::Return(Local(1)));
+            map_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut ops);
+            ops.push(OpCode::Return(Local(1)));
         }
         kind => {
             todo!("target: {kind:?}");
@@ -81,56 +88,57 @@ pub fn codegen_map_obj_origin<'m>(
 
     // post-process
     let mut var_stack_state = VarStackState::default();
-    let opcodes: OpCodes = opcodes
-        .into_iter()
-        .fold(smallvec![], |mut opcodes, opcode| {
-            match opcode {
-                OpCode::Clone(Local(pos)) if pos >= 2 => {
-                    let syntax_var = SyntaxVar(pos - 2);
-                    let state = map_codegen.var_tracker.do_use(syntax_var);
-                    let origin_property = origin_properties[syntax_var.0 as usize];
+    let opcodes: OpCodes = ops.into_iter().fold(smallvec![], |mut opcodes, opcode| {
+        match opcode {
+            OpCode::Clone(Local(pos)) if pos >= 2 => {
+                let syntax_var = SyntaxVar(pos - 2);
+                let state = map_codegen.var_tracker.do_use(syntax_var);
+                let origin_property = origin_properties[syntax_var.0 as usize];
 
-                    match (state.use_count, state.reused) {
-                        (1, false) => {
-                            // no need to clone
-                            opcodes.push(OpCode::TakeAttr(Local(0), origin_property.0));
+                match (state.use_count, state.reused) {
+                    (1, false) => {
+                        // no need to clone
+                        opcodes.push(OpCode::TakeAttr(Local(0), origin_property.0));
+                    }
+                    (_, false) => {
+                        // first use, must clone
+                        opcodes.push(OpCode::TakeAttr(Local(0), origin_property.0));
+                        var_stack_state.stack.push(syntax_var);
+                        opcodes.push(OpCode::Clone(Local(
+                            2 + var_stack_state.stack.len() as u32 - 1,
+                        )));
+                    }
+                    (1, true) => {
+                        // last use
+                        if let Some(index) = var_stack_state.swap_to_top(syntax_var) {
+                            // swap to top
+                            opcodes.push(OpCode::Swap(
+                                Local(2 + index),
+                                Local(2 + var_stack_state.stack.len() as u32 - 1),
+                            ));
                         }
-                        (_, false) => {
-                            // first use, must clone
-                            opcodes.push(OpCode::TakeAttr(Local(0), origin_property.0));
-                            var_stack_state.stack.push(syntax_var);
-                            opcodes.push(OpCode::Clone(Local(
-                                2 + var_stack_state.stack.len() as u32 - 1,
-                            )));
-                        }
-                        (1, true) => {
-                            // last use
-                            if let Some(index) = var_stack_state.swap_to_top(syntax_var) {
-                                // swap to top
-                                opcodes.push(OpCode::Swap(
-                                    Local(2 + index),
-                                    Local(2 + var_stack_state.stack.len() as u32 - 1),
-                                ));
-                            }
-                            var_stack_state.stack.pop();
-                        }
-                        (_, true) => {
-                            // not first, and not last use
-                            let index = var_stack_state.find(syntax_var);
-                            opcodes.push(OpCode::Clone(Local(2 + index as u32)));
-                        }
+                        var_stack_state.stack.pop();
+                    }
+                    (_, true) => {
+                        // not first, and not last use
+                        let index = var_stack_state.find(syntax_var);
+                        opcodes.push(OpCode::Clone(Local(2 + index as u32)));
                     }
                 }
-                _ => {
-                    opcodes.push(opcode);
-                }
             }
-            opcodes
-        });
+            _ => {
+                opcodes.push(opcode);
+            }
+        }
+        opcodes
+    });
 
     debug!("{opcodes:#?}");
 
-    lib.add_procedure(NParams(1), opcodes)
+    UnlinkedProc {
+        n_params: NParams(1),
+        opcodes,
+    }
 }
 
 #[derive(Default)]

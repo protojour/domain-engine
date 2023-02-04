@@ -12,17 +12,18 @@ pub struct SyntaxVar(pub u32);
 #[derive(Clone, Debug)]
 pub struct TypedExpr<'m> {
     pub ty: TypeRef<'m>,
-    pub kind: TypedExprKind,
+    pub kind: TypedExprKind<'m>,
 }
 
 #[derive(Clone, Debug)]
-pub enum TypedExprKind {
+pub enum TypedExprKind<'m> {
     Unit,
     Call(BuiltinProc, Box<[NodeId]>),
     ValueObj(NodeId),
     MapObj(HashMap<RelationId, NodeId>),
     Variable(SyntaxVar),
     Constant(i64),
+    Translate(NodeId, TypeRef<'m>),
 }
 
 impl<'m> Debug for TypedExprTable<'m> {
@@ -123,6 +124,12 @@ impl<'m> TypedExprTable<'m> {
             }
             TypedExprKind::Constant(c) => format!("{c}"),
             TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),
+            TypedExprKind::Translate(node_id, _) => {
+                format!(
+                    "(translate! {})",
+                    self.debug_tree_guard(rewrites, *node_id, depth + 1)
+                )
+            }
         };
         if node_id != target_node_id {
             format!("[{}=>{}]@{}", node_id.0, target_node_id.0, s)

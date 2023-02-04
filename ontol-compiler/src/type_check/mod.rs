@@ -20,6 +20,14 @@ pub mod inference;
 
 mod check_expr;
 
+#[derive(Debug)]
+pub enum TypeError<'m> {
+    Mismatch {
+        actual: TypeRef<'m>,
+        expected: TypeRef<'m>,
+    },
+}
+
 /// Type checking is a stage in compilation.
 /// It is not only an immutable "check" of typing,
 /// but also actually produces more output for later compile stages.
@@ -49,14 +57,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
         self.error(compile_error, span)
     }
-}
-
-#[derive(Debug)]
-pub enum TypeError<'m> {
-    Mismatch {
-        actual: TypeRef<'m>,
-        expected: TypeRef<'m>,
-    },
 }
 
 impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
