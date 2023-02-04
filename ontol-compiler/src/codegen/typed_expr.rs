@@ -1,10 +1,10 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use ontol_runtime::{proc::BuiltinProc, RelationId};
 
 use crate::types::TypeRef;
 
-use super::rewrite::RewriteTable;
+use super::rewrite::{RewriteTable, Rewriter};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SyntaxVar(pub u32);
@@ -36,19 +36,30 @@ pub struct NodeId(pub u32);
 
 pub const ERROR_NODE: NodeId = NodeId(u32::MAX);
 
+#[derive(Default)]
+pub struct TypedExpressions<'m>(pub(super) Vec<TypedExpr<'m>>);
+
+impl<'m> Index<NodeId> for TypedExpressions<'m> {
+    type Output = TypedExpr<'m>;
+
+    fn index(&self, index: NodeId) -> &Self::Output {
+        &self.0[index.0 as usize]
+    }
+}
+
 /// Table used to store expression trees
 /// suitable for equation-style rewriting.
 #[derive(Default)]
 pub struct TypedExprTable<'m> {
-    exprs: Vec<TypedExpr<'m>>,
+    pub expressions: TypedExpressions<'m>,
     pub source_rewrites: RewriteTable,
     pub target_rewrites: RewriteTable,
 }
 
 impl<'m> TypedExprTable<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
-        let id = NodeId(self.exprs.len() as u32);
-        self.exprs.push(expr);
+        let id = NodeId(self.expressions.0.len() as u32);
+        self.expressions.0.push(expr);
         self.source_rewrites.push_node(id);
         self.target_rewrites.push_node(id);
         id
@@ -57,12 +68,12 @@ impl<'m> TypedExprTable<'m> {
     /// Mark the table as "sealed".
     /// A sealed table can be reset to its original state.
     pub fn seal(self) -> SealedTypedExprTable<'m> {
-        let size = self.exprs.len();
+        let size = self.expressions.0.len();
         SealedTypedExprTable { size, inner: self }
     }
 
-    pub fn get_expr_no_rewrite(&self, id: NodeId) -> &TypedExpr<'m> {
-        &self.exprs[id.0 as usize]
+    pub fn rewriter<'c>(&'c mut self) -> Rewriter<'c, 'm> {
+        Rewriter::new(self)
     }
 
     pub fn get_expr<'t>(
@@ -71,20 +82,7 @@ impl<'m> TypedExprTable<'m> {
         source_node: NodeId,
     ) -> (NodeId, &'t TypedExpr<'m>) {
         let root_node = rewrite_table.find_root(source_node);
-        (root_node, &self.exprs[root_node.0 as usize])
-    }
-
-    pub fn get_exprs<'t>(
-        &'t self,
-        rewrite_table: &RewriteTable,
-        node_ids: &[NodeId],
-        target: &mut Vec<(NodeId, &'t TypedExpr<'m>)>,
-    ) {
-        target.clear();
-        for source_node in node_ids {
-            let root_node = rewrite_table.find_root(*source_node);
-            target.push((root_node, &self.exprs[root_node.0 as usize]));
-        }
+        (root_node, &self.expressions[root_node])
     }
 
     pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
@@ -143,7 +141,7 @@ pub struct SealedTypedExprTable<'m> {
 impl<'m> SealedTypedExprTable<'m> {
     /// Reset all rewrites, which backtracks to original state
     pub fn reset(&mut self) {
-        self.inner.exprs.truncate(self.size);
+        self.inner.expressions.0.truncate(self.size);
         self.inner.source_rewrites.reset(self.size);
         self.inner.target_rewrites.reset(self.size);
     }

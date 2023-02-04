@@ -14,7 +14,6 @@ use crate::{
 };
 
 use super::{
-    rewrite::rewrite,
     typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprTable},
     CodegenTask,
 };
@@ -43,6 +42,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_a,
                     eq_task.node_b,
+                    DebugDirection::Forward,
                 );
 
                 eq_task.typed_expr_table.reset();
@@ -54,6 +54,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &mut eq_task.typed_expr_table,
                     eq_task.node_b,
                     eq_task.node_a,
+                    DebugDirection::Backward,
                 );
             }
         }
@@ -63,20 +64,27 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_translations = translations;
 }
 
+enum DebugDirection {
+    Forward,
+    Backward,
+}
+
 fn codegen_translate_rewrite(
     lib: &mut Lib,
     translations: &mut HashMap<(DefId, DefId), Procedure>,
     table: &mut SealedTypedExprTable,
     origin_node: NodeId,
     dest_node: NodeId,
+    direction: DebugDirection,
 ) -> bool {
-    match rewrite(&mut table.inner, origin_node) {
-        Ok(()) => {
-            let key_a = find_translation_key(&table.inner.get_expr_no_rewrite(origin_node).ty);
-            let key_b = find_translation_key(&table.inner.get_expr_no_rewrite(dest_node).ty);
+    match table.inner.rewriter().rewrite_expr(origin_node) {
+        Ok(_) => {
+            let key_a = find_translation_key(&table.inner.expressions[origin_node].ty);
+            let key_b = find_translation_key(&table.inner.expressions[dest_node].ty);
             match (key_a, key_b) {
                 (Some(a), Some(b)) => {
-                    let procedure = codegen_translate(lib, b, &table.inner, origin_node, dest_node);
+                    let procedure =
+                        codegen_translate(lib, b, &table.inner, origin_node, dest_node, direction);
 
                     translations.insert((a, b), procedure);
                     true
@@ -109,14 +117,23 @@ fn codegen_translate<'m>(
     table: &TypedExprTable<'m>,
     origin_node: NodeId,
     dest_node: NodeId,
+    direction: DebugDirection,
 ) -> Procedure {
     let (_, origin_expr) = table.get_expr(&table.source_rewrites, origin_node);
 
-    debug!(
-        "codegen origin: {} dest: {}",
-        table.debug_tree(&table.source_rewrites, origin_node),
-        table.debug_tree(&table.target_rewrites, dest_node),
-    );
+    // for easier readability:
+    match direction {
+        DebugDirection::Forward => debug!(
+            "codegen source: {} target: {}",
+            table.debug_tree(&table.source_rewrites, origin_node),
+            table.debug_tree(&table.target_rewrites, dest_node),
+        ),
+        DebugDirection::Backward => debug!(
+            "codegen target: {} source: {}",
+            table.debug_tree(&table.target_rewrites, dest_node),
+            table.debug_tree(&table.source_rewrites, origin_node),
+        ),
+    }
 
     match &origin_expr.kind {
         TypedExprKind::ValueObj(_) => {

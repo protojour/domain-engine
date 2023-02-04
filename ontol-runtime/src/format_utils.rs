@@ -96,3 +96,21 @@ mod tests {
         assert_eq!(s, "a 42");
     }
 }
+
+#[derive(Default, Clone, Copy)]
+pub struct Indent(usize);
+
+impl Indent {
+    pub fn inc(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+impl Display for Indent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for _ in 0..self.0 {
+            write!(f, "  ")?;
+        }
+        Ok(())
+    }
+}
