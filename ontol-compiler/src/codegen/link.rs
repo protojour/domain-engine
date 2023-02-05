@@ -18,6 +18,7 @@ pub struct LinkResult {
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
     let mut translations: HashMap<(DefId, DefId), Procedure> = Default::default();
     let mut lib = Lib::default();
+    // All the spans for each opcode
     let mut spans: Vec<SourceSpan> = vec![];
 
     for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procedures) {
@@ -43,6 +44,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     call_procedure.start = translation_procedure.start;
                 }
                 None => {
+                    call_procedure.start = 0;
                     compiler.push_error(
                         CompileError::CannotConvertMissingEquation {
                             input: format_def(compiler, translate_call.translation.0),

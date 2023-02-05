@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use indexmap::IndexMap;
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams, OpCode},
     RelationId,
@@ -22,8 +21,8 @@ use super::{ProcTable, UnlinkedProc};
 pub(super) fn codegen_map_obj_origin<'m>(
     proc_table: &mut ProcTable,
     expr_table: &TypedExprTable<'m>,
-    origin_attrs: &HashMap<RelationId, ExprRef>,
     to: ExprRef,
+    origin_attrs: &IndexMap<RelationId, ExprRef>,
 ) -> UnlinkedProc {
     let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 

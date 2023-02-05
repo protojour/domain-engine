@@ -2,8 +2,9 @@
 //!
 //! These data structures are emitted from the type check stage, and used in the codegen stage.
 
-use std::{collections::HashMap, fmt::Debug, ops::Index};
+use std::{fmt::Debug, ops::Index};
 
+use indexmap::IndexMap;
 use ontol_runtime::{proc::BuiltinProc, RelationId};
 
 use crate::{
@@ -33,7 +34,7 @@ pub enum TypedExprKind<'m> {
     /// A value object (object with one anonymous property/attribute)
     ValueObjPattern(ExprRef),
     /// A map object pattern
-    MapObjPattern(HashMap<RelationId, ExprRef>),
+    MapObjPattern(IndexMap<RelationId, ExprRef>),
     /// A variable definition
     Variable(SyntaxVar),
     /// A variable reference (usage site)

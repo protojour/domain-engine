@@ -18,11 +18,11 @@ use super::{ProcTable, UnlinkedProc};
 
 pub(super) fn codegen_value_obj_origin<'m>(
     proc_table: &mut ProcTable,
-    return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
     to: ExprRef,
+    to_def: DefId,
 ) -> UnlinkedProc {
-    let (_, dest_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
+    let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 
     struct ValueCodegen {
         input_local: Local,
@@ -49,16 +49,13 @@ pub(super) fn codegen_value_obj_origin<'m>(
     };
     let mut opcodes = smallvec![];
 
-    match &dest_expr.kind {
+    match &to_expr.kind {
         TypedExprKind::ValueObjPattern(expr_ref) => {
             value_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut opcodes);
-            opcodes.push((OpCode::Return0, dest_expr.span));
+            opcodes.push((OpCode::Return0, to_expr.span));
         }
         TypedExprKind::MapObjPattern(dest_attrs) => {
-            opcodes.push((
-                OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                span,
-            ));
+            opcodes.push((OpCode::CallBuiltin(BuiltinProc::NewMap, to_def), span));
 
             // the input value is not compound, so it will be consumed.
             // Therefore it must be top of the stack:

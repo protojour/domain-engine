@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
+use indexmap::IndexMap;
 use ontol_runtime::{DefId, RelationId};
 use tracing::warn;
 
@@ -159,7 +160,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             })
                             .collect::<HashMap<_, _>>();
 
-                        let mut typed_properties = HashMap::new();
+                        let mut typed_properties = IndexMap::new();
 
                         for ((attr_prop, prop_span), value) in attributes.iter() {
                             let attr_prop = match attr_prop {

@@ -73,15 +73,15 @@ fn codegen_translate_rewrite(
         panic!("TODO: could not rewrite: {error:?}");
     });
 
-    let from_key = find_translation_key(&table.inner.expressions[from].ty);
-    let to_key = find_translation_key(&table.inner.expressions[to].ty);
+    let from_def = find_translation_key(&table.inner.expressions[from].ty);
+    let to_def = find_translation_key(&table.inner.expressions[to].ty);
 
-    match (from_key, to_key) {
-        (Some(from_key), Some(to_key)) => {
+    match (from_def, to_def) {
+        (Some(from_def), Some(to_def)) => {
             let procedure =
-                codegen_translate(proc_table, to_key, &table.inner, (from, to), direction);
+                codegen_translate(proc_table, &table.inner, (from, to), to_def, direction);
 
-            proc_table.procedures.insert((from_key, to_key), procedure);
+            proc_table.procedures.insert((from_def, to_def), procedure);
             true
         }
         other => {
@@ -93,9 +93,9 @@ fn codegen_translate_rewrite(
 
 fn codegen_translate<'m>(
     proc_table: &mut ProcTable,
-    return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
     (from, to): (ExprRef, ExprRef),
+    to_def: DefId,
     direction: DebugDirection,
 ) -> UnlinkedProc {
     let (_, from_expr, _) = expr_table.resolve_expr(&expr_table.source_rewrites, from);
@@ -116,10 +116,10 @@ fn codegen_translate<'m>(
 
     match &from_expr.kind {
         TypedExprKind::ValueObjPattern(_) => {
-            codegen_value_obj_origin(proc_table, return_def_id, expr_table, to)
+            codegen_value_obj_origin(proc_table, expr_table, to, to_def)
         }
         TypedExprKind::MapObjPattern(attributes) => {
-            codegen_map_obj_origin(proc_table, expr_table, attributes, to)
+            codegen_map_obj_origin(proc_table, expr_table, to, attributes)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
