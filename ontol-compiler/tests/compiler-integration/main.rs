@@ -6,6 +6,7 @@ use ontol_runtime::{env::Env, PackageId};
 mod test_compile_errors;
 mod test_deserialize;
 mod test_eq_basic;
+mod test_geojson;
 mod test_serde;
 mod util;
 
@@ -21,6 +22,21 @@ macro_rules! assert_error_msg {
 }
 
 pub(crate) use assert_error_msg;
+
+macro_rules! assert_json_io_matches {
+    ($env:expr, $binding:expr, $json:expr) => {
+        let input = $json;
+        let value = match $binding.deserialize_value($env, input.clone()) {
+            Ok(value) => value,
+            Err(err) => panic!("deserialize failed: {err}"),
+        };
+        let output = serialize_json($env, &value);
+
+        pretty_assertions::assert_eq!(input, output);
+    };
+}
+
+pub(crate) use assert_json_io_matches;
 
 trait TestCompile {
     fn compile_ok(self, validator: impl Fn(&Env));

@@ -145,19 +145,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 type_def_id,
                 properties: Default::default(),
             }),
-            Some(SubjectProperties::Value(relationship_id, _)) => {
+            Some(SubjectProperties::Value(relationship_id, _, cardinality)) => {
                 let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
 
-                let operator_id = self
+                let inner_operator_id = self
                     .get_serde_operator_id(relationship.object)
                     .expect("No inner operator");
+
+                let inner_operator_id =
+                    self.cardinality_operator(inner_operator_id, relationship.object, *cardinality);
 
                 SerdeOperator::ValueType(ValueType {
                     typename: typename.into(),
                     type_def_id,
-                    inner_operator_id: operator_id,
+                    inner_operator_id,
                 })
             }
             Some(SubjectProperties::ValueUnion(_)) => {

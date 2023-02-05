@@ -131,13 +131,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     SubjectProperties::Empty => {
                         return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                     }
-                    SubjectProperties::Value(relationship_id, _) => {
+                    SubjectProperties::Value(relationship_id, _, Cardinality::One) => {
                         let (relationship, _) = self
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");
 
                         def_id = relationship.object;
                         continue;
+                    }
+                    SubjectProperties::Value(_, _, _) => {
+                        todo!("test non-standard value cardinality");
                     }
                     SubjectProperties::ValueUnion(_) => {
                         return Err(UnionCheckError::UnionTreeNotSupported);

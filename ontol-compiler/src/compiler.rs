@@ -103,14 +103,14 @@ impl<'m> Compiler<'m> {
         self.namespaces.namespaces.keys().map(|id| *id).collect()
     }
 
-    ///
+    /// Check for errors and bail out of the compilation process now, if in error state.
     pub(crate) fn check_error(&mut self) -> Result<(), UnifiedCompileError> {
         if self.errors.errors.is_empty() {
             Ok(())
         } else {
-            let mut errors = vec![];
-            errors.append(&mut self.errors.errors);
-            Err(UnifiedCompileError { errors })
+            Err(UnifiedCompileError {
+                errors: std::mem::take(&mut self.errors.errors),
+            })
         }
     }
 

@@ -128,6 +128,16 @@ fn tuple_in_union() {
 }
 
 #[test]
+fn no_need_to_support_differing_cardinality_in_unions_at_least_yet() {
+    r#"
+    (type! u)
+    (rel! (u) _ (int))
+    (rel! (u) _[] (string)) ;; ERROR invalid cardinality combination in union
+    "#
+    .compile_fail();
+}
+
+#[test]
 fn eq_undeclared_variable() {
     "
     (eq! ()

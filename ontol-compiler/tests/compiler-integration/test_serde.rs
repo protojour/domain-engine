@@ -1,19 +1,8 @@
-use crate::{assert_error_msg, util::serialize_json, util::TypeBinding, TestCompile};
+use crate::{
+    assert_error_msg, assert_json_io_matches, util::serialize_json, util::TypeBinding, TestCompile,
+};
 use serde_json::json;
 use test_log::test;
-
-macro_rules! assert_json_io_matches {
-    ($env:expr, $binding:expr, $json:expr) => {
-        let input = $json;
-        let value = match $binding.deserialize_value($env, input.clone()) {
-            Ok(value) => value,
-            Err(err) => panic!("deserialize failed: {err}"),
-        };
-        let output = serialize_json($env, &value);
-
-        pretty_assertions::assert_eq!(input, output);
-    };
-}
 
 #[test]
 fn test_serde_empty_type() {
@@ -134,47 +123,5 @@ fn test_serde_many_cardinality() {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(env, foo, json!({ "s": []}));
         assert_json_io_matches!(env, foo, json!({ "s": ["a", "b"]}));
-    });
-}
-
-#[test]
-fn test_serde_geojson() {
-    r#"
-    (type! position)
-    (rel! (position) _ (tuple! (int) (int)))
-
-    (type! Point)
-    (rel! (Point) type "Point")
-    (rel! (Point) coordinates (position))
-
-    (type! Polygon)
-    (rel! (Polygon) type "Polygon")
-    ; BUG: need to store in list:
-    (rel! (Polygon) coordinates (tuple! (position) (position)))
-
-    (type! Geometry)
-    (rel! (Geometry) _ (Point))
-    (rel! (Geometry) _ (Polygon))
-    "#
-    .compile_ok(|env| {
-        let geometry = TypeBinding::new(env, "Geometry");
-        assert_json_io_matches!(
-            env,
-            geometry,
-            json!({ "type": "Point", "coordinates": [1, 2]})
-        );
-        assert_json_io_matches!(
-            env,
-            geometry,
-            json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4]]})
-        );
-        assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!([])),
-            "invalid type: sequence, expected `Geometry` (`Point` or `Polygon`) at line 1 column 2"
-        );
-        assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "bogus" })),
-            "invalid map value, expected `Geometry` (`Point` or `Polygon`) at line 1 column 16"
-        );
     });
 }

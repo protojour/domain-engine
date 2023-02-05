@@ -55,7 +55,7 @@ pub enum SubjectProperties {
     /// A type with no properties
     #[default]
     Empty,
-    Value(RelationshipId, SourceSpan),
+    Value(RelationshipId, SourceSpan, Cardinality),
     /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),

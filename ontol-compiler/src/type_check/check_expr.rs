@@ -103,7 +103,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             span: expr.span,
                         })
                     }
-                    Some(SubjectProperties::Value(relationship_id, _)) => {
+                    Some(SubjectProperties::Value(relationship_id, _, _)) => {
                         match attributes.deref() {
                             [((prop_ident, _), value)] if prop_ident.is_none() => {
                                 let (relationship, _) = self

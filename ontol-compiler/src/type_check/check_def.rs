@@ -137,22 +137,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match role {
             Role::Subject => match (&relation.ident, &mut properties.subject) {
                 (None, SubjectProperties::Empty) => {
-                    let Cardinality::One = relationship.cardinality else {
-                        return self.error(CompileError::UnsupportedCardinality, span);
-                    };
-                    properties.subject = SubjectProperties::Value(relationship_id, *span);
+                    properties.subject =
+                        SubjectProperties::Value(relationship_id, *span, relationship.cardinality);
                 }
-                (None, SubjectProperties::Value(existing_relationship_id, existing_span)) => {
-                    properties.subject = SubjectProperties::ValueUnion(
-                        [
-                            (*existing_relationship_id, *existing_span),
-                            (relationship_id, *span),
-                        ]
-                        .into(),
-                    );
+                (
+                    None,
+                    SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
+                ) => {
+                    match (relationship.cardinality, cardinality) {
+                        (Cardinality::One, Cardinality::One) => {
+                            properties.subject = SubjectProperties::ValueUnion(
+                                [
+                                    (*existing_relationship_id, *existing_span),
+                                    (relationship_id, *span),
+                                ]
+                                .into(),
+                            );
 
-                    // Register union for check later
-                    self.relations.value_unions.insert(role_def_id);
+                            // Register union for check later
+                            self.relations.value_unions.insert(role_def_id);
+                        }
+                        _ => {
+                            return self
+                                .error(CompileError::InvalidCardinaltyCombinationInUnion, span);
+                        }
+                    }
                 }
                 (None, SubjectProperties::ValueUnion(properties)) => {
                     properties.push((relationship_id, *span));
@@ -173,7 +182,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (None, SubjectProperties::Map(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
-                (Some(_), SubjectProperties::Value(_, _) | SubjectProperties::ValueUnion(_)) => {
+                (Some(_), SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_)) => {
                     return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
                 }
             },
