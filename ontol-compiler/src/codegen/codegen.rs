@@ -24,7 +24,7 @@ pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
 
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub procs: HashMap<(DefId, DefId), UnlinkedProc>,
+    pub procedures: HashMap<(DefId, DefId), UnlinkedProc>,
     pub translate_calls: Vec<TranslateCall>,
 }
 
@@ -64,24 +64,11 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Eq(mut eq_task) => {
-                debug!("codegen eq:");
-                for (i, typed_expr) in eq_task
-                    .typed_expr_table
-                    .inner
-                    .expressions
-                    .0
-                    .iter()
-                    .enumerate()
-                {
-                    debug!("{i} {typed_expr:?}");
-                }
-
                 // a -> b
                 codegen_translate_rewrite(
                     &mut proc_table,
                     &mut eq_task.typed_expr_table,
-                    eq_task.node_a,
-                    eq_task.node_b,
+                    (eq_task.node_a, eq_task.node_b),
                     DebugDirection::Forward,
                 );
 
@@ -91,8 +78,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 codegen_translate_rewrite(
                     &mut proc_table,
                     &mut eq_task.typed_expr_table,
-                    eq_task.node_b,
-                    eq_task.node_a,
+                    (eq_task.node_b, eq_task.node_a),
                     DebugDirection::Backward,
                 );
             }
@@ -113,36 +99,29 @@ enum DebugDirection {
 fn codegen_translate_rewrite(
     proc_table: &mut ProcTable,
     table: &mut SealedTypedExprTable,
-    origin_node: NodeId,
-    dest_node: NodeId,
+    (from, to): (NodeId, NodeId),
     direction: DebugDirection,
 ) -> bool {
-    match table.inner.rewriter().rewrite_expr(origin_node) {
-        Ok(_) => {
-            let key_a = find_translation_key(&table.inner.expressions[origin_node].ty);
-            let key_b = find_translation_key(&table.inner.expressions[dest_node].ty);
-            match (key_a, key_b) {
-                (Some(a), Some(b)) => {
-                    let procedure = codegen_translate(
-                        proc_table,
-                        b,
-                        &table.inner,
-                        origin_node,
-                        dest_node,
-                        direction,
-                    );
+    // perform rewrite
+    let mut rewriter = table.inner.rewriter();
+    rewriter.rewrite_expr(from).unwrap_or_else(|error| {
+        panic!("TODO: could not rewrite: {error:?}");
+    });
 
-                    proc_table.procs.insert((a, b), procedure);
-                    true
-                }
-                other => {
-                    warn!("unable to save translation: key = {other:?}");
-                    false
-                }
-            }
+    let from_key = find_translation_key(&table.inner.expressions[from].ty);
+    let to_key = find_translation_key(&table.inner.expressions[to].ty);
+
+    match (from_key, to_key) {
+        (Some(from_key), Some(to_key)) => {
+            let procedure =
+                codegen_translate(proc_table, to_key, &table.inner, (from, to), direction);
+
+            proc_table.procedures.insert((from_key, to_key), procedure);
+            true
         }
-        Err(error) => {
-            panic!("TODO: could not rewrite: {error:?}");
+        other => {
+            warn!("unable to save translation: key = {other:?}");
+            false
         }
     }
 }
@@ -161,32 +140,31 @@ fn codegen_translate<'m>(
     proc_table: &mut ProcTable,
     return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
-    origin_node: NodeId,
-    dest_node: NodeId,
+    (from, to): (NodeId, NodeId),
     direction: DebugDirection,
 ) -> UnlinkedProc {
-    let (_, origin_expr) = expr_table.resolve_expr(&expr_table.source_rewrites, origin_node);
+    let (_, from_expr, _) = expr_table.resolve_expr(&expr_table.source_rewrites, from);
 
     // for easier readability:
     match direction {
         DebugDirection::Forward => debug!(
             "codegen source: {} target: {}",
-            expr_table.debug_tree(&expr_table.source_rewrites, origin_node),
-            expr_table.debug_tree(&expr_table.target_rewrites, dest_node),
+            expr_table.debug_tree(&expr_table.source_rewrites, from),
+            expr_table.debug_tree(&expr_table.target_rewrites, to),
         ),
         DebugDirection::Backward => debug!(
             "codegen target: {} source: {}",
-            expr_table.debug_tree(&expr_table.target_rewrites, dest_node),
-            expr_table.debug_tree(&expr_table.source_rewrites, origin_node),
+            expr_table.debug_tree(&expr_table.target_rewrites, from),
+            expr_table.debug_tree(&expr_table.source_rewrites, to),
         ),
     }
 
-    match &origin_expr.kind {
+    match &from_expr.kind {
         TypedExprKind::ValueObj(_) => {
-            codegen_value_obj_origin(proc_table, return_def_id, expr_table, dest_node)
+            codegen_value_obj_origin(proc_table, return_def_id, expr_table, to)
         }
         TypedExprKind::MapObj(attributes) => {
-            codegen_map_obj_origin(proc_table, expr_table, attributes, dest_node)
+            codegen_map_obj_origin(proc_table, expr_table, attributes, to)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
@@ -196,9 +174,9 @@ fn codegen_value_obj_origin<'m>(
     proc_table: &mut ProcTable,
     return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
-    dest_node: NodeId,
+    to: NodeId,
 ) -> UnlinkedProc {
-    let (_, dest_expr) = expr_table.resolve_expr(&expr_table.target_rewrites, dest_node);
+    let (_, dest_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 
     struct ValueCodegen {
         input_local: Local,
@@ -224,7 +202,6 @@ fn codegen_value_obj_origin<'m>(
         var_tracker: Default::default(),
     };
     let mut opcodes = smallvec![];
-    let span = dest_expr.span;
 
     match &dest_expr.kind {
         TypedExprKind::ValueObj(node_id) => {
@@ -289,8 +266,7 @@ pub(super) trait Codegen {
         expr_id: NodeId,
         opcodes: &mut SpannedOpCodes,
     ) {
-        let (_, expr) = expr_table.resolve_expr(&expr_table.target_rewrites, expr_id);
-        let span = expr.span;
+        let (_, expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
                 for param in params.iter() {
@@ -308,6 +284,7 @@ pub(super) trait Codegen {
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(*var, opcodes, &span);
             }
+            TypedExprKind::VariableRef(_) => panic!(),
             TypedExprKind::Translate(param_id, from_ty) => {
                 self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
 

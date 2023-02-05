@@ -23,6 +23,7 @@ pub enum TypedExprKind<'m> {
     ValueObj(NodeId),
     MapObj(HashMap<RelationId, NodeId>),
     Variable(SyntaxVar),
+    VariableRef(NodeId),
     Constant(i64),
     Translate(NodeId, TypeRef<'m>),
 }
@@ -60,10 +61,21 @@ pub struct TypedExprTable<'m> {
 
 impl<'m> TypedExprTable<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
+        let auto_rewrite = match &expr.kind {
+            TypedExprKind::VariableRef(var_node_id) => Some(*var_node_id),
+            _ => None,
+        };
+
         let id = NodeId(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
         self.source_rewrites.push();
         self.target_rewrites.push();
+
+        if let Some(auto_rewrite) = auto_rewrite {
+            self.source_rewrites.rewrite(id, auto_rewrite);
+            self.target_rewrites.rewrite(id, auto_rewrite);
+        }
+
         id
     }
 
@@ -79,13 +91,15 @@ impl<'m> TypedExprTable<'m> {
         Rewriter::new(self)
     }
 
+    #[inline]
     pub fn resolve_expr<'t>(
         &'t self,
         rewrite_table: &RewriteTable,
         source_node: NodeId,
-    ) -> (NodeId, &'t TypedExpr<'m>) {
+    ) -> (NodeId, &'t TypedExpr<'m>, SourceSpan) {
+        let span = self.expressions[source_node].span;
         let root_node = rewrite_table.resolve(source_node);
-        (root_node, &self.expressions[root_node])
+        (root_node, &self.expressions[root_node], span)
     }
 
     pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
@@ -96,7 +110,7 @@ impl<'m> TypedExprTable<'m> {
         if depth > 20 {
             return format!("[ERROR depth exceeded]");
         }
-        let (target_node_id, expr) = self.resolve_expr(rewrites, node_id);
+        let (target_node_id, expr, _) = self.resolve_expr(rewrites, node_id);
         let s = match &expr.kind {
             TypedExprKind::Unit => format!("{{}}"),
             TypedExprKind::Call(proc, params) => {
@@ -125,7 +139,11 @@ impl<'m> TypedExprTable<'m> {
                 format!("(obj! {attr_strings})")
             }
             TypedExprKind::Constant(c) => format!("{c}"),
-            TypedExprKind::Variable(SyntaxVar(v)) => format!(":{v}"),
+            TypedExprKind::Variable(SyntaxVar(v)) => format!("var:{v}"),
+            TypedExprKind::VariableRef(var_node_id) => {
+                let val = self.debug_tree_guard(rewrites, *var_node_id, depth + 1);
+                format!("=>{val}")
+            }
             TypedExprKind::Translate(node_id, _) => {
                 format!(
                     "(translate! {})",
@@ -134,9 +152,9 @@ impl<'m> TypedExprTable<'m> {
             }
         };
         if node_id != target_node_id {
-            format!("[{}=>{}]@{}", node_id.0, target_node_id.0, s)
+            format!("{{{}->{}}}#{}", node_id.0, target_node_id.0, s)
         } else {
-            format!("{}@{}", node_id.0, s)
+            format!("{{{}}}#{}", node_id.0, s)
         }
     }
 }
@@ -153,5 +171,20 @@ impl<'m> SealedTypedExprTable<'m> {
         self.inner.expressions.0.truncate(self.size);
         self.inner.source_rewrites.reset(self.size);
         self.inner.target_rewrites.reset(self.size);
+
+        // auto rewrites of variable refs
+        for (index, expr) in self.inner.expressions.0.iter().enumerate() {
+            match &expr.kind {
+                TypedExprKind::VariableRef(node_id) => {
+                    self.inner
+                        .source_rewrites
+                        .rewrite(NodeId(index as u32), *node_id);
+                    self.inner
+                        .target_rewrites
+                        .rewrite(NodeId(index as u32), *node_id);
+                }
+                _ => {}
+            }
+        }
     }
 }

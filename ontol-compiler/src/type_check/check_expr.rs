@@ -221,11 +221,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self
                     .types
                     .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
-                let node_id = ctx
+                let var_node_id = ctx
                     .variable_nodes
                     .get(expr_id)
                     .expect("variable node not found");
-                (ty, *node_id)
+
+                let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
+                    ty,
+                    kind: TypedExprKind::VariableRef(*var_node_id),
+                    span: expr.span,
+                });
+
+                (ty, node_id)
             }
         }
     }

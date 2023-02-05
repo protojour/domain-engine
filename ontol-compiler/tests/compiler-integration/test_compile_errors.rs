@@ -277,7 +277,7 @@ fn union_in_named_relationship() {
 }
 
 #[test]
-fn unresolved_eq_fixme() {
+fn unresolved_transitive_eq() {
     r#"
     (type! a)
     (type! b)
@@ -289,14 +289,12 @@ fn unresolved_eq_fixme() {
     (rel! (c) p0 (a))
     (rel! (d) p1 (b))
 
-    ; FIXME: these compile errors are pretty bad,
-    ; need to fix them to point to the correct culprit:
-
     (eq! (:x)
-        (obj! c (p0 :x))
-        (obj! d (
-            p1
-            :x ;; ERROR cannot equate;; ERROR cannot equate
+        (obj! c (p0
+            :x ;; ERROR cannot convert this `a` from `b`: These types are not equated.
+        ))
+        (obj! d (p1
+            :x ;; ERROR cannot convert this `b` from `a`: These types are not equated.
         ))
     )
     "#

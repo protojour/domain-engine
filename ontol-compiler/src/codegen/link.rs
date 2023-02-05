@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use ontol_runtime::{
     proc::{Lib, OpCode, Procedure},
-    DefId,
+    smart_format, DefId,
 };
+use smartstring::alias::String;
 
-use crate::{compiler::Compiler, error::CompileError, SourceSpan};
+use crate::{compiler::Compiler, error::CompileError, types::FormatType, SourceSpan};
 
 use super::codegen::ProcTable;
 
@@ -19,7 +20,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     let mut lib = Lib::default();
     let mut spans: Vec<SourceSpan> = vec![];
 
-    for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procs) {
+    for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procedures) {
         spans.extend(unlinked_proc.opcodes.iter().map(|(_, span)| span));
 
         let procedure = lib.add_procedure(
@@ -43,7 +44,11 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                 }
                 None => {
                     compiler.push_error(
-                        CompileError::CannotEquate.spanned(&compiler.sources, &spans[index]),
+                        CompileError::CannotConvertMissingEquation {
+                            input: format_def(compiler, translate_call.translation.0),
+                            output: format_def(compiler, translate_call.translation.1),
+                        }
+                        .spanned(&compiler.sources, &spans[index]),
                     );
                 }
             }
@@ -51,4 +56,10 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 
     LinkResult { lib, translations }
+}
+
+fn format_def(compiler: &Compiler, def_id: DefId) -> String {
+    let ty = compiler.def_types.map.get(&def_id).unwrap();
+
+    smart_format!("{}", FormatType(ty, &compiler.defs))
 }

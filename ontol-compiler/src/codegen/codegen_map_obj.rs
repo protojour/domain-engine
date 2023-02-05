@@ -25,9 +25,9 @@ pub(super) fn codegen_map_obj_origin<'m>(
     proc_table: &mut ProcTable,
     expr_table: &TypedExprTable<'m>,
     origin_attrs: &HashMap<RelationId, NodeId>,
-    dest_node: NodeId,
+    to: NodeId,
 ) -> UnlinkedProc {
-    let (_, dest_expr) = expr_table.resolve_expr(&expr_table.target_rewrites, dest_node);
+    let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
@@ -70,11 +70,10 @@ pub(super) fn codegen_map_obj_origin<'m>(
 
     let mut map_codegen = MapCodegen::default();
     let mut ops = smallvec![];
-    let span = dest_expr.span;
 
-    match &dest_expr.kind {
+    match &to_expr.kind {
         TypedExprKind::MapObj(dest_attrs) => {
-            let return_def_id = dest_expr.ty.get_single_def_id().unwrap();
+            let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
             ops.push((
@@ -94,7 +93,7 @@ pub(super) fn codegen_map_obj_origin<'m>(
             ops.push((OpCode::Return(Local(1)), span));
         }
         kind => {
-            todo!("target: {kind:?}");
+            todo!("to: {kind:?}");
         }
     }
 

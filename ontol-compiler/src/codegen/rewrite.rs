@@ -106,6 +106,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                 Ok(RewriteResult::Constant)
             }
             TypedExprKind::Variable(_) => Ok(RewriteResult::Variable(node_id)),
+            TypedExprKind::VariableRef(var_node_id) => Ok(RewriteResult::Variable(*var_node_id)),
             TypedExprKind::Constant(_) => Ok(RewriteResult::Constant),
             TypedExprKind::Translate(param_id, param_ty) => {
                 let param_ty = *param_ty;
@@ -320,13 +321,18 @@ mod tests {
             ty: int,
             span: SourceSpan::none(),
         });
+        let var_ref = table.add_expr(TypedExpr {
+            kind: TypedExprKind::VariableRef(var),
+            ty: int,
+            span: SourceSpan::none(),
+        });
         let constant = table.add_expr(TypedExpr {
             kind: TypedExprKind::Constant(1000),
             ty: int,
             span: SourceSpan::none(),
         });
         let call = table.add_expr(TypedExpr {
-            kind: TypedExprKind::Call(BuiltinProc::Mul, [var, constant].into()),
+            kind: TypedExprKind::Call(BuiltinProc::Mul, [var_ref, constant].into()),
             ty: int,
             span: SourceSpan::none(),
         });
