@@ -25,6 +25,7 @@ mod relation;
 mod source;
 mod strings;
 mod type_check;
+mod typed_expr;
 mod types;
 
 pub trait Compile {

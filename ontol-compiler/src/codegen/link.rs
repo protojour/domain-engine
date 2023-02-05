@@ -8,7 +8,7 @@ use smartstring::alias::String;
 
 use crate::{compiler::Compiler, error::CompileError, types::FormatType, SourceSpan};
 
-use super::codegen::ProcTable;
+use super::ProcTable;
 
 pub struct LinkResult {
     pub lib: Lib,

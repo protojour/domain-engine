@@ -1,14 +1,21 @@
+//! # Typed expressiona
+//!
+//! These data structures are emitted from the type check stage, and used in the codegen stage.
+
 use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use ontol_runtime::{proc::BuiltinProc, RelationId};
 
-use crate::{types::TypeRef, SourceSpan};
-
-use super::rewrite::{RewriteTable, Rewriter};
+use crate::{
+    codegen::rewrite::{RewriteTable, Rewriter},
+    types::TypeRef,
+    SourceSpan,
+};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SyntaxVar(pub u32);
 
+/// An expression with type information attached
 #[derive(Clone, Debug)]
 pub struct TypedExpr<'m> {
     pub kind: TypedExprKind<'m>,
@@ -16,16 +23,25 @@ pub struct TypedExpr<'m> {
     pub span: SourceSpan,
 }
 
+/// The 'kind' of a typed expression
 #[derive(Clone, Debug)]
 pub enum TypedExprKind<'m> {
+    /// An expression with no information
     Unit,
-    Call(BuiltinProc, Box<[NodeId]>),
-    ValueObj(NodeId),
-    MapObj(HashMap<RelationId, NodeId>),
+    /// Call to a built-in procedure
+    Call(BuiltinProc, Box<[ExprRef]>),
+    /// A value object (object with one anonymous property/attribute)
+    ValueObjPattern(ExprRef),
+    /// A map object pattern
+    MapObjPattern(HashMap<RelationId, ExprRef>),
+    /// A variable definition
     Variable(SyntaxVar),
-    VariableRef(NodeId),
+    /// A variable reference (usage site)
+    VariableRef(ExprRef),
+    /// A constant/literal expression
     Constant(i64),
-    Translate(NodeId, TypeRef<'m>),
+    /// A translation from one type to another
+    Translate(ExprRef, TypeRef<'m>),
 }
 
 impl<'m> Debug for TypedExprTable<'m> {
@@ -34,18 +50,21 @@ impl<'m> Debug for TypedExprTable<'m> {
     }
 }
 
+/// A reference to a typed expression.
+///
+/// This reference is tied to a `TypedExprTable` and is not globally valid.
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-pub struct NodeId(pub u32);
+pub struct ExprRef(pub u32);
 
-pub const ERROR_NODE: NodeId = NodeId(u32::MAX);
+pub const ERROR_NODE: ExprRef = ExprRef(u32::MAX);
 
 #[derive(Default)]
 pub struct TypedExpressions<'m>(pub(super) Vec<TypedExpr<'m>>);
 
-impl<'m> Index<NodeId> for TypedExpressions<'m> {
+impl<'m> Index<ExprRef> for TypedExpressions<'m> {
     type Output = TypedExpr<'m>;
 
-    fn index(&self, index: NodeId) -> &Self::Output {
+    fn index(&self, index: ExprRef) -> &Self::Output {
         &self.0[index.0 as usize]
     }
 }
@@ -60,13 +79,13 @@ pub struct TypedExprTable<'m> {
 }
 
 impl<'m> TypedExprTable<'m> {
-    pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> NodeId {
+    pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> ExprRef {
         let auto_rewrite = match &expr.kind {
-            TypedExprKind::VariableRef(var_node_id) => Some(*var_node_id),
+            TypedExprKind::VariableRef(var_ref) => Some(*var_ref),
             _ => None,
         };
 
-        let id = NodeId(self.expressions.0.len() as u32);
+        let id = ExprRef(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
         self.source_rewrites.push();
         self.target_rewrites.push();
@@ -95,43 +114,43 @@ impl<'m> TypedExprTable<'m> {
     pub fn resolve_expr<'t>(
         &'t self,
         rewrite_table: &RewriteTable,
-        source_node: NodeId,
-    ) -> (NodeId, &'t TypedExpr<'m>, SourceSpan) {
+        source_node: ExprRef,
+    ) -> (ExprRef, &'t TypedExpr<'m>, SourceSpan) {
         let span = self.expressions[source_node].span;
         let root_node = rewrite_table.resolve(source_node);
         (root_node, &self.expressions[root_node], span)
     }
 
-    pub fn debug_tree(&self, rewrites: &RewriteTable, node_id: NodeId) -> String {
-        self.debug_tree_guard(rewrites, node_id, 0)
+    pub fn debug_tree(&self, rewrites: &RewriteTable, expr_ref: ExprRef) -> String {
+        self.debug_tree_guard(rewrites, expr_ref, 0)
     }
 
-    fn debug_tree_guard(&self, rewrites: &RewriteTable, node_id: NodeId, depth: usize) -> String {
+    fn debug_tree_guard(&self, rewrites: &RewriteTable, expr_ref: ExprRef, depth: usize) -> String {
         if depth > 20 {
             return format!("[ERROR depth exceeded]");
         }
-        let (target_node_id, expr, _) = self.resolve_expr(rewrites, node_id);
+        let (target_expr_ref, expr, _) = self.resolve_expr(rewrites, expr_ref);
         let s = match &expr.kind {
             TypedExprKind::Unit => format!("{{}}"),
             TypedExprKind::Call(proc, params) => {
                 let param_strings = params
                     .iter()
-                    .map(|node_id| self.debug_tree_guard(rewrites, *node_id, depth + 1))
+                    .map(|param_ref| self.debug_tree_guard(rewrites, *param_ref, depth + 1))
                     .collect::<Vec<_>>()
                     .join(" ");
                 format!("({proc:?} {param_strings})")
             }
-            TypedExprKind::ValueObj(node_id) => {
+            TypedExprKind::ValueObjPattern(expr_ref) => {
                 format!(
                     "(obj! {})",
-                    self.debug_tree_guard(rewrites, *node_id, depth + 1)
+                    self.debug_tree_guard(rewrites, *expr_ref, depth + 1)
                 )
             }
-            TypedExprKind::MapObj(attributes) => {
+            TypedExprKind::MapObjPattern(attributes) => {
                 let attr_strings = attributes
                     .iter()
-                    .map(|(relation_id, node_id)| {
-                        let val = self.debug_tree_guard(rewrites, *node_id, depth + 1);
+                    .map(|(relation_id, expr_ref)| {
+                        let val = self.debug_tree_guard(rewrites, *expr_ref, depth + 1);
                         format!("({} {})", (relation_id.0 .0), val)
                     })
                     .collect::<Vec<_>>()
@@ -140,21 +159,21 @@ impl<'m> TypedExprTable<'m> {
             }
             TypedExprKind::Constant(c) => format!("{c}"),
             TypedExprKind::Variable(SyntaxVar(v)) => format!("var:{v}"),
-            TypedExprKind::VariableRef(var_node_id) => {
-                let val = self.debug_tree_guard(rewrites, *var_node_id, depth + 1);
+            TypedExprKind::VariableRef(var_ref) => {
+                let val = self.debug_tree_guard(rewrites, *var_ref, depth + 1);
                 format!("=>{val}")
             }
-            TypedExprKind::Translate(node_id, _) => {
+            TypedExprKind::Translate(expr_ref, _) => {
                 format!(
                     "(translate! {})",
-                    self.debug_tree_guard(rewrites, *node_id, depth + 1)
+                    self.debug_tree_guard(rewrites, *expr_ref, depth + 1)
                 )
             }
         };
-        if node_id != target_node_id {
-            format!("{{{}->{}}}#{}", node_id.0, target_node_id.0, s)
+        if expr_ref != target_expr_ref {
+            format!("{{{}->{}}}#{}", expr_ref.0, target_expr_ref.0, s)
         } else {
-            format!("{{{}}}#{}", node_id.0, s)
+            format!("{{{}}}#{}", expr_ref.0, s)
         }
     }
 }
@@ -175,13 +194,13 @@ impl<'m> SealedTypedExprTable<'m> {
         // auto rewrites of variable refs
         for (index, expr) in self.inner.expressions.0.iter().enumerate() {
             match &expr.kind {
-                TypedExprKind::VariableRef(node_id) => {
+                TypedExprKind::VariableRef(var_ref) => {
                     self.inner
                         .source_rewrites
-                        .rewrite(NodeId(index as u32), *node_id);
+                        .rewrite(ExprRef(index as u32), *var_ref);
                     self.inner
                         .target_rewrites
-                        .rewrite(NodeId(index as u32), *node_id);
+                        .rewrite(ExprRef(index as u32), *var_ref);
                 }
                 _ => {}
             }

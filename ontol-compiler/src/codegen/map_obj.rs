@@ -9,31 +9,29 @@ use tracing::debug;
 
 use crate::{
     codegen::{
-        codegen::{Codegen, SpannedOpCodes, VarFlowTracker},
-        typed_expr::SyntaxVar,
+        codegen::{SpannedOpCodes, VarFlowTracker},
+        Codegen,
     },
+    typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
     SourceSpan,
 };
 
-use super::{
-    codegen::{ProcTable, UnlinkedProc},
-    typed_expr::{NodeId, TypedExprKind, TypedExprTable},
-};
+use super::{ProcTable, UnlinkedProc};
 
 /// Generate code originating from a map obj destructuring
 pub(super) fn codegen_map_obj_origin<'m>(
     proc_table: &mut ProcTable,
     expr_table: &TypedExprTable<'m>,
-    origin_attrs: &HashMap<RelationId, NodeId>,
-    to: NodeId,
+    origin_attrs: &HashMap<RelationId, ExprRef>,
+    to: ExprRef,
 ) -> UnlinkedProc {
     let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
-        .map(|(prop_id, node_id)| {
+        .map(|(prop_id, expr_ref)| {
             match &expr_table
-                .resolve_expr(&expr_table.source_rewrites, *node_id)
+                .resolve_expr(&expr_table.source_rewrites, *expr_ref)
                 .1
                 .kind
             {
@@ -72,7 +70,7 @@ pub(super) fn codegen_map_obj_origin<'m>(
     let mut ops = smallvec![];
 
     match &to_expr.kind {
-        TypedExprKind::MapObj(dest_attrs) => {
+        TypedExprKind::MapObjPattern(dest_attrs) => {
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
@@ -81,15 +79,15 @@ pub(super) fn codegen_map_obj_origin<'m>(
                 span,
             ));
 
-            for (relation_id, node) in dest_attrs {
-                map_codegen.codegen_expr(proc_table, expr_table, *node, &mut ops);
+            for (relation_id, expr_ref) in dest_attrs {
+                map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
                 ops.push((OpCode::PutAttr(Local(1), *relation_id), span));
             }
 
             ops.push((OpCode::Return(Local(1)), span));
         }
-        TypedExprKind::ValueObj(node_id) => {
-            map_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut ops);
+        TypedExprKind::ValueObjPattern(expr_ref) => {
+            map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
             ops.push((OpCode::Return(Local(1)), span));
         }
         kind => {

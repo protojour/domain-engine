@@ -3,7 +3,7 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
-use super::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, TypedExpressions};
+use crate::typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable, TypedExpressions};
 
 /// A rewrite table tracks rewrites of node indices.
 ///
@@ -14,29 +14,29 @@ use super::typed_expr::{NodeId, TypedExpr, TypedExprKind, TypedExprTable, TypedE
 ///
 /// Be careful to not introduce circular rewrites.
 #[derive(Default, Debug)]
-pub struct RewriteTable(SmallVec<[NodeId; 32]>);
+pub struct RewriteTable(SmallVec<[ExprRef; 32]>);
 
 impl RewriteTable {
     pub fn push(&mut self) {
         let len = self.0.len();
-        self.0.push(NodeId(len as u32));
+        self.0.push(ExprRef(len as u32));
     }
 
     /// Register a rewrite.
     /// All occurences of `source` should be rewritten to `target`.
-    pub fn rewrite(&mut self, source: NodeId, target: NodeId) {
+    pub fn rewrite(&mut self, source: ExprRef, target: ExprRef) {
         self.0[source.0 as usize] = target;
     }
 
-    /// Resolve any node to its rewritten form.
-    pub fn resolve(&self, mut node_id: NodeId) -> NodeId {
+    /// Resolve any expression to its rewritten form.
+    pub fn resolve(&self, mut expr_ref: ExprRef) -> ExprRef {
         loop {
-            let entry = self.0[node_id.0 as usize];
-            if entry == node_id {
-                return node_id;
+            let entry = self.0[expr_ref.0 as usize];
+            if entry == expr_ref {
+                return expr_ref;
             }
 
-            node_id = entry;
+            expr_ref = entry;
         }
     }
 
@@ -58,7 +58,7 @@ pub enum RewriteError {
 }
 
 pub enum RewriteResult {
-    Variable(NodeId),
+    Variable(ExprRef),
     Constant,
 }
 
@@ -77,51 +77,51 @@ impl<'t, 'm> Rewriter<'t, 'm> {
         }
     }
 
-    pub fn rewrite_expr(&mut self, node: NodeId) -> Result<RewriteResult, RewriteError> {
-        self.rewrite_expr_inner(node, Indent::default())
+    pub fn rewrite_expr(&mut self, expr_ref: ExprRef) -> Result<RewriteResult, RewriteError> {
+        self.rewrite_expr_inner(expr_ref, Indent::default())
     }
 
     fn rewrite_expr_inner(
         &mut self,
-        node_id: NodeId,
+        expr_ref: ExprRef,
         indent: Indent,
     ) -> Result<RewriteResult, RewriteError> {
-        match &self.expressions[node_id].kind {
+        match &self.expressions[expr_ref].kind {
             TypedExprKind::Call(proc, params) => {
-                let params_ids = params
+                let param_refs = params
                     .into_iter()
                     .map(|param_id| self.source_rewrites.resolve(*param_id))
                     .collect();
 
-                self.rewrite_call(node_id, *proc, params_ids, indent)
+                self.rewrite_call(expr_ref, *proc, param_refs, indent)
             }
-            TypedExprKind::ValueObj(value_node) => {
+            TypedExprKind::ValueObjPattern(value_node) => {
                 self.rewrite_expr_inner(*value_node, indent.inc())
             }
-            TypedExprKind::MapObj(property_map) => {
-                let nodes: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
-                for node in nodes {
-                    self.rewrite_expr_inner(node, indent.inc())?;
+            TypedExprKind::MapObjPattern(property_map) => {
+                let expr_refs: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
+                for expr_ref in expr_refs {
+                    self.rewrite_expr_inner(expr_ref, indent.inc())?;
                 }
                 Ok(RewriteResult::Constant)
             }
-            TypedExprKind::Variable(_) => Ok(RewriteResult::Variable(node_id)),
-            TypedExprKind::VariableRef(var_node_id) => Ok(RewriteResult::Variable(*var_node_id)),
+            TypedExprKind::Variable(_) => Ok(RewriteResult::Variable(expr_ref)),
+            TypedExprKind::VariableRef(var_ref) => Ok(RewriteResult::Variable(*var_ref)),
             TypedExprKind::Constant(_) => Ok(RewriteResult::Constant),
-            TypedExprKind::Translate(param_id, param_ty) => {
+            TypedExprKind::Translate(param_ref, param_ty) => {
                 let param_ty = *param_ty;
-                let param_id = match self.rewrite_expr_inner(*param_id, indent.inc())? {
+                let param_ref = match self.rewrite_expr_inner(*param_ref, indent.inc())? {
                     RewriteResult::Variable(var_id) => var_id,
                     RewriteResult::Constant => return Ok(RewriteResult::Constant),
                 };
 
-                let (cloned_param_id, cloned_param) = self.clone_expr(param_id);
+                let (cloned_param_id, cloned_param) = self.clone_expr(param_ref);
                 let cloned_param_span = cloned_param.span;
-                let expr = &self.expressions[node_id];
+                let expr = &self.expressions[expr_ref];
 
                 debug!(
                     "rewrite TypedExprKind::Call with span {:?}, param_id: {:?}",
-                    expr.span, param_id.0
+                    expr.span, param_ref.0
                 );
 
                 // invert translation:
@@ -132,10 +132,10 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                 });
 
                 // remove the translation call from the source
-                self.source_rewrites.rewrite(node_id, param_id);
+                self.source_rewrites.rewrite(expr_ref, param_ref);
                 // add inverted translation call to the target
                 self.target_rewrites
-                    .rewrite(param_id, inverted_translation_id);
+                    .rewrite(param_ref, inverted_translation_id);
 
                 Ok(RewriteResult::Variable(cloned_param_id))
             }
@@ -145,21 +145,21 @@ impl<'t, 'm> Rewriter<'t, 'm> {
 
     fn rewrite_call(
         &mut self,
-        node_id: NodeId,
+        expr_ref: ExprRef,
         proc: BuiltinProc,
-        params: SmallVec<[NodeId; 4]>,
+        params: SmallVec<[ExprRef; 4]>,
         indent: Indent,
     ) -> Result<RewriteResult, RewriteError> {
         let params_len = params.len();
-        let mut param_var_id = None;
+        let mut param_var_ref = None;
 
         for (index, param_id) in params.iter().enumerate() {
             match self.rewrite_expr_inner(*param_id, indent.inc())? {
                 RewriteResult::Variable(rewritten_node) => {
-                    if param_var_id.is_some() {
+                    if param_var_ref.is_some() {
                         return Err(RewriteError::MultipleVariablesInCall);
                     }
-                    param_var_id = Some((rewritten_node, index));
+                    param_var_ref = Some((rewritten_node, index));
                 }
                 RewriteResult::Constant => {}
             }
@@ -167,7 +167,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
 
         debug!("{indent}rewrite proc {proc:?}");
 
-        let (param_var_id, var_index) = match param_var_id {
+        let (param_var_ref, var_index) = match param_var_ref {
             Some(rewritten) => rewritten,
             None => {
                 debug!("{indent}proc {proc:?} was constant");
@@ -176,7 +176,7 @@ impl<'t, 'm> Rewriter<'t, 'm> {
             }
         };
 
-        let expr = &self.expressions[node_id];
+        let expr = &self.expressions[expr_ref];
         let span = expr.span;
 
         for rule in &rules::RULES {
@@ -199,12 +199,12 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                 .map(|index| params[*index as usize])
                 .collect();
 
-            // Make sure the expr node representing the variable
+            // Make sure the expression representing the variable
             // doesn't get recursively rewritten.
-            // e.g. if the node `:v` gets rewritten to `(* :v 2)`,
+            // e.g. if the expr `:v` gets rewritten to `(* :v 2)`,
             // we only want to do this once.
             // The left `:v` cannot be the same node as the right `:v`.
-            let (cloned_var_id, _) = self.clone_expr(param_var_id);
+            let (cloned_var_id, _) = self.clone_expr(param_var_ref);
             cloned_params[var_index] = cloned_var_id;
 
             let target_expr = TypedExpr {
@@ -212,14 +212,14 @@ impl<'t, 'm> Rewriter<'t, 'm> {
                 ty: expr_ty,
                 span,
             };
-            let (target_expr_id, _) = self.add_expr(target_expr);
+            let (target_expr_ref, _) = self.add_expr(target_expr);
 
             // rewrites
-            self.source_rewrites.rewrite(node_id, param_var_id);
-            self.target_rewrites.rewrite(param_var_id, target_expr_id);
+            self.source_rewrites.rewrite(expr_ref, param_var_ref);
+            self.target_rewrites.rewrite(param_var_ref, target_expr_ref);
 
-            debug!("{indent}source rewrite: {node_id:?}->{param_var_id:?}");
-            debug!("{indent}target rewrite: {param_var_id:?}->{target_expr_id:?} (new!)",);
+            debug!("{indent}source rewrite: {expr_ref:?}->{param_var_ref:?}");
+            debug!("{indent}target rewrite: {param_var_ref:?}->{target_expr_ref:?} (new!)",);
 
             return Ok(RewriteResult::Variable(cloned_var_id));
         }
@@ -227,16 +227,16 @@ impl<'t, 'm> Rewriter<'t, 'm> {
         Err(RewriteError::NoRulesMatchedCall)
     }
 
-    fn add_expr(&mut self, expr: TypedExpr<'m>) -> (NodeId, &TypedExpr<'m>) {
-        let id = NodeId(self.expressions.0.len() as u32);
+    fn add_expr(&mut self, expr: TypedExpr<'m>) -> (ExprRef, &TypedExpr<'m>) {
+        let id = ExprRef(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
         self.source_rewrites.push();
         self.target_rewrites.push();
         (id, &self.expressions[id])
     }
 
-    fn clone_expr(&mut self, node_id: NodeId) -> (NodeId, &TypedExpr<'m>) {
-        let expr = &self.expressions[node_id];
+    fn clone_expr(&mut self, expr_ref: ExprRef) -> (ExprRef, &TypedExpr<'m>) {
+        let expr = &self.expressions[expr_ref];
         self.add_expr(expr.clone())
     }
 }
@@ -302,9 +302,9 @@ mod tests {
     use tracing::info;
 
     use crate::{
-        codegen::typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         compiler::Compiler,
         mem::{Intern, Mem},
+        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
         SourceSpan,
     };

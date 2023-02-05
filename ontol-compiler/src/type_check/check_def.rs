@@ -1,14 +1,12 @@
 use ontol_runtime::{DefId, RelationId};
 
 use crate::{
-    codegen::{
-        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
-        CodegenTask, EqCodegenTask,
-    },
+    codegen::{CodegenTask, EqCodegenTask},
     def::{Cardinality, Def, DefKind, Primitive, Relation, Relationship},
     error::CompileError,
     mem::Intern,
     relation::{RelationshipId, Role, SubjectProperties},
+    typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -91,16 +89,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),
                     typed_expr_table: TypedExprTable::default(),
-                    variable_nodes: Default::default(),
+                    bound_variables: Default::default(),
                 };
 
                 for (index, (variable_expr_id, variable_span)) in variables.0.iter().enumerate() {
-                    let node_id = ctx.typed_expr_table.add_expr(TypedExpr {
+                    let var_ref = ctx.typed_expr_table.add_expr(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
                         kind: TypedExprKind::Variable(SyntaxVar(index as u32)),
                         span: *variable_span,
                     });
-                    ctx.variable_nodes.insert(*variable_expr_id, node_id);
+                    ctx.bound_variables.insert(*variable_expr_id, var_ref);
                 }
 
                 let (_, node_a) = self.check_expr_id(*first_id, &mut ctx);

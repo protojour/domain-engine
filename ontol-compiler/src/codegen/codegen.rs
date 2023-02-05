@@ -1,59 +1,24 @@
 use std::collections::HashMap;
 
-use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams, OpCode, Procedure},
-    DefId,
-};
-use smallvec::{smallvec, SmallVec};
+use ontol_runtime::{proc::OpCode, DefId};
+use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{codegen_map_obj::codegen_map_obj_origin, typed_expr::TypedExprKind},
+    codegen::map_obj::codegen_map_obj_origin,
     compiler::Compiler,
-    types::{Type, TypeRef},
+    typed_expr::{ExprRef, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
     SourceSpan,
 };
 
 use super::{
+    find_translation_key,
     link::{link, LinkResult},
-    typed_expr::{NodeId, SealedTypedExprTable, SyntaxVar, TypedExprTable},
-    CodegenTask,
+    value_obj::codegen_value_obj_origin,
+    CodegenTask, ProcTable, UnlinkedProc,
 };
 
 pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
-
-#[derive(Default)]
-pub(super) struct ProcTable {
-    pub procedures: HashMap<(DefId, DefId), UnlinkedProc>,
-    pub translate_calls: Vec<TranslateCall>,
-}
-
-impl ProcTable {
-    /// Allocate a temporary procedure id for a translate call.
-    /// This will be resolved to final "physical" ID in the link phase.
-    fn gen_translate_call(&mut self, from: DefId, to: DefId) -> OpCode {
-        let id = self.translate_calls.len() as u32;
-        self.translate_calls.push(TranslateCall {
-            translation: (from, to),
-        });
-        OpCode::Call(Procedure {
-            start: id,
-            n_params: NParams(1),
-        })
-    }
-}
-
-pub(super) struct TranslateCall {
-    pub translation: (DefId, DefId),
-}
-
-/// Procedure that has been generated but not linked.
-/// i.e. OpCode::Call has incorrect parameters, and
-/// we need to look up a table to resolve that in the link phase.
-pub(super) struct UnlinkedProc {
-    pub n_params: NParams,
-    pub opcodes: SpannedOpCodes,
-}
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
@@ -99,7 +64,7 @@ enum DebugDirection {
 fn codegen_translate_rewrite(
     proc_table: &mut ProcTable,
     table: &mut SealedTypedExprTable,
-    (from, to): (NodeId, NodeId),
+    (from, to): (ExprRef, ExprRef),
     direction: DebugDirection,
 ) -> bool {
     // perform rewrite
@@ -126,21 +91,11 @@ fn codegen_translate_rewrite(
     }
 }
 
-fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
-    match ty {
-        Type::Domain(def_id) => Some(*def_id),
-        other => {
-            warn!("unable to get translation key: {other:?}");
-            None
-        }
-    }
-}
-
 fn codegen_translate<'m>(
     proc_table: &mut ProcTable,
     return_def_id: DefId,
     expr_table: &TypedExprTable<'m>,
-    (from, to): (NodeId, NodeId),
+    (from, to): (ExprRef, ExprRef),
     direction: DebugDirection,
 ) -> UnlinkedProc {
     let (_, from_expr, _) = expr_table.resolve_expr(&expr_table.source_rewrites, from);
@@ -160,155 +115,14 @@ fn codegen_translate<'m>(
     }
 
     match &from_expr.kind {
-        TypedExprKind::ValueObj(_) => {
+        TypedExprKind::ValueObjPattern(_) => {
             codegen_value_obj_origin(proc_table, return_def_id, expr_table, to)
         }
-        TypedExprKind::MapObj(attributes) => {
+        TypedExprKind::MapObjPattern(attributes) => {
             codegen_map_obj_origin(proc_table, expr_table, attributes, to)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
-}
-
-fn codegen_value_obj_origin<'m>(
-    proc_table: &mut ProcTable,
-    return_def_id: DefId,
-    expr_table: &TypedExprTable<'m>,
-    to: NodeId,
-) -> UnlinkedProc {
-    let (_, dest_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
-
-    struct ValueCodegen {
-        input_local: Local,
-        var_tracker: VarFlowTracker,
-    }
-
-    impl Codegen for ValueCodegen {
-        fn codegen_variable(
-            &mut self,
-            var: SyntaxVar,
-            opcodes: &mut SpannedOpCodes,
-            span: &SourceSpan,
-        ) {
-            // There should only be one origin variable (but can flow into several slots)
-            assert!(var.0 == 0);
-            self.var_tracker.count_use(var);
-            opcodes.push((OpCode::Clone(self.input_local), *span));
-        }
-    }
-
-    let mut value_codegen = ValueCodegen {
-        input_local: Local(0),
-        var_tracker: Default::default(),
-    };
-    let mut opcodes = smallvec![];
-
-    match &dest_expr.kind {
-        TypedExprKind::ValueObj(node_id) => {
-            value_codegen.codegen_expr(proc_table, expr_table, *node_id, &mut opcodes);
-            opcodes.push((OpCode::Return0, dest_expr.span));
-        }
-        TypedExprKind::MapObj(dest_attrs) => {
-            opcodes.push((
-                OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                span,
-            ));
-
-            // the input value is not compound, so it will be consumed.
-            // Therefore it must be top of the stack:
-            opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
-            value_codegen.input_local = Local(1);
-
-            for (relation_id, node) in dest_attrs {
-                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes);
-                opcodes.push((OpCode::PutAttr(Local(0), *relation_id), span));
-            }
-
-            opcodes.push((OpCode::Return0, span));
-        }
-        kind => {
-            todo!("target: {kind:?}");
-        }
-    }
-
-    let opcodes = opcodes
-        .into_iter()
-        .filter(|op| {
-            match op {
-                (OpCode::Clone(local), _) if *local == value_codegen.input_local => {
-                    if value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1 {
-                        // Keep cloning until the last use of the variable,
-                        // which must pop it off the stack. (i.e. keep the clone instruction)
-                        true
-                    } else {
-                        // drop clone instruction. Stack should only contain the return value.
-                        false
-                    }
-                }
-                _ => true,
-            }
-        })
-        .collect::<SpannedOpCodes>();
-
-    debug!("{opcodes:#?}");
-
-    UnlinkedProc {
-        n_params: NParams(1),
-        opcodes,
-    }
-}
-
-pub(super) trait Codegen {
-    fn codegen_expr<'m>(
-        &mut self,
-        proc_table: &mut ProcTable,
-        expr_table: &TypedExprTable<'m>,
-        expr_id: NodeId,
-        opcodes: &mut SpannedOpCodes,
-    ) {
-        let (_, expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, expr_id);
-        match &expr.kind {
-            TypedExprKind::Call(proc, params) => {
-                for param in params.iter() {
-                    self.codegen_expr(proc_table, expr_table, *param, opcodes);
-                }
-
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-
-                opcodes.push((OpCode::CallBuiltin(*proc, return_def_id), span));
-            }
-            TypedExprKind::Constant(k) => {
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-                opcodes.push((OpCode::Constant(*k, return_def_id), span));
-            }
-            TypedExprKind::Variable(var) => {
-                self.codegen_variable(*var, opcodes, &span);
-            }
-            TypedExprKind::VariableRef(_) => panic!(),
-            TypedExprKind::Translate(param_id, from_ty) => {
-                self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
-
-                debug!(
-                    "translate from {from_ty:?} to {:?}, span = {span:?}",
-                    expr.ty
-                );
-                let from = find_translation_key(from_ty).unwrap();
-                let to = find_translation_key(&expr.ty).unwrap();
-                opcodes.push((proc_table.gen_translate_call(from, to), span));
-            }
-            TypedExprKind::ValueObj(_) => {
-                todo!()
-            }
-            TypedExprKind::MapObj(_) => {
-                todo!()
-            }
-            TypedExprKind::Unit => {
-                todo!()
-            }
-        }
-    }
-
-    fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut SpannedOpCodes, span: &SourceSpan);
 }
 
 #[derive(Default)]
