@@ -99,12 +99,8 @@ fn test_temperature() {
     (rel! (fahrenheit) _ (int))
 
     (eq! (:x)
-        (obj! celsius
-            (_ :x)
-        )
-        (obj! fahrenheit
-            (_ (+ (* :x (/ 9 5)) 32))
-        )
+        (obj! celsius (_ :x))
+        (obj! fahrenheit (_ (+ (* :x (/ 9 5)) 32)))
     )
     "
     .compile_ok(|env| {

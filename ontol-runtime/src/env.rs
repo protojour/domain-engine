@@ -28,7 +28,7 @@ impl Env {
 
     pub fn new_serde_processor(&self, serde_operator_id: SerdeOperatorId) -> SerdeProcessor {
         SerdeProcessor {
-            current: &self.serde_operators[serde_operator_id.0 as usize],
+            operator: &self.serde_operators[serde_operator_id.0 as usize],
             env: self,
         }
     }

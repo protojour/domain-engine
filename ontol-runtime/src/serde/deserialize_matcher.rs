@@ -294,7 +294,7 @@ impl<'e> MapMatcher<'e> {
                 match self
                     .env
                     .new_serde_processor(discriminator.operator_id)
-                    .current
+                    .operator
                 {
                     SerdeOperator::MapType(map_type) => map_type,
                     _ => panic!("Matched discriminator is not a map type"),

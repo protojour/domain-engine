@@ -9,7 +9,7 @@ type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Err
 impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match self.current {
+        match self.operator {
             SerdeOperator::Unit => self.serialize_unit(value, serializer),
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)

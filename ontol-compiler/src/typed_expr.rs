@@ -1,4 +1,4 @@
-//! # Typed expressiona
+//! # Typed expressions
 //!
 //! These data structures are emitted from the type check stage, and used in the codegen stage.
 
@@ -6,6 +6,7 @@ use std::{fmt::Debug, ops::Index};
 
 use indexmap::IndexMap;
 use ontol_runtime::{proc::BuiltinProc, RelationId};
+use smallvec::SmallVec;
 
 use crate::{
     codegen::rewrite::{RewriteTable, Rewriter},
@@ -30,7 +31,7 @@ pub enum TypedExprKind<'m> {
     /// An expression with no information
     Unit,
     /// Call to a built-in procedure
-    Call(BuiltinProc, Box<[ExprRef]>),
+    Call(BuiltinProc, SmallVec<[ExprRef; 2]>),
     /// A value object (object with one anonymous property/attribute)
     ValueObjPattern(ExprRef),
     /// A map object pattern

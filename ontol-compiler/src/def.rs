@@ -56,7 +56,7 @@ impl<'m> DefKind<'m> {
 }
 
 #[derive(Debug)]
-pub struct Variables(pub Box<[(ExprId, SourceSpan)]>);
+pub struct Variables(pub SmallVec<[(ExprId, SourceSpan); 2]>);
 
 #[derive(Debug)]
 pub enum Primitive {

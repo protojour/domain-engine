@@ -15,51 +15,16 @@ mod deserialize;
 mod deserialize_matcher;
 mod serialize;
 
-/// SerdeOperator is handle serializing and deserializing domain types in an optimized way.
+/// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
 /// in the compilerironment.
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
-    pub(crate) current: &'e SerdeOperator,
+    pub(crate) operator: &'e SerdeOperator,
     pub(crate) env: &'e Env,
 }
 
-impl<'e> Debug for SerdeProcessor<'e> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // This structure might contain cycles (through operator id),
-        // so just print the topmost level.
-        f.debug_struct("SerdeProcessor")
-            .field("current", self.current)
-            .finish()
-    }
-}
-
-impl<'e> Display for SerdeProcessor<'e> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.current {
-            SerdeOperator::Unit => write!(f, "unit"),
-            SerdeOperator::Int(_) => write!(f, "`int`"),
-            SerdeOperator::Number(_) => write!(f, "`number`"),
-            SerdeOperator::String(_) => write!(f, "`string`"),
-            SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
-            SerdeOperator::Tuple(ids, _) => {
-                let processors = ids
-                    .iter()
-                    .map(|id| self.env.new_serde_processor(*id))
-                    .collect::<Vec<_>>();
-                write!(f, "[{}]", CommaSeparated(&processors))
-            }
-            SerdeOperator::Array(_, element_operator_id) => {
-                let inner_processor = self.env.new_serde_processor(*element_operator_id);
-                write!(f, "{}[]", inner_processor)
-            }
-            SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
-            SerdeOperator::ValueUnionType(_) => write!(f, "union"),
-            SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
-        }
-    }
-}
-
+/// SerdeOperatorId is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct SerdeOperatorId(pub u32);
 
@@ -110,4 +75,40 @@ pub struct MapType {
 pub struct SerdeProperty {
     pub relation_id: RelationId,
     pub operator_id: SerdeOperatorId,
+}
+
+impl<'e> Debug for SerdeProcessor<'e> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // This structure might contain cycles (through operator id),
+        // so just print the topmost level.
+        f.debug_struct("SerdeProcessor")
+            .field("operator", self.operator)
+            .finish()
+    }
+}
+
+impl<'e> Display for SerdeProcessor<'e> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.operator {
+            SerdeOperator::Unit => write!(f, "unit"),
+            SerdeOperator::Int(_) => write!(f, "`int`"),
+            SerdeOperator::Number(_) => write!(f, "`number`"),
+            SerdeOperator::String(_) => write!(f, "`string`"),
+            SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
+            SerdeOperator::Tuple(ids, _) => {
+                let processors = ids
+                    .iter()
+                    .map(|id| self.env.new_serde_processor(*id))
+                    .collect::<Vec<_>>();
+                write!(f, "[{}]", CommaSeparated(&processors))
+            }
+            SerdeOperator::Array(_, element_operator_id) => {
+                let inner_processor = self.env.new_serde_processor(*element_operator_id);
+                write!(f, "{}[]", inner_processor)
+            }
+            SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
+            SerdeOperator::ValueUnionType(_) => write!(f, "union"),
+            SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
+        }
+    }
 }

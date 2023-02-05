@@ -40,7 +40,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     where
         D: serde::Deserializer<'de>,
     {
-        match self.current {
+        match self.operator {
             SerdeOperator::Unit => {
                 panic!("This should not be used");
             }
