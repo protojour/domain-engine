@@ -187,8 +187,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             let object_ty = match match_property.cardinality {
                                 Cardinality::One => object_ty,
-                                Cardinality::Any => self.types.intern(Type::Array(object_ty)),
-                                Cardinality::AtLeastOne => todo!(),
+                                Cardinality::Many => self.types.intern(Type::Array(object_ty)),
+                                Cardinality::ManyWithRange(_, _) => todo!(),
                             };
                             let (_, typed_expr_ref) = self.check_expr_expect(value, object_ty, ctx);
 

@@ -90,7 +90,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         subject,
                         cardinality: match cardinality {
                             ast::Cardinality::One => Cardinality::One,
-                            ast::Cardinality::Many => Cardinality::Any,
+                            ast::Cardinality::Many(range) => match (range.start, range.end) {
+                                (None, None) => Cardinality::Many,
+                                (start, end) => Cardinality::ManyWithRange(start, end),
+                            },
                         },
                         object,
                     }),

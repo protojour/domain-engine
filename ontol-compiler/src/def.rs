@@ -90,8 +90,8 @@ pub struct Relationship {
 #[derive(Clone, Copy, Debug)]
 pub enum Cardinality {
     One,
-    AtLeastOne,
-    Any,
+    Many,
+    ManyWithRange(Option<u16>, Option<u16>),
 }
 
 impl<'m> Relation<'m> {

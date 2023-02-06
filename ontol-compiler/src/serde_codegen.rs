@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -24,8 +24,7 @@ pub struct SerdeGenerator<'c, 'm> {
     relations: &'c Relations,
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
-    /// TODO: Need to key these based on the specific cardinality
-    array_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
+    array_operators: HashMap<(SerdeOperatorId, Option<u16>, Option<u16>), SerdeOperatorId>,
 }
 
 impl<'m> Compiler<'m> {
@@ -226,19 +225,34 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> SerdeOperatorId {
         match cardinality {
             Cardinality::One => operator_id,
-            Cardinality::AtLeastOne => todo!(),
-            Cardinality::Any => {
-                if let Some(array_operator_id) = self.array_operators.get(&operator_id) {
-                    return *array_operator_id;
-                }
-
-                let array_operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
-                self.serde_operators
-                    .push(SerdeOperator::Array(element_def_id, operator_id));
-                self.array_operators.insert(operator_id, array_operator_id);
-                array_operator_id
+            Cardinality::Many => self.array_operator(operator_id, element_def_id, (None, None)),
+            Cardinality::ManyWithRange(start, end) => {
+                self.array_operator(operator_id, element_def_id, (start, end))
             }
         }
+    }
+
+    fn array_operator(
+        &mut self,
+        operator_id: SerdeOperatorId,
+        element_def_id: DefId,
+        range: (Option<u16>, Option<u16>),
+    ) -> SerdeOperatorId {
+        if let Some(array_operator_id) = self.array_operators.get(&(operator_id, range.0, range.1))
+        {
+            return *array_operator_id;
+        }
+
+        let array_operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
+        self.serde_operators.push(match range {
+            (None, None) => SerdeOperator::Array(element_def_id, operator_id),
+            (start, end) => {
+                SerdeOperator::RangeArray(element_def_id, Range { start, end }, operator_id)
+            }
+        });
+        self.array_operators
+            .insert((operator_id, range.0, range.1), array_operator_id);
+        array_operator_id
     }
 }
 

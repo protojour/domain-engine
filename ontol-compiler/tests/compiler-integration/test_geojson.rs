@@ -12,12 +12,10 @@ fn test_geojson() {
     (rel! (position) _ (tuple! (int) (int)))
 
     (type! position-list)
-    ; TODO: cardinality is 2 or more
-    (rel! (position-list) _[] (position))
+    (rel! (position-list) _[2..] (position))
 
     (type! position-ring)
-    ; TODO: cardinality is 4 or more
-    (rel! (position-ring) _[] (position))
+    (rel! (position-ring) _[4..] (position))
 
     (type! Geometry)
     (type! LeafGeometry)
@@ -93,12 +91,15 @@ fn test_geojson() {
         assert_json_io_matches!(
             env,
             geometry,
-            json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4]]})
+            json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4], [5, 6], [1, 2]]})
         );
         assert_json_io_matches!(
             env,
             geometry,
-            json!({ "type": "MultiPolygon", "coordinates": [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]})
+            json!({ "type": "MultiPolygon", "coordinates": [
+                [[1, 2], [3, 4], [5, 6], [1, 2]],
+                [[2, 3], [4, 5], [6, 7], [2, 3]],
+            ]})
         );
         assert_json_io_matches!(
             env,
@@ -120,6 +121,14 @@ fn test_geojson() {
         assert_error_msg!(
             geometry.deserialize_data_variant(env, json!({ "type": "Polygon", "coordinates": [1, 2] })),
             "invalid type: integer `1`, expected tuple with length 2 at line 1 column 38"
+        );
+        assert_error_msg!(
+            geometry.deserialize_data_variant(env, json!({ "type": "LineString", "coordinates": [[1, 2]] })),
+            "invalid length 1, expected array[2..] at line 1 column 43"
+        );
+        assert_error_msg!(
+            geometry.deserialize_data_variant(env, json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
+            "invalid length 1, expected array[4..] at line 1 column 40"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(env, json!([])),

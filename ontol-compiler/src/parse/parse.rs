@@ -1,6 +1,11 @@
 use chumsky::prelude::Simple;
 
-use super::{ast::*, tree::Tree, tree_stream::TreeStream, Span, Spanned};
+use super::{
+    ast::*,
+    tree::Tree,
+    tree_stream::{Bracket, Dot, Num, Paren, Sym, TreeStream, Variable},
+    Span, Spanned,
+};
 
 pub fn parse((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
     match tree {
@@ -11,13 +16,13 @@ pub fn parse((tree, span): Spanned<Tree>) -> ParseResult<Ast> {
 }
 
 fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
-    let (keyword, span) = input.next_sym_msg("expected keyword")?;
+    let (keyword, span) = input.next::<Sym>("expected keyword")?;
 
     match keyword.as_str() {
         "import" => parse_import(input),
         "type!" => {
             let span = input.span();
-            let ident = input.next_sym_msg("expected ident")?;
+            let ident = input.next::<Sym>("expected ident")?;
             input.end()?;
             Ok((Ast::Type(ident), span))
         }
@@ -34,12 +39,12 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
-    let (next, type_span) = stream.next_msg(Some, "expected type")?;
+    let (next, type_span) = stream.next_any("expected type")?;
     match next {
         Tree::Paren(trees) => {
             let mut ty_stream = TreeStream::new(trees, type_span);
             let type_span = ty_stream.span();
-            let (kind, _) = ty_stream.next_sym_msg("")?;
+            let (kind, _) = ty_stream.next::<Sym>("")?;
 
             let ty = match kind.as_str() {
                 "tuple!" => {
@@ -64,21 +69,39 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
 fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
-    let (rel_ident, ident_span) = stream.next_sym_msg("expected relation identifier")?;
+    let (rel_ident, ident_span) = stream.next::<Sym>("expected relation identifier")?;
     let ident = match rel_ident.as_str() {
         "_" => None,
         _ => Some(rel_ident),
     };
 
-    let mut cardinality = Cardinality::One;
+    let cardinality = if stream.peek::<Bracket>() {
+        let mut stream: TreeStream = stream.next::<Bracket>("expected bracket")?.into();
 
-    if let Some(_) = stream.peek(|tree| match tree {
-        Tree::Bracket(v) if v.len() == 0 => Some(&()),
-        _ => None,
-    }) {
-        stream.next().unwrap();
-        cardinality = Cardinality::Many;
-    }
+        let mut start: Option<u16> = None;
+        let mut end: Option<u16> = None;
+
+        if stream.peek::<Num>() {
+            let (s, _) = parse_u16(&mut stream)?;
+            start = Some(s);
+        }
+
+        if stream.peek::<Dot>() {
+            stream.next::<Dot>("expected dot")?;
+            stream.next::<Dot>("expected dot")?;
+        }
+
+        if stream.peek::<Num>() {
+            let (e, _) = parse_u16(&mut stream)?;
+            end = Some(e);
+        }
+
+        stream.end()?;
+
+        Cardinality::Many(std::ops::Range { start, end })
+    } else {
+        Cardinality::One
+    };
 
     let object = parse_type(&mut stream)?;
     stream.end()?;
@@ -95,12 +118,12 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
-    let (initial, mut span) = input.next_sym()?;
+    let (initial, mut span) = input.next::<Sym>("expected identifier")?;
     let mut symbols = vec![(initial, span.clone())];
 
-    while input.peek_dot() {
-        let _ = input.next_dot()?;
-        let (next, next_span) = input.next_sym()?;
+    while input.peek::<Dot>() {
+        let _ = input.next::<Dot>("expected dot")?;
+        let (next, next_span) = input.next::<Sym>("expected identifier")?;
 
         symbols.push((next, next_span.clone()));
 
@@ -115,9 +138,9 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
 
     let mut params = vec![];
-    let mut input_params = input.next_list_msg("expected param list")?;
+    let mut input_params: TreeStream = input.next::<Paren>("expected param list")?.into();
     while input_params.peek_any() {
-        let (var, span) = input_params.next_var()?;
+        let (var, span) = input_params.next::<Variable>("expected variable")?;
         params.push((var, span));
     }
 
@@ -136,7 +159,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_next_expr(input: &mut TreeStream) -> ParseResult<Expr> {
-    parse_expr(input.next_msg(Some, "expected expression")?)
+    parse_expr(input.next_any("expected expression")?)
 }
 
 fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {
@@ -151,18 +174,18 @@ fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {
 
 fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     let span = input.span();
-    let sym = input.next_sym()?;
+    let sym = input.next::<Sym>("expected identifier")?;
 
     match sym.0.as_str() {
         "obj!" => {
-            let typename = input.next_sym_msg("expected type name")?;
+            let typename = input.next::<Sym>("expected type name")?;
 
             let mut attributes = vec![];
 
             while input.peek_any() {
-                let mut list = input.next_list_msg("expected attribute")?;
+                let mut list: TreeStream = input.next::<Paren>("expected attribute")?.into();
                 let span = list.span();
-                let (property, prop_span) = list.next_sym_msg("expected property")?;
+                let (property, prop_span) = list.next::<Sym>("expected property")?;
                 let value = parse_next_expr(&mut list)?;
                 list.end()?;
 
@@ -193,6 +216,15 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
             Ok((Expr::Call(sym, args.into()), span))
         }
     }
+}
+
+fn parse_u16(input: &mut TreeStream) -> ParseResult<u16> {
+    let (num, span) = input.next::<Num>("expected number")?;
+    Ok((
+        num.parse()
+            .map_err(|_| error("unable to parse number", span.clone()))?,
+        span,
+    ))
 }
 
 pub fn error(msg: impl ToString, span: Span) -> Simple<Tree> {

@@ -280,6 +280,56 @@ fn deserialize_map_union() {
 }
 
 #[test]
+fn deserialize_array_with_range_constraints() {
+    r#"
+    (type! a)
+    (type! b)
+    (type! c)
+    (type! d)
+
+    (rel! (a) prop[] (int))
+    (rel! (b) prop[1..] (int))
+    (rel! (c) prop[..1] (int))
+    (rel! (d) prop[1..2] (int))
+    "#
+    .compile_ok(|env| {
+        let a = TypeBinding::new(env, "a");
+        let b = TypeBinding::new(env, "b");
+        let c = TypeBinding::new(env, "c");
+        let d = TypeBinding::new(env, "d");
+
+        assert_matches!(
+            a.deserialize_data(env, json!({ "prop": [42] })),
+            Ok(Data::Map(map))
+        );
+        assert_matches!(
+            b.deserialize_data(env, json!({ "prop": [42, 43] })),
+            Ok(Data::Map(map))
+        );
+        assert_matches!(
+            c.deserialize_data(env, json!({ "prop": [] })),
+            Ok(Data::Map(map))
+        );
+        assert_matches!(
+            d.deserialize_data(env, json!({ "prop": [42] })),
+            Ok(Data::Map(map))
+        );
+        assert_error_msg!(
+            b.deserialize_data_variant(env, json!({ "prop": [] })),
+            "invalid length 0, expected array[1..] at line 1 column 10"
+        );
+        assert_error_msg!(
+            c.deserialize_data_variant(env, json!({ "prop": [42, 43] })),
+            "trailing characters at line 1 column 13"
+        );
+        assert_error_msg!(
+            d.deserialize_data(env, json!({ "prop": [] })),
+            "invalid length 0, expected array[1..2] at line 1 column 10"
+        );
+    });
+}
+
+#[test]
 #[ignore = "must implement"]
 fn deserialize_monads() {
     r#"

@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    ops::Range,
+};
 
 use indexmap::IndexMap;
 use smallvec::SmallVec;
@@ -37,6 +40,7 @@ pub enum SerdeOperator {
     StringConstant(String, DefId),
     Tuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
     Array(DefId, SerdeOperatorId),
+    RangeArray(DefId, Range<Option<u16>>, SerdeOperatorId),
     // A type with just one anonymous property
     ValueType(ValueType),
     // A type with multiple anonymous properties, equivalent to a union of types
@@ -105,6 +109,19 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::Array(_, element_operator_id) => {
                 let inner_processor = self.env.new_serde_processor(*element_operator_id);
                 write!(f, "{}[]", inner_processor)
+            }
+            SerdeOperator::RangeArray(_, range, element_operator_id) => {
+                let inner_processor = self.env.new_serde_processor(*element_operator_id);
+                write!(f, "{}[", inner_processor)?;
+                if let Some(start) = range.start {
+                    write!(f, "{start}")?;
+                }
+                write!(f, "..")?;
+                if let Some(end) = range.end {
+                    write!(f, "{end}")?;
+                }
+
+                Ok(())
             }
             SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
             SerdeOperator::ValueUnionType(_) => write!(f, "union"),

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Range};
 
 use crate::{
     discriminator::Discriminant,
@@ -172,6 +172,51 @@ impl ValueMatcher for ArrayMatcher {
     }
 
     fn match_seq_end(&self, _: usize) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
+pub struct RangeArrayMatcher {
+    pub element_def_id: DefId,
+    pub range: Range<Option<u16>>,
+    pub element_operator_id: SerdeOperatorId,
+}
+
+impl ValueMatcher for RangeArrayMatcher {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "array[")?;
+        if let Some(start) = self.range.start {
+            write!(f, "{start}")?;
+        }
+        write!(f, "..")?;
+        if let Some(end) = self.range.end {
+            write!(f, "{end}")?;
+        }
+        write!(f, "]")
+    }
+
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.element_def_id)
+    }
+
+    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+        match self.range.end {
+            Some(end) if index >= end as usize => None,
+            _ => Some(self.element_operator_id),
+        }
+    }
+
+    fn match_seq_end(&self, index: usize) -> Result<(), ()> {
+        if let Some(start) = self.range.start {
+            if index < start as usize {
+                return Err(());
+            }
+        }
+        if let Some(end) = self.range.end {
+            if index > end as usize {
+                return Err(());
+            }
+        }
         Ok(())
     }
 }

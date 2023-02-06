@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
@@ -55,7 +57,7 @@ pub struct Rel {
 
 pub enum Cardinality {
     One,
-    Many,
+    Many(Range<Option<u16>>),
 }
 
 #[derive(Debug)]

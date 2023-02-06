@@ -7,6 +7,13 @@ use crate::{parse::ast::ParseResult, parse::tree::Tree};
 
 use super::{parse::error, Span, Spanned};
 
+pub trait Next {
+    type Data;
+
+    fn peek(tree: &Tree) -> bool;
+    fn next(tree: Spanned<Tree>) -> Option<Spanned<Self::Data>>;
+}
+
 /// A stream of token trees.
 ///
 /// The stream is consumed by parsing one element at a time.
@@ -14,6 +21,12 @@ pub struct TreeStream {
     span: Span,
     remain_span: Span,
     iterator: Peekable<<Vec<Spanned<Tree>> as IntoIterator>::IntoIter>,
+}
+
+impl From<(Vec<Spanned<Tree>>, Span)> for TreeStream {
+    fn from(value: (Vec<Spanned<Tree>>, Span)) -> Self {
+        Self::new(value.0, value.1)
+    }
 }
 
 impl TreeStream {
@@ -33,6 +46,16 @@ impl TreeStream {
         self.remain_span.clone()
     }
 
+    pub fn peek<N: Next>(&mut self) -> bool {
+        if !self.peek_any() {
+            return false;
+        }
+        return match self.iterator.peek() {
+            Some((tree, _)) => N::peek(tree),
+            None => false,
+        };
+    }
+
     pub fn peek_any(&mut self) -> bool {
         loop {
             match self.iterator.peek() {
@@ -49,26 +72,24 @@ impl TreeStream {
         }
     }
 
-    pub fn peek<T>(&mut self, matcher: impl Fn(&Tree) -> Option<&T>) -> Option<Spanned<&T>> {
-        if !self.peek_any() {
-            return None;
-        }
-        match self.iterator.peek() {
-            Some((tree, span)) => return matcher(tree).map(|t| (t, span.clone())),
-            None => {
-                return None;
-            }
+    pub fn next<N: Next>(&mut self, msg: impl ToString) -> ParseResult<N::Data> {
+        match self.next_opt() {
+            Some((tree, span)) => match N::next((tree, span.clone())) {
+                Some(value) => Ok(value),
+                None => Err(error(msg, span)),
+            },
+            None => Err(error(msg, self.remain_span())),
         }
     }
 
-    pub fn peek_dot(&mut self) -> bool {
-        match self.iterator.peek() {
-            Some((Tree::Dot, _)) => true,
-            _ => false,
+    pub fn next_any(&mut self, msg: impl ToString) -> ParseResult<Tree> {
+        match self.next_opt() {
+            Some((tree, span)) => Ok((tree, span)),
+            None => Err(error(msg, self.remain_span())),
         }
     }
 
-    pub fn next(&mut self) -> Option<Spanned<Tree>> {
+    fn next_opt(&mut self) -> Option<Spanned<Tree>> {
         loop {
             match self.iterator.next() {
                 Some((Tree::Comment(_), _)) => {}
@@ -83,69 +104,47 @@ impl TreeStream {
         }
     }
 
-    pub fn next_sym(&mut self) -> ParseResult<String> {
-        self.next_sym_msg("expected symbol")
-    }
-
-    pub fn next_sym_msg(&mut self, msg: impl ToString) -> ParseResult<String> {
-        self.next_msg(
-            |tree| {
-                if let Tree::Sym(sym) = tree {
-                    Some(sym)
-                } else {
-                    None
-                }
-            },
-            msg,
-        )
-    }
-
-    pub fn next_var(&mut self) -> ParseResult<String> {
-        self.next_msg(
-            |tree| {
-                if let Tree::Variable(sym) = tree {
-                    Some(sym)
-                } else {
-                    None
-                }
-            },
-            "expected variable",
-        )
-    }
-
-    pub fn next_list_msg(&mut self, msg: impl ToString) -> Result<TreeStream, Simple<Tree, Span>> {
-        match self.next() {
-            Some((Tree::Paren(vec), span)) => Ok(Self::new(vec, span)),
-            Some((_, span)) => Err(error(msg, span)),
-            None => Err(error(msg, self.remain_span())),
-        }
-    }
-
-    pub fn next_dot(&mut self) -> ParseResult<()> {
-        self.next_msg(
-            |tree| if let Tree::Dot = tree { Some(()) } else { None },
-            "expected dot",
-        )
-    }
-
-    pub fn next_msg<T>(
-        &mut self,
-        f: impl FnOnce(Tree) -> Option<T>,
-        msg: impl ToString,
-    ) -> ParseResult<T> {
-        match self.next() {
-            Some((tree, span)) => match f(tree) {
-                Some(value) => Ok((value, span)),
-                None => Err(error(msg, span)),
-            },
-            None => Err(error(msg, self.remain_span())),
-        }
-    }
-
     pub fn end(&mut self) -> Result<(), Simple<Tree>> {
-        match self.next() {
+        match self.next_opt() {
             Some((_, span)) => Err(error("expected end of list", span)),
             None => Ok(()),
         }
     }
 }
+
+macro_rules! next {
+    ($ident:ident, $data:ty, $pat:pat, $ret:expr) => {
+        impl Next for $ident {
+            type Data = $data;
+
+            #[allow(unused)]
+            fn peek(tree: &Tree) -> bool {
+                match tree {
+                    $pat => true,
+                    _ => false,
+                }
+            }
+
+            fn next(spanned_tree: Spanned<Tree>) -> Option<Spanned<Self::Data>> {
+                match spanned_tree {
+                    ($pat, span) => Some(($ret, span)),
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
+pub struct Paren;
+pub struct Bracket;
+pub struct Dot;
+pub struct Sym;
+pub struct Variable;
+pub struct Num;
+
+next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
+next!(Bracket, Vec<Spanned<Tree>>, Tree::Bracket(vec), vec);
+next!(Dot, (), Tree::Dot, ());
+next!(Sym, String, Tree::Sym(str), str);
+next!(Variable, String, Tree::Variable(str), str);
+next!(Num, String, Tree::Num(str), str);

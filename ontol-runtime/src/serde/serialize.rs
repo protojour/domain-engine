@@ -20,7 +20,8 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Tuple(operator_ids, _) => {
                 self.serialize_tuple(value, operator_ids, serializer)
             }
-            SerdeOperator::Array(_, element_operator_id) => {
+            SerdeOperator::Array(_, element_operator_id)
+            | SerdeOperator::RangeArray(_, _, element_operator_id) => {
                 self.serialize_array(value, *element_operator_id, serializer)
             }
             SerdeOperator::ValueType(value_type) => self
