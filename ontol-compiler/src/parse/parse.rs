@@ -78,6 +78,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let cardinality = if stream.peek::<Bracket>() {
         let mut stream: TreeStream = stream.next::<Bracket>("expected bracket")?.into();
 
+        let mut has_range = false;
         let mut start: Option<u16> = None;
         let mut end: Option<u16> = None;
 
@@ -89,11 +90,16 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         if stream.peek::<Dot>() {
             stream.next::<Dot>("expected dot")?;
             stream.next::<Dot>("expected dot")?;
+            has_range = true;
         }
 
         if stream.peek::<Num>() {
             let (e, _) = parse_u16(&mut stream)?;
             end = Some(e);
+        }
+
+        if has_range && start.is_none() && end.is_none() {
+            return Err(error("expected array range constraint", stream.span()));
         }
 
         stream.end()?;

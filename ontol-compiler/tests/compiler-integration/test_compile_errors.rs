@@ -52,6 +52,19 @@ fn rel_mix_anonymous_and_named() {
 }
 
 #[test]
+fn rel_array_range_without_start_or_end() {
+    "
+    (type! foo)
+    (rel!
+        (foo)
+        n[..] ;; ERROR parse error: expected array range constraint
+        (int)
+    )
+    "
+    .compile_fail()
+}
+
+#[test]
 fn map_union_unit_type() {
     "
     (type! foo)
