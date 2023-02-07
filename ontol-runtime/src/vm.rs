@@ -62,7 +62,7 @@ impl<'l> AbstractVm<'l> {
         stack: &mut S,
         debug: &mut impl VmDebug<S>,
     ) {
-        self.program_counter = procedure.start as usize;
+        self.program_counter = procedure.address as usize;
 
         let opcodes = self.lib.opcodes.as_slice();
 
@@ -76,7 +76,7 @@ impl<'l> AbstractVm<'l> {
                         local0_pos: stack.local0_pos(),
                     });
                     *stack.local0_pos_mut() = stack.size() - procedure.n_params.0 as usize;
-                    self.program_counter = procedure.start as usize;
+                    self.program_counter = procedure.address as usize;
                 }
                 OpCode::Return(local) => {
                     stack.swap(*local, Local(0));

@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn translate_map() {
         let mut lib = Lib::default();
-        let proc = lib.add_procedure(
+        let proc = lib.append_procedure(
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(42)),
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn call_stack() {
         let mut lib = Lib::default();
-        let double = lib.add_procedure(
+        let double = lib.append_procedure(
             NParams(1),
             [
                 OpCode::Clone(Local(0)),
@@ -278,7 +278,7 @@ mod tests {
                 OpCode::Return0,
             ],
         );
-        let add_then_double = lib.add_procedure(
+        let add_then_double = lib.append_procedure(
             NParams(2),
             [
                 OpCode::CallBuiltin(BuiltinProc::Add, DefId(0)),
@@ -286,7 +286,7 @@ mod tests {
                 OpCode::Return0,
             ],
         );
-        let translate = lib.add_procedure(
+        let translate = lib.append_procedure(
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(0)),

@@ -68,15 +68,15 @@ pub(super) struct ProcTable {
 }
 
 impl ProcTable {
-    /// Allocate a temporary procedure id for a translate call.
+    /// Allocate a temporary procedure address for a translate call.
     /// This will be resolved to final "physical" ID in the link phase.
     fn gen_translate_call(&mut self, from: DefId, to: DefId) -> OpCode {
-        let id = self.translate_calls.len() as u32;
+        let address = self.translate_calls.len() as u32;
         self.translate_calls.push(TranslateCall {
             translation: (from, to),
         });
         OpCode::Call(Procedure {
-            start: id,
+            address,
             n_params: NParams(1),
         })
     }

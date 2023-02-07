@@ -24,7 +24,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procedures) {
         spans.extend(unlinked_proc.opcodes.iter().map(|(_, span)| span));
 
-        let procedure = lib.add_procedure(
+        let procedure = lib.append_procedure(
             unlinked_proc.n_params,
             unlinked_proc
                 .opcodes
@@ -37,14 +37,14 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     // correct "call" opcodes to point to correct address
     for (index, opcode) in lib.opcodes.iter_mut().enumerate() {
         if let OpCode::Call(call_procedure) = opcode {
-            let translate_call = &proc_table.translate_calls[call_procedure.start as usize];
+            let translate_call = &proc_table.translate_calls[call_procedure.address as usize];
 
             match translations.get(&translate_call.translation) {
                 Some(translation_procedure) => {
-                    call_procedure.start = translation_procedure.start;
+                    call_procedure.address = translation_procedure.address;
                 }
                 None => {
-                    call_procedure.start = 0;
+                    call_procedure.address = 0;
                     compiler.push_error(
                         CompileError::CannotConvertMissingEquation {
                             input: format_def(compiler, translate_call.translation.0),

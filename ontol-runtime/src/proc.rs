@@ -11,15 +11,15 @@ pub struct Lib {
 }
 
 impl Lib {
-    pub fn add_procedure(
+    pub fn append_procedure(
         &mut self,
         n_params: NParams,
         opcodes: impl IntoIterator<Item = OpCode>,
     ) -> Procedure {
-        let start = self.opcodes.len() as u32;
-
+        let address = self.opcodes.len() as u32;
         self.opcodes.extend(opcodes.into_iter());
-        Procedure { start, n_params }
+
+        Procedure { address, n_params }
     }
 }
 
@@ -29,7 +29,9 @@ impl Lib {
 /// must be top of the stack when it's called.
 #[derive(Clone, Copy, Debug)]
 pub struct Procedure {
-    pub start: u32,
+    /// 'Pointer' to the first OpCode
+    pub address: u32,
+    /// Number of parameters
     pub n_params: NParams,
 }
 

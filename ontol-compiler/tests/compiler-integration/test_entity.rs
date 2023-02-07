@@ -12,6 +12,8 @@ fn test_entity_experiment_etc() {
     (rel! (artist) name (string))
 
     (rel! (artist-id) _ "artist/{uuid}")
+    ; (rel! (artist-id) uuid (string))
+
     (rel! (artist-id) id! (artist)) ;; ERROR cannot mix named and anonymous relations on the same type
 
     (entity! record)

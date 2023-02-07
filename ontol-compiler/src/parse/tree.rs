@@ -246,4 +246,17 @@ mod tests {
             .parse("(")
             .expect("Expected OK tree parse, got error");
     }
+
+    #[test]
+    #[ignore = "this bug is reported here: https://github.com/zesterer/chumsky/issues/268"]
+    fn bug_test() {
+        pub fn simplistic_parser<'s>() -> impl Parser<char, &'s str, Error = Simple<char>> {
+            just("foobar")
+        }
+
+        simplistic_parser()
+            .repeated()
+            .parse("something invalid")
+            .expect_err("should fail");
+    }
 }
