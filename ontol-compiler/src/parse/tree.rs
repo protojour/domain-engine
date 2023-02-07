@@ -68,9 +68,11 @@ pub fn trees_parser() -> impl Parser<char, Vec<Spanned<Tree>>, Error = Simple<ch
 }
 
 fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
-    filter(|c: &char| c.is_digit(10) && *c != '0' && !special_char(*c))
+    filter(|c: &char| c.is_ascii_digit() && *c != '0' && !special_char(*c))
         .map(Some)
-        .chain::<char, Vec<_>, _>(filter(|c: &char| c.is_digit(10) && !special_char(*c)).repeated())
+        .chain::<char, Vec<_>, _>(
+            filter(|c: &char| c.is_ascii_digit() && !special_char(*c)).repeated(),
+        )
         .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
 }
 
@@ -100,10 +102,7 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 fn special_char(c: char) -> bool {
-    match c {
-        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' => true,
-        _ => false,
-    }
+    matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':')
 }
 
 #[cfg(test)]

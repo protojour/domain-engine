@@ -13,12 +13,14 @@ pub struct Expr {
     pub span: SourceSpan,
 }
 
+type ObjKey = (Option<String>, SourceSpan);
+
 #[derive(Debug)]
 pub enum ExprKind {
     /// Function call
     Call(DefId, Box<[Expr]>),
     /// Object constructor
-    Obj(TypePath, Box<[((Option<String>, SourceSpan), Expr)]>),
+    Obj(TypePath, Box<[(ObjKey, Expr)]>),
     Variable(ExprId),
     Constant(i64),
 }

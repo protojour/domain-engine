@@ -46,7 +46,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> (TypeRef<'m>, ExprRef) {
         match &expr.kind {
             ExprKind::Call(def_id, args) => {
-                match (self.defs.map.get(&def_id), self.def_types.map.get(&def_id)) {
+                match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
                     (
                         Some(Def {
                             kind: DefKind::CoreFn(proc),
@@ -72,7 +72,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let call_expr_ref = ctx.typed_expr_table.add_expr(TypedExpr {
                             kind: TypedExprKind::Call(*proc, param_expr_refs.into()),
-                            ty: *output,
+                            ty: output,
                             span: expr.span,
                         });
 
@@ -149,7 +149,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .expect("BUG: Expected named subject property");
 
                                 (
-                                    property_name.clone(),
+                                    property_name,
                                     MatchProperty {
                                         relation_id: *relation_id,
                                         cardinality: relationship.cardinality,
@@ -166,7 +166,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let attr_prop = match attr_prop {
                                 Some(attr_prop) => attr_prop,
                                 None => {
-                                    self.error(CompileError::NamedPropertyExpected, &prop_span);
+                                    self.error(CompileError::NamedPropertyExpected, prop_span);
                                     continue;
                                 }
                             };
@@ -174,12 +174,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             {
                                 Some(match_properties) => match_properties,
                                 None => {
-                                    self.error(CompileError::UnknownProperty, &prop_span);
+                                    self.error(CompileError::UnknownProperty, prop_span);
                                     continue;
                                 }
                             };
                             if match_property.used {
-                                self.error(CompileError::DuplicateProperty, &prop_span);
+                                self.error(CompileError::DuplicateProperty, prop_span);
                                 continue;
                             }
                             match_property.used = true;
@@ -306,7 +306,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, ExprRef) {
-        self.errors.push(error.spanned(&self.sources, span));
+        self.errors.push(error.spanned(self.sources, span));
         (self.types.intern(Type::Error), ERROR_NODE)
     }
 }

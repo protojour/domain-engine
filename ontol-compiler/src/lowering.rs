@@ -71,7 +71,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }) => {
                 let ident = ident.map(|i| self.compiler.strings.intern(&i));
                 // This syntax just defines the relation the first time it's used
-                let relation_def_id = match self.define_relation_if_undefined(ident.clone()) {
+                let relation_def_id = match self.define_relation_if_undefined(ident) {
                     ImplicitDefId::New(def_id) => {
                         self.set_def(
                             def_id,
@@ -237,7 +237,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .lookup(&[self.src.package, CORE_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
-            None => Err(self.error(CompileError::TypeNotFound, &span)),
+            None => Err(self.error(CompileError::TypeNotFound, span)),
         }
     }
 
@@ -250,9 +250,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 .entry(ident.into())
             {
                 Entry::Vacant(vacant) => {
-                    ImplicitDefId::New(vacant.insert(self.compiler.defs.alloc_def_id()).clone())
+                    ImplicitDefId::New(*vacant.insert(self.compiler.defs.alloc_def_id()))
                 }
-                Entry::Occupied(occupied) => ImplicitDefId::Reused(occupied.get().clone()),
+                Entry::Occupied(occupied) => ImplicitDefId::Reused(*occupied.get()),
             },
             None => ImplicitDefId::Reused(self.compiler.defs.anonymous_relation()),
         }
@@ -274,7 +274,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 id: def_id,
                 package: self.src.package,
                 kind,
-                span: self.src.span(&span),
+                span: self.src.span(span),
             }),
         );
     }
@@ -289,7 +289,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Expr {
             id: ExprId(0),
             kind,
-            span: self.src.span(&span),
+            span: self.src.span(span),
         }
     }
 
@@ -310,10 +310,10 @@ struct VarTable {
 
 impl VarTable {
     fn new_var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
-        self.variables
+        *self
+            .variables
             .entry(ident)
             .or_insert_with(|| compiler.defs.alloc_expr_id())
-            .clone()
     }
 
     fn get_var_id(&self, ident: &str) -> Option<ExprId> {

@@ -149,11 +149,11 @@ fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {
 fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
     let span = input.span();
 
-    let mut params = vec![];
+    let mut variables = vec![];
     let mut input_params: TreeStream = input.next::<Paren>("expected param list")?.into();
     while input_params.peek_any() {
         let (var, span) = input_params.next::<Variable>("expected variable")?;
-        params.push((var, span));
+        variables.push((var, span));
     }
 
     let first = parse_next_expr(&mut input)?;
@@ -162,7 +162,7 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 
     Ok((
         Ast::Eq(Eq {
-            variables: params.into(),
+            variables,
             first,
             second,
         }),
@@ -216,7 +216,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
                 ));
             }
 
-            Ok((Expr::Obj(typename, attributes.into()), span))
+            Ok((Expr::Obj(typename, attributes), span))
         }
         _ => {
             let mut args = vec![];
@@ -225,7 +225,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
                 args.push(parse_next_expr(&mut input)?);
             }
 
-            Ok((Expr::Call(sym, args.into()), span))
+            Ok((Expr::Call(sym, args), span))
         }
     }
 }

@@ -116,7 +116,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .flat_map(|(_, errors)| errors.into_iter())
             .map(|(union_error, span)| {
                 self.make_compile_error(union_error)
-                    .spanned(&self.sources, &span)
+                    .spanned(self.sources, &span)
             })
             .collect()
     }
@@ -205,7 +205,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         if map_discriminator_candidate.property_candidates.is_empty() {
             debug!("no prop candidates for variant");
-            error_set.report(object_def, UnionCheckError::CannotDiscriminateType, &span);
+            error_set.report(object_def, UnionCheckError::CannotDiscriminateType, span);
         } else {
             discriminator_builder
                 .map_discriminator_candidates

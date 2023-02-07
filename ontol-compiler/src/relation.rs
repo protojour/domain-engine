@@ -14,24 +14,13 @@ pub enum Role {
 #[derive(Clone, Copy, Debug)]
 pub struct RelationshipId(pub DefId);
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Relations {
     pub properties_by_type: HashMap<DefId, Properties>,
     pub relationships_by_subject: HashMap<(DefId, RelationId), RelationshipId>,
 
     pub value_unions: HashSet<DefId>,
     pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
-}
-
-impl Default for Relations {
-    fn default() -> Self {
-        Self {
-            properties_by_type: Default::default(),
-            relationships_by_subject: Default::default(),
-            value_unions: Default::default(),
-            union_discriminators: Default::default(),
-        }
-    }
 }
 
 impl Relations {

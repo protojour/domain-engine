@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{parse::ast::ParseResult, parse::tree::Tree};
 
-use super::{parse::error, Span, Spanned};
+use super::{ast_parse::error, Span, Spanned};
 
 pub trait Next {
     type Data;

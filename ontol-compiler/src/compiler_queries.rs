@@ -27,7 +27,7 @@ where
     T: AsRef<Defs<'m>> + AsRef<DefTypes<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
-        get::<_, DefTypes>(self).map.get(&def_id).map(|ty| *ty)
+        get::<_, DefTypes>(self).map.get(&def_id).copied()
     }
 
     fn expect_def_type(&self, def_id: DefId) -> TypeRef<'m> {

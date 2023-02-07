@@ -129,11 +129,11 @@ impl<'m> TypedExprTable<'m> {
 
     fn debug_tree_guard(&self, rewrites: &RewriteTable, expr_ref: ExprRef, depth: usize) -> String {
         if depth > 20 {
-            return format!("[ERROR depth exceeded]");
+            return "[ERROR depth exceeded]".into();
         }
         let (target_expr_ref, expr, _) = self.resolve_expr(rewrites, expr_ref);
         let s = match &expr.kind {
-            TypedExprKind::Unit => format!("{{}}"),
+            TypedExprKind::Unit => "unit".into(),
             TypedExprKind::Call(proc, params) => {
                 let param_strings = params
                     .iter()
@@ -195,16 +195,13 @@ impl<'m> SealedTypedExprTable<'m> {
 
         // auto rewrites of variable refs
         for (index, expr) in self.inner.expressions.0.iter().enumerate() {
-            match &expr.kind {
-                TypedExprKind::VariableRef(var_ref) => {
-                    self.inner
-                        .source_rewrites
-                        .rewrite(ExprRef(index as u32), *var_ref);
-                    self.inner
-                        .target_rewrites
-                        .rewrite(ExprRef(index as u32), *var_ref);
-                }
-                _ => {}
+            if let TypedExprKind::VariableRef(var_ref) = &expr.kind {
+                self.inner
+                    .source_rewrites
+                    .rewrite(ExprRef(index as u32), *var_ref);
+                self.inner
+                    .target_rewrites
+                    .rewrite(ExprRef(index as u32), *var_ref);
             }
         }
     }

@@ -44,15 +44,15 @@ pub struct TypeCheck<'c, 'm> {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
-        self.errors.push(error.spanned(&self.sources, span));
+        self.errors.push(error.spanned(self.sources, span));
         self.types.intern(Type::Error)
     }
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
             TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: smart_format!("{}", FormatType(actual, &self.defs)),
-                expected: smart_format!("{}", FormatType(expected, &self.defs)),
+                actual: smart_format!("{}", FormatType(actual, self.defs)),
+                expected: smart_format!("{}", FormatType(expected, self.defs)),
             },
         };
         self.error(compile_error, span)
@@ -61,13 +61,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
 impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
     fn as_ref(&self) -> &Defs<'m> {
-        &self.defs
+        self.defs
     }
 }
 
 impl<'c, 'm> AsRef<Relations> for TypeCheck<'c, 'm> {
     fn as_ref(&self) -> &Relations {
-        &self.relations
+        self.relations
     }
 }
 

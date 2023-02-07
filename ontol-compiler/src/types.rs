@@ -139,7 +139,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
         match ty {
             Type::Tautology => write!(f, "tautology"),
-            Type::IntConstant(val) => write!(f, "int({})", val),
+            Type::IntConstant(val) => write!(f, "int({val})"),
             Type::Unit(_) => write!(f, "unit"),
             Type::Int(_) => write!(f, "int"),
             Type::Number(_) => write!(f, "number"),
@@ -155,7 +155,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "[")?;
                 let mut iterator = elements.iter().peekable();
                 while let Some(next) = iterator.next() {
-                    write!(f, "{}", FormatType(*next, defs))?;
+                    write!(f, "{}", FormatType(next, defs))?;
                     if iterator.peek().is_some() {
                         write!(f, " ")?;
                     }

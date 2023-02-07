@@ -61,23 +61,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
 
                 self.check_property(
-                    RelationshipId(def_id),
-                    relationship,
-                    relationship.relation_id,
-                    relation,
-                    relationship.subject,
+                    (RelationshipId(def_id), relationship),
+                    (relationship.relation_id, relation),
                     Role::Subject,
-                    relationship.object,
+                    (relationship.subject, relationship.object),
                     &def.span,
                 );
                 self.check_property(
-                    RelationshipId(def_id),
-                    relationship,
-                    relationship.relation_id,
-                    relation,
-                    relationship.object,
+                    (RelationshipId(def_id), relationship),
+                    (relationship.relation_id, relation),
                     Role::Object,
-                    relationship.subject,
+                    (relationship.object, relationship.subject),
                     &def.span,
                 );
 
@@ -121,41 +115,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_property(
         &mut self,
-        relationship_id: RelationshipId,
-        relationship: &Relationship,
-        relation_id: RelationId,
-        relation: &Relation,
-        role_def_id: DefId,
-        role: Role,
-        inverse_role_def_id: DefId,
+        relationship: (RelationshipId, &Relationship),
+        relation: (RelationId, &Relation),
+        primary_role: Role,
+        role_defs: (DefId, DefId),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let property_codomain_ty = self.check_def(inverse_role_def_id);
+        let property_codomain_ty = self.check_def(role_defs.1);
 
         // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(role_def_id);
-        match role {
-            Role::Subject => match (&relation.ident, &mut properties.subject) {
+        let properties = self.relations.properties_by_type_mut(role_defs.0);
+        match primary_role {
+            Role::Subject => match (&relation.1.ident, &mut properties.subject) {
                 (None, SubjectProperties::Empty) => {
                     properties.subject =
-                        SubjectProperties::Value(relationship_id, *span, relationship.cardinality);
+                        SubjectProperties::Value(relationship.0, *span, relationship.1.cardinality);
                 }
                 (
                     None,
                     SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
                 ) => {
-                    match (relationship.cardinality, cardinality) {
+                    match (relationship.1.cardinality, cardinality) {
                         (Cardinality::One, Cardinality::One) => {
                             properties.subject = SubjectProperties::ValueUnion(
                                 [
                                     (*existing_relationship_id, *existing_span),
-                                    (relationship_id, *span),
+                                    (relationship.0, *span),
                                 ]
                                 .into(),
                             );
 
                             // Register union for check later
-                            self.relations.value_unions.insert(role_def_id);
+                            self.relations.value_unions.insert(role_defs.0);
                         }
                         _ => {
                             return self
@@ -164,15 +155,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 (None, SubjectProperties::ValueUnion(properties)) => {
-                    properties.push((relationship_id, *span));
+                    properties.push((relationship.0, *span));
                 }
                 (Some(_), SubjectProperties::Empty) => {
                     properties.subject =
-                        SubjectProperties::Map([(relation_id, relationship.cardinality)].into());
+                        SubjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
                 }
                 (Some(_), SubjectProperties::Map(properties)) => {
                     if properties
-                        .insert(relation_id, relationship.cardinality)
+                        .insert(relation.0, relationship.1.cardinality)
                         .is_some()
                     {
                         return self
@@ -187,7 +178,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             },
             Role::Object => {
-                properties.object.insert(relation_id);
+                properties.object.insert(relation.0);
             }
         }
 

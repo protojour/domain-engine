@@ -246,7 +246,7 @@ impl<'m> Defs<'m> {
 
     pub fn get_string_literal(&self, def_id: DefId) -> &str {
         match self.get_def_kind(def_id) {
-            Some(DefKind::StringLiteral(lit)) => &lit,
+            Some(DefKind::StringLiteral(lit)) => lit,
             kind => panic!("BUG: not a string literal: {kind:?}"),
         }
     }

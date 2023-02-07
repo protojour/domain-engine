@@ -3,10 +3,10 @@ use std::ops::Range;
 pub mod ast;
 pub mod tree;
 
-mod parse;
+mod ast_parse;
 mod tree_stream;
 
-pub use parse::parse;
+pub use ast_parse::parse;
 
 pub type Span = Range<usize>;
 pub type Spanned<T> = (T, Span);
