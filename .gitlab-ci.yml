@@ -1,12 +1,13 @@
 stages:
   - check
 
-pretty:
+lint:
   stage: check
   image: rust:latest
   script:
-    - rustup component add rustfmt
+    - rustup component add rustfmt clippy
     - cargo fmt -- --check
+    - cargo clippy
 
 test:
   stage: check
