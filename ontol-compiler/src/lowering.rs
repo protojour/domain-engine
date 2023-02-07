@@ -57,6 +57,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.set_def(def_id, DefKind::DomainType(ident), &span);
                 Ok(Some(def_id))
             }
+            ast::Ast::Entity((ident, _)) => {
+                let def_id = self.named_def_id(Space::Type, &ident);
+                let ident = self.compiler.strings.intern(&ident);
+                self.set_def(def_id, DefKind::DomainType(ident), &span);
+                Ok(Some(def_id))
+            }
             ast::Ast::Rel(ast::Rel {
                 subject,
                 ident: (ident, ident_span),

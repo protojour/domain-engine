@@ -65,7 +65,6 @@ impl Compile for CompileSrc {
 
         if let Some(trees) = trees {
             let mut asts = vec![];
-            let mut parse_errors = vec![];
 
             for tree in trees {
                 match crate::parse::parse(tree) {
@@ -73,17 +72,13 @@ impl Compile for CompileSrc {
                         asts.push(ast);
                     }
                     Err(error) => {
-                        parse_errors.push(error);
+                        let span = error.span();
+                        compiler.push_error(
+                            CompileError::Parse(ChumskyError::new(error))
+                                .spanned(&compiler.sources, &self.span(&span)),
+                        );
                     }
                 }
-            }
-
-            for parse_error in parse_errors {
-                let span = parse_error.span();
-                compiler.push_error(
-                    CompileError::Parse(ChumskyError::new(parse_error))
-                        .spanned(&compiler.sources, &self.span(&span)),
-                );
             }
 
             let mut lowering = Lowering::new(compiler, &self);
@@ -97,16 +92,15 @@ impl Compile for CompileSrc {
             for root_def in root_defs {
                 type_check.check_def(root_def);
             }
-
-            // Call this after all source files have been compiled
-            type_check.check_unions();
-            compiler.check_error()?;
-
-            execute_codegen_tasks(compiler);
-            compiler.check_error()?;
         }
 
+        // Call this after all source files have been compiled
+        compiler.type_check().check_unions();
         compiler.check_error()?;
+
+        execute_codegen_tasks(compiler);
+        compiler.check_error()?;
+
         compiler.sources.compile_finished();
         Ok(())
     }

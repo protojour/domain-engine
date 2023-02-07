@@ -28,6 +28,7 @@ pub enum DefKind<'m> {
     StringLiteral(&'m str),
     Tuple(SmallVec<[DefId; 4]>),
     DomainType(&'m str),
+    DomainEntity(&'m str),
     Relation(Relation<'m>),
     Relationship(Relationship),
     // FIXME: This should not be builtin proc directly.
@@ -48,6 +49,7 @@ impl<'m> DefKind<'m> {
             Self::Tuple(_) => None,
             Self::CoreFn(_) => None,
             Self::DomainType(ident) => Some((*ident).into()),
+            Self::DomainEntity(ident) => Some((*ident).into()),
             Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,

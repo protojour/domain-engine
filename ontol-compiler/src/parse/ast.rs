@@ -10,6 +10,7 @@ pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
 pub enum Ast {
     Import(Path),
     Type(Spanned<String>),
+    Entity(Spanned<String>),
     Rel(Rel),
     Eq(Eq),
     Comment(String),

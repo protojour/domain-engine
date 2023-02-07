@@ -26,6 +26,12 @@ fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
             input.end()?;
             Ok((Ast::Type(ident), span))
         }
+        "entity!" => {
+            let span = input.span();
+            let ident = input.next::<Sym>("expected ident")?;
+            input.end()?;
+            Ok((Ast::Entity(ident), span))
+        }
         "rel!" => parse_rel(input),
         "eq!" => parse_eq(input),
         _ => Err(error("unknown keyword", span)),
