@@ -5,6 +5,7 @@ use ontol_runtime::{env::Env, PackageId};
 
 mod test_compile_errors;
 mod test_deserialize;
+mod test_entity;
 mod test_eq_basic;
 mod test_geojson;
 mod test_serde;

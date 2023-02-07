@@ -57,7 +57,7 @@ pub(super) fn codegen_value_obj_origin<'m>(
         TypedExprKind::MapObjPattern(dest_attrs) => {
             opcodes.push((OpCode::CallBuiltin(BuiltinProc::NewMap, to_def), span));
 
-            // the input value is not compound, so it will be consumed.
+            // the input value is not a map, so it will be consumed.
             // Therefore it must be top of the stack:
             opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
             value_codegen.input_local = Local(1);

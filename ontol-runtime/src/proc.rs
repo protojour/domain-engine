@@ -52,9 +52,9 @@ pub enum OpCode {
     Clone(Local),
     /// Swap the position of two locals.
     Swap(Local, Local),
-    /// Take an attribute from local compound, and put its value on the top of the stack.
+    /// Take an attribute from local map, and put its value on the top of the stack.
     TakeAttr(Local, RelationId),
-    /// Pop value from stack, and move it into the specified compound local.
+    /// Pop value from stack, and move it into the specified local map.
     PutAttr(Local, RelationId),
     /// Push a constant to the stack.
     Constant(i64, DefId),

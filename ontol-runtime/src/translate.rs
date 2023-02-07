@@ -93,15 +93,15 @@ impl Stack for ValueStack {
     }
 
     fn take_attr(&mut self, source: Local, relation_id: RelationId) {
-        let compound = self.map_local_mut(source);
-        let value = compound.remove(&relation_id).expect("Attribute not found");
+        let map = self.map_local_mut(source);
+        let value = map.remove(&relation_id).expect("Attribute not found");
         self.stack.push(value);
     }
 
     fn put_attr(&mut self, target: Local, relation_id: RelationId) {
         let value = self.stack.pop().unwrap();
-        let compound = self.map_local_mut(target);
-        compound.insert(relation_id, value);
+        let map = self.map_local_mut(target);
+        map.insert(relation_id, value);
     }
 
     fn constant(&mut self, k: i64, result_type: DefId) {
@@ -149,7 +149,7 @@ impl ValueStack {
     fn map_local_mut(&mut self, local: Local) -> &mut HashMap<RelationId, Value> {
         match &mut self.local_mut(local).data {
             Data::Map(hash_map) => hash_map,
-            _ => panic!("Value at {local:?} is not a compound value"),
+            _ => panic!("Value at {local:?} is not a map"),
         }
     }
 

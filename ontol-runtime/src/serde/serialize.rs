@@ -124,7 +124,7 @@ impl<'e> SerdeProcessor<'e> {
     ) -> Res<S> {
         let attributes = match &value.data {
             Data::Map(attributes) => attributes,
-            other => panic!("BUG: Serialize expected compound attributes, got {other:?}"),
+            other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
         };
 
         let mut serialize_map = serializer.serialize_map(Some(attributes.len()))?;
