@@ -7,21 +7,25 @@ use ontol_runtime::{
 
 pub mod rewrite;
 
-mod codegen;
 mod link;
 mod map_obj;
+mod translate;
 mod value_obj;
 
-pub use codegen::execute_codegen_tasks;
+use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
+    compiler::Compiler,
     typed_expr::{ExprRef, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
 };
 
-use self::codegen::SpannedOpCodes;
+use self::{
+    link::{link, LinkResult},
+    translate::{codegen_translate_rewrite, DebugDirection},
+};
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
@@ -82,6 +86,8 @@ pub(super) struct TranslateCall {
     pub translation: (DefId, DefId),
 }
 
+pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
+
 /// Procedure that has been generated but not linked.
 /// i.e. OpCode::Call has incorrect parameters, and
 /// we need to look up a table to resolve that in the link phase.
@@ -93,10 +99,10 @@ pub(super) struct UnlinkedProc {
 trait Codegen {
     fn codegen_variable(&mut self, var: SyntaxVar, opcodes: &mut SpannedOpCodes, span: &SourceSpan);
 
-    fn codegen_expr<'m>(
+    fn codegen_expr(
         &mut self,
         proc_table: &mut ProcTable,
-        expr_table: &TypedExprTable<'m>,
+        expr_table: &TypedExprTable,
         expr_id: ExprRef,
         opcodes: &mut SpannedOpCodes,
     ) {
@@ -151,4 +157,40 @@ fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
             None
         }
     }
+}
+
+/// Perform all codegen tasks
+pub fn execute_codegen_tasks(compiler: &mut Compiler) {
+    let tasks = std::mem::take(&mut compiler.codegen_tasks.tasks);
+
+    let mut proc_table = ProcTable::default();
+
+    for task in tasks {
+        match task {
+            CodegenTask::Eq(mut eq_task) => {
+                // a -> b
+                codegen_translate_rewrite(
+                    &mut proc_table,
+                    &mut eq_task.typed_expr_table,
+                    (eq_task.node_a, eq_task.node_b),
+                    DebugDirection::Forward,
+                );
+
+                eq_task.typed_expr_table.reset();
+
+                // b -> a
+                codegen_translate_rewrite(
+                    &mut proc_table,
+                    &mut eq_task.typed_expr_table,
+                    (eq_task.node_b, eq_task.node_a),
+                    DebugDirection::Backward,
+                );
+            }
+        }
+    }
+
+    let LinkResult { lib, translations } = link(compiler, &mut proc_table);
+
+    compiler.codegen_tasks.result_lib = lib;
+    compiler.codegen_tasks.result_translations = translations;
 }

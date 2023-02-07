@@ -50,6 +50,7 @@ impl RewriteTable {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub enum RewriteError {
     UnhandledExpr(String),
     NoRulesMatchedCall,

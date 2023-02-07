@@ -108,11 +108,11 @@ impl<'e> Display for SerdeProcessor<'e> {
             }
             SerdeOperator::Array(_, element_operator_id) => {
                 let inner_processor = self.env.new_serde_processor(*element_operator_id);
-                write!(f, "{}[]", inner_processor)
+                write!(f, "{inner_processor}[]")
             }
             SerdeOperator::RangeArray(_, range, element_operator_id) => {
                 let inner_processor = self.env.new_serde_processor(*element_operator_id);
-                write!(f, "{}[", inner_processor)?;
+                write!(f, "{inner_processor}[")?;
                 if let Some(start) = range.start {
                     write!(f, "{start}")?;
                 }

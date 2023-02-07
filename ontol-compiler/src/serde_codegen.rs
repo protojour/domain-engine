@@ -106,8 +106,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::DomainType(ident)) => ident.clone(),
-                    _ => "Unknown type".into(),
+                    Some(DefKind::DomainType(ident)) => ident,
+                    _ => "Unknown type",
                 };
                 let operator_id = self.alloc_operator_id(type_def_id);
                 Some((
@@ -193,7 +193,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         panic!("Problem getting property meta");
                     };
 
-                    let object_key = relation.object_prop().expect("Property has no name").clone();
+                    let object_key = relation.object_prop().expect("Property has no name");
                     let operator_id =
                         self.get_serde_operator_id(relationship.object)
                             .expect("No inner operator");
@@ -258,18 +258,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
 impl<'c, 'm> AsRef<Defs<'m>> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &Defs<'m> {
-        &self.defs
+        self.defs
     }
 }
 
 impl<'c, 'm> AsRef<DefTypes<'m>> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &DefTypes<'m> {
-        &self.def_types
+        self.def_types
     }
 }
 
 impl<'c, 'm> AsRef<Relations> for SerdeGenerator<'c, 'm> {
     fn as_ref(&self) -> &Relations {
-        &self.relations
+        self.relations
     }
 }

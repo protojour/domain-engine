@@ -29,17 +29,17 @@ mod typed_expr;
 mod types;
 
 pub trait Compile {
-    fn compile<'m>(
+    fn compile(
         self,
-        compiler: &mut Compiler<'m>,
+        compiler: &mut Compiler,
         package: PackageId,
     ) -> Result<(), UnifiedCompileError>;
 }
 
 impl Compile for &str {
-    fn compile<'m>(
+    fn compile(
         self,
-        compiler: &mut Compiler<'m>,
+        compiler: &mut Compiler,
         package: PackageId,
     ) -> Result<(), UnifiedCompileError> {
         let src = compiler.sources.add(package, "str".into(), self.into());
@@ -48,11 +48,7 @@ impl Compile for &str {
 }
 
 impl Compile for CompileSrc {
-    fn compile<'m>(
-        self,
-        compiler: &mut Compiler<'m>,
-        _: PackageId,
-    ) -> Result<(), UnifiedCompileError> {
+    fn compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
         let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self.text.as_str());
 
         for lex_error in lex_errors {

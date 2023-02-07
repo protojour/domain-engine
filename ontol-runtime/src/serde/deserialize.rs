@@ -65,16 +65,18 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     env: self.env,
                 },
             ),
-            SerdeOperator::StringConstant(lit, def_id) => serde::de::Deserializer::deserialize_str(
-                deserializer,
-                MatcherVisitor {
-                    matcher: ConstantStringMatcher {
-                        literal: &lit,
-                        def_id: *def_id,
+            SerdeOperator::StringConstant(literal, def_id) => {
+                serde::de::Deserializer::deserialize_str(
+                    deserializer,
+                    MatcherVisitor {
+                        matcher: ConstantStringMatcher {
+                            literal,
+                            def_id: *def_id,
+                        },
+                        env: self.env,
                     },
-                    env: self.env,
-                },
-            ),
+                )
+            }
             SerdeOperator::Tuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
                 deserializer,
                 MatcherVisitor {
@@ -176,7 +178,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         Ok(Value {
             data: Data::Int(
                 v.try_into()
-                    .map_err(|_| serde::de::Error::custom(format!("u64 overflow")))?,
+                    .map_err(|_| serde::de::Error::custom("u64 overflow".to_string()))?,
             ),
             type_def_id,
         })
@@ -385,10 +387,7 @@ impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
             None => {
                 // TODO: This error message could be improved to suggest valid fields.
                 // see OneOf in serde (this is a private struct)
-                Err(serde::de::Error::custom(format!(
-                    "unknown property `{}`",
-                    v
-                )))
+                Err(serde::de::Error::custom(format!("unknown property `{v}`")))
             }
         }
     }

@@ -50,7 +50,7 @@ impl<'m> DefKind<'m> {
             Self::CoreFn(_) => None,
             Self::DomainType(ident) => Some((*ident).into()),
             Self::DomainEntity(ident) => Some((*ident).into()),
-            Self::Relation(relation) => relation.ident.as_deref().map(|str| str.into()),
+            Self::Relation(relation) => relation.ident.map(|str| str.into()),
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,
         }
@@ -221,11 +221,8 @@ impl<'m> Defs<'m> {
         match self.string_literals.get(&lit) {
             Some(def_id) => *def_id,
             None => {
-                let def_id = self.add_def(
-                    DefKind::StringLiteral(lit.clone()),
-                    CORE_PKG,
-                    SourceSpan::none(),
-                );
+                let def_id =
+                    self.add_def(DefKind::StringLiteral(lit), CORE_PKG, SourceSpan::none());
                 self.string_literals.insert(lit, def_id);
                 def_id
             }

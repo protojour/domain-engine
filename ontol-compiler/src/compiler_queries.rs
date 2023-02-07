@@ -78,7 +78,7 @@ where
             .relationships_by_subject
             .get(&(subject_id, relation_id))
             .cloned()
-            .ok_or_else(|| ())?;
+            .ok_or(())?;
 
         get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
     }

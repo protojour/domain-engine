@@ -6,19 +6,16 @@ use smallvec::smallvec;
 use tracing::debug;
 
 use crate::{
-    codegen::{
-        codegen::{SpannedOpCodes, VarFlowTracker},
-        Codegen,
-    },
+    codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
     SourceSpan,
 };
 
 use super::{ProcTable, UnlinkedProc};
 
-pub(super) fn codegen_value_obj_origin<'m>(
+pub(super) fn codegen_value_obj_origin(
     proc_table: &mut ProcTable,
-    expr_table: &TypedExprTable<'m>,
+    expr_table: &TypedExprTable,
     to: ExprRef,
     to_def: DefId,
 ) -> UnlinkedProc {
@@ -79,14 +76,10 @@ pub(super) fn codegen_value_obj_origin<'m>(
         .filter(|op| {
             match op {
                 (OpCode::Clone(local), _) if *local == value_codegen.input_local => {
-                    if value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1 {
-                        // Keep cloning until the last use of the variable,
-                        // which must pop it off the stack. (i.e. keep the clone instruction)
-                        true
-                    } else {
-                        // drop clone instruction. Stack should only contain the return value.
-                        false
-                    }
+                    // Keep cloning until the last use of the variable,
+                    // which must pop it off the stack. (i.e. keep the clone instruction).
+                    // else: drop clone instruction. Stack should only contain the return value.
+                    value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1
                 }
                 _ => true,
             }

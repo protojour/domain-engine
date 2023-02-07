@@ -131,7 +131,7 @@ impl Stack for PropStack {
         target_set.extend(source_set.into_iter());
     }
 
-    fn constant(&mut self, k: i64, _: DefId) {
+    fn constant(&mut self, _k: i64, _: DefId) {
         self.stack.push(Props::Set([].into()));
     }
 }

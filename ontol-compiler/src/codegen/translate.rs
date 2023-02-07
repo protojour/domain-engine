@@ -1,67 +1,21 @@
 use std::collections::HashMap;
 
-use ontol_runtime::{proc::OpCode, DefId};
-use smallvec::SmallVec;
+use ontol_runtime::DefId;
 use tracing::{debug, warn};
 
 use crate::{
     codegen::map_obj::codegen_map_obj_origin,
-    compiler::Compiler,
     typed_expr::{ExprRef, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
-    SourceSpan,
 };
 
-use super::{
-    find_translation_key,
-    link::{link, LinkResult},
-    value_obj::codegen_value_obj_origin,
-    CodegenTask, ProcTable, UnlinkedProc,
-};
+use super::{find_translation_key, value_obj::codegen_value_obj_origin, ProcTable, UnlinkedProc};
 
-pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
-
-/// Perform all codegen tasks
-pub fn execute_codegen_tasks(compiler: &mut Compiler) {
-    let tasks = std::mem::take(&mut compiler.codegen_tasks.tasks);
-
-    let mut proc_table = ProcTable::default();
-
-    for task in tasks {
-        match task {
-            CodegenTask::Eq(mut eq_task) => {
-                // a -> b
-                codegen_translate_rewrite(
-                    &mut proc_table,
-                    &mut eq_task.typed_expr_table,
-                    (eq_task.node_a, eq_task.node_b),
-                    DebugDirection::Forward,
-                );
-
-                eq_task.typed_expr_table.reset();
-
-                // b -> a
-                codegen_translate_rewrite(
-                    &mut proc_table,
-                    &mut eq_task.typed_expr_table,
-                    (eq_task.node_b, eq_task.node_a),
-                    DebugDirection::Backward,
-                );
-            }
-        }
-    }
-
-    let LinkResult { lib, translations } = link(compiler, &mut proc_table);
-
-    compiler.codegen_tasks.result_lib = lib;
-    compiler.codegen_tasks.result_translations = translations;
-}
-
-enum DebugDirection {
+pub(super) enum DebugDirection {
     Forward,
     Backward,
 }
 
-fn codegen_translate_rewrite(
+pub(super) fn codegen_translate_rewrite(
     proc_table: &mut ProcTable,
     table: &mut SealedTypedExprTable,
     (from, to): (ExprRef, ExprRef),
@@ -91,9 +45,9 @@ fn codegen_translate_rewrite(
     }
 }
 
-fn codegen_translate<'m>(
+fn codegen_translate(
     proc_table: &mut ProcTable,
-    expr_table: &TypedExprTable<'m>,
+    expr_table: &TypedExprTable,
     (from, to): (ExprRef, ExprRef),
     to_def: DefId,
     direction: DebugDirection,

@@ -116,11 +116,8 @@ impl CompileError {
 
         SpannedCompileError {
             error: self,
-            span: span.clone(),
-            miette_source: miette::NamedSource::new(
-                source.name.as_str().clone(),
-                source.text.clone(),
-            ),
+            span: *span,
+            miette_source: miette::NamedSource::new(source.name.as_str(), source.text.clone()),
             miette_span: miette::SourceSpan::new(
                 (span.start as usize).into(),
                 (span.end as usize).into(),

@@ -7,10 +7,7 @@ use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::{
-    codegen::{
-        codegen::{SpannedOpCodes, VarFlowTracker},
-        Codegen,
-    },
+    codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
     SourceSpan,
 };
@@ -18,9 +15,9 @@ use crate::{
 use super::{ProcTable, UnlinkedProc};
 
 /// Generate code originating from a map obj destructuring
-pub(super) fn codegen_map_obj_origin<'m>(
+pub(super) fn codegen_map_obj_origin(
     proc_table: &mut ProcTable,
-    expr_table: &TypedExprTable<'m>,
+    expr_table: &TypedExprTable,
     to: ExprRef,
     origin_attrs: &IndexMap<RelationId, ExprRef>,
 ) -> UnlinkedProc {

@@ -9,8 +9,8 @@ impl<T: Display> Display for Missing<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.items.as_slice() {
             [] => panic!("BUG: Nothing is missing!"),
-            [single] => write!(f, "{}", single),
-            [a, b] => write!(f, "{} {} {}", a, self.logic_op.name(), b),
+            [single] => write!(f, "{single}"),
+            [a, b] => write!(f, "{a} {} {b}", self.logic_op.name()),
             slice => {
                 write!(
                     f,
@@ -66,7 +66,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut iterator = self.0.into_iter().peekable();
         while let Some(next) = iterator.next() {
-            write!(f, "{}", next)?;
+            write!(f, "{next}")?;
             if iterator.peek().is_some() {
                 write!(f, ", ")?;
             }

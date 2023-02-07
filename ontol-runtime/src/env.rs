@@ -19,7 +19,7 @@ pub struct Env {
 
 impl Env {
     pub fn get_domain(&self, package_id: &PackageId) -> Option<&Domain> {
-        self.domains.get(&package_id)
+        self.domains.get(package_id)
     }
 
     pub fn get_translator(&self, from: DefId, to: DefId) -> Option<Procedure> {

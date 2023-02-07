@@ -100,7 +100,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn package_ids(&self) -> Vec<PackageId> {
-        self.namespaces.namespaces.keys().map(|id| *id).collect()
+        self.namespaces.namespaces.keys().copied().collect()
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.

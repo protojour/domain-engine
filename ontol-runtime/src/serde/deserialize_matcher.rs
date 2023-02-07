@@ -273,18 +273,16 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_map(&self) -> Result<MapMatcher, ()> {
-        if self
+        if !self
             .value_union_type
             .discriminators
             .iter()
-            .find(
-                |discriminator| match &discriminator.discriminator.discriminant {
-                    Discriminant::HasProperty(_, _) => true,
-                    Discriminant::HasStringAttribute(_, _, _) => true,
-                    _ => false,
-                },
-            )
-            .is_none()
+            .any(|discriminator| {
+                matches!(
+                    &discriminator.discriminator.discriminant,
+                    Discriminant::HasProperty(_, _) | Discriminant::HasStringAttribute(_, _, _)
+                )
+            })
         {
             // None of the discriminators are matching a map.
             return Err(());
