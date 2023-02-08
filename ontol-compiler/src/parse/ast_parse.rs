@@ -3,7 +3,7 @@ use chumsky::prelude::Simple;
 use super::{
     ast::*,
     tree::Tree,
-    tree_stream::{Bracket, Dot, Num, Paren, Sym, TreeStream, Variable},
+    tree_stream::{At, Bracket, Dot, Num, Paren, Sym, TreeStream, Variable},
     Span, Spanned,
 };
 
@@ -115,6 +115,19 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         Cardinality::One
     };
 
+    let edge_params = if stream.peek::<At>() {
+        let _ = stream.next::<At>("").unwrap();
+        Some(parse_type(&mut stream)?)
+    } else {
+        None
+    };
+
+    let _object_ident = if stream.peek::<Sym>() {
+        Some(stream.next::<Sym>("").unwrap())
+    } else {
+        None
+    };
+
     let object = parse_type(&mut stream)?;
     stream.end()?;
 
@@ -123,6 +136,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
             subject,
             ident: (ident, ident_span),
             cardinality,
+            edge_params,
             object,
         }),
         span,

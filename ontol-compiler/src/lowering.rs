@@ -67,6 +67,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 subject,
                 ident: (ident, ident_span),
                 cardinality,
+                edge_params,
                 object,
             }) => {
                 let ident = ident.map(|i| self.compiler.strings.intern(&i));
@@ -88,6 +89,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 };
 
                 let subject = self.ast_type_to_def(subject)?;
+                let edge_params = match edge_params {
+                    Some(edge_params) => self.ast_type_to_def(edge_params)?,
+                    None => self.compiler.defs.unit(),
+                };
                 let object = self.ast_type_to_def(object)?;
 
                 Ok(Some(self.def(
@@ -101,6 +106,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                 (start, end) => Cardinality::ManyWithRange(start, end),
                             },
                         },
+                        edge_params,
                         object,
                     }),
                     &span,

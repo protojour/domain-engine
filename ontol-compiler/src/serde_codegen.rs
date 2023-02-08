@@ -198,13 +198,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         self.get_serde_operator_id(relationship.object)
                             .expect("No inner operator");
                     let value_operator_id = self.cardinality_operator(operator_id, relationship.object, *cardinality);
+                    let edge_operator_id = if relationship.edge_params == DefId::unit() {
+                        None
+                    } else {
+                        self.get_serde_operator_id(relationship.edge_params)
+                    };
 
                     (
                         object_key.into(),
                         SerdeProperty {
                             relation_id: *relation_id,
                             value_operator_id,
-                            edge_operator_id: None,
+                            edge_operator_id,
                         }
                     )
                 }).collect::<IndexMap<_, _>>();

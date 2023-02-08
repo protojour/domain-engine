@@ -10,8 +10,8 @@ impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: serde::Serializer>(
         &self,
-        edge_params: Option<&Value>,
         value: &Value,
+        edge_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
         match self.value_operator {
@@ -32,7 +32,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => self
                 .env
                 .new_serde_processor(value_type.inner_operator_id)
-                .serialize_value(edge_params, value, serializer),
+                .serialize_value(value, edge_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type
                     .discriminators
@@ -45,7 +45,7 @@ impl<'e> SerdeProcessor<'e> {
                     Some(discriminator) => self
                         .env
                         .new_serde_processor(discriminator.operator_id)
-                        .serialize_value(edge_params, value, serializer),
+                        .serialize_value(value, edge_params, serializer),
                     None => {
                         panic!("Discriminator not found while serializing union type");
                     }
@@ -90,9 +90,10 @@ impl<'e> SerdeProcessor<'e> {
         match &value.data {
             Data::Vec(elements) => {
                 let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-                for (value, operator_id) in elements.iter().zip(operator_ids) {
+                for (attr, operator_id) in elements.iter().zip(operator_ids) {
                     seq.serialize_element(&Proxy {
-                        value,
+                        value: &attr.value,
+                        edge_params: None,
                         processor: self.env.new_serde_processor(*operator_id),
                     })?;
                 }
@@ -113,8 +114,12 @@ impl<'e> SerdeProcessor<'e> {
             Data::Vec(elements) => {
                 let processor = self.env.new_serde_processor(element_operator_id);
                 let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-                for value in elements.iter() {
-                    seq.serialize_element(&Proxy { value, processor })?;
+                for attr in elements.iter() {
+                    seq.serialize_element(&Proxy {
+                        value: &attr.value,
+                        edge_params: attr.edge_params.filter_non_unit(),
+                        processor,
+                    })?;
                 }
 
                 seq.end()
@@ -150,6 +155,7 @@ impl<'e> SerdeProcessor<'e> {
                 name,
                 &Proxy {
                     value: &attribute.value,
+                    edge_params: attribute.edge_params.filter_non_unit(),
                     processor: self.env.new_serde_processor(serde_prop.value_operator_id),
                 },
             )?;
@@ -162,6 +168,7 @@ impl<'e> SerdeProcessor<'e> {
                     EDGE_PROPERTY,
                     &Proxy {
                         value: edge_params,
+                        edge_params: None,
                         processor: self.env.new_serde_processor(operator_id),
                     },
                 )?;
@@ -177,6 +184,7 @@ impl<'e> SerdeProcessor<'e> {
 
 struct Proxy<'v, 'e> {
     value: &'v Value,
+    edge_params: Option<&'v Value>,
     processor: SerdeProcessor<'e>,
 }
 
@@ -185,6 +193,7 @@ impl<'v, 'e> serde::Serialize for Proxy<'v, 'e> {
     where
         S: serde::Serializer,
     {
-        self.processor.serialize_value(None, self.value, serializer)
+        self.processor
+            .serialize_value(self.value, self.edge_params, serializer)
     }
 }

@@ -138,6 +138,7 @@ macro_rules! next {
 pub struct Paren;
 pub struct Bracket;
 pub struct Dot;
+pub struct At;
 pub struct Sym;
 pub struct Variable;
 pub struct Num;
@@ -145,6 +146,7 @@ pub struct Num;
 next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
 next!(Bracket, Vec<Spanned<Tree>>, Tree::Bracket(vec), vec);
 next!(Dot, (), Tree::Dot, ());
+next!(At, (), Tree::At, ());
 next!(Sym, String, Tree::Sym(str), str);
 next!(Variable, String, Tree::Variable(str), str);
 next!(Num, String, Tree::Num(str), str);

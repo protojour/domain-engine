@@ -60,7 +60,8 @@ impl<'e> SerdeProcessor<'e> {
     fn matcher_visitor_no_edge<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
         assert!(
             self.edge_operator_id.is_none(),
-            "edge_operator_id should be None"
+            "edge_operator_id should be None for {:?}",
+            self.value_operator
         );
 
         MatcherVisitor {
@@ -112,20 +113,28 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Array(element_def_id, element_operator_id) => {
                 serde::de::Deserializer::deserialize_seq(
                     deserializer,
-                    self.matcher_visitor_no_edge(ArrayMatcher {
-                        element_def_id: *element_def_id,
-                        element_operator_id: *element_operator_id,
-                    }),
+                    MatcherVisitor {
+                        matcher: ArrayMatcher {
+                            element_def_id: *element_def_id,
+                            element_operator_id: *element_operator_id,
+                            edge_operator_id: self.edge_operator_id,
+                        },
+                        env: self.env,
+                    },
                 )
             }
             SerdeOperator::RangeArray(element_def_id, range, element_operator_id) => {
                 serde::de::Deserializer::deserialize_seq(
                     deserializer,
-                    self.matcher_visitor_no_edge(RangeArrayMatcher {
-                        element_def_id: *element_def_id,
-                        range: range.clone(),
-                        element_operator_id: *element_operator_id,
-                    }),
+                    MatcherVisitor {
+                        matcher: RangeArrayMatcher {
+                            element_def_id: *element_def_id,
+                            range: range.clone(),
+                            element_operator_id: *element_operator_id,
+                            edge_operator_id: self.edge_operator_id,
+                        },
+                        env: self.env,
+                    },
                 )
             }
             SerdeOperator::ValueType(value_type) => {
@@ -248,7 +257,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let type_def_id = self
+        let seq_match = self
             .matcher
             .match_seq()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
@@ -258,7 +267,9 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         loop {
             let processor = match self.matcher.match_seq_element(index) {
-                Some(operator_id) => self.env.new_serde_processor(operator_id),
+                Some(operator_id) => self
+                    .env
+                    .new_serde_processor_with_edge(operator_id, seq_match.edge_operator_id),
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
@@ -266,15 +277,15 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                         Value::unit(),
                         Value {
                             data: Data::Vec(output),
-                            type_def_id,
+                            type_def_id: seq_match.type_def_id,
                         },
                     ));
                 }
             };
 
             match seq.next_element_seed(processor)? {
-                Some((_edge, typed_value)) => {
-                    output.push(typed_value);
+                Some((edge_params, value)) => {
+                    output.push(Attribute { edge_params, value });
                     index += 1;
                 }
                 None => {
@@ -283,7 +294,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                             Value::unit(),
                             Value {
                                 data: Data::Vec(output),
-                                type_def_id,
+                                type_def_id: seq_match.type_def_id,
                             },
                         )),
                         Err(_) => Err(serde::de::Error::invalid_length(index, &self)),
@@ -402,7 +413,9 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             }
         }
 
-        if attributes.len() < self.map_type.properties.len() {
+        if attributes.len() < self.map_type.properties.len()
+            || (edge_params.is_unit() != self.edge_operator_id.is_none())
+        {
             debug!("Missing attributes: {attributes:?}");
 
             let mut items: Vec<DoubleQuote<String>> = self

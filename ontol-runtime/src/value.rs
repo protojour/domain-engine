@@ -26,6 +26,18 @@ impl Value {
             type_def_id: DefId::unit(),
         }
     }
+
+    pub fn is_unit(&self) -> bool {
+        self.type_def_id == DefId::unit()
+    }
+
+    pub fn filter_non_unit(&self) -> Option<&Self> {
+        if self.is_unit() {
+            None
+        } else {
+            Some(self)
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -38,12 +50,13 @@ pub enum Data {
     /// A collection of attributes keyed by relation
     Map(BTreeMap<RelationId, Attribute>),
     /// Represents both dynamic lists and static tuples at runtime
-    Vec(Vec<Value>),
+    Vec(Vec<Attribute>),
 }
 
-/// A Map value consists of attributes.
+/// An Attribute is a Value that is part of another value.
 ///
-/// An attribute may be parameterized (edge_params), and the parameter is itself a value.
+/// An attribute may be parameterized (edge_params).
+/// The parameter _value_ is itself a `Value`.
 /// Most attribute parameters is usually just `unit`, i.e. no parameters.
 ///
 /// The attribute value is also just a Value.

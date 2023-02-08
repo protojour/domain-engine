@@ -17,6 +17,11 @@ impl<'v> Display for ExpectingMatching<'v> {
     }
 }
 
+pub struct SeqMatch {
+    pub type_def_id: DefId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
+}
+
 /// Trait for matching incoming types for deserialization
 pub trait ValueMatcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
@@ -37,7 +42,7 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
+    fn match_seq(&self) -> Result<SeqMatch, ()> {
         Err(())
     }
 
@@ -132,8 +137,11 @@ impl<'e> ValueMatcher for TupleMatcher<'e> {
         write!(f, "tuple with length {}", self.elements.len())
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.def_id)
+    fn match_seq(&self) -> Result<SeqMatch, ()> {
+        Ok(SeqMatch {
+            type_def_id: self.def_id,
+            edge_operator_id: None,
+        })
     }
 
     fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
@@ -156,6 +164,7 @@ impl<'e> ValueMatcher for TupleMatcher<'e> {
 pub struct ArrayMatcher {
     pub element_def_id: DefId,
     pub element_operator_id: SerdeOperatorId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
 }
 
 impl ValueMatcher for ArrayMatcher {
@@ -163,8 +172,11 @@ impl ValueMatcher for ArrayMatcher {
         write!(f, "array")
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.element_def_id)
+    fn match_seq(&self) -> Result<SeqMatch, ()> {
+        Ok(SeqMatch {
+            type_def_id: self.element_def_id,
+            edge_operator_id: self.edge_operator_id,
+        })
     }
 
     fn match_seq_element(&self, _: usize) -> Option<SerdeOperatorId> {
@@ -180,6 +192,7 @@ pub struct RangeArrayMatcher {
     pub element_def_id: DefId,
     pub range: Range<Option<u16>>,
     pub element_operator_id: SerdeOperatorId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
 }
 
 impl ValueMatcher for RangeArrayMatcher {
@@ -195,8 +208,11 @@ impl ValueMatcher for RangeArrayMatcher {
         write!(f, "]")
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.element_def_id)
+    fn match_seq(&self) -> Result<SeqMatch, ()> {
+        Ok(SeqMatch {
+            type_def_id: self.element_def_id,
+            edge_operator_id: self.edge_operator_id,
+        })
     }
 
     fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {

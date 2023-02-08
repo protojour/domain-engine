@@ -86,6 +86,7 @@ pub struct Relationship {
     pub subject: DefId,
     // The cardinality of the relationship, i.e. how many objects are related to the subject
     pub cardinality: Cardinality,
+    pub edge_params: DefId,
     pub object: DefId,
 }
 
@@ -159,6 +160,11 @@ impl<'m> Defs<'m> {
 
         defs
     }
+
+    pub fn unit(&self) -> DefId {
+        self.unit
+    }
+
     pub fn anonymous_relation(&self) -> DefId {
         self.anonymous_relation
     }

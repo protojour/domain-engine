@@ -11,6 +11,7 @@ pub enum Tree {
     Paren(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
     Dot,
+    At,
     /// Any unquoted string
     Sym(String),
     /// String starting with ":"
@@ -26,6 +27,7 @@ impl Display for Tree {
             Self::Paren(_) => write!(f, "parentheses"),
             Self::Bracket(_) => write!(f, "square brackets"),
             Self::Dot => write!(f, "`.`"),
+            Self::At => write!(f, "@"),
             Self::Sym(_) => write!(f, "symbol"),
             Self::Variable(_) => write!(f, "variable"),
             Self::Num(_) => write!(f, "number"),
@@ -50,6 +52,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
         let combined_tree = paren
             .or(bracket)
             .or(just(".").map(|_| Tree::Dot))
+            .or(just("@").map(|_| Tree::At))
             .or(num())
             .or(just(":").ignore_then(ident().map(Tree::Variable)))
             .or(string_literal().map(Tree::StringLiteral))
@@ -105,7 +108,7 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 fn special_char(c: char) -> bool {
-    matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':')
+    matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '@')
 }
 
 #[cfg(test)]
