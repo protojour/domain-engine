@@ -22,10 +22,16 @@ mod vm;
 pub struct PackageId(pub u32);
 
 /// One definition inside some domain.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct DefId(pub u32);
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+impl DefId {
+    pub const fn unit() -> Self {
+        DefId(0)
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct RelationId(pub DefId);
 
 pub struct ProcId(u32);

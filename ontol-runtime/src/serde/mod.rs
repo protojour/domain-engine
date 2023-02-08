@@ -23,7 +23,8 @@ mod serialize;
 /// in the compilerironment.
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
-    pub(crate) operator: &'e SerdeOperator,
+    pub(crate) value_operator: &'e SerdeOperator,
+    pub(crate) edge_operator_id: Option<SerdeOperatorId>,
     pub(crate) env: &'e Env,
 }
 
@@ -78,7 +79,8 @@ pub struct MapType {
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
     pub relation_id: RelationId,
-    pub operator_id: SerdeOperatorId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
+    pub value_operator_id: SerdeOperatorId,
 }
 
 impl<'e> Debug for SerdeProcessor<'e> {
@@ -86,14 +88,14 @@ impl<'e> Debug for SerdeProcessor<'e> {
         // This structure might contain cycles (through operator id),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
-            .field("operator", self.operator)
+            .field("operator", self.value_operator)
             .finish()
     }
 }
 
 impl<'e> Display for SerdeProcessor<'e> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.operator {
+        match self.value_operator {
             SerdeOperator::Unit => write!(f, "unit"),
             SerdeOperator::Int(_) => write!(f, "`int`"),
             SerdeOperator::Number(_) => write!(f, "`number`"),

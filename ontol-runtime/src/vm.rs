@@ -38,8 +38,8 @@ pub trait Stack {
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
     fn swap(&mut self, a: Local, b: Local);
-    fn take_attr(&mut self, source: Local, relation_id: RelationId);
-    fn put_attr(&mut self, target: Local, relation_id: RelationId);
+    fn take_attr_value(&mut self, source: Local, relation_id: RelationId);
+    fn put_unit_attr(&mut self, target: Local, relation_id: RelationId);
     fn constant(&mut self, k: i64, result_type: DefId);
 }
 
@@ -97,12 +97,12 @@ impl<'l> AbstractVm<'l> {
                     stack.swap(*a, *b);
                     self.program_counter += 1;
                 }
-                OpCode::TakeAttr(source, relation_id) => {
-                    stack.take_attr(*source, *relation_id);
+                OpCode::TakeAttrValue(source, relation_id) => {
+                    stack.take_attr_value(*source, *relation_id);
                     self.program_counter += 1;
                 }
-                OpCode::PutAttr(target, relation_id) => {
-                    stack.put_attr(*target, *relation_id);
+                OpCode::PutUnitAttr(target, relation_id) => {
+                    stack.put_unit_attr(*target, *relation_id);
                     self.program_counter += 1;
                 }
                 OpCode::Constant(k, result_type) => {

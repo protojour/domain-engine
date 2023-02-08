@@ -77,7 +77,7 @@ pub(super) fn codegen_map_obj_origin(
 
             for (relation_id, expr_ref) in dest_attrs {
                 map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
-                ops.push((OpCode::PutAttr(Local(1), *relation_id), span));
+                ops.push((OpCode::PutUnitAttr(Local(1), *relation_id), span));
             }
 
             ops.push((OpCode::Return(Local(1)), span));
@@ -103,11 +103,11 @@ pub(super) fn codegen_map_obj_origin(
                 match (state.use_count, state.reused) {
                     (1, false) => {
                         // no need to clone
-                        opcodes.push((OpCode::TakeAttr(Local(0), origin_property.0), span));
+                        opcodes.push((OpCode::TakeAttrValue(Local(0), origin_property.0), span));
                     }
                     (_, false) => {
                         // first use, must clone
-                        opcodes.push((OpCode::TakeAttr(Local(0), origin_property.0), span));
+                        opcodes.push((OpCode::TakeAttrValue(Local(0), origin_property.0), span));
                         var_stack_state.stack.push(syntax_var);
                         opcodes.push((
                             OpCode::Clone(Local(2 + var_stack_state.stack.len() as u32 - 1)),

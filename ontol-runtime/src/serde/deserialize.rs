@@ -1,14 +1,15 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, Unexpected};
 use smartstring::alias::String;
-use tracing::warn;
+use tracing::debug;
 
 use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
-    value::{Data, Value},
+    value::{Attribute, Data, Value},
+    DefId,
 };
 
 use super::{
@@ -16,31 +17,55 @@ use super::{
         ArrayMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher, RangeArrayMatcher,
         StringMatcher, TupleMatcher, UnionMatcher, ValueMatcher,
     },
-    MapType, SerdeOperator, SerdeProcessor, SerdeProperty,
+    MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
 };
 
-#[derive(Clone, Copy)]
-struct PropertySet<'s>(&'s IndexMap<String, SerdeProperty>);
+enum MapKey {
+    Property(SerdeProperty),
+    EdgeParams(SerdeOperatorId),
+}
 
 struct MatcherVisitor<'e, M> {
     matcher: M,
+    edge_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 
 struct MapTypeVisitor<'e> {
     buffered_attrs: Vec<(String, serde_value::Value)>,
     map_type: &'e MapType,
+    edge_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 
+const EDGE_PROPERTY: &str = "_edge";
+
+#[derive(Clone, Copy)]
+struct PropertySet<'s> {
+    properties: &'s IndexMap<String, SerdeProperty>,
+    edge_operator: Option<SerdeOperatorId>,
+}
+
+impl<'s> PropertySet<'s> {
+    fn new(
+        properties: &'s IndexMap<String, SerdeProperty>,
+        edge_operator: Option<SerdeOperatorId>,
+    ) -> Self {
+        Self {
+            properties,
+            edge_operator,
+        }
+    }
+}
+
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
-    type Value = Value;
+    type Value = (Value, Value);
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match self.operator {
+        match self.value_operator {
             SerdeOperator::Unit => {
                 panic!("This should not be used");
             }
@@ -48,6 +73,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer,
                 MatcherVisitor {
                     matcher: IntMatcher(*def_id),
+                    edge_operator_id: self.edge_operator_id,
                     env: self.env,
                 },
             ),
@@ -55,6 +81,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer,
                 MatcherVisitor {
                     matcher: IntMatcher(*def_id),
+                    edge_operator_id: self.edge_operator_id,
                     env: self.env,
                 },
             ),
@@ -62,6 +89,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer,
                 MatcherVisitor {
                     matcher: StringMatcher(*def_id),
+                    edge_operator_id: self.edge_operator_id,
                     env: self.env,
                 },
             ),
@@ -69,6 +97,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 serde::de::Deserializer::deserialize_str(
                     deserializer,
                     MatcherVisitor {
+                        edge_operator_id: self.edge_operator_id,
                         matcher: ConstantStringMatcher {
                             literal,
                             def_id: *def_id,
@@ -84,6 +113,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                         elements: elems,
                         def_id: *def_id,
                     },
+                    edge_operator_id: self.edge_operator_id,
                     env: self.env,
                 },
             ),
@@ -95,6 +125,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                             element_def_id: *element_def_id,
                             element_operator_id: *element_operator_id,
                         },
+                        edge_operator_id: self.edge_operator_id,
                         env: self.env,
                     },
                 )
@@ -108,6 +139,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                             range: range.clone(),
                             element_operator_id: *element_operator_id,
                         },
+                        edge_operator_id: self.edge_operator_id,
                         env: self.env,
                     },
                 )
@@ -128,6 +160,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                             value_union_type,
                             env: self.env,
                         },
+                        edge_operator_id: self.edge_operator_id,
                         env: self.env,
                     },
                 )
@@ -137,6 +170,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 MapTypeVisitor {
                     buffered_attrs: Default::default(),
                     map_type,
+                    edge_operator_id: self.edge_operator_id,
                     env: self.env,
                 },
             ),
@@ -145,7 +179,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
 }
 
 impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M> {
-    type Value = Value;
+    type Value = (Value, Value);
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.matcher.expecting(f)
@@ -160,10 +194,13 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_unit()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unit, &self))?;
 
-        Ok(Value {
-            data: Data::Unit,
-            type_def_id,
-        })
+        Ok((
+            Value::unit(),
+            Value {
+                data: Data::Unit,
+                type_def_id,
+            },
+        ))
     }
 
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
@@ -175,13 +212,16 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_u64(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
-        Ok(Value {
-            data: Data::Int(
-                v.try_into()
-                    .map_err(|_| serde::de::Error::custom("u64 overflow".to_string()))?,
-            ),
-            type_def_id,
-        })
+        Ok((
+            Value::unit(),
+            Value {
+                data: Data::Int(
+                    v.try_into()
+                        .map_err(|_| serde::de::Error::custom("u64 overflow".to_string()))?,
+                ),
+                type_def_id,
+            },
+        ))
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
@@ -193,10 +233,13 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_i64(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Signed(v), &self))?;
 
-        Ok(Value {
-            data: Data::Int(v),
-            type_def_id,
-        })
+        Ok((
+            Value::unit(),
+            Value {
+                data: Data::Int(v),
+                type_def_id,
+            },
+        ))
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -208,10 +251,13 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_str(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
 
-        Ok(Value {
-            data: Data::String(v.into()),
-            type_def_id,
-        })
+        Ok((
+            Value::unit(),
+            Value {
+                data: Data::String(v.into()),
+                type_def_id,
+            },
+        ))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -232,24 +278,30 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(Value {
-                        data: Data::Vec(output),
-                        type_def_id,
-                    });
+                    return Ok((
+                        Value::unit(),
+                        Value {
+                            data: Data::Vec(output),
+                            type_def_id,
+                        },
+                    ));
                 }
             };
 
             match seq.next_element_seed(processor)? {
-                Some(typed_value) => {
+                Some((_edge, typed_value)) => {
                     output.push(typed_value);
                     index += 1;
                 }
                 None => {
                     return match self.matcher.match_seq_end(index) {
-                        Ok(_) => Ok(Value {
-                            data: Data::Vec(output),
-                            type_def_id,
-                        }),
+                        Ok(_) => Ok((
+                            Value::unit(),
+                            Value {
+                                data: Data::Vec(output),
+                                type_def_id,
+                            },
+                        )),
                         Err(_) => Err(serde::de::Error::invalid_length(index, &self)),
                     }
                 }
@@ -292,6 +344,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         // delegate to the real map visitor
         MapTypeVisitor {
+            edge_operator_id: self.edge_operator_id,
             buffered_attrs,
             map_type,
             env: self.env,
@@ -301,7 +354,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 }
 
 impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
-    type Value = Value;
+    type Value = (Value, Value);
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "type `{}`", self.map_type.typename)
@@ -311,40 +364,89 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut attributes = HashMap::with_capacity(self.map_type.properties.len());
+        let mut attributes = BTreeMap::new();
+        let mut edge_params = Value::unit();
 
         // first parse buffered attributes, if any
         for (serde_key, serde_value) in self.buffered_attrs {
-            let serde_property = PropertySet(&self.map_type.properties).visit_str(&serde_key)?;
-            let typed_value = self
-                .env
-                .new_serde_processor(serde_property.operator_id)
-                .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+            match PropertySet::new(&self.map_type.properties, self.edge_operator_id)
+                .visit_str(&serde_key)?
+            {
+                MapKey::EdgeParams(operator_id) => {
+                    let (_, value) = self
+                        .env
+                        .new_serde_processor(operator_id)
+                        .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-            attributes.insert(serde_property.relation_id, typed_value);
+                    edge_params = value;
+                }
+                MapKey::Property(serde_property) => {
+                    let (edge_params, value) = self
+                        .env
+                        .new_serde_processor_with_edge(
+                            serde_property.value_operator_id,
+                            serde_property.edge_operator_id,
+                        )
+                        .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+
+                    attributes.insert(
+                        serde_property.relation_id,
+                        Attribute {
+                            params: edge_params,
+                            value,
+                        },
+                    );
+                }
+            }
         }
 
         // parse rest of map
-        while let Some(serde_property) =
-            map.next_key_seed(PropertySet(&self.map_type.properties))?
-        {
-            let typed_value =
-                map.next_value_seed(self.env.new_serde_processor(serde_property.operator_id))?;
+        while let Some(map_key) = map.next_key_seed(PropertySet::new(
+            &self.map_type.properties,
+            self.edge_operator_id,
+        ))? {
+            match map_key {
+                MapKey::EdgeParams(operator_id) => {
+                    let (_, value) =
+                        map.next_value_seed(self.env.new_serde_processor(operator_id))?;
 
-            attributes.insert(serde_property.relation_id, typed_value);
+                    edge_params = value;
+                }
+                MapKey::Property(serde_property) => {
+                    let (edge_params, value) =
+                        map.next_value_seed(self.env.new_serde_processor_with_edge(
+                            serde_property.value_operator_id,
+                            serde_property.edge_operator_id,
+                        ))?;
+
+                    attributes.insert(
+                        serde_property.relation_id,
+                        Attribute {
+                            params: edge_params,
+                            value,
+                        },
+                    );
+                }
+            }
         }
 
         if attributes.len() < self.map_type.properties.len() {
-            warn!("Missing attributes: {attributes:?}");
+            debug!("Missing attributes: {attributes:?}");
+
+            let mut items: Vec<DoubleQuote<String>> = self
+                .map_type
+                .properties
+                .iter()
+                .filter(|(_, property)| !attributes.contains_key(&property.relation_id))
+                .map(|(key, _)| DoubleQuote(key.clone()))
+                .collect();
+
+            if self.edge_operator_id.is_some() && edge_params.type_def_id == DefId::unit() {
+                items.push(DoubleQuote(EDGE_PROPERTY.into()));
+            }
 
             let missing_keys = Missing {
-                items: self
-                    .map_type
-                    .properties
-                    .iter()
-                    .filter(|(_, property)| !attributes.contains_key(&property.relation_id))
-                    .map(|(key, _)| DoubleQuote(key))
-                    .collect(),
+                items,
                 logic_op: LogicOp::And,
             };
 
@@ -353,15 +455,18 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
             )));
         }
 
-        Ok(Value {
-            data: Data::Map(attributes),
-            type_def_id: self.map_type.type_def_id,
-        })
+        Ok((
+            edge_params,
+            Value {
+                data: Data::Map(attributes),
+                type_def_id: self.map_type.type_def_id,
+            },
+        ))
     }
 }
 
 impl<'s, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s> {
-    type Value = SerdeProperty;
+    type Value = MapKey;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -372,7 +477,7 @@ impl<'s, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s> {
 }
 
 impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
-    type Value = SerdeProperty;
+    type Value = MapKey;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")
@@ -382,12 +487,25 @@ impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
     where
         E: serde::de::Error,
     {
-        match self.0.get(v) {
-            Some(serde_property) => Ok(*serde_property),
-            None => {
-                // TODO: This error message could be improved to suggest valid fields.
-                // see OneOf in serde (this is a private struct)
-                Err(serde::de::Error::custom(format!("unknown property `{v}`")))
+        match v {
+            EDGE_PROPERTY => {
+                if let Some(operator_id) = self.edge_operator {
+                    Ok(MapKey::EdgeParams(operator_id))
+                } else {
+                    Err(serde::de::Error::custom(
+                        "`_edge` property not accepted here",
+                    ))
+                }
+            }
+            _ => {
+                match self.properties.get(v) {
+                    Some(serde_property) => Ok(MapKey::Property(*serde_property)),
+                    None => {
+                        // TODO: This error message could be improved to suggest valid fields.
+                        // see OneOf in serde (this is a private struct)
+                        Err(serde::de::Error::custom(format!("unknown property `{v}`")))
+                    }
+                }
             }
         }
     }

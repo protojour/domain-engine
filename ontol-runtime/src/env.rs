@@ -5,6 +5,7 @@ use smartstring::alias::String;
 use crate::{
     proc::{Lib, Procedure},
     serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor},
+    value::{Data, Value},
     DefId, PackageId,
 };
 
@@ -18,6 +19,13 @@ pub struct Env {
 }
 
 impl Env {
+    pub fn unit_value(&self) -> Value {
+        Value {
+            type_def_id: DefId::unit(),
+            data: Data::Unit,
+        }
+    }
+
     pub fn get_domain(&self, package_id: &PackageId) -> Option<&Domain> {
         self.domains.get(package_id)
     }
@@ -26,9 +34,22 @@ impl Env {
         self.translations.get(&(from, to)).cloned()
     }
 
-    pub fn new_serde_processor(&self, serde_operator_id: SerdeOperatorId) -> SerdeProcessor {
+    pub fn new_serde_processor(&self, value_operator_id: SerdeOperatorId) -> SerdeProcessor {
         SerdeProcessor {
-            operator: &self.serde_operators[serde_operator_id.0 as usize],
+            edge_operator_id: None,
+            value_operator: &self.serde_operators[value_operator_id.0 as usize],
+            env: self,
+        }
+    }
+
+    pub(crate) fn new_serde_processor_with_edge(
+        &self,
+        value_operator_id: SerdeOperatorId,
+        edge_operator_id: Option<SerdeOperatorId>,
+    ) -> SerdeProcessor {
+        SerdeProcessor {
+            edge_operator_id,
+            value_operator: &self.serde_operators[value_operator_id.0 as usize],
             env: self,
         }
     }

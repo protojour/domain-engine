@@ -1,11 +1,11 @@
-use std::{array, collections::HashMap};
+use std::{array, collections::BTreeMap};
 
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     proc::{BuiltinProc, Lib, Local, Procedure},
-    value::{Data, Value},
+    value::{Attribute, Data, Value},
     vm::{AbstractVm, Stack, VmDebug},
     DefId, RelationId,
 };
@@ -92,16 +92,16 @@ impl Stack for ValueStack {
             .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
     }
 
-    fn take_attr(&mut self, source: Local, relation_id: RelationId) {
+    fn take_attr_value(&mut self, source: Local, relation_id: RelationId) {
         let map = self.map_local_mut(source);
-        let value = map.remove(&relation_id).expect("Attribute not found");
-        self.stack.push(value);
+        let attribute = map.remove(&relation_id).expect("Attribute not found");
+        self.stack.push(attribute.value);
     }
 
-    fn put_attr(&mut self, target: Local, relation_id: RelationId) {
+    fn put_unit_attr(&mut self, target: Local, relation_id: RelationId) {
         let value = self.stack.pop().unwrap();
         let map = self.map_local_mut(target);
-        map.insert(relation_id, value);
+        map.insert(relation_id, Attribute::with_unit_params(value));
     }
 
     fn constant(&mut self, k: i64, result_type: DefId) {
@@ -146,9 +146,9 @@ impl ValueStack {
         &mut self.stack[self.local0_pos + local.0 as usize]
     }
 
-    fn map_local_mut(&mut self, local: Local) -> &mut HashMap<RelationId, Value> {
+    fn map_local_mut(&mut self, local: Local) -> &mut BTreeMap<RelationId, Attribute> {
         match &mut self.local_mut(local).data {
-            Data::Map(hash_map) => hash_map,
+            Data::Map(map) => map,
             _ => panic!("Value at {local:?} is not a map"),
         }
     }
@@ -215,7 +215,7 @@ mod tests {
 
     use crate::{
         proc::{NParams, OpCode},
-        value::Value,
+        value::{Attribute, Value},
         DefId,
     };
 
@@ -228,10 +228,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(42)),
-                OpCode::TakeAttr(Local(0), RelationId(DefId(1))),
-                OpCode::PutAttr(Local(1), RelationId(DefId(3))),
-                OpCode::TakeAttr(Local(0), RelationId(DefId(2))),
-                OpCode::PutAttr(Local(1), RelationId(DefId(4))),
+                OpCode::TakeAttrValue(Local(0), RelationId(DefId(1))),
+                OpCode::PutUnitAttr(Local(1), RelationId(DefId(3))),
+                OpCode::TakeAttrValue(Local(0), RelationId(DefId(2))),
+                OpCode::PutUnitAttr(Local(1), RelationId(DefId(4))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -244,11 +244,17 @@ mod tests {
                     [
                         (
                             RelationId(DefId(1)),
-                            Value::new(Data::String("foo".into()), DefId(0)),
+                            Attribute::with_unit_params(Value::new(
+                                Data::String("foo".into()),
+                                DefId(0),
+                            )),
                         ),
                         (
                             RelationId(DefId(2)),
-                            Value::new(Data::String("bar".into()), DefId(0)),
+                            Attribute::with_unit_params(Value::new(
+                                Data::String("bar".into()),
+                                DefId(0),
+                            )),
                         ),
                     ]
                     .into(),
@@ -290,13 +296,13 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(0)),
-                OpCode::TakeAttr(Local(0), RelationId(DefId(1))),
+                OpCode::TakeAttrValue(Local(0), RelationId(DefId(1))),
                 OpCode::Call(double),
-                OpCode::PutAttr(Local(1), RelationId(DefId(4))),
-                OpCode::TakeAttr(Local(0), RelationId(DefId(2))),
-                OpCode::TakeAttr(Local(0), RelationId(DefId(3))),
+                OpCode::PutUnitAttr(Local(1), RelationId(DefId(4))),
+                OpCode::TakeAttrValue(Local(0), RelationId(DefId(2))),
+                OpCode::TakeAttrValue(Local(0), RelationId(DefId(3))),
                 OpCode::Call(add_then_double),
-                OpCode::PutAttr(Local(1), RelationId(DefId(5))),
+                OpCode::PutUnitAttr(Local(1), RelationId(DefId(5))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -307,9 +313,18 @@ mod tests {
             [Value::new(
                 Data::Map(
                     [
-                        (RelationId(DefId(1)), Value::new(Data::Int(333), DefId(0))),
-                        (RelationId(DefId(2)), Value::new(Data::Int(10), DefId(0))),
-                        (RelationId(DefId(3)), Value::new(Data::Int(11), DefId(0))),
+                        (
+                            RelationId(DefId(1)),
+                            Attribute::with_unit_params(Value::new(Data::Int(333), DefId(0))),
+                        ),
+                        (
+                            RelationId(DefId(2)),
+                            Attribute::with_unit_params(Value::new(Data::Int(10), DefId(0))),
+                        ),
+                        (
+                            RelationId(DefId(3)),
+                            Attribute::with_unit_params(Value::new(Data::Int(11), DefId(0))),
+                        ),
                     ]
                     .into(),
                 ),
@@ -320,10 +335,10 @@ mod tests {
         let Data::Map(mut map) = output.data else {
             panic!();
         };
-        let Data::Int(a) = map.remove(&RelationId(DefId(4))).unwrap().data else {
+        let Data::Int(a) = map.remove(&RelationId(DefId(4))).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = map.remove(&RelationId(DefId(5))).unwrap().data else {
+        let Data::Int(b) = map.remove(&RelationId(DefId(5))).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);

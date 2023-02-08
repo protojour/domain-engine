@@ -137,6 +137,9 @@ impl<'m> Defs<'m> {
             tuples: Default::default(),
         };
 
+        defs.unit = defs.add_primitive(Primitive::Unit);
+        assert_eq!(DefId::unit(), defs.unit);
+
         // Add some extremely fundamental definitions here already.
         // These are even independent from CORE being defined.
 
@@ -150,7 +153,6 @@ impl<'m> Defs<'m> {
             CORE_PKG,
             SourceSpan::none(),
         );
-        defs.unit = defs.add_primitive(Primitive::Unit);
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
         defs.string = defs.add_primitive(Primitive::String);

@@ -203,7 +203,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         object_key.into(),
                         SerdeProperty {
                             relation_id: *relation_id,
-                            operator_id,
+                            value_operator_id: operator_id,
+                            edge_operator_id: None,
                         }
                     )
                 }).collect::<IndexMap<_, _>>();

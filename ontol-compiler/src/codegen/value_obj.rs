@@ -61,7 +61,7 @@ pub(super) fn codegen_value_obj_origin(
 
             for (relation_id, node) in dest_attrs {
                 value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes);
-                opcodes.push((OpCode::PutAttr(Local(0), *relation_id), span));
+                opcodes.push((OpCode::PutUnitAttr(Local(0), *relation_id), span));
             }
 
             opcodes.push((OpCode::Return0, span));

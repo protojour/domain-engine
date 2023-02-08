@@ -9,7 +9,7 @@ type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Err
 impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match self.operator {
+        match self.value_operator {
             SerdeOperator::Unit => self.serialize_unit(value, serializer),
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)
@@ -130,7 +130,7 @@ impl<'e> SerdeProcessor<'e> {
         let mut serialize_map = serializer.serialize_map(Some(attributes.len()))?;
 
         for (name, serde_prop) in &map_type.properties {
-            let value = match attributes.get(&serde_prop.relation_id) {
+            let attribute = match attributes.get(&serde_prop.relation_id) {
                 Some(value) => value,
                 None => panic!(
                     "While serializing `{}`, property `{}` was not found",
@@ -141,8 +141,8 @@ impl<'e> SerdeProcessor<'e> {
             serialize_map.serialize_entry(
                 name,
                 &Proxy {
-                    value,
-                    processor: self.env.new_serde_processor(serde_prop.operator_id),
+                    value: &attribute.value,
+                    processor: self.env.new_serde_processor(serde_prop.value_operator_id),
                 },
             )?;
         }

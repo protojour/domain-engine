@@ -93,6 +93,13 @@ fn deserialize_object_properties() {
             "unknown property `c` at line 1 column 21"
         );
         assert_error_msg!(
+            obj.deserialize_data(
+                env,
+                json!({ "a": "hei", "b": 42, "_edge": { "param": 42 } })
+            ),
+            "`_edge` property not accepted here at line 1 column 8"
+        );
+        assert_error_msg!(
             obj.deserialize_data(env, json!({})),
             r#"missing properties, expected "a" and "b" at line 1 column 2"#
         );
