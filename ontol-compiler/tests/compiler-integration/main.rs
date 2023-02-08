@@ -31,7 +31,7 @@ macro_rules! assert_json_io_matches {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };
-        let output = serialize_json($env, &value);
+        let output = crate::util::serialize_json($env, &value);
 
         pretty_assertions::assert_eq!(input, output);
     };

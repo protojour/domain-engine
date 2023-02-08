@@ -36,8 +36,8 @@ impl Env {
 
     pub fn new_serde_processor(&self, value_operator_id: SerdeOperatorId) -> SerdeProcessor {
         SerdeProcessor {
-            edge_operator_id: None,
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
+            edge_operator_id: None,
             env: self,
         }
     }
@@ -48,8 +48,8 @@ impl Env {
         edge_operator_id: Option<SerdeOperatorId>,
     ) -> SerdeProcessor {
         SerdeProcessor {
-            edge_operator_id,
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
+            edge_operator_id,
             env: self,
         }
     }

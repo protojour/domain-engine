@@ -112,7 +112,9 @@ impl<'e> SerdeProcessor<'e> {
     ) -> Res<S> {
         match &value.data {
             Data::Vec(elements) => {
-                let processor = self.env.new_serde_processor(element_operator_id);
+                let processor = self
+                    .env
+                    .new_serde_processor_with_edge(element_operator_id, self.edge_operator_id);
                 let mut seq = serializer.serialize_seq(Some(elements.len()))?;
                 for attr in elements.iter() {
                     seq.serialize_element(&Proxy {
@@ -156,7 +158,10 @@ impl<'e> SerdeProcessor<'e> {
                 &Proxy {
                     value: &attribute.value,
                     edge_params: attribute.edge_params.filter_non_unit(),
-                    processor: self.env.new_serde_processor(serde_prop.value_operator_id),
+                    processor: self.env.new_serde_processor_with_edge(
+                        serde_prop.value_operator_id,
+                        serde_prop.edge_operator_id,
+                    ),
                 },
             )?;
         }
@@ -173,8 +178,11 @@ impl<'e> SerdeProcessor<'e> {
                     },
                 )?;
             }
-            _ => {
-                panic!("Mismatch between edge operator and edge params")
+            (None, Some(_)) => {
+                panic!("Must serialize edge params, but attribute did not contain anything")
+            }
+            (Some(edge_params), None) => {
+                panic!("Attribute had edge params {edge_params:?}, but no serializer operator available: {self:?}")
             }
         }
 

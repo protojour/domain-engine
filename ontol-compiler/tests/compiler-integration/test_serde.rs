@@ -1,6 +1,4 @@
-use crate::{
-    assert_error_msg, assert_json_io_matches, util::serialize_json, util::TypeBinding, TestCompile,
-};
+use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
 

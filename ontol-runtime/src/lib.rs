@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use derive_debug_extras::DebugExtras;
 
 pub mod discriminator;
@@ -22,7 +20,8 @@ mod vm;
 pub struct PackageId(pub u32);
 
 /// One definition inside some domain.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
 pub struct DefId(pub u32);
 
 impl DefId {
@@ -31,7 +30,8 @@ impl DefId {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
 pub struct RelationId(pub DefId);
 
 pub struct ProcId(u32);

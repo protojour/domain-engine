@@ -3,7 +3,7 @@ use ontol_runtime::value::Data;
 use serde_json::json;
 use test_log::test;
 
-use crate::{assert_error_msg, util::TypeBinding, TestCompile, TEST_PKG};
+use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile, TEST_PKG};
 
 #[test]
 fn test_entity_experiment_etc() {
@@ -33,8 +33,10 @@ fn test_entity_experiment_etc() {
     "#
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
-        assert_matches!(
-            artist.deserialize_data(env, json!({
+        assert_json_io_matches!(
+            env,
+            artist,
+            json!({
                 "name": "Zappa",
                 "plays": [
                     {
@@ -44,8 +46,7 @@ fn test_entity_experiment_etc() {
                         }
                     }
                 ]
-            })),
-            Ok(Data::Map(_))
+            })
         );
 
         assert_error_msg!(
