@@ -43,13 +43,13 @@ pub enum Data {
 
 /// A Map value consists of attributes.
 ///
-/// An attribute may be parameterized, and the parameter is itself a value.
+/// An attribute may be parameterized (edge_params), and the parameter is itself a value.
 /// Most attribute parameters is usually just `unit`, i.e. no parameters.
 ///
 /// The attribute value is also just a Value.
 #[derive(Clone, Debug)]
 pub struct Attribute {
-    pub params: Value,
+    pub edge_params: Value,
     pub value: Value,
 }
 
@@ -57,7 +57,7 @@ impl Attribute {
     /// Create an attribute with a unit edge
     pub const fn with_unit_params(value: Value) -> Self {
         Self {
-            params: Value::unit(),
+            edge_params: Value::unit(),
             value,
         }
     }

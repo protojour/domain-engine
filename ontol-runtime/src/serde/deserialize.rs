@@ -8,6 +8,7 @@ use tracing::debug;
 use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
+    serde::EDGE_PROPERTY,
     value::{Attribute, Data, Value},
     DefId,
 };
@@ -27,7 +28,6 @@ enum MapKey {
 
 struct MatcherVisitor<'e, M> {
     matcher: M,
-    edge_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 
@@ -37,8 +37,6 @@ struct MapTypeVisitor<'e> {
     edge_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
-
-const EDGE_PROPERTY: &str = "_edge";
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s> {
@@ -58,6 +56,20 @@ impl<'s> PropertySet<'s> {
     }
 }
 
+impl<'e> SerdeProcessor<'e> {
+    fn matcher_visitor_no_edge<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
+        assert!(
+            self.edge_operator_id.is_none(),
+            "edge_operator_id should be None"
+        );
+
+        MatcherVisitor {
+            matcher,
+            env: self.env,
+        }
+    }
+}
+
 impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     type Value = (Value, Value);
 
@@ -71,77 +83,49 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             }
             SerdeOperator::Int(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
-                MatcherVisitor {
-                    matcher: IntMatcher(*def_id),
-                    edge_operator_id: self.edge_operator_id,
-                    env: self.env,
-                },
+                self.matcher_visitor_no_edge(IntMatcher(*def_id)),
             ),
             SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
-                MatcherVisitor {
-                    matcher: IntMatcher(*def_id),
-                    edge_operator_id: self.edge_operator_id,
-                    env: self.env,
-                },
+                self.matcher_visitor_no_edge(IntMatcher(*def_id)),
             ),
             SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
                 deserializer,
-                MatcherVisitor {
-                    matcher: StringMatcher(*def_id),
-                    edge_operator_id: self.edge_operator_id,
-                    env: self.env,
-                },
+                self.matcher_visitor_no_edge(StringMatcher(*def_id)),
             ),
             SerdeOperator::StringConstant(literal, def_id) => {
                 serde::de::Deserializer::deserialize_str(
                     deserializer,
-                    MatcherVisitor {
-                        edge_operator_id: self.edge_operator_id,
-                        matcher: ConstantStringMatcher {
-                            literal,
-                            def_id: *def_id,
-                        },
-                        env: self.env,
-                    },
+                    self.matcher_visitor_no_edge(ConstantStringMatcher {
+                        literal,
+                        def_id: *def_id,
+                    }),
                 )
             }
             SerdeOperator::Tuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
                 deserializer,
-                MatcherVisitor {
-                    matcher: TupleMatcher {
-                        elements: elems,
-                        def_id: *def_id,
-                    },
-                    edge_operator_id: self.edge_operator_id,
-                    env: self.env,
-                },
+                self.matcher_visitor_no_edge(TupleMatcher {
+                    elements: elems,
+                    def_id: *def_id,
+                }),
             ),
             SerdeOperator::Array(element_def_id, element_operator_id) => {
                 serde::de::Deserializer::deserialize_seq(
                     deserializer,
-                    MatcherVisitor {
-                        matcher: ArrayMatcher {
-                            element_def_id: *element_def_id,
-                            element_operator_id: *element_operator_id,
-                        },
-                        edge_operator_id: self.edge_operator_id,
-                        env: self.env,
-                    },
+                    self.matcher_visitor_no_edge(ArrayMatcher {
+                        element_def_id: *element_def_id,
+                        element_operator_id: *element_operator_id,
+                    }),
                 )
             }
             SerdeOperator::RangeArray(element_def_id, range, element_operator_id) => {
                 serde::de::Deserializer::deserialize_seq(
                     deserializer,
-                    MatcherVisitor {
-                        matcher: RangeArrayMatcher {
-                            element_def_id: *element_def_id,
-                            range: range.clone(),
-                            element_operator_id: *element_operator_id,
-                        },
-                        edge_operator_id: self.edge_operator_id,
-                        env: self.env,
-                    },
+                    self.matcher_visitor_no_edge(RangeArrayMatcher {
+                        element_def_id: *element_def_id,
+                        range: range.clone(),
+                        element_operator_id: *element_operator_id,
+                    }),
                 )
             }
             SerdeOperator::ValueType(value_type) => {
@@ -158,9 +142,9 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     MatcherVisitor {
                         matcher: UnionMatcher {
                             value_union_type,
+                            edge_operator_id: self.edge_operator_id,
                             env: self.env,
                         },
-                        edge_operator_id: self.edge_operator_id,
                         env: self.env,
                     },
                 )
@@ -344,9 +328,9 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         // delegate to the real map visitor
         MapTypeVisitor {
-            edge_operator_id: self.edge_operator_id,
             buffered_attrs,
             map_type,
+            edge_operator_id: map_matcher.edge_operator_id,
             env: self.env,
         }
         .visit_map(map)
@@ -389,13 +373,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                         )
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                    attributes.insert(
-                        serde_property.relation_id,
-                        Attribute {
-                            params: edge_params,
-                            value,
-                        },
-                    );
+                    attributes.insert(serde_property.relation_id, Attribute { edge_params, value });
                 }
             }
         }
@@ -419,13 +397,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                             serde_property.edge_operator_id,
                         ))?;
 
-                    attributes.insert(
-                        serde_property.relation_id,
-                        Attribute {
-                            params: edge_params,
-                            value,
-                        },
-                    );
+                    attributes.insert(serde_property.relation_id, Attribute { edge_params, value });
                 }
             }
         }

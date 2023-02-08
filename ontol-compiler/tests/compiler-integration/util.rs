@@ -73,7 +73,7 @@ impl TypeBinding {
     pub fn serialize_json(&self, env: &Env, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         env.new_serde_processor(self.serde_operator_id)
-            .serialize_value(&value, &mut serde_json::Serializer::new(&mut buf))
+            .serialize_value(None, &value, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }
@@ -83,7 +83,7 @@ pub fn serialize_json(env: &Env, value: &Value) -> serde_json::Value {
     let serde_operator_id = env.serde_operators_per_def.get(&value.type_def_id).unwrap();
     let mut buf: Vec<u8> = vec![];
     env.new_serde_processor(*serde_operator_id)
-        .serialize_value(&value, &mut serde_json::Serializer::new(&mut buf))
+        .serialize_value(None, &value, &mut serde_json::Serializer::new(&mut buf))
         .expect("serialization failed");
     serde_json::from_slice(&buf).unwrap()
 }

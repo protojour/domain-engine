@@ -18,13 +18,25 @@ mod deserialize;
 mod deserialize_matcher;
 mod serialize;
 
+const EDGE_PROPERTY: &str = "_edge";
+
 /// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
 /// in the compilerironment.
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
+    /// The operator used for (de)serializing this value
     pub(crate) value_operator: &'e SerdeOperator,
+
+    /// The edge properties used for (de)serializing the _edge data_
+    /// related to this value when it's associated with a "parent value" through a relation.
+    ///
+    /// Generally, non-unit edge data can only be represented on a relation between two map types.
+    /// The parent (often the subject) map has an attribute that is another child map.
+    /// The edge data would be injected in the child map as the `_edge` property.
     pub(crate) edge_operator_id: Option<SerdeOperatorId>,
+
+    /// The environment, via which new SerdeOperators can be created.
     pub(crate) env: &'e Env,
 }
 

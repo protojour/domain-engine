@@ -197,13 +197,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let operator_id =
                         self.get_serde_operator_id(relationship.object)
                             .expect("No inner operator");
-                    let operator_id = self.cardinality_operator(operator_id, relationship.object, *cardinality);
+                    let value_operator_id = self.cardinality_operator(operator_id, relationship.object, *cardinality);
 
                     (
                         object_key.into(),
                         SerdeProperty {
                             relation_id: *relation_id,
-                            value_operator_id: operator_id,
+                            value_operator_id,
                             edge_operator_id: None,
                         }
                     )

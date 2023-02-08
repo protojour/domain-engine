@@ -223,6 +223,7 @@ impl ValueMatcher for RangeArrayMatcher {
 
 pub struct UnionMatcher<'e> {
     pub value_union_type: &'e ValueUnionType,
+    pub edge_operator_id: Option<SerdeOperatorId>,
     pub env: &'e Env,
 }
 
@@ -290,6 +291,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
         Ok(MapMatcher {
             value_union_type: self.value_union_type,
+            edge_operator_id: self.edge_operator_id,
             env: self.env,
         })
     }
@@ -309,6 +311,7 @@ impl<'e> UnionMatcher<'e> {
 
 pub struct MapMatcher<'e> {
     value_union_type: &'e ValueUnionType,
+    pub edge_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 

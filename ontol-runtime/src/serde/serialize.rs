@@ -2,13 +2,18 @@ use serde::ser::{SerializeMap, SerializeSeq};
 
 use crate::value::{Data, Value};
 
-use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor};
+use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, EDGE_PROPERTY};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
 impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
-    pub fn serialize_value<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
+    pub fn serialize_value<S: serde::Serializer>(
+        &self,
+        edge_params: Option<&Value>,
+        value: &Value,
+        serializer: S,
+    ) -> Res<S> {
         match self.value_operator {
             SerdeOperator::Unit => self.serialize_unit(value, serializer),
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
@@ -27,7 +32,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => self
                 .env
                 .new_serde_processor(value_type.inner_operator_id)
-                .serialize_value(value, serializer),
+                .serialize_value(edge_params, value, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type
                     .discriminators
@@ -40,13 +45,15 @@ impl<'e> SerdeProcessor<'e> {
                     Some(discriminator) => self
                         .env
                         .new_serde_processor(discriminator.operator_id)
-                        .serialize_value(value, serializer),
+                        .serialize_value(edge_params, value, serializer),
                     None => {
                         panic!("Discriminator not found while serializing union type");
                     }
                 }
             }
-            SerdeOperator::MapType(map_type) => self.serialize_map(map_type, value, serializer),
+            SerdeOperator::MapType(map_type) => {
+                self.serialize_map(map_type, edge_params, value, serializer)
+            }
         }
     }
 }
@@ -119,6 +126,7 @@ impl<'e> SerdeProcessor<'e> {
     fn serialize_map<S: serde::Serializer>(
         &self,
         map_type: &MapType,
+        edge_params: Option<&Value>,
         value: &Value,
         serializer: S,
     ) -> Res<S> {
@@ -146,6 +154,23 @@ impl<'e> SerdeProcessor<'e> {
                 },
             )?;
         }
+
+        match (edge_params, self.edge_operator_id) {
+            (None, None) => {}
+            (Some(edge_params), Some(operator_id)) => {
+                serialize_map.serialize_entry(
+                    EDGE_PROPERTY,
+                    &Proxy {
+                        value: edge_params,
+                        processor: self.env.new_serde_processor(operator_id),
+                    },
+                )?;
+            }
+            _ => {
+                panic!("Mismatch between edge operator and edge params")
+            }
+        }
+
         serialize_map.end()
     }
 }
@@ -160,6 +185,6 @@ impl<'v, 'e> serde::Serialize for Proxy<'v, 'e> {
     where
         S: serde::Serializer,
     {
-        self.processor.serialize_value(self.value, serializer)
+        self.processor.serialize_value(None, self.value, serializer)
     }
 }
