@@ -63,8 +63,11 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
     .padded()
 }
 
+/// Parse a sequence of trees.
+///
+/// Typically a source file.
 pub fn trees_parser() -> impl Parser<char, Vec<Spanned<Tree>>, Error = Simple<char>> {
-    tree_parser().repeated()
+    tree_parser().repeated().then_ignore(end())
 }
 
 fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
@@ -240,23 +243,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "bug in chumsky::repeated. It believes that the error is a recovery."]
-    fn chumsky_repeated_bug() {
-        let _ = tree_parser()
-            .parse("(")
-            .expect("Expected OK tree parse, got error");
-    }
-
-    #[test]
-    #[ignore = "this bug is reported here: https://github.com/zesterer/chumsky/issues/268"]
-    fn bug_test() {
-        pub fn simplistic_parser<'s>() -> impl Parser<char, &'s str, Error = Simple<char>> {
-            just("foobar")
-        }
-
-        simplistic_parser()
-            .repeated()
-            .parse("something invalid")
-            .expect_err("should fail");
+    fn parse_incomplete_should_error() {
+        let _ = trees_parser().parse("(").expect_err("");
     }
 }

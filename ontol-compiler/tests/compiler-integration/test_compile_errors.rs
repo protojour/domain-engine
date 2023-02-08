@@ -3,8 +3,7 @@ use test_log::test;
 
 #[test]
 fn lex_error() {
-    // BUG: chumsky bug
-    "( ;; ERROR parse error".compile_ok(|_| {});
+    "( ;; ERROR lex error".compile_fail();
 }
 
 #[test]
