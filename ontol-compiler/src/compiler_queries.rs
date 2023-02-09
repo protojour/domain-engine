@@ -51,9 +51,15 @@ pub trait GetPropertyMeta<'m> {
         relationship_id: RelationshipId,
     ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
 
-    fn get_property_meta(
+    fn get_subject_property_meta(
         &self,
         subject_id: DefId,
+        relation_id: RelationId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
+
+    fn get_object_property_meta(
+        &self,
+        object_id: DefId,
         relation_id: RelationId,
     ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
 }
@@ -69,7 +75,7 @@ where
         get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
     }
 
-    fn get_property_meta(
+    fn get_subject_property_meta(
         &self,
         subject_id: DefId,
         relation_id: RelationId,
@@ -77,6 +83,20 @@ where
         let relationship_id = get::<_, Relations>(self)
             .relationships_by_subject
             .get(&(subject_id, relation_id))
+            .cloned()
+            .ok_or(())?;
+
+        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
+    }
+
+    fn get_object_property_meta(
+        &self,
+        object_id: DefId,
+        relation_id: RelationId,
+    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+        let relationship_id = get::<_, Relations>(self)
+            .relationships_by_object
+            .get(&(object_id, relation_id))
             .cloned()
             .ok_or(())?;
 

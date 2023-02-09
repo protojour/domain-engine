@@ -171,7 +171,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (relation_id, _cardinality) in property_set {
             let (relationship, relation) = self
-                .get_property_meta(object_def, *relation_id)
+                .get_subject_property_meta(object_def, *relation_id)
                 .expect("BUG: problem getting property meta");
 
             let object_def = relationship.object;

@@ -54,6 +54,7 @@ pub struct Rel {
     pub ident: Spanned<Option<String>>,
     pub cardinality: Cardinality,
     pub edge_params: Option<Spanned<Type>>,
+    pub object_prop_ident: Option<Spanned<String>>,
     pub object: Spanned<Type>,
 }
 

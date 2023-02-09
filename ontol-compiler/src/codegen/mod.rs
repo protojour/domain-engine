@@ -151,7 +151,7 @@ trait Codegen {
 
 fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
     match ty {
-        Type::Domain(def_id) => Some(*def_id),
+        Type::Domain(def_id) | Type::DomainEntity(def_id) => Some(*def_id),
         other => {
             warn!("unable to get translation key: {other:?}");
             None

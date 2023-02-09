@@ -29,10 +29,12 @@ fn test_entity_experiment_etc() {
     (type! plays)
     (rel! (plays) how_much (string))
 
-    (rel! (artist) plays[] @(plays) played-by (instrument))
+    (rel! (artist) plays[] @(plays) played_by (instrument))
     "#
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
+        let instrument = TypeBinding::new(env, "instrument");
+
         assert_json_io_matches!(
             env,
             artist,
@@ -41,6 +43,26 @@ fn test_entity_experiment_etc() {
                 "plays": [
                     {
                         "name": "guitar",
+                        // FIXME: This should be an optional property:
+                        "played_by": [],
+                        "_edge": {
+                            "how_much": "a lot"
+                        }
+                    }
+                ]
+            })
+        );
+
+        assert_json_io_matches!(
+            env,
+            instrument,
+            json!({
+                "name": "guitar",
+                "played_by": [
+                    {
+                        "name": "Zappa",
+                        // FIXME: This should be an optional property:
+                        "plays": [],
                         "_edge": {
                             "how_much": "a lot"
                         }
@@ -54,7 +76,7 @@ fn test_entity_experiment_etc() {
                 "name": "Herbie Hancock",
                 "plays": [{ "name": "piano" }]
             })),
-            r#"missing properties, expected "_edge" at line 1 column 50"#
+            r#"missing properties, expected "played_by" and "_edge" at line 1 column 50"#
         );
     });
 }

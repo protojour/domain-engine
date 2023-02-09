@@ -6,7 +6,7 @@ use ontol_runtime::{
         MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionDiscriminator,
         ValueUnionType,
     },
-    DefId,
+    DefId, RelationId,
 };
 use smallvec::SmallVec;
 
@@ -14,7 +14,7 @@ use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs},
-    relation::{Properties, Relations, SubjectProperties},
+    relation::{ObjectProperties, Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
 
@@ -103,10 +103,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(Type::Array(_)) => {
                 panic!("not handled here")
             }
-            Some(Type::Domain(def_id)) => {
+            Some(Type::Domain(def_id) | Type::DomainEntity(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::DomainType(ident)) => ident,
+                    Some(DefKind::DomainType(ident) | DefKind::DomainEntity(ident)) => ident,
                     _ => "Unknown type",
                 };
                 let operator_id = self.alloc_operator_id(type_def_id);
@@ -138,13 +138,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
         properties: Option<&Properties>,
     ) -> SerdeOperator {
-        match properties.map(|prop| &prop.subject) {
-            Some(SubjectProperties::Empty) | None => SerdeOperator::MapType(MapType {
-                typename: typename.into(),
-                type_def_id,
-                properties: Default::default(),
-            }),
-            Some(SubjectProperties::Value(relationship_id, _, cardinality)) => {
+        let properties = match properties {
+            None => return MapTypeBuilder::new(typename, type_def_id).build(),
+            Some(properties) => properties,
+        };
+
+        match &properties.subject {
+            SubjectProperties::Empty => MapTypeBuilder::new(typename, type_def_id)
+                .add_object_properties(self, &properties.object)
+                .build(),
+            SubjectProperties::Value(relationship_id, _, cardinality) => {
                 let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
@@ -162,7 +165,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     inner_operator_id,
                 })
             }
-            Some(SubjectProperties::ValueUnion(_)) => {
+            SubjectProperties::ValueUnion(_) => {
                 let union_disciminator = self
                     .relations
                     .union_discriminators
@@ -187,39 +190,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .collect(),
                 })
             }
-            Some(SubjectProperties::Map(property_set)) => {
-                let serde_properties = property_set.iter().map(|(relation_id, cardinality)| {
-                    let Ok((relationship, relation)) = self.get_property_meta(type_def_id, *relation_id) else {
-                        panic!("Problem getting property meta");
-                    };
-
-                    let object_key = relation.object_prop().expect("Property has no name");
-                    let operator_id =
-                        self.get_serde_operator_id(relationship.object)
-                            .expect("No inner operator");
-                    let value_operator_id = self.cardinality_operator(operator_id, relationship.object, *cardinality);
-                    let edge_operator_id = if relationship.edge_params == DefId::unit() {
-                        None
-                    } else {
-                        self.get_serde_operator_id(relationship.edge_params)
-                    };
-
-                    (
-                        object_key.into(),
-                        SerdeProperty {
-                            relation_id: *relation_id,
-                            value_operator_id,
-                            edge_operator_id,
-                        }
-                    )
-                }).collect::<IndexMap<_, _>>();
-
-                SerdeOperator::MapType(MapType {
-                    typename: typename.into(),
-                    type_def_id,
-                    properties: serde_properties,
-                })
-            }
+            SubjectProperties::Map(property_set) => MapTypeBuilder::new(typename, type_def_id)
+                .add_subject_property_set(self, property_set)
+                .add_object_properties(self, &properties.object)
+                .build(),
         }
     }
 
@@ -259,6 +233,115 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         self.array_operators
             .insert((operator_id, range.0, range.1), array_operator_id);
         array_operator_id
+    }
+}
+
+struct MapTypeBuilder {
+    map_type: MapType,
+}
+
+impl MapTypeBuilder {
+    fn new(typename: &str, type_def_id: DefId) -> Self {
+        Self {
+            map_type: MapType {
+                typename: typename.into(),
+                type_def_id,
+                properties: Default::default(),
+            },
+        }
+    }
+
+    fn build(self) -> SerdeOperator {
+        SerdeOperator::MapType(self.map_type)
+    }
+
+    fn add_subject_property_set(
+        mut self,
+        generator: &mut SerdeGenerator,
+        property_set: &IndexMap<RelationId, Cardinality>,
+    ) -> Self {
+        self.map_type
+            .properties
+            .extend(property_set.iter().map(|(relation_id, cardinality)| {
+                let Ok((relationship, relation)) = generator
+                    .get_subject_property_meta(self.map_type.type_def_id, *relation_id)
+                else {
+                    panic!("Problem getting subject property meta");
+                };
+
+                let subject_key = relation.subject_prop().expect("Property has no name");
+                let operator_id = generator
+                    .get_serde_operator_id(relationship.object)
+                    .expect("No inner operator");
+                let value_operator_id =
+                    generator.cardinality_operator(operator_id, relationship.object, *cardinality);
+                let edge_operator_id = if relationship.edge_params == DefId::unit() {
+                    None
+                } else {
+                    generator.get_serde_operator_id(relationship.edge_params)
+                };
+
+                (
+                    subject_key.into(),
+                    SerdeProperty {
+                        relation_id: *relation_id,
+                        value_operator_id,
+                        edge_operator_id,
+                    },
+                )
+            }));
+        self
+    }
+
+    fn add_object_properties(
+        self,
+        generator: &mut SerdeGenerator,
+        object_properties: &ObjectProperties,
+    ) -> Self {
+        match object_properties {
+            ObjectProperties::Map(property_set) => {
+                self.add_object_property_set(generator, property_set)
+            }
+            ObjectProperties::Empty => self,
+        }
+    }
+
+    fn add_object_property_set(
+        mut self,
+        generator: &mut SerdeGenerator,
+        property_set: &IndexMap<RelationId, Cardinality>,
+    ) -> Self {
+        self.map_type
+            .properties
+            .extend(property_set.iter().map(|(relation_id, cardinality)| {
+                let Ok((relationship, relation)) = generator
+                    .get_object_property_meta(self.map_type.type_def_id, *relation_id)
+                else {
+                    panic!("Problem getting object property meta");
+                };
+
+                let object_key = relation.object_prop().expect("Property has no name");
+                let operator_id = generator
+                    .get_serde_operator_id(relationship.subject)
+                    .expect("No inner operator");
+                let value_operator_id =
+                    generator.cardinality_operator(operator_id, relationship.subject, *cardinality);
+                let edge_operator_id = if relationship.edge_params == DefId::unit() {
+                    None
+                } else {
+                    generator.get_serde_operator_id(relationship.edge_params)
+                };
+
+                (
+                    object_key.into(),
+                    SerdeProperty {
+                        relation_id: *relation_id,
+                        value_operator_id,
+                        edge_operator_id,
+                    },
+                )
+            }));
+        self
     }
 }
 

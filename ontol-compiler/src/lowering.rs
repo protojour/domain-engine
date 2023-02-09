@@ -60,7 +60,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Entity((ident, _)) => {
                 let def_id = self.named_def_id(Space::Type, &ident);
                 let ident = self.compiler.strings.intern(&ident);
-                self.set_def(def_id, DefKind::DomainType(ident), &span);
+                self.set_def(def_id, DefKind::DomainEntity(ident), &span);
                 Ok(Some(def_id))
             }
             ast::Ast::Rel(ast::Rel {
@@ -68,18 +68,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident: (ident, ident_span),
                 cardinality,
                 edge_params,
+                object_prop_ident,
                 object,
             }) => {
-                let ident = ident.map(|i| self.compiler.strings.intern(&i));
+                let ident = ident.map(|ident| self.compiler.strings.intern(&ident));
                 // This syntax just defines the relation the first time it's used
                 let relation_def_id = match self.define_relation_if_undefined(ident) {
                     ImplicitDefId::New(def_id) => {
+                        let object_prop =
+                            object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
+
                         self.set_def(
                             def_id,
                             DefKind::Relation(Relation {
                                 subject_prop: None,
                                 ident,
-                                object_prop: None,
+                                object_prop,
                             }),
                             &ident_span,
                         );

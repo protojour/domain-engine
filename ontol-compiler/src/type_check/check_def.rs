@@ -5,7 +5,7 @@ use crate::{
     def::{Cardinality, Def, DefKind, Primitive, Relation, Relationship},
     error::CompileError,
     mem::Intern,
-    relation::{RelationshipId, Role, SubjectProperties},
+    relation::{ObjectProperties, RelationshipId, Role, SubjectProperties},
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
@@ -28,6 +28,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match &def.kind {
             DefKind::DomainType(_) => {
                 let ty = self.types.intern(Type::Domain(def_id));
+                self.def_types.map.insert(def_id, ty);
+                ty
+            }
+            DefKind::DomainEntity(_) => {
+                let ty = self.types.intern(Type::DomainEntity(def_id));
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
@@ -57,6 +62,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.relations.relationships_by_subject.insert(
                     (relationship.subject, relationship.relation_id),
+                    RelationshipId(def_id),
+                );
+                self.relations.relationships_by_object.insert(
+                    (relationship.object, relationship.relation_id),
                     RelationshipId(def_id),
                 );
 
@@ -121,7 +130,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         role_defs: (DefId, DefId),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let property_codomain_ty = self.check_def(role_defs.1);
+        let domain_ty = self.check_def(role_defs.0);
+        let codomain_ty = self.check_def(role_defs.1);
 
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(role_defs.0);
@@ -178,10 +188,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             },
             Role::Object => {
-                properties.object.insert(relation.0);
+                match (&relation.1.object_prop, domain_ty, &mut properties.object) {
+                    (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
+                        properties.object = ObjectProperties::Map(
+                            [(relation.0, relationship.1.cardinality)].into(),
+                        );
+                    }
+                    (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
+                        if properties
+                            .insert(relation.0, relationship.1.cardinality)
+                            .is_some()
+                        {
+                            return self
+                                .error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                        }
+                    }
+                    (Some(_), Type::Domain(_), _) => {
+                        panic!("Only entities may have reverse properties");
+                    }
+                    _ => {}
+                };
             }
         }
 
-        property_codomain_ty
+        codomain_ty
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use ontol_runtime::{discriminator::UnionDiscriminator, DefId, RelationId};
 
 use crate::{def::Cardinality, SourceSpan};
@@ -18,6 +18,7 @@ pub struct RelationshipId(pub DefId);
 pub struct Relations {
     pub properties_by_type: HashMap<DefId, Properties>,
     pub relationships_by_subject: HashMap<(DefId, RelationId), RelationshipId>,
+    pub relationships_by_object: HashMap<(DefId, RelationId), RelationshipId>,
 
     pub value_unions: HashSet<DefId>,
     pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
@@ -36,7 +37,7 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub subject: SubjectProperties,
-    pub object: IndexSet<RelationId>,
+    pub object: ObjectProperties,
 }
 
 #[derive(Default, Debug)]
@@ -48,5 +49,12 @@ pub enum SubjectProperties {
     /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
+    Map(IndexMap<RelationId, Cardinality>),
+}
+
+#[derive(Default, Debug)]
+pub enum ObjectProperties {
+    #[default]
+    Empty,
     Map(IndexMap<RelationId, Cardinality>),
 }

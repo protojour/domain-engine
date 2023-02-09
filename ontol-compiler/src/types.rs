@@ -39,6 +39,7 @@ pub enum Type<'m> {
     },
     // User-defined data type from a domain:
     Domain(DefId),
+    DomainEntity(DefId),
     Infer(TypeVar<'m>),
     Error,
 }
@@ -57,6 +58,7 @@ impl<'m> Type<'m> {
             Self::Array(_) => None,
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
+            Self::DomainEntity(def_id) => Some(*def_id),
             Self::Infer(_) => None,
             Self::Error => None,
         }
@@ -166,7 +168,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "{}[]", FormatType(ty, defs))
             }
             Type::Function { .. } => write!(f, "function"),
-            Type::Domain(def_id) => {
+            Type::Domain(def_id) | Type::DomainEntity(def_id) => {
                 let ident = defs
                     .get_def_kind(*def_id)
                     .unwrap()

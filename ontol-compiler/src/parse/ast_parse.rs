@@ -122,7 +122,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         None
     };
 
-    let _object_ident = if stream.peek::<Sym>() {
+    let object_prop_ident = if stream.peek::<Sym>() {
         Some(stream.next::<Sym>("").unwrap())
     } else {
         None
@@ -137,6 +137,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
             ident: (ident, ident_span),
             cardinality,
             edge_params,
+            object_prop_ident,
             object,
         }),
         span,

@@ -83,8 +83,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
-                let Type::Domain(subject_id) = domain_type else {
-                    return self.expr_error(CompileError::DomainTypeExpected, &type_path.span);
+                let subject_id = match domain_type {
+                    Type::Domain(subject_id) | Type::DomainEntity(subject_id) => subject_id,
+                    _ => return self.expr_error(CompileError::DomainTypeExpected, &type_path.span),
                 };
 
                 let subject_properties = self
@@ -142,7 +143,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .iter()
                             .map(|(relation_id, _cardinality)| {
                                 let (relationship, relation) = self
-                                    .get_property_meta(*subject_id, *relation_id)
+                                    .get_subject_property_meta(*subject_id, *relation_id)
                                     .expect("BUG: problem getting property meta");
                                 let property_name = relation
                                     .subject_prop()
