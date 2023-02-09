@@ -98,7 +98,7 @@ fn test_entity_one_to_one_relationship() {
                     "name": "b",
                     "child_of": [],
                 },
-                // "child_of": [],
+                "child_of": [],
             })
         );
     });

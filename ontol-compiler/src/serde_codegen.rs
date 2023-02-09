@@ -6,6 +6,7 @@ use ontol_runtime::{
         MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionDiscriminator,
         ValueUnionType,
     },
+    value::PropertyId,
     DefId, RelationId,
 };
 use smallvec::SmallVec;
@@ -284,7 +285,7 @@ impl MapTypeBuilder {
                 (
                     subject_key.into(),
                     SerdeProperty {
-                        relation_id: *relation_id,
+                        property_id: PropertyId::subject(*relation_id),
                         value_operator_id,
                         edge_operator_id,
                     },
@@ -335,7 +336,7 @@ impl MapTypeBuilder {
                 (
                     object_key.into(),
                     SerdeProperty {
-                        relation_id: *relation_id,
+                        property_id: PropertyId::object(*relation_id),
                         value_operator_id,
                         edge_operator_id,
                     },

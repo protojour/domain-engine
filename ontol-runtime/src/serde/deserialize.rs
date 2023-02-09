@@ -9,7 +9,7 @@ use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::EDGE_PROPERTY,
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, Value},
     DefId,
 };
 
@@ -384,10 +384,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                         )
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                    attributes.insert(
-                        PropertyId::subject(serde_property.relation_id),
-                        Attribute { edge_params, value },
-                    );
+                    attributes.insert(serde_property.property_id, Attribute { edge_params, value });
                 }
             }
         }
@@ -411,10 +408,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                             serde_property.edge_operator_id,
                         ))?;
 
-                    attributes.insert(
-                        PropertyId::subject(serde_property.relation_id),
-                        Attribute { edge_params, value },
-                    );
+                    attributes.insert(serde_property.property_id, Attribute { edge_params, value });
                 }
             }
         }
@@ -431,16 +425,14 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 debug!("    attr {:?}", attr.0);
             }
             for prop in &self.map_type.properties {
-                debug!("    prop {:?}", prop.1.relation_id);
+                debug!("    prop {:?}", prop.1.property_id);
             }
 
             let mut items: Vec<DoubleQuote<String>> = self
                 .map_type
                 .properties
                 .iter()
-                .filter(|(_, property)| {
-                    !attributes.contains_key(&PropertyId::subject(property.relation_id))
-                })
+                .filter(|(_, property)| !attributes.contains_key(&property.property_id))
                 .map(|(key, _)| DoubleQuote(key.clone()))
                 .collect();
 

@@ -11,7 +11,8 @@ use crate::{
     discriminator::VariantDiscriminator,
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    DefId, RelationId,
+    value::PropertyId,
+    DefId,
 };
 
 mod deserialize;
@@ -90,7 +91,7 @@ pub struct MapType {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
-    pub relation_id: RelationId,
+    pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
     pub edge_operator_id: Option<SerdeOperatorId>,
 }

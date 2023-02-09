@@ -66,6 +66,13 @@ impl PropertyId {
             relation_id,
         }
     }
+
+    pub fn object(relation_id: RelationId) -> Self {
+        Self {
+            role: Role::Object,
+            relation_id,
+        }
+    }
 }
 
 /// An Attribute is a Value that is part of another value.

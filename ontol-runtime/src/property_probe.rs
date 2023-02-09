@@ -8,7 +8,7 @@ use crate::{
     serde::SerdeOperator,
     value::PropertyId,
     vm::{AbstractVm, Stack, VmDebug},
-    DefId, Role,
+    DefId,
 };
 
 pub struct PropertyProbe<'l> {
@@ -42,14 +42,8 @@ impl<'l> PropertyProbe<'l> {
                     .iter()
                     .map(|(_, serde_property)| {
                         (
-                            PropertyId {
-                                role: Role::Subject,
-                                relation_id: serde_property.relation_id,
-                            },
-                            HashSet::from([PropertyId {
-                                role: Role::Subject,
-                                relation_id: serde_property.relation_id,
-                            }]),
+                            serde_property.property_id,
+                            HashSet::from([serde_property.property_id]),
                         )
                     })
                     .collect::<HashMap<_, _>>();
