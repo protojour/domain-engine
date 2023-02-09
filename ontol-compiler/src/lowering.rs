@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
-    def::{Cardinality, Def, DefKind, Relation, Relationship, Variables},
+    def::{Def, DefKind, PropertyCardinality, Relation, Relationship, ValueCardinality, Variables},
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
@@ -109,7 +109,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             subject,
                             subject_cardinality: subject_cardinality
                                 .map(convert_cardinality)
-                                .unwrap_or(Cardinality::One),
+                                .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
                             edge_params,
                             object_cardinality: object_cardinality
                                 .map(convert_cardinality)
@@ -117,11 +117,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                     if has_object_prop {
                                         // i.e. no syntax sugar: The object prop is explicit,
                                         // therefore the object cardinality is explicit.
-                                        Cardinality::One
+                                        (PropertyCardinality::Mandatory, ValueCardinality::One)
                                     } else {
                                         // The syntactic sugar case, which is the default behaviour:
                                         // Many incoming edges to the same object:
-                                        Cardinality::Many
+                                        (PropertyCardinality::Optional, ValueCardinality::Many)
                                     }
                                 }),
                             object,
@@ -345,12 +345,17 @@ impl VarTable {
     }
 }
 
-fn convert_cardinality(ast_cardinality: ast::Cardinality) -> Cardinality {
+fn convert_cardinality(
+    ast_cardinality: ast::Cardinality,
+) -> (PropertyCardinality, ValueCardinality) {
     match ast_cardinality {
-        ast::Cardinality::ZeroOrOne => Cardinality::ZeroOrOne,
+        ast::Cardinality::ZeroOrOne => (PropertyCardinality::Optional, ValueCardinality::One),
         ast::Cardinality::Many(range) => match (range.start, range.end) {
-            (None, None) => Cardinality::Many,
-            (start, end) => Cardinality::ManyWithRange(start, end),
+            (None, None) => (PropertyCardinality::Mandatory, ValueCardinality::Many),
+            (start, end) => (
+                PropertyCardinality::Mandatory,
+                ValueCardinality::ManyInRange(start, end),
+            ),
         },
     }
 }

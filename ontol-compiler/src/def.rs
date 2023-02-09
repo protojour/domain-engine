@@ -83,20 +83,41 @@ pub struct Relation<'m> {
 #[derive(Debug)]
 pub struct Relationship {
     pub relation_id: RelationId,
+
     pub subject: DefId,
-    // The cardinality of the relationship, i.e. how many objects are related to the subject
+    /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
+
     pub edge_params: DefId,
-    pub object_cardinality: Cardinality,
+
     pub object: DefId,
+    /// How many subjects are related to the object
+    pub object_cardinality: Cardinality,
+}
+
+pub type Cardinality = (PropertyCardinality, ValueCardinality);
+
+#[derive(Clone, Copy, Debug)]
+pub enum PropertyCardinality {
+    Optional,
+    Mandatory,
+}
+
+impl PropertyCardinality {
+    pub fn is_mandatory(&self) -> bool {
+        matches!(self, Self::Mandatory)
+    }
+
+    pub fn is_optional(&self) -> bool {
+        matches!(self, Self::Optional)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Cardinality {
+pub enum ValueCardinality {
     One,
-    ZeroOrOne,
     Many,
-    ManyWithRange(Option<u16>, Option<u16>),
+    ManyInRange(Option<u16>, Option<u16>),
 }
 
 impl<'m> Relation<'m> {

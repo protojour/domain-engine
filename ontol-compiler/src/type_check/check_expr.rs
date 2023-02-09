@@ -6,7 +6,7 @@ use tracing::warn;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind},
+    def::{Cardinality, Def, DefKind, PropertyCardinality, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
@@ -187,12 +187,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             let object_ty = self.check_def(match_property.object_def);
                             let object_ty = match match_property.cardinality {
-                                Cardinality::One => object_ty,
-                                Cardinality::ZeroOrOne => {
+                                (PropertyCardinality::Mandatory, ValueCardinality::One) => {
+                                    object_ty
+                                }
+                                (PropertyCardinality::Optional, ValueCardinality::One) => {
                                     self.types.intern(Type::Option(object_ty))
                                 }
-                                Cardinality::Many => self.types.intern(Type::Array(object_ty)),
-                                Cardinality::ManyWithRange(_, _) => todo!(),
+                                (_, ValueCardinality::Many) => {
+                                    self.types.intern(Type::Array(object_ty))
+                                }
+                                (_, ValueCardinality::ManyInRange(_, _)) => todo!(),
                             };
                             let (_, typed_expr_ref) = self.check_expr_expect(value, object_ty, ctx);
 

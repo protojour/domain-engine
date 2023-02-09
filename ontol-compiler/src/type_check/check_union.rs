@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def},
+    def::{Cardinality, Def, PropertyCardinality, ValueCardinality},
     error::CompileError,
     relation::SubjectProperties,
     types::{FormatType, Type},
@@ -131,7 +131,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     SubjectProperties::Empty => {
                         return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                     }
-                    SubjectProperties::Value(relationship_id, _, Cardinality::One) => {
+                    SubjectProperties::Value(
+                        relationship_id,
+                        _,
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                    ) => {
                         let (relationship, _) = self
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");

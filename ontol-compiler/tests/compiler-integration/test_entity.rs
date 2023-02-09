@@ -42,8 +42,6 @@ fn test_entity_experiment_etc() {
                 "plays": [
                     {
                         "name": "guitar",
-                        // FIXME: This should be an optional property:
-                        "played_by": [],
                         "_edge": {
                             "how_much": "a lot"
                         }
@@ -59,8 +57,6 @@ fn test_entity_experiment_etc() {
                 "played_by": [
                     {
                         "name": "Zappa",
-                        // FIXME: This should be an optional property:
-                        "plays": [],
                         "_edge": {
                             "how_much": "a lot"
                         }
@@ -74,13 +70,13 @@ fn test_entity_experiment_etc() {
                 "name": "Herbie Hancock",
                 "plays": [{ "name": "piano" }]
             })),
-            r#"missing properties, expected "played_by" and "_edge" at line 1 column 50"#
+            r#"missing properties, expected "_edge" at line 1 column 50"#
         );
     });
 }
 
 #[test]
-fn test_entity_one_to_one_relationship() {
+fn test_entity_self_relationship() {
     r#"
     (entity! node)
 
@@ -95,9 +91,19 @@ fn test_entity_one_to_one_relationship() {
                 "name": "a",
                 "parent": {
                     "name": "b",
-                    "children": [],
                 },
-                "children": []
+            })
+        );
+
+        assert_json_io_matches!(
+            node,
+            json!({
+                "name": "b",
+                "children": [
+                    {
+                        "name": "a",
+                    }
+                ]
             })
         );
     });

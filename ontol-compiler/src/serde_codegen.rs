@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{Cardinality, DefKind, Defs},
+    def::{Cardinality, DefKind, Defs, PropertyCardinality, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
@@ -26,22 +26,6 @@ pub struct SerdeGenerator<'c, 'm> {
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     array_operators: HashMap<(SerdeOperatorId, Option<u16>, Option<u16>), SerdeOperatorId>,
-}
-
-#[derive(Debug)]
-enum PropertyRequirement {
-    Mandatory,
-    Optional,
-}
-
-impl PropertyRequirement {
-    fn is_mandatory(&self) -> bool {
-        matches!(self, Self::Mandatory)
-    }
-
-    fn is_optional(&self) -> bool {
-        matches!(self, Self::Optional)
-    }
 }
 
 impl<'m> Compiler<'m> {
@@ -179,7 +163,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (requirement, inner_operator_id) =
                     self.property_operator(inner_operator_id, relationship.object, *cardinality);
 
-                if !matches!(requirement, PropertyRequirement::Mandatory) {
+                if !matches!(requirement, PropertyCardinality::Mandatory) {
                     panic!("Value properties must be mandatory, fix this during type check");
                 }
 
@@ -226,16 +210,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         operator_id: SerdeOperatorId,
         element_def_id: DefId,
         cardinality: Cardinality,
-    ) -> (PropertyRequirement, SerdeOperatorId) {
-        match cardinality {
-            Cardinality::One => (PropertyRequirement::Mandatory, operator_id),
-            Cardinality::ZeroOrOne => (PropertyRequirement::Optional, operator_id),
-            Cardinality::Many => (
-                PropertyRequirement::Mandatory,
+    ) -> (PropertyCardinality, SerdeOperatorId) {
+        match cardinality.1 {
+            ValueCardinality::One => (cardinality.0, operator_id),
+            ValueCardinality::Many => (
+                cardinality.0,
                 self.array_operator(operator_id, element_def_id, (None, None)),
             ),
-            Cardinality::ManyWithRange(start, end) => (
-                PropertyRequirement::Mandatory,
+            ValueCardinality::ManyInRange(start, end) => (
+                cardinality.0,
                 self.array_operator(operator_id, element_def_id, (start, end)),
             ),
         }
@@ -288,7 +271,7 @@ impl MapTypeBuilder {
     fn add_subject_property_set(
         mut self,
         generator: &mut SerdeGenerator,
-        property_set: &IndexMap<RelationId, Cardinality>,
+        property_set: &IndexMap<RelationId, (PropertyCardinality, ValueCardinality)>,
     ) -> Self {
         self.map_type
             .properties

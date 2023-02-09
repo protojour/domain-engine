@@ -2,7 +2,10 @@ use ontol_runtime::{DefId, RelationId};
 
 use crate::{
     codegen::{CodegenTask, EqCodegenTask},
-    def::{Cardinality, Def, DefKind, Primitive, Relation, Relationship},
+    def::{
+        Cardinality, Def, DefKind, Primitive, PropertyCardinality, Relation, Relationship,
+        ValueCardinality,
+    },
     error::CompileError,
     mem::Intern,
     relation::{ObjectProperties, RelationshipId, SubjectProperties},
@@ -130,8 +133,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object_def: DefId,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let _ = self.check_def(subject_def);
+        let domain_ty = self.check_def(subject_def);
         let codomain_ty = self.check_def(object_def);
+        let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
 
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(subject_def);
@@ -149,7 +153,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
             ) => {
                 match (relationship.1.subject_cardinality, cardinality) {
-                    (Cardinality::One, Cardinality::One) => {
+                    (
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                    ) => {
                         properties.subject = SubjectProperties::ValueUnion(
                             [
                                 (*existing_relationship_id, *existing_span),
@@ -176,7 +183,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (Some(_), SubjectProperties::Map(properties)) => {
                 if properties
-                    .insert(relation.0, relationship.1.subject_cardinality)
+                    .insert(
+                        relation.0,
+                        adapter.adapt(relationship.1.subject_cardinality),
+                    )
                     .is_some()
                 {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
@@ -204,18 +214,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypeRef<'m> {
         let domain_ty = self.check_def(object_def);
         let codomain_ty = self.check_def(subject_def);
+        let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
 
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(object_def);
 
         match (&relation.1.object_prop, domain_ty, &mut properties.object) {
             (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
-                properties.object =
-                    ObjectProperties::Map([(relation.0, relationship.1.object_cardinality)].into());
+                properties.object = ObjectProperties::Map(
+                    [(relation.0, adapter.adapt(relationship.1.object_cardinality))].into(),
+                );
             }
             (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
                 if properties
-                    .insert(relation.0, relationship.1.object_cardinality)
+                    .insert(relation.0, adapter.adapt(relationship.1.object_cardinality))
                     .is_some()
                 {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
@@ -228,5 +240,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         codomain_ty
+    }
+}
+
+struct CardinalityAdapter<'m> {
+    domain_ty: TypeRef<'m>,
+    codomain_ty: TypeRef<'m>,
+}
+
+impl<'m> CardinalityAdapter<'m> {
+    fn new(domain_ty: TypeRef<'m>, codomain_ty: TypeRef<'m>) -> Self {
+        Self {
+            domain_ty,
+            codomain_ty,
+        }
+    }
+
+    /// Relationships between _entities_ behave differently than relationships between values.
+    ///
+    /// Entity relationships are usually optional.
+    fn adapt(&self, cardinality: Cardinality) -> Cardinality {
+        match (self.domain_ty, self.codomain_ty) {
+            (Type::DomainEntity(_), Type::DomainEntity(_)) => {
+                (PropertyCardinality::Optional, cardinality.1)
+            }
+            _ => cardinality,
+        }
     }
 }

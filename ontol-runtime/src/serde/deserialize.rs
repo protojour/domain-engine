@@ -435,7 +435,10 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 debug!("    attr {:?}", attr.0);
             }
             for prop in &self.map_type.properties {
-                debug!("    prop {:?}", prop.1.property_id);
+                debug!(
+                    "    prop {:?} '{}' optional={}",
+                    prop.1.property_id, prop.0, prop.1.optional
+                );
             }
 
             let mut items: Vec<DoubleQuote<String>> = self
