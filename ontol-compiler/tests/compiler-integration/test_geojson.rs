@@ -84,17 +84,14 @@ fn test_geojson() {
     .compile_ok(|env| {
         let geometry = TypeBinding::new(env, "Geometry");
         assert_json_io_matches!(
-            env,
             geometry,
             json!({ "type": "Point", "coordinates": [1, 2]})
         );
         assert_json_io_matches!(
-            env,
             geometry,
             json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4], [5, 6], [1, 2]]})
         );
         assert_json_io_matches!(
-            env,
             geometry,
             json!({ "type": "MultiPolygon", "coordinates": [
                 [[1, 2], [3, 4], [5, 6], [1, 2]],
@@ -102,7 +99,6 @@ fn test_geojson() {
             ]})
         );
         assert_json_io_matches!(
-            env,
             geometry,
             json!({
                 "type": "GeometryCollection",
@@ -115,27 +111,27 @@ fn test_geojson() {
             })
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "Point", "coordinates": [[1, 2]] })),
+            geometry.deserialize_data_variant(json!({ "type": "Point", "coordinates": [[1, 2]] })),
             "invalid type: sequence, expected integer at line 1 column 38"
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "Polygon", "coordinates": [1, 2] })),
+            geometry.deserialize_data_variant(json!({ "type": "Polygon", "coordinates": [1, 2] })),
             "invalid type: integer `1`, expected tuple with length 2 at line 1 column 38"
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "LineString", "coordinates": [[1, 2]] })),
+            geometry.deserialize_data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
             "invalid length 1, expected array[2..] at line 1 column 43"
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
+            geometry.deserialize_data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
             "invalid length 1, expected array[4..] at line 1 column 40"
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!([])),
+            geometry.deserialize_data_variant(json!([])),
             "invalid type: sequence, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 2"
         );
         assert_error_msg!(
-            geometry.deserialize_data_variant(env, json!({ "type": "bogus" })),
+            geometry.deserialize_data_variant(json!({ "type": "bogus" })),
             "invalid map value, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 16"
         );
     });

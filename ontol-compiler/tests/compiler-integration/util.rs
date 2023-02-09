@@ -9,13 +9,14 @@ use tracing::debug;
 
 use crate::TEST_PKG;
 
-pub struct TypeBinding {
+pub struct TypeBinding<'e> {
     pub def_id: DefId,
     serde_operator_id: SerdeOperatorId,
+    env: &'e Env,
 }
 
-impl TypeBinding {
-    pub fn new(env: &Env, type_name: &str) -> Self {
+impl<'e> TypeBinding<'e> {
+    pub fn new(env: &'e Env, type_name: &str) -> Self {
         let domain = env.get_domain(&TEST_PKG).unwrap();
         let def_id = domain
             .get_def_id(type_name)
@@ -24,6 +25,7 @@ impl TypeBinding {
         let binding = Self {
             def_id,
             serde_operator_id,
+            env,
         };
         debug!(
             "deserializing `{type_name}` with processor {:?}",
@@ -32,12 +34,12 @@ impl TypeBinding {
         binding
     }
 
-    pub fn deserialize_data(
-        &self,
-        env: &Env,
-        json: serde_json::Value,
-    ) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(env, json)?;
+    pub fn env(&self) -> &Env {
+        self.env
+    }
+
+    pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
+        let value = self.deserialize_value(json)?;
         assert_eq!(value.type_def_id, self.def_id);
         Ok(value.data)
     }
@@ -47,21 +49,17 @@ impl TypeBinding {
     /// (i.e. it should deserialize to a _variant_ of the type)
     pub fn deserialize_data_variant(
         &self,
-        env: &Env,
         json: serde_json::Value,
     ) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(env, json)?;
+        let value = self.deserialize_value(json)?;
         assert_ne!(value.type_def_id, self.def_id);
         Ok(value.data)
     }
 
-    pub fn deserialize_value(
-        &self,
-        env: &Env,
-        json: serde_json::Value,
-    ) -> Result<Value, serde_json::Error> {
+    pub fn deserialize_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
-        let (edge, value) = env
+        let (edge, value) = self
+            .env
             .new_serde_processor(self.serde_operator_id)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
 

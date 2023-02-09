@@ -36,7 +36,6 @@ fn test_entity_experiment_etc() {
         let instrument = TypeBinding::new(env, "instrument");
 
         assert_json_io_matches!(
-            env,
             artist,
             json!({
                 "name": "Zappa",
@@ -54,7 +53,6 @@ fn test_entity_experiment_etc() {
         );
 
         assert_json_io_matches!(
-            env,
             instrument,
             json!({
                 "name": "guitar",
@@ -72,7 +70,7 @@ fn test_entity_experiment_etc() {
         );
 
         assert_error_msg!(
-            artist.deserialize_data(env, json!({
+            artist.deserialize_data(json!({
                 "name": "Herbie Hancock",
                 "plays": [{ "name": "piano" }]
             })),

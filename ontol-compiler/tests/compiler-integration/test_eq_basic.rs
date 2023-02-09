@@ -17,7 +17,7 @@ fn assert_translate(
     let input_binding = TypeBinding::new(env, translation.0);
     let output_binding = TypeBinding::new(env, translation.1);
 
-    let value = input_binding.deserialize_value(env, input).unwrap();
+    let value = input_binding.deserialize_value(input).unwrap();
 
     let procedure = match env.get_translator(input_binding.def_id, output_binding.def_id) {
         Some(procedure) => procedure,
