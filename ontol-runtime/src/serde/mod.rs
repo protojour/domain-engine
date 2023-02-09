@@ -91,8 +91,8 @@ pub struct MapType {
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
     pub relation_id: RelationId,
-    pub edge_operator_id: Option<SerdeOperatorId>,
     pub value_operator_id: SerdeOperatorId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
 }
 
 impl<'e> Debug for SerdeProcessor<'e> {

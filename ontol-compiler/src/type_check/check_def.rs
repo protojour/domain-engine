@@ -5,7 +5,7 @@ use crate::{
     def::{Cardinality, Def, DefKind, Primitive, Relation, Relationship},
     error::CompileError,
     mem::Intern,
-    relation::{ObjectProperties, RelationshipId, Role, SubjectProperties},
+    relation::{ObjectProperties, RelationshipId, SubjectProperties},
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
@@ -69,18 +69,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     RelationshipId(def_id),
                 );
 
-                self.check_property(
+                self.check_subject_property(
                     (RelationshipId(def_id), relationship),
                     (relationship.relation_id, relation),
-                    Role::Subject,
-                    (relationship.subject, relationship.object),
+                    relationship.subject,
+                    relationship.object,
                     &def.span,
                 );
-                self.check_property(
+                self.check_object_property(
                     (RelationshipId(def_id), relationship),
                     (relationship.relation_id, relation),
-                    Role::Object,
-                    (relationship.object, relationship.subject),
+                    relationship.object,
+                    relationship.subject,
                     &def.span,
                 );
 
@@ -122,94 +122,106 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn check_property(
+    fn check_subject_property(
         &mut self,
         relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
-        primary_role: Role,
-        role_defs: (DefId, DefId),
+        subject_def: DefId,
+        object_def: DefId,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let domain_ty = self.check_def(role_defs.0);
-        let codomain_ty = self.check_def(role_defs.1);
+        let _ = self.check_def(subject_def);
+        let codomain_ty = self.check_def(object_def);
 
         // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(role_defs.0);
-        match primary_role {
-            Role::Subject => match (&relation.1.ident, &mut properties.subject) {
-                (None, SubjectProperties::Empty) => {
-                    properties.subject =
-                        SubjectProperties::Value(relationship.0, *span, relationship.1.cardinality);
-                }
-                (
-                    None,
-                    SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
-                ) => {
-                    match (relationship.1.cardinality, cardinality) {
-                        (Cardinality::One, Cardinality::One) => {
-                            properties.subject = SubjectProperties::ValueUnion(
-                                [
-                                    (*existing_relationship_id, *existing_span),
-                                    (relationship.0, *span),
-                                ]
-                                .into(),
-                            );
+        let properties = self.relations.properties_by_type_mut(subject_def);
 
-                            // Register union for check later
-                            self.relations.value_unions.insert(role_defs.0);
-                        }
-                        _ => {
-                            return self
-                                .error(CompileError::InvalidCardinaltyCombinationInUnion, span);
-                        }
-                    }
-                }
-                (None, SubjectProperties::ValueUnion(properties)) => {
-                    properties.push((relationship.0, *span));
-                }
-                (Some(_), SubjectProperties::Empty) => {
-                    properties.subject =
-                        SubjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
-                }
-                (Some(_), SubjectProperties::Map(properties)) => {
-                    if properties
-                        .insert(relation.0, relationship.1.cardinality)
-                        .is_some()
-                    {
-                        return self
-                            .error(CompileError::UnionInNamedRelationshipNotSupported, span);
-                    }
-                }
-                (None, SubjectProperties::Map(_)) => {
-                    return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
-                }
-                (Some(_), SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_)) => {
-                    return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
-                }
-            },
-            Role::Object => {
-                match (&relation.1.object_prop, domain_ty, &mut properties.object) {
-                    (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
-                        properties.object = ObjectProperties::Map(
-                            [(relation.0, relationship.1.cardinality)].into(),
+        match (&relation.1.ident, &mut properties.subject) {
+            (None, SubjectProperties::Empty) => {
+                properties.subject =
+                    SubjectProperties::Value(relationship.0, *span, relationship.1.cardinality);
+            }
+            (
+                None,
+                SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
+            ) => {
+                match (relationship.1.cardinality, cardinality) {
+                    (Cardinality::One, Cardinality::One) => {
+                        properties.subject = SubjectProperties::ValueUnion(
+                            [
+                                (*existing_relationship_id, *existing_span),
+                                (relationship.0, *span),
+                            ]
+                            .into(),
                         );
+
+                        // Register union for check later
+                        self.relations.value_unions.insert(subject_def);
                     }
-                    (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
-                        if properties
-                            .insert(relation.0, relationship.1.cardinality)
-                            .is_some()
-                        {
-                            return self
-                                .error(CompileError::UnionInNamedRelationshipNotSupported, span);
-                        }
+                    _ => {
+                        return self.error(CompileError::InvalidCardinaltyCombinationInUnion, span);
                     }
-                    (Some(_), Type::Domain(_), _) => {
-                        panic!("Only entities may have reverse properties");
-                    }
-                    _ => {}
-                };
+                }
+            }
+            (None, SubjectProperties::ValueUnion(properties)) => {
+                properties.push((relationship.0, *span));
+            }
+            (Some(_), SubjectProperties::Empty) => {
+                properties.subject =
+                    SubjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
+            }
+            (Some(_), SubjectProperties::Map(properties)) => {
+                if properties
+                    .insert(relation.0, relationship.1.cardinality)
+                    .is_some()
+                {
+                    return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                }
+            }
+            (None, SubjectProperties::Map(_)) => {
+                return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
+            }
+            (Some(_), SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_)) => {
+                return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
             }
         }
+
+        codomain_ty
+    }
+
+    /// Check object property, the inverse of a subject property
+    fn check_object_property(
+        &mut self,
+        relationship: (RelationshipId, &Relationship),
+        relation: (RelationId, &Relation),
+        object_def: DefId,
+        subject_def: DefId,
+        span: &SourceSpan,
+    ) -> TypeRef<'m> {
+        let domain_ty = self.check_def(object_def);
+        let codomain_ty = self.check_def(subject_def);
+
+        // Type of the property value/the property "range" / "co-domain":
+        let properties = self.relations.properties_by_type_mut(object_def);
+
+        match (&relation.1.object_prop, domain_ty, &mut properties.object) {
+            (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
+                properties.object =
+                    ObjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
+            }
+            (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
+                if properties
+                    .insert(relation.0, relationship.1.cardinality)
+                    .is_some()
+                {
+                    return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                }
+            }
+            (Some(_), Type::Domain(_), _) => {
+                panic!("Only entities may have reverse properties");
+            }
+            _ => {}
+        };
 
         codomain_ty
     }

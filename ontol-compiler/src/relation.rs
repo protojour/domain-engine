@@ -5,12 +5,6 @@ use ontol_runtime::{discriminator::UnionDiscriminator, DefId, RelationId};
 
 use crate::{def::Cardinality, SourceSpan};
 
-#[derive(Debug, Clone, Copy)]
-pub enum Role {
-    Subject,
-    Object,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct RelationshipId(pub DefId);
 
