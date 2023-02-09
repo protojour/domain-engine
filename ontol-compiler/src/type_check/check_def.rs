@@ -178,7 +178,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (Some(_), SubjectProperties::Empty) => {
                 properties.subject = SubjectProperties::Map(
-                    [(relation.0, relationship.1.subject_cardinality)].into(),
+                    [(
+                        relation.0,
+                        adapter.adapt(relationship.1.subject_cardinality),
+                    )]
+                    .into(),
                 );
             }
             (Some(_), SubjectProperties::Map(properties)) => {
@@ -260,10 +264,12 @@ impl<'m> CardinalityAdapter<'m> {
     ///
     /// Entity relationships are usually optional.
     fn adapt(&self, cardinality: Cardinality) -> Cardinality {
-        match (self.domain_ty, self.codomain_ty) {
-            (Type::DomainEntity(_), Type::DomainEntity(_)) => {
-                (PropertyCardinality::Optional, cardinality.1)
-            }
+        match (self.domain_ty, self.codomain_ty, cardinality.1) {
+            (
+                Type::DomainEntity(_),
+                Type::DomainEntity(_),
+                ValueCardinality::Many | ValueCardinality::ManyInRange(..),
+            ) => (PropertyCardinality::Optional, cardinality.1),
             _ => cardinality,
         }
     }

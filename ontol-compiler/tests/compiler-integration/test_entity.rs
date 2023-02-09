@@ -85,15 +85,13 @@ fn test_entity_self_relationship() {
     "#
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
-        assert_json_io_matches!(
-            node,
-            json!({
-                "name": "a",
-                "parent": {
-                    "name": "b",
-                },
-            })
+
+        assert_error_msg!(
+            node.deserialize_data(json!({})),
+            r#"missing properties, expected "name" at line 1 column 2"#
         );
+
+        assert_json_io_matches!(node, json!({ "name": "a" }));
 
         assert_json_io_matches!(
             node,
@@ -105,6 +103,37 @@ fn test_entity_self_relationship() {
                     }
                 ]
             })
+        );
+
+        assert_json_io_matches!(
+            node,
+            json!({
+                "name": "b",
+                "parent": {
+                    "name": "c",
+                },
+                "children": [
+                    {
+                        "name": "a",
+                    }
+                ]
+            })
+        );
+    });
+}
+
+#[test]
+fn test_entity_self_relationship_mandatory_object() {
+    r#"
+    (entity! node)
+    (rel! (node) children[] parent (node))
+    "#
+    .compile_ok(|env| {
+        let node = TypeBinding::new(env, "node");
+
+        assert_error_msg!(
+            node.deserialize_data(json!({})),
+            r#"missing properties, expected "parent" at line 1 column 2"#
         );
     });
 }
