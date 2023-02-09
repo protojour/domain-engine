@@ -347,6 +347,7 @@ impl VarTable {
 
 fn convert_cardinality(ast_cardinality: ast::Cardinality) -> Cardinality {
     match ast_cardinality {
+        ast::Cardinality::ZeroOrOne => Cardinality::ZeroOrOne,
         ast::Cardinality::Many(range) => match (range.start, range.end) {
             (None, None) => Cardinality::Many,
             (start, end) => Cardinality::ManyWithRange(start, end),

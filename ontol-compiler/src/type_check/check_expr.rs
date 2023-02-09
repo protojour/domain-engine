@@ -188,6 +188,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             let object_ty = match match_property.cardinality {
                                 Cardinality::One => object_ty,
+                                Cardinality::ZeroOrOne => {
+                                    self.types.intern(Type::Option(object_ty))
+                                }
                                 Cardinality::Many => self.types.intern(Type::Array(object_ty)),
                                 Cardinality::ManyWithRange(_, _) => todo!(),
                             };

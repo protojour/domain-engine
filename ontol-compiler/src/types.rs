@@ -31,6 +31,7 @@ pub enum Type<'m> {
     StringConstant(DefId),
     Tuple(&'m [TypeRef<'m>]),
     Array(TypeRef<'m>),
+    Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
     Function {
@@ -56,6 +57,7 @@ impl<'m> Type<'m> {
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Tuple(_) => None,
             Self::Array(_) => None,
+            Self::Option(_) => None,
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
             Self::DomainEntity(def_id) => Some(*def_id),
@@ -166,6 +168,9 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             }
             Type::Array(ty) => {
                 write!(f, "{}[]", FormatType(ty, defs))
+            }
+            Type::Option(ty) => {
+                write!(f, "{}?", FormatType(ty, defs))
             }
             Type::Function { .. } => write!(f, "function"),
             Type::Domain(def_id) | Type::DomainEntity(def_id) => {

@@ -21,7 +21,7 @@ fn test_entity_experiment_etc() {
     (entity! record)
     (rel! (record) name (string))
     ; i.e. syntax sugar for:
-    ; (rel! (record) name @(unit) []name (string))
+    ; (rel! (record) name @(unit) name[] (string))
 
     (entity! instrument)
     (rel! (instrument) name (string))
@@ -83,22 +83,22 @@ fn test_entity_experiment_etc() {
 #[ignore = "This is not working yet"]
 fn test_entity_one_to_one_relationship() {
     r#"
-    (entity! a)
+    (entity! node)
 
-    (rel! (a) name (string))
-    (rel! (a) parent_of child_of[] (a))
+    (rel! (node) name (string))
+    (rel! (node) children[] parent? (node))
     "#
     .compile_ok(|env| {
-        let a = TypeBinding::new(env, "a");
+        let node = TypeBinding::new(env, "node");
         assert_json_io_matches!(
-            a,
+            node,
             json!({
                 "name": "a",
-                "parent_of": {
+                "parent": {
                     "name": "b",
-                    "child_of": [],
+                    "children": [],
                 },
-                "child_of": [],
+                "children": []
             })
         );
     });

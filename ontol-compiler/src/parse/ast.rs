@@ -60,6 +60,7 @@ pub struct Rel {
 }
 
 pub enum Cardinality {
+    ZeroOrOne,
     Many(Range<Option<u16>>),
 }
 

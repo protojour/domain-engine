@@ -3,7 +3,7 @@ use chumsky::prelude::Simple;
 use super::{
     ast::*,
     tree::Tree,
-    tree_stream::{At, Bracket, Dot, Num, Paren, Sym, TreeStream, Variable},
+    tree_stream::{At, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Variable},
     Span, Spanned,
 };
 
@@ -147,6 +147,9 @@ fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinali
         stream.end()?;
 
         Ok(Some(Cardinality::Many(std::ops::Range { start, end })))
+    } else if input.peek::<Questionmark>() {
+        let _ = input.next::<Questionmark>("").unwrap();
+        Ok(Some(Cardinality::ZeroOrOne))
     } else {
         Ok(None)
     }

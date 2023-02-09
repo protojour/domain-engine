@@ -26,6 +26,7 @@ pub struct SerdeGenerator<'c, 'm> {
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     array_operators: HashMap<(SerdeOperatorId, Option<u16>, Option<u16>), SerdeOperatorId>,
+    option_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
 }
 
 impl<'m> Compiler<'m> {
@@ -37,6 +38,7 @@ impl<'m> Compiler<'m> {
             serde_operators: Default::default(),
             serde_operators_per_def: Default::default(),
             array_operators: Default::default(),
+            option_operators: Default::default(),
         }
     }
 }
@@ -102,7 +104,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ))
             }
             Some(Type::Array(_)) => {
-                panic!("not handled here")
+                panic!("Array not handled here")
+            }
+            Some(Type::Option(_)) => {
+                panic!("Option not handled here")
             }
             Some(Type::Domain(def_id) | Type::DomainEntity(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
@@ -206,6 +211,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> SerdeOperatorId {
         match cardinality {
             Cardinality::One => operator_id,
+            Cardinality::ZeroOrOne => self.option_operator(operator_id, element_def_id),
             Cardinality::Many => self.array_operator(operator_id, element_def_id, (None, None)),
             Cardinality::ManyWithRange(start, end) => {
                 self.array_operator(operator_id, element_def_id, (start, end))
@@ -234,6 +240,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         self.array_operators
             .insert((operator_id, range.0, range.1), array_operator_id);
         array_operator_id
+    }
+
+    fn option_operator(
+        &mut self,
+        operator_id: SerdeOperatorId,
+        element_def_id: DefId,
+    ) -> SerdeOperatorId {
+        if let Some(option_operator_id) = self.option_operators.get(&operator_id) {
+            return *option_operator_id;
+        }
+
+        panic!();
     }
 }
 
