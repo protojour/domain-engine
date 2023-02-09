@@ -147,10 +147,16 @@ impl<'e> SerdeProcessor<'e> {
         for (name, serde_prop) in &map_type.properties {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
-                None => panic!(
-                    "While serializing `{}`, property `{}` was not found",
-                    map_type.typename, name
-                ),
+                None => {
+                    if serde_prop.optional {
+                        continue;
+                    } else {
+                        panic!(
+                            "While serializing `{}`, property `{}` was not found",
+                            map_type.typename, name
+                        )
+                    }
+                }
             };
 
             serialize_map.serialize_entry(

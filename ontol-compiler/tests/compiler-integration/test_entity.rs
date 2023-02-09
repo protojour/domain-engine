@@ -80,7 +80,6 @@ fn test_entity_experiment_etc() {
 }
 
 #[test]
-#[ignore = "This is not working yet"]
 fn test_entity_one_to_one_relationship() {
     r#"
     (entity! node)

@@ -87,12 +87,14 @@ pub struct MapType {
     pub typename: String,
     pub type_def_id: DefId,
     pub properties: IndexMap<String, SerdeProperty>,
+    pub n_mandatory_properties: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
+    pub optional: bool,
     pub edge_operator_id: Option<SerdeOperatorId>,
 }
 

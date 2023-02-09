@@ -26,7 +26,22 @@ pub struct SerdeGenerator<'c, 'm> {
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     array_operators: HashMap<(SerdeOperatorId, Option<u16>, Option<u16>), SerdeOperatorId>,
-    option_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
+}
+
+#[derive(Debug)]
+enum PropertyRequirement {
+    Mandatory,
+    Optional,
+}
+
+impl PropertyRequirement {
+    fn is_mandatory(&self) -> bool {
+        matches!(self, Self::Mandatory)
+    }
+
+    fn is_optional(&self) -> bool {
+        matches!(self, Self::Optional)
+    }
 }
 
 impl<'m> Compiler<'m> {
@@ -38,7 +53,6 @@ impl<'m> Compiler<'m> {
             serde_operators: Default::default(),
             serde_operators_per_def: Default::default(),
             array_operators: Default::default(),
-            option_operators: Default::default(),
         }
     }
 }
@@ -162,8 +176,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .get_serde_operator_id(relationship.object)
                     .expect("No inner operator");
 
-                let inner_operator_id =
-                    self.cardinality_operator(inner_operator_id, relationship.object, *cardinality);
+                let (requirement, inner_operator_id) =
+                    self.property_operator(inner_operator_id, relationship.object, *cardinality);
+
+                if !matches!(requirement, PropertyRequirement::Mandatory) {
+                    panic!("Value properties must be mandatory, fix this during type check");
+                }
 
                 SerdeOperator::ValueType(ValueType {
                     typename: typename.into(),
@@ -203,19 +221,23 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn cardinality_operator(
+    fn property_operator(
         &mut self,
         operator_id: SerdeOperatorId,
         element_def_id: DefId,
         cardinality: Cardinality,
-    ) -> SerdeOperatorId {
+    ) -> (PropertyRequirement, SerdeOperatorId) {
         match cardinality {
-            Cardinality::One => operator_id,
-            Cardinality::ZeroOrOne => self.option_operator(operator_id, element_def_id),
-            Cardinality::Many => self.array_operator(operator_id, element_def_id, (None, None)),
-            Cardinality::ManyWithRange(start, end) => {
-                self.array_operator(operator_id, element_def_id, (start, end))
-            }
+            Cardinality::One => (PropertyRequirement::Mandatory, operator_id),
+            Cardinality::ZeroOrOne => (PropertyRequirement::Optional, operator_id),
+            Cardinality::Many => (
+                PropertyRequirement::Mandatory,
+                self.array_operator(operator_id, element_def_id, (None, None)),
+            ),
+            Cardinality::ManyWithRange(start, end) => (
+                PropertyRequirement::Mandatory,
+                self.array_operator(operator_id, element_def_id, (start, end)),
+            ),
         }
     }
 
@@ -241,18 +263,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             .insert((operator_id, range.0, range.1), array_operator_id);
         array_operator_id
     }
-
-    fn option_operator(
-        &mut self,
-        operator_id: SerdeOperatorId,
-        element_def_id: DefId,
-    ) -> SerdeOperatorId {
-        if let Some(option_operator_id) = self.option_operators.get(&operator_id) {
-            return *option_operator_id;
-        }
-
-        panic!();
-    }
 }
 
 struct MapTypeBuilder {
@@ -266,6 +276,7 @@ impl MapTypeBuilder {
                 typename: typename.into(),
                 type_def_id,
                 properties: Default::default(),
+                n_mandatory_properties: 0,
             },
         }
     }
@@ -292,19 +303,24 @@ impl MapTypeBuilder {
                 let operator_id = generator
                     .get_serde_operator_id(relationship.object)
                     .expect("No inner operator");
-                let value_operator_id =
-                    generator.cardinality_operator(operator_id, relationship.object, *cardinality);
+                let (requirement, value_operator_id) =
+                    generator.property_operator(operator_id, relationship.object, *cardinality);
                 let edge_operator_id = if relationship.edge_params == DefId::unit() {
                     None
                 } else {
                     generator.get_serde_operator_id(relationship.edge_params)
                 };
 
+                if requirement.is_mandatory() {
+                    self.map_type.n_mandatory_properties += 1;
+                }
+
                 (
                     subject_key.into(),
                     SerdeProperty {
                         property_id: PropertyId::subject(*relation_id),
                         value_operator_id,
+                        optional: requirement.is_optional(),
                         edge_operator_id,
                     },
                 )
@@ -343,19 +359,24 @@ impl MapTypeBuilder {
                 let operator_id = generator
                     .get_serde_operator_id(relationship.subject)
                     .expect("No inner operator");
-                let value_operator_id =
-                    generator.cardinality_operator(operator_id, relationship.subject, *cardinality);
+                let (requirement, value_operator_id) =
+                    generator.property_operator(operator_id, relationship.subject, *cardinality);
                 let edge_operator_id = if relationship.edge_params == DefId::unit() {
                     None
                 } else {
                     generator.get_serde_operator_id(relationship.edge_params)
                 };
 
+                if requirement.is_mandatory() {
+                    self.map_type.n_mandatory_properties += 1;
+                }
+
                 (
                     object_key.into(),
                     SerdeProperty {
                         property_id: PropertyId::object(*relation_id),
                         value_operator_id,
+                        optional: requirement.is_optional(),
                         edge_operator_id,
                     },
                 )

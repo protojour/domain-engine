@@ -362,6 +362,8 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         let mut attributes = BTreeMap::new();
         let mut edge_params = Value::unit();
 
+        let mut n_mandatory_properties = 0;
+
         // first parse buffered attributes, if any
         for (serde_key, serde_value) in self.buffered_attrs {
             match PropertySet::new(&self.map_type.properties, self.edge_operator_id)
@@ -383,6 +385,10 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                             serde_property.edge_operator_id,
                         )
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+
+                    if !serde_property.optional {
+                        n_mandatory_properties += 1;
+                    }
 
                     attributes.insert(serde_property.property_id, Attribute { edge_params, value });
                 }
@@ -408,12 +414,16 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                             serde_property.edge_operator_id,
                         ))?;
 
+                    if !serde_property.optional {
+                        n_mandatory_properties += 1;
+                    }
+
                     attributes.insert(serde_property.property_id, Attribute { edge_params, value });
                 }
             }
         }
 
-        if attributes.len() < self.map_type.properties.len()
+        if n_mandatory_properties < self.map_type.n_mandatory_properties
             || (edge_params.is_unit() != self.edge_operator_id.is_none())
         {
             debug!(
@@ -432,7 +442,9 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 .map_type
                 .properties
                 .iter()
-                .filter(|(_, property)| !attributes.contains_key(&property.property_id))
+                .filter(|(_, property)| {
+                    !property.optional && !attributes.contains_key(&property.property_id)
+                })
                 .map(|(key, _)| DoubleQuote(key.clone()))
                 .collect();
 
