@@ -1,6 +1,6 @@
 use derive_debug_extras::DebugExtras;
 
-use crate::{DefId, RelationId};
+use crate::{value::PropertyId, DefId};
 
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
@@ -56,9 +56,9 @@ pub enum OpCode {
     Swap(Local, Local),
     /// Take an attribute from local map, and put its value on the top of the stack.
     /// Discards the attribute edge.
-    TakeAttrValue(Local, RelationId),
+    TakeAttrValue(Local, PropertyId),
     /// Pop value from stack, and move it into the specified local map.
-    PutUnitAttr(Local, RelationId),
+    PutUnitAttr(Local, PropertyId),
     /// Push a constant to the stack.
     Constant(i64, DefId),
 }

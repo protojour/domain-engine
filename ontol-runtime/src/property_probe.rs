@@ -6,8 +6,9 @@ use crate::{
     env::{Env, TypeInfo},
     proc::{BuiltinProc, Lib, Local},
     serde::SerdeOperator,
+    value::PropertyId,
     vm::{AbstractVm, Stack, VmDebug},
-    DefId, RelationId,
+    DefId, Role,
 };
 
 pub struct PropertyProbe<'l> {
@@ -28,7 +29,7 @@ impl<'l> PropertyProbe<'l> {
         env: &Env,
         origin: &TypeInfo,
         destination: &TypeInfo,
-    ) -> Option<HashMap<RelationId, HashSet<RelationId>>> {
+    ) -> Option<HashMap<PropertyId, HashSet<PropertyId>>> {
         let dest_serde_operator_id = destination.serde_operator_id?;
         let serde_operator = &env.serde_operators[dest_serde_operator_id.0 as usize];
 
@@ -41,8 +42,14 @@ impl<'l> PropertyProbe<'l> {
                     .iter()
                     .map(|(_, serde_property)| {
                         (
-                            serde_property.relation_id,
-                            HashSet::from([serde_property.relation_id]),
+                            PropertyId {
+                                role: Role::Subject,
+                                relation_id: serde_property.relation_id,
+                            },
+                            HashSet::from([PropertyId {
+                                role: Role::Subject,
+                                relation_id: serde_property.relation_id,
+                            }]),
                         )
                     })
                     .collect::<HashMap<_, _>>();
@@ -67,8 +74,8 @@ impl<'l> PropertyProbe<'l> {
 
 #[derive(Clone, Debug)]
 enum Props {
-    Set(HashSet<RelationId>),
-    Map(HashMap<RelationId, HashSet<RelationId>>),
+    Set(HashSet<PropertyId>),
+    Map(HashMap<PropertyId, HashSet<PropertyId>>),
 }
 
 #[derive(Default)]
@@ -118,16 +125,16 @@ impl Stack for PropStack {
             .swap(local0_pos + a.0 as usize, local0_pos + b.0 as usize);
     }
 
-    fn take_attr_value(&mut self, source: Local, relation_id: RelationId) {
+    fn take_attr_value(&mut self, source: Local, key: PropertyId) {
         let map = self.get_map_mut(source);
-        let set = map.remove(&relation_id).unwrap();
+        let set = map.remove(&key).unwrap();
         self.stack.push(Props::Set(set));
     }
 
-    fn put_unit_attr(&mut self, target: Local, relation_id: RelationId) {
+    fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
         let source_set = self.pop_set();
         let map = self.get_map_mut(target);
-        let target_set = map.entry(relation_id).or_default();
+        let target_set = map.entry(key).or_default();
         target_set.extend(source_set.into_iter());
     }
 
@@ -148,7 +155,7 @@ impl PropStack {
     }
 
     #[inline(always)]
-    fn get_map_mut(&mut self, local: Local) -> &mut HashMap<RelationId, HashSet<RelationId>> {
+    fn get_map_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, HashSet<PropertyId>> {
         match self.local_mut(local) {
             Props::Map(map) => map,
             Props::Set(_) => panic!("expected map"),
@@ -156,7 +163,7 @@ impl PropStack {
     }
 
     #[inline(always)]
-    fn pop_set(&mut self) -> HashSet<RelationId> {
+    fn pop_set(&mut self) -> HashSet<PropertyId> {
         match self.stack.pop() {
             Some(Props::Set(set)) => set,
             _ => panic!("expected set"),

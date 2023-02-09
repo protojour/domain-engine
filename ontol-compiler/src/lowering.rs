@@ -66,12 +66,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Rel(ast::Rel {
                 subject,
                 ident: (ident, ident_span),
-                cardinality,
+                subject_cardinality,
                 edge_params,
+                object_cardinality,
                 object_prop_ident,
                 object,
             }) => {
                 let ident = ident.map(|ident| self.compiler.strings.intern(&ident));
+                let has_object_prop = object_prop_ident.is_some();
+
                 // This syntax just defines the relation the first time it's used
                 let relation_def_id = match self.define_relation_if_undefined(ident) {
                     ImplicitDefId::New(def_id) => {
@@ -99,22 +102,33 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 };
                 let object = self.ast_type_to_def(object)?;
 
-                Ok(Some(self.def(
-                    DefKind::Relationship(Relationship {
-                        relation_id: RelationId(relation_def_id),
-                        subject,
-                        cardinality: match cardinality {
-                            ast::Cardinality::One => Cardinality::One,
-                            ast::Cardinality::Many(range) => match (range.start, range.end) {
-                                (None, None) => Cardinality::Many,
-                                (start, end) => Cardinality::ManyWithRange(start, end),
-                            },
-                        },
-                        edge_params,
-                        object,
-                    }),
-                    &span,
-                )))
+                Ok(Some(
+                    self.def(
+                        DefKind::Relationship(Relationship {
+                            relation_id: RelationId(relation_def_id),
+                            subject,
+                            subject_cardinality: subject_cardinality
+                                .map(convert_cardinality)
+                                .unwrap_or(Cardinality::One),
+                            edge_params,
+                            object_cardinality: object_cardinality
+                                .map(convert_cardinality)
+                                .unwrap_or_else(|| {
+                                    if has_object_prop {
+                                        // i.e. no syntax sugar: The object prop is explicit,
+                                        // therefore the object cardinality is explicit.
+                                        Cardinality::One
+                                    } else {
+                                        // The syntactic sugar case, which is the default behaviour:
+                                        // Many incoming edges to the same object:
+                                        Cardinality::Many
+                                    }
+                                }),
+                            object,
+                        }),
+                        &span,
+                    ),
+                ))
             }
             ast::Ast::Eq(ast::Eq {
                 variables: ast_variables,
@@ -328,5 +342,14 @@ impl VarTable {
 
     fn get_var_id(&self, ident: &str) -> Option<ExprId> {
         self.variables.get(ident).cloned()
+    }
+}
+
+fn convert_cardinality(ast_cardinality: ast::Cardinality) -> Cardinality {
+    match ast_cardinality {
+        ast::Cardinality::Many(range) => match (range.start, range.end) {
+            (None, None) => Cardinality::Many,
+            (start, end) => Cardinality::ManyWithRange(start, end),
+        },
     }
 }

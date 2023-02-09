@@ -34,4 +34,8 @@ impl DefId {
 #[debug_single_tuple_inline]
 pub struct RelationId(pub DefId);
 
-pub struct ProcId(u32);
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum Role {
+    Subject,
+    Object,
+}

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, RelationId};
+use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::warn;
 
 use crate::{
@@ -153,7 +153,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     property_name,
                                     MatchProperty {
                                         relation_id: *relation_id,
-                                        cardinality: relationship.cardinality,
+                                        cardinality: relationship.subject_cardinality,
                                         object_def: relationship.object,
                                         used: false,
                                     },
@@ -193,7 +193,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             };
                             let (_, typed_expr_ref) = self.check_expr_expect(value, object_ty, ctx);
 
-                            typed_properties.insert(match_property.relation_id, typed_expr_ref);
+                            typed_properties.insert(
+                                PropertyId::subject(match_property.relation_id),
+                                typed_expr_ref,
+                            );
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {

@@ -9,7 +9,7 @@ use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::EDGE_PROPERTY,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
 
@@ -384,7 +384,10 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                         )
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                    attributes.insert(serde_property.relation_id, Attribute { edge_params, value });
+                    attributes.insert(
+                        PropertyId::subject(serde_property.relation_id),
+                        Attribute { edge_params, value },
+                    );
                 }
             }
         }
@@ -408,7 +411,10 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                             serde_property.edge_operator_id,
                         ))?;
 
-                    attributes.insert(serde_property.relation_id, Attribute { edge_params, value });
+                    attributes.insert(
+                        PropertyId::subject(serde_property.relation_id),
+                        Attribute { edge_params, value },
+                    );
                 }
             }
         }
@@ -416,19 +422,33 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         if attributes.len() < self.map_type.properties.len()
             || (edge_params.is_unit() != self.edge_operator_id.is_none())
         {
-            debug!("Missing attributes: {attributes:?}");
+            debug!(
+                "Missing attributes. Edge match: {}, {}",
+                edge_params.is_unit(),
+                self.edge_operator_id.is_none()
+            );
+            for attr in &attributes {
+                debug!("    attr {:?}", attr.0);
+            }
+            for prop in &self.map_type.properties {
+                debug!("    prop {:?}", prop.1.relation_id);
+            }
 
             let mut items: Vec<DoubleQuote<String>> = self
                 .map_type
                 .properties
                 .iter()
-                .filter(|(_, property)| !attributes.contains_key(&property.relation_id))
+                .filter(|(_, property)| {
+                    !attributes.contains_key(&PropertyId::subject(property.relation_id))
+                })
                 .map(|(key, _)| DoubleQuote(key.clone()))
                 .collect();
 
             if self.edge_operator_id.is_some() && edge_params.type_def_id == DefId::unit() {
                 items.push(DoubleQuote(EDGE_PROPERTY.into()));
             }
+
+            debug!("items len: {}", items.len());
 
             let missing_keys = Missing {
                 items,

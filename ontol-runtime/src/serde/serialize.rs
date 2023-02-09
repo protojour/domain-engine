@@ -1,6 +1,6 @@
 use serde::ser::{SerializeMap, SerializeSeq};
 
-use crate::value::{Data, Value};
+use crate::value::{Data, PropertyId, Value};
 
 use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, EDGE_PROPERTY};
 
@@ -145,7 +145,7 @@ impl<'e> SerdeProcessor<'e> {
         let mut serialize_map = serializer.serialize_map(Some(attributes.len()))?;
 
         for (name, serde_prop) in &map_type.properties {
-            let attribute = match attributes.get(&serde_prop.relation_id) {
+            let attribute = match attributes.get(&PropertyId::subject(serde_prop.relation_id)) {
                 Some(value) => value,
                 None => panic!(
                     "While serializing `{}`, property `{}` was not found",

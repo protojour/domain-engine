@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use smartstring::alias::String;
 
-use crate::{DefId, RelationId};
+use crate::{DefId, RelationId, Role};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -48,9 +48,24 @@ pub enum Data {
     Rational(Box<num::rational::BigRational>),
     String(String),
     /// A collection of attributes keyed by relation
-    Map(BTreeMap<RelationId, Attribute>),
+    Map(BTreeMap<PropertyId, Attribute>),
     /// Represents both dynamic lists and static tuples at runtime
     Vec(Vec<Attribute>),
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct PropertyId {
+    pub role: Role,
+    pub relation_id: RelationId,
+}
+
+impl PropertyId {
+    pub fn subject(relation_id: RelationId) -> Self {
+        Self {
+            role: Role::Subject,
+            relation_id,
+        }
+    }
 }
 
 /// An Attribute is a Value that is part of another value.

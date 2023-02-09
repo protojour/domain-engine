@@ -21,7 +21,7 @@ fn test_entity_experiment_etc() {
     (entity! record)
     (rel! (record) name (string))
     ; i.e. syntax sugar for:
-    ; (rel! (record) "name" (unit) name (string))
+    ; (rel! (record) name @(unit) []name (string))
 
     (entity! instrument)
     (rel! (instrument) name (string))
@@ -29,7 +29,7 @@ fn test_entity_experiment_etc() {
     (type! plays)
     (rel! (plays) how_much (string))
 
-    (rel! (artist) plays[] @(plays) played_by (instrument))
+    (rel! (artist) plays[] @(plays) played_by[] (instrument))
     "#
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
@@ -75,6 +75,31 @@ fn test_entity_experiment_etc() {
                 "plays": [{ "name": "piano" }]
             })),
             r#"missing properties, expected "played_by" and "_edge" at line 1 column 50"#
+        );
+    });
+}
+
+#[test]
+#[ignore = "This is not working yet"]
+fn test_entity_one_to_one_relationship() {
+    r#"
+    (entity! a)
+
+    (rel! (a) name (string))
+    (rel! (a) parent_of child_of[] (a))
+    "#
+    .compile_ok(|env| {
+        let a = TypeBinding::new(env, "a");
+        assert_json_io_matches!(
+            a,
+            json!({
+                "name": "a",
+                "parent_of": {
+                    "name": "b",
+                    "child_of": [],
+                },
+                // "child_of": [],
+            })
         );
     });
 }

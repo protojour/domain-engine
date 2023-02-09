@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams, OpCode},
-    RelationId,
+    value::PropertyId,
 };
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
@@ -19,7 +19,7 @@ pub(super) fn codegen_map_obj_origin(
     proc_table: &mut ProcTable,
     expr_table: &TypedExprTable,
     to: ExprRef,
-    origin_attrs: &IndexMap<RelationId, ExprRef>,
+    origin_attrs: &IndexMap<PropertyId, ExprRef>,
 ) -> UnlinkedProc {
     let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
 
@@ -75,9 +75,9 @@ pub(super) fn codegen_map_obj_origin(
                 span,
             ));
 
-            for (relation_id, expr_ref) in dest_attrs {
+            for (property_id, expr_ref) in dest_attrs {
                 map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
-                ops.push((OpCode::PutUnitAttr(Local(1), *relation_id), span));
+                ops.push((OpCode::PutUnitAttr(Local(1), *property_id), span));
             }
 
             ops.push((OpCode::Return(Local(1)), span));

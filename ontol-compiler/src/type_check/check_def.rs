@@ -138,14 +138,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match (&relation.1.ident, &mut properties.subject) {
             (None, SubjectProperties::Empty) => {
-                properties.subject =
-                    SubjectProperties::Value(relationship.0, *span, relationship.1.cardinality);
+                properties.subject = SubjectProperties::Value(
+                    relationship.0,
+                    *span,
+                    relationship.1.subject_cardinality,
+                );
             }
             (
                 None,
                 SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
             ) => {
-                match (relationship.1.cardinality, cardinality) {
+                match (relationship.1.subject_cardinality, cardinality) {
                     (Cardinality::One, Cardinality::One) => {
                         properties.subject = SubjectProperties::ValueUnion(
                             [
@@ -167,12 +170,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 properties.push((relationship.0, *span));
             }
             (Some(_), SubjectProperties::Empty) => {
-                properties.subject =
-                    SubjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
+                properties.subject = SubjectProperties::Map(
+                    [(relation.0, relationship.1.subject_cardinality)].into(),
+                );
             }
             (Some(_), SubjectProperties::Map(properties)) => {
                 if properties
-                    .insert(relation.0, relationship.1.cardinality)
+                    .insert(relation.0, relationship.1.subject_cardinality)
                     .is_some()
                 {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
@@ -207,11 +211,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match (&relation.1.object_prop, domain_ty, &mut properties.object) {
             (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
                 properties.object =
-                    ObjectProperties::Map([(relation.0, relationship.1.cardinality)].into());
+                    ObjectProperties::Map([(relation.0, relationship.1.object_cardinality)].into());
             }
             (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
                 if properties
-                    .insert(relation.0, relationship.1.cardinality)
+                    .insert(relation.0, relationship.1.object_cardinality)
                     .is_some()
                 {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);

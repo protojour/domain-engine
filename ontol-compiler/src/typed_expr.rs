@@ -5,7 +5,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use indexmap::IndexMap;
-use ontol_runtime::{proc::BuiltinProc, RelationId};
+use ontol_runtime::{proc::BuiltinProc, value::PropertyId};
 use smallvec::SmallVec;
 
 use crate::{
@@ -35,7 +35,7 @@ pub enum TypedExprKind<'m> {
     /// A value object (object with one anonymous property/attribute)
     ValueObjPattern(ExprRef),
     /// A map object pattern
-    MapObjPattern(IndexMap<RelationId, ExprRef>),
+    MapObjPattern(IndexMap<PropertyId, ExprRef>),
     /// A variable definition
     Variable(SyntaxVar),
     /// A variable reference (usage site)
@@ -151,9 +151,9 @@ impl<'m> TypedExprTable<'m> {
             TypedExprKind::MapObjPattern(attributes) => {
                 let attr_strings = attributes
                     .iter()
-                    .map(|(relation_id, expr_ref)| {
+                    .map(|(property_id, expr_ref)| {
                         let val = self.debug_tree_guard(rewrites, *expr_ref, depth + 1);
-                        format!("({} {})", (relation_id.0 .0), val)
+                        format!("({} {})", (property_id.relation_id.0 .0), val)
                     })
                     .collect::<Vec<_>>()
                     .join(" ");

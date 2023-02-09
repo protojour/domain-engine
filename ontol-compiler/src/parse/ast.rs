@@ -52,14 +52,14 @@ pub enum Type {
 pub struct Rel {
     pub subject: Spanned<Type>,
     pub ident: Spanned<Option<String>>,
-    pub cardinality: Cardinality,
+    pub subject_cardinality: Option<Cardinality>,
     pub edge_params: Option<Spanned<Type>>,
+    pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
     pub object: Spanned<Type>,
 }
 
 pub enum Cardinality {
-    One,
     Many(Range<Option<u16>>),
 }
 

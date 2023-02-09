@@ -81,8 +81,44 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         _ => Some(rel_ident),
     };
 
-    let cardinality = if stream.peek::<Bracket>() {
-        let mut stream: TreeStream = stream.next::<Bracket>("expected bracket")?.into();
+    let subject_cardinality = parse_optional_cardinality(&mut stream)?;
+
+    let edge_params = if stream.peek::<At>() {
+        let _ = stream.next::<At>("").unwrap();
+        Some(parse_type(&mut stream)?)
+    } else {
+        None
+    };
+
+    let (object_prop_ident, object_cardinality) = if stream.peek::<Sym>() {
+        let sym = stream.next::<Sym>("").unwrap();
+        let object_cardinality = parse_optional_cardinality(&mut stream)?;
+
+        (Some(sym), object_cardinality)
+    } else {
+        (None, None)
+    };
+
+    let object = parse_type(&mut stream)?;
+    stream.end()?;
+
+    Ok((
+        Ast::Rel(Rel {
+            subject,
+            ident: (ident, ident_span),
+            subject_cardinality,
+            edge_params,
+            object_cardinality,
+            object_prop_ident,
+            object,
+        }),
+        span,
+    ))
+}
+
+fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinality>, Simple<Tree>> {
+    if input.peek::<Bracket>() {
+        let mut stream: TreeStream = input.next::<Bracket>("expected bracket")?.into();
 
         let mut has_range = false;
         let mut start: Option<u16> = None;
@@ -110,38 +146,10 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
 
         stream.end()?;
 
-        Cardinality::Many(std::ops::Range { start, end })
+        Ok(Some(Cardinality::Many(std::ops::Range { start, end })))
     } else {
-        Cardinality::One
-    };
-
-    let edge_params = if stream.peek::<At>() {
-        let _ = stream.next::<At>("").unwrap();
-        Some(parse_type(&mut stream)?)
-    } else {
-        None
-    };
-
-    let object_prop_ident = if stream.peek::<Sym>() {
-        Some(stream.next::<Sym>("").unwrap())
-    } else {
-        None
-    };
-
-    let object = parse_type(&mut stream)?;
-    stream.end()?;
-
-    Ok((
-        Ast::Rel(Rel {
-            subject,
-            ident: (ident, ident_span),
-            cardinality,
-            edge_params,
-            object_prop_ident,
-            object,
-        }),
-        span,
-    ))
+        Ok(None)
+    }
 }
 
 fn parse_path(input: &mut TreeStream) -> ParseResult<Path> {

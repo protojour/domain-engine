@@ -85,8 +85,9 @@ pub struct Relationship {
     pub relation_id: RelationId,
     pub subject: DefId,
     // The cardinality of the relationship, i.e. how many objects are related to the subject
-    pub cardinality: Cardinality,
+    pub subject_cardinality: Cardinality,
     pub edge_params: DefId,
+    pub object_cardinality: Cardinality,
     pub object: DefId,
 }
 
