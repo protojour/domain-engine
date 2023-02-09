@@ -338,3 +338,28 @@ fn unresolved_transitive_eq() {
     "#
     .compile_fail();
 }
+
+#[test]
+fn various_monadic_properties() {
+    r#"
+    (type! foo)
+    (rel! (foo) a (string))
+    (default! (foo) a "default") ;; ERROR parse error: unknown keyword
+
+    (type! bar)
+    ; a is either a string or not present
+    (rel! (bar) maybe? (string))
+
+    ; bar and string may be related via b many times
+    (rel! (bar) array[] (string))
+
+    ; bar and string may be related via c many times, minimum 1
+    (rel! (bar) maybe_array[1..]? (string))
+
+    ; a is either a string or null
+    (rel! (bar) nullable (string))
+    ; FIXME: Should this work?
+    (rel! (bar) nullable (null)) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    "#
+    .compile_fail()
+}

@@ -1,4 +1,7 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    ops::Range,
+};
 
 use ontol_runtime::{DefId, RelationId};
 use smartstring::alias::String;
@@ -349,13 +352,21 @@ fn convert_cardinality(
     ast_cardinality: ast::Cardinality,
 ) -> (PropertyCardinality, ValueCardinality) {
     match ast_cardinality {
-        ast::Cardinality::ZeroOrOne => (PropertyCardinality::Optional, ValueCardinality::One),
-        ast::Cardinality::Many(range) => match (range.start, range.end) {
-            (None, None) => (PropertyCardinality::Mandatory, ValueCardinality::Many),
-            (start, end) => (
-                PropertyCardinality::Mandatory,
-                ValueCardinality::ManyInRange(start, end),
-            ),
-        },
+        ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::One),
+        ast::Cardinality::Many(range) => (
+            PropertyCardinality::Mandatory,
+            convert_many_value_cardinality(range),
+        ),
+        ast::Cardinality::OptionalMany(range) => (
+            PropertyCardinality::Optional,
+            convert_many_value_cardinality(range),
+        ),
+    }
+}
+
+fn convert_many_value_cardinality(range: Range<Option<u16>>) -> ValueCardinality {
+    match (range.start, range.end) {
+        (None, None) => ValueCardinality::Many,
+        (start, end) => ValueCardinality::ManyInRange(start, end),
     }
 }

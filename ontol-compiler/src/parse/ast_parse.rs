@@ -144,10 +144,18 @@ fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinali
 
         stream.end()?;
 
-        Ok(Some(Cardinality::Many(std::ops::Range { start, end })))
+        if input.peek::<Questionmark>() {
+            let _ = input.next::<Questionmark>("").unwrap();
+            Ok(Some(Cardinality::OptionalMany(std::ops::Range {
+                start,
+                end,
+            })))
+        } else {
+            Ok(Some(Cardinality::Many(std::ops::Range { start, end })))
+        }
     } else if input.peek::<Questionmark>() {
         let _ = input.next::<Questionmark>("").unwrap();
-        Ok(Some(Cardinality::ZeroOrOne))
+        Ok(Some(Cardinality::Optional))
     } else {
         Ok(None)
     }

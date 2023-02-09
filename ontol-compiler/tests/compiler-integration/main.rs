@@ -12,6 +12,7 @@ mod test_entity;
 mod test_eq_basic;
 mod test_geojson;
 mod test_serde;
+mod test_string_patterns;
 mod util;
 
 const TEST_PKG: PackageId = PackageId(42);

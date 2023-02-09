@@ -323,28 +323,3 @@ fn deserialize_array_with_range_constraints() {
         );
     });
 }
-
-#[test]
-#[ignore = "must implement"]
-fn deserialize_monads() {
-    r#"
-    (type! foo)
-    (rel! (foo) a (string))
-    (default! (foo) a "default")
-
-    (type! bar)
-    ; a is either a string or not present
-    (rel! (bar) maybe? (string))
-
-    ; bar and string may be related via b many times
-    (rel! (bar) array[] (string))
-
-    ; bar and string may be related via c many times, minimum 1
-    (rel! (bar) maybe-array[1..]? (string))
-
-    ; a is either a string or null
-    (rel! (bar) nullable (string))
-    (rel! (bar) nullable (null))
-    "#
-    .compile_ok(|env| {})
-}
