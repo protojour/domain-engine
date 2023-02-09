@@ -112,7 +112,7 @@ impl TreeStream {
     }
 }
 
-macro_rules! next {
+macro_rules! impl_next {
     ($ident:ident, $data:ty, $pat:pat, $ret:expr) => {
         impl Next for $ident {
             type Data = $data;
@@ -140,15 +140,17 @@ pub struct Bracket;
 pub struct Dot;
 pub struct At;
 pub struct Questionmark;
+pub struct Underscore;
 pub struct Sym;
 pub struct Variable;
 pub struct Num;
 
-next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
-next!(Bracket, Vec<Spanned<Tree>>, Tree::Bracket(vec), vec);
-next!(Dot, (), Tree::Dot, ());
-next!(At, (), Tree::At, ());
-next!(Questionmark, (), Tree::Questionmark, ());
-next!(Sym, String, Tree::Sym(str), str);
-next!(Variable, String, Tree::Variable(str), str);
-next!(Num, String, Tree::Num(str), str);
+impl_next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
+impl_next!(Bracket, Vec<Spanned<Tree>>, Tree::Bracket(vec), vec);
+impl_next!(Dot, (), Tree::Dot, ());
+impl_next!(At, (), Tree::At, ());
+impl_next!(Questionmark, (), Tree::Questionmark, ());
+impl_next!(Underscore, (), Tree::Underscore, ());
+impl_next!(Sym, String, Tree::Sym(str), str);
+impl_next!(Variable, String, Tree::Variable(str), str);
+impl_next!(Num, String, Tree::Num(str), str);

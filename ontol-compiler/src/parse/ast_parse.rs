@@ -1,9 +1,12 @@
 use chumsky::prelude::Simple;
+use smartstring::alias::String;
 
 use super::{
     ast::*,
     tree::Tree,
-    tree_stream::{At, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Variable},
+    tree_stream::{
+        At, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Underscore, Variable,
+    },
     Span, Spanned,
 };
 
@@ -75,12 +78,7 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
 fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
-    let (rel_ident, ident_span) = stream.next::<Sym>("expected relation identifier")?;
-    let ident = match rel_ident.as_str() {
-        "_" => None,
-        _ => Some(rel_ident),
-    };
-
+    let (ident, ident_span) = parse_sym_or_wildcard(&mut stream, "expected relation identifier")?;
     let subject_cardinality = parse_optional_cardinality(&mut stream)?;
 
     let edge_params = if stream.peek::<At>() {
@@ -223,17 +221,14 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
             while input.peek_any() {
                 let mut list: TreeStream = input.next::<Paren>("expected attribute")?.into();
                 let span = list.span();
-                let (property, prop_span) = list.next::<Sym>("expected property")?;
+                let (property, prop_span) = parse_sym_or_wildcard(&mut list, "expected property")?;
                 let value = parse_next_expr(&mut list)?;
                 list.end()?;
 
                 attributes.push((
                     Attribute {
                         property: (
-                            match property.as_str() {
-                                "_" => Property::Wildcard,
-                                _ => Property::Named(property),
-                            },
+                            property.map(Property::Named).unwrap_or(Property::Wildcard),
                             prop_span,
                         ),
                         value,
@@ -253,6 +248,19 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
 
             Ok((Expr::Call(sym, args), span))
         }
+    }
+}
+
+fn parse_sym_or_wildcard(
+    input: &mut TreeStream,
+    msg: impl ToString,
+) -> ParseResult<Option<String>> {
+    if input.peek::<Underscore>() {
+        let (_, span) = input.next::<Underscore>("").unwrap();
+        Ok((None, span))
+    } else {
+        let (ident, span) = input.next::<Sym>(msg)?;
+        Ok((Some(ident), span))
     }
 }
 

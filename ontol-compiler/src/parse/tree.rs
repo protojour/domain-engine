@@ -15,6 +15,7 @@ pub enum Tree {
     Dot,
     At,
     Questionmark,
+    Underscore,
     /// Any unquoted string
     Sym(String),
     /// String starting with ":"
@@ -32,6 +33,7 @@ impl Display for Tree {
             Self::Dot => write!(f, "`.`"),
             Self::At => write!(f, "@"),
             Self::Questionmark => write!(f, "?"),
+            Self::Underscore => write!(f, "_"),
             Self::Sym(_) => write!(f, "symbol"),
             Self::Variable(_) => write!(f, "variable"),
             Self::Num(_) => write!(f, "number"),
@@ -58,6 +60,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(just(".").map(|_| Tree::Dot))
             .or(just("@").map(|_| Tree::At))
             .or(just("?").map(|_| Tree::Questionmark))
+            .or(just("_").map(|_| Tree::Underscore))
             .or(num())
             .or(just(":").ignore_then(ident().map(Tree::Variable)))
             .or(string_literal().map(Tree::StringLiteral))
@@ -88,7 +91,7 @@ fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 fn ident() -> impl Parser<char, String, Error = Simple<char>> {
-    filter(|c: &char| !c.is_whitespace() && !special_char(*c))
+    filter(|c: &char| !c.is_whitespace() && !special_char(*c) && *c != '_')
         .map(Some)
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),

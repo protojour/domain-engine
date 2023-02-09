@@ -12,6 +12,11 @@ fn parse_error1() {
 }
 
 #[test]
+fn underscore_not_allowed_at_start_of_identifier() {
+    "(type! _foo) ;; ERROR parse error: expected ident".compile_fail()
+}
+
+#[test]
 fn rel_type_not_found() {
     "
     (type! foo)
