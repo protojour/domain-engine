@@ -85,6 +85,8 @@ pub enum CompileError {
     InvalidCardinaltyCombinationInUnion,
     #[error("cannot convert this `{output}` from `{input}`: These types are not equated.")]
     CannotConvertMissingEquation { input: String, output: String },
+    #[error("only entities may have named reverse relationship")]
+    NonEntityInReverseRelationship,
 }
 
 #[derive(Debug)]

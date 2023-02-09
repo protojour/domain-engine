@@ -35,19 +35,6 @@ fn test_serde_map_type() {
 }
 
 #[test]
-fn test_serde_object_property_not_sugared() {
-    "
-    (type! foo)
-    ; this is sugar for `(rel! (foo) a (string))`:
-    (rel! (foo) a @(unit) a[] (string))
-    "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
-        assert_json_io_matches!(foo, json!({ "a": "string" }));
-    });
-}
-
-#[test]
 fn test_serde_complex_type() {
     "
     (type! foo)

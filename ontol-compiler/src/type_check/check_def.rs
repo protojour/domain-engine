@@ -237,10 +237,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (Some(_), Type::Domain(_), _) => {
-                panic!("Only entities may have reverse properties");
+            (Some(_), _, _) => {
+                return self.error(CompileError::NonEntityInReverseRelationship, span);
             }
-            _ => {}
+            (None, _, _) => {}
         };
 
         codomain_ty

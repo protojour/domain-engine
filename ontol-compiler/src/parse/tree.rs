@@ -16,7 +16,7 @@ pub enum Tree {
     At,
     Questionmark,
     Underscore,
-    /// Any unquoted string
+    /// Any unquoted string not starting with "_"
     Sym(String),
     /// String starting with ":"
     Variable(String),

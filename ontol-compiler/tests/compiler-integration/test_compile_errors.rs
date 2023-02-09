@@ -304,6 +304,17 @@ fn union_in_named_relationship() {
 }
 
 #[test]
+fn test_serde_object_property_not_sugared() {
+    "
+    (type! foo)
+    (type! bar)
+    (rel! (foo) a @(unit) aa[] (bar)) ;; ERROR only entities may have named reverse relationship
+    (rel! (foo) b @(unit) bb[] (string)) ;; ERROR only entities may have named reverse relationship
+    "
+    .compile_fail()
+}
+
+#[test]
 fn unresolved_transitive_eq() {
     r#"
     (type! a)
