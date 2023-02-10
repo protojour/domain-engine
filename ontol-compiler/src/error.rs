@@ -89,6 +89,10 @@ pub enum CompileError {
     CannotConvertMissingEquation { input: String, output: String },
     #[error("only entities may have named reverse relationship")]
     NonEntityInReverseRelationship,
+    #[error("overlapping indexes")]
+    OverlappingTupleIndexes,
+    #[error("unsupported tuple index type")]
+    UnsupportedTupleIndexType,
 }
 
 #[derive(Debug)]

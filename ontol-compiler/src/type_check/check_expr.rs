@@ -221,6 +221,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             span: expr.span,
                         })
                     }
+                    Some(SubjectProperties::Tuple(_)) => todo!(),
                 };
 
                 (domain_type, typed_expr_ref)

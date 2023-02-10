@@ -24,6 +24,7 @@ mod parse;
 mod relation;
 mod source;
 mod strings;
+mod tuple;
 mod type_check;
 mod typed_expr;
 mod types;

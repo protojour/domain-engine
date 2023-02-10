@@ -205,7 +205,7 @@ impl<'m> Defs<'m> {
         );
         defs.indexed_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Anonymous,
+                ident: RelationIdent::Indexed,
                 subject_prop: None,
                 object_prop: None,
             }),

@@ -9,6 +9,7 @@ use crate::{
     error::CompileError,
     mem::Intern,
     relation::{ObjectProperties, RelationshipId, SubjectProperties},
+    tuple::Tuple,
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
@@ -176,6 +177,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (RelationIdent::Anonymous, SubjectProperties::ValueUnion(properties)) => {
                 properties.push((relationship.0, *span));
             }
+            (RelationIdent::Indexed, SubjectProperties::Empty) => {
+                let mut tuple = Tuple::default();
+
+                if let Err(error) =
+                    tuple.define_relationship(&relationship.1.edge_params, relationship.0)
+                {
+                    return self.error(error, span);
+                }
+
+                properties.subject = SubjectProperties::Tuple(tuple);
+            }
+            (RelationIdent::Indexed, SubjectProperties::Tuple(tuple)) => {
+                if let Err(error) =
+                    tuple.define_relationship(&relationship.1.edge_params, relationship.0)
+                {
+                    return self.error(error, span);
+                }
+            }
             (RelationIdent::Named(_), SubjectProperties::Empty) => {
                 properties.subject = SubjectProperties::Map(
                     [(
@@ -205,7 +224,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ) => {
                 return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
             }
-            _ => todo!(),
+            (ident, properties) => todo!("not implemented: {ident:?}, {properties:?}"),
         }
 
         codomain_ty

@@ -16,6 +16,7 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, EdgeParams, PropertyCardinality, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
+    tuple::TupleElement,
     types::{DefTypes, Type},
 };
 
@@ -202,6 +203,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_subject_property_set(self, property_set)
                 .add_object_properties(self, &properties.object)
                 .build(),
+            SubjectProperties::Tuple(tuple) => {
+                let operator_ids = tuple.elements().iter().map(|element| match element {
+                    TupleElement::Undefined => {
+                        todo!()
+                    }
+                    TupleElement::Defined(relationship_id) => {
+                        let Ok((relationship, _relation)) = self
+                            .get_relationship_meta(*relationship_id)
+                        else {
+                            panic!("Problem getting relationship meta");
+                        };
+
+                        self.get_serde_operator_id(relationship.object)
+                            .expect("no inner operator")
+                    }
+                });
+
+                SerdeOperator::Tuple(operator_ids.collect(), type_def_id)
+            }
         }
     }
 

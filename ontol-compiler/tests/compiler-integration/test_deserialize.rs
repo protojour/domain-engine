@@ -217,6 +217,34 @@ fn deserialize_tuple() {
 }
 
 #[test]
+fn deserialize_tuple_new() {
+    r#"
+    (type! foo)
+    (rel! (foo) 0 (int))
+    (rel! (foo) 1 "a")
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_matches!(
+            foo.deserialize_data(json!([42, "a"])),
+            Ok(Data::Vec(vector)) if vector.len() == 2
+        );
+        assert_error_msg!(
+            foo.deserialize_data(json!([77])),
+            "invalid length 1, expected tuple with length 2 at line 1 column 4"
+        );
+        assert_error_msg!(
+            foo.deserialize_data(json!([11, "a", "boom"])),
+            "trailing characters at line 1 column 9"
+        );
+        assert_error_msg!(
+            foo.deserialize_data(json!([14, "b"])),
+            r#"invalid type: string "b", expected "a" at line 1 column 7"#
+        );
+    });
+}
+
+#[test]
 fn deserialize_string_union() {
     r#"
     (type! foo)
