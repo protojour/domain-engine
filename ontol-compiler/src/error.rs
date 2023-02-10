@@ -51,8 +51,8 @@ pub enum CompileError {
     DomainTypeExpected,
     #[error("duplicate anonymous relationship")]
     DuplicateAnonymousRelationship,
-    #[error("cannot mix named and anonymous relations on the same type")]
-    CannotMixNamedAndAnonymousRelations,
+    #[error("invalid mix of relationship type for subject")]
+    InvalidMixOfRelationshipTypeForSubject,
     #[error("cannot mix index relation identifiers and edge types")]
     CannotMixIndexedRelationIdentsAndEdgeTypes,
     #[error("no properties expected")]

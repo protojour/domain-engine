@@ -48,7 +48,7 @@ fn rel_mix_anonymous_and_named() {
     (type! foo)
     (type! bar)
     (rel! (foo) _ (bar))
-    (rel! ;; ERROR cannot mix named and anonymous relations on the same type
+    (rel! ;; ERROR invalid mix of relationship type for subject
         (foo) foobar (bar)
     )
     "
@@ -140,6 +140,26 @@ fn tuple_in_union() {
     (type! u)
     (rel! (u) _ (tuple! "a")) ;; ERROR cannot discriminate type
     (rel! (u) _ "b")
+    "#
+    .compile_fail();
+}
+
+#[test]
+fn sequence_mix1() {
+    r#"
+    (type! u)
+    (rel! (u) _ (int))
+    (rel! (u) 0 (string)) ;; ERROR invalid mix of relationship type for subject
+    "#
+    .compile_fail();
+}
+
+#[test]
+fn sequence_mix2() {
+    r#"
+    (type! u)
+    (rel! (u) a (int))
+    (rel! (u) 0 (string)) ;; ERROR invalid mix of relationship type for subject
     "#
     .compile_fail();
 }

@@ -215,16 +215,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (RelationIdent::Anonymous, SubjectProperties::Map(_)) => {
-                return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
-            }
-            (
-                RelationIdent::Named(_),
-                SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_),
-            ) => {
-                return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
-            }
-            (ident, properties) => todo!("not implemented: {ident:?}, {properties:?}"),
+            _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
         }
 
         codomain_ty
