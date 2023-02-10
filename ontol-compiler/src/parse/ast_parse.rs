@@ -94,7 +94,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     stream.end()?;
 
     Ok((
-        Ast::Rel(Rel {
+        Ast::Rel(Box::new(Rel {
             subject,
             ident: (ident, ident_span),
             subject_cardinality,
@@ -102,7 +102,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
             object_cardinality,
             object_prop_ident,
             object,
-        }),
+        })),
         span,
     ))
 }

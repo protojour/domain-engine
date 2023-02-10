@@ -11,7 +11,7 @@ pub enum Ast {
     Import(Path),
     Type(Spanned<String>),
     Entity(Spanned<String>),
-    Rel(Rel),
+    Rel(Box<Rel>),
     Eq(Eq),
     Comment(String),
 }

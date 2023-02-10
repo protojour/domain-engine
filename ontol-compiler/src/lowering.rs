@@ -72,15 +72,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.set_def(def_id, DefKind::DomainEntity(ident), &span);
                 Ok(Some(def_id))
             }
-            ast::Ast::Rel(ast::Rel {
-                subject,
-                ident: (ident, ident_span),
-                subject_cardinality,
-                edge_params,
-                object_cardinality,
-                object_prop_ident,
-                object,
-            }) => {
+            ast::Ast::Rel(rel) => {
+                let ast::Rel {
+                    subject,
+                    ident: (ident, ident_span),
+                    subject_cardinality,
+                    edge_params,
+                    object_cardinality,
+                    object_prop_ident,
+                    object,
+                } = *rel;
+
                 let (relation_ident, index_range_edge_params): (_, Option<Range<Option<u16>>>) =
                     match ident {
                         SymOrIntRangeOrWildcard::Sym(str) => (

@@ -26,7 +26,7 @@ impl Cast<Value> for Value {
 impl Cast<()> for Value {
     type Ref = ();
 
-    fn cast_into(self) -> () {
+    fn cast_into(self) {
         match self.data {
             Data::Unit => (),
             _ => panic!("not a unit"),
