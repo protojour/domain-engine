@@ -17,7 +17,7 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, EdgeParams, PropertyCardinality, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
-    tuple::TupleElement,
+    sequence::SequenceElement,
     types::{DefTypes, Type},
 };
 
@@ -100,7 +100,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some((
                     self.alloc_operator_id(type_def_id),
-                    SerdeOperator::FiniteTuple(operator_ids, type_def_id),
+                    SerdeOperator::FiniteSequence(operator_ids, type_def_id),
                 ))
             }
             Some(Type::Array(_)) => {
@@ -204,17 +204,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_subject_property_set(self, property_set)
                 .add_object_properties(self, &properties.object)
                 .build(),
-            SubjectProperties::Tuple(tuple) => {
+            SubjectProperties::Sequence(tuple) => {
                 debug!("Codegen tuple {tuple:#?}");
 
                 let operator_ids: SmallVec<_> = tuple
                     .elements()
                     .iter()
                     .map(|element| match element {
-                        TupleElement::Undefined => {
+                        SequenceElement::Undefined => {
                             self.get_serde_operator_id(DefId::unit()).unwrap()
                         }
-                        TupleElement::Defined(relationship_id) => {
+                        SequenceElement::Defined(relationship_id) => {
                             let Ok((relationship, _relation)) = self
                             .get_relationship_meta(*relationship_id)
                         else {
@@ -229,9 +229,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 if tuple.is_infinite() {
                     assert!(!operator_ids.is_empty());
-                    SerdeOperator::InfiniteTuple(operator_ids, type_def_id)
+                    SerdeOperator::InfiniteSequence(operator_ids, type_def_id)
                 } else {
-                    SerdeOperator::FiniteTuple(operator_ids, type_def_id)
+                    SerdeOperator::FiniteSequence(operator_ids, type_def_id)
                 }
             }
         }

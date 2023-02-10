@@ -22,10 +22,10 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => {
                 self.serialize_string(value, serializer)
             }
-            SerdeOperator::FiniteTuple(operator_ids, _) => {
+            SerdeOperator::FiniteSequence(operator_ids, _) => {
                 self.serialize_tuple(value, operator_ids, false, serializer)
             }
-            SerdeOperator::InfiniteTuple(operator_ids, _) => {
+            SerdeOperator::InfiniteSequence(operator_ids, _) => {
                 self.serialize_tuple(value, operator_ids, true, serializer)
             }
             SerdeOperator::Array(_, element_operator_id)

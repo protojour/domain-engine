@@ -203,7 +203,7 @@ fn deserialize_tuple() {
         );
         assert_error_msg!(
             foo.deserialize_data_variant(json!([77])),
-            "invalid length 1, expected finite tuple with length 2 at line 1 column 4"
+            "invalid length 1, expected sequence with length 2 at line 1 column 4"
         );
         assert_error_msg!(
             foo.deserialize_data_variant(json!([11, "a", "boom"])),
@@ -217,7 +217,7 @@ fn deserialize_tuple() {
 }
 
 #[test]
-fn deserialize_tuple_new() {
+fn deserialize_finite_non_uniform_sequence() {
     r#"
     (type! foo)
     (rel! (foo) 0 (int))
@@ -231,7 +231,7 @@ fn deserialize_tuple_new() {
         );
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
-            "invalid length 1, expected finite tuple with length 2 at line 1 column 4"
+            "invalid length 1, expected sequence with length 2 at line 1 column 4"
         );
         assert_error_msg!(
             foo.deserialize_data(json!([11, "a", "boom"])),
@@ -245,7 +245,7 @@ fn deserialize_tuple_new() {
 }
 
 #[test]
-fn deserialize_finite_uniform_tuple() {
+fn deserialize_finite_uniform_sequence() {
     r#"
     (type! foo)
     (rel! (foo) ..2 (int))
@@ -258,7 +258,7 @@ fn deserialize_finite_uniform_tuple() {
         );
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
-            "invalid length 1, expected finite tuple with length 2 at line 1 column 4"
+            "invalid length 1, expected sequence with length 2 at line 1 column 4"
         );
         assert_error_msg!(
             foo.deserialize_data(json!([11, "a"])),

@@ -152,7 +152,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     SubjectProperties::Map(property_set) => {
                         return Ok(property_set);
                     }
-                    SubjectProperties::Tuple(_) => todo!(),
+                    SubjectProperties::Sequence(_) => todo!(),
                 },
                 None => {
                     return Err(UnionCheckError::CannotDiscriminateType);

@@ -2,18 +2,18 @@ use tracing::debug;
 
 use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
 
-/// A tuple represents both finite and infinite arrays,
+/// A sequence represents both finite tuples and infinite arrays,
 /// where elements may be of different types.
 #[derive(Debug, Default)]
-pub struct Tuple {
-    elements: Vec<TupleElement>,
+pub struct Sequence {
+    elements: Vec<SequenceElement>,
 
     /// Whether the last element continues to be accepted ad infinitum.
     infinite: bool,
 }
 
-impl Tuple {
-    pub fn elements(&self) -> &[TupleElement] {
+impl Sequence {
+    pub fn elements(&self) -> &[SequenceElement] {
         self.elements.as_slice()
     }
 
@@ -28,10 +28,10 @@ impl Tuple {
     ) -> Result<(), CompileError> {
         let range = match edge_params {
             EdgeParams::IndexRange(range) => range,
-            _ => return Err(CompileError::UnsupportedTupleIndexType),
+            _ => return Err(CompileError::UnsupportedSequenceIndexType),
         };
 
-        debug!("define tuple relationship for range {range:?}");
+        debug!("define sequence relationship for range {range:?}");
 
         match (range.start, range.end) {
             (start, Some(end)) => {
@@ -42,20 +42,20 @@ impl Tuple {
                 }
                 Ok(())
             }
-            (Some(_), None) if self.infinite => Err(CompileError::OverlappingTupleIndexes),
+            (Some(_), None) if self.infinite => Err(CompileError::OverlappingSequenceIndexes),
             (Some(start), None) => {
                 self.ensure_size(start as usize + 1);
                 self.define_element(start, relationship_id)?;
                 self.infinite = true;
                 Ok(())
             }
-            (None, None) => Err(CompileError::UnsupportedTupleIndexType),
+            (None, None) => Err(CompileError::UnsupportedSequenceIndexType),
         }
     }
 
     fn ensure_size(&mut self, size: usize) {
         while self.elements.len() < size {
-            self.elements.push(TupleElement::Undefined)
+            self.elements.push(SequenceElement::Undefined)
         }
     }
 
@@ -66,9 +66,9 @@ impl Tuple {
     ) -> Result<(), CompileError> {
         let element = self.elements.get_mut(index as usize).unwrap();
         match element {
-            TupleElement::Defined(..) => Err(CompileError::OverlappingTupleIndexes),
-            TupleElement::Undefined => {
-                *element = TupleElement::Defined(relationship_id);
+            SequenceElement::Defined(..) => Err(CompileError::OverlappingSequenceIndexes),
+            SequenceElement::Undefined => {
+                *element = SequenceElement::Defined(relationship_id);
                 Ok(())
             }
         }
@@ -76,7 +76,7 @@ impl Tuple {
 }
 
 #[derive(Default, Debug)]
-pub enum TupleElement {
+pub enum SequenceElement {
     /// Corresponds to the Unit type:
     #[default]
     Undefined,

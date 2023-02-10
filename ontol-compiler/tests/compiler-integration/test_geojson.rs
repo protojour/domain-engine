@@ -118,15 +118,15 @@ fn test_geojson() {
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!({ "type": "Polygon", "coordinates": [1, 2] })),
-            "invalid type: integer `1`, expected finite tuple with length 2 at line 1 column 38"
+            "invalid type: integer `1`, expected sequence with length 2 at line 1 column 38"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected infinite tuple with minimum length 2 at line 1 column 43"
+            "invalid length 1, expected sequence with minimum length 2 at line 1 column 43"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected infinite tuple with minimum length 4 at line 1 column 40"
+            "invalid length 1, expected sequence with minimum length 4 at line 1 column 40"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!([])),

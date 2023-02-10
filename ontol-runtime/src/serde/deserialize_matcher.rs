@@ -138,14 +138,14 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
-pub struct FiniteTupleMatcher<'e> {
+pub struct FiniteSequenceMatcher<'e> {
     pub elements: &'e [SerdeOperatorId],
     pub def_id: DefId,
 }
 
-impl<'e> ValueMatcher for FiniteTupleMatcher<'e> {
+impl<'e> ValueMatcher for FiniteSequenceMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "finite tuple with length {}", self.elements.len())
+        write!(f, "sequence with length {}", self.elements.len())
     }
 
     fn match_seq(&self) -> Result<SeqMatch, ()> {
@@ -172,18 +172,14 @@ impl<'e> ValueMatcher for FiniteTupleMatcher<'e> {
     }
 }
 
-pub struct InfiniteTupleMatcher<'e> {
+pub struct InfiniteSequenceMatcher<'e> {
     pub elements: &'e [SerdeOperatorId],
     pub def_id: DefId,
 }
 
-impl<'e> ValueMatcher for InfiniteTupleMatcher<'e> {
+impl<'e> ValueMatcher for InfiniteSequenceMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "infinite tuple with minimum length {}",
-            self.elements.len()
-        )
+        write!(f, "sequence with minimum length {}", self.elements.len())
     }
 
     fn match_seq(&self) -> Result<SeqMatch, ()> {

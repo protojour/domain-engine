@@ -138,7 +138,7 @@ fn test_serde_infinite_tuple() {
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44, 45, 46]));
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
-            "invalid length 1, expected infinite tuple with minimum length 6 at line 1 column 4"
+            "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
         );
     });
 }

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{discriminator::UnionDiscriminator, DefId, RelationId};
 
-use crate::{def::Cardinality, tuple::Tuple, SourceSpan};
+use crate::{def::Cardinality, sequence::Sequence, SourceSpan};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RelationshipId(pub DefId);
@@ -44,7 +44,7 @@ pub enum SubjectProperties {
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
     Map(IndexMap<RelationId, Cardinality>),
-    Tuple(Tuple),
+    Sequence(Sequence),
 }
 
 #[derive(Default, Debug)]

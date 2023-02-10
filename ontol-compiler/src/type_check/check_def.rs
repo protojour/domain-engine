@@ -9,7 +9,7 @@ use crate::{
     error::CompileError,
     mem::Intern,
     relation::{ObjectProperties, RelationshipId, SubjectProperties},
-    tuple::Tuple,
+    sequence::Sequence,
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     SourceSpan,
@@ -178,7 +178,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 properties.push((relationship.0, *span));
             }
             (RelationIdent::Indexed, SubjectProperties::Empty) => {
-                let mut tuple = Tuple::default();
+                let mut tuple = Sequence::default();
 
                 if let Err(error) =
                     tuple.define_relationship(&relationship.1.edge_params, relationship.0)
@@ -186,9 +186,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(error, span);
                 }
 
-                properties.subject = SubjectProperties::Tuple(tuple);
+                properties.subject = SubjectProperties::Sequence(tuple);
             }
-            (RelationIdent::Indexed, SubjectProperties::Tuple(tuple)) => {
+            (RelationIdent::Indexed, SubjectProperties::Sequence(tuple)) => {
                 if let Err(error) =
                     tuple.define_relationship(&relationship.1.edge_params, relationship.0)
                 {
