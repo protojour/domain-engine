@@ -24,7 +24,7 @@ fn test_string_patterns() {
     (rel! (my_id) 0 "my/")
     (rel! (my_id) 1 (uuid))
 
-    ; FIXME: named tuples, if 1 expands to `1 @1`
+    ; FIXME: named sequence elements, if 1 expands to `1 @1`
     ; (rel! (my_id) uuid @1 (uuid))
     "#
     .compile_fail()

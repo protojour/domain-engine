@@ -4,6 +4,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
+    cast::Cast,
     proc::{BuiltinProc, Lib, Local, Procedure},
     value::{Attribute, Data, PropertyId, Value},
     vm::{AbstractVm, Stack, VmDebug},
@@ -175,38 +176,9 @@ impl ValueStack {
     where
         Value: Cast<T>,
     {
-        let mut arr = array::from_fn(|_| self.pop_one().cast());
+        let mut arr = array::from_fn(|_| self.pop_one().cast_into());
         arr.reverse();
         arr
-    }
-}
-
-/// Cast a value into T, panic if this fails.
-trait Cast<T> {
-    fn cast(self) -> T;
-}
-
-impl Cast<Value> for Value {
-    fn cast(self) -> Value {
-        self
-    }
-}
-
-impl Cast<i64> for Value {
-    fn cast(self) -> i64 {
-        match self.data {
-            Data::Int(n) => n,
-            _ => panic!("not an integer"),
-        }
-    }
-}
-
-impl Cast<String> for Value {
-    fn cast(self) -> String {
-        match self.data {
-            Data::String(s) => s,
-            _ => panic!("not a string"),
-        }
     }
 }
 

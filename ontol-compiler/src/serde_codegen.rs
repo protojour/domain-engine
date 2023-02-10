@@ -10,7 +10,6 @@ use ontol_runtime::{
     DefId, RelationId,
 };
 use smallvec::SmallVec;
-use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -192,10 +191,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_subject_property_set(self, property_set)
                 .add_object_properties(self, &properties.object)
                 .build(),
-            SubjectProperties::Sequence(tuple) => {
-                debug!("Codegen tuple {tuple:#?}");
-
-                let operator_ids: SmallVec<_> = tuple
+            SubjectProperties::Sequence(sequence) => {
+                let operator_ids: SmallVec<_> = sequence
                     .elements()
                     .map(|(_, element)| match element {
                         None => self.get_serde_operator_id(DefId::unit()).unwrap(),
@@ -210,7 +207,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     })
                     .collect();
 
-                if tuple.is_infinite() {
+                if sequence.is_infinite() {
                     assert!(!operator_ids.is_empty());
                     SerdeOperator::InfiniteSequence(operator_ids, type_def_id)
                 } else {

@@ -1,5 +1,6 @@
 use derive_debug_extras::DebugExtras;
 
+pub mod cast;
 pub mod discriminator;
 pub mod env;
 pub mod format_utils;
