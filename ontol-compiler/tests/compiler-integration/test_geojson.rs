@@ -9,21 +9,15 @@ fn test_geojson() {
     r#"
     ; TODO: domain-private types?
     (type! position)
-    (rel! (position) _ (tuple! (int) (int)))
-    ; ALTERNATIVE:
-    ; (rel! (position) 0..1 (int))
+    (rel! (position) 0..2 (int))
 
     (type! position-list)
-    (rel! (position-list) _[2..] (position))
-    ; ALTERNATIVE:
-    ; (rel! (position-list) 0 (position))
-    ; (rel! (position-list) 1.. (position))
+    (rel! (position-list) ..1 (position))
+    (rel! (position-list) 1.. (position))
 
     (type! position-ring)
-    (rel! (position-ring) _[4..] (position))
-    ; ALTERNATIVE:
-    ; (rel! (position-ring) 0..2 (position))
-    ; (rel! (position-ring) 3.. (position))
+    (rel! (position-ring) ..3 (position))
+    (rel! (position-ring) 3.. (position))
 
     (type! Geometry)
     (type! LeafGeometry)
@@ -128,11 +122,11 @@ fn test_geojson() {
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected array[2..] at line 1 column 43"
+            "invalid length 1, expected infinite tuple with minimum length 2 at line 1 column 43"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected array[4..] at line 1 column 40"
+            "invalid length 1, expected infinite tuple with minimum length 4 at line 1 column 40"
         );
         assert_error_msg!(
             geometry.deserialize_data_variant(json!([])),
