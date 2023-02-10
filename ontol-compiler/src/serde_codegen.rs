@@ -10,6 +10,7 @@ use ontol_runtime::{
     DefId, RelationId,
 };
 use smallvec::SmallVec;
+use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -204,26 +205,33 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_object_properties(self, &properties.object)
                 .build(),
             SubjectProperties::Tuple(tuple) => {
-                let operator_ids = tuple.elements().iter().map(|element| match element {
-                    TupleElement::Undefined => {
-                        todo!()
-                    }
-                    TupleElement::Defined(relationship_id) => {
-                        let Ok((relationship, _relation)) = self
+                debug!("Codegen tuple {tuple:#?}");
+
+                let operator_ids: SmallVec<_> = tuple
+                    .elements()
+                    .iter()
+                    .map(|element| match element {
+                        TupleElement::Undefined => {
+                            self.get_serde_operator_id(DefId::unit()).unwrap()
+                        }
+                        TupleElement::Defined(relationship_id) => {
+                            let Ok((relationship, _relation)) = self
                             .get_relationship_meta(*relationship_id)
                         else {
                             panic!("Problem getting relationship meta");
                         };
 
-                        self.get_serde_operator_id(relationship.object)
-                            .expect("no inner operator")
-                    }
-                });
+                            self.get_serde_operator_id(relationship.object)
+                                .expect("no inner operator")
+                        }
+                    })
+                    .collect();
 
                 if tuple.is_infinite() {
-                    SerdeOperator::InfiniteTuple(operator_ids.collect(), type_def_id)
+                    assert!(!operator_ids.is_empty());
+                    SerdeOperator::InfiniteTuple(operator_ids, type_def_id)
                 } else {
-                    SerdeOperator::FiniteTuple(operator_ids.collect(), type_def_id)
+                    SerdeOperator::FiniteTuple(operator_ids, type_def_id)
                 }
             }
         }

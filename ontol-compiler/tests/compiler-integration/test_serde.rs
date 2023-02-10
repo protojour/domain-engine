@@ -123,3 +123,22 @@ fn test_serde_many_cardinality() {
         assert_json_io_matches!(foo, json!({ "s": ["a", "b"]}));
     });
 }
+
+#[test]
+fn test_serde_infinite_tuple() {
+    r#"
+    (type! foo)
+    (rel! (foo) ..2 (int))
+    (rel! (foo) 2..4 (string))
+    (rel! (foo) 5.. (int))
+    "#
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44]));
+        assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44, 45, 46]));
+        assert_error_msg!(
+            foo.deserialize_data(json!([77])),
+            "invalid length 1, expected infinite tuple with minimum length 6 at line 1 column 4"
+        );
+    });
+}

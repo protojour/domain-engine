@@ -1,3 +1,5 @@
+use tracing::debug;
+
 use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
 
 /// A tuple represents both finite and infinite arrays,
@@ -29,6 +31,8 @@ impl Tuple {
             _ => return Err(CompileError::UnsupportedTupleIndexType),
         };
 
+        debug!("define tuple relationship for range {range:?}");
+
         match (range.start, range.end) {
             (start, Some(end)) => {
                 let start = start.unwrap_or(0);
@@ -40,7 +44,7 @@ impl Tuple {
             }
             (Some(_), None) if self.infinite => Err(CompileError::OverlappingTupleIndexes),
             (Some(start), None) => {
-                self.ensure_size(start as usize);
+                self.ensure_size(start as usize + 1);
                 self.define_element(start, relationship_id)?;
                 self.infinite = true;
                 Ok(())

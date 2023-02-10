@@ -22,9 +22,11 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => {
                 self.serialize_string(value, serializer)
             }
-            SerdeOperator::FiniteTuple(operator_ids, _)
-            | SerdeOperator::InfiniteTuple(operator_ids, _) => {
-                self.serialize_tuple(value, operator_ids, serializer)
+            SerdeOperator::FiniteTuple(operator_ids, _) => {
+                self.serialize_tuple(value, operator_ids, false, serializer)
+            }
+            SerdeOperator::InfiniteTuple(operator_ids, _) => {
+                self.serialize_tuple(value, operator_ids, true, serializer)
             }
             SerdeOperator::Array(_, element_operator_id)
             | SerdeOperator::RangeArray(_, _, element_operator_id) => {
@@ -86,17 +88,35 @@ impl<'e> SerdeProcessor<'e> {
         &self,
         value: &Value,
         operator_ids: &[SerdeOperatorId],
+        infinite: bool,
         serializer: S,
     ) -> Res<S> {
         match &value.data {
             Data::Vec(elements) => {
                 let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-                for (attr, operator_id) in elements.iter().zip(operator_ids) {
-                    seq.serialize_element(&Proxy {
-                        value: &attr.value,
-                        edge_params: None,
-                        processor: self.env.new_serde_processor(*operator_id),
-                    })?;
+
+                if infinite {
+                    for (index, attr) in elements.iter().enumerate() {
+                        let operator_id = if index < operator_ids.len() {
+                            operator_ids[index]
+                        } else {
+                            operator_ids.last().copied().unwrap()
+                        };
+
+                        seq.serialize_element(&Proxy {
+                            value: &attr.value,
+                            edge_params: None,
+                            processor: self.env.new_serde_processor(operator_id),
+                        })?;
+                    }
+                } else {
+                    for (attr, operator_id) in elements.iter().zip(operator_ids) {
+                        seq.serialize_element(&Proxy {
+                            value: &attr.value,
+                            edge_params: None,
+                            processor: self.env.new_serde_processor(*operator_id),
+                        })?;
+                    }
                 }
 
                 seq.end()

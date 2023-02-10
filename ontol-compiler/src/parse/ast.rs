@@ -51,7 +51,7 @@ pub enum Type {
 
 pub struct Rel {
     pub subject: Spanned<Type>,
-    pub ident: Spanned<SymOrIntOrWildcard>,
+    pub ident: Spanned<SymOrIntRangeOrWildcard>,
     pub subject_cardinality: Option<Cardinality>,
     pub edge_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
@@ -59,9 +59,9 @@ pub struct Rel {
     pub object: Spanned<Type>,
 }
 
-pub enum SymOrIntOrWildcard {
+pub enum SymOrIntRangeOrWildcard {
     Sym(String),
-    Int(i64),
+    IntRange(Range<Option<u16>>),
     Wildcard,
 }
 

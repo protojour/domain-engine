@@ -16,7 +16,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     parse::{
-        ast::{self, SymOrIntOrWildcard},
+        ast::{self, SymOrIntRangeOrWildcard},
         Span,
     },
     source::{CompileSrc, CORE_PKG},
@@ -83,23 +83,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }) => {
                 let (relation_ident, index_range_edge_params): (_, Option<Range<Option<u16>>>) =
                     match ident {
-                        SymOrIntOrWildcard::Sym(str) => (
+                        SymOrIntRangeOrWildcard::Sym(str) => (
                             RelationIdent::Named(self.compiler.strings.intern(&str)),
                             None,
                         ),
-                        SymOrIntOrWildcard::Int(int) => {
-                            let index: u16 = int.try_into().map_err(|_| {
-                                self.error(CompileError::InvalidInteger, &ident_span)
-                            })?;
-                            (
-                                RelationIdent::Indexed,
-                                Some(Range {
-                                    start: Some(index),
-                                    end: Some(index + 1),
-                                }),
-                            )
+                        SymOrIntRangeOrWildcard::IntRange(range) => {
+                            (RelationIdent::Indexed, Some(range))
                         }
-                        SymOrIntOrWildcard::Wildcard => (RelationIdent::Anonymous, None),
+                        SymOrIntRangeOrWildcard::Wildcard => (RelationIdent::Anonymous, None),
                     };
 
                 let has_object_prop = object_prop_ident.is_some();

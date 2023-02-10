@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use chumsky::prelude::Simple;
 use smartstring::alias::String;
 
@@ -79,7 +81,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
     let (ident, ident_span) =
-        SymOrIntOrWildcard::parse(&mut stream, "expected relation identifier")?;
+        SymOrIntRangeOrWildcard::parse(&mut stream, "expected relation identifier")?;
     let subject_cardinality = parse_optional_cardinality(&mut stream)?;
 
     let edge_params = if stream.peek::<At>() {
@@ -260,21 +262,57 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     }
 }
 
-impl SymOrIntOrWildcard {
+impl SymOrIntRangeOrWildcard {
     fn parse(input: &mut TreeStream, msg: impl ToString) -> ParseResult<Self> {
         if input.peek::<Underscore>() {
             let (_, span) = input.next::<Underscore>("").unwrap();
             Ok((Self::Wildcard, span))
         } else if input.peek::<Num>() {
             let (num, span) = input.next::<Num>("").unwrap();
-            let num: i64 = num
+            let start: u16 = num
                 .parse()
                 .map_err(|_| error("must be an integer", span.clone()))?;
-            Ok((Self::Int(num), span))
+
+            let end = if input.peek::<Dot>() {
+                parse_dot_dot_opt_u16(input)?.0
+            } else {
+                // if no dot, it's just an index, so the range is n..n+1
+                Some(start + 1)
+            };
+
+            Ok((
+                Self::IntRange(Range {
+                    start: Some(start),
+                    end,
+                }),
+                span,
+            ))
+        } else if input.peek::<Dot>() {
+            let (end, span) = parse_dot_dot_opt_u16(input)?;
+            let end = end.ok_or_else(|| error("expected number", span.clone()))?;
+
+            Ok((
+                Self::IntRange(Range {
+                    start: None,
+                    end: Some(end),
+                }),
+                span,
+            ))
         } else {
             let (ident, span) = input.next::<Sym>(msg)?;
             Ok((Self::Sym(ident), span))
         }
+    }
+}
+
+fn parse_dot_dot_opt_u16(input: &mut TreeStream) -> ParseResult<Option<u16>> {
+    let (_, dot_span) = input.next::<Dot>("expected dot")?;
+    input.next::<Dot>("expected dot")?;
+    if input.peek::<Num>() {
+        let (num, span) = parse_u16(input)?;
+        Ok((Some(num), span))
+    } else {
+        Ok((None, dot_span))
     }
 }
 

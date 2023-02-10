@@ -59,6 +59,18 @@ pub trait ValueMatcher {
     }
 }
 
+pub struct UnitMatcher;
+
+impl ValueMatcher for UnitMatcher {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "unit")
+    }
+
+    fn match_unit(&self) -> Result<DefId, ()> {
+        Ok(DefId::unit())
+    }
+}
+
 /// match any integer
 pub struct IntMatcher(pub DefId);
 
@@ -167,7 +179,11 @@ pub struct InfiniteTupleMatcher<'e> {
 
 impl<'e> ValueMatcher for InfiniteTupleMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "infinite tuple")
+        write!(
+            f,
+            "infinite tuple with minimum length {}",
+            self.elements.len()
+        )
     }
 
     fn match_seq(&self) -> Result<SeqMatch, ()> {

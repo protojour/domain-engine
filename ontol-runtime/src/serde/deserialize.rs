@@ -17,7 +17,7 @@ use super::{
     deserialize_matcher::{
         ArrayMatcher, ConstantStringMatcher, ExpectingMatching, FiniteTupleMatcher,
         InfiniteTupleMatcher, IntMatcher, RangeArrayMatcher, StringMatcher, UnionMatcher,
-        ValueMatcher,
+        UnitMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
 };
@@ -80,9 +80,10 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
         D: serde::Deserializer<'de>,
     {
         match self.value_operator {
-            SerdeOperator::Unit => {
-                panic!("This should not be used");
-            }
+            SerdeOperator::Unit => serde::de::Deserializer::deserialize_unit(
+                deserializer,
+                self.matcher_visitor_no_edge(UnitMatcher),
+            ),
             SerdeOperator::Int(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
                 self.matcher_visitor_no_edge(IntMatcher(*def_id)),
