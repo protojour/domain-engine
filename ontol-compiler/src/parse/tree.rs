@@ -82,7 +82,7 @@ pub fn trees_parser() -> impl Parser<char, Vec<Spanned<Tree>>, Error = Simple<ch
 }
 
 fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
-    filter(|c: &char| c.is_ascii_digit() && *c != '0' && !special_char(*c))
+    filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
         .map(Some)
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| c.is_ascii_digit() && !special_char(*c)).repeated(),
@@ -91,7 +91,7 @@ fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 fn ident() -> impl Parser<char, String, Error = Simple<char>> {
-    filter(|c: &char| !c.is_whitespace() && !special_char(*c) && *c != '_')
+    filter(|c: &char| !c.is_whitespace() && !special_char(*c) && !c.is_ascii_digit() && *c != '_')
         .map(Some)
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),

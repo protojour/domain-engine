@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId, RelationId};
 use smallvec::SmallVec;
@@ -50,7 +50,10 @@ impl<'m> DefKind<'m> {
             Self::CoreFn(_) => None,
             Self::DomainType(ident) => Some((*ident).into()),
             Self::DomainEntity(ident) => Some((*ident).into()),
-            Self::Relation(relation) => relation.ident.map(|str| str.into()),
+            Self::Relation(relation) => match relation.ident {
+                RelationIdent::Named(name) => Some(name.into()),
+                _ => None,
+            },
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,
         }
@@ -74,9 +77,17 @@ pub enum Primitive {
 /// This definition expresses that a relation _exists_
 #[derive(Debug)]
 pub struct Relation<'m> {
-    pub ident: Option<&'m str>,
+    pub ident: RelationIdent<'m>,
     pub subject_prop: Option<&'m str>,
     pub object_prop: Option<&'m str>,
+}
+
+#[derive(Clone, Debug)]
+pub enum RelationIdent<'m> {
+    Named(&'m str),
+    Index(i32),
+    IndexRange(Range<Option<u32>>),
+    Anonymous,
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
@@ -121,12 +132,19 @@ pub enum ValueCardinality {
 }
 
 impl<'m> Relation<'m> {
+    pub fn named_ident(&self) -> Option<&'m str> {
+        match self.ident {
+            RelationIdent::Named(name) => Some(name),
+            _ => None,
+        }
+    }
+
     pub fn subject_prop(&self) -> Option<&'m str> {
-        self.subject_prop.or(self.ident)
+        self.subject_prop.or_else(|| self.named_ident())
     }
 
     pub fn object_prop(&self) -> Option<&'m str> {
-        self.object_prop.or(self.ident)
+        self.object_prop.or_else(|| self.named_ident())
     }
 }
 
@@ -170,7 +188,7 @@ impl<'m> Defs<'m> {
         // The anonymous / "manifested-as" relation
         defs.anonymous_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: None,
+                ident: RelationIdent::Anonymous,
                 subject_prop: None,
                 object_prop: None,
             }),

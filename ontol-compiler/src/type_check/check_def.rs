@@ -3,8 +3,8 @@ use ontol_runtime::{DefId, RelationId};
 use crate::{
     codegen::{CodegenTask, EqCodegenTask},
     def::{
-        Cardinality, Def, DefKind, Primitive, PropertyCardinality, Relation, Relationship,
-        ValueCardinality,
+        Cardinality, Def, DefKind, Primitive, PropertyCardinality, Relation, RelationIdent,
+        Relationship, ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
@@ -141,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_type_mut(subject_def);
 
         match (&relation.1.ident, &mut properties.subject) {
-            (None, SubjectProperties::Empty) => {
+            (RelationIdent::Anonymous, SubjectProperties::Empty) => {
                 properties.subject = SubjectProperties::Value(
                     relationship.0,
                     *span,
@@ -149,7 +149,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
             }
             (
-                None,
+                RelationIdent::Anonymous,
                 SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
             ) => {
                 match (relationship.1.subject_cardinality, cardinality) {
@@ -173,10 +173,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (None, SubjectProperties::ValueUnion(properties)) => {
+            (RelationIdent::Anonymous, SubjectProperties::ValueUnion(properties)) => {
                 properties.push((relationship.0, *span));
             }
-            (Some(_), SubjectProperties::Empty) => {
+            (RelationIdent::Named(_), SubjectProperties::Empty) => {
                 properties.subject = SubjectProperties::Map(
                     [(
                         relation.0,
@@ -185,7 +185,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (Some(_), SubjectProperties::Map(properties)) => {
+            (RelationIdent::Named(_), SubjectProperties::Map(properties)) => {
                 if properties
                     .insert(
                         relation.0,
@@ -196,12 +196,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (None, SubjectProperties::Map(_)) => {
+            (RelationIdent::Anonymous, SubjectProperties::Map(_)) => {
                 return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
             }
-            (Some(_), SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_)) => {
+            (
+                RelationIdent::Named(_),
+                SubjectProperties::Value(_, _, _) | SubjectProperties::ValueUnion(_),
+            ) => {
                 return self.error(CompileError::CannotMixNamedAndAnonymousRelations, span);
             }
+            _ => todo!(),
         }
 
         codomain_ty

@@ -78,7 +78,8 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
 fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
-    let (ident, ident_span) = parse_sym_or_wildcard(&mut stream, "expected relation identifier")?;
+    let (ident, ident_span) =
+        SymOrIntOrWildcard::parse(&mut stream, "expected relation identifier")?;
     let subject_cardinality = parse_optional_cardinality(&mut stream)?;
 
     let edge_params = if stream.peek::<At>() {
@@ -255,6 +256,24 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
             }
 
             Ok((Expr::Call(sym, args), span))
+        }
+    }
+}
+
+impl SymOrIntOrWildcard {
+    fn parse(input: &mut TreeStream, msg: impl ToString) -> ParseResult<Self> {
+        if input.peek::<Underscore>() {
+            let (_, span) = input.next::<Underscore>("").unwrap();
+            Ok((Self::Wildcard, span))
+        } else if input.peek::<Num>() {
+            let (num, span) = input.next::<Num>("").unwrap();
+            let num: i64 = num
+                .parse()
+                .map_err(|_| error("must be an integer", span.clone()))?;
+            Ok((Self::Int(num), span))
+        } else {
+            let (ident, span) = input.next::<Sym>(msg)?;
+            Ok((Self::Sym(ident), span))
         }
     }
 }

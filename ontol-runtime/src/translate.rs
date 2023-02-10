@@ -60,50 +60,60 @@ pub struct ValueStack {
 }
 
 impl Stack for ValueStack {
+    #[inline(always)]
     fn size(&self) -> usize {
         self.stack.len()
     }
 
+    #[inline(always)]
     fn local0_pos(&self) -> usize {
         self.local0_pos
     }
 
+    #[inline(always)]
     fn local0_pos_mut(&mut self) -> &mut usize {
         &mut self.local0_pos
     }
 
+    #[inline(always)]
     fn truncate(&mut self, n_locals: usize) {
         self.stack.truncate(self.local0_pos + n_locals);
     }
 
+    #[inline(always)]
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) {
         let data = self.eval_builtin(proc);
         self.stack.push(Value::new(data, result_type));
     }
 
+    #[inline(always)]
     fn clone(&mut self, source: Local) {
         let value = self.local(source).clone();
         self.stack.push(value);
     }
 
+    #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
         let stack_pos = self.local0_pos;
         self.stack
             .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
     }
 
+    #[inline(always)]
     fn take_attr_value(&mut self, source: Local, key: PropertyId) {
         let map = self.map_local_mut(source);
         let attribute = map.remove(&key).expect("Attribute not found");
         self.stack.push(attribute.value);
     }
 
+    #[inline(always)]
     fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
         let map = self.map_local_mut(target);
         map.insert(key, Attribute::with_unit_params(value));
     }
 
+    #[inline(always)]
     fn constant(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
     }

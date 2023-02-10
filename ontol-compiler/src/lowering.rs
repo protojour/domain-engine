@@ -8,11 +8,17 @@ use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
-    def::{Def, DefKind, PropertyCardinality, Relation, Relationship, ValueCardinality, Variables},
+    def::{
+        Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship, ValueCardinality,
+        Variables,
+    },
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    parse::{ast, Span},
+    parse::{
+        ast::{self, SymOrIntOrWildcard},
+        Span,
+    },
     source::{CompileSrc, CORE_PKG},
 };
 
@@ -75,28 +81,39 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 object_prop_ident,
                 object,
             }) => {
-                let ident = ident.map(|ident| self.compiler.strings.intern(&ident));
+                let relation_ident = match ident {
+                    SymOrIntOrWildcard::Sym(str) => {
+                        RelationIdent::Named(self.compiler.strings.intern(&str))
+                    }
+                    SymOrIntOrWildcard::Int(int) => RelationIdent::Index(
+                        int.try_into()
+                            .map_err(|_| self.error(CompileError::InvalidInteger, &ident_span))?,
+                    ),
+                    SymOrIntOrWildcard::Wildcard => RelationIdent::Anonymous,
+                };
+
                 let has_object_prop = object_prop_ident.is_some();
 
                 // This syntax just defines the relation the first time it's used
-                let relation_def_id = match self.define_relation_if_undefined(ident) {
-                    ImplicitDefId::New(def_id) => {
-                        let object_prop =
-                            object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
+                let relation_def_id =
+                    match self.define_relation_if_undefined(relation_ident.clone()) {
+                        ImplicitDefId::New(def_id) => {
+                            let object_prop = object_prop_ident
+                                .map(|ident| self.compiler.strings.intern(&ident.0));
 
-                        self.set_def(
-                            def_id,
-                            DefKind::Relation(Relation {
-                                subject_prop: None,
-                                ident,
-                                object_prop,
-                            }),
-                            &ident_span,
-                        );
-                        def_id
-                    }
-                    ImplicitDefId::Reused(def_id) => def_id,
-                };
+                            self.set_def(
+                                def_id,
+                                DefKind::Relation(Relation {
+                                    ident: relation_ident,
+                                    subject_prop: None,
+                                    object_prop,
+                                }),
+                                &ident_span,
+                            );
+                            def_id
+                        }
+                        ImplicitDefId::Reused(def_id) => def_id,
+                    };
 
                 let subject = self.ast_type_to_def(subject)?;
                 let edge_params = match edge_params {
@@ -268,20 +285,25 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, ident: Option<&'m str>) -> ImplicitDefId {
-        match ident {
-            Some(ident) => match self
-                .compiler
-                .namespaces
-                .get_mut(self.src.package, Space::Rel)
-                .entry(ident.into())
-            {
-                Entry::Vacant(vacant) => {
-                    ImplicitDefId::New(*vacant.insert(self.compiler.defs.alloc_def_id()))
+    fn define_relation_if_undefined(&mut self, relation_ident: RelationIdent<'m>) -> ImplicitDefId {
+        match relation_ident {
+            RelationIdent::Named(ident) => {
+                match self
+                    .compiler
+                    .namespaces
+                    .get_mut(self.src.package, Space::Rel)
+                    .entry(ident.into())
+                {
+                    Entry::Vacant(vacant) => {
+                        ImplicitDefId::New(*vacant.insert(self.compiler.defs.alloc_def_id()))
+                    }
+                    Entry::Occupied(occupied) => ImplicitDefId::Reused(*occupied.get()),
                 }
-                Entry::Occupied(occupied) => ImplicitDefId::Reused(*occupied.get()),
-            },
-            None => ImplicitDefId::Reused(self.compiler.defs.anonymous_relation()),
+            }
+            RelationIdent::Anonymous => {
+                ImplicitDefId::Reused(self.compiler.defs.anonymous_relation())
+            }
+            _ => todo!(),
         }
     }
 

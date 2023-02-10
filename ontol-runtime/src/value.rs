@@ -47,6 +47,7 @@ pub enum Data {
     Float(f64),
     Rational(Box<num::rational::BigRational>),
     String(String),
+    Uuid(uuid::Uuid),
     /// A collection of attributes keyed by relation
     Map(BTreeMap<PropertyId, Attribute>),
     /// Represents both dynamic lists and static tuples at runtime
@@ -120,6 +121,7 @@ mod tests {
     #[test]
     fn value_size() {
         assert_eq!(40, std::mem::size_of::<Value>());
+        assert_eq!(16, std::mem::size_of::<[u8; 16]>());
 
         assert_eq!(24, std::mem::size_of::<BTreeMap<RelationId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
