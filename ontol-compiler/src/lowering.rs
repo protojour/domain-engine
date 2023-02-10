@@ -205,14 +205,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.compiler.defs.def_string_literal(lit))
             }
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
-            ast::Type::Tuple(elements) => {
-                let element_defs = elements
-                    .into_iter()
-                    .map(|element| self.ast_type_to_def(element))
-                    .collect::<Result<_, _>>()?;
-
-                Ok(self.compiler.defs.def_tuple(element_defs))
-            }
         }
     }
 

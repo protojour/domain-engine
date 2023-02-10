@@ -46,7 +46,6 @@ pub enum Property {
 pub enum Type {
     Sym(String),
     Literal(Literal),
-    Tuple(Vec<Spanned<Type>>),
 }
 
 pub struct Rel {

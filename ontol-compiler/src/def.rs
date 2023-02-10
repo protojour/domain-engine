@@ -167,7 +167,6 @@ pub struct Defs<'m> {
     string: DefId,
     pub(crate) map: HashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
-    pub(crate) tuples: HashMap<SmallVec<[DefId; 4]>, DefId>,
 }
 
 impl<'m> Defs<'m> {
@@ -184,7 +183,6 @@ impl<'m> Defs<'m> {
             string: DefId(0),
             map: Default::default(),
             string_literals: Default::default(),
-            tuples: Default::default(),
         };
 
         defs.unit = defs.add_primitive(Primitive::Unit);
@@ -295,21 +293,6 @@ impl<'m> Defs<'m> {
                 let def_id =
                     self.add_def(DefKind::StringLiteral(lit), CORE_PKG, SourceSpan::none());
                 self.string_literals.insert(lit, def_id);
-                def_id
-            }
-        }
-    }
-
-    pub fn def_tuple(&mut self, elements: SmallVec<[DefId; 4]>) -> DefId {
-        match self.tuples.get(elements.as_slice()) {
-            Some(def_id) => *def_id,
-            None => {
-                let def_id = self.add_def(
-                    DefKind::Tuple(elements.clone()),
-                    CORE_PKG,
-                    SourceSpan::none(),
-                );
-                self.tuples.insert(elements, def_id);
                 def_id
             }
         }

@@ -50,10 +50,11 @@ fn test_serde_complex_type() {
 }
 
 #[test]
-fn test_serde_tuple() {
+fn test_serde_sequence() {
     "
     (type! t)
-    (rel! (t) _ (tuple! (string) (int)))
+    (rel! (t) 0 (string))
+    (rel! (t) 1 (int))
     "
     .compile_ok(|env| {
         let t = TypeBinding::new(env, "t");

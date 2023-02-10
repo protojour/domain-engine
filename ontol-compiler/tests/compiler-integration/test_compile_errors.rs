@@ -135,16 +135,6 @@ fn union_tree() {
 }
 
 #[test]
-fn tuple_in_union() {
-    r#"
-    (type! u)
-    (rel! (u) _ (tuple! "a")) ;; ERROR cannot discriminate type
-    (rel! (u) _ "b")
-    "#
-    .compile_fail();
-}
-
-#[test]
 fn sequence_mix1() {
     r#"
     (type! u)

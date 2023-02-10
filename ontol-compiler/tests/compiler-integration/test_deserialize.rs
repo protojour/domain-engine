@@ -190,33 +190,6 @@ fn deserialize_string_constant() {
 }
 
 #[test]
-fn deserialize_tuple() {
-    r#"
-    (type! foo)
-    (rel! (foo) _ (tuple! (int) "a"))
-    "#
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
-        assert_matches!(
-            foo.deserialize_data_variant(json!([42, "a"])),
-            Ok(Data::Vec(vector)) if vector.len() == 2
-        );
-        assert_error_msg!(
-            foo.deserialize_data_variant(json!([77])),
-            "invalid length 1, expected sequence with length 2 at line 1 column 4"
-        );
-        assert_error_msg!(
-            foo.deserialize_data_variant(json!([11, "a", "boom"])),
-            "trailing characters at line 1 column 9"
-        );
-        assert_error_msg!(
-            foo.deserialize_data_variant(json!([14, "b"])),
-            r#"invalid type: string "b", expected "a" at line 1 column 7"#
-        );
-    });
-}
-
-#[test]
 fn deserialize_finite_non_uniform_sequence() {
     r#"
     (type! foo)

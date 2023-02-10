@@ -88,19 +88,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
-            Some(Type::Tuple(types)) => {
-                let operator_ids = types
-                    .iter()
-                    .map(|ty| {
-                        ty.get_single_def_id()
-                            .and_then(|def_id| self.get_serde_operator_id(def_id))
-                    })
-                    .collect::<Option<SmallVec<_>>>()?;
-
-                Some((
-                    self.alloc_operator_id(type_def_id),
-                    SerdeOperator::FiniteSequence(operator_ids, type_def_id),
-                ))
+            Some(Type::Tuple(_)) => {
+                panic!("Tuple not handled here")
             }
             Some(Type::Array(_)) => {
                 panic!("Array not handled here")
