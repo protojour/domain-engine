@@ -190,8 +190,6 @@ impl<'e> ValueMatcher for InfiniteSequenceMatcher<'e> {
     }
 
     fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
-        assert!(self.elements.len() > 0);
-
         if index < self.elements.len() - 1 {
             Some(self.elements[index])
         } else {
