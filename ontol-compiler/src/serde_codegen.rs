@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{Cardinality, DefKind, Defs, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, DefKind, Defs, EdgeParams, PropertyCardinality, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
@@ -288,10 +288,10 @@ impl MapTypeBuilder {
                     .expect("No inner operator");
                 let (requirement, value_operator_id) =
                     generator.property_operator(operator_id, relationship.object, *cardinality);
-                let edge_operator_id = if relationship.edge_params == DefId::unit() {
-                    None
-                } else {
-                    generator.get_serde_operator_id(relationship.edge_params)
+                let edge_operator_id = match relationship.edge_params {
+                    EdgeParams::Type(def_id) => generator.get_serde_operator_id(def_id),
+                    EdgeParams::Unit => None,
+                    _ => todo!(),
                 };
 
                 if requirement.is_mandatory() {
@@ -344,10 +344,11 @@ impl MapTypeBuilder {
                     .expect("No inner operator");
                 let (requirement, value_operator_id) =
                     generator.property_operator(operator_id, relationship.subject, *cardinality);
-                let edge_operator_id = if relationship.edge_params == DefId::unit() {
-                    None
-                } else {
-                    generator.get_serde_operator_id(relationship.edge_params)
+
+                let edge_operator_id = match relationship.edge_params {
+                    EdgeParams::Type(def_id) => generator.get_serde_operator_id(def_id),
+                    EdgeParams::Unit => None,
+                    _ => todo!(),
                 };
 
                 if requirement.is_mandatory() {

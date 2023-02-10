@@ -9,8 +9,8 @@ use smartstring::alias::String;
 use crate::{
     compiler::Compiler,
     def::{
-        Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship, ValueCardinality,
-        Variables,
+        Def, DefKind, EdgeParams, PropertyCardinality, Relation, RelationIdent, Relationship,
+        ValueCardinality, Variables,
     },
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -81,16 +81,26 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 object_prop_ident,
                 object,
             }) => {
-                let relation_ident = match ident {
-                    SymOrIntOrWildcard::Sym(str) => {
-                        RelationIdent::Named(self.compiler.strings.intern(&str))
-                    }
-                    SymOrIntOrWildcard::Int(int) => RelationIdent::Index(
-                        int.try_into()
-                            .map_err(|_| self.error(CompileError::InvalidInteger, &ident_span))?,
-                    ),
-                    SymOrIntOrWildcard::Wildcard => RelationIdent::Anonymous,
-                };
+                let (relation_ident, index_range_edge_params): (_, Option<Range<Option<u16>>>) =
+                    match ident {
+                        SymOrIntOrWildcard::Sym(str) => (
+                            RelationIdent::Named(self.compiler.strings.intern(&str)),
+                            None,
+                        ),
+                        SymOrIntOrWildcard::Int(int) => {
+                            let index: u16 = int.try_into().map_err(|_| {
+                                self.error(CompileError::InvalidInteger, &ident_span)
+                            })?;
+                            (
+                                RelationIdent::Indexed,
+                                Some(Range {
+                                    start: Some(index),
+                                    end: Some(index + 1),
+                                }),
+                            )
+                        }
+                        SymOrIntOrWildcard::Wildcard => (RelationIdent::Anonymous, None),
+                    };
 
                 let has_object_prop = object_prop_ident.is_some();
 
@@ -116,10 +126,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     };
 
                 let subject = self.ast_type_to_def(subject)?;
-                let edge_params = match edge_params {
-                    Some(edge_params) => self.ast_type_to_def(edge_params)?,
-                    None => self.compiler.defs.unit(),
+
+                let edge_params = if let Some(index_range_edge_params) = index_range_edge_params {
+                    if let Some((_, span)) = edge_params {
+                        return Err(self.error(
+                            CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
+                            &span,
+                        ));
+                    }
+
+                    EdgeParams::IndexRange(index_range_edge_params)
+                } else {
+                    match edge_params {
+                        Some(edge_params) => EdgeParams::Type(self.ast_type_to_def(edge_params)?),
+                        None => EdgeParams::Unit,
+                    }
                 };
+
                 let object = self.ast_type_to_def(object)?;
 
                 Ok(Some(
@@ -300,10 +323,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Entry::Occupied(occupied) => ImplicitDefId::Reused(*occupied.get()),
                 }
             }
+            RelationIdent::Indexed => ImplicitDefId::Reused(self.compiler.defs.indexed_relation()),
             RelationIdent::Anonymous => {
                 ImplicitDefId::Reused(self.compiler.defs.anonymous_relation())
             }
-            _ => todo!(),
         }
     }
 

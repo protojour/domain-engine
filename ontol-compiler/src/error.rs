@@ -53,6 +53,8 @@ pub enum CompileError {
     DuplicateAnonymousRelationship,
     #[error("cannot mix named and anonymous relations on the same type")]
     CannotMixNamedAndAnonymousRelations,
+    #[error("cannot mix index relation identifiers and edge types")]
+    CannotMixIndexedRelationIdentsAndEdgeTypes,
     #[error("no properties expected")]
     NoPropertiesExpected,
     #[error("expected anonymous property")]

@@ -85,8 +85,7 @@ pub struct Relation<'m> {
 #[derive(Clone, Debug)]
 pub enum RelationIdent<'m> {
     Named(&'m str),
-    Index(i32),
-    IndexRange(Range<Option<u32>>),
+    Indexed,
     Anonymous,
 }
 
@@ -99,11 +98,18 @@ pub struct Relationship {
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
 
-    pub edge_params: DefId,
+    pub edge_params: EdgeParams,
 
     pub object: DefId,
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
+}
+
+#[derive(Debug)]
+pub enum EdgeParams {
+    Unit,
+    Type(DefId),
+    IndexRange(Range<Option<u16>>),
 }
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
@@ -153,8 +159,9 @@ pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
     next_def_id: DefId,
     next_expr_id: ExprId,
-    anonymous_relation: DefId,
     unit: DefId,
+    anonymous_relation: DefId,
+    indexed_relation: DefId,
     int: DefId,
     number: DefId,
     string: DefId,
@@ -169,8 +176,9 @@ impl<'m> Defs<'m> {
             mem,
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
-            anonymous_relation: DefId(0),
             unit: DefId(0),
+            anonymous_relation: DefId(0),
+            indexed_relation: DefId(0),
             int: DefId(0),
             number: DefId(0),
             string: DefId(0),
@@ -195,6 +203,16 @@ impl<'m> Defs<'m> {
             CORE_PKG,
             SourceSpan::none(),
         );
+        defs.indexed_relation = defs.add_def(
+            DefKind::Relation(Relation {
+                ident: RelationIdent::Anonymous,
+                subject_prop: None,
+                object_prop: None,
+            }),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
+
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
         defs.string = defs.add_primitive(Primitive::String);
@@ -208,6 +226,10 @@ impl<'m> Defs<'m> {
 
     pub fn anonymous_relation(&self) -> DefId {
         self.anonymous_relation
+    }
+
+    pub fn indexed_relation(&self) -> DefId {
+        self.indexed_relation
     }
 
     pub fn int(&self) -> DefId {

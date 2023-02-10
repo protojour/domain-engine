@@ -95,10 +95,10 @@ fn test_entity_self_relationship() {
         assert_json_io_matches!(
             node,
             json!({
-                "name": "b",
+                "name": "a",
                 "children": [
                     {
-                        "name": "a",
+                        "name": "b",
                     }
                 ]
             })
@@ -109,11 +109,11 @@ fn test_entity_self_relationship() {
             json!({
                 "name": "b",
                 "parent": {
-                    "name": "c",
+                    "name": "a",
                 },
                 "children": [
                     {
-                        "name": "a",
+                        "name": "c",
                     }
                 ]
             })

@@ -363,3 +363,14 @@ fn various_monadic_properties() {
     "#
     .compile_fail()
 }
+
+#[test]
+fn mix_of_index_and_edge_type() {
+    r#"
+    (type! foo)
+    (type! bar)
+
+    (rel! (foo) 0 @(bar) (string)) ;; ERROR cannot mix index relation identifiers and edge types
+    "#
+    .compile_fail()
+}
