@@ -17,7 +17,6 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, EdgeParams, PropertyCardinality, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
-    sequence::SequenceElement,
     types::{DefTypes, Type},
 };
 
@@ -209,17 +208,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let operator_ids: SmallVec<_> = tuple
                     .elements()
-                    .iter()
-                    .map(|element| match element {
-                        SequenceElement::Undefined => {
-                            self.get_serde_operator_id(DefId::unit()).unwrap()
-                        }
-                        SequenceElement::Defined(relationship_id) => {
-                            let Ok((relationship, _relation)) = self
-                            .get_relationship_meta(*relationship_id)
-                        else {
-                            panic!("Problem getting relationship meta");
-                        };
+                    .map(|(_, element)| match element {
+                        None => self.get_serde_operator_id(DefId::unit()).unwrap(),
+                        Some(relationship_id) => {
+                            let (relationship, _relation) = self
+                                .get_relationship_meta(relationship_id)
+                                .expect("Problem getting relationship meta");
 
                             self.get_serde_operator_id(relationship.object)
                                 .expect("no inner operator")

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use tracing::debug;
 
 use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
@@ -6,15 +8,37 @@ use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
 /// where elements may be of different types.
 #[derive(Debug, Default)]
 pub struct Sequence {
-    elements: Vec<SequenceElement>,
+    /// elements are stored in a map to avoid large "holes"
+    /// of potentially undefined index gaps.
+    ///
+    /// TODO: Map should instead contain contiguous regions, i.e. Range as key,
+    /// which are continuously merged together in define_relationship
+    elements: BTreeMap<u16, RelationshipId>,
 
     /// Whether the last element continues to be accepted ad infinitum.
     infinite: bool,
 }
 
 impl Sequence {
-    pub fn elements(&self) -> &[SequenceElement] {
-        self.elements.as_slice()
+    pub fn elements(&self) -> impl Iterator<Item = (u16, Option<RelationshipId>)> + '_ {
+        let mut next_index: u16 = 0;
+        let mut iterator = self.elements.iter().peekable();
+
+        // enumerate indexes, yield Some(_) if index exists in the map.
+        std::iter::from_fn(move || {
+            let item = match iterator.peek() {
+                None => None,
+                Some((index, relationship_id)) if **index == next_index => {
+                    let elem = Some((**index, Some(**relationship_id)));
+                    iterator.next();
+                    elem
+                }
+                Some(_) => Some((next_index, None)),
+            };
+
+            next_index += 1;
+            item
+        })
     }
 
     pub fn is_infinite(&self) -> bool {
@@ -36,7 +60,6 @@ impl Sequence {
         match (range.start, range.end) {
             (start, Some(end)) => {
                 let start = start.unwrap_or(0);
-                self.ensure_size(end as usize);
                 for index in start..end {
                     self.define_element(index, relationship_id)?;
                 }
@@ -44,7 +67,6 @@ impl Sequence {
             }
             (Some(_), None) if self.infinite => Err(CompileError::OverlappingSequenceIndexes),
             (Some(start), None) => {
-                self.ensure_size(start as usize + 1);
                 self.define_element(start, relationship_id)?;
                 self.infinite = true;
                 Ok(())
@@ -53,33 +75,14 @@ impl Sequence {
         }
     }
 
-    fn ensure_size(&mut self, size: usize) {
-        while self.elements.len() < size {
-            self.elements.push(SequenceElement::Undefined)
-        }
-    }
-
     fn define_element(
         &mut self,
         index: u16,
         relationship_id: RelationshipId,
     ) -> Result<(), CompileError> {
-        let element = self.elements.get_mut(index as usize).unwrap();
-        match element {
-            SequenceElement::Defined(..) => Err(CompileError::OverlappingSequenceIndexes),
-            SequenceElement::Undefined => {
-                *element = SequenceElement::Defined(relationship_id);
-                Ok(())
-            }
+        match self.elements.insert(index, relationship_id) {
+            Some(_) => Err(CompileError::OverlappingSequenceIndexes),
+            None => Ok(()),
         }
     }
-}
-
-#[derive(Default, Debug)]
-pub enum SequenceElement {
-    /// Corresponds to the Unit type:
-    #[default]
-    Undefined,
-
-    Defined(RelationshipId),
 }
