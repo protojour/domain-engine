@@ -52,7 +52,8 @@ pub enum SerdeOperator {
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),
-    Tuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
+    FiniteTuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
+    InfiniteTuple(SmallVec<[SerdeOperatorId; 3]>, DefId),
     Array(DefId, SerdeOperatorId),
     RangeArray(DefId, Range<Option<u16>>, SerdeOperatorId),
     // A type with just one anonymous property
@@ -117,12 +118,19 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
-            SerdeOperator::Tuple(ids, _) => {
+            SerdeOperator::FiniteTuple(ids, _) => {
                 let processors = ids
                     .iter()
                     .map(|id| self.env.new_serde_processor(*id))
                     .collect::<Vec<_>>();
                 write!(f, "[{}]", CommaSeparated(&processors))
+            }
+            SerdeOperator::InfiniteTuple(ids, _) => {
+                let processors = ids
+                    .iter()
+                    .map(|id| self.env.new_serde_processor(*id))
+                    .collect::<Vec<_>>();
+                write!(f, "[{}..]", CommaSeparated(&processors))
             }
             SerdeOperator::Array(_, element_operator_id) => {
                 let inner_processor = self.env.new_serde_processor(*element_operator_id);

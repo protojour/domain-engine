@@ -1,14 +1,22 @@
 use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
 
+/// A tuple represents both finite and infinite arrays,
+/// where elements may be of different types.
 #[derive(Debug, Default)]
 pub struct Tuple {
     elements: Vec<TupleElement>,
-    finite: bool,
+
+    /// Whether the last element continues to be accepted ad infinitum.
+    infinite: bool,
 }
 
 impl Tuple {
     pub fn elements(&self) -> &[TupleElement] {
         self.elements.as_slice()
+    }
+
+    pub fn is_infinite(&self) -> bool {
+        self.infinite
     }
 
     pub fn define_relationship(
@@ -30,11 +38,11 @@ impl Tuple {
                 }
                 Ok(())
             }
-            (Some(_), None) if !self.finite => Err(CompileError::OverlappingTupleIndexes),
+            (Some(_), None) if self.infinite => Err(CompileError::OverlappingTupleIndexes),
             (Some(start), None) => {
                 self.ensure_size(start as usize);
                 self.define_element(start, relationship_id)?;
-                self.finite = false;
+                self.infinite = true;
                 Ok(())
             }
             (None, None) => Err(CompileError::UnsupportedTupleIndexType),
@@ -65,7 +73,9 @@ impl Tuple {
 
 #[derive(Default, Debug)]
 pub enum TupleElement {
+    /// Corresponds to the Unit type:
     #[default]
     Undefined,
+
     Defined(RelationshipId),
 }

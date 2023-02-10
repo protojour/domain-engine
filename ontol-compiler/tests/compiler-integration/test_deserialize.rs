@@ -203,7 +203,7 @@ fn deserialize_tuple() {
         );
         assert_error_msg!(
             foo.deserialize_data_variant(json!([77])),
-            "invalid length 1, expected tuple with length 2 at line 1 column 4"
+            "invalid length 1, expected finite tuple with length 2 at line 1 column 4"
         );
         assert_error_msg!(
             foo.deserialize_data_variant(json!([11, "a", "boom"])),
@@ -231,7 +231,7 @@ fn deserialize_tuple_new() {
         );
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
-            "invalid length 1, expected tuple with length 2 at line 1 column 4"
+            "invalid length 1, expected finite tuple with length 2 at line 1 column 4"
         );
         assert_error_msg!(
             foo.deserialize_data(json!([11, "a", "boom"])),

@@ -126,15 +126,14 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
-/// match a tuple
-pub struct TupleMatcher<'e> {
+pub struct FiniteTupleMatcher<'e> {
     pub elements: &'e [SerdeOperatorId],
     pub def_id: DefId,
 }
 
-impl<'e> ValueMatcher for TupleMatcher<'e> {
+impl<'e> ValueMatcher for FiniteTupleMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "tuple with length {}", self.elements.len())
+        write!(f, "finite tuple with length {}", self.elements.len())
     }
 
     fn match_seq(&self) -> Result<SeqMatch, ()> {
@@ -157,6 +156,42 @@ impl<'e> ValueMatcher for TupleMatcher<'e> {
             Ok(())
         } else {
             Err(())
+        }
+    }
+}
+
+pub struct InfiniteTupleMatcher<'e> {
+    pub elements: &'e [SerdeOperatorId],
+    pub def_id: DefId,
+}
+
+impl<'e> ValueMatcher for InfiniteTupleMatcher<'e> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "infinite tuple")
+    }
+
+    fn match_seq(&self) -> Result<SeqMatch, ()> {
+        Ok(SeqMatch {
+            type_def_id: self.def_id,
+            edge_operator_id: None,
+        })
+    }
+
+    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+        assert!(self.elements.len() > 0);
+
+        if index < self.elements.len() - 1 {
+            Some(self.elements[index])
+        } else {
+            self.elements.last().copied()
+        }
+    }
+
+    fn match_seq_end(&self, end: usize) -> Result<(), ()> {
+        if end < self.elements.len() {
+            Err(())
+        } else {
+            Ok(())
         }
     }
 }

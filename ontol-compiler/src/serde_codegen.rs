@@ -99,7 +99,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some((
                     self.alloc_operator_id(type_def_id),
-                    SerdeOperator::Tuple(operator_ids, type_def_id),
+                    SerdeOperator::FiniteTuple(operator_ids, type_def_id),
                 ))
             }
             Some(Type::Array(_)) => {
@@ -220,7 +220,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                 });
 
-                SerdeOperator::Tuple(operator_ids.collect(), type_def_id)
+                if tuple.is_infinite() {
+                    SerdeOperator::InfiniteTuple(operator_ids.collect(), type_def_id)
+                } else {
+                    SerdeOperator::FiniteTuple(operator_ids.collect(), type_def_id)
+                }
             }
         }
     }

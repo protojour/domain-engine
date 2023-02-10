@@ -15,8 +15,9 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher, RangeArrayMatcher,
-        StringMatcher, TupleMatcher, UnionMatcher, ValueMatcher,
+        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, FiniteTupleMatcher,
+        InfiniteTupleMatcher, IntMatcher, RangeArrayMatcher, StringMatcher, UnionMatcher,
+        ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
 };
@@ -103,13 +104,22 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     }),
                 )
             }
-            SerdeOperator::Tuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
+            SerdeOperator::FiniteTuple(elems, def_id) => serde::de::Deserializer::deserialize_seq(
                 deserializer,
-                self.matcher_visitor_no_edge(TupleMatcher {
+                self.matcher_visitor_no_edge(FiniteTupleMatcher {
                     elements: elems,
                     def_id: *def_id,
                 }),
             ),
+            SerdeOperator::InfiniteTuple(elems, def_id) => {
+                serde::de::Deserializer::deserialize_seq(
+                    deserializer,
+                    self.matcher_visitor_no_edge(InfiniteTupleMatcher {
+                        elements: elems,
+                        def_id: *def_id,
+                    }),
+                )
+            }
             SerdeOperator::Array(element_def_id, element_operator_id) => {
                 serde::de::Deserializer::deserialize_seq(
                     deserializer,
