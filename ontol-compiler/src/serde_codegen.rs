@@ -249,6 +249,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         let array_operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
         self.serde_operators.push(match range {
+            // (None, None) => SerdeOperator::InfiniteSequence([element])
             (None, None) => SerdeOperator::Array(element_def_id, operator_id),
             (start, end) => {
                 SerdeOperator::RangeArray(element_def_id, Range { start, end }, operator_id)

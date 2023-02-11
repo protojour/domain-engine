@@ -270,7 +270,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let seq_match = self
+        let seq_type_def_id = self
             .matcher
             .match_seq()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
@@ -280,9 +280,10 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         loop {
             let processor = match self.matcher.match_seq_element(index) {
-                Some(operator_id) => self
-                    .env
-                    .new_serde_processor_with_edge(operator_id, seq_match.edge_operator_id),
+                Some(element_match) => self.env.new_serde_processor_with_edge(
+                    element_match.element_operator_id,
+                    element_match.edge_operator_id,
+                ),
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
@@ -290,7 +291,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                         Value::unit(),
                         Value {
                             data: Data::Vec(output),
-                            type_def_id: seq_match.type_def_id,
+                            type_def_id: seq_type_def_id,
                         },
                     ));
                 }
@@ -307,7 +308,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                             Value::unit(),
                             Value {
                                 data: Data::Vec(output),
-                                type_def_id: seq_match.type_def_id,
+                                type_def_id: seq_type_def_id,
                             },
                         )),
                         Err(_) => Err(serde::de::Error::invalid_length(index, &self)),

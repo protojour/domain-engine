@@ -17,8 +17,8 @@ impl<'v> Display for ExpectingMatching<'v> {
     }
 }
 
-pub struct SeqMatch {
-    pub type_def_id: DefId,
+pub struct SeqElementMatch {
+    pub element_operator_id: SerdeOperatorId,
     pub edge_operator_id: Option<SerdeOperatorId>,
 }
 
@@ -42,11 +42,11 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_seq(&self) -> Result<SeqMatch, ()> {
+    fn match_seq(&self) -> Result<DefId, ()> {
         Err(())
     }
 
-    fn match_seq_element(&self, _: usize) -> Option<SerdeOperatorId> {
+    fn match_seq_element(&self, _: usize) -> Option<SeqElementMatch> {
         None
     }
 
@@ -148,16 +148,16 @@ impl<'e> ValueMatcher for FiniteSequenceMatcher<'e> {
         write!(f, "sequence with length {}", self.elements.len())
     }
 
-    fn match_seq(&self) -> Result<SeqMatch, ()> {
-        Ok(SeqMatch {
-            type_def_id: self.def_id,
-            edge_operator_id: None,
-        })
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.def_id)
     }
 
-    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
         if index < self.elements.len() {
-            Some(self.elements[index])
+            Some(SeqElementMatch {
+                element_operator_id: self.elements[index],
+                edge_operator_id: None,
+            })
         } else {
             None
         }
@@ -182,18 +182,21 @@ impl<'e> ValueMatcher for InfiniteSequenceMatcher<'e> {
         write!(f, "sequence with minimum length {}", self.elements.len())
     }
 
-    fn match_seq(&self) -> Result<SeqMatch, ()> {
-        Ok(SeqMatch {
-            type_def_id: self.def_id,
-            edge_operator_id: None,
-        })
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.def_id)
     }
 
-    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
         if index < self.elements.len() - 1 {
-            Some(self.elements[index])
+            Some(SeqElementMatch {
+                element_operator_id: self.elements[index],
+                edge_operator_id: None,
+            })
         } else {
-            self.elements.last().copied()
+            self.elements.last().map(|operator_id| SeqElementMatch {
+                element_operator_id: *operator_id,
+                edge_operator_id: None,
+            })
         }
     }
 
@@ -217,15 +220,15 @@ impl ValueMatcher for ArrayMatcher {
         write!(f, "array")
     }
 
-    fn match_seq(&self) -> Result<SeqMatch, ()> {
-        Ok(SeqMatch {
-            type_def_id: self.element_def_id,
-            edge_operator_id: self.edge_operator_id,
-        })
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.element_def_id)
     }
 
-    fn match_seq_element(&self, _: usize) -> Option<SerdeOperatorId> {
-        Some(self.element_operator_id)
+    fn match_seq_element(&self, _: usize) -> Option<SeqElementMatch> {
+        Some(SeqElementMatch {
+            element_operator_id: self.element_operator_id,
+            edge_operator_id: self.edge_operator_id,
+        })
     }
 
     fn match_seq_end(&self, _: usize) -> Result<(), ()> {
@@ -253,17 +256,17 @@ impl ValueMatcher for RangeArrayMatcher {
         write!(f, "]")
     }
 
-    fn match_seq(&self) -> Result<SeqMatch, ()> {
-        Ok(SeqMatch {
-            type_def_id: self.element_def_id,
-            edge_operator_id: self.edge_operator_id,
-        })
+    fn match_seq(&self) -> Result<DefId, ()> {
+        Ok(self.element_def_id)
     }
 
-    fn match_seq_element(&self, index: usize) -> Option<SerdeOperatorId> {
+    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
         match self.range.end {
             Some(end) if index >= end as usize => None,
-            _ => Some(self.element_operator_id),
+            _ => Some(SeqElementMatch {
+                element_operator_id: self.element_operator_id,
+                edge_operator_id: self.edge_operator_id,
+            }),
         }
     }
 
