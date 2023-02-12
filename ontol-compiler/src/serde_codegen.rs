@@ -197,8 +197,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ranges: Default::default(),
                 };
 
-                for (_, element) in sequence.elements() {
-                    sequence_range_builder.push_operator(match element {
+                let mut element_iterator = sequence.elements().peekable();
+
+                while let Some((_, element)) = element_iterator.next() {
+                    let operator_id = match element {
                         None => self.get_serde_operator_id(DefId::unit()).unwrap(),
                         Some(relationship_id) => {
                             let (relationship, _relation) = self
@@ -208,11 +210,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             self.get_serde_operator_id(relationship.object)
                                 .expect("no inner operator")
                         }
-                    });
-                }
+                    };
 
-                if sequence.is_infinite() {
-                    sequence_range_builder.set_infinite();
+                    if element_iterator.peek().is_some() || !sequence.is_infinite() {
+                        sequence_range_builder.push_required_operator(operator_id);
+                    } else {
+                        // last operator is infinite and accepts zero or more items
+                        sequence_range_builder.push_infinite_operator(operator_id);
+                    }
                 }
 
                 debug!("sequence ranges: {:#?}", sequence_range_builder.ranges);
@@ -387,7 +392,7 @@ struct SequenceRangeBuilder {
 }
 
 impl SequenceRangeBuilder {
-    fn push_operator(&mut self, operator_id: SerdeOperatorId) {
+    fn push_required_operator(&mut self, operator_id: SerdeOperatorId) {
         match self.ranges.last_mut() {
             Some(range) => {
                 if operator_id == range.operator_id {
@@ -411,13 +416,11 @@ impl SequenceRangeBuilder {
         }
     }
 
-    fn set_infinite(&mut self) {
-        if let Some(last) = self.ranges.last().cloned() {
-            self.ranges.push(SequenceRange {
-                operator_id: last.operator_id,
-                finite_repetition: None,
-            });
-        }
+    fn push_infinite_operator(&mut self, operator_id: SerdeOperatorId) {
+        self.ranges.push(SequenceRange {
+            operator_id,
+            finite_repetition: None,
+        })
     }
 }
 

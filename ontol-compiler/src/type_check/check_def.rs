@@ -178,19 +178,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 properties.push((relationship.0, *span));
             }
             (RelationIdent::Indexed, SubjectProperties::Empty) => {
-                let mut tuple = Sequence::default();
+                let mut sequence = Sequence::default();
 
                 if let Err(error) =
-                    tuple.define_relationship(&relationship.1.rel_params, relationship.0)
+                    sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
 
-                properties.subject = SubjectProperties::Sequence(tuple);
+                properties.subject = SubjectProperties::Sequence(sequence);
             }
-            (RelationIdent::Indexed, SubjectProperties::Sequence(tuple)) => {
+            (RelationIdent::Indexed, SubjectProperties::Sequence(sequence)) => {
                 if let Err(error) =
-                    tuple.define_relationship(&relationship.1.rel_params, relationship.0)
+                    sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }

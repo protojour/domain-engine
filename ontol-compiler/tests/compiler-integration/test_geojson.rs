@@ -12,12 +12,12 @@ fn test_geojson() {
     (rel! (position) 0..2 (int))
 
     (type! position-list)
-    (rel! (position-list) ..1 (position))
-    (rel! (position-list) 1.. (position))
+    (rel! (position-list) ..2 (position))
+    (rel! (position-list) 2.. (position))
 
     (type! position-ring)
-    (rel! (position-ring) ..3 (position))
-    (rel! (position-ring) 3.. (position))
+    (rel! (position-ring) ..4 (position))
+    (rel! (position-ring) 4.. (position))
 
     (type! Geometry)
     (type! LeafGeometry)

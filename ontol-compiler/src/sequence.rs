@@ -16,6 +16,7 @@ pub struct Sequence {
     elements: BTreeMap<u16, RelationshipId>,
 
     /// Whether the last element continues to be accepted ad infinitum.
+    /// If the sequence is infinite, the last element is accepted zero or more times.
     infinite: bool,
 }
 

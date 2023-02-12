@@ -155,6 +155,26 @@ fn sequence_mix2() {
 }
 
 #[test]
+fn sequence_overlapping_indices() {
+    r#"
+    (type! u)
+    (rel! (u) 0..3 (int))
+    (rel! (u) 2..4 (string)) ;; ERROR overlapping indexes
+    "#
+    .compile_fail();
+}
+
+#[test]
+fn sequence_ambiguous_infinite_tail() {
+    r#"
+    (type! u)
+    (rel! (u) 0.. (int))
+    (rel! (u) 1.. (string)) ;; ERROR overlapping indexes
+    "#
+    .compile_fail();
+}
+
+#[test]
 fn no_need_to_support_differing_cardinality_in_unions_at_least_yet() {
     r#"
     (type! u)

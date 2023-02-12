@@ -126,12 +126,13 @@ fn test_serde_many_cardinality() {
 }
 
 #[test]
-fn test_serde_infinite_tuple() {
+fn test_serde_infinite_sequence() {
     r#"
     (type! foo)
     (rel! (foo) ..2 (int))
     (rel! (foo) 2..4 (string))
-    (rel! (foo) 5.. (int))
+    (rel! (foo) 5..6 (int))
+    (rel! (foo) 6.. (int))
     "#
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -161,7 +162,6 @@ fn test_jsonml() {
     ; (also in serialization if this equals the default value!)
     (rel! (tag) 1 (attributes))
 
-    ; BUG: this should be zero or more, not one or more
     (rel! (tag) 2.. (element))
 
     (rel! (tag_name) _ "div")
@@ -169,16 +169,17 @@ fn test_jsonml() {
     (rel! (tag_name) _ "strong")
 
     ; BUG: should accept any string as key
-    (rel! (attributes) prop? (string))
+    (rel! (attributes) class? (string))
     "#
     .compile_ok(|env| {
         let element = TypeBinding::new(env, "element");
 
         assert_json_io_matches!(element, json!("text"));
+        assert_json_io_matches!(element, json!(["div", {}]));
         assert_json_io_matches!(element, json!(["div", {}, "text"]));
         assert_json_io_matches!(
             element,
-            json!(["div", {}, ["em", {}, "text1"], ["strong", {}, "text2"]])
+            json!(["div", {}, ["em", {}, "text1"], ["strong", { "class": "foo" }]])
         );
     });
 }
