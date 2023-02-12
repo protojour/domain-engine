@@ -49,10 +49,18 @@ pub enum Data {
     Rational(Box<num::rational::BigRational>),
     String(String),
     Uuid(uuid::Uuid),
-    /// A collection of attributes keyed by relation
+
+    /// A collection of attributes keyed by property.
     Map(BTreeMap<PropertyId, Attribute>),
-    /// Represents both dynamic lists and static tuples at runtime
-    Vec(Vec<Attribute>),
+
+    /// A sequence of attributes.
+    ///
+    /// The difference between a Sequence and a Map is that
+    /// sequences use numeric keys instead of PropertyId.
+    ///
+    /// Some sequences will be uniform (all elements have the same type).
+    /// Other sequences will behave more like tuples.
+    Sequence(Vec<Attribute>),
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -80,8 +88,10 @@ impl PropertyId {
 /// An Attribute is a Value that is part of another value.
 ///
 /// An attribute may be parameterized (rel_params).
+/// The attribute parameter should be non-unit when the relationship between
+/// the container (subject) and the map (object) is parameterized.
+///
 /// The parameter _value_ is itself a `Value`.
-/// Most attribute parameters is usually just `unit`, i.e. no parameters.
 ///
 /// The attribute value is also just a Value.
 #[derive(Clone, Debug)]

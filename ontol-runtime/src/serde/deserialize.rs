@@ -252,7 +252,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
                     return Ok(Attribute::with_unit_params(Value {
-                        data: Data::Vec(output),
+                        data: Data::Sequence(output),
                         type_def_id: seq_type_def_id,
                     }));
                 }
@@ -266,7 +266,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                 None => {
                     return match self.matcher.match_seq_end() {
                         Ok(_) => Ok(Attribute::with_unit_params(Value {
-                            data: Data::Vec(output),
+                            data: Data::Sequence(output),
                             type_def_id: seq_type_def_id,
                         })),
                         Err(_) => Err(serde::de::Error::invalid_length(len, &self)),

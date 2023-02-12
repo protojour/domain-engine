@@ -200,7 +200,7 @@ fn deserialize_finite_non_uniform_sequence() {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data(json!([42, "a"])),
-            Ok(Data::Vec(vector)) if vector.len() == 2
+            Ok(Data::Sequence(vec)) if vec.len() == 2
         );
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
@@ -227,7 +227,7 @@ fn deserialize_finite_uniform_sequence() {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data(json!([42, 42])),
-            Ok(Data::Vec(vector)) if vector.len() == 2
+            Ok(Data::Sequence(vector)) if vector.len() == 2
         );
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
