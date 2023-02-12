@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Range};
+use std::fmt::Display;
 
 use crate::{
     discriminator::Discriminant,
@@ -7,7 +7,7 @@ use crate::{
     DefId,
 };
 
-use super::{MapType, SerdeOperator, SerdeOperatorId, ValueUnionType};
+use super::{MapType, SequenceRange, SerdeOperator, SerdeOperatorId, ValueUnionType};
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
 
@@ -46,11 +46,11 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_seq_element(&self, _: usize) -> Option<SeqElementMatch> {
+    fn match_next_seq_element(&mut self) -> Option<SeqElementMatch> {
         None
     }
 
-    fn match_seq_end(&self, _: usize) -> Result<(), ()> {
+    fn match_seq_end(&self) -> Result<(), ()> {
         Err(())
     }
 
@@ -138,150 +138,87 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
-pub struct FiniteSequenceMatcher<'e> {
-    pub elements: &'e [SerdeOperatorId],
+pub struct SequenceMatcher<'e> {
+    pub ranges: &'e [SequenceRange],
+    pub range_cursor: usize,
+    pub repetition_cursor: u16,
     pub def_id: DefId,
+    pub edge_operator_id: Option<SerdeOperatorId>,
 }
 
-impl<'e> ValueMatcher for FiniteSequenceMatcher<'e> {
+impl<'e> ValueMatcher for SequenceMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "sequence with length {}", self.elements.len())
+        let mut len: usize = 0;
+        let mut finite = true;
+        for range in self.ranges {
+            if let Some(finite_repetition) = &range.finite_repetition {
+                finite = true;
+                len += *finite_repetition as usize;
+            } else {
+                finite = false;
+            }
+        }
+
+        if finite {
+            write!(f, "sequence with length {len}")
+        } else {
+            write!(f, "sequence with minimum length {len}")
+        }
     }
 
     fn match_seq(&self) -> Result<DefId, ()> {
         Ok(self.def_id)
     }
 
-    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
-        if index < self.elements.len() {
-            Some(SeqElementMatch {
-                element_operator_id: self.elements[index],
-                edge_operator_id: None,
-            })
-        } else {
-            None
+    fn match_next_seq_element(&mut self) -> Option<SeqElementMatch> {
+        loop {
+            let range = &self.ranges[self.range_cursor];
+
+            if let Some(finite_repetition) = range.finite_repetition {
+                if self.repetition_cursor < finite_repetition {
+                    self.repetition_cursor += 1;
+
+                    return Some(SeqElementMatch {
+                        element_operator_id: range.operator_id,
+                        edge_operator_id: self.edge_operator_id,
+                    });
+                } else {
+                    self.range_cursor += 1;
+                    self.repetition_cursor = 0;
+
+                    if self.range_cursor == self.ranges.len() {
+                        return None;
+                    } else {
+                        continue;
+                    }
+                }
+            } else {
+                return Some(SeqElementMatch {
+                    element_operator_id: range.operator_id,
+                    edge_operator_id: self.edge_operator_id,
+                });
+            }
         }
     }
 
-    fn match_seq_end(&self, end: usize) -> Result<(), ()> {
-        if end == self.elements.len() {
-            Ok(())
-        } else {
-            Err(())
+    fn match_seq_end(&self) -> Result<(), ()> {
+        if self.range_cursor == self.ranges.len() {
+            return Ok(());
+        } else if !self.ranges.is_empty() && self.range_cursor < self.ranges.len() - 1 {
+            return Err(());
         }
-    }
-}
 
-pub struct InfiniteSequenceMatcher<'e> {
-    pub elements: &'e [SerdeOperatorId],
-    pub def_id: DefId,
-}
-
-impl<'e> ValueMatcher for InfiniteSequenceMatcher<'e> {
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "sequence with minimum length {}", self.elements.len())
-    }
-
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.def_id)
-    }
-
-    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
-        if index < self.elements.len() - 1 {
-            Some(SeqElementMatch {
-                element_operator_id: self.elements[index],
-                edge_operator_id: None,
-            })
-        } else {
-            self.elements.last().map(|operator_id| SeqElementMatch {
-                element_operator_id: *operator_id,
-                edge_operator_id: None,
-            })
-        }
-    }
-
-    fn match_seq_end(&self, end: usize) -> Result<(), ()> {
-        if end < self.elements.len() {
-            Err(())
+        let range = &self.ranges[self.range_cursor];
+        if let Some(finite_repetition) = range.finite_repetition {
+            // note: repetition cursor has already been increased in match_next_seq_element
+            if self.repetition_cursor - 1 < finite_repetition {
+                Err(())
+            } else {
+                Ok(())
+            }
         } else {
             Ok(())
         }
-    }
-}
-
-pub struct ArrayMatcher {
-    pub element_def_id: DefId,
-    pub element_operator_id: SerdeOperatorId,
-    pub edge_operator_id: Option<SerdeOperatorId>,
-}
-
-impl ValueMatcher for ArrayMatcher {
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "array")
-    }
-
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.element_def_id)
-    }
-
-    fn match_seq_element(&self, _: usize) -> Option<SeqElementMatch> {
-        Some(SeqElementMatch {
-            element_operator_id: self.element_operator_id,
-            edge_operator_id: self.edge_operator_id,
-        })
-    }
-
-    fn match_seq_end(&self, _: usize) -> Result<(), ()> {
-        Ok(())
-    }
-}
-
-pub struct RangeArrayMatcher {
-    pub element_def_id: DefId,
-    pub range: Range<Option<u16>>,
-    pub element_operator_id: SerdeOperatorId,
-    pub edge_operator_id: Option<SerdeOperatorId>,
-}
-
-impl ValueMatcher for RangeArrayMatcher {
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "array[")?;
-        if let Some(start) = self.range.start {
-            write!(f, "{start}")?;
-        }
-        write!(f, "..")?;
-        if let Some(end) = self.range.end {
-            write!(f, "{end}")?;
-        }
-        write!(f, "]")
-    }
-
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.element_def_id)
-    }
-
-    fn match_seq_element(&self, index: usize) -> Option<SeqElementMatch> {
-        match self.range.end {
-            Some(end) if index >= end as usize => None,
-            _ => Some(SeqElementMatch {
-                element_operator_id: self.element_operator_id,
-                edge_operator_id: self.edge_operator_id,
-            }),
-        }
-    }
-
-    fn match_seq_end(&self, index: usize) -> Result<(), ()> {
-        if let Some(start) = self.range.start {
-            if index < start as usize {
-                return Err(());
-            }
-        }
-        if let Some(end) = self.range.end {
-            if index > end as usize {
-                return Err(());
-            }
-        }
-        Ok(())
     }
 }
 

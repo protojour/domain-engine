@@ -383,20 +383,7 @@ fn convert_cardinality(
 ) -> (PropertyCardinality, ValueCardinality) {
     match ast_cardinality {
         ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::One),
-        ast::Cardinality::Many(range) => (
-            PropertyCardinality::Mandatory,
-            convert_many_value_cardinality(range),
-        ),
-        ast::Cardinality::OptionalMany(range) => (
-            PropertyCardinality::Optional,
-            convert_many_value_cardinality(range),
-        ),
-    }
-}
-
-fn convert_many_value_cardinality(range: Range<Option<u16>>) -> ValueCardinality {
-    match (range.start, range.end) {
-        (None, None) => ValueCardinality::Many,
-        (start, end) => ValueCardinality::ManyInRange(start, end),
+        ast::Cardinality::Many => (PropertyCardinality::Mandatory, ValueCardinality::Many),
+        ast::Cardinality::OptionalMany => (PropertyCardinality::Optional, ValueCardinality::Many),
     }
 }

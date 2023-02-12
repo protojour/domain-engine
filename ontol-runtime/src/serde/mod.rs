@@ -1,8 +1,6 @@
-use std::{
-    fmt::{Debug, Display},
-    ops::Range,
-};
+use std::fmt::{Debug, Display};
 
+use derive_debug_extras::DebugExtras;
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -42,7 +40,8 @@ pub struct SerdeProcessor<'e> {
 }
 
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
 pub struct SerdeOperatorId(pub u32);
 
 #[derive(Debug)]
@@ -52,16 +51,24 @@ pub enum SerdeOperator {
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),
-    FiniteSequence(SmallVec<[SerdeOperatorId; 3]>, DefId),
-    InfiniteSequence(SmallVec<[SerdeOperatorId; 3]>, DefId),
-    Array(DefId, SerdeOperatorId),
-    RangeArray(DefId, Range<Option<u16>>, SerdeOperatorId),
+    Sequence(SmallVec<[SequenceRange; 3]>, DefId),
     // A type with just one anonymous property
     ValueType(ValueType),
     // A type with multiple anonymous properties, equivalent to a union of types
     ValueUnionType(ValueUnionType),
     // A type with many properties
     MapType(MapType),
+}
+
+/// A matcher for a range within a sequence
+#[derive(Clone, Debug)]
+pub struct SequenceRange {
+    /// Operator to use for this range
+    pub operator_id: SerdeOperatorId,
+    /// If this range is finite, this represents the number of repetitions.
+    /// If None, this range is infinite and accepts 0 or more items.
+    /// An infinite range must be the last range in the sequence to make any sense.
+    pub finite_repetition: Option<u16>,
 }
 
 #[derive(Debug)]
@@ -118,36 +125,28 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
-            SerdeOperator::FiniteSequence(ids, _) => {
-                let processors = ids
-                    .iter()
-                    .map(|id| self.env.new_serde_processor(*id))
-                    .collect::<Vec<_>>();
-                write!(f, "[{}]", CommaSeparated(&processors))
-            }
-            SerdeOperator::InfiniteSequence(ids, _) => {
-                let processors = ids
-                    .iter()
-                    .map(|id| self.env.new_serde_processor(*id))
-                    .collect::<Vec<_>>();
-                write!(f, "[{}..]", CommaSeparated(&processors))
-            }
-            SerdeOperator::Array(_, element_operator_id) => {
-                let inner_processor = self.env.new_serde_processor(*element_operator_id);
-                write!(f, "{inner_processor}[]")
-            }
-            SerdeOperator::RangeArray(_, range, element_operator_id) => {
-                let inner_processor = self.env.new_serde_processor(*element_operator_id);
-                write!(f, "{inner_processor}[")?;
-                if let Some(start) = range.start {
-                    write!(f, "{start}")?;
-                }
-                write!(f, "..")?;
-                if let Some(end) = range.end {
-                    write!(f, "{end}")?;
+            SerdeOperator::Sequence(ranges, _) => {
+                let mut processors = vec![];
+                let mut finite = true;
+                for range in ranges {
+                    if let Some(finite_repetition) = range.finite_repetition {
+                        for _ in 0..finite_repetition {
+                            processors.push(self.env.new_serde_processor(range.operator_id));
+                        }
+                        finite = true;
+                    } else {
+                        finite = false;
+                        processors.push(self.env.new_serde_processor(range.operator_id));
+                    }
                 }
 
-                Ok(())
+                let dot_dot = if finite { "" } else { ".." };
+
+                write!(
+                    f,
+                    "[{processors}{dot_dot}]",
+                    processors = CommaSeparated(&processors)
+                )
             }
             SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
             SerdeOperator::ValueUnionType(_) => write!(f, "union"),

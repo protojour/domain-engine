@@ -110,41 +110,13 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
 fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinality>, Simple<Tree>> {
     if input.peek::<Bracket>() {
         let mut stream: TreeStream = input.next::<Bracket>("expected bracket")?.into();
-
-        let mut has_range = false;
-        let mut start: Option<u16> = None;
-        let mut end: Option<u16> = None;
-
-        if stream.peek::<Num>() {
-            let (s, _) = parse_u16(&mut stream)?;
-            start = Some(s);
-        }
-
-        if stream.peek::<Dot>() {
-            stream.next::<Dot>("expected dot")?;
-            stream.next::<Dot>("expected dot")?;
-            has_range = true;
-        }
-
-        if stream.peek::<Num>() {
-            let (e, _) = parse_u16(&mut stream)?;
-            end = Some(e);
-        }
-
-        if has_range && start.is_none() && end.is_none() {
-            return Err(error("expected array range constraint", stream.span()));
-        }
-
         stream.end()?;
 
         if input.peek::<Questionmark>() {
             let _ = input.next::<Questionmark>("").unwrap();
-            Ok(Some(Cardinality::OptionalMany(std::ops::Range {
-                start,
-                end,
-            })))
+            Ok(Some(Cardinality::OptionalMany))
         } else {
-            Ok(Some(Cardinality::Many(std::ops::Range { start, end })))
+            Ok(Some(Cardinality::Many))
         }
     } else if input.peek::<Questionmark>() {
         let _ = input.next::<Questionmark>("").unwrap();

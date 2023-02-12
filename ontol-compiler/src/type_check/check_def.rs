@@ -279,11 +279,9 @@ impl<'m> CardinalityAdapter<'m> {
     /// Entity relationships are usually optional.
     fn adapt(&self, cardinality: Cardinality) -> Cardinality {
         match (self.domain_ty, self.codomain_ty, cardinality.1) {
-            (
-                Type::DomainEntity(_),
-                Type::DomainEntity(_),
-                ValueCardinality::Many | ValueCardinality::ManyInRange(..),
-            ) => (PropertyCardinality::Optional, cardinality.1),
+            (Type::DomainEntity(_), Type::DomainEntity(_), ValueCardinality::Many) => {
+                (PropertyCardinality::Optional, cardinality.1)
+            }
             _ => cardinality,
         }
     }

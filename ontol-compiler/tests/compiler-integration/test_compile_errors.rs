@@ -56,12 +56,12 @@ fn rel_mix_anonymous_and_named() {
 }
 
 #[test]
-fn rel_array_range_without_start_or_end() {
+fn rel_array_range_with_dots_is_illegal() {
     "
     (type! foo)
     (rel!
         (foo)
-        n[..] ;; ERROR parse error: expected array range constraint
+        n[..] ;; ERROR parse error: expected end of list
         (int)
     )
     "
@@ -362,9 +362,6 @@ fn various_monadic_properties() {
 
     ; bar and string may be related via b many times
     (rel! (bar) array[] (string))
-
-    ; bar and string may be related via c many times, minimum 1
-    (rel! (bar) maybe_array[1..]? (string))
 
     ; a is either a string or null
     (rel! (bar) nullable (string))

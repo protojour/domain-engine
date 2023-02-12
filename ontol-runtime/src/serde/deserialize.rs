@@ -15,9 +15,8 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ArrayMatcher, ConstantStringMatcher, ExpectingMatching, FiniteSequenceMatcher,
-        InfiniteSequenceMatcher, IntMatcher, RangeArrayMatcher, StringMatcher, UnionMatcher,
-        UnitMatcher, ValueMatcher,
+        ConstantStringMatcher, ExpectingMatching, IntMatcher, SequenceMatcher, StringMatcher,
+        UnionMatcher, UnitMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
 };
@@ -105,51 +104,19 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     }),
                 )
             }
-            SerdeOperator::FiniteSequence(elems, def_id) => {
-                serde::de::Deserializer::deserialize_seq(
-                    deserializer,
-                    self.matcher_visitor_no_edge(FiniteSequenceMatcher {
-                        elements: elems,
+            SerdeOperator::Sequence(ranges, def_id) => serde::de::Deserializer::deserialize_seq(
+                deserializer,
+                MatcherVisitor {
+                    matcher: SequenceMatcher {
+                        ranges,
+                        range_cursor: 0,
+                        repetition_cursor: 0,
                         def_id: *def_id,
-                    }),
-                )
-            }
-            SerdeOperator::InfiniteSequence(elems, def_id) => {
-                serde::de::Deserializer::deserialize_seq(
-                    deserializer,
-                    self.matcher_visitor_no_edge(InfiniteSequenceMatcher {
-                        elements: elems,
-                        def_id: *def_id,
-                    }),
-                )
-            }
-            SerdeOperator::Array(element_def_id, element_operator_id) => {
-                serde::de::Deserializer::deserialize_seq(
-                    deserializer,
-                    MatcherVisitor {
-                        matcher: ArrayMatcher {
-                            element_def_id: *element_def_id,
-                            element_operator_id: *element_operator_id,
-                            edge_operator_id: self.edge_operator_id,
-                        },
-                        env: self.env,
+                        edge_operator_id: self.edge_operator_id,
                     },
-                )
-            }
-            SerdeOperator::RangeArray(element_def_id, range, element_operator_id) => {
-                serde::de::Deserializer::deserialize_seq(
-                    deserializer,
-                    MatcherVisitor {
-                        matcher: RangeArrayMatcher {
-                            element_def_id: *element_def_id,
-                            range: range.clone(),
-                            element_operator_id: *element_operator_id,
-                            edge_operator_id: self.edge_operator_id,
-                        },
-                        env: self.env,
-                    },
-                )
-            }
+                    env: self.env,
+                },
+            ),
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
                     .env
@@ -266,7 +233,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         ))
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    fn visit_seq<A>(mut self, mut seq: A) -> Result<Self::Value, A::Error>
     where
         A: serde::de::SeqAccess<'de>,
     {
@@ -275,11 +242,11 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             .match_seq()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
 
-        let mut index = 0;
+        let mut len = 0;
         let mut output = vec![];
 
         loop {
-            let processor = match self.matcher.match_seq_element(index) {
+            let processor = match self.matcher.match_next_seq_element() {
                 Some(element_match) => self.env.new_serde_processor_with_edge(
                     element_match.element_operator_id,
                     element_match.edge_operator_id,
@@ -300,10 +267,10 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
             match seq.next_element_seed(processor)? {
                 Some((edge_params, value)) => {
                     output.push(Attribute { edge_params, value });
-                    index += 1;
+                    len += 1;
                 }
                 None => {
-                    return match self.matcher.match_seq_end(index) {
+                    return match self.matcher.match_seq_end() {
                         Ok(_) => Ok((
                             Value::unit(),
                             Value {
@@ -311,8 +278,8 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                                 type_def_id: seq_type_def_id,
                             },
                         )),
-                        Err(_) => Err(serde::de::Error::invalid_length(index, &self)),
-                    }
+                        Err(_) => Err(serde::de::Error::invalid_length(len, &self)),
+                    };
                 }
             }
         }

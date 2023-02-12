@@ -134,7 +134,7 @@ impl PropertyCardinality {
 pub enum ValueCardinality {
     One,
     Many,
-    ManyInRange(Option<u16>, Option<u16>),
+    // ManyInRange(Option<u16>, Option<u16>),
 }
 
 impl<'m> Relation<'m> {

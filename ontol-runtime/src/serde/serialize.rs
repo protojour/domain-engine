@@ -6,7 +6,7 @@ use crate::{
     value::{Attribute, Data, Value},
 };
 
-use super::{MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, EDGE_PROPERTY};
+use super::{MapType, SequenceRange, SerdeOperator, SerdeProcessor, EDGE_PROPERTY};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
@@ -29,17 +29,8 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => {
                 serializer.serialize_str(cast_ref::<String>(value))
             }
-            SerdeOperator::FiniteSequence(operator_ids, _) => {
-                self.serialize_finite_sequence(cast_ref::<Vec<_>>(value), operator_ids, serializer)
-            }
-            SerdeOperator::InfiniteSequence(operator_ids, _) => self.serialize_infinite_sequence(
-                cast_ref::<Vec<_>>(value),
-                operator_ids,
-                serializer,
-            ),
-            SerdeOperator::Array(_, element_operator_id)
-            | SerdeOperator::RangeArray(_, _, element_operator_id) => {
-                self.serialize_array(value, *element_operator_id, serializer)
+            SerdeOperator::Sequence(ranges, _) => {
+                self.serialize_sequence(cast_ref::<Vec<_>>(value), ranges, serializer)
             }
             SerdeOperator::ValueType(value_type) => self
                 .env
@@ -79,74 +70,45 @@ impl<'e> SerdeProcessor<'e> {
         }
     }
 
-    fn serialize_finite_sequence<S: serde::Serializer>(
+    fn serialize_sequence<S: serde::Serializer>(
         &self,
         elements: &[Attribute],
-        operator_ids: &[SerdeOperatorId],
+        ranges: &[SequenceRange],
         serializer: S,
     ) -> Res<S> {
         let mut seq = serializer.serialize_seq(Some(elements.len()))?;
 
-        for (attr, operator_id) in elements.iter().zip(operator_ids) {
-            seq.serialize_element(&Proxy {
-                value: &attr.value,
-                edge_params: None,
-                processor: self.env.new_serde_processor(*operator_id),
-            })?;
-        }
+        let mut element_iter = elements.into_iter();
 
-        seq.end()
-    }
+        for range in ranges {
+            if let Some(finite_repetition) = range.finite_repetition {
+                for _ in 0..finite_repetition {
+                    let attribute = element_iter.next().unwrap();
 
-    fn serialize_infinite_sequence<S: serde::Serializer>(
-        &self,
-        elements: &[Attribute],
-        operator_ids: &[SerdeOperatorId],
-        serializer: S,
-    ) -> Res<S> {
-        let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-
-        for (index, attr) in elements.iter().enumerate() {
-            let operator_id = if index < operator_ids.len() {
-                operator_ids[index]
-            } else {
-                operator_ids.last().copied().unwrap()
-            };
-
-            seq.serialize_element(&Proxy {
-                value: &attr.value,
-                edge_params: None,
-                processor: self.env.new_serde_processor(operator_id),
-            })?;
-        }
-
-        seq.end()
-    }
-
-    fn serialize_array<S: serde::Serializer>(
-        &self,
-        value: &Value,
-        element_operator_id: SerdeOperatorId,
-        serializer: S,
-    ) -> Res<S> {
-        match &value.data {
-            Data::Vec(elements) => {
-                let processor = self
-                    .env
-                    .new_serde_processor_with_edge(element_operator_id, self.edge_operator_id);
-                let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-                for attr in elements.iter() {
                     seq.serialize_element(&Proxy {
-                        value: &attr.value,
-                        edge_params: attr.edge_params.filter_non_unit(),
-                        processor,
+                        value: &attribute.value,
+                        edge_params: attribute.edge_params.filter_non_unit(),
+                        processor: self.env.new_serde_processor_with_edge(
+                            range.operator_id,
+                            self.edge_operator_id,
+                        ),
                     })?;
                 }
-
-                seq.end()
+            } else {
+                while let Some(attribute) = element_iter.next() {
+                    seq.serialize_element(&Proxy {
+                        value: &attribute.value,
+                        edge_params: attribute.edge_params.filter_non_unit(),
+                        processor: self.env.new_serde_processor_with_edge(
+                            range.operator_id,
+                            self.edge_operator_id,
+                        ),
+                    })?;
+                }
             }
-            other => panic!("BUG: Serialize expected vector, got {other:?}"),
         }
+
+        seq.end()
     }
 
     fn serialize_map<S: serde::Serializer>(

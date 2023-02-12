@@ -196,7 +196,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 (_, ValueCardinality::Many) => {
                                     self.types.intern(Type::Array(object_ty))
                                 }
-                                (_, ValueCardinality::ManyInRange(_, _)) => todo!(),
                             };
                             let (_, typed_expr_ref) = self.check_expr_expect(value, object_ty, ctx);
 

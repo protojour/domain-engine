@@ -1,15 +1,16 @@
-use std::{collections::HashMap, ops::Range};
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use ontol_runtime::{
     serde::{
-        MapType, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionDiscriminator,
-        ValueUnionType,
+        MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType,
+        ValueUnionDiscriminator, ValueUnionType,
     },
     value::PropertyId,
     DefId, RelationId,
 };
 use smallvec::SmallVec;
+use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -25,7 +26,7 @@ pub struct SerdeGenerator<'c, 'm> {
     relations: &'c Relations,
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
-    array_operators: HashMap<(SerdeOperatorId, Option<u16>, Option<u16>), SerdeOperatorId>,
+    array_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
 }
 
 impl<'m> Compiler<'m> {
@@ -192,9 +193,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_object_properties(self, &properties.object)
                 .build(),
             SubjectProperties::Sequence(sequence) => {
-                let operator_ids: SmallVec<_> = sequence
-                    .elements()
-                    .map(|(_, element)| match element {
+                let mut sequence_range_builder = SequenceRangeBuilder {
+                    ranges: Default::default(),
+                };
+
+                for (_, element) in sequence.elements() {
+                    sequence_range_builder.push_operator(match element {
                         None => self.get_serde_operator_id(DefId::unit()).unwrap(),
                         Some(relationship_id) => {
                             let (relationship, _relation) = self
@@ -204,15 +208,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             self.get_serde_operator_id(relationship.object)
                                 .expect("no inner operator")
                         }
-                    })
-                    .collect();
+                    });
+                }
 
                 if sequence.is_infinite() {
-                    assert!(!operator_ids.is_empty());
-                    SerdeOperator::InfiniteSequence(operator_ids, type_def_id)
-                } else {
-                    SerdeOperator::FiniteSequence(operator_ids, type_def_id)
+                    sequence_range_builder.set_infinite();
                 }
+
+                debug!("sequence ranges: {:#?}", sequence_range_builder.ranges);
+
+                SerdeOperator::Sequence(sequence_range_builder.ranges, type_def_id)
             }
         }
     }
@@ -227,36 +232,31 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ValueCardinality::One => (cardinality.0, operator_id),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.array_operator(operator_id, element_def_id, (None, None)),
-            ),
-            ValueCardinality::ManyInRange(start, end) => (
-                cardinality.0,
-                self.array_operator(operator_id, element_def_id, (start, end)),
+                self.many_operator(operator_id, element_def_id),
             ),
         }
     }
 
-    fn array_operator(
+    fn many_operator(
         &mut self,
         operator_id: SerdeOperatorId,
         element_def_id: DefId,
-        range: (Option<u16>, Option<u16>),
     ) -> SerdeOperatorId {
-        if let Some(array_operator_id) = self.array_operators.get(&(operator_id, range.0, range.1))
-        {
+        if let Some(array_operator_id) = self.array_operators.get(&operator_id) {
             return *array_operator_id;
         }
 
         let array_operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
-        self.serde_operators.push(match range {
-            // (None, None) => SerdeOperator::InfiniteSequence([element])
-            (None, None) => SerdeOperator::Array(element_def_id, operator_id),
-            (start, end) => {
-                SerdeOperator::RangeArray(element_def_id, Range { start, end }, operator_id)
-            }
-        });
-        self.array_operators
-            .insert((operator_id, range.0, range.1), array_operator_id);
+        self.serde_operators.push(SerdeOperator::Sequence(
+            [SequenceRange {
+                operator_id,
+                finite_repetition: None,
+            }]
+            .into_iter()
+            .collect(),
+            element_def_id,
+        ));
+        self.array_operators.insert(operator_id, array_operator_id);
         array_operator_id
     }
 }
@@ -379,6 +379,45 @@ impl MapTypeBuilder {
                 )
             }));
         self
+    }
+}
+
+struct SequenceRangeBuilder {
+    ranges: SmallVec<[SequenceRange; 3]>,
+}
+
+impl SequenceRangeBuilder {
+    fn push_operator(&mut self, operator_id: SerdeOperatorId) {
+        match self.ranges.last_mut() {
+            Some(range) => {
+                if operator_id == range.operator_id {
+                    // two or more identical operator ids in row;
+                    // just increase repetition counter:
+                    let finite_repetition = range.finite_repetition.unwrap();
+                    range.finite_repetition = Some(finite_repetition + 1);
+                } else {
+                    self.ranges.push(SequenceRange {
+                        operator_id,
+                        finite_repetition: Some(1),
+                    });
+                }
+            }
+            None => {
+                self.ranges.push(SequenceRange {
+                    operator_id,
+                    finite_repetition: Some(1),
+                });
+            }
+        }
+    }
+
+    fn set_infinite(&mut self) {
+        if let Some(last) = self.ranges.last().cloned() {
+            self.ranges.push(SequenceRange {
+                operator_id: last.operator_id,
+                finite_repetition: None,
+            });
+        }
     }
 }
 

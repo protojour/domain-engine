@@ -66,8 +66,8 @@ pub enum SymOrIntRangeOrWildcard {
 
 pub enum Cardinality {
     Optional,
-    Many(Range<Option<u16>>),
-    OptionalMany(Range<Option<u16>>),
+    Many,
+    OptionalMany,
 }
 
 #[derive(Debug)]
