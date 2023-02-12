@@ -20,6 +20,7 @@ impl Value {
         Self { data, type_def_id }
     }
 
+    #[inline]
     pub const fn unit() -> Self {
         Self {
             data: Data::Unit,
@@ -85,16 +86,17 @@ impl PropertyId {
 /// The attribute value is also just a Value.
 #[derive(Clone, Debug)]
 pub struct Attribute {
-    pub edge_params: Value,
     pub value: Value,
+    pub edge_params: Value,
 }
 
 impl Attribute {
     /// Create an attribute with a unit edge
+    #[inline]
     pub const fn with_unit_params(value: Value) -> Self {
         Self {
-            edge_params: Value::unit(),
             value,
+            edge_params: Value::unit(),
         }
     }
 }

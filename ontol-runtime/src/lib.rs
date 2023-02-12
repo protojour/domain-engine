@@ -26,6 +26,7 @@ pub struct PackageId(pub u32);
 pub struct DefId(pub u32);
 
 impl DefId {
+    #[inline]
     pub const fn unit() -> Self {
         DefId(0)
     }

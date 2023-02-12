@@ -78,7 +78,7 @@ impl<'e> SerdeProcessor<'e> {
     ) -> Res<S> {
         let mut seq = serializer.serialize_seq(Some(elements.len()))?;
 
-        let mut element_iter = elements.into_iter();
+        let mut element_iter = elements.iter();
 
         for range in ranges {
             if let Some(finite_repetition) = range.finite_repetition {
@@ -95,7 +95,7 @@ impl<'e> SerdeProcessor<'e> {
                     })?;
                 }
             } else {
-                while let Some(attribute) = element_iter.next() {
+                for attribute in element_iter.by_ref() {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         edge_params: attribute.edge_params.filter_non_unit(),
