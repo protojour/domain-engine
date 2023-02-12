@@ -13,6 +13,7 @@ use crate::{
     def::{Cardinality, Def, PropertyCardinality, ValueCardinality},
     error::CompileError,
     relation::SubjectProperties,
+    sequence::Sequence,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
 };
@@ -75,8 +76,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     builder.add_string_literal(string_literal, *def_id);
                 }
                 Type::Domain(domain_def_id) => {
-                    match self.find_subject_map_properties(*domain_def_id) {
-                        Ok(property_set) => {
+                    match self.find_domain_type_match_data(*domain_def_id) {
+                        Ok(DomainTypeMatchData::Map(property_set)) => {
                             self.add_property_set_to_discriminator(
                                 &mut builder,
                                 object_def,
@@ -84,6 +85,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 span,
                                 &mut error_set,
                             );
+                        }
+                        Ok(DomainTypeMatchData::Sequence(_)) => {
+                            if builder.sequence.is_some() {
+                                error_set.report(
+                                    object_def,
+                                    UnionCheckError::CannotDiscriminateType,
+                                    span,
+                                );
+                            } else {
+                                builder.sequence = Some(object_def);
+                            }
                         }
                         Err(error) => {
                             error_set.report(object_def, error, span);
@@ -121,10 +133,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .collect()
     }
 
-    fn find_subject_map_properties(
+    fn find_domain_type_match_data(
         &self,
         mut def_id: DefId,
-    ) -> Result<&IndexMap<RelationId, Cardinality>, UnionCheckError> {
+    ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
         loop {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.subject {
@@ -150,9 +162,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         return Err(UnionCheckError::UnionTreeNotSupported);
                     }
                     SubjectProperties::Map(property_set) => {
-                        return Ok(property_set);
+                        return Ok(DomainTypeMatchData::Map(property_set));
                     }
-                    SubjectProperties::Sequence(_) => todo!(),
+                    SubjectProperties::Sequence(sequence) => {
+                        return Ok(DomainTypeMatchData::Sequence(sequence));
+                    }
                 },
                 None => {
                     return Err(UnionCheckError::CannotDiscriminateType);
@@ -295,6 +309,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
+        if let Some(sequence_def_id) = builder.sequence {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::IsSequence,
+                result_type: sequence_def_id,
+            });
+        }
+
         for map_discriminator in builder.map_discriminator_candidates {
             for candidate in map_discriminator.property_candidates {
                 union_discriminator.variants.push(VariantDiscriminator {
@@ -329,11 +350,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 }
 
+enum DomainTypeMatchData<'a> {
+    Map(&'a IndexMap<RelationId, Cardinality>),
+    Sequence(&'a Sequence),
+}
+
 #[derive(Default)]
 struct DiscriminatorBuilder {
     unit: Option<DefId>,
     number: Option<IntDiscriminator>,
     string: StringDiscriminator,
+    sequence: Option<DefId>,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 

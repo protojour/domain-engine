@@ -143,3 +143,42 @@ fn test_serde_infinite_tuple() {
         );
     });
 }
+
+#[test]
+fn test_jsonml() {
+    r#"
+    (type! element)
+    (type! tag)
+    (type! tag_name)
+    (type! attributes)
+
+    (rel! (element) _ (tag))
+    (rel! (element) _ (string))
+
+    (rel! (tag) 0 (tag_name))
+
+    ; BUG: should have default `{}` and serde would skip this if not a map
+    ; (also in serialization if this equals the default value!)
+    (rel! (tag) 1 (attributes))
+
+    ; BUG: this should be zero or more, not one or more
+    (rel! (tag) 2.. (element))
+
+    (rel! (tag_name) _ "div")
+    (rel! (tag_name) _ "em")
+    (rel! (tag_name) _ "strong")
+
+    ; BUG: should accept any string as key
+    (rel! (attributes) prop? (string))
+    "#
+    .compile_ok(|env| {
+        let element = TypeBinding::new(env, "element");
+
+        assert_json_io_matches!(element, json!("text"));
+        assert_json_io_matches!(element, json!(["div", {}, "text"]));
+        assert_json_io_matches!(
+            element,
+            json!(["div", {}, ["em", {}, "text1"], ["strong", {}, "text2"]])
+        );
+    });
+}

@@ -116,13 +116,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Sequence(ranges, def_id) => serde::de::Deserializer::deserialize_seq(
                 deserializer,
                 MatcherVisitor {
-                    matcher: SequenceMatcher {
-                        ranges,
-                        range_cursor: 0,
-                        repetition_cursor: 0,
-                        def_id: *def_id,
-                        edge_operator_id: self.rel_params_operator_id,
-                    },
+                    matcher: SequenceMatcher::new(ranges, *def_id, self.rel_params_operator_id),
                     env: self.env,
                 },
             ),
@@ -230,20 +224,20 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         }))
     }
 
-    fn visit_seq<A>(mut self, mut seq: A) -> Result<Self::Value, A::Error>
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let seq_type_def_id = self
+        let mut sequence_matcher = self
             .matcher
-            .match_seq()
+            .match_sequence()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
 
         let mut len = 0;
         let mut output = vec![];
 
         loop {
-            let processor = match self.matcher.match_next_seq_element() {
+            let processor = match sequence_matcher.match_next_seq_element() {
                 Some(element_match) => self.env.new_serde_processor_parameterized(
                     element_match.element_operator_id,
                     element_match.rel_params_operator_id,
@@ -253,7 +247,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     // serde will automatically generate a 'trailing characters' error after returning:
                     return Ok(Attribute::with_unit_params(Value {
                         data: Data::Sequence(output),
-                        type_def_id: seq_type_def_id,
+                        type_def_id: sequence_matcher.type_def_id,
                     }));
                 }
             };
@@ -264,10 +258,10 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
                     len += 1;
                 }
                 None => {
-                    return match self.matcher.match_seq_end() {
+                    return match sequence_matcher.match_seq_end() {
                         Ok(_) => Ok(Attribute::with_unit_params(Value {
                             data: Data::Sequence(output),
-                            type_def_id: seq_type_def_id,
+                            type_def_id: sequence_matcher.type_def_id,
                         })),
                         Err(_) => Err(serde::de::Error::invalid_length(len, &self)),
                     };

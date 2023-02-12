@@ -42,15 +42,7 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Err(())
-    }
-
-    fn match_next_seq_element(&mut self) -> Option<SeqElementMatch> {
-        None
-    }
-
-    fn match_seq_end(&self) -> Result<(), ()> {
+    fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
         Err(())
     }
 
@@ -138,12 +130,14 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
+#[derive(Clone)]
 pub struct SequenceMatcher<'e> {
-    pub ranges: &'e [SequenceRange],
-    pub range_cursor: usize,
-    pub repetition_cursor: u16,
-    pub def_id: DefId,
-    pub edge_operator_id: Option<SerdeOperatorId>,
+    ranges: &'e [SequenceRange],
+    range_cursor: usize,
+    repetition_cursor: u16,
+
+    pub type_def_id: DefId,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
 impl<'e> ValueMatcher for SequenceMatcher<'e> {
@@ -166,11 +160,27 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
         }
     }
 
-    fn match_seq(&self) -> Result<DefId, ()> {
-        Ok(self.def_id)
+    fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
+        Ok(self.clone())
+    }
+}
+
+impl<'e> SequenceMatcher<'e> {
+    pub fn new(
+        ranges: &'e [SequenceRange],
+        type_def_id: DefId,
+        rel_params_operator_id: Option<SerdeOperatorId>,
+    ) -> Self {
+        Self {
+            ranges,
+            range_cursor: 0,
+            repetition_cursor: 0,
+            type_def_id,
+            rel_params_operator_id,
+        }
     }
 
-    fn match_next_seq_element(&mut self) -> Option<SeqElementMatch> {
+    pub fn match_next_seq_element(&mut self) -> Option<SeqElementMatch> {
         loop {
             let range = &self.ranges[self.range_cursor];
 
@@ -180,7 +190,7 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
 
                     return Some(SeqElementMatch {
                         element_operator_id: range.operator_id,
-                        rel_params_operator_id: self.edge_operator_id,
+                        rel_params_operator_id: self.rel_params_operator_id,
                     });
                 } else {
                     self.range_cursor += 1;
@@ -195,13 +205,13 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
             } else {
                 return Some(SeqElementMatch {
                     element_operator_id: range.operator_id,
-                    rel_params_operator_id: self.edge_operator_id,
+                    rel_params_operator_id: self.rel_params_operator_id,
                 });
             }
         }
     }
 
-    fn match_seq_end(&self) -> Result<(), ()> {
+    pub fn match_seq_end(&self) -> Result<(), ()> {
         if self.range_cursor == self.ranges.len() {
             return Ok(());
         } else if !self.ranges.is_empty() && self.range_cursor < self.ranges.len() - 1 {
@@ -268,6 +278,27 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     return Ok(discriminator.discriminator.result_type);
                 }
                 _ => {}
+            }
+        }
+
+        Err(())
+    }
+
+    fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
+        for discriminator in &self.value_union_type.discriminators {
+            if discriminator.discriminator.discriminant == Discriminant::IsSequence {
+                let processor = self.env.new_serde_processor(discriminator.operator_id);
+
+                match &processor.value_operator {
+                    SerdeOperator::Sequence(ranges, def_id) => {
+                        return Ok(SequenceMatcher::new(
+                            ranges,
+                            *def_id,
+                            self.rel_params_operator_id,
+                        ))
+                    }
+                    _ => panic!("not a sequence"),
+                }
             }
         }
 

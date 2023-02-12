@@ -19,6 +19,7 @@ pub enum Discriminant {
     IsInt,
     IsString,
     IsStringLiteral(String),
+    IsSequence,
     HasProperty(RelationId, String),
     HasStringAttribute(RelationId, String, String),
 }
