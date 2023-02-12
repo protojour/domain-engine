@@ -23,7 +23,7 @@ use super::{
 
 enum MapKey {
     Property(SerdeProperty),
-    EdgeParams(SerdeOperatorId),
+    RelParams(SerdeOperatorId),
 }
 
 struct MatcherVisitor<'e, M> {
@@ -34,33 +34,33 @@ struct MatcherVisitor<'e, M> {
 struct MapTypeVisitor<'e> {
     buffered_attrs: Vec<(String, serde_value::Value)>,
     map_type: &'e MapType,
-    edge_operator_id: Option<SerdeOperatorId>,
+    rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s> {
     properties: &'s IndexMap<String, SerdeProperty>,
-    edge_operator: Option<SerdeOperatorId>,
+    rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
 impl<'s> PropertySet<'s> {
     fn new(
         properties: &'s IndexMap<String, SerdeProperty>,
-        edge_operator: Option<SerdeOperatorId>,
+        rel_params_operator_id: Option<SerdeOperatorId>,
     ) -> Self {
         Self {
             properties,
-            edge_operator,
+            rel_params_operator_id,
         }
     }
 }
 
 impl<'e> SerdeProcessor<'e> {
-    fn matcher_visitor_no_edge<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
+    fn matcher_visitor_no_params<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
         assert!(
-            self.edge_operator_id.is_none(),
-            "edge_operator_id should be None for {:?}",
+            self.rel_params_operator_id.is_none(),
+            "rel_params_operator_id should be None for {:?}",
             self.value_operator
         );
 
@@ -73,7 +73,7 @@ impl<'e> SerdeProcessor<'e> {
 
 /// The serde implementation deserializes Attributes instead of Values.
 ///
-/// The reason for this is parameterized edges.
+/// The reason for this is parameterized relationships.
 ///
 /// In JSON, the parameters of a parameterized relationships are _inlined_
 /// inside the attribute value, with the special map key `_edge`.
@@ -90,24 +90,24 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
         match self.value_operator {
             SerdeOperator::Unit => serde::de::Deserializer::deserialize_unit(
                 deserializer,
-                self.matcher_visitor_no_edge(UnitMatcher),
+                self.matcher_visitor_no_params(UnitMatcher),
             ),
             SerdeOperator::Int(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
-                self.matcher_visitor_no_edge(IntMatcher(*def_id)),
+                self.matcher_visitor_no_params(IntMatcher(*def_id)),
             ),
             SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
                 deserializer,
-                self.matcher_visitor_no_edge(IntMatcher(*def_id)),
+                self.matcher_visitor_no_params(IntMatcher(*def_id)),
             ),
             SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
                 deserializer,
-                self.matcher_visitor_no_edge(StringMatcher(*def_id)),
+                self.matcher_visitor_no_params(StringMatcher(*def_id)),
             ),
             SerdeOperator::StringConstant(literal, def_id) => {
                 serde::de::Deserializer::deserialize_str(
                     deserializer,
-                    self.matcher_visitor_no_edge(ConstantStringMatcher {
+                    self.matcher_visitor_no_params(ConstantStringMatcher {
                         literal,
                         def_id: *def_id,
                     }),
@@ -121,7 +121,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                         range_cursor: 0,
                         repetition_cursor: 0,
                         def_id: *def_id,
-                        edge_operator_id: self.edge_operator_id,
+                        edge_operator_id: self.rel_params_operator_id,
                     },
                     env: self.env,
                 },
@@ -140,7 +140,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     MatcherVisitor {
                         matcher: UnionMatcher {
                             value_union_type,
-                            edge_operator_id: self.edge_operator_id,
+                            rel_params_operator_id: self.rel_params_operator_id,
                             env: self.env,
                         },
                         env: self.env,
@@ -152,7 +152,7 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                 MapTypeVisitor {
                     buffered_attrs: Default::default(),
                     map_type,
-                    edge_operator_id: self.edge_operator_id,
+                    rel_params_operator_id: self.rel_params_operator_id,
                     env: self.env,
                 },
             ),
@@ -244,9 +244,9 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
 
         loop {
             let processor = match self.matcher.match_next_seq_element() {
-                Some(element_match) => self.env.new_serde_processor_with_edge(
+                Some(element_match) => self.env.new_serde_processor_parameterized(
                     element_match.element_operator_id,
-                    element_match.edge_operator_id,
+                    element_match.rel_params_operator_id,
                 ),
                 None => {
                     // note: if there are more elements to deserialize,
@@ -313,7 +313,7 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
         MapTypeVisitor {
             buffered_attrs,
             map_type,
-            edge_operator_id: map_matcher.edge_operator_id,
+            rel_params_operator_id: map_matcher.edge_operator_id,
             env: self.env,
         }
         .visit_map(map)
@@ -332,29 +332,29 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         A: serde::de::MapAccess<'de>,
     {
         let mut attributes = BTreeMap::new();
-        let mut edge_params = Value::unit();
+        let mut rel_params = Value::unit();
 
         let mut n_mandatory_properties = 0;
 
         // first parse buffered attributes, if any
         for (serde_key, serde_value) in self.buffered_attrs {
-            match PropertySet::new(&self.map_type.properties, self.edge_operator_id)
+            match PropertySet::new(&self.map_type.properties, self.rel_params_operator_id)
                 .visit_str(&serde_key)?
             {
-                MapKey::EdgeParams(operator_id) => {
+                MapKey::RelParams(operator_id) => {
                     let Attribute { value, .. } = self
                         .env
                         .new_serde_processor(operator_id)
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                    edge_params = value;
+                    rel_params = value;
                 }
                 MapKey::Property(serde_property) => {
-                    let Attribute { edge_params, value } = self
+                    let Attribute { rel_params, value } = self
                         .env
-                        .new_serde_processor_with_edge(
+                        .new_serde_processor_parameterized(
                             serde_property.value_operator_id,
-                            serde_property.edge_operator_id,
+                            serde_property.rel_params_operator_id,
                         )
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
@@ -362,7 +362,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                         n_mandatory_properties += 1;
                     }
 
-                    attributes.insert(serde_property.property_id, Attribute { edge_params, value });
+                    attributes.insert(serde_property.property_id, Attribute { rel_params, value });
                 }
             }
         }
@@ -370,20 +370,21 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         // parse rest of map
         while let Some(map_key) = map.next_key_seed(PropertySet::new(
             &self.map_type.properties,
-            self.edge_operator_id,
+            self.rel_params_operator_id,
         ))? {
             match map_key {
-                MapKey::EdgeParams(operator_id) => {
+                MapKey::RelParams(operator_id) => {
                     let Attribute { value, .. } =
                         map.next_value_seed(self.env.new_serde_processor(operator_id))?;
 
-                    edge_params = value;
+                    rel_params = value;
                 }
                 MapKey::Property(serde_property) => {
-                    let attribute = map.next_value_seed(self.env.new_serde_processor_with_edge(
-                        serde_property.value_operator_id,
-                        serde_property.edge_operator_id,
-                    ))?;
+                    let attribute =
+                        map.next_value_seed(self.env.new_serde_processor_parameterized(
+                            serde_property.value_operator_id,
+                            serde_property.rel_params_operator_id,
+                        ))?;
 
                     if !serde_property.optional {
                         n_mandatory_properties += 1;
@@ -395,12 +396,12 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
         }
 
         if n_mandatory_properties < self.map_type.n_mandatory_properties
-            || (edge_params.is_unit() != self.edge_operator_id.is_none())
+            || (rel_params.is_unit() != self.rel_params_operator_id.is_none())
         {
             debug!(
-                "Missing attributes. Edge match: {}, {}",
-                edge_params.is_unit(),
-                self.edge_operator_id.is_none()
+                "Missing attributes. Rel params match: {}, {}",
+                rel_params.is_unit(),
+                self.rel_params_operator_id.is_none()
             );
             for attr in &attributes {
                 debug!("    attr {:?}", attr.0);
@@ -422,7 +423,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 .map(|(key, _)| DoubleQuote(key.clone()))
                 .collect();
 
-            if self.edge_operator_id.is_some() && edge_params.type_def_id == DefId::unit() {
+            if self.rel_params_operator_id.is_some() && rel_params.type_def_id == DefId::unit() {
                 items.push(DoubleQuote(EDGE_PROPERTY.into()));
             }
 
@@ -443,7 +444,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 data: Data::Map(attributes),
                 type_def_id: self.map_type.type_def_id,
             },
-            edge_params,
+            rel_params,
         })
     }
 }
@@ -472,8 +473,8 @@ impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
     {
         match v {
             EDGE_PROPERTY => {
-                if let Some(operator_id) = self.edge_operator {
-                    Ok(MapKey::EdgeParams(operator_id))
+                if let Some(operator_id) = self.rel_params_operator_id {
+                    Ok(MapKey::RelParams(operator_id))
                 } else {
                     Err(serde::de::Error::custom(
                         "`_edge` property not accepted here",

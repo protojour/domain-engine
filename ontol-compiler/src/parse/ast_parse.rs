@@ -74,7 +74,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
         SymOrIntRangeOrWildcard::parse(&mut stream, "expected relation identifier")?;
     let subject_cardinality = parse_optional_cardinality(&mut stream)?;
 
-    let edge_params = if stream.peek::<At>() {
+    let rel_params = if stream.peek::<At>() {
         let _ = stream.next::<At>("").unwrap();
         Some(parse_type(&mut stream)?)
     } else {
@@ -98,7 +98,7 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
             subject,
             ident: (ident, ident_span),
             subject_cardinality,
-            edge_params,
+            rel_params,
             object_cardinality,
             object_prop_ident,
             object,

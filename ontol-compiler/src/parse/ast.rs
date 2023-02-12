@@ -52,7 +52,7 @@ pub struct Rel {
     pub subject: Spanned<Type>,
     pub ident: Spanned<SymOrIntRangeOrWildcard>,
     pub subject_cardinality: Option<Cardinality>,
-    pub edge_params: Option<Spanned<Type>>,
+    pub rel_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
     pub object: Spanned<Type>,

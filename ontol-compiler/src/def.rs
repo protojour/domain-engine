@@ -98,7 +98,7 @@ pub struct Relationship {
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
 
-    pub edge_params: EdgeParams,
+    pub rel_params: RelParams,
 
     pub object: DefId,
     /// How many subjects are related to the object
@@ -106,7 +106,7 @@ pub struct Relationship {
 }
 
 #[derive(Debug)]
-pub enum EdgeParams {
+pub enum RelParams {
     Unit,
     Type(DefId),
     IndexRange(Range<Option<u16>>),

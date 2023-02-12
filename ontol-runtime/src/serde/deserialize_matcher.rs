@@ -19,7 +19,7 @@ impl<'v> Display for ExpectingMatching<'v> {
 
 pub struct SeqElementMatch {
     pub element_operator_id: SerdeOperatorId,
-    pub edge_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
 /// Trait for matching incoming types for deserialization
@@ -180,7 +180,7 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
 
                     return Some(SeqElementMatch {
                         element_operator_id: range.operator_id,
-                        edge_operator_id: self.edge_operator_id,
+                        rel_params_operator_id: self.edge_operator_id,
                     });
                 } else {
                     self.range_cursor += 1;
@@ -195,7 +195,7 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
             } else {
                 return Some(SeqElementMatch {
                     element_operator_id: range.operator_id,
-                    edge_operator_id: self.edge_operator_id,
+                    rel_params_operator_id: self.edge_operator_id,
                 });
             }
         }
@@ -224,7 +224,7 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
 
 pub struct UnionMatcher<'e> {
     pub value_union_type: &'e ValueUnionType,
-    pub edge_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
     pub env: &'e Env,
 }
 
@@ -292,7 +292,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
         Ok(MapMatcher {
             value_union_type: self.value_union_type,
-            edge_operator_id: self.edge_operator_id,
+            edge_operator_id: self.rel_params_operator_id,
             env: self.env,
         })
     }

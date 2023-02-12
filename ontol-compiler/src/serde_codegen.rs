@@ -15,7 +15,7 @@ use tracing::debug;
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{Cardinality, DefKind, Defs, EdgeParams, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
     relation::{ObjectProperties, Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
@@ -301,9 +301,9 @@ impl MapTypeBuilder {
                     .expect("No inner operator");
                 let (requirement, value_operator_id) =
                     generator.property_operator(operator_id, relationship.object, *cardinality);
-                let edge_operator_id = match relationship.edge_params {
-                    EdgeParams::Type(def_id) => generator.get_serde_operator_id(def_id),
-                    EdgeParams::Unit => None,
+                let edge_operator_id = match relationship.rel_params {
+                    RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
+                    RelParams::Unit => None,
                     _ => todo!(),
                 };
 
@@ -317,7 +317,7 @@ impl MapTypeBuilder {
                         property_id: PropertyId::subject(*relation_id),
                         value_operator_id,
                         optional: requirement.is_optional(),
-                        edge_operator_id,
+                        rel_params_operator_id: edge_operator_id,
                     },
                 )
             }));
@@ -358,9 +358,9 @@ impl MapTypeBuilder {
                 let (requirement, value_operator_id) =
                     generator.property_operator(operator_id, relationship.subject, *cardinality);
 
-                let edge_operator_id = match relationship.edge_params {
-                    EdgeParams::Type(def_id) => generator.get_serde_operator_id(def_id),
-                    EdgeParams::Unit => None,
+                let edge_operator_id = match relationship.rel_params {
+                    RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
+                    RelParams::Unit => None,
                     _ => todo!(),
                 };
 
@@ -374,7 +374,7 @@ impl MapTypeBuilder {
                         property_id: PropertyId::object(*relation_id),
                         value_operator_id,
                         optional: requirement.is_optional(),
-                        edge_operator_id,
+                        rel_params_operator_id: edge_operator_id,
                     },
                 )
             }));

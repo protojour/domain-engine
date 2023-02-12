@@ -181,7 +181,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut tuple = Sequence::default();
 
                 if let Err(error) =
-                    tuple.define_relationship(&relationship.1.edge_params, relationship.0)
+                    tuple.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
@@ -190,7 +190,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (RelationIdent::Indexed, SubjectProperties::Sequence(tuple)) => {
                 if let Err(error) =
-                    tuple.define_relationship(&relationship.1.edge_params, relationship.0)
+                    tuple.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }

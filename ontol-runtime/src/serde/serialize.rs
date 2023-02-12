@@ -15,7 +15,7 @@ impl<'e> SerdeProcessor<'e> {
     pub fn serialize_value<S: serde::Serializer>(
         &self,
         value: &Value,
-        edge_params: Option<&Value>,
+        rel_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
         match self.value_operator {
@@ -35,7 +35,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => self
                 .env
                 .new_serde_processor(value_type.inner_operator_id)
-                .serialize_value(value, edge_params, serializer),
+                .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type
                     .discriminators
@@ -48,14 +48,14 @@ impl<'e> SerdeProcessor<'e> {
                     Some(discriminator) => self
                         .env
                         .new_serde_processor(discriminator.operator_id)
-                        .serialize_value(value, edge_params, serializer),
+                        .serialize_value(value, rel_params, serializer),
                     None => {
                         panic!("Discriminator not found while serializing union type");
                     }
                 }
             }
             SerdeOperator::MapType(map_type) => {
-                self.serialize_map(map_type, edge_params, value, serializer)
+                self.serialize_map(map_type, rel_params, value, serializer)
             }
         }
     }
@@ -87,10 +87,10 @@ impl<'e> SerdeProcessor<'e> {
 
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
-                        edge_params: attribute.edge_params.filter_non_unit(),
-                        processor: self.env.new_serde_processor_with_edge(
+                        rel_params: attribute.rel_params.filter_non_unit(),
+                        processor: self.env.new_serde_processor_parameterized(
                             range.operator_id,
-                            self.edge_operator_id,
+                            self.rel_params_operator_id,
                         ),
                     })?;
                 }
@@ -98,10 +98,10 @@ impl<'e> SerdeProcessor<'e> {
                 for attribute in element_iter.by_ref() {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
-                        edge_params: attribute.edge_params.filter_non_unit(),
-                        processor: self.env.new_serde_processor_with_edge(
+                        rel_params: attribute.rel_params.filter_non_unit(),
+                        processor: self.env.new_serde_processor_parameterized(
                             range.operator_id,
-                            self.edge_operator_id,
+                            self.rel_params_operator_id,
                         ),
                     })?;
                 }
@@ -114,7 +114,7 @@ impl<'e> SerdeProcessor<'e> {
     fn serialize_map<S: serde::Serializer>(
         &self,
         map_type: &MapType,
-        edge_params: Option<&Value>,
+        rel_params: Option<&Value>,
         value: &Value,
         serializer: S,
     ) -> Res<S> {
@@ -144,23 +144,23 @@ impl<'e> SerdeProcessor<'e> {
                 name,
                 &Proxy {
                     value: &attribute.value,
-                    edge_params: attribute.edge_params.filter_non_unit(),
-                    processor: self.env.new_serde_processor_with_edge(
+                    rel_params: attribute.rel_params.filter_non_unit(),
+                    processor: self.env.new_serde_processor_parameterized(
                         serde_prop.value_operator_id,
-                        serde_prop.edge_operator_id,
+                        serde_prop.rel_params_operator_id,
                     ),
                 },
             )?;
         }
 
-        match (edge_params, self.edge_operator_id) {
+        match (rel_params, self.rel_params_operator_id) {
             (None, None) => {}
-            (Some(edge_params), Some(operator_id)) => {
+            (Some(rel_params), Some(operator_id)) => {
                 serialize_map.serialize_entry(
                     EDGE_PROPERTY,
                     &Proxy {
-                        value: edge_params,
-                        edge_params: None,
+                        value: rel_params,
+                        rel_params: None,
                         processor: self.env.new_serde_processor(operator_id),
                     },
                 )?;
@@ -168,8 +168,8 @@ impl<'e> SerdeProcessor<'e> {
             (None, Some(_)) => {
                 panic!("Must serialize edge params, but attribute did not contain anything")
             }
-            (Some(edge_params), None) => {
-                panic!("Attribute had edge params {edge_params:?}, but no serializer operator available: {self:?}")
+            (Some(rel_params), None) => {
+                panic!("Attribute had rel params {rel_params:?}, but no serializer operator available: {self:?}")
             }
         }
 
@@ -179,7 +179,7 @@ impl<'e> SerdeProcessor<'e> {
 
 struct Proxy<'v, 'e> {
     value: &'v Value,
-    edge_params: Option<&'v Value>,
+    rel_params: Option<&'v Value>,
     processor: SerdeProcessor<'e>,
 }
 
@@ -189,7 +189,7 @@ impl<'v, 'e> serde::Serialize for Proxy<'v, 'e> {
         S: serde::Serializer,
     {
         self.processor
-            .serialize_value(self.value, self.edge_params, serializer)
+            .serialize_value(self.value, self.rel_params, serializer)
     }
 }
 

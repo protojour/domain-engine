@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use tracing::debug;
 
-use crate::{def::EdgeParams, error::CompileError, relation::RelationshipId};
+use crate::{def::RelParams, error::CompileError, relation::RelationshipId};
 
 /// A sequence represents both finite tuples and infinite arrays,
 /// where elements may be of different types.
@@ -47,11 +47,11 @@ impl Sequence {
 
     pub fn define_relationship(
         &mut self,
-        edge_params: &EdgeParams,
+        rel_params: &RelParams,
         relationship_id: RelationshipId,
     ) -> Result<(), CompileError> {
-        let range = match edge_params {
-            EdgeParams::IndexRange(range) => range,
+        let range = match rel_params {
+            RelParams::IndexRange(range) => range,
             _ => return Err(CompileError::UnsupportedSequenceIndexType),
         };
 

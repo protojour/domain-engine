@@ -59,12 +59,12 @@ impl<'e> TypeBinding<'e> {
 
     pub fn deserialize_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
-        let Attribute { value, edge_params } = self
+        let Attribute { value, rel_params } = self
             .env
             .new_serde_processor(self.serde_operator_id)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
 
-        assert_eq!(edge_params.type_def_id, DefId::unit());
+        assert_eq!(rel_params.type_def_id, DefId::unit());
 
         Ok(value)
     }

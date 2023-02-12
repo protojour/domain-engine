@@ -37,19 +37,19 @@ impl Env {
     pub fn new_serde_processor(&self, value_operator_id: SerdeOperatorId) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
-            edge_operator_id: None,
+            rel_params_operator_id: None,
             env: self,
         }
     }
 
-    pub(crate) fn new_serde_processor_with_edge(
+    pub(crate) fn new_serde_processor_parameterized(
         &self,
         value_operator_id: SerdeOperatorId,
-        edge_operator_id: Option<SerdeOperatorId>,
+        rel_params_operator_id: Option<SerdeOperatorId>,
     ) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
-            edge_operator_id,
+            rel_params_operator_id,
             env: self,
         }
     }

@@ -9,7 +9,7 @@ use smartstring::alias::String;
 use crate::{
     compiler::Compiler,
     def::{
-        Def, DefKind, EdgeParams, PropertyCardinality, Relation, RelationIdent, Relationship,
+        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
         ValueCardinality, Variables,
     },
     error::{CompileError, SpannedCompileError},
@@ -77,13 +77,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     subject,
                     ident: (ident, ident_span),
                     subject_cardinality,
-                    edge_params,
+                    rel_params,
                     object_cardinality,
                     object_prop_ident,
                     object,
                 } = *rel;
 
-                let (relation_ident, index_range_edge_params): (_, Option<Range<Option<u16>>>) =
+                let (relation_ident, index_range_rel_params): (_, Option<Range<Option<u16>>>) =
                     match ident {
                         SymOrIntRangeOrWildcard::Sym(str) => (
                             RelationIdent::Named(self.compiler.strings.intern(&str)),
@@ -120,19 +120,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let subject = self.ast_type_to_def(subject)?;
 
-                let edge_params = if let Some(index_range_edge_params) = index_range_edge_params {
-                    if let Some((_, span)) = edge_params {
+                let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
+                    if let Some((_, span)) = rel_params {
                         return Err(self.error(
                             CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
                             &span,
                         ));
                     }
 
-                    EdgeParams::IndexRange(index_range_edge_params)
+                    RelParams::IndexRange(index_range_rel_params)
                 } else {
-                    match edge_params {
-                        Some(edge_params) => EdgeParams::Type(self.ast_type_to_def(edge_params)?),
-                        None => EdgeParams::Unit,
+                    match rel_params {
+                        Some(rel_params) => RelParams::Type(self.ast_type_to_def(rel_params)?),
+                        None => RelParams::Unit,
                     }
                 };
 
@@ -146,7 +146,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             subject_cardinality: subject_cardinality
                                 .map(convert_cardinality)
                                 .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
-                            edge_params,
+                            rel_params,
                             object_cardinality: object_cardinality
                                 .map(convert_cardinality)
                                 .unwrap_or_else(|| {

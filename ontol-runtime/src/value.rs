@@ -79,7 +79,7 @@ impl PropertyId {
 
 /// An Attribute is a Value that is part of another value.
 ///
-/// An attribute may be parameterized (edge_params).
+/// An attribute may be parameterized (rel_params).
 /// The parameter _value_ is itself a `Value`.
 /// Most attribute parameters is usually just `unit`, i.e. no parameters.
 ///
@@ -87,7 +87,7 @@ impl PropertyId {
 #[derive(Clone, Debug)]
 pub struct Attribute {
     pub value: Value,
-    pub edge_params: Value,
+    pub rel_params: Value,
 }
 
 impl Attribute {
@@ -96,7 +96,7 @@ impl Attribute {
     pub const fn with_unit_params(value: Value) -> Self {
         Self {
             value,
-            edge_params: Value::unit(),
+            rel_params: Value::unit(),
         }
     }
 }
