@@ -28,7 +28,7 @@ fn test_geojson() {
 
     (type! MultiPoint)
     (rel! MultiPoint { 'type' } 'MultiPoint')
-    (rel! MultiPoint { 'coordinates'[] } position)
+    (rel! MultiPoint { 'coordinates'* } position)
 
     (type! LineString)
     (rel! LineString { 'type' } 'LineString')
@@ -36,7 +36,7 @@ fn test_geojson() {
 
     (type! MultiLineString)
     (rel! MultiLineString { 'type' } 'MultiLineString')
-    (rel! MultiLineString { 'coordinates'[] } position-list)
+    (rel! MultiLineString { 'coordinates'* } position-list)
 
     (type! Polygon)
     (rel! Polygon { 'type' } 'Polygon')
@@ -44,11 +44,11 @@ fn test_geojson() {
 
     (type! MultiPolygon)
     (rel! MultiPolygon { 'type' } 'MultiPolygon')
-    (rel! MultiPolygon { 'coordinates'[] } position-ring)
+    (rel! MultiPolygon { 'coordinates'* } position-ring)
 
     (type! GeometryCollection)
     (rel! GeometryCollection { 'type' } 'GeometryCollection')
-    (rel! GeometryCollection { 'geometries'[] } LeafGeometry)
+    (rel! GeometryCollection { 'geometries'* } LeafGeometry)
 
     (rel! LeafGeometry {} Point)
     (rel! LeafGeometry {} MultiPoint)
@@ -81,7 +81,7 @@ fn test_geojson() {
 
     (type! FeatureCollection)
     (rel! FeatureCollection { 'type' } 'FeatureCollection')
-    (rel! FeatureCollection { 'features'[] } Feature)
+    (rel! FeatureCollection { 'features'* } Feature)
     "
     .compile_ok(|env| {
         let geometry = TypeBinding::new(env, "Geometry");

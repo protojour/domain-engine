@@ -20,7 +20,7 @@ fn test_entity_experiment_etc() {
     (entity! record)
     (rel! record { 'name' } string)
     ; i.e. syntax sugar for:
-    ; (rel! record { 'name' @unit 'name'[] } string)
+    ; (rel! record { 'name' @unit 'name'* } string)
 
     (entity! instrument)
     (rel! instrument { 'name' } string)
@@ -28,7 +28,7 @@ fn test_entity_experiment_etc() {
     (type! plays)
     (rel! plays { 'how_much' } string)
 
-    (rel! artist { 'plays'[] @plays 'played_by'[] } instrument)
+    (rel! artist { 'plays'* @plays 'played_by'* } instrument)
     "
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
@@ -80,7 +80,7 @@ fn test_entity_self_relationship() {
     (entity! node)
 
     (rel! node { 'name' } string)
-    (rel! node { 'children'[] 'parent'? } node)
+    (rel! node { 'children'* 'parent'? } node)
     "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
@@ -125,7 +125,7 @@ fn test_entity_self_relationship() {
 fn test_entity_self_relationship_mandatory_object() {
     "
     (entity! node)
-    (rel! node { 'children'[] 'parent' } node)
+    (rel! node { 'children'* 'parent' } node)
     "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");

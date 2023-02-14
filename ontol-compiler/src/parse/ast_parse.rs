@@ -7,8 +7,8 @@ use super::{
     ast::*,
     tree::Tree,
     tree_stream::{
-        At, Brace, Bracket, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream,
-        Underscore, Variable,
+        At, Brace, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream, Underscore,
+        Variable,
     },
     Span, Spanned,
 };
@@ -117,9 +117,15 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
 }
 
 fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinality>, Simple<Tree>> {
-    if input.peek::<Bracket>() {
-        let mut stream: TreeStream = input.next::<Bracket>("expected bracket")?.into();
-        stream.end()?;
+    if input.peek::<Sym>() {
+        let (sym, sym_span) = input.next::<Sym>("")?;
+
+        match sym.as_str() {
+            "*" => {}
+            _ => {
+                return Err(error("expected `*` or `?`", sym_span));
+            }
+        };
 
         if input.peek::<Questionmark>() {
             let _ = input.next::<Questionmark>("").unwrap();

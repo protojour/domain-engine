@@ -152,8 +152,8 @@ fn test_eq_simple_array() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { 'a'[] } int)
-    (rel! bar { 'b'[] } int)
+    (rel! foo { 'a'* } int)
+    (rel! bar { 'b'* } int)
     (eq! (:x)
         (obj! foo (a :x))
         (obj! bar (b :x))

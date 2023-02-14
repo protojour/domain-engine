@@ -295,12 +295,12 @@ fn eq_type_mismatch_in_func() {
 fn eq_array_mismatch() {
     "
     (type! foo)
-    (rel! foo { 'a'[] } string)
-    (rel! foo { 'b'[] } string)
+    (rel! foo { 'a'* } string)
+    (rel! foo { 'b'* } string)
 
     (type! bar)
     (rel! bar { 'a' } string)
-    (rel! bar { 'b'[] } int)
+    (rel! bar { 'b'* } int)
 
     (eq! (:x :y)
         (obj! foo (a :x) (b :y))
@@ -328,8 +328,8 @@ fn test_serde_object_property_not_sugared() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { 'a' @unit 'aa'[]} bar) ;; ERROR only entities may have named reverse relationship
-    (rel! foo { 'b' @unit 'bb'[]} string) ;; ERROR only entities may have named reverse relationship
+    (rel! foo { 'a' @unit 'aa'* } bar) ;; ERROR only entities may have named reverse relationship
+    (rel! foo { 'b' @unit 'bb'* } string) ;; ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -371,7 +371,7 @@ fn various_monadic_properties() {
     (rel! bar { 'maybe'? } string)
 
     ; bar and string may be related via b many times
-    (rel! bar { 'array'[] } string)
+    (rel! bar { 'array'* } string)
 
     ; a is either a string or null
     (rel! bar { 'nullable' } string)
