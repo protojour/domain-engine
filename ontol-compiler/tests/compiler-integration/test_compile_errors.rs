@@ -20,7 +20,7 @@ fn underscore_not_allowed_at_start_of_identifier() {
 fn rel_type_not_found() {
     "
     (type! foo)
-    (rel! foo {bar}
+    (rel! foo { bar }
         baz ;; ERROR type not found
     )
     "
@@ -33,10 +33,10 @@ fn rel_duplicate_anonymous_relation() {
     (type! foo)
     (type! bar)
     (rel! ;; ERROR unit type `bar` cannot be part of a union
-        foo {_} bar
+        foo {} bar
     )
     (rel! ;; ERROR duplicate anonymous relationship
-        foo {_} bar
+        foo {} bar
     )
     "
     .compile_fail()
@@ -47,7 +47,7 @@ fn rel_mix_anonymous_and_named() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo {_} bar)
+    (rel! foo {} bar)
     (rel! ;; ERROR invalid mix of relationship type for subject
         foo {foobar} bar
     )
@@ -74,8 +74,8 @@ fn map_union_unit_type() {
     (type! foo)
     (type! bar)
     (type! u)
-    (rel! u {_} foo) ;; ERROR unit type `foo` cannot be part of a union
-    (rel! u {_} bar) ;; ERROR unit type `bar` cannot be part of a union
+    (rel! u {} foo) ;; ERROR unit type `foo` cannot be part of a union
+    (rel! u {} bar) ;; ERROR unit type `bar` cannot be part of a union
     "
     .compile_fail()
 }
@@ -88,8 +88,8 @@ fn map_union_missing_discriminator() {
     (rel! foo {a} "constant")
     (rel! bar {b} string)
     (type! u)
-    (rel! u {_} foo)
-    (rel! u {_} bar) ;; ERROR cannot discriminate type
+    (rel! u {} foo)
+    (rel! u {} bar) ;; ERROR cannot discriminate type
     "#
     .compile_fail()
 }
@@ -102,8 +102,8 @@ fn map_union_non_uniform_discriminators() {
     (rel! foo {a} "constant")
     (rel! bar {b} "other-constant")
     (type! u) ;; ERROR no uniform discriminator found for union variants
-    (rel! u {_} foo)
-    (rel! u {_} bar)
+    (rel! u {} foo)
+    (rel! u {} bar)
     "#
     .compile_fail()
 }
@@ -112,8 +112,8 @@ fn map_union_non_uniform_discriminators() {
 fn non_disjoint_string_union() {
     r#"
     (type! u1)
-    (rel! u1 {_} "a")
-    (rel! u1 {_} "a") ;; ERROR duplicate anonymous relationship
+    (rel! u1 {} "a")
+    (rel! u1 {} "a") ;; ERROR duplicate anonymous relationship
     "#
     .compile_fail()
 }
@@ -122,14 +122,14 @@ fn non_disjoint_string_union() {
 fn union_tree() {
     r#"
     (type! u1)
-    (rel! u1 {_} "1a")
-    (rel! u1 {_} "1b")
+    (rel! u1 {} "1a")
+    (rel! u1 {} "1b")
     (type! u2)
-    (rel! u2 {_} "2a")
-    (rel! u2 {_} "2b")
+    (rel! u2 {} "2a")
+    (rel! u2 {} "2b")
     (type! u3)
-    (rel! u3 {_} u1) ;; ERROR union tree not supported
-    (rel! u3 {_} u2) ;; ERROR union tree not supported
+    (rel! u3 {} u1) ;; ERROR union tree not supported
+    (rel! u3 {} u2) ;; ERROR union tree not supported
     "#
     .compile_fail()
 }
@@ -138,7 +138,7 @@ fn union_tree() {
 fn sequence_mix1() {
     r#"
     (type! u)
-    (rel! u {_} int)
+    (rel! u {} int)
     (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
     "#
     .compile_fail();
@@ -170,16 +170,6 @@ fn sequence_ambiguous_infinite_tail() {
     (type! u)
     (rel! u { 0.. } int)
     (rel! u { 1.. } string) ;; ERROR overlapping indexes
-    "#
-    .compile_fail();
-}
-
-#[test]
-fn no_need_to_support_differing_cardinality_in_unions_at_least_yet() {
-    r#"
-    (type! u)
-    (rel! u { _ } int)
-    (rel! u { _[] } string) ;; ERROR invalid cardinality combination in union
     "#
     .compile_fail();
 }
@@ -230,7 +220,7 @@ fn eq_attribute_mismatch() {
     (type! foo)
     (type! bar)
     (rel! foo { prop } bar)
-    (rel! bar { _ } int)
+    (rel! bar {} int)
     (eq! (:x)
         (obj! ;; ERROR missing property `prop`
             foo
@@ -309,8 +299,8 @@ fn eq_array_mismatch() {
     (rel! foo { b[] } string)
 
     (type! bar)
-    (rel! bar {a} string)
-    (rel! bar {b[]} int)
+    (rel! bar { a } string)
+    (rel! bar { b[] } int)
 
     (eq! (:x :y)
         (obj! foo (a :x) (b :y))
@@ -349,13 +339,13 @@ fn unresolved_transitive_eq() {
     r#"
     (type! a)
     (type! b)
-    (rel! a {_} int)
-    (rel! b {_} int)
+    (rel! a {} int)
+    (rel! b {} int)
 
     (type! c)
     (type! d)
-    (rel! c {p0} a)
-    (rel! d {p1} b)
+    (rel! c { p0 } a)
+    (rel! d { p1 } b)
 
     (eq! (:x)
         (obj! c (p0
@@ -381,12 +371,12 @@ fn various_monadic_properties() {
     (rel! bar { maybe? } string)
 
     ; bar and string may be related via b many times
-    (rel! bar {array[]} string)
+    (rel! bar { array[] } string)
 
     ; a is either a string or null
-    (rel! bar {nullable} string)
+    (rel! bar { nullable } string)
     ; FIXME: Should this work?
-    (rel! bar {nullable} null) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    (rel! bar { nullable } null) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
     "#
     .compile_fail()
 }

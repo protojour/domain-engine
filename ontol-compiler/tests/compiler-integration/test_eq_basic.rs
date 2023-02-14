@@ -72,8 +72,8 @@ fn test_meters() {
     "
     (type! meters)
     (type! millimeters)
-    (rel! meters {_} int)
-    (rel! millimeters {_} int)
+    (rel! meters {} int)
+    (rel! millimeters {} int)
     (eq! (:x)
         (obj! meters
             (_ (/ :x 1000))
@@ -93,10 +93,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     (type! celsius)
-    (rel! celsius {_} int)
+    (rel! celsius {} int)
 
     (type! fahrenheit)
-    (rel! fahrenheit {_} int)
+    (rel! fahrenheit {} int)
 
     (eq! (:x)
         (obj! celsius (_ :x))
@@ -116,7 +116,7 @@ fn test_eq_value_to_map() {
     "
     (type! one)
     (type! two)
-    (rel! one { _ } string)
+    (rel! one {} string)
     (rel! two { a } string)
     (eq! (:x)
         (obj! one (_ :x))
@@ -134,7 +134,7 @@ fn test_eq_value_to_map_func() {
     "
     (type! one)
     (type! two)
-    (rel! one { _ } int)
+    (rel! one {} int)
     (rel! two { a } int)
     (eq! (:x)
         (obj! one (_ :x))
@@ -221,10 +221,10 @@ fn test_eq_complex_flow() {
 fn test_eq_delegation() {
     r#"
     (type! meters)
-    (rel! meters {_} int)
+    (rel! meters {} int)
 
     (type! millimeters)
-    (rel! millimeters {_} int)
+    (rel! millimeters {} int)
 
     (eq! (:m)
         (obj! meters (_ :m))

@@ -13,7 +13,7 @@ fn test_entity_experiment_etc() {
     (entity! artist)
     (rel! artist {name} string)
 
-    (rel! artist-id {_} "artist/{uuid}")
+    (rel! artist-id {} "artist/{uuid}")
     ; (rel! artist-id { uuid } string)
     ; (rel! artist-id { id! } artist)
 

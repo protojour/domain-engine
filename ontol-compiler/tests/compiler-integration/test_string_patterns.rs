@@ -20,7 +20,7 @@ fn test_string_patterns() {
     ; (rel! uuid {24..25} hex)
 
     (type! my_id)
-    (rel! my_id {_} string)
+    (rel! my_id {} string)
     (rel! my_id {0} "my/")
     (rel! my_id {1} uuid)
 
@@ -34,7 +34,7 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     r#"
     (type! lol)
-    (rel! lol {_} (re! "abc(?<named>.)")) ;; ERROR parse error: invalid type
+    (rel! lol {} (re! "abc(?<named>.)")) ;; ERROR parse error: invalid type
     "#
     .compile_fail()
 }

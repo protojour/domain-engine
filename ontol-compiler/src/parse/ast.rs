@@ -11,7 +11,7 @@ pub enum Ast {
     Import(Path),
     Type(Spanned<String>),
     Entity(Spanned<String>),
-    Rel(Box<Rel>),
+    Relationship(Box<Relationship>),
     Eq(Eq),
     Comment(String),
 }
@@ -48,20 +48,23 @@ pub enum Type {
     Literal(Literal),
 }
 
-pub struct Rel {
+pub struct Relationship {
     pub subject: Spanned<Type>,
-    pub ident: Spanned<SymOrIntRangeOrWildcard>,
+    pub relation: Option<Relation>,
+    pub object: Spanned<Type>,
+}
+
+pub struct Relation {
+    pub ident: Spanned<SymOrIntRange>,
     pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
-    pub object: Spanned<Type>,
 }
 
-pub enum SymOrIntRangeOrWildcard {
+pub enum SymOrIntRange {
     Sym(String),
     IntRange(Range<Option<u16>>),
-    Wildcard,
 }
 
 pub enum Cardinality {

@@ -14,7 +14,7 @@ fn test_serde_empty_type() {
 fn test_serde_value_type() {
     "
     (type! foo)
-    (rel! foo {_} string)
+    (rel! foo {} string)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -66,8 +66,8 @@ fn test_serde_sequence() {
 fn test_serde_value_union1() {
     r#"
     (type! u)
-    (rel! u {_} "a")
-    (rel! u {_} "b")
+    (rel! u {} "a")
+    (rel! u {} "b")
     "#
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
@@ -79,8 +79,8 @@ fn test_serde_value_union1() {
 fn test_serde_string_or_null() {
     r#"
     (type! string-or-null)
-    (rel! string-or-null {_} string)
-    (rel! string-or-null {_} null)
+    (rel! string-or-null {} string)
+    (rel! string-or-null {} null)
 
     (type! foo)
     (rel! foo {a} string-or-null)
@@ -103,8 +103,8 @@ fn test_serde_map_union() {
     (rel! bar { d } int)
 
     (type! u)
-    (rel! u {_} foo)
-    (rel! u {_} bar)
+    (rel! u {} foo)
+    (rel! u {} bar)
     "#
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
@@ -153,8 +153,8 @@ fn test_jsonml() {
     (type! tag_name)
     (type! attributes)
 
-    (rel! element {_} tag)
-    (rel! element {_} string)
+    (rel! element {} tag)
+    (rel! element {} string)
 
     (rel! tag { 0 } tag_name)
 
@@ -164,9 +164,9 @@ fn test_jsonml() {
 
     (rel! tag { 2.. } element)
 
-    (rel! tag_name {_} "div")
-    (rel! tag_name {_} "em")
-    (rel! tag_name {_} "strong")
+    (rel! tag_name {} "div")
+    (rel! tag_name {} "em")
+    (rel! tag_name {} "strong")
 
     ; BUG: should accept any string as key
     (rel! attributes { class? } string)

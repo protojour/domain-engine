@@ -37,7 +37,7 @@ fn parse_ast(mut input: TreeStream) -> ParseResult<Ast> {
             input.end()?;
             Ok((Ast::Entity(ident), span))
         }
-        "rel!" => parse_rel(input),
+        "rel!" => parse_relationship(input),
         "eq!" => parse_eq(input),
         _ => Err(error("unknown keyword", span)),
     }
@@ -61,15 +61,32 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
     }
 }
 
-fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
+fn parse_relationship(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
+    let relation = parse_relation(&mut stream)?;
+    let object = parse_type(&mut stream)?;
+    stream.end()?;
 
+    Ok((
+        Ast::Relationship(Box::new(Relationship {
+            subject,
+            relation,
+            object,
+        })),
+        span,
+    ))
+}
+
+fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tree>> {
     let (brace, brace_span) = stream.next::<Brace>("expected brace")?;
     let mut brace = TreeStream::new(brace, brace_span);
 
-    let (ident, ident_span) =
-        SymOrIntRangeOrWildcard::parse(&mut brace, "expected relation identifier")?;
+    if !brace.peek_any() {
+        return Ok(None);
+    }
+
+    let (ident, ident_span) = SymOrIntRange::parse(&mut brace, "expected relation identifier")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
 
     let rel_params = if brace.peek::<At>() {
@@ -89,21 +106,13 @@ fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     };
     brace.end()?;
 
-    let object = parse_type(&mut stream)?;
-    stream.end()?;
-
-    Ok((
-        Ast::Rel(Box::new(Rel {
-            subject,
-            ident: (ident, ident_span),
-            subject_cardinality,
-            rel_params,
-            object_cardinality,
-            object_prop_ident,
-            object,
-        })),
-        span,
-    ))
+    Ok(Some(Relation {
+        ident: (ident, ident_span),
+        subject_cardinality,
+        rel_params,
+        object_cardinality,
+        object_prop_ident,
+    }))
 }
 
 fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinality>, Simple<Tree>> {
@@ -223,12 +232,9 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     }
 }
 
-impl SymOrIntRangeOrWildcard {
+impl SymOrIntRange {
     fn parse(input: &mut TreeStream, msg: impl ToString) -> ParseResult<Self> {
-        if input.peek::<Underscore>() {
-            let (_, span) = input.next::<Underscore>("").unwrap();
-            Ok((Self::Wildcard, span))
-        } else if input.peek::<Num>() {
+        if input.peek::<Num>() {
             let (num, span) = input.next::<Num>("").unwrap();
             let start: u16 = num
                 .parse()
