@@ -52,14 +52,8 @@ fn parse_import(mut input: TreeStream) -> ParseResult<Ast> {
 fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
     let (next, type_span) = stream.next_any("expected type")?;
     match next {
-        Tree::Paren(trees) => {
-            let mut ty_stream = TreeStream::new(trees, type_span);
-            let type_span = ty_stream.span();
-            let (kind, _) = ty_stream.next::<Sym>("")?;
-
-            let ty = Type::Sym(kind);
-
-            ty_stream.end()?;
+        Tree::Sym(sym) => {
+            let ty = Type::Sym(sym);
             Ok((ty, type_span))
         }
         Tree::StringLiteral(lit) => Ok((Type::Literal(Literal::String(lit)), type_span)),
