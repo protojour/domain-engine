@@ -31,11 +31,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         self.relations.relationships_by_subject.insert(
-            (relationship.subject, relationship.relation_id),
+            (relationship.subject.0, relationship.relation_id),
             RelationshipId(def_id),
         );
         self.relations.relationships_by_object.insert(
-            (relationship.object, relationship.relation_id),
+            (relationship.object.0, relationship.relation_id),
             RelationshipId(def_id),
         );
 
@@ -61,21 +61,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
-        subject_def: DefId,
-        object_def: DefId,
+        subject: (DefId, SourceSpan),
+        object: (DefId, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let domain_ty = self.check_def(subject_def);
-        let codomain_ty = self.check_def(object_def);
+        let domain_ty = self.check_def(subject.0);
+        let codomain_ty = self.check_def(object.0);
         let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
 
         match domain_ty {
-            Type::Unit(_) => return codomain_ty,
+            Type::Unit(_) | Type::EmptySequence(_) => return codomain_ty,
+            Type::StringConstant(def_id) if *def_id == self.defs.empty_string() => {
+                return codomain_ty;
+            }
+            Type::StringConstant(_) => {
+                return self.error(CompileError::InvalidSubjectType, &subject.1)
+            }
             _ => {}
         }
 
         // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(subject_def);
+        let properties = self.relations.properties_by_type_mut(subject.0);
 
         match (&relation.1.ident, &mut properties.subject) {
             (RelationIdent::Anonymous, SubjectProperties::Empty) => {
@@ -103,7 +109,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
 
                         // Register union for check later
-                        self.relations.value_unions.insert(subject_def);
+                        self.relations.value_unions.insert(subject.0);
                     }
                     _ => {
                         return self.error(CompileError::InvalidCardinaltyCombinationInUnion, span);
@@ -162,16 +168,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
-        object_def: DefId,
-        subject_def: DefId,
+        object: (DefId, SourceSpan),
+        subject: (DefId, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let domain_ty = self.check_def(object_def);
-        let codomain_ty = self.check_def(subject_def);
+        let domain_ty = self.check_def(object.0);
+        let codomain_ty = self.check_def(subject.0);
         let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
 
         // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(object_def);
+        let properties = self.relations.properties_by_type_mut(object.0);
 
         match (&relation.1.object_prop, domain_ty, &mut properties.object) {
             (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {

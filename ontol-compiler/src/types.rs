@@ -21,6 +21,7 @@ pub enum Type<'m> {
     Tautology,
     IntConstant(i32),
     Unit(DefId),
+    EmptySequence(DefId),
     /// Any integer
     Int(DefId),
     /// Any number
@@ -49,6 +50,7 @@ impl<'m> Type<'m> {
         match self {
             Self::Tautology => None,
             Self::Unit(def_id) => Some(*def_id),
+            Self::EmptySequence(def_id) => Some(*def_id),
             Self::IntConstant(_) => todo!(),
             Self::Int(def_id) => Some(*def_id),
             Self::Number(def_id) => Some(*def_id),
@@ -143,6 +145,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Tautology => write!(f, "tautology"),
             Type::IntConstant(val) => write!(f, "int({val})"),
             Type::Unit(_) => write!(f, "unit"),
+            Type::EmptySequence(_) => write!(f, "[]"),
             Type::Int(_) => write!(f, "int"),
             Type::Number(_) => write!(f, "number"),
             Type::String(_) => write!(f, "string"),

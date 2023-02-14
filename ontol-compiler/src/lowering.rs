@@ -120,7 +120,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                 ImplicitDefId::Reused(def_id) => def_id,
                             };
 
-                        let subject = self.ast_type_to_def(subject)?;
+                        let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
+                        let object_def = self.ast_type_to_def(object.0, &object.1)?;
 
                         let rel_params =
                             if let Some(index_range_rel_params) = index_range_rel_params {
@@ -134,25 +135,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                 RelParams::IndexRange(index_range_rel_params)
                             } else {
                                 match rel_params {
-                                    Some(rel_params) => {
-                                        RelParams::Type(self.ast_type_to_def(rel_params)?)
-                                    }
+                                    Some(rel_params) => RelParams::Type(
+                                        self.ast_type_to_def(rel_params.0, &rel_params.1)?,
+                                    ),
                                     None => RelParams::Unit,
                                 }
                             };
 
-                        let object = self.ast_type_to_def(object)?;
-
                         Ok(Some(self.def(
                             DefKind::Relationship(Relationship {
                                 relation_id: RelationId(relation_def_id),
-                                subject,
+                                subject: (subject_def, self.src.span(&subject.1)),
                                 subject_cardinality:
                                     subject_cardinality.map(convert_cardinality).unwrap_or((
                                         PropertyCardinality::Mandatory,
                                         ValueCardinality::One,
                                     )),
-                                rel_params,
+                                object: (object_def, self.src.span(&object.1)),
                                 object_cardinality:
                                     object_cardinality.map(convert_cardinality).unwrap_or_else(
                                         || {
@@ -173,19 +172,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                             }
                                         },
                                     ),
-                                object,
+                                rel_params,
                             }),
                             &span,
                         )))
                     }
                     None => {
-                        let subject = self.ast_type_to_def(subject)?;
-                        let object = self.ast_type_to_def(object)?;
+                        let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
+                        let object_def = self.ast_type_to_def(object.0, &object.1)?;
 
                         Ok(Some(self.def(
                             DefKind::Relationship(Relationship {
                                 relation_id: RelationId(self.compiler.defs.anonymous_relation()),
-                                subject,
+                                subject: (subject_def, self.src.span(&subject.1)),
                                 subject_cardinality: (
                                     PropertyCardinality::Mandatory,
                                     ValueCardinality::One,
@@ -195,7 +194,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                     PropertyCardinality::Optional,
                                     ValueCardinality::Many,
                                 ),
-                                object,
+                                object: (object_def, self.src.span(&object.1)),
                             }),
                             &span,
                         )))
@@ -226,7 +225,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn ast_type_to_def(&mut self, (ast_ty, span): (ast::Type, Span)) -> Res<DefId> {
+    fn ast_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
         match ast_ty {
             ast::Type::Sym(ident) => {
                 match self.compiler.namespaces.lookup(

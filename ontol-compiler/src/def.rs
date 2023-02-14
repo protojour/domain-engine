@@ -94,15 +94,15 @@ pub enum RelationIdent<'m> {
 pub struct Relationship {
     pub relation_id: RelationId,
 
-    pub subject: DefId,
+    pub subject: (DefId, SourceSpan),
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
 
-    pub rel_params: RelParams,
-
-    pub object: DefId,
+    pub object: (DefId, SourceSpan),
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
+
+    pub rel_params: RelParams,
 }
 
 #[derive(Debug)]
@@ -360,11 +360,17 @@ impl<'m> Compiler<'m> {
 
         // fundamental types
         let unit_ty = self.types.intern(Type::Unit(self.defs.unit));
+        let empty_sequence_ty = self
+            .types
+            .intern(Type::EmptySequence(self.defs.empty_sequence));
         let int_ty = self.types.intern(Type::Int(self.defs.int));
         let num_ty = self.types.intern(Type::Number(self.defs.number));
         let string_ty = self.types.intern(Type::String(self.defs.string));
 
         self.def_types.map.insert(self.defs.unit, unit_ty);
+        self.def_types
+            .map
+            .insert(self.defs.empty_sequence, empty_sequence_ty);
 
         let int = self.def_core_type("int", self.defs.int, int_ty);
         let _number = self.def_core_type("number", self.defs.number, num_ty);

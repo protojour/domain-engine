@@ -52,7 +52,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let (relationship, _) = self
                 .get_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting property meta");
-            let object_def = relationship.object;
+            let (object_def, _) = relationship.object;
 
             if used_objects.contains(&object_def) {
                 error_set.report(
@@ -152,7 +152,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");
 
-                        def_id = relationship.object;
+                        def_id = relationship.object.0;
                         continue;
                     }
                     SubjectProperties::Value(_, _, _) => {
@@ -193,7 +193,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .get_subject_property_meta(object_def, *relation_id)
                 .expect("BUG: problem getting property meta");
 
-            let object_def = relationship.object;
+            let (object_def, _) = relationship.object;
             let object_ty = self.def_types.map.get(&object_def).unwrap();
             let Some(property_name) = relation.object_prop() else {
                 continue;

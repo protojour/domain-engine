@@ -88,6 +88,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
+            Some(Type::EmptySequence(_)) => {
+                todo!("not sure if this should be handled here")
+            }
             Some(Type::Array(_)) => {
                 panic!("Array not handled here")
             }
@@ -144,11 +147,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 let inner_operator_id = self
-                    .get_serde_operator_id(relationship.object)
+                    .get_serde_operator_id(relationship.object.0)
                     .expect("No inner operator");
 
                 let (requirement, inner_operator_id) =
-                    self.property_operator(inner_operator_id, relationship.object, *cardinality);
+                    self.property_operator(inner_operator_id, relationship.object.0, *cardinality);
 
                 if !matches!(requirement, PropertyCardinality::Mandatory) {
                     panic!("Value properties must be mandatory, fix this during type check");
@@ -204,7 +207,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 .get_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
-                            self.get_serde_operator_id(relationship.object)
+                            self.get_serde_operator_id(relationship.object.0)
                                 .expect("no inner operator")
                         }
                     };
@@ -299,10 +302,10 @@ impl MapTypeBuilder {
 
                 let subject_key = relation.subject_prop().expect("Property has no name");
                 let operator_id = generator
-                    .get_serde_operator_id(relationship.object)
+                    .get_serde_operator_id(relationship.object.0)
                     .expect("No inner operator");
                 let (requirement, value_operator_id) =
-                    generator.property_operator(operator_id, relationship.object, *cardinality);
+                    generator.property_operator(operator_id, relationship.object.0, *cardinality);
                 let edge_operator_id = match relationship.rel_params {
                     RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
                     RelParams::Unit => None,
@@ -355,10 +358,10 @@ impl MapTypeBuilder {
 
                 let object_key = relation.object_prop().expect("Property has no name");
                 let operator_id = generator
-                    .get_serde_operator_id(relationship.subject)
+                    .get_serde_operator_id(relationship.subject.0)
                     .expect("No inner operator");
                 let (requirement, value_operator_id) =
-                    generator.property_operator(operator_id, relationship.subject, *cardinality);
+                    generator.property_operator(operator_id, relationship.subject.0, *cardinality);
 
                 let edge_operator_id = match relationship.rel_params {
                     RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),

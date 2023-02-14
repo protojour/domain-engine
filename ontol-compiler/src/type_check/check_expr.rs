@@ -111,7 +111,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .get_relationship_meta(*relationship_id)
                                     .expect("BUG: problem getting anonymous property meta");
 
-                                let object_ty = self.check_def(relationship.object);
+                                let object_ty = self.check_def(relationship.object.0);
                                 let typed_expr_ref =
                                     self.check_expr_expect(value, object_ty, ctx).1;
 
@@ -154,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     MatchProperty {
                                         relation_id: *relation_id,
                                         cardinality: relationship.subject_cardinality,
-                                        object_def: relationship.object,
+                                        object_def: relationship.object.0,
                                         used: false,
                                     },
                                 )

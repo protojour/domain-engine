@@ -391,3 +391,15 @@ fn mix_of_index_and_edge_type() {
     "#
     .compile_fail()
 }
+
+#[test]
+fn invalid_subject_types() {
+    r#"
+    (rel!
+        'a' ;; ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
+        {}
+        string
+    )
+    "#
+    .compile_fail()
+}
