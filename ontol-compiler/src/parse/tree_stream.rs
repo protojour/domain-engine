@@ -136,6 +136,7 @@ macro_rules! impl_next {
 }
 
 pub struct Paren;
+pub struct Brace;
 pub struct Bracket;
 pub struct Dot;
 pub struct At;
@@ -146,6 +147,7 @@ pub struct Variable;
 pub struct Num;
 
 impl_next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
+impl_next!(Brace, Vec<Spanned<Tree>>, Tree::Brace(vec), vec);
 impl_next!(Bracket, Vec<Spanned<Tree>>, Tree::Bracket(vec), vec);
 impl_next!(Dot, (), Tree::Dot, ());
 impl_next!(At, (), Tree::At, ());

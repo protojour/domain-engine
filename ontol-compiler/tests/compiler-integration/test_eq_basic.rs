@@ -40,8 +40,8 @@ fn test_eq_simple() {
     "
     (type! foo)
     (type! bar)
-    (rel! (foo) f (string))
-    (rel! (bar) b (string))
+    (rel! (foo) {f} (string))
+    (rel! (bar) {b} (string))
     (eq! (:x)
         (obj! foo
             (f :x)
@@ -72,8 +72,8 @@ fn test_meters() {
     "
     (type! meters)
     (type! millimeters)
-    (rel! (meters) _ (int))
-    (rel! (millimeters) _ (int))
+    (rel! (meters) {_} (int))
+    (rel! (millimeters) {_} (int))
     (eq! (:x)
         (obj! meters
             (_ (/ :x 1000))
@@ -93,10 +93,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     (type! celsius)
-    (rel! (celsius) _ (int))
+    (rel! (celsius) {_} (int))
 
     (type! fahrenheit)
-    (rel! (fahrenheit) _ (int))
+    (rel! (fahrenheit) {_} (int))
 
     (eq! (:x)
         (obj! celsius (_ :x))
@@ -116,8 +116,8 @@ fn test_eq_value_to_map() {
     "
     (type! one)
     (type! two)
-    (rel! (one) _ (string))
-    (rel! (two) a (string))
+    (rel! (one) {_} (string))
+    (rel! (two) {a} (string))
     (eq! (:x)
         (obj! one (_ :x))
         (obj! two (a :x))
@@ -134,8 +134,8 @@ fn test_eq_value_to_map_func() {
     "
     (type! one)
     (type! two)
-    (rel! (one) _ (int))
-    (rel! (two) a (int))
+    (rel! (one) {_} (int))
+    (rel! (two) {a} (int))
     (eq! (:x)
         (obj! one (_ :x))
         (obj! two (a (* :x 2)))
@@ -152,8 +152,8 @@ fn test_eq_simple_array() {
     "
     (type! foo)
     (type! bar)
-    (rel! (foo) a[] (int))
-    (rel! (bar) b[] (int))
+    (rel! (foo) {a[]} (int))
+    (rel! (bar) {b[]} (int))
     (eq! (:x)
         (obj! foo (a :x))
         (obj! bar (b :x))
@@ -184,12 +184,12 @@ fn test_eq_complex_flow() {
     r#"
     (type! one)
     (type! two)
-    (rel! (one) a (string))
-    (rel! (one) b (string))
-    (rel! (two) a (string))
-    (rel! (two) b (string))
-    (rel! (two) c (string))
-    (rel! (two) d (string))
+    (rel! (one) {a} (string))
+    (rel! (one) {b} (string))
+    (rel! (two) {a} (string))
+    (rel! (two) {b} (string))
+    (rel! (two) {c} (string))
+    (rel! (two) {d} (string))
     (eq! (:x :y)
         (obj! one (a :x) (b :y))
         (obj! two (a :x) (b :y) (c :x) (d :y))
@@ -221,10 +221,10 @@ fn test_eq_complex_flow() {
 fn test_eq_delegation() {
     r#"
     (type! meters)
-    (rel! (meters) _ (int))
+    (rel! (meters) {_} (int))
 
     (type! millimeters)
-    (rel! (millimeters) _ (int))
+    (rel! (millimeters) {_} (int))
 
     (eq! (:m)
         (obj! meters (_ :m))
@@ -232,10 +232,10 @@ fn test_eq_delegation() {
     )
 
     (type! car)
-    (rel! (car) length (meters))
+    (rel! (car) {length} (meters))
 
     (type! vehicle)
-    (rel! (vehicle) length (millimeters))
+    (rel! (vehicle) {length} (millimeters))
     
     (eq! (:l)
         (obj! car (length :l))

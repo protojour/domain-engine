@@ -11,6 +11,7 @@ use super::Spanned;
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Tree {
     Paren(Vec<Spanned<Tree>>),
+    Brace(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
     Dot,
     At,
@@ -29,6 +30,7 @@ impl Display for Tree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Paren(_) => write!(f, "parentheses"),
+            Self::Brace(_) => write!(f, "curly braces"),
             Self::Bracket(_) => write!(f, "square brackets"),
             Self::Dot => write!(f, "`.`"),
             Self::At => write!(f, "@"),
@@ -51,11 +53,16 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .clone()
             .map(Tree::Paren)
             .delimited_by(just("("), just(")"));
+        let brace = repetition
+            .clone()
+            .map(Tree::Brace)
+            .delimited_by(just("{"), just("}"));
         let bracket = repetition
             .map(Tree::Bracket)
             .delimited_by(just("["), just("]"));
 
         let combined_tree = paren
+            .or(brace)
             .or(bracket)
             .or(just(".").map(|_| Tree::Dot))
             .or(just("@").map(|_| Tree::At))

@@ -9,79 +9,79 @@ fn test_geojson() {
     r#"
     ; TODO: domain-private types?
     (type! position)
-    (rel! (position) 0..2 (int))
+    (rel! (position) {0..2} (int))
 
     (type! position-list)
-    (rel! (position-list) ..2 (position))
-    (rel! (position-list) 2.. (position))
+    (rel! (position-list) {..2} (position))
+    (rel! (position-list) {2..} (position))
 
     (type! position-ring)
-    (rel! (position-ring) ..4 (position))
-    (rel! (position-ring) 4.. (position))
+    (rel! (position-ring) {..4} (position))
+    (rel! (position-ring) {4..} (position))
 
     (type! Geometry)
     (type! LeafGeometry)
 
     (type! Point)
-    (rel! (Point) type "Point")
-    (rel! (Point) coordinates (position))
+    (rel! (Point) {type} "Point")
+    (rel! (Point) {coordinates} (position))
 
     (type! MultiPoint)
-    (rel! (MultiPoint) type "MultiPoint")
-    (rel! (MultiPoint) coordinates[] (position))
+    (rel! (MultiPoint) {type} "MultiPoint")
+    (rel! (MultiPoint) {coordinates[]} (position))
 
     (type! LineString)
-    (rel! (LineString) type "LineString")
-    (rel! (LineString) coordinates (position-list))
+    (rel! (LineString) {type} "LineString")
+    (rel! (LineString) {coordinates} (position-list))
 
     (type! MultiLineString)
-    (rel! (MultiLineString) type "MultiLineString")
-    (rel! (MultiLineString) coordinates[] (position-list))
+    (rel! (MultiLineString) {type} "MultiLineString")
+    (rel! (MultiLineString) {coordinates[]} (position-list))
 
     (type! Polygon)
-    (rel! (Polygon) type "Polygon")
-    (rel! (Polygon) coordinates (position-ring))
+    (rel! (Polygon) {type} "Polygon")
+    (rel! (Polygon) {coordinates} (position-ring))
 
     (type! MultiPolygon)
-    (rel! (MultiPolygon) type "MultiPolygon")
-    (rel! (MultiPolygon) coordinates[] (position-ring))
+    (rel! (MultiPolygon) {type} "MultiPolygon")
+    (rel! (MultiPolygon) {coordinates[]} (position-ring))
 
     (type! GeometryCollection)
-    (rel! (GeometryCollection) type "GeometryCollection")
-    (rel! (GeometryCollection) geometries[] (LeafGeometry))
+    (rel! (GeometryCollection) {type} "GeometryCollection")
+    (rel! (GeometryCollection) {geometries[]} (LeafGeometry))
 
-    (rel! (LeafGeometry) _ (Point))
-    (rel! (LeafGeometry) _ (MultiPoint))
-    (rel! (LeafGeometry) _ (LineString))
-    (rel! (LeafGeometry) _ (MultiLineString))
-    (rel! (LeafGeometry) _ (Polygon))
-    (rel! (LeafGeometry) _ (MultiPolygon))
+    (rel! (LeafGeometry) {_} (Point))
+    (rel! (LeafGeometry) {_} (MultiPoint))
+    (rel! (LeafGeometry) {_} (LineString))
+    (rel! (LeafGeometry) {_} (MultiLineString))
+    (rel! (LeafGeometry) {_} (Polygon))
+    (rel! (LeafGeometry) {_} (MultiPolygon))
 
     ; Note: Geometry is an extension of LeafGeometry + GeometryCollection
-    (rel! (Geometry) _ (Point))
-    (rel! (Geometry) _ (MultiPoint))
-    (rel! (Geometry) _ (LineString))
-    (rel! (Geometry) _ (MultiLineString))
-    (rel! (Geometry) _ (Polygon))
-    (rel! (Geometry) _ (MultiPolygon))
-    (rel! (Geometry) _ (GeometryCollection))
+    (rel! (Geometry) {_} (Point))
+    (rel! (Geometry) {_} (MultiPoint))
+    (rel! (Geometry) {_} (LineString))
+    (rel! (Geometry) {_} (MultiLineString))
+    (rel! (Geometry) {_} (Polygon))
+    (rel! (Geometry) {_} (MultiPolygon))
+    (rel! (Geometry) {_} (GeometryCollection))
 
     (type! GeometryOrNull)
-    (rel! (GeometryOrNull) _ (Geometry))
+    (rel! (GeometryOrNull) {_} (Geometry))
     ; TODO: Not supported yet (union tree):
-    ; (rel! (GeometryOrNull) _ (null))
+    ; (rel! (GeometryOrNull) {_} (null))
 
     (type! Feature)
-    (rel! (Feature) type "Feature")
-    (rel! (Feature) geometry (GeometryOrNull))
+    (rel! (Feature) {type} "Feature")
+    (rel! (Feature) {geometry} (GeometryOrNull))
 
     ; FIXME: Features is a map of "anything".
     ; This could be a good use case for generics in ONTOL.
-    (rel! (Feature) properties (null))
+    (rel! (Feature) {properties} (null))
 
     (type! FeatureCollection)
-    (rel! (FeatureCollection) type "FeatureCollection")
-    (rel! (FeatureCollection) features[] (Feature))
+    (rel! (FeatureCollection) {type} "FeatureCollection")
+    (rel! (FeatureCollection) {features[]} (Feature))
     "#
     .compile_ok(|env| {
         let geometry = TypeBinding::new(env, "Geometry");

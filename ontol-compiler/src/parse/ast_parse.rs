@@ -7,7 +7,7 @@ use super::{
     ast::*,
     tree::Tree,
     tree_stream::{
-        At, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Underscore, Variable,
+        At, Brace, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Underscore, Variable,
     },
     Span, Spanned,
 };
@@ -70,25 +70,30 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
 fn parse_rel(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
-    let (ident, ident_span) =
-        SymOrIntRangeOrWildcard::parse(&mut stream, "expected relation identifier")?;
-    let subject_cardinality = parse_optional_cardinality(&mut stream)?;
 
-    let rel_params = if stream.peek::<At>() {
-        let _ = stream.next::<At>("").unwrap();
-        Some(parse_type(&mut stream)?)
+    let (brace, brace_span) = stream.next::<Brace>("expected brace")?;
+    let mut brace = TreeStream::new(brace, brace_span);
+
+    let (ident, ident_span) =
+        SymOrIntRangeOrWildcard::parse(&mut brace, "expected relation identifier")?;
+    let subject_cardinality = parse_optional_cardinality(&mut brace)?;
+
+    let rel_params = if brace.peek::<At>() {
+        let _ = brace.next::<At>("").unwrap();
+        Some(parse_type(&mut brace)?)
     } else {
         None
     };
 
-    let (object_prop_ident, object_cardinality) = if stream.peek::<Sym>() {
-        let sym = stream.next::<Sym>("").unwrap();
-        let object_cardinality = parse_optional_cardinality(&mut stream)?;
+    let (object_prop_ident, object_cardinality) = if brace.peek::<Sym>() {
+        let sym = brace.next::<Sym>("").unwrap();
+        let object_cardinality = parse_optional_cardinality(&mut brace)?;
 
         (Some(sym), object_cardinality)
     } else {
         (None, None)
     };
+    brace.end()?;
 
     let object = parse_type(&mut stream)?;
     stream.end()?;
