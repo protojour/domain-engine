@@ -29,7 +29,6 @@ pub enum Type<'m> {
     String(DefId),
     /// A specific string
     StringConstant(DefId),
-    Tuple(&'m [TypeRef<'m>]),
     Array(TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
@@ -55,7 +54,6 @@ impl<'m> Type<'m> {
             Self::Number(def_id) => Some(*def_id),
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
-            Self::Tuple(_) => None,
             Self::Array(_) => None,
             Self::Option(_) => None,
             Self::Function { .. } => None,
@@ -154,17 +152,6 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 };
 
                 write!(f, "\"{lit}\"")
-            }
-            Type::Tuple(elements) => {
-                write!(f, "[")?;
-                let mut iterator = elements.iter().peekable();
-                while let Some(next) = iterator.next() {
-                    write!(f, "{}", FormatType(next, defs))?;
-                    if iterator.peek().is_some() {
-                        write!(f, " ")?;
-                    }
-                }
-                write!(f, "]")
             }
             Type::Array(ty) => {
                 write!(f, "{}[]", FormatType(ty, defs))

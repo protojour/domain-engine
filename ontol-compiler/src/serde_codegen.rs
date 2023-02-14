@@ -88,9 +88,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
-            Some(Type::Tuple(_)) => {
-                panic!("Tuple not handled here")
-            }
             Some(Type::Array(_)) => {
                 panic!("Array not handled here")
             }

@@ -38,16 +38,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
-            DefKind::Tuple(element_defs) => {
-                let element_types = element_defs
-                    .iter()
-                    .map(|e| self.check_def(*e))
-                    .collect::<Vec<_>>();
-                let element_types = self.types.intern(element_types);
-                let ty = self.types.intern(Type::Tuple(element_types));
-                self.def_types.map.insert(def_id, ty);
-                ty
-            }
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }

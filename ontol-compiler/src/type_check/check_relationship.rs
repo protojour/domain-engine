@@ -69,6 +69,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let codomain_ty = self.check_def(object_def);
         let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
 
+        match domain_ty {
+            Type::Unit(_) => return codomain_ty,
+            _ => {}
+        }
+
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(subject_def);
 
