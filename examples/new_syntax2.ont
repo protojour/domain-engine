@@ -1,0 +1,40 @@
+# relationships are in brackets
+
+foo { 'bar' } int
+
+node { 'children'* | 'parent'? } node
+node { 'children'* | 'parent'?: () } node
+
+artist { 'plays'* | 'played-by'?: plays } instrument
+plays { 'how-much' } string
+
+position { 0 } int
+position { 1 } int
+
+position-ring { 0..4 } int
+position-ring { 4.. } int
+
+Geometry {} Point
+
+# automaton/transducer idea
+# 
+# relationships describe automaton state transitions.
+# This should be able to fully describe regular languages.
+# The first type is [] or ''.
+# We could use them for both string and sequence types.
+
+[] => {int} {int} {int*} position
+'' => { "a" } { "b" } some_type
+
+'' => { 'my/' } { uuid } my_id
+
+eq(x, y) {
+    foo {
+        'bar': x,
+        'foo': y
+    }
+    bar {
+        'foo': x,
+        'bar': y
+    }
+}
