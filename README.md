@@ -36,6 +36,5 @@ Tests must use the `test_log::test` attribute for proper tracing.
 
 * Run all the tests with `cargo test`.
 * Run a specific test with `cargo test {test_name}`.
-* To enable traces, use `RUST_LOG=debug cargo test {test_name} -- --nocapture`.
-
-Trace logs are only shown for failed tests.
+* To enable traces, use `RUST_LOG=debug cargo test {test_name}`.
+* Rust captures all console output for successful tests. To show traces for successful tests, use `-- --nocapture` after the test command.
