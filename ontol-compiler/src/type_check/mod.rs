@@ -19,6 +19,7 @@ pub mod check_union;
 pub mod inference;
 
 mod check_expr;
+mod check_relationship;
 
 #[derive(Debug)]
 pub enum TypeError<'m> {

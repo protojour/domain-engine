@@ -29,7 +29,7 @@ impl<'e> TypeBinding<'e> {
             env,
         };
         debug!(
-            "deserializing `{type_name}` with processor {:?}",
+            "deserializing `{type_name}` with {:?}",
             env.new_serde_processor(serde_operator_id)
         );
         binding

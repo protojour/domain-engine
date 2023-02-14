@@ -76,7 +76,6 @@ fn test_serde_value_union1() {
 }
 
 #[test]
-#[ignore]
 fn test_serde_value_union2() {
     "
     (type! u)
