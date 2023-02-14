@@ -30,6 +30,7 @@ impl Relations {
 
 #[derive(Default, Debug)]
 pub struct Properties {
+    pub constructor: Constructor,
     pub subject: SubjectProperties,
     pub object: ObjectProperties,
 }
@@ -39,12 +40,7 @@ pub enum SubjectProperties {
     /// A type with no properties
     #[default]
     Empty,
-    Value(RelationshipId, SourceSpan, Cardinality),
-    /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
-    /// serializers etc should try things in sequence anyway.
-    ValueUnion(Vec<(RelationshipId, SourceSpan)>),
     Map(IndexMap<RelationId, Cardinality>),
-    Sequence(Sequence),
 }
 
 #[derive(Default, Debug)]
@@ -52,4 +48,15 @@ pub enum ObjectProperties {
     #[default]
     Empty,
     Map(IndexMap<RelationId, Cardinality>),
+}
+
+#[derive(Default, Debug)]
+pub enum Constructor {
+    #[default]
+    Identity,
+    Value(RelationshipId, SourceSpan, Cardinality),
+    /// ValueUnion uses a Vec even if we have to prove that properties have disjoint types.
+    /// serializers etc should try things in sequence anyway.
+    ValueUnion(Vec<(RelationshipId, SourceSpan)>),
+    Sequence(Sequence),
 }

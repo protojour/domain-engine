@@ -7,7 +7,7 @@ use crate::{
     },
     error::CompileError,
     mem::Intern,
-    relation::{ObjectProperties, RelationshipId, SubjectProperties},
+    relation::{Constructor, ObjectProperties, RelationshipId, SubjectProperties},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -65,14 +65,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object: (DefId, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let domain_ty = self.check_def(subject.0);
-        let codomain_ty = self.check_def(object.0);
-        let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
+        let subject_ty = self.check_def(subject.0);
+        let object_ty = self.check_def(object.0);
+        let adapter = CardinalityAdapter::new(subject_ty, object_ty);
 
-        match domain_ty {
-            Type::Unit(_) | Type::EmptySequence(_) => return codomain_ty,
+        match subject_ty {
+            Type::Unit(_) | Type::EmptySequence(_) => return object_ty,
             Type::StringConstant(def_id) if *def_id == self.defs.empty_string() => {
-                return codomain_ty;
+                return object_ty;
             }
             Type::StringConstant(_) => {
                 return self.error(CompileError::InvalidSubjectType, &subject.1)
@@ -83,24 +83,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(subject.0);
 
-        match (&relation.1.ident, &mut properties.subject) {
-            (RelationIdent::Anonymous, SubjectProperties::Empty) => {
-                properties.subject = SubjectProperties::Value(
-                    relationship.0,
-                    *span,
-                    relationship.1.subject_cardinality,
-                );
+        match (
+            &relation.1.ident,
+            &mut properties.subject,
+            &mut properties.constructor,
+        ) {
+            (RelationIdent::Anonymous, SubjectProperties::Empty, Constructor::Identity) => {
+                properties.constructor =
+                    Constructor::Value(relationship.0, *span, relationship.1.subject_cardinality);
             }
             (
                 RelationIdent::Anonymous,
-                SubjectProperties::Value(existing_relationship_id, existing_span, cardinality),
+                SubjectProperties::Empty,
+                Constructor::Value(existing_relationship_id, existing_span, cardinality),
             ) => {
                 match (relationship.1.subject_cardinality, cardinality) {
                     (
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                     ) => {
-                        properties.subject = SubjectProperties::ValueUnion(
+                        properties.constructor = Constructor::ValueUnion(
                             [
                                 (*existing_relationship_id, *existing_span),
                                 (relationship.0, *span),
@@ -116,10 +118,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (RelationIdent::Anonymous, SubjectProperties::ValueUnion(properties)) => {
+            (
+                RelationIdent::Anonymous,
+                SubjectProperties::Empty,
+                Constructor::ValueUnion(properties),
+            ) => {
                 properties.push((relationship.0, *span));
             }
-            (RelationIdent::Indexed, SubjectProperties::Empty) => {
+            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -128,16 +134,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(error, span);
                 }
 
-                properties.subject = SubjectProperties::Sequence(sequence);
+                properties.constructor = Constructor::Sequence(sequence);
             }
-            (RelationIdent::Indexed, SubjectProperties::Sequence(sequence)) => {
+            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Sequence(sequence)) => {
                 if let Err(error) =
                     sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
             }
-            (RelationIdent::Named(_), SubjectProperties::Empty) => {
+            (RelationIdent::Named(_), SubjectProperties::Empty, Constructor::Identity) => {
                 properties.subject = SubjectProperties::Map(
                     [(
                         relation.0,
@@ -146,7 +152,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (RelationIdent::Named(_), SubjectProperties::Map(properties)) => {
+            (
+                RelationIdent::Named(_),
+                SubjectProperties::Map(properties),
+                Constructor::Identity,
+            ) => {
                 if properties
                     .insert(
                         relation.0,
@@ -160,7 +170,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
         }
 
-        codomain_ty
+        object_ty
     }
 
     /// Check object property, the inverse of a subject property
@@ -172,34 +182,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         subject: (DefId, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let domain_ty = self.check_def(object.0);
-        let codomain_ty = self.check_def(subject.0);
-        let adapter = CardinalityAdapter::new(domain_ty, codomain_ty);
+        let object_ty = self.check_def(object.0);
+        let subject_ty = self.check_def(subject.0);
+        let adapter = CardinalityAdapter::new(object_ty, subject_ty);
 
         // Type of the property value/the property "range" / "co-domain":
         let properties = self.relations.properties_by_type_mut(object.0);
 
-        match (&relation.1.object_prop, domain_ty, &mut properties.object) {
-            (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
-                properties.object = ObjectProperties::Map(
-                    [(relation.0, adapter.adapt(relationship.1.object_cardinality))].into(),
-                );
-            }
-            (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
-                if properties
-                    .insert(relation.0, adapter.adapt(relationship.1.object_cardinality))
-                    .is_some()
-                {
-                    return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
+        match subject_ty {
+            Type::Unit(_) => {}
+            _ => match (&relation.1.object_prop, object_ty, &mut properties.object) {
+                (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
+                    properties.object = ObjectProperties::Map(
+                        [(relation.0, adapter.adapt(relationship.1.object_cardinality))].into(),
+                    );
                 }
-            }
-            (Some(_), _, _) => {
-                return self.error(CompileError::NonEntityInReverseRelationship, span);
-            }
-            (None, _, _) => {}
-        };
+                (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
+                    if properties
+                        .insert(relation.0, adapter.adapt(relationship.1.object_cardinality))
+                        .is_some()
+                    {
+                        return self
+                            .error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                    }
+                }
+                (Some(_), _, _) => {
+                    return self.error(CompileError::NonEntityInReverseRelationship, span);
+                }
+                (None, _, _) => {}
+            },
+        }
 
-        codomain_ty
+        subject_ty
     }
 }
 

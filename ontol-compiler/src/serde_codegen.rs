@@ -16,7 +16,7 @@ use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
-    relation::{ObjectProperties, Properties, Relations, SubjectProperties},
+    relation::{Constructor, ObjectProperties, Properties, Relations, SubjectProperties},
     types::{DefTypes, Type},
 };
 
@@ -137,11 +137,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(properties) => properties,
         };
 
-        match &properties.subject {
-            SubjectProperties::Empty => MapTypeBuilder::new(typename, type_def_id)
-                .add_object_properties(self, &properties.object)
-                .build(),
-            SubjectProperties::Value(relationship_id, _, cardinality) => {
+        match &properties.constructor {
+            Constructor::Identity => match &properties.subject {
+                SubjectProperties::Empty => MapTypeBuilder::new(typename, type_def_id)
+                    .add_object_properties(self, &properties.object)
+                    .build(),
+                SubjectProperties::Map(property_set) => MapTypeBuilder::new(typename, type_def_id)
+                    .add_subject_property_set(self, property_set)
+                    .add_object_properties(self, &properties.object)
+                    .build(),
+            },
+            Constructor::Value(relationship_id, _, cardinality) => {
                 let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
@@ -163,7 +169,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     inner_operator_id,
                 })
             }
-            SubjectProperties::ValueUnion(_) => {
+            Constructor::ValueUnion(_) => {
                 let union_disciminator = self
                     .relations
                     .union_discriminators
@@ -188,11 +194,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .collect(),
                 })
             }
-            SubjectProperties::Map(property_set) => MapTypeBuilder::new(typename, type_def_id)
-                .add_subject_property_set(self, property_set)
-                .add_object_properties(self, &properties.object)
-                .build(),
-            SubjectProperties::Sequence(sequence) => {
+            Constructor::Sequence(sequence) => {
                 let mut sequence_range_builder = SequenceRangeBuilder {
                     ranges: Default::default(),
                 };

@@ -12,7 +12,7 @@ use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, PropertyCardinality, ValueCardinality},
     error::CompileError,
-    relation::SubjectProperties,
+    relation::{Constructor, SubjectProperties},
     sequence::Sequence,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -41,7 +41,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .relations
             .properties_by_type(value_union_def_id)
             .unwrap();
-        let SubjectProperties::ValueUnion(relationship_ids) = &properties.subject else {
+        let Constructor::ValueUnion(relationship_ids) = &properties.constructor else {
             panic!("not a union");
         };
 
@@ -139,11 +139,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
         loop {
             match self.relations.properties_by_type(def_id) {
-                Some(properties) => match &properties.subject {
-                    SubjectProperties::Empty => {
-                        return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
-                    }
-                    SubjectProperties::Value(
+                Some(properties) => match &properties.constructor {
+                    Constructor::Identity => match &properties.subject {
+                        SubjectProperties::Empty => {
+                            return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
+                        }
+                        SubjectProperties::Map(property_set) => {
+                            return Ok(DomainTypeMatchData::Map(property_set));
+                        }
+                    },
+                    Constructor::Value(
                         relationship_id,
                         _,
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
@@ -155,16 +160,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         def_id = relationship.object.0;
                         continue;
                     }
-                    SubjectProperties::Value(_, _, _) => {
+                    Constructor::Value(_, _, _) => {
                         todo!("test non-standard value cardinality");
                     }
-                    SubjectProperties::ValueUnion(_) => {
+                    Constructor::ValueUnion(_) => {
                         return Err(UnionCheckError::UnionTreeNotSupported);
                     }
-                    SubjectProperties::Map(property_set) => {
-                        return Ok(DomainTypeMatchData::Map(property_set));
-                    }
-                    SubjectProperties::Sequence(sequence) => {
+                    Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
                     }
                 },
