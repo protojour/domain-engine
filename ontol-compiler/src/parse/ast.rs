@@ -46,6 +46,8 @@ pub enum Property {
 pub enum Type {
     Sym(String),
     Literal(Literal),
+    Unit,
+    EmptySequence,
 }
 
 pub struct Relationship {

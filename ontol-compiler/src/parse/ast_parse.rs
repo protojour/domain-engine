@@ -7,8 +7,7 @@ use super::{
     ast::*,
     tree::Tree,
     tree_stream::{
-        At, Brace, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream, Underscore,
-        Variable,
+        Brace, Colon, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream, Underscore,
     },
     Span, Spanned,
 };
@@ -58,6 +57,13 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
             Ok((ty, type_span))
         }
         Tree::StringLiteral(lit) => Ok((Type::Literal(Literal::String(lit)), type_span)),
+        Tree::Underscore => Ok((Type::Unit, type_span)),
+        Tree::Bracket(tree) => {
+            if !tree.is_empty() {
+                return Err(error("sequence must be empty", type_span));
+            }
+            Ok((Type::EmptySequence, type_span))
+        }
         _ => Err(error("invalid type", type_span)),
     }
 }
@@ -90,13 +96,6 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
     let (ident, ident_span) = RelationIdent::parse(&mut brace, "expected string literal or range")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
 
-    let rel_params = if brace.peek::<At>() {
-        let _ = brace.next::<At>("").unwrap();
-        Some(parse_type(&mut brace)?)
-    } else {
-        None
-    };
-
     let (object_prop_ident, object_cardinality) = if brace.peek::<StringLiteral>() {
         let lit = brace.next::<StringLiteral>("").unwrap();
         let object_cardinality = parse_optional_cardinality(&mut brace)?;
@@ -105,6 +104,14 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
     } else {
         (None, None)
     };
+
+    let rel_params = if brace.peek::<Colon>() {
+        let _ = brace.next::<Colon>("").unwrap();
+        Some(parse_type(&mut brace)?)
+    } else {
+        None
+    };
+
     brace.end()?;
 
     Ok(Some(Relation {
@@ -164,7 +171,8 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
     let mut variables = vec![];
     let mut input_params: TreeStream = input.next::<Paren>("expected param list")?.into();
     while input_params.peek_any() {
-        let (var, span) = input_params.next::<Variable>("expected variable")?;
+        let _ = input_params.next::<Colon>("expected colon")?;
+        let (var, span) = input_params.next::<Sym>("expected variable name")?;
         variables.push((var, span));
     }
 
@@ -183,16 +191,16 @@ fn parse_eq(mut input: TreeStream) -> ParseResult<Ast> {
 }
 
 fn parse_next_expr(input: &mut TreeStream) -> ParseResult<Expr> {
-    parse_expr(input.next_any("expected expression")?)
-}
-
-fn parse_expr((tree, span): Spanned<Tree>) -> ParseResult<Expr> {
-    match tree {
-        Tree::Sym(string) => Ok((Expr::Sym(string), span)),
-        Tree::Variable(string) => Ok((Expr::Variable(string), span)),
-        Tree::Num(string) => Ok((Expr::Literal(Literal::Int(string)), span)),
-        Tree::Paren(list) => parse_list_expr(TreeStream::new(list, span)),
-        _ => Err(error("invalid expression", span)),
+    match input.next_any("expected expression")? {
+        (Tree::Sym(string), span) => Ok((Expr::Sym(string), span)),
+        // (Tree::Variable(string), span) => Ok((Expr::Variable(string), span)),
+        (Tree::Colon, _) => {
+            let (variable, span) = input.next::<Sym>("expected variable name")?;
+            Ok((Expr::Variable(variable), span))
+        }
+        (Tree::Num(string), span) => Ok((Expr::Literal(Literal::Int(string)), span)),
+        (Tree::Paren(list), span) => parse_list_expr(TreeStream::new(list, span)),
+        (_, span) => Err(error("invalid expression", span)),
     }
 }
 

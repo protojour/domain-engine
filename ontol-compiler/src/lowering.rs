@@ -238,10 +238,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     None => Err(self.error(CompileError::TypeNotFound, &span)),
                 }
             }
-            ast::Type::Literal(ast::Literal::String(lit)) => {
-                let lit = self.compiler.strings.intern(&lit);
-                Ok(self.compiler.defs.def_string_literal(lit))
-            }
+            ast::Type::Literal(ast::Literal::String(lit)) => match lit.as_str() {
+                "" => Ok(self.compiler.defs.empty_string()),
+                _ => {
+                    let lit = self.compiler.strings.intern(&lit);
+                    Ok(self.compiler.defs.def_string_literal(lit))
+                }
+            },
+            ast::Type::Unit => Ok(self.compiler.defs.unit()),
+            ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
         }
     }

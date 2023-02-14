@@ -26,6 +26,7 @@ pub struct Def<'m> {
 pub enum DefKind<'m> {
     Primitive(Primitive),
     StringLiteral(&'m str),
+    EmptySequence,
     Tuple(SmallVec<[DefId; 4]>),
     DomainType(&'m str),
     DomainEntity(&'m str),
@@ -46,6 +47,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
+            Self::EmptySequence => None,
             Self::Tuple(_) => None,
             Self::CoreFn(_) => None,
             Self::DomainType(ident) => Some((*ident).into()),
@@ -162,6 +164,8 @@ pub struct Defs<'m> {
     unit: DefId,
     anonymous_relation: DefId,
     indexed_relation: DefId,
+    empty_sequence: DefId,
+    empty_string: DefId,
     int: DefId,
     number: DefId,
     string: DefId,
@@ -178,6 +182,8 @@ impl<'m> Defs<'m> {
             unit: DefId(0),
             anonymous_relation: DefId(0),
             indexed_relation: DefId(0),
+            empty_sequence: DefId(0),
+            empty_string: DefId(0),
             int: DefId(0),
             number: DefId(0),
             string: DefId(0),
@@ -210,6 +216,8 @@ impl<'m> Defs<'m> {
             CORE_PKG,
             SourceSpan::none(),
         );
+        defs.empty_sequence = defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none());
+        defs.empty_string = defs.add_def(DefKind::StringLiteral(""), CORE_PKG, SourceSpan::none());
 
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
@@ -228,6 +236,14 @@ impl<'m> Defs<'m> {
 
     pub fn indexed_relation(&self) -> DefId {
         self.indexed_relation
+    }
+
+    pub fn empty_sequence(&self) -> DefId {
+        self.empty_sequence
+    }
+
+    pub fn empty_string(&self) -> DefId {
+        self.empty_string
     }
 
     pub fn int(&self) -> DefId {
@@ -350,9 +366,7 @@ impl<'m> Compiler<'m> {
         let num_ty = self.types.intern(Type::Number(self.defs.number));
         let string_ty = self.types.intern(Type::String(self.defs.string));
 
-        // add fundamental types to core namespace
-        self.def_core_type("unit", self.defs.unit, unit_ty);
-        self.def_core_pun(self.defs.unit, "null");
+        self.def_types.map.insert(self.defs.unit, unit_ty);
 
         let int = self.def_core_type("int", self.defs.int, int_ty);
         let _number = self.def_core_type("number", self.defs.number, num_ty);
@@ -393,12 +407,6 @@ impl<'m> Compiler<'m> {
             .insert(ident.into(), def_id);
         self.def_types.map.insert(def_id, ty);
         ty
-    }
-
-    fn def_core_pun(&mut self, def_id: DefId, pun: &str) {
-        self.namespaces
-            .get_mut(CORE_PKG, Space::Type)
-            .insert(pun.into(), def_id);
     }
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {

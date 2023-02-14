@@ -76,14 +76,28 @@ fn test_serde_value_union1() {
 }
 
 #[test]
-fn test_serde_string_or_null() {
+#[ignore]
+fn test_serde_value_union2() {
     "
-    (type! string-or-null)
-    (rel! string-or-null {} string)
-    (rel! string-or-null {} null)
+    (type! u)
+    (rel! _ { 'a' } u)
+    (rel! _ { 'b' } u)
+    "
+    .compile_ok(|env| {
+        let u = TypeBinding::new(env, "u");
+        assert_json_io_matches!(u, json!("a"));
+    });
+}
+
+#[test]
+fn test_serde_string_or_unit() {
+    "
+    (type! string-or-unit)
+    (rel! string-or-unit {} string)
+    (rel! string-or-unit {} _)
 
     (type! foo)
-    (rel! foo { 'a' } string-or-null)
+    (rel! foo { 'a' } string-or-unit)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");

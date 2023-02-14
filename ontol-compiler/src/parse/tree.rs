@@ -14,13 +14,11 @@ pub enum Tree {
     Brace(Vec<Spanned<Tree>>),
     Bracket(Vec<Spanned<Tree>>),
     Dot,
-    At,
+    Colon,
     Questionmark,
     Underscore,
     /// Any unquoted string not starting with "_"
     Sym(String),
-    /// String starting with ":"
-    Variable(String),
     Num(String),
     StringLiteral(String),
     Comment(String),
@@ -33,11 +31,10 @@ impl Display for Tree {
             Self::Brace(_) => write!(f, "curly braces"),
             Self::Bracket(_) => write!(f, "square brackets"),
             Self::Dot => write!(f, "`.`"),
-            Self::At => write!(f, "@"),
+            Self::Colon => write!(f, ":"),
             Self::Questionmark => write!(f, "?"),
             Self::Underscore => write!(f, "_"),
             Self::Sym(_) => write!(f, "symbol"),
-            Self::Variable(_) => write!(f, "variable"),
             Self::Num(_) => write!(f, "number"),
             Self::StringLiteral(_) => write!(f, "string literal"),
             Self::Comment(_) => write!(f, "comment"),
@@ -65,11 +62,10 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(brace)
             .or(bracket)
             .or(just(".").map(|_| Tree::Dot))
-            .or(just("@").map(|_| Tree::At))
+            .or(just(":").map(|_| Tree::Colon))
             .or(just("?").map(|_| Tree::Questionmark))
             .or(just("_").map(|_| Tree::Underscore))
             .or(num())
-            .or(just(":").ignore_then(ident().map(Tree::Variable)))
             .or(double_quote_string_literal().map(Tree::StringLiteral))
             .or(single_quote_string_literal().map(Tree::StringLiteral))
             .or(ident().map(Tree::Sym))
@@ -133,10 +129,7 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 fn special_char(c: char) -> bool {
-    matches!(
-        c,
-        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '@' | '?'
-    )
+    matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?')
 }
 
 #[cfg(test)]

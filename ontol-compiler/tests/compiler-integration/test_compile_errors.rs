@@ -328,8 +328,8 @@ fn test_serde_object_property_not_sugared() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { 'a' @unit 'aa'* } bar) ;; ERROR only entities may have named reverse relationship
-    (rel! foo { 'b' @unit 'bb'* } string) ;; ERROR only entities may have named reverse relationship
+    (rel! foo { 'a' 'aa'*: _ } bar) ;; ERROR only entities may have named reverse relationship
+    (rel! foo { 'b' 'bb'*: _ } string) ;; ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -376,7 +376,7 @@ fn various_monadic_properties() {
     ; a is either a string or null
     (rel! bar { 'nullable' } string)
     ; FIXME: Should this work?
-    (rel! bar { 'nullable' } null) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    (rel! bar { 'nullable' } _) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail()
 }
@@ -387,7 +387,7 @@ fn mix_of_index_and_edge_type() {
     (type! foo)
     (type! bar)
 
-    (rel! foo { 0 @bar } string) ;; ERROR cannot mix index relation identifiers and edge types
+    (rel! foo { 0: bar } string) ;; ERROR cannot mix index relation identifiers and edge types
     "#
     .compile_fail()
 }

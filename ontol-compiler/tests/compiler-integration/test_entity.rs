@@ -20,7 +20,7 @@ fn test_entity_experiment_etc() {
     (entity! record)
     (rel! record { 'name' } string)
     ; i.e. syntax sugar for:
-    ; (rel! record { 'name' @unit 'name'* } string)
+    ; (rel! record { 'name' 'name'*: () } string)
 
     (entity! instrument)
     (rel! instrument { 'name' } string)
@@ -28,7 +28,7 @@ fn test_entity_experiment_etc() {
     (type! plays)
     (rel! plays { 'how_much' } string)
 
-    (rel! artist { 'plays'* @plays 'played_by'* } instrument)
+    (rel! artist { 'plays'* 'played_by'*: plays } instrument)
     "
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");

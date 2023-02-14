@@ -69,7 +69,7 @@ fn test_geojson() {
     (type! GeometryOrNull)
     (rel! GeometryOrNull {} Geometry)
     ; TODO: Not supported yet (union tree):
-    ; (rel! GeometryOrNull {} null)
+    ; (rel! GeometryOrNull {} ())
 
     (type! Feature)
     (rel! Feature { 'type' } 'Feature')
@@ -77,7 +77,7 @@ fn test_geojson() {
 
     ; FIXME: Features is a map of 'anything'.
     ; This could be a good use case for generics in ONTOL.
-    (rel! Feature { 'properties' } null)
+    (rel! Feature { 'properties' } _)
 
     (type! FeatureCollection)
     (rel! FeatureCollection { 'type' } 'FeatureCollection')
