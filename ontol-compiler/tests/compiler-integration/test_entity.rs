@@ -7,13 +7,13 @@ use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCom
 
 #[test]
 fn test_entity_experiment_etc() {
-    r#"
+    "
     (type! artist-id)
 
     (entity! artist)
     (rel! artist {name} string)
 
-    (rel! artist-id {} "artist/{uuid}")
+    (rel! artist-id {} 'artist/{uuid}')
     ; (rel! artist-id { uuid } string)
     ; (rel! artist-id { id! } artist)
 
@@ -29,7 +29,7 @@ fn test_entity_experiment_etc() {
     (rel! plays { how_much } string)
 
     (rel! artist { plays[] @plays played_by[] } instrument)
-    "#
+    "
     .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
         let instrument = TypeBinding::new(env, "instrument");
@@ -76,12 +76,12 @@ fn test_entity_experiment_etc() {
 
 #[test]
 fn test_entity_self_relationship() {
-    r#"
+    "
     (entity! node)
 
     (rel! node { name } string)
     (rel! node { children[] parent? } node)
-    "#
+    "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 
@@ -123,10 +123,10 @@ fn test_entity_self_relationship() {
 
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
-    r#"
+    "
     (entity! node)
     (rel! node { children[] parent } node)
-    "#
+    "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 

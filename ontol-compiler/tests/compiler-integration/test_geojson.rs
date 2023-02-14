@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_geojson() {
-    r#"
+    "
     ; TODO: domain-private types?
     (type! position)
     (rel! position { 0..2 } int)
@@ -23,31 +23,31 @@ fn test_geojson() {
     (type! LeafGeometry)
 
     (type! Point)
-    (rel! Point { type } "Point")
+    (rel! Point { type } 'Point')
     (rel! Point { coordinates } position)
 
     (type! MultiPoint)
-    (rel! MultiPoint { type } "MultiPoint")
+    (rel! MultiPoint { type } 'MultiPoint')
     (rel! MultiPoint { coordinates[] } position)
 
     (type! LineString)
-    (rel! LineString { type } "LineString")
+    (rel! LineString { type } 'LineString')
     (rel! LineString { coordinates } position-list)
 
     (type! MultiLineString)
-    (rel! MultiLineString { type } "MultiLineString")
+    (rel! MultiLineString { type } 'MultiLineString')
     (rel! MultiLineString { coordinates[] } position-list)
 
     (type! Polygon)
-    (rel! Polygon { type } "Polygon")
+    (rel! Polygon { type } 'Polygon')
     (rel! Polygon { coordinates } position-ring)
 
     (type! MultiPolygon)
-    (rel! MultiPolygon { type } "MultiPolygon")
+    (rel! MultiPolygon { type } 'MultiPolygon')
     (rel! MultiPolygon { coordinates[] } position-ring)
 
     (type! GeometryCollection)
-    (rel! GeometryCollection { type } "GeometryCollection")
+    (rel! GeometryCollection { type } 'GeometryCollection')
     (rel! GeometryCollection { geometries[] } LeafGeometry)
 
     (rel! LeafGeometry {} Point)
@@ -72,17 +72,17 @@ fn test_geojson() {
     ; (rel! GeometryOrNull {} null)
 
     (type! Feature)
-    (rel! Feature { type } "Feature")
+    (rel! Feature { type } 'Feature')
     (rel! Feature { geometry } GeometryOrNull)
 
-    ; FIXME: Features is a map of "anything".
+    ; FIXME: Features is a map of 'anything'.
     ; This could be a good use case for generics in ONTOL.
     (rel! Feature { properties } null)
 
     (type! FeatureCollection)
-    (rel! FeatureCollection { type } "FeatureCollection")
+    (rel! FeatureCollection { type } 'FeatureCollection')
     (rel! FeatureCollection { features[] } Feature)
-    "#
+    "
     .compile_ok(|env| {
         let geometry = TypeBinding::new(env, "Geometry");
         assert_json_io_matches!(

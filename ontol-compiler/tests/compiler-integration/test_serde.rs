@@ -64,11 +64,11 @@ fn test_serde_sequence() {
 
 #[test]
 fn test_serde_value_union1() {
-    r#"
+    "
     (type! u)
-    (rel! u {} "a")
-    (rel! u {} "b")
-    "#
+    (rel! u {} 'a')
+    (rel! u {} 'b')
+    "
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!("a"));
@@ -77,14 +77,14 @@ fn test_serde_value_union1() {
 
 #[test]
 fn test_serde_string_or_null() {
-    r#"
+    "
     (type! string-or-null)
     (rel! string-or-null {} string)
     (rel! string-or-null {} null)
 
     (type! foo)
     (rel! foo {a} string-or-null)
-    "#
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "string" }));
@@ -94,18 +94,18 @@ fn test_serde_string_or_null() {
 
 #[test]
 fn test_serde_map_union() {
-    r#"
+    "
     (type! foo)
     (type! bar)
-    (rel! foo { type } "foo")
+    (rel! foo { type } 'foo')
     (rel! foo { c } int)
-    (rel! bar { type } "bar")
+    (rel! bar { type } 'bar')
     (rel! bar { d } int)
 
     (type! u)
     (rel! u {} foo)
     (rel! u {} bar)
-    "#
+    "
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!({ "type": "foo", "c": 7}));
@@ -127,13 +127,13 @@ fn test_serde_many_cardinality() {
 
 #[test]
 fn test_serde_infinite_sequence() {
-    r#"
+    "
     (type! foo)
     (rel! foo {  ..2 } int)
     (rel! foo { 2..4 } string)
     (rel! foo { 5..6 } int)
     (rel! foo { 6..  } int)
-    "#
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44]));
@@ -147,7 +147,7 @@ fn test_serde_infinite_sequence() {
 
 #[test]
 fn test_jsonml() {
-    r#"
+    "
     (type! element)
     (type! tag)
     (type! tag_name)
@@ -164,13 +164,13 @@ fn test_jsonml() {
 
     (rel! tag { 2.. } element)
 
-    (rel! tag_name {} "div")
-    (rel! tag_name {} "em")
-    (rel! tag_name {} "strong")
+    (rel! tag_name {} 'div')
+    (rel! tag_name {} 'em')
+    (rel! tag_name {} 'strong')
 
     ; BUG: should accept any string as key
     (rel! attributes { class? } string)
-    "#
+    "
     .compile_ok(|env| {
         let element = TypeBinding::new(env, "element");
 

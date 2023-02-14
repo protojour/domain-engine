@@ -168,10 +168,10 @@ fn deserialize_union_of_primitives() {
 
 #[test]
 fn deserialize_string_constant() {
-    r#"
+    "
     (type! foo)
-    (rel! foo {} "my_value")
-    "#
+    (rel! foo {} 'my_value')
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
@@ -191,11 +191,11 @@ fn deserialize_string_constant() {
 
 #[test]
 fn deserialize_finite_non_uniform_sequence() {
-    r#"
+    "
     (type! foo)
     (rel! foo { 0 } int)
-    (rel! foo { 1 } "a")
-    "#
+    (rel! foo { 1 } 'a')
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
@@ -219,10 +219,10 @@ fn deserialize_finite_non_uniform_sequence() {
 
 #[test]
 fn deserialize_finite_uniform_sequence() {
-    r#"
+    "
     (type! foo)
     (rel! foo { ..2 } int)
-    "#
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
@@ -246,11 +246,11 @@ fn deserialize_finite_uniform_sequence() {
 
 #[test]
 fn deserialize_string_union() {
-    r#"
+    "
     (type! foo)
-    (rel! foo {} "a")
-    (rel! foo {} "b")
-    "#
+    (rel! foo {} 'a')
+    (rel! foo {} 'b')
+    "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
@@ -266,17 +266,17 @@ fn deserialize_string_union() {
 
 #[test]
 fn deserialize_map_union() {
-    r#"
+    "
     (type! foo)
     (type! bar)
-    (rel! foo { variant } "foo")
-    (rel! bar { variant } "bar")
+    (rel! foo { variant } 'foo')
+    (rel! bar { variant } 'bar')
     (rel! bar { prop } int)
 
     (type! union)
     (rel! union {} foo)
     (rel! union {} bar)
-    "#
+    "
     .compile_ok(|env| {
         let union = TypeBinding::new(env, "union");
         assert_matches!(

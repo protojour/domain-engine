@@ -82,55 +82,55 @@ fn map_union_unit_type() {
 
 #[test]
 fn map_union_missing_discriminator() {
-    r#"
+    "
     (type! foo)
     (type! bar)
-    (rel! foo {a} "constant")
+    (rel! foo {a} 'constant')
     (rel! bar {b} string)
     (type! u)
     (rel! u {} foo)
     (rel! u {} bar) ;; ERROR cannot discriminate type
-    "#
+    "
     .compile_fail()
 }
 
 #[test]
 fn map_union_non_uniform_discriminators() {
-    r#"
+    "
     (type! foo)
     (type! bar)
-    (rel! foo {a} "constant")
-    (rel! bar {b} "other-constant")
+    (rel! foo {a} 'constant')
+    (rel! bar {b} 'other-constant')
     (type! u) ;; ERROR no uniform discriminator found for union variants
     (rel! u {} foo)
     (rel! u {} bar)
-    "#
+    "
     .compile_fail()
 }
 
 #[test]
 fn non_disjoint_string_union() {
-    r#"
+    "
     (type! u1)
-    (rel! u1 {} "a")
-    (rel! u1 {} "a") ;; ERROR duplicate anonymous relationship
-    "#
+    (rel! u1 {} 'a')
+    (rel! u1 {} 'a') ;; ERROR duplicate anonymous relationship
+    "
     .compile_fail()
 }
 
 #[test]
 fn union_tree() {
-    r#"
+    "
     (type! u1)
-    (rel! u1 {} "1a")
-    (rel! u1 {} "1b")
+    (rel! u1 {} '1a')
+    (rel! u1 {} '1b')
     (type! u2)
-    (rel! u2 {} "2a")
-    (rel! u2 {} "2b")
+    (rel! u2 {} '2a')
+    (rel! u2 {} '2b')
     (type! u3)
     (rel! u3 {} u1) ;; ERROR union tree not supported
     (rel! u3 {} u2) ;; ERROR union tree not supported
-    "#
+    "
     .compile_fail()
 }
 
@@ -293,7 +293,7 @@ fn eq_type_mismatch_in_func() {
 
 #[test]
 fn eq_array_mismatch() {
-    r#"
+    "
     (type! foo)
     (rel! foo { a[] } string)
     (rel! foo { b[] } string)
@@ -309,17 +309,17 @@ fn eq_array_mismatch() {
             (b :y) ;; ERROR type mismatch: expected `int[]`, found `string[]`
         )
     )
-    "#
+    "
     .compile_fail();
 }
 
 #[test]
 fn union_in_named_relationship() {
-    r#"
+    "
     (type! foo)
     (rel! foo {a} string)
     (rel! foo {a} int) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
-    "#
+    "
     .compile_fail();
 }
 
@@ -336,7 +336,7 @@ fn test_serde_object_property_not_sugared() {
 
 #[test]
 fn unresolved_transitive_eq() {
-    r#"
+    "
     (type! a)
     (type! b)
     (rel! a {} int)
@@ -355,16 +355,16 @@ fn unresolved_transitive_eq() {
             :x ;; ERROR cannot convert this `b` from `a`: These types are not equated.
         ))
     )
-    "#
+    "
     .compile_fail();
 }
 
 #[test]
 fn various_monadic_properties() {
-    r#"
+    "
     (type! foo)
     (rel! foo { a } string)
-    (default! foo { a } "default") ;; ERROR parse error: unknown keyword
+    (default! foo { a } 'default') ;; ERROR parse error: unknown keyword
 
     (type! bar)
     ; a is either a string or not present
@@ -377,7 +377,7 @@ fn various_monadic_properties() {
     (rel! bar { nullable } string)
     ; FIXME: Should this work?
     (rel! bar { nullable } null) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
-    "#
+    "
     .compile_fail()
 }
 

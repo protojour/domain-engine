@@ -40,8 +40,8 @@ fn test_eq_simple() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo {f} string)
-    (rel! bar {b} string)
+    (rel! foo { f } string)
+    (rel! bar { b } string)
     (eq! (:x)
         (obj! foo
             (f :x)
@@ -181,7 +181,7 @@ fn test_eq_complex_flow() {
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
-    r#"
+    "
     (type! one)
     (type! two)
     (rel! one { a } string)
@@ -194,7 +194,7 @@ fn test_eq_complex_flow() {
         (obj! one (a :x) (b :y))
         (obj! two (a :x) (b :y) (c :x) (d :y))
     )
-    "#
+    "
     .compile_ok(|env| {
         assert_translate(
             env,
@@ -219,7 +219,7 @@ fn test_eq_complex_flow() {
 
 #[test]
 fn test_eq_delegation() {
-    r#"
+    "
     (type! meters)
     (rel! meters {} int)
 
@@ -241,7 +241,7 @@ fn test_eq_delegation() {
         (obj! car (length :l))
         (obj! vehicle (length :l))
     )
-    "#
+    "
     .compile_ok(|env| {
         assert_translate(
             env,

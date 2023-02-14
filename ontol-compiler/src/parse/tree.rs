@@ -70,7 +70,8 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(just("_").map(|_| Tree::Underscore))
             .or(num())
             .or(just(":").ignore_then(ident().map(Tree::Variable)))
-            .or(string_literal().map(Tree::StringLiteral))
+            .or(double_quote_string_literal().map(Tree::StringLiteral))
+            .or(single_quote_string_literal().map(Tree::StringLiteral))
             .or(ident().map(Tree::Sym))
             .or(comment());
 
@@ -106,12 +107,21 @@ fn ident() -> impl Parser<char, String, Error = Simple<char>> {
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
-fn string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
     // FIXME: other escape codes?
     // see https://github.com/zesterer/chumsky/blob/940d531a7b4bc63062284bec6888fc5dae10a3d2/benches/json.rs
     just('"')
         .ignore_then(filter(|c: &char| *c != '\\' && *c != '"').repeated())
         .then_ignore(just('"'))
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+    // FIXME: other escape codes?
+    // see https://github.com/zesterer/chumsky/blob/940d531a7b4bc63062284bec6888fc5dae10a3d2/benches/json.rs
+    just('\'')
+        .ignore_then(filter(|c: &char| *c != '\\' && *c != '\'').repeated())
+        .then_ignore(just('\''))
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
