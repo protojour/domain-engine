@@ -26,7 +26,7 @@ fn test_serde_value_type() {
 fn test_serde_map_type() {
     "
     (type! foo)
-    (rel! foo { a } string)
+    (rel! foo { 'a' } string)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -39,9 +39,9 @@ fn test_serde_complex_type() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { a } string)
-    (rel! foo { b } bar)
-    (rel! bar { c } string)
+    (rel! foo { 'a' } string)
+    (rel! foo { 'b' } bar)
+    (rel! bar { 'c' } string)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -83,7 +83,7 @@ fn test_serde_string_or_null() {
     (rel! string-or-null {} null)
 
     (type! foo)
-    (rel! foo {a} string-or-null)
+    (rel! foo { 'a' } string-or-null)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -97,10 +97,10 @@ fn test_serde_map_union() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { type } 'foo')
-    (rel! foo { c } int)
-    (rel! bar { type } 'bar')
-    (rel! bar { d } int)
+    (rel! foo { 'type' } 'foo')
+    (rel! foo { 'c' } int)
+    (rel! bar { 'type' } 'bar')
+    (rel! bar { 'd' } int)
 
     (type! u)
     (rel! u {} foo)
@@ -116,7 +116,7 @@ fn test_serde_map_union() {
 fn test_serde_many_cardinality() {
     "
     (type! foo)
-    (rel! foo { s[] } string)
+    (rel! foo { 's'[] } string)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -169,7 +169,7 @@ fn test_jsonml() {
     (rel! tag_name {} 'strong')
 
     ; BUG: should accept any string as key
-    (rel! attributes { class? } string)
+    (rel! attributes { 'class'? } string)
     "
     .compile_ok(|env| {
         let element = TypeBinding::new(env, "element");

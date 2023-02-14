@@ -145,6 +145,7 @@ pub struct Underscore;
 pub struct Sym;
 pub struct Variable;
 pub struct Num;
+pub struct StringLiteral;
 
 impl_next!(Paren, Vec<Spanned<Tree>>, Tree::Paren(vec), vec);
 impl_next!(Brace, Vec<Spanned<Tree>>, Tree::Brace(vec), vec);
@@ -156,3 +157,4 @@ impl_next!(Underscore, (), Tree::Underscore, ());
 impl_next!(Sym, String, Tree::Sym(str), str);
 impl_next!(Variable, String, Tree::Variable(str), str);
 impl_next!(Num, String, Tree::Num(str), str);
+impl_next!(StringLiteral, String, Tree::StringLiteral(str), str);

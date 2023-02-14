@@ -7,7 +7,8 @@ use super::{
     ast::*,
     tree::Tree,
     tree_stream::{
-        At, Brace, Bracket, Dot, Num, Paren, Questionmark, Sym, TreeStream, Underscore, Variable,
+        At, Brace, Bracket, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream,
+        Underscore, Variable,
     },
     Span, Spanned,
 };
@@ -86,7 +87,7 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
         return Ok(None);
     }
 
-    let (ident, ident_span) = SymOrIntRange::parse(&mut brace, "expected relation identifier")?;
+    let (ident, ident_span) = RelationIdent::parse(&mut brace, "expected string literal or range")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
 
     let rel_params = if brace.peek::<At>() {
@@ -96,11 +97,11 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
         None
     };
 
-    let (object_prop_ident, object_cardinality) = if brace.peek::<Sym>() {
-        let sym = brace.next::<Sym>("").unwrap();
+    let (object_prop_ident, object_cardinality) = if brace.peek::<StringLiteral>() {
+        let lit = brace.next::<StringLiteral>("").unwrap();
         let object_cardinality = parse_optional_cardinality(&mut brace)?;
 
-        (Some(sym), object_cardinality)
+        (Some(lit), object_cardinality)
     } else {
         (None, None)
     };
@@ -232,7 +233,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     }
 }
 
-impl SymOrIntRange {
+impl RelationIdent {
     fn parse(input: &mut TreeStream, msg: impl ToString) -> ParseResult<Self> {
         if input.peek::<Num>() {
             let (num, span) = input.next::<Num>("").unwrap();
@@ -266,8 +267,8 @@ impl SymOrIntRange {
                 span,
             ))
         } else {
-            let (ident, span) = input.next::<Sym>(msg)?;
-            Ok((Self::Sym(ident), span))
+            let (ident, span) = input.next::<StringLiteral>(msg)?;
+            Ok((Self::Named(ident), span))
         }
     }
 }

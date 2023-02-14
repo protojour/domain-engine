@@ -72,8 +72,8 @@ fn deserialize_string() {
 fn deserialize_object_properties() {
     "
     (type! obj)
-    (rel! obj { a } string)
-    (rel! obj { b } int)
+    (rel! obj { 'a' } string)
+    (rel! obj { 'b' } int)
     "
     .compile_ok(|env| {
         let obj = TypeBinding::new(env, "obj");
@@ -103,9 +103,9 @@ fn deserialize_nested() {
     (type! one)
     (type! two)
     (type! three)
-    (rel! one { x } two)
-    (rel! one { y } three)
-    (rel! two { y } three)
+    (rel! one { 'x' } two)
+    (rel! one { 'y' } three)
+    (rel! two { 'y' } three)
     (rel! three {} string)
     "
     .compile_ok(|env| {
@@ -127,8 +127,8 @@ fn deserialize_recursive() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { b } bar)
-    (rel! bar { f } foo)
+    (rel! foo { 'b' } bar)
+    (rel! bar { 'f' } foo)
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -269,9 +269,9 @@ fn deserialize_map_union() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo { variant } 'foo')
-    (rel! bar { variant } 'bar')
-    (rel! bar { prop } int)
+    (rel! foo { 'variant' } 'foo')
+    (rel! bar { 'variant' } 'bar')
+    (rel! bar { 'prop' } int)
 
     (type! union)
     (rel! union {} foo)

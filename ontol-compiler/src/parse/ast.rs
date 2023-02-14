@@ -55,15 +55,15 @@ pub struct Relationship {
 }
 
 pub struct Relation {
-    pub ident: Spanned<SymOrIntRange>,
+    pub ident: Spanned<RelationIdent>,
     pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
 }
 
-pub enum SymOrIntRange {
-    Sym(String),
+pub enum RelationIdent {
+    Named(String),
     IntRange(Range<Option<u16>>),
 }
 

@@ -15,10 +15,7 @@ use crate::{
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    parse::{
-        ast::{self, SymOrIntRange},
-        Span,
-    },
+    parse::{ast, Span},
     source::{CompileSrc, CORE_PKG},
 };
 
@@ -91,11 +88,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             _,
                             Option<Range<Option<u16>>>,
                         ) = match ident {
-                            SymOrIntRange::Sym(str) => (
+                            ast::RelationIdent::Named(str) => (
                                 RelationIdent::Named(self.compiler.strings.intern(&str)),
                                 None,
                             ),
-                            SymOrIntRange::IntRange(range) => (RelationIdent::Indexed, Some(range)),
+                            ast::RelationIdent::IntRange(range) => {
+                                (RelationIdent::Indexed, Some(range))
+                            }
                         };
 
                         let has_object_prop = object_prop_ident.is_some();
