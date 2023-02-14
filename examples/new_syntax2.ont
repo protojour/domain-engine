@@ -1,4 +1,4 @@
-# relationships are in brackets
+# relationships are in curly braces
 
 foo { 'bar' } int
 
