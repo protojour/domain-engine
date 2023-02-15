@@ -43,12 +43,8 @@ fn test_eq_simple() {
     (rel! foo { 'f' } string)
     (rel! bar { 'b' } string)
     (eq! (:x)
-        (obj! foo
-            (f :x)
-        )
-        (obj! bar
-            (b :x)
-        )
+        (obj! foo { f :x })
+        (obj! bar { b :x })
     )
     "
     .compile_ok(|env| {
@@ -75,12 +71,8 @@ fn test_meters() {
     (rel! _ { int } meters)
     (rel! _ { int } millimeters)
     (eq! (:x)
-        (obj! meters
-            (_ (/ :x 1000))
-        )
-        (obj! millimeters
-            (_ :x)
-        )
+        (obj! meters (/ :x 1000))
+        (obj! millimeters :x)
     )
     "
     .compile_ok(|env| {
@@ -99,8 +91,8 @@ fn test_temperature() {
     (rel! _ { int } fahrenheit)
 
     (eq! (:x)
-        (obj! celsius (_ :x))
-        (obj! fahrenheit (_ (+ (* :x (/ 9 5)) 32)))
+        (obj! celsius :x)
+        (obj! fahrenheit (+ (* :x (/ 9 5)) 32))
     )
     "
     .compile_ok(|env| {
@@ -119,8 +111,8 @@ fn test_eq_value_to_map() {
     (rel! _ { string } one)
     (rel! two { 'a' } string)
     (eq! (:x)
-        (obj! one (_ :x))
-        (obj! two (a :x))
+        (obj! one :x)
+        (obj! two { a :x })
     )
     "
     .compile_ok(|env| {
@@ -137,8 +129,8 @@ fn test_eq_value_to_map_func() {
     (rel! _ { int } one)
     (rel! two { 'a' } int)
     (eq! (:x)
-        (obj! one (_ :x))
-        (obj! two (a (* :x 2)))
+        (obj! one :x)
+        (obj! two { a (* :x 2) })
     )
     "
     .compile_ok(|env| {
@@ -155,8 +147,8 @@ fn test_eq_simple_array() {
     (rel! foo { 'a'* } int)
     (rel! bar { 'b'* } int)
     (eq! (:x)
-        (obj! foo (a :x))
-        (obj! bar (b :x))
+        (obj! foo { a :x })
+        (obj! bar { b :x })
     )
     "
     .compile_ok(|env| {
@@ -191,8 +183,8 @@ fn test_eq_complex_flow() {
     (rel! two { 'c' } string)
     (rel! two { 'd' } string)
     (eq! (:x :y)
-        (obj! one (a :x) (b :y))
-        (obj! two (a :x) (b :y) (c :x) (d :y))
+        (obj! one { a :x } { b :y })
+        (obj! two { a :x } { b :y } { c :x } { d :y })
     )
     "
     .compile_ok(|env| {
@@ -227,8 +219,8 @@ fn test_eq_delegation() {
     (rel! _ { int } millimeters)
 
     (eq! (:m)
-        (obj! meters (_ :m))
-        (obj! millimeters (_ (* :m 1000)))
+        (obj! meters :m)
+        (obj! millimeters (* :m 1000))
     )
 
     (type! car)
@@ -238,8 +230,8 @@ fn test_eq_delegation() {
     (rel! vehicle { 'length' } millimeters)
     
     (eq! (:l)
-        (obj! car (length :l))
-        (obj! vehicle (length :l))
+        (obj! car { length :l })
+        (obj! vehicle { length :l })
     )
     "
     .compile_ok(|env| {

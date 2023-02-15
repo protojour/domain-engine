@@ -208,28 +208,48 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
         "obj!" => {
             let typename = input.next::<Sym>("expected type name")?;
 
-            let mut attributes = vec![];
+            if input.peek::<Brace>() {
+                let mut attributes = vec![];
 
-            while input.peek_any() {
-                let mut list: TreeStream = input.next::<Paren>("expected attribute")?.into();
-                let span = list.span();
-                let (property, prop_span) = parse_sym_or_wildcard(&mut list, "expected property")?;
-                let value = parse_next_expr(&mut list)?;
-                list.end()?;
+                while input.peek_any() {
+                    let mut brace: TreeStream = input.next::<Brace>("expected attribute")?.into();
+                    let span = brace.span();
+                    let (property, prop_span) =
+                        parse_sym_or_wildcard(&mut brace, "expected property")?;
+                    let value = parse_next_expr(&mut brace)?;
+                    brace.end()?;
 
-                attributes.push((
-                    Attribute {
-                        property: (
-                            property.map(Property::Named).unwrap_or(Property::Wildcard),
-                            prop_span,
-                        ),
-                        value,
-                    },
+                    attributes.push((
+                        Attribute {
+                            property: (
+                                property.map(Property::Named).unwrap_or(Property::Wildcard),
+                                prop_span,
+                            ),
+                            value,
+                        },
+                        span,
+                    ));
+                }
+
+                Ok((Expr::Obj(typename, attributes), span))
+            } else if input.peek_any() {
+                let (value, value_span) = parse_next_expr(&mut input)?;
+                Ok((
+                    Expr::Obj(
+                        typename,
+                        vec![(
+                            Attribute {
+                                property: (Property::Wildcard, value_span.clone()),
+                                value: (value, value_span.clone()),
+                            },
+                            value_span,
+                        )],
+                    ),
                     span,
-                ));
+                ))
+            } else {
+                Ok((Expr::Obj(typename, vec![]), span))
             }
-
-            Ok((Expr::Obj(typename, attributes), span))
         }
         _ => {
             let mut args = vec![];
