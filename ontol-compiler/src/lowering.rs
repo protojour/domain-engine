@@ -109,7 +109,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let has_object_prop = object_prop_ident.is_some();
 
                 // This syntax just defines the relation the first time it's used
-                let relation_id = match self.define_relation_if_undefined(relation_ident.clone()) {
+                let relation_id = match self.define_relation_if_undefined(relation_ident) {
                     ImplicitRelationId::New(relation_id) => {
                         let object_prop =
                             object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
@@ -207,7 +207,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &ident,
                 ) {
                     Some(type_def_id) => Ok(type_def_id),
-                    None => Err(self.error(CompileError::TypeNotFound, &span)),
+                    None => Err(self.error(CompileError::TypeNotFound, span)),
                 }
             }
             ast::Type::Literal(ast::Literal::String(lit)) => match lit.as_str() {
@@ -219,7 +219,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             },
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
             ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
-            ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, &span)),
+            ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
         }
     }
 
