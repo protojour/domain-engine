@@ -9,7 +9,7 @@ use smartstring::alias::String;
 use crate::{
     compiler::Compiler,
     def::{
-        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
+        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationKind, Relationship,
         ValueCardinality, Variables,
     },
     error::{CompileError, SpannedCompileError},
@@ -76,52 +76,59 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     object,
                 } = *rel;
 
+                let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
+                let object_def = self.ast_type_to_def(object.0, &object.1)?;
+
                 match relation {
                     Some(ast::Relation {
-                        ident: (ident, ident_span),
+                        ty: relation_ty,
                         subject_cardinality,
-                        rel_params,
-                        object_cardinality,
                         object_prop_ident,
+                        object_cardinality,
+                        rel_params,
                     }) => {
-                        let (relation_ident, index_range_rel_params): (
+                        let (relation_ident, ident_span, index_range_rel_params): (
+                            _,
                             _,
                             Option<Range<Option<u16>>>,
-                        ) = match ident {
-                            ast::RelationIdent::Named(str) => (
-                                RelationIdent::Named(self.compiler.strings.intern(&str)),
-                                None,
-                            ),
-                            ast::RelationIdent::IntRange(range) => {
-                                (RelationIdent::Indexed, Some(range))
+                        ) = match relation_ty {
+                            (ast::RelationType::Type((ast_ty, span)), _) => {
+                                let def_id = self.ast_type_to_def(ast_ty, &span)?;
+
+                                match self.compiler.defs.get_def_kind(def_id) {
+                                    Some(DefKind::StringLiteral(_)) => {
+                                        (RelationKind::Named(def_id), span, None)
+                                    }
+                                    _ => (RelationKind::Typed(def_id), span, None),
+                                }
+                            }
+                            (ast::RelationType::IntRange(range), span) => {
+                                (RelationKind::Indexed, span, Some(range))
                             }
                         };
 
                         let has_object_prop = object_prop_ident.is_some();
 
                         // This syntax just defines the relation the first time it's used
-                        let relation_def_id =
+                        let relation_id =
                             match self.define_relation_if_undefined(relation_ident.clone()) {
-                                ImplicitDefId::New(def_id) => {
+                                ImplicitRelationId::New(relation_id) => {
                                     let object_prop = object_prop_ident
                                         .map(|ident| self.compiler.strings.intern(&ident.0));
 
                                     self.set_def(
-                                        def_id,
+                                        relation_id.0,
                                         DefKind::Relation(Relation {
-                                            ident: relation_ident,
+                                            kind: relation_ident,
                                             subject_prop: None,
                                             object_prop,
                                         }),
                                         &ident_span,
                                     );
-                                    def_id
+                                    relation_id
                                 }
-                                ImplicitDefId::Reused(def_id) => def_id,
+                                ImplicitRelationId::Reused(relation_id) => relation_id,
                             };
-
-                        let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
-                        let object_def = self.ast_type_to_def(object.0, &object.1)?;
 
                         let rel_params =
                             if let Some(index_range_rel_params) = index_range_rel_params {
@@ -144,7 +151,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                         Ok(Some(self.def(
                             DefKind::Relationship(Relationship {
-                                relation_id: RelationId(relation_def_id),
+                                relation_id,
                                 subject: (subject_def, self.src.span(&subject.1)),
                                 subject_cardinality:
                                     subject_cardinality.map(convert_cardinality).unwrap_or((
@@ -177,28 +184,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             &span,
                         )))
                     }
-                    None => {
-                        let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
-                        let object_def = self.ast_type_to_def(object.0, &object.1)?;
-
-                        Ok(Some(self.def(
-                            DefKind::Relationship(Relationship {
-                                relation_id: RelationId(self.compiler.defs.anonymous_relation()),
-                                subject: (subject_def, self.src.span(&subject.1)),
-                                subject_cardinality: (
-                                    PropertyCardinality::Mandatory,
-                                    ValueCardinality::One,
-                                ),
-                                rel_params: RelParams::Unit,
-                                object_cardinality: (
-                                    PropertyCardinality::Optional,
-                                    ValueCardinality::Many,
-                                ),
-                                object: (object_def, self.src.span(&object.1)),
-                            }),
-                            &span,
-                        )))
-                    }
+                    None => Ok(Some(self.def(
+                        DefKind::Relationship(Relationship {
+                            relation_id: RelationId(self.compiler.defs.anonymous_relation()),
+                            subject: (subject_def, self.src.span(&subject.1)),
+                            subject_cardinality: (
+                                PropertyCardinality::Mandatory,
+                                ValueCardinality::One,
+                            ),
+                            rel_params: RelParams::Unit,
+                            object_cardinality: (
+                                PropertyCardinality::Optional,
+                                ValueCardinality::Many,
+                            ),
+                            object: (object_def, self.src.span(&object.1)),
+                        }),
+                        &span,
+                    ))),
                 }
             }
             ast::Ast::Eq(ast::Eq {
@@ -333,24 +335,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, relation_ident: RelationIdent<'m>) -> ImplicitDefId {
-        match relation_ident {
-            RelationIdent::Named(ident) => {
-                match self
-                    .compiler
-                    .namespaces
-                    .get_mut(self.src.package, Space::Rel)
-                    .entry(ident.into())
-                {
-                    Entry::Vacant(vacant) => {
-                        ImplicitDefId::New(*vacant.insert(self.compiler.defs.alloc_def_id()))
-                    }
-                    Entry::Occupied(occupied) => ImplicitDefId::Reused(*occupied.get()),
+    fn define_relation_if_undefined(&mut self, kind: RelationKind) -> ImplicitRelationId {
+        match kind {
+            RelationKind::Named(def_id) | RelationKind::Typed(def_id) => {
+                match self.compiler.relations.relations.entry(def_id) {
+                    Entry::Vacant(vacant) => ImplicitRelationId::New(
+                        *vacant.insert(RelationId(self.compiler.defs.alloc_def_id())),
+                    ),
+                    Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationIdent::Indexed => ImplicitDefId::Reused(self.compiler.defs.indexed_relation()),
-            RelationIdent::Anonymous => {
-                ImplicitDefId::Reused(self.compiler.defs.anonymous_relation())
+            RelationKind::Indexed => {
+                ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
+            }
+            RelationKind::Anonymous => {
+                ImplicitRelationId::Reused(RelationId(self.compiler.defs.anonymous_relation()))
             }
         }
     }
@@ -395,9 +394,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 }
 
-enum ImplicitDefId {
-    New(DefId),
-    Reused(DefId),
+enum ImplicitRelationId {
+    New(RelationId),
+    Reused(RelationId),
 }
 
 #[derive(Default)]

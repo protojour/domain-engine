@@ -108,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         .get_subject_property_meta(*subject_id, *relation_id)
                                         .expect("BUG: problem getting property meta");
                                     let property_name = relation
-                                        .subject_prop()
+                                        .subject_prop(self.defs)
                                         .expect("BUG: Expected named subject property");
 
                                     (

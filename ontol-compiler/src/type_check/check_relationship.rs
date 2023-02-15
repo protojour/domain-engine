@@ -2,7 +2,7 @@ use ontol_runtime::{DefId, RelationId};
 
 use crate::{
     def::{
-        Cardinality, Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship,
+        Cardinality, Def, DefKind, PropertyCardinality, Relation, RelationKind, Relationship,
         ValueCardinality,
     },
     error::CompileError,
@@ -84,16 +84,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_type_mut(subject.0);
 
         match (
-            &relation.1.ident,
+            &relation.1.kind,
             &mut properties.subject,
             &mut properties.constructor,
         ) {
-            (RelationIdent::Anonymous, SubjectProperties::Empty, Constructor::Identity) => {
+            (RelationKind::Anonymous, SubjectProperties::Empty, Constructor::Identity) => {
                 properties.constructor =
                     Constructor::Value(relationship.0, *span, relationship.1.subject_cardinality);
             }
             (
-                RelationIdent::Anonymous,
+                RelationKind::Anonymous,
                 SubjectProperties::Empty,
                 Constructor::Value(existing_relationship_id, existing_span, cardinality),
             ) => {
@@ -119,13 +119,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                RelationIdent::Anonymous,
+                RelationKind::Anonymous,
                 SubjectProperties::Empty,
                 Constructor::ValueUnion(properties),
             ) => {
                 properties.push((relationship.0, *span));
             }
-            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Identity) => {
+            (RelationKind::Indexed, SubjectProperties::Empty, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -136,14 +136,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 properties.constructor = Constructor::Sequence(sequence);
             }
-            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Sequence(sequence)) => {
+            (RelationKind::Indexed, SubjectProperties::Empty, Constructor::Sequence(sequence)) => {
                 if let Err(error) =
                     sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
             }
-            (RelationIdent::Named(_), SubjectProperties::Empty, Constructor::Identity) => {
+            (RelationKind::Named(_), SubjectProperties::Empty, Constructor::Identity) => {
                 properties.subject = SubjectProperties::Map(
                     [(
                         relation.0,
@@ -152,11 +152,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (
-                RelationIdent::Named(_),
-                SubjectProperties::Map(properties),
-                Constructor::Identity,
-            ) => {
+            (RelationKind::Named(_), SubjectProperties::Map(properties), Constructor::Identity) => {
                 if properties
                     .insert(
                         relation.0,
@@ -190,7 +186,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_type_mut(object.0);
 
         match subject_ty {
-            Type::Unit(_) => {}
+            Type::Unit(_) => match &mut properties.constructor {
+                Constructor::Identity => {
+                    properties.constructor = Constructor::Value(
+                        relationship.0,
+                        *span,
+                        relationship.1.subject_cardinality,
+                    );
+                }
+                Constructor::Value(existing_relationship_id, existing_span, cardinality) => {
+                    match (relationship.1.subject_cardinality, cardinality) {
+                        (
+                            (PropertyCardinality::Mandatory, ValueCardinality::One),
+                            (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        ) => {
+                            properties.constructor = Constructor::ValueUnion(
+                                [
+                                    (*existing_relationship_id, *existing_span),
+                                    (relationship.0, *span),
+                                ]
+                                .into(),
+                            );
+
+                            // Register union for check later
+                            self.relations.value_unions.insert(object.0);
+                        }
+                        _ => {
+                            return self
+                                .error(CompileError::InvalidCardinaltyCombinationInUnion, span);
+                        }
+                    }
+                }
+                _ => return self.error(CompileError::ConstructorMismatch, span),
+            },
             _ => match (&relation.1.object_prop, object_ty, &mut properties.object) {
                 (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
                     properties.object = ObjectProperties::Map(

@@ -10,6 +10,7 @@ pub struct RelationshipId(pub DefId);
 
 #[derive(Default, Debug)]
 pub struct Relations {
+    pub relations: HashMap<DefId, RelationId>,
     pub properties_by_type: HashMap<DefId, Properties>,
     pub relationships_by_subject: HashMap<(DefId, RelationId), RelationshipId>,
     pub relationships_by_object: HashMap<(DefId, RelationId), RelationshipId>,

@@ -54,6 +54,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .expect("BUG: problem getting property meta");
             let (object_def, _) = relationship.object;
 
+            debug!("check union relationship {relationship:?}");
+
             if used_objects.contains(&object_def) {
                 error_set.report(
                     object_def,
@@ -197,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let (object_def, _) = relationship.object;
             let object_ty = self.def_types.map.get(&object_def).unwrap();
-            let Some(property_name) = relation.object_prop() else {
+            let Some(property_name) = relation.object_prop(self.defs) else {
                 continue;
             };
 

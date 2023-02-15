@@ -93,7 +93,7 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
         return Ok(None);
     }
 
-    let (ident, ident_span) = RelationIdent::parse(&mut brace, "expected string literal or range")?;
+    let ident = RelationType::parse(&mut brace, "expected string literal or range")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
 
     let (object_prop_ident, object_cardinality) = if brace.peek::<StringLiteral>() {
@@ -115,7 +115,7 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
     brace.end()?;
 
     Ok(Some(Relation {
-        ident: (ident, ident_span),
+        ty: ident,
         subject_cardinality,
         rel_params,
         object_cardinality,
@@ -247,8 +247,8 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     }
 }
 
-impl RelationIdent {
-    fn parse(input: &mut TreeStream, msg: impl ToString) -> ParseResult<Self> {
+impl RelationType {
+    fn parse(input: &mut TreeStream, _: impl ToString) -> ParseResult<Self> {
         if input.peek::<Num>() {
             let (num, span) = input.next::<Num>("").unwrap();
             let start: u16 = num
@@ -281,8 +281,8 @@ impl RelationIdent {
                 span,
             ))
         } else {
-            let (ident, span) = input.next::<StringLiteral>(msg)?;
-            Ok((Self::Named(ident), span))
+            let (ty, span) = parse_type(input)?;
+            Ok((Self::Type((ty, span.clone())), span))
         }
     }
 }

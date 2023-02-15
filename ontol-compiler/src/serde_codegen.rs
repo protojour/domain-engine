@@ -302,7 +302,9 @@ impl MapTypeBuilder {
                     panic!("Problem getting subject property meta");
                 };
 
-                let subject_key = relation.subject_prop().expect("Property has no name");
+                let subject_key = relation
+                    .subject_prop(generator.defs)
+                    .expect("Property has no name");
                 let operator_id = generator
                     .get_serde_operator_id(relationship.object.0)
                     .expect("No inner operator");
@@ -358,7 +360,9 @@ impl MapTypeBuilder {
                     panic!("Problem getting object property meta");
                 };
 
-                let object_key = relation.object_prop().expect("Property has no name");
+                let object_key = relation
+                    .object_prop(generator.defs)
+                    .expect("Property has no name");
                 let operator_id = generator
                     .get_serde_operator_id(relationship.subject.0)
                     .expect("No inner operator");

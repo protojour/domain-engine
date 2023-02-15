@@ -95,6 +95,8 @@ pub enum CompileError {
     OverlappingSequenceIndexes,
     #[error("unsupported sequence index type")]
     UnsupportedSequenceIndexType,
+    #[error("constructor mismatch")]
+    ConstructorMismatch,
 }
 
 #[derive(Debug)]

@@ -57,15 +57,15 @@ pub struct Relationship {
 }
 
 pub struct Relation {
-    pub ident: Spanned<RelationIdent>,
+    pub ty: Spanned<RelationType>,
     pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
 }
 
-pub enum RelationIdent {
-    Named(String),
+pub enum RelationType {
+    Type(Spanned<Type>),
     IntRange(Range<Option<u16>>),
 }
 

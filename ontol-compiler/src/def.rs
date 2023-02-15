@@ -50,10 +50,7 @@ impl<'m> DefKind<'m> {
             Self::CoreFn(_) => None,
             Self::DomainType(ident) => Some((*ident).into()),
             Self::DomainEntity(ident) => Some((*ident).into()),
-            Self::Relation(relation) => match relation.ident {
-                RelationIdent::Named(name) => Some(name.into()),
-                _ => None,
-            },
+            Self::Relation(_) => None,
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,
         }
@@ -77,14 +74,35 @@ pub enum Primitive {
 /// This definition expresses that a relation _exists_
 #[derive(Debug)]
 pub struct Relation<'m> {
-    pub ident: RelationIdent<'m>,
+    pub kind: RelationKind,
     pub subject_prop: Option<&'m str>,
     pub object_prop: Option<&'m str>,
 }
 
+impl<'m> Relation<'m> {
+    pub fn named_ident(&self, defs: &'m Defs) -> Option<&'m str> {
+        match self.kind {
+            RelationKind::Named(def_id) => match defs.get_def_kind(def_id) {
+                Some(DefKind::StringLiteral(lit)) => Some(lit),
+                _ => panic!(),
+            },
+            _ => None,
+        }
+    }
+
+    pub fn subject_prop(&self, defs: &'m Defs) -> Option<&'m str> {
+        self.subject_prop.or_else(|| self.named_ident(defs))
+    }
+
+    pub fn object_prop(&self, defs: &'m Defs) -> Option<&'m str> {
+        self.object_prop.or_else(|| self.named_ident(defs))
+    }
+}
+
 #[derive(Clone, Debug)]
-pub enum RelationIdent<'m> {
-    Named(&'m str),
+pub enum RelationKind {
+    Named(DefId),
+    Typed(DefId),
     Indexed,
     Anonymous,
 }
@@ -137,23 +155,6 @@ pub enum ValueCardinality {
     // ManyInRange(Option<u16>, Option<u16>),
 }
 
-impl<'m> Relation<'m> {
-    pub fn named_ident(&self) -> Option<&'m str> {
-        match self.ident {
-            RelationIdent::Named(name) => Some(name),
-            _ => None,
-        }
-    }
-
-    pub fn subject_prop(&self) -> Option<&'m str> {
-        self.subject_prop.or_else(|| self.named_ident())
-    }
-
-    pub fn object_prop(&self) -> Option<&'m str> {
-        self.object_prop.or_else(|| self.named_ident())
-    }
-}
-
 #[derive(Debug)]
 pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
@@ -198,7 +199,7 @@ impl<'m> Defs<'m> {
         // The anonymous / "manifested-as" relation
         defs.anonymous_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Anonymous,
+                kind: RelationKind::Anonymous,
                 subject_prop: None,
                 object_prop: None,
             }),
@@ -207,7 +208,7 @@ impl<'m> Defs<'m> {
         );
         defs.indexed_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Indexed,
+                kind: RelationKind::Indexed,
                 subject_prop: None,
                 object_prop: None,
             }),
