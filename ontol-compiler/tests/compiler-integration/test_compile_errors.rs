@@ -207,7 +207,7 @@ fn eq_obj_non_domain_type_and_unit_type() {
             number ;; ERROR expected domain type
         )
         (obj! ;; ERROR no properties expected
-            foo { prop :x }
+            foo { 'prop' :x }
         )
     )
     "
@@ -240,9 +240,9 @@ fn eq_duplicate_unknown_property() {
     (rel! foo { 'a' } bar)
     (eq! (:x)
         (obj! foo
-            { a :x }
-            { a :x } ;; ERROR duplicate property
-            { b :x } ;; ERROR unknown property
+            { 'a' :x }
+            { 'a' :x } ;; ERROR duplicate property
+            { 'b' :x } ;; ERROR unknown property
         )
         (obj! bar)
     )
@@ -258,9 +258,9 @@ fn eq_type_mismatch() {
     (rel! foo { 'prop' } string)
     (rel! bar { 'prop' } int)
     (eq! (:x)
-        (obj! foo { prop :x })
+        (obj! foo { 'prop' :x })
         (obj! bar
-            { prop
+            { 'prop'
                 :x ;; ERROR type mismatch: expected `int`, found `string`
             }
         )
@@ -277,9 +277,9 @@ fn eq_type_mismatch_in_func() {
     (rel! foo { 'prop' } string)
     (rel! bar { 'prop' } int)
     (eq! (:x)
-        (obj! foo { prop :x })
+        (obj! foo { 'prop' :x })
         (obj! bar
-            { prop
+            { 'prop'
                 (*
                     :x ;; ERROR type mismatch: expected `int`, found `string`
                     2
@@ -303,10 +303,10 @@ fn eq_array_mismatch() {
     (rel! bar { 'b'* } int)
 
     (eq! (:x :y)
-        (obj! foo { a :x } { b :y })
+        (obj! foo { 'a' :x } { 'b' :y })
         (obj! bar
-            { a :x } ;; ERROR type mismatch: expected `string`, found `string[]`
-            { b :y } ;; ERROR type mismatch: expected `int[]`, found `string[]`
+            { 'a' :x } ;; ERROR type mismatch: expected `string`, found `string[]`
+            { 'b' :y } ;; ERROR type mismatch: expected `int[]`, found `string[]`
         )
     )
     "
@@ -348,10 +348,10 @@ fn unresolved_transitive_eq() {
     (rel! d { 'p1' } b)
 
     (eq! (:x)
-        (obj! c { p0
+        (obj! c { 'p0'
             :x ;; ERROR cannot convert this `a` from `b`: These types are not equated.
         })
-        (obj! d { p1
+        (obj! d { 'p1'
             :x ;; ERROR cannot convert this `b` from `a`: These types are not equated.
         })
     )

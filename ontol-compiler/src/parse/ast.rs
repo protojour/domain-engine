@@ -33,16 +33,11 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub struct Attribute {
-    pub property: Spanned<Property>,
+    pub ty: Spanned<Type>,
     pub value: Spanned<Expr>,
 }
 
 #[derive(Debug)]
-pub enum Property {
-    Named(String),
-    Wildcard,
-}
-
 pub enum Type {
     Sym(String),
     Literal(Literal),

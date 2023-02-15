@@ -125,22 +125,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             let mut typed_properties = IndexMap::new();
 
-                            for ((attr_prop, prop_span), value) in attributes.iter() {
-                                let attr_prop = match attr_prop {
-                                    Some(attr_prop) => attr_prop,
-                                    None => {
+                            for ((def_id, prop_span), value) in attributes.iter() {
+                                let attr_prop = match self.defs.get_def_kind(*def_id) {
+                                    Some(DefKind::StringLiteral(lit)) => lit,
+                                    _ => {
                                         self.error(CompileError::NamedPropertyExpected, prop_span);
                                         continue;
                                     }
                                 };
-                                let match_property =
-                                    match match_properties.get_mut(attr_prop.as_str()) {
-                                        Some(match_properties) => match_properties,
-                                        None => {
-                                            self.error(CompileError::UnknownProperty, prop_span);
-                                            continue;
-                                        }
-                                    };
+                                let match_property = match match_properties.get_mut(attr_prop) {
+                                    Some(match_properties) => match_properties,
+                                    None => {
+                                        self.error(CompileError::UnknownProperty, prop_span);
+                                        continue;
+                                    }
+                                };
                                 if match_property.used {
                                     self.error(CompileError::DuplicateProperty, prop_span);
                                     continue;
@@ -196,7 +195,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     },
                     Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
-                        [((prop_ident, _), value)] if prop_ident.is_none() => {
+                        [((def_id, _), value)] if *def_id == DefId::unit() => {
                             let (_, relation) = self
                                 .get_relationship_meta(*relationship_id)
                                 .expect("BUG: problem getting anonymous property meta");

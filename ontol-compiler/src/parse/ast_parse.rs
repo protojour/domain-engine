@@ -1,14 +1,11 @@
 use std::ops::Range;
 
 use chumsky::prelude::Simple;
-use smartstring::alias::String;
 
 use super::{
     ast::*,
     tree::Tree,
-    tree_stream::{
-        Brace, Colon, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream, Underscore,
-    },
+    tree_stream::{Brace, Colon, Dot, Num, Paren, Questionmark, StringLiteral, Sym, TreeStream},
     Span, Spanned,
 };
 
@@ -214,21 +211,11 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
                 while input.peek_any() {
                     let mut brace: TreeStream = input.next::<Brace>("expected attribute")?.into();
                     let span = brace.span();
-                    let (property, prop_span) =
-                        parse_sym_or_wildcard(&mut brace, "expected property")?;
+                    let ty = parse_type(&mut brace)?;
                     let value = parse_next_expr(&mut brace)?;
                     brace.end()?;
 
-                    attributes.push((
-                        Attribute {
-                            property: (
-                                property.map(Property::Named).unwrap_or(Property::Wildcard),
-                                prop_span,
-                            ),
-                            value,
-                        },
-                        span,
-                    ));
+                    attributes.push((Attribute { ty, value }, span));
                 }
 
                 Ok((Expr::Obj(typename, attributes), span))
@@ -239,7 +226,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
                         typename,
                         vec![(
                             Attribute {
-                                property: (Property::Wildcard, value_span.clone()),
+                                ty: (Type::Unit, value_span.clone()),
                                 value: (value, value_span.clone()),
                             },
                             value_span,
@@ -311,19 +298,6 @@ fn parse_dot_dot_opt_u16(input: &mut TreeStream) -> ParseResult<Option<u16>> {
         Ok((Some(num), span))
     } else {
         Ok((None, dot_span))
-    }
-}
-
-fn parse_sym_or_wildcard(
-    input: &mut TreeStream,
-    msg: impl ToString,
-) -> ParseResult<Option<String>> {
-    if input.peek::<Underscore>() {
-        let (_, span) = input.next::<Underscore>("").unwrap();
-        Ok((None, span))
-    } else {
-        let (ident, span) = input.next::<Sym>(msg)?;
-        Ok((Some(ident), span))
     }
 }
 

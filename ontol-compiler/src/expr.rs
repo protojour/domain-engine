@@ -1,5 +1,4 @@
 use ontol_runtime::DefId;
-use smartstring::alias::String;
 
 use crate::{compiler::Compiler, source::SourceSpan};
 
@@ -13,7 +12,7 @@ pub struct Expr {
     pub span: SourceSpan,
 }
 
-type ObjKey = (Option<String>, SourceSpan);
+type ObjKey = (DefId, SourceSpan);
 
 #[derive(Debug)]
 pub enum ExprKind {

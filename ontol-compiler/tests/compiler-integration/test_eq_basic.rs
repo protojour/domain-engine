@@ -43,8 +43,8 @@ fn test_eq_simple() {
     (rel! foo { 'f' } string)
     (rel! bar { 'b' } string)
     (eq! (:x)
-        (obj! foo { f :x })
-        (obj! bar { b :x })
+        (obj! foo { 'f' :x })
+        (obj! bar { 'b' :x })
     )
     "
     .compile_ok(|env| {
@@ -112,7 +112,7 @@ fn test_eq_value_to_map() {
     (rel! two { 'a' } string)
     (eq! (:x)
         (obj! one :x)
-        (obj! two { a :x })
+        (obj! two { 'a' :x })
     )
     "
     .compile_ok(|env| {
@@ -130,7 +130,7 @@ fn test_eq_value_to_map_func() {
     (rel! two { 'a' } int)
     (eq! (:x)
         (obj! one :x)
-        (obj! two { a (* :x 2) })
+        (obj! two { 'a' (* :x 2) })
     )
     "
     .compile_ok(|env| {
@@ -147,8 +147,8 @@ fn test_eq_simple_array() {
     (rel! foo { 'a'* } int)
     (rel! bar { 'b'* } int)
     (eq! (:x)
-        (obj! foo { a :x })
-        (obj! bar { b :x })
+        (obj! foo { 'a' :x })
+        (obj! bar { 'b' :x })
     )
     "
     .compile_ok(|env| {
@@ -183,8 +183,8 @@ fn test_eq_complex_flow() {
     (rel! two { 'c' } string)
     (rel! two { 'd' } string)
     (eq! (:x :y)
-        (obj! one { a :x } { b :y })
-        (obj! two { a :x } { b :y } { c :x } { d :y })
+        (obj! one { 'a' :x } { 'b' :y })
+        (obj! two { 'a' :x } { 'b' :y } { 'c' :x } { 'd' :y })
     )
     "
     .compile_ok(|env| {
@@ -230,8 +230,8 @@ fn test_eq_delegation() {
     (rel! vehicle { 'length' } millimeters)
     
     (eq! (:l)
-        (obj! car { length :l })
-        (obj! vehicle { length :l })
+        (obj! car { 'length' :l })
+        (obj! vehicle { 'length' :l })
     )
     "
     .compile_ok(|env| {

@@ -255,18 +255,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let attributes = ast_attributes
                     .into_iter()
                     .map(|(ast_attr, _)| {
-                        self.lower_expr(ast_attr.value, var_table).map(|expr| {
-                            (
-                                (
-                                    match ast_attr.property.0 {
-                                        ast::Property::Named(name) => Some(name),
-                                        ast::Property::Wildcard => None,
-                                    },
-                                    self.src.span(&ast_attr.property.1),
-                                ),
-                                expr,
-                            )
-                        })
+                        let key = self.ast_type_to_def(ast_attr.ty.0, &ast_attr.ty.1)?;
+
+                        self.lower_expr(ast_attr.value, var_table)
+                            .map(|expr| ((key, self.src.span(&ast_attr.ty.1)), expr))
                     })
                     .collect::<Result<_, _>>()?;
 
