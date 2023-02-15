@@ -72,136 +72,107 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Relationship(rel) => {
                 let ast::Relationship {
                     subject,
-                    relation,
+                    relation:
+                        ast::Relation {
+                            ty: relation_ty,
+                            subject_cardinality,
+                            object_prop_ident,
+                            object_cardinality,
+                            rel_params,
+                        },
                     object,
                 } = *rel;
 
                 let subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
                 let object_def = self.ast_type_to_def(object.0, &object.1)?;
 
-                match relation {
-                    Some(ast::Relation {
-                        ty: relation_ty,
-                        subject_cardinality,
-                        object_prop_ident,
-                        object_cardinality,
-                        rel_params,
-                    }) => {
-                        let (relation_ident, ident_span, index_range_rel_params): (
-                            _,
-                            _,
-                            Option<Range<Option<u16>>>,
-                        ) = match relation_ty {
-                            (ast::RelationType::Type((ast_ty, span)), _) => {
-                                let def_id = self.ast_type_to_def(ast_ty, &span)?;
+                let (relation_ident, ident_span, index_range_rel_params): (
+                    _,
+                    _,
+                    Option<Range<Option<u16>>>,
+                ) = match relation_ty {
+                    (ast::RelationType::Type((ast_ty, span)), _) => {
+                        let def_id = self.ast_type_to_def(ast_ty, &span)?;
 
-                                match self.compiler.defs.get_def_kind(def_id) {
-                                    Some(DefKind::StringLiteral(_)) => {
-                                        (RelationIdent::Named(def_id), span, None)
-                                    }
-                                    _ => (RelationIdent::Typed(def_id), span, None),
-                                }
+                        match self.compiler.defs.get_def_kind(def_id) {
+                            Some(DefKind::StringLiteral(_)) => {
+                                (RelationIdent::Named(def_id), span, None)
                             }
-                            (ast::RelationType::IntRange(range), span) => {
-                                (RelationIdent::Indexed, span, Some(range))
-                            }
-                        };
-
-                        let has_object_prop = object_prop_ident.is_some();
-
-                        // This syntax just defines the relation the first time it's used
-                        let relation_id =
-                            match self.define_relation_if_undefined(relation_ident.clone()) {
-                                ImplicitRelationId::New(relation_id) => {
-                                    let object_prop = object_prop_ident
-                                        .map(|ident| self.compiler.strings.intern(&ident.0));
-
-                                    self.set_def(
-                                        relation_id.0,
-                                        DefKind::Relation(Relation {
-                                            ident: relation_ident,
-                                            subject_prop: None,
-                                            object_prop,
-                                        }),
-                                        &ident_span,
-                                    );
-                                    relation_id
-                                }
-                                ImplicitRelationId::Reused(relation_id) => relation_id,
-                            };
-
-                        let rel_params =
-                            if let Some(index_range_rel_params) = index_range_rel_params {
-                                if let Some((_, span)) = rel_params {
-                                    return Err(self.error(
-                                        CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
-                                        &span,
-                                    ));
-                                }
-
-                                RelParams::IndexRange(index_range_rel_params)
-                            } else {
-                                match rel_params {
-                                    Some(rel_params) => RelParams::Type(
-                                        self.ast_type_to_def(rel_params.0, &rel_params.1)?,
-                                    ),
-                                    None => RelParams::Unit,
-                                }
-                            };
-
-                        Ok(Some(self.def(
-                            DefKind::Relationship(Relationship {
-                                relation_id,
-                                subject: (subject_def, self.src.span(&subject.1)),
-                                subject_cardinality:
-                                    subject_cardinality.map(convert_cardinality).unwrap_or((
-                                        PropertyCardinality::Mandatory,
-                                        ValueCardinality::One,
-                                    )),
-                                object: (object_def, self.src.span(&object.1)),
-                                object_cardinality:
-                                    object_cardinality.map(convert_cardinality).unwrap_or_else(
-                                        || {
-                                            if has_object_prop {
-                                                // i.e. no syntax sugar: The object prop is explicit,
-                                                // therefore the object cardinality is explicit.
-                                                (
-                                                    PropertyCardinality::Mandatory,
-                                                    ValueCardinality::One,
-                                                )
-                                            } else {
-                                                // The syntactic sugar case, which is the default behaviour:
-                                                // Many incoming edges to the same object:
-                                                (
-                                                    PropertyCardinality::Optional,
-                                                    ValueCardinality::Many,
-                                                )
-                                            }
-                                        },
-                                    ),
-                                rel_params,
-                            }),
-                            &span,
-                        )))
+                            _ => (RelationIdent::Typed(def_id), span, None),
+                        }
                     }
-                    None => Ok(Some(self.def(
+                    (ast::RelationType::IntRange(range), span) => {
+                        (RelationIdent::Indexed, span, Some(range))
+                    }
+                };
+
+                let has_object_prop = object_prop_ident.is_some();
+
+                // This syntax just defines the relation the first time it's used
+                let relation_id = match self.define_relation_if_undefined(relation_ident.clone()) {
+                    ImplicitRelationId::New(relation_id) => {
+                        let object_prop =
+                            object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
+
+                        self.set_def(
+                            relation_id.0,
+                            DefKind::Relation(Relation {
+                                ident: relation_ident,
+                                subject_prop: None,
+                                object_prop,
+                            }),
+                            &ident_span,
+                        );
+                        relation_id
+                    }
+                    ImplicitRelationId::Reused(relation_id) => relation_id,
+                };
+
+                let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
+                    if let Some((_, span)) = rel_params {
+                        return Err(self.error(
+                            CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
+                            &span,
+                        ));
+                    }
+
+                    RelParams::IndexRange(index_range_rel_params)
+                } else {
+                    match rel_params {
+                        Some(rel_params) => {
+                            RelParams::Type(self.ast_type_to_def(rel_params.0, &rel_params.1)?)
+                        }
+                        None => RelParams::Unit,
+                    }
+                };
+
+                Ok(Some(
+                    self.def(
                         DefKind::Relationship(Relationship {
-                            relation_id: RelationId(self.compiler.defs.anonymous_relation()),
+                            relation_id,
                             subject: (subject_def, self.src.span(&subject.1)),
-                            subject_cardinality: (
-                                PropertyCardinality::Mandatory,
-                                ValueCardinality::One,
-                            ),
-                            rel_params: RelParams::Unit,
-                            object_cardinality: (
-                                PropertyCardinality::Optional,
-                                ValueCardinality::Many,
-                            ),
+                            subject_cardinality: subject_cardinality
+                                .map(convert_cardinality)
+                                .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
                             object: (object_def, self.src.span(&object.1)),
+                            object_cardinality: object_cardinality
+                                .map(convert_cardinality)
+                                .unwrap_or_else(|| {
+                                    if has_object_prop {
+                                        // i.e. no syntax sugar: The object prop is explicit,
+                                        // therefore the object cardinality is explicit.
+                                        (PropertyCardinality::Mandatory, ValueCardinality::One)
+                                    } else {
+                                        // The syntactic sugar case, which is the default behaviour:
+                                        // Many incoming edges to the same object:
+                                        (PropertyCardinality::Optional, ValueCardinality::Many)
+                                    }
+                                }),
+                            rel_params,
                         }),
                         &span,
-                    ))),
-                }
+                    ),
+                ))
             }
             ast::Ast::Eq(ast::Eq {
                 variables: ast_variables,
@@ -347,9 +318,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             RelationIdent::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
-            }
-            RelationIdent::Anonymous => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.anonymous_relation()))
             }
         }
     }

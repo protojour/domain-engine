@@ -52,7 +52,7 @@ pub enum Type {
 
 pub struct Relationship {
     pub subject: Spanned<Type>,
-    pub relation: Option<Relation>,
+    pub relation: Relation,
     pub object: Spanned<Type>,
 }
 

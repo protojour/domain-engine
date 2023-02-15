@@ -50,12 +50,12 @@ fn test_geojson() {
     (rel! GeometryCollection { 'type' } 'GeometryCollection')
     (rel! GeometryCollection { 'geometries'* } LeafGeometry)
 
-    (rel! _ { Point } LeafGeometry )
-    (rel! _ { MultiPoint } LeafGeometry )
-    (rel! _ { LineString } LeafGeometry )
-    (rel! _ { MultiLineString } LeafGeometry )
-    (rel! _ { Polygon } LeafGeometry )
-    (rel! _ { MultiPolygon } LeafGeometry )
+    (rel! _ { Point } LeafGeometry)
+    (rel! _ { MultiPoint } LeafGeometry)
+    (rel! _ { LineString } LeafGeometry)
+    (rel! _ { MultiLineString } LeafGeometry)
+    (rel! _ { Polygon } LeafGeometry)
+    (rel! _ { MultiPolygon } LeafGeometry)
 
     ; Note: Geometry is an extension of LeafGeometry + GeometryCollection
     (rel! _ { Point } Geometry)

@@ -397,7 +397,7 @@ fn invalid_subject_types() {
     r#"
     (rel!
         'a' ;; ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
-        {}
+        { _ }
         string
     )
     "#

@@ -111,7 +111,6 @@ pub enum RelationIdent {
     Named(DefId),
     Typed(DefId),
     Indexed,
-    Anonymous,
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
@@ -168,7 +167,6 @@ pub struct Defs<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
     unit: DefId,
-    anonymous_relation: DefId,
     indexed_relation: DefId,
     empty_sequence: DefId,
     empty_string: DefId,
@@ -186,7 +184,6 @@ impl<'m> Defs<'m> {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             unit: DefId(0),
-            anonymous_relation: DefId(0),
             indexed_relation: DefId(0),
             empty_sequence: DefId(0),
             empty_string: DefId(0),
@@ -203,16 +200,6 @@ impl<'m> Defs<'m> {
         // Add some extremely fundamental definitions here already.
         // These are even independent from CORE being defined.
 
-        // The anonymous / "manifested-as" relation
-        defs.anonymous_relation = defs.add_def(
-            DefKind::Relation(Relation {
-                ident: RelationIdent::Anonymous,
-                subject_prop: None,
-                object_prop: None,
-            }),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
         defs.indexed_relation = defs.add_def(
             DefKind::Relation(Relation {
                 ident: RelationIdent::Indexed,
@@ -234,10 +221,6 @@ impl<'m> Defs<'m> {
 
     pub fn unit(&self) -> DefId {
         self.unit
-    }
-
-    pub fn anonymous_relation(&self) -> DefId {
-        self.anonymous_relation
     }
 
     pub fn indexed_relation(&self) -> DefId {

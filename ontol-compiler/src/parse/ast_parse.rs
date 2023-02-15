@@ -85,13 +85,9 @@ fn parse_relationship(mut stream: TreeStream) -> ParseResult<Ast> {
     ))
 }
 
-fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tree>> {
+fn parse_relation(stream: &mut TreeStream) -> Result<Relation, Simple<Tree>> {
     let (brace, brace_span) = stream.next::<Brace>("expected brace")?;
     let mut brace = TreeStream::new(brace, brace_span);
-
-    if !brace.peek_any() {
-        return Ok(None);
-    }
 
     let ident = RelationType::parse(&mut brace, "expected string literal or range")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
@@ -114,13 +110,13 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Option<Relation>, Simple<Tr
 
     brace.end()?;
 
-    Ok(Some(Relation {
+    Ok(Relation {
         ty: ident,
         subject_cardinality,
         rel_params,
         object_cardinality,
         object_prop_ident,
-    }))
+    })
 }
 
 fn parse_optional_cardinality(input: &mut TreeStream) -> Result<Option<Cardinality>, Simple<Tree>> {
