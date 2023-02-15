@@ -4,12 +4,13 @@ use derive_debug_extras::DebugExtras;
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
+use uuid::Uuid;
 
 use crate::{
     discriminator::VariantDiscriminator,
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    value::PropertyId,
+    value::{Data, PropertyId, Value},
     DefId,
 };
 
@@ -151,6 +152,26 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
             SerdeOperator::ValueUnionType(_) => write!(f, "union"),
             SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
+        }
+    }
+}
+
+pub enum CustomStringType {
+    Uuid,
+}
+
+impl CustomStringType {
+    pub fn try_deserialize(&self, def_id: DefId, str: &str) -> Result<Value, ()> {
+        match self {
+            Self::Uuid => {
+                let uuid = Uuid::parse_str(str).map_err(|_| ())?;
+                Ok(Value::new(Data::Uuid(uuid), def_id))
+            }
+        }
+    }
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Uuid => "uuid",
         }
     }
 }

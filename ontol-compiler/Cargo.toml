@@ -17,6 +17,7 @@ thiserror = "1"
 miette = "5"
 indexmap = "1"
 tracing = "0.1"
+regex-syntax = "0.6"
 
 [dev-dependencies]
 assert_matches = "1"

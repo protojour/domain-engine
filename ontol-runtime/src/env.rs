@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     proc::{Lib, Procedure},
-    serde::{SerdeOperator, SerdeOperatorId, SerdeProcessor},
+    serde::{CustomStringType, SerdeOperator, SerdeOperatorId, SerdeProcessor},
     value::{Data, Value},
     DefId, PackageId,
 };
@@ -16,6 +16,7 @@ pub struct Env {
     pub translations: HashMap<(DefId, DefId), Procedure>,
     pub serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     pub serde_operators: Vec<SerdeOperator>,
+    pub custom_string_deserializers: HashMap<DefId, CustomStringType>,
 }
 
 impl Env {

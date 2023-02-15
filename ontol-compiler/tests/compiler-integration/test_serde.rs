@@ -1,4 +1,6 @@
 use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile};
+use assert_matches::assert_matches;
+use ontol_runtime::value::Data;
 use serde_json::json;
 use test_log::test;
 
@@ -141,6 +143,30 @@ fn test_serde_infinite_sequence() {
         assert_error_msg!(
             foo.deserialize_data(json!([77])),
             "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
+        );
+    });
+}
+
+#[test]
+fn test_serde_uuid() {
+    "
+    (type! my_id)
+    (rel! _ { uuid } my_id)
+    "
+    .compile_ok(|env| {
+        let my_id = TypeBinding::new(env, "my_id");
+        assert_matches!(
+            my_id.deserialize_data_variant(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Data::Uuid(_))
+        );
+        assert_json_io_matches!(my_id, json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));
+        assert_error_msg!(
+            my_id.deserialize_data(json!(42)),
+            "invalid type: integer `42`, expected `uuid` at line 1 column 2"
+        );
+        assert_error_msg!(
+            my_id.deserialize_data(json!("foobar")),
+            r#"invalid type: string "foobar", expected `uuid` at line 1 column 8"#
         );
     });
 }

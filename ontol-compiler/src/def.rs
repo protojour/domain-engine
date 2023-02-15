@@ -45,6 +45,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
+            Self::Primitive(Primitive::Uuid) => Some("uuid".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::EmptySequence => None,
             Self::CoreFn(_) => None,
@@ -69,6 +70,7 @@ pub enum Primitive {
     /// All numbers (realistically all rational numbers as all computer numbers are rational)
     Number,
     String,
+    Uuid,
 }
 
 /// This definition expresses that a relation _exists_
@@ -173,6 +175,7 @@ pub struct Defs<'m> {
     int: DefId,
     number: DefId,
     string: DefId,
+    uuid: DefId,
     pub(crate) map: HashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
 }
@@ -190,6 +193,7 @@ impl<'m> Defs<'m> {
             int: DefId(0),
             number: DefId(0),
             string: DefId(0),
+            uuid: DefId(0),
             map: Default::default(),
             string_literals: Default::default(),
         };
@@ -215,6 +219,7 @@ impl<'m> Defs<'m> {
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
         defs.string = defs.add_primitive(Primitive::String);
+        defs.uuid = defs.add_primitive(Primitive::Uuid);
 
         defs
     }
@@ -245,6 +250,10 @@ impl<'m> Defs<'m> {
 
     pub fn string(&self) -> DefId {
         self.string
+    }
+
+    pub fn uuid(&self) -> DefId {
+        self.uuid
     }
 
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
@@ -350,33 +359,23 @@ impl<'m> Compiler<'m> {
         );
 
         // fundamental types
-        let unit_ty = self.types.intern(Type::Unit(self.defs.unit));
-        let empty_sequence_ty = self
-            .types
-            .intern(Type::EmptySequence(self.defs.empty_sequence));
-        let int_ty = self.types.intern(Type::Int(self.defs.int));
-        let num_ty = self.types.intern(Type::Number(self.defs.number));
-        let string_ty = self.types.intern(Type::String(self.defs.string));
+        let _ = self.def_core_type(self.defs.unit, Type::Unit);
+        let _ = self.def_core_type(self.defs.empty_sequence, Type::EmptySequence);
+        let int_ty = self.def_core_type_name(self.defs.int, "int", Type::Int);
+        let _ = self.def_core_type_name(self.defs.number, "number", Type::Number);
+        let string_ty = self.def_core_type_name(self.defs.string, "string", Type::String);
+        let _ = self.def_core_type_name(self.defs.uuid, "uuid", Type::Uuid);
 
-        self.def_types.map.insert(self.defs.unit, unit_ty);
-        self.def_types
-            .map
-            .insert(self.defs.empty_sequence, empty_sequence_ty);
-
-        let int = self.def_core_type("int", self.defs.int, int_ty);
-        let _number = self.def_core_type("number", self.defs.number, num_ty);
-        let string = self.def_core_type("string", self.defs.string, string_ty);
-
-        let int_int = self.types.intern([int, int]);
-        let string_string = self.types.intern([string, string]);
+        let int_int_ty = self.types.intern([int_ty, int_ty]);
+        let string_string_ty = self.types.intern([string_ty, string_ty]);
 
         let int_int_to_int = self.types.intern(Type::Function {
-            params: int_int,
-            output: int,
+            params: int_int_ty,
+            output: int_ty,
         });
         let string_string_to_string = self.types.intern(Type::Function {
-            params: string_string,
-            output: string,
+            params: string_string_ty,
+            output: string_ty,
         });
 
         // Built-in functions
@@ -396,7 +395,25 @@ impl<'m> Compiler<'m> {
         self
     }
 
-    fn def_core_type(&mut self, ident: &str, def_id: DefId, ty: TypeRef<'m>) -> TypeRef<'m> {
+    fn def_core_type(
+        &mut self,
+        def_id: impl DefIdSource,
+        ty_fn: impl Fn(DefId) -> Type<'m>,
+    ) -> TypeRef<'m> {
+        let def_id = def_id.get(self);
+        let ty = self.types.intern(ty_fn(def_id));
+        self.def_types.map.insert(def_id, ty);
+        ty
+    }
+
+    fn def_core_type_name(
+        &mut self,
+        def_id: impl DefIdSource,
+        ident: &str,
+        ty_fn: impl Fn(DefId) -> Type<'m>,
+    ) -> TypeRef<'m> {
+        let def_id = def_id.get(self);
+        let ty = self.types.intern(ty_fn(def_id));
         self.namespaces
             .get_mut(CORE_PKG, Space::Type)
             .insert(ident.into(), def_id);
@@ -409,5 +426,21 @@ impl<'m> Compiler<'m> {
         self.def_types.map.insert(def_id, ty);
 
         def_id
+    }
+}
+
+trait DefIdSource {
+    fn get(self, compiler: &mut Compiler) -> DefId;
+}
+
+impl DefIdSource for DefId {
+    fn get(self, _: &mut Compiler) -> DefId {
+        self
+    }
+}
+
+impl DefIdSource for () {
+    fn get(self, compiler: &mut Compiler) -> DefId {
+        compiler.defs.alloc_def_id()
     }
 }

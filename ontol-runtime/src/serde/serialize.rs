@@ -1,5 +1,6 @@
 use serde::ser::{SerializeMap, SerializeSeq};
 use smartstring::alias::String;
+use std::fmt::Write;
 
 use crate::{
     cast::Cast,
@@ -26,9 +27,15 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)
             }
-            SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => {
-                serializer.serialize_str(cast_ref::<String>(value))
-            }
+            SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => match &value.data {
+                Data::String(s) => serializer.serialize_str(&s),
+                Data::Uuid(uuid) => {
+                    let mut buf = String::new();
+                    write!(&mut buf, "{uuid}").unwrap();
+                    serializer.serialize_str(&buf)
+                }
+                _ => panic!("cannot deserialize {:?} as a string", value.data),
+            },
             SerdeOperator::Sequence(ranges, _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), ranges, serializer)
             }

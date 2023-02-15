@@ -57,12 +57,16 @@ impl<'s> PropertySet<'s> {
 }
 
 impl<'e> SerdeProcessor<'e> {
-    fn matcher_visitor_no_params<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
+    fn assert_no_rel_params(&self) {
         assert!(
             self.rel_params_operator_id.is_none(),
             "rel_params_operator_id should be None for {:?}",
             self.value_operator
         );
+    }
+
+    fn matcher_visitor_no_params<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
+        self.assert_no_rel_params();
 
         MatcherVisitor {
             matcher,
@@ -102,7 +106,10 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
             ),
             SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
                 deserializer,
-                self.matcher_visitor_no_params(StringMatcher(*def_id)),
+                self.matcher_visitor_no_params(StringMatcher {
+                    def_id: *def_id,
+                    env: self.env,
+                }),
             ),
             SerdeOperator::StringConstant(literal, def_id) => {
                 serde::de::Deserializer::deserialize_str(
@@ -154,7 +161,10 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
     }
 }
 
-impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M> {
+impl<'e, 'de, M> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
+where
+    M: ValueMatcher,
+{
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -165,15 +175,12 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
     where
         E: serde::de::Error,
     {
-        let type_def_id = self
+        let value = self
             .matcher
             .match_unit()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unit, &self))?;
 
-        Ok(Attribute::with_unit_params(Value {
-            data: Data::Unit,
-            type_def_id,
-        }))
+        Ok(Attribute::with_unit_params(value))
     }
 
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
@@ -213,15 +220,12 @@ impl<'e, 'de, M: ValueMatcher> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
     where
         E: serde::de::Error,
     {
-        let type_def_id = self
+        let value = self
             .matcher
             .match_str(v)
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
 
-        Ok(Attribute::with_unit_params(Value {
-            data: Data::String(v.into()),
-            type_def_id,
-        }))
+        Ok(Attribute::with_unit_params(value))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

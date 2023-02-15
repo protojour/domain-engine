@@ -88,6 +88,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
+            Some(Type::Uuid(_)) => Some((
+                self.alloc_operator_id(type_def_id),
+                SerdeOperator::String(type_def_id),
+            )),
             Some(Type::EmptySequence(_)) => {
                 todo!("not sure if this should be handled here")
             }

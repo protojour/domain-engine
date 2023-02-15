@@ -4,6 +4,7 @@ use crate::{
     discriminator::Discriminant,
     env::Env,
     format_utils::{Backticks, LogicOp, Missing},
+    value::{Data, Value},
     DefId,
 };
 
@@ -26,7 +27,7 @@ pub struct SeqElementMatch {
 pub trait ValueMatcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
 
-    fn match_unit(&self) -> Result<DefId, ()> {
+    fn match_unit(&self) -> Result<Value, ()> {
         Err(())
     }
 
@@ -38,7 +39,7 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_str(&self, _: &str) -> Result<DefId, ()> {
+    fn match_str(&self, _: &str) -> Result<Value, ()> {
         Err(())
     }
 
@@ -58,8 +59,8 @@ impl ValueMatcher for UnitMatcher {
         write!(f, "unit")
     }
 
-    fn match_unit(&self) -> Result<DefId, ()> {
-        Ok(DefId::unit())
+    fn match_unit(&self) -> Result<Value, ()> {
+        Ok(Value::new(Data::Unit, DefId::unit()))
     }
 }
 
@@ -98,15 +99,18 @@ impl ValueMatcher for NumberMatcher {
 }
 
 /// match any string
-pub struct StringMatcher(pub DefId);
+pub struct StringMatcher<'e> {
+    pub def_id: DefId,
+    pub env: &'e Env,
+}
 
-impl ValueMatcher for StringMatcher {
+impl<'e> ValueMatcher for StringMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "string")
+        expecting_custom_string(&self.env, self.def_id, f)
     }
 
-    fn match_str(&self, _: &str) -> Result<DefId, ()> {
-        Ok(self.0)
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        try_deserialize_custom_string(self.env, self.def_id, str)
     }
 }
 
@@ -121,9 +125,9 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
         write!(f, "\"{}\"", self.literal)
     }
 
-    fn match_str(&self, str: &str) -> Result<DefId, ()> {
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
         if str == self.literal {
-            Ok(self.def_id)
+            Ok(Value::new(Data::String(str.into()), self.def_id))
         } else {
             Err(())
         }
@@ -256,8 +260,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         )
     }
 
-    fn match_unit(&self) -> Result<DefId, ()> {
-        self.match_discriminant(Discriminant::IsUnit)
+    fn match_unit(&self) -> Result<Value, ()> {
+        let def_id = self.match_discriminant(Discriminant::IsUnit)?;
+        Ok(Value::new(Data::Unit, def_id))
     }
 
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {
@@ -268,14 +273,22 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         self.match_discriminant(Discriminant::IsInt)
     }
 
-    fn match_str(&self, v: &str) -> Result<DefId, ()> {
+    fn match_str(&self, v: &str) -> Result<Value, ()> {
         for discriminator in &self.value_union_type.discriminators {
             match &discriminator.discriminator.discriminant {
                 Discriminant::IsString => {
-                    return Ok(discriminator.discriminator.result_type);
+                    return try_deserialize_custom_string(
+                        &self.env,
+                        discriminator.discriminator.result_type,
+                        v,
+                    )
                 }
                 Discriminant::IsStringLiteral(lit) if lit == v => {
-                    return Ok(discriminator.discriminator.result_type);
+                    return try_deserialize_custom_string(
+                        &self.env,
+                        discriminator.discriminator.result_type,
+                        v,
+                    )
                 }
                 _ => {}
             }
@@ -384,4 +397,24 @@ impl<'e> MapMatcher<'e> {
 
 pub enum MapMatchError {
     Indecisive,
+}
+
+fn try_deserialize_custom_string(env: &Env, def_id: DefId, str: &str) -> Result<Value, ()> {
+    match env.custom_string_deserializers.get(&def_id) {
+        Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
+        None => Ok(Value::new(Data::String(str.into()), def_id)),
+    }
+}
+
+fn expecting_custom_string(
+    env: &Env,
+    def_id: DefId,
+    f: &mut std::fmt::Formatter,
+) -> std::fmt::Result {
+    match env.custom_string_deserializers.get(&def_id) {
+        Some(custom_string_deserializer) => {
+            write!(f, "`{}`", custom_string_deserializer.type_name())
+        }
+        None => write!(f, "string"),
+    }
 }
