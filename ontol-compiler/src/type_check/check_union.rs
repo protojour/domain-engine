@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
     relation::{Constructor, SubjectProperties},
     sequence::Sequence,
@@ -46,32 +46,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         let mut builder = DiscriminatorBuilder::default();
-        let mut used_objects: HashSet<DefId> = Default::default();
+        let mut used_variants: HashSet<DefId> = Default::default();
 
         for (relationship_id, span) in relationship_ids {
-            let (relationship, _) = self
+            let (relationship, relation) = self
                 .get_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting property meta");
-            let (object_def, _) = relationship.object;
 
             debug!("check union relationship {relationship:?}");
 
-            if used_objects.contains(&object_def) {
+            let variant_def = match relation.ident {
+                RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => def_id,
+                _ => relationship.object.0,
+            };
+
+            if used_variants.contains(&variant_def) {
                 error_set.report(
-                    object_def,
+                    variant_def,
                     UnionCheckError::DuplicateAnonymousRelation,
                     span,
                 );
                 continue;
             }
 
-            let object_ty = self.def_types.map.get(&object_def).unwrap();
+            let variant_ty = self.def_types.map.get(&variant_def).unwrap_or_else(|| {
+                let def = self.defs.get_def_kind(variant_def);
+                panic!("No type found for {def:?}");
+            });
 
-            match object_ty {
+            match variant_ty {
                 Type::Unit(def_id) => builder.unit = Some(*def_id),
-                Type::Int(_) => builder.number = Some(IntDiscriminator(object_def)),
+                Type::Int(_) => builder.number = Some(IntDiscriminator(variant_def)),
                 Type::String(_) => {
-                    builder.string = StringDiscriminator::Any(object_def);
+                    builder.string = StringDiscriminator::Any(variant_def);
                 }
                 Type::StringConstant(def_id) => {
                     let string_literal = self.defs.get_string_literal(*def_id);
@@ -82,7 +89,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Ok(DomainTypeMatchData::Map(property_set)) => {
                             self.add_property_set_to_discriminator(
                                 &mut builder,
-                                object_def,
+                                variant_def,
                                 property_set,
                                 span,
                                 &mut error_set,
@@ -91,25 +98,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Ok(DomainTypeMatchData::Sequence(_)) => {
                             if builder.sequence.is_some() {
                                 error_set.report(
-                                    object_def,
+                                    variant_def,
                                     UnionCheckError::CannotDiscriminateType,
                                     span,
                                 );
                             } else {
-                                builder.sequence = Some(object_def);
+                                builder.sequence = Some(variant_def);
                             }
                         }
                         Err(error) => {
-                            error_set.report(object_def, error, span);
+                            error_set.report(variant_def, error, span);
                         }
                     }
                 }
                 _ => {
-                    error_set.report(object_def, UnionCheckError::CannotDiscriminateType, span);
+                    error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
                 }
             }
 
-            used_objects.insert(object_def);
+            used_variants.insert(variant_def);
         }
 
         self.limit_property_discriminators(
@@ -173,7 +180,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 },
                 None => {
-                    return Err(UnionCheckError::CannotDiscriminateType);
+                    return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                 }
             }
         }
@@ -182,19 +189,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn add_property_set_to_discriminator(
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
-        object_def: DefId,
+        variant_def: DefId,
         property_set: &IndexMap<RelationId, Cardinality>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
     ) {
         let mut map_discriminator_candidate = MapDiscriminatorCandidate {
-            result_type: object_def,
+            result_type: variant_def,
             property_candidates: vec![],
         };
 
         for (relation_id, _cardinality) in property_set {
             let (relationship, relation) = self
-                .get_subject_property_meta(object_def, *relation_id)
+                .get_subject_property_meta(variant_def, *relation_id)
                 .expect("BUG: problem getting property meta");
 
             let (object_def, _) = relationship.object;
@@ -228,7 +235,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         if map_discriminator_candidate.property_candidates.is_empty() {
             debug!("no prop candidates for variant");
-            error_set.report(object_def, UnionCheckError::CannotDiscriminateType, span);
+            error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
         } else {
             discriminator_builder
                 .map_discriminator_candidates

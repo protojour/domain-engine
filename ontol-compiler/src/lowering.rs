@@ -9,7 +9,7 @@ use smartstring::alias::String;
 use crate::{
     compiler::Compiler,
     def::{
-        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationKind, Relationship,
+        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
         ValueCardinality, Variables,
     },
     error::{CompileError, SpannedCompileError},
@@ -97,13 +97,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                                 match self.compiler.defs.get_def_kind(def_id) {
                                     Some(DefKind::StringLiteral(_)) => {
-                                        (RelationKind::Named(def_id), span, None)
+                                        (RelationIdent::Named(def_id), span, None)
                                     }
-                                    _ => (RelationKind::Typed(def_id), span, None),
+                                    _ => (RelationIdent::Typed(def_id), span, None),
                                 }
                             }
                             (ast::RelationType::IntRange(range), span) => {
-                                (RelationKind::Indexed, span, Some(range))
+                                (RelationIdent::Indexed, span, Some(range))
                             }
                         };
 
@@ -119,7 +119,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                     self.set_def(
                                         relation_id.0,
                                         DefKind::Relation(Relation {
-                                            kind: relation_ident,
+                                            ident: relation_ident,
                                             subject_prop: None,
                                             object_prop,
                                         }),
@@ -335,9 +335,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, kind: RelationKind) -> ImplicitRelationId {
+    fn define_relation_if_undefined(&mut self, kind: RelationIdent) -> ImplicitRelationId {
         match kind {
-            RelationKind::Named(def_id) | RelationKind::Typed(def_id) => {
+            RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => {
                 match self.compiler.relations.relations.entry(def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(
                         *vacant.insert(RelationId(self.compiler.defs.alloc_def_id())),
@@ -345,10 +345,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationKind::Indexed => {
+            RelationIdent::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
             }
-            RelationKind::Anonymous => {
+            RelationIdent::Anonymous => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.anonymous_relation()))
             }
         }

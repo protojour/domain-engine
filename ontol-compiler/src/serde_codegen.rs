@@ -148,16 +148,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .build(),
             },
             Constructor::Value(relationship_id, _, cardinality) => {
-                let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
+                let Ok((_, relation)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
 
+                let value_def = relation.ident_def().unwrap();
                 let inner_operator_id = self
-                    .get_serde_operator_id(relationship.object.0)
+                    .get_serde_operator_id(value_def)
                     .expect("No inner operator");
 
                 let (requirement, inner_operator_id) =
-                    self.property_operator(inner_operator_id, relationship.object.0, *cardinality);
+                    self.property_operator(inner_operator_id, value_def, *cardinality);
 
                 if !matches!(requirement, PropertyCardinality::Mandatory) {
                     panic!("Value properties must be mandatory, fix this during type check");

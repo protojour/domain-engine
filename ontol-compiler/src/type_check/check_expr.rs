@@ -197,11 +197,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                     Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
                         [((prop_ident, _), value)] if prop_ident.is_none() => {
-                            let (relationship, _) = self
+                            let (_, relation) = self
                                 .get_relationship_meta(*relationship_id)
                                 .expect("BUG: problem getting anonymous property meta");
 
-                            let object_ty = self.check_def(relationship.object.0);
+                            let object_ty = self.check_def(relation.ident_def().unwrap());
                             let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
 
                             ctx.typed_expr_table.add_expr(TypedExpr {

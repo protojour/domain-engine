@@ -33,10 +33,10 @@ fn rel_duplicate_anonymous_relation() {
     (type! foo)
     (type! bar)
     (rel! ;; ERROR unit type `bar` cannot be part of a union
-        foo {} bar
+        _ { bar } foo
     )
     (rel! ;; ERROR duplicate anonymous relationship
-        foo {} bar
+        _ { bar } foo
     )
     "
     .compile_fail()
@@ -47,7 +47,7 @@ fn rel_mix_anonymous_and_named() {
     "
     (type! foo)
     (type! bar)
-    (rel! foo {} bar)
+    (rel! _ { bar } foo)
     (rel! ;; ERROR invalid mix of relationship type for subject
         foo { 'foobar' } bar
     )
@@ -74,8 +74,8 @@ fn map_union_unit_type() {
     (type! foo)
     (type! bar)
     (type! u)
-    (rel! u {} foo) ;; ERROR unit type `foo` cannot be part of a union
-    (rel! u {} bar) ;; ERROR unit type `bar` cannot be part of a union
+    (rel! _ { foo } u) ;; ERROR unit type `foo` cannot be part of a union
+    (rel! _ { bar } u) ;; ERROR unit type `bar` cannot be part of a union
     "
     .compile_fail()
 }
@@ -88,8 +88,8 @@ fn map_union_missing_discriminator() {
     (rel! foo { 'a' } 'constant')
     (rel! bar { 'b' } string)
     (type! u)
-    (rel! u {} foo)
-    (rel! u {} bar) ;; ERROR cannot discriminate type
+    (rel! _ { foo } u)
+    (rel! _ { bar } u) ;; ERROR cannot discriminate type
     "
     .compile_fail()
 }
@@ -102,8 +102,8 @@ fn map_union_non_uniform_discriminators() {
     (rel! foo { 'a' } 'constant')
     (rel! bar { 'b' } 'other-constant')
     (type! u) ;; ERROR no uniform discriminator found for union variants
-    (rel! u {} foo)
-    (rel! u {} bar)
+    (rel! _ { foo } u)
+    (rel! _ { bar } u)
     "
     .compile_fail()
 }
@@ -112,8 +112,8 @@ fn map_union_non_uniform_discriminators() {
 fn non_disjoint_string_union() {
     "
     (type! u1)
-    (rel! u1 {} 'a')
-    (rel! u1 {} 'a') ;; ERROR duplicate anonymous relationship
+    (rel! _ { 'a' } u1)
+    (rel! _ { 'a' } u1) ;; ERROR duplicate anonymous relationship
     "
     .compile_fail()
 }
@@ -122,14 +122,14 @@ fn non_disjoint_string_union() {
 fn union_tree() {
     "
     (type! u1)
-    (rel! u1 {} '1a')
-    (rel! u1 {} '1b')
+    (rel! _ { '1a' } u1)
+    (rel! _ { '1b' } u1)
     (type! u2)
-    (rel! u2 {} '2a')
-    (rel! u2 {} '2b')
+    (rel! _ { '2a' } u2)
+    (rel! _ { '2b' } u2)
     (type! u3)
-    (rel! u3 {} u1) ;; ERROR union tree not supported
-    (rel! u3 {} u2) ;; ERROR union tree not supported
+    (rel! _ { u1 } u3) ;; ERROR union tree not supported
+    (rel! _ { u2 } u3) ;; ERROR union tree not supported
     "
     .compile_fail()
 }
@@ -138,7 +138,7 @@ fn union_tree() {
 fn sequence_mix1() {
     r#"
     (type! u)
-    (rel! u {} int)
+    (rel! _ { int } u)
     (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
     "#
     .compile_fail();
@@ -220,7 +220,7 @@ fn eq_attribute_mismatch() {
     (type! foo)
     (type! bar)
     (rel! foo { 'prop' } bar)
-    (rel! bar {} int)
+    (rel! _ { int } bar)
     (eq! (:x)
         (obj! ;; ERROR missing property `prop`
             foo
@@ -339,8 +339,8 @@ fn unresolved_transitive_eq() {
     "
     (type! a)
     (type! b)
-    (rel! a {} int)
-    (rel! b {} int)
+    (rel! _ { int } a)
+    (rel! _ { int } b)
 
     (type! c)
     (type! d)
