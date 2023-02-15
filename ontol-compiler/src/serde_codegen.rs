@@ -6,17 +6,17 @@ use ontol_runtime::{
         MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType,
         ValueUnionDiscriminator, ValueUnionType,
     },
-    value::PropertyId,
-    DefId, RelationId,
+    DefId, Role,
 };
 use smallvec::SmallVec;
+use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
-    relation::{Constructor, ObjectProperties, Properties, Relations, SubjectProperties},
+    relation::{Constructor, MapProperties, Properties, Relations},
     types::{DefTypes, Type},
 };
 
@@ -137,20 +137,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         properties: Option<&Properties>,
     ) -> SerdeOperator {
         let properties = match properties {
-            None => return MapTypeBuilder::new(typename, type_def_id).build(),
+            None => return create_map_operator(typename, type_def_id, &MapProperties::Empty, self),
             Some(properties) => properties,
         };
 
         match &properties.constructor {
-            Constructor::Identity => match &properties.subject {
-                SubjectProperties::Empty => MapTypeBuilder::new(typename, type_def_id)
-                    .add_object_properties(self, &properties.object)
-                    .build(),
-                SubjectProperties::Map(property_set) => MapTypeBuilder::new(typename, type_def_id)
-                    .add_subject_property_set(self, property_set)
-                    .add_object_properties(self, &properties.object)
-                    .build(),
-            },
+            Constructor::Identity => {
+                create_map_operator(typename, type_def_id, &properties.map, self)
+            }
             Constructor::Value(relationship_id, _, cardinality) => {
                 let Ok((_, relation)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
@@ -273,129 +267,87 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 }
 
-struct MapTypeBuilder {
-    map_type: MapType,
-}
+fn create_map_operator(
+    typename: &str,
+    type_def_id: DefId,
+    map_properties: &MapProperties,
+    generator: &mut SerdeGenerator,
+) -> SerdeOperator {
+    let map_type = match map_properties {
+        MapProperties::Empty => MapType {
+            typename: typename.into(),
+            type_def_id,
+            properties: [].into(),
+            n_mandatory_properties: 0,
+        },
+        MapProperties::Map(map) => {
+            let mut n_mandatory_properties = 0;
+            let properties: IndexMap<String, SerdeProperty> = map
+                .iter()
+                .map(|(property_id, cardinality)| {
+                    let (relationship, prop_key, type_def_id) = match property_id.role {
+                        Role::Subject => {
+                            let (relationship, relation) = generator
+                                .get_subject_property_meta(type_def_id, property_id.relation_id)
+                                .expect("Problem getting subject property meta");
 
-impl MapTypeBuilder {
-    fn new(typename: &str, type_def_id: DefId) -> Self {
-        Self {
-            map_type: MapType {
+                            let prop_key = relation
+                                .subject_prop(generator.defs)
+                                .expect("Subject property has no name");
+
+                            (relationship, prop_key, relationship.object.0)
+                        }
+                        Role::Object => {
+                            let (relationship, relation) = generator
+                                .get_object_property_meta(type_def_id, property_id.relation_id)
+                                .expect("Problem getting object property meta");
+
+                            let prop_key = relation
+                                .object_prop(generator.defs)
+                                .expect("Object property has no name");
+
+                            (relationship, prop_key, relationship.subject.0)
+                        }
+                    };
+
+                    let operator_id = generator
+                        .get_serde_operator_id(type_def_id)
+                        .expect("No inner operator");
+                    let (requirement, value_operator_id) =
+                        generator.property_operator(operator_id, type_def_id, *cardinality);
+
+                    let edge_operator_id = match relationship.rel_params {
+                        RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
+                        RelParams::Unit => None,
+                        _ => todo!(),
+                    };
+
+                    if requirement.is_mandatory() {
+                        n_mandatory_properties += 1;
+                    }
+
+                    (
+                        prop_key.into(),
+                        SerdeProperty {
+                            property_id: *property_id,
+                            value_operator_id,
+                            optional: requirement.is_optional(),
+                            rel_params_operator_id: edge_operator_id,
+                        },
+                    )
+                })
+                .collect();
+
+            MapType {
                 typename: typename.into(),
                 type_def_id,
-                properties: Default::default(),
-                n_mandatory_properties: 0,
-            },
-        }
-    }
-
-    fn build(self) -> SerdeOperator {
-        SerdeOperator::MapType(self.map_type)
-    }
-
-    fn add_subject_property_set(
-        mut self,
-        generator: &mut SerdeGenerator,
-        property_set: &IndexMap<RelationId, (PropertyCardinality, ValueCardinality)>,
-    ) -> Self {
-        self.map_type
-            .properties
-            .extend(property_set.iter().map(|(relation_id, cardinality)| {
-                let Ok((relationship, relation)) = generator
-                    .get_subject_property_meta(self.map_type.type_def_id, *relation_id)
-                else {
-                    panic!("Problem getting subject property meta");
-                };
-
-                let subject_key = relation
-                    .subject_prop(generator.defs)
-                    .expect("Property has no name");
-                let operator_id = generator
-                    .get_serde_operator_id(relationship.object.0)
-                    .expect("No inner operator");
-                let (requirement, value_operator_id) =
-                    generator.property_operator(operator_id, relationship.object.0, *cardinality);
-                let edge_operator_id = match relationship.rel_params {
-                    RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
-                    RelParams::Unit => None,
-                    _ => todo!(),
-                };
-
-                if requirement.is_mandatory() {
-                    self.map_type.n_mandatory_properties += 1;
-                }
-
-                (
-                    subject_key.into(),
-                    SerdeProperty {
-                        property_id: PropertyId::subject(*relation_id),
-                        value_operator_id,
-                        optional: requirement.is_optional(),
-                        rel_params_operator_id: edge_operator_id,
-                    },
-                )
-            }));
-        self
-    }
-
-    fn add_object_properties(
-        self,
-        generator: &mut SerdeGenerator,
-        object_properties: &ObjectProperties,
-    ) -> Self {
-        match object_properties {
-            ObjectProperties::Map(property_set) => {
-                self.add_object_property_set(generator, property_set)
+                properties,
+                n_mandatory_properties,
             }
-            ObjectProperties::Empty => self,
         }
-    }
+    };
 
-    fn add_object_property_set(
-        mut self,
-        generator: &mut SerdeGenerator,
-        property_set: &IndexMap<RelationId, Cardinality>,
-    ) -> Self {
-        self.map_type
-            .properties
-            .extend(property_set.iter().map(|(relation_id, cardinality)| {
-                let Ok((relationship, relation)) = generator
-                    .get_object_property_meta(self.map_type.type_def_id, *relation_id)
-                else {
-                    panic!("Problem getting object property meta");
-                };
-
-                let object_key = relation
-                    .object_prop(generator.defs)
-                    .expect("Property has no name");
-                let operator_id = generator
-                    .get_serde_operator_id(relationship.subject.0)
-                    .expect("No inner operator");
-                let (requirement, value_operator_id) =
-                    generator.property_operator(operator_id, relationship.subject.0, *cardinality);
-
-                let edge_operator_id = match relationship.rel_params {
-                    RelParams::Type(def_id) => generator.get_serde_operator_id(def_id),
-                    RelParams::Unit => None,
-                    _ => todo!(),
-                };
-
-                if requirement.is_mandatory() {
-                    self.map_type.n_mandatory_properties += 1;
-                }
-
-                (
-                    object_key.into(),
-                    SerdeProperty {
-                        property_id: PropertyId::object(*relation_id),
-                        value_operator_id,
-                        optional: requirement.is_optional(),
-                        rel_params_operator_id: edge_operator_id,
-                    },
-                )
-            }));
-        self
-    }
+    SerdeOperator::MapType(map_type)
 }
 
 struct SequenceRangeBuilder {

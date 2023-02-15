@@ -1,4 +1,4 @@
-use ontol_runtime::{DefId, RelationId};
+use ontol_runtime::{value::PropertyId, DefId, RelationId};
 
 use crate::{
     def::{
@@ -7,7 +7,7 @@ use crate::{
     },
     error::CompileError,
     mem::Intern,
-    relation::{Constructor, ObjectProperties, RelationshipId, SubjectProperties},
+    relation::{Constructor, MapProperties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -92,10 +92,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match (
             &relation.1.ident,
-            &mut properties.subject,
+            &mut properties.map,
             &mut properties.constructor,
         ) {
-            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Identity) => {
+            (RelationIdent::Indexed, MapProperties::Empty, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -106,30 +106,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 properties.constructor = Constructor::Sequence(sequence);
             }
-            (RelationIdent::Indexed, SubjectProperties::Empty, Constructor::Sequence(sequence)) => {
+            (RelationIdent::Indexed, MapProperties::Empty, Constructor::Sequence(sequence)) => {
                 if let Err(error) =
                     sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
             }
-            (RelationIdent::Named(_), SubjectProperties::Empty, Constructor::Identity) => {
-                properties.subject = SubjectProperties::Map(
+            (RelationIdent::Named(_), MapProperties::Empty, Constructor::Identity) => {
+                properties.map = MapProperties::Map(
                     [(
-                        relation.0,
+                        PropertyId::subject(relation.0),
                         adapter.adapt(relationship.1.subject_cardinality),
                     )]
                     .into(),
                 );
             }
-            (
-                RelationIdent::Named(_),
-                SubjectProperties::Map(properties),
-                Constructor::Identity,
-            ) => {
-                if properties
+            (RelationIdent::Named(_), MapProperties::Map(map), Constructor::Identity) => {
+                if map
                     .insert(
-                        relation.0,
+                        PropertyId::subject(relation.0),
                         adapter.adapt(relationship.1.subject_cardinality),
                     )
                     .is_some()
@@ -196,15 +192,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => return self.error(CompileError::ConstructorMismatch, span),
             },
-            _ => match (&relation.1.object_prop, object_ty, &mut properties.object) {
-                (Some(_), Type::DomainEntity(_), ObjectProperties::Empty) => {
-                    properties.object = ObjectProperties::Map(
-                        [(relation.0, adapter.adapt(relationship.1.object_cardinality))].into(),
+            _ => match (&relation.1.object_prop, object_ty, &mut properties.map) {
+                (Some(_), Type::DomainEntity(_), MapProperties::Empty) => {
+                    properties.map = MapProperties::Map(
+                        [(
+                            PropertyId::object(relation.0),
+                            adapter.adapt(relationship.1.object_cardinality),
+                        )]
+                        .into(),
                     );
                 }
-                (Some(_), Type::DomainEntity(_), ObjectProperties::Map(properties)) => {
-                    if properties
-                        .insert(relation.0, adapter.adapt(relationship.1.object_cardinality))
+                (Some(_), Type::DomainEntity(_), MapProperties::Map(map)) => {
+                    if map
+                        .insert(
+                            PropertyId::object(relation.0),
+                            adapter.adapt(relationship.1.object_cardinality),
+                        )
                         .is_some()
                     {
                         return self

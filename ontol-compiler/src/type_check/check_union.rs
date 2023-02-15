@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
-    smart_format, DefId, RelationId,
+    smart_format,
+    value::PropertyId,
+    DefId, RelationId,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -12,7 +14,7 @@ use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
-    relation::{Constructor, SubjectProperties},
+    relation::{Constructor, MapProperties},
     sequence::Sequence,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -149,11 +151,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         loop {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Identity => match &properties.subject {
-                        SubjectProperties::Empty => {
+                    Constructor::Identity => match &properties.map {
+                        MapProperties::Empty => {
                             return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                         }
-                        SubjectProperties::Map(property_set) => {
+                        MapProperties::Map(property_set) => {
                             return Ok(DomainTypeMatchData::Map(property_set));
                         }
                     },
@@ -190,7 +192,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         variant_def: DefId,
-        property_set: &IndexMap<RelationId, Cardinality>,
+        property_set: &IndexMap<PropertyId, Cardinality>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
     ) {
@@ -199,9 +201,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             property_candidates: vec![],
         };
 
-        for (relation_id, _cardinality) in property_set {
+        for (property_id, _cardinality) in property_set {
             let (relationship, relation) = self
-                .get_subject_property_meta(variant_def, *relation_id)
+                .get_subject_property_meta(variant_def, property_id.relation_id)
                 .expect("BUG: problem getting property meta");
 
             let (object_def, _) = relationship.object;
@@ -222,7 +224,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         PropertyDiscriminatorCandidate {
                             relation_id: relationship.relation_id,
                             discriminant: Discriminant::HasStringAttribute(
-                                *relation_id,
+                                property_id.relation_id,
                                 property_name.into(),
                                 string_literal.into(),
                             ),
@@ -362,7 +364,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Map(&'a IndexMap<RelationId, Cardinality>),
+    Map(&'a IndexMap<PropertyId, Cardinality>),
     Sequence(&'a Sequence),
 }
 

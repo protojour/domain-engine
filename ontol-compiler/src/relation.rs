@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
-use ontol_runtime::{discriminator::UnionDiscriminator, DefId, RelationId};
+use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId};
 
 use crate::{def::Cardinality, sequence::Sequence, SourceSpan};
 
@@ -32,23 +32,14 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub subject: SubjectProperties,
-    pub object: ObjectProperties,
+    pub map: MapProperties,
 }
 
 #[derive(Default, Debug)]
-pub enum SubjectProperties {
-    /// A type with no properties
+pub enum MapProperties {
     #[default]
     Empty,
-    Map(IndexMap<RelationId, Cardinality>),
-}
-
-#[derive(Default, Debug)]
-pub enum ObjectProperties {
-    #[default]
-    Empty,
-    Map(IndexMap<RelationId, Cardinality>),
+    Map(IndexMap<PropertyId, Cardinality>),
 }
 
 #[derive(Default, Debug)]
