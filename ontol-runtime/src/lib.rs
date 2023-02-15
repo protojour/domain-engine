@@ -7,6 +7,8 @@ pub mod format_utils;
 pub mod proc;
 pub mod property_probe;
 pub mod serde;
+pub mod string_pattern;
+pub mod string_types;
 pub mod translate;
 pub mod value;
 

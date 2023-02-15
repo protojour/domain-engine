@@ -51,4 +51,5 @@ pub enum Constructor {
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
     Sequence(Sequence),
+    StringPattern,
 }

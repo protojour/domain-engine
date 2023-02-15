@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use crate::{
     cast::Cast,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, FormatStringData, Value},
 };
 
 use super::{MapType, SequenceRange, SerdeOperator, SerdeProcessor, EDGE_PROPERTY};
@@ -28,13 +28,12 @@ impl<'e> SerdeProcessor<'e> {
                 self.serialize_number(value, serializer)
             }
             SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => match &value.data {
-                Data::String(s) => serializer.serialize_str(&s),
-                Data::Uuid(uuid) => {
+                Data::String(s) => serializer.serialize_str(s),
+                data => {
                     let mut buf = String::new();
-                    write!(&mut buf, "{uuid}").unwrap();
+                    write!(&mut buf, "{}", FormatStringData(data)).unwrap();
                     serializer.serialize_str(&buf)
                 }
-                _ => panic!("cannot deserialize {:?} as a string", value.data),
             },
             SerdeOperator::Sequence(ranges, _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), ranges, serializer)

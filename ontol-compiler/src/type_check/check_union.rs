@@ -108,6 +108,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 builder.sequence = Some(variant_def);
                             }
                         }
+                        Ok(DomainTypeMatchData::StringPattern) => {
+                            builder.add_string_pattern(variant_def);
+                        }
                         Err(error) => {
                             error_set.report(variant_def, error, span);
                         }
@@ -179,6 +182,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
+                    }
+                    Constructor::StringPattern => {
+                        return Ok(DomainTypeMatchData::StringPattern);
                     }
                 },
                 None => {
@@ -366,6 +372,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 enum DomainTypeMatchData<'a> {
     Map(&'a IndexMap<PropertyId, Cardinality>),
     Sequence(&'a Sequence),
+    StringPattern,
 }
 
 #[derive(Default)]
@@ -388,6 +395,10 @@ impl DiscriminatorBuilder {
                 set.insert((lit.into(), def_id));
             }
         }
+    }
+
+    fn add_string_pattern(&mut self, _: DefId) {
+        todo!();
     }
 }
 

@@ -225,6 +225,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 SerdeOperator::Sequence(sequence_range_builder.ranges, type_def_id)
             }
+            Constructor::StringPattern => todo!(),
         }
     }
 

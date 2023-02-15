@@ -4,6 +4,7 @@ use crate::{
     discriminator::Discriminant,
     env::Env,
     format_utils::{Backticks, LogicOp, Missing},
+    string_types::ParseError,
     value::{Data, Value},
     DefId,
 };
@@ -106,11 +107,11 @@ pub struct StringMatcher<'e> {
 
 impl<'e> ValueMatcher for StringMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        expecting_custom_string(&self.env, self.def_id, f)
+        expecting_custom_string(self.env, self.def_id, f)
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        try_deserialize_custom_string(self.env, self.def_id, str)
+        try_deserialize_custom_string(self.env, self.def_id, str).map_err(|_| ())
     }
 }
 
@@ -278,17 +279,19 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             match &discriminator.discriminator.discriminant {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
-                        &self.env,
+                        self.env,
                         discriminator.discriminator.result_type,
                         v,
                     )
+                    .map_err(|_| ())
                 }
                 Discriminant::IsStringLiteral(lit) if lit == v => {
                     return try_deserialize_custom_string(
-                        &self.env,
+                        self.env,
                         discriminator.discriminator.result_type,
                         v,
                     )
+                    .map_err(|_| ())
                 }
                 _ => {}
             }
@@ -399,8 +402,8 @@ pub enum MapMatchError {
     Indecisive,
 }
 
-fn try_deserialize_custom_string(env: &Env, def_id: DefId, str: &str) -> Result<Value, ()> {
-    match env.custom_string_deserializers.get(&def_id) {
+fn try_deserialize_custom_string(env: &Env, def_id: DefId, str: &str) -> Result<Value, ParseError> {
+    match env.string_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
         None => Ok(Value::new(Data::String(str.into()), def_id)),
     }
@@ -411,7 +414,7 @@ fn expecting_custom_string(
     def_id: DefId,
     f: &mut std::fmt::Formatter,
 ) -> std::fmt::Result {
-    match env.custom_string_deserializers.get(&def_id) {
+    match env.string_like_types.get(&def_id) {
         Some(custom_string_deserializer) => {
             write!(f, "`{}`", custom_string_deserializer.type_name())
         }

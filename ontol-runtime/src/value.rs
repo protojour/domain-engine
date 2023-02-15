@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 use smartstring::alias::String;
 
@@ -61,6 +61,18 @@ pub enum Data {
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.
     Sequence(Vec<Attribute>),
+}
+
+pub struct FormatStringData<'d>(pub &'d Data);
+
+impl<'d> Display for FormatStringData<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Data::String(s) => write!(f, "{s}"),
+            Data::Uuid(uuid) => write!(f, "{uuid}"),
+            _ => panic!("not a string-like type"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

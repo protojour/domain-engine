@@ -17,7 +17,7 @@ use crate::{
 };
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
-    serde::CustomStringType,
+    string_types::StringLikeType,
     PackageId,
 };
 use smartstring::alias::String;
@@ -97,7 +97,7 @@ impl<'m> Compiler<'m> {
             translations: self.codegen_tasks.result_translations,
             serde_operators_per_def,
             serde_operators,
-            custom_string_deserializers: [(self.defs.uuid(), CustomStringType::Uuid)].into(),
+            string_like_types: [(self.defs.uuid(), StringLikeType::Uuid)].into(),
         }
     }
 
