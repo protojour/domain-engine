@@ -4,6 +4,7 @@ use crate::{
     discriminator::Discriminant,
     env::Env,
     format_utils::{Backticks, LogicOp, Missing},
+    string_pattern::{DisplayPatternRoot, StringPattern},
     string_types::ParseError,
     value::{Data, Value},
     DefId,
@@ -132,6 +133,22 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
         } else {
             Err(())
         }
+    }
+}
+
+pub struct StringPatternMatcher<'e> {
+    pub pattern: &'e StringPattern,
+    pub def_id: DefId,
+}
+
+impl<'e> ValueMatcher for StringPatternMatcher<'e> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", DisplayPatternRoot(self.pattern))
+    }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        let data = self.pattern.try_match(str).map_err(|_| ())?;
+        Ok(Value::new(data, self.def_id))
     }
 }
 

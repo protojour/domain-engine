@@ -6,6 +6,7 @@ use ontol_runtime::{
         MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType,
         ValueUnionDiscriminator, ValueUnionType,
     },
+    string_pattern::{StringPattern, StringPatternId},
     DefId, Role,
 };
 use smallvec::SmallVec;
@@ -27,6 +28,7 @@ pub struct SerdeGenerator<'c, 'm> {
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     array_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
+    string_patterns: HashMap<StringPattern, StringPatternId>,
 }
 
 impl<'m> Compiler<'m> {
@@ -38,13 +40,34 @@ impl<'m> Compiler<'m> {
             serde_operators: Default::default(),
             serde_operators_per_def: Default::default(),
             array_operators: Default::default(),
+            string_patterns: Default::default(),
         }
     }
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
-    pub fn finish(self) -> (Vec<SerdeOperator>, HashMap<DefId, SerdeOperatorId>) {
-        (self.serde_operators, self.serde_operators_per_def)
+    pub fn finish(
+        self,
+    ) -> (
+        Vec<SerdeOperator>,
+        HashMap<DefId, SerdeOperatorId>,
+        Vec<StringPattern>,
+    ) {
+        let mut string_patterns_sortable = Vec::with_capacity(self.string_patterns.len());
+
+        for (string_pattern, id) in self.string_patterns {
+            string_patterns_sortable.push((id, string_pattern));
+        }
+        string_patterns_sortable.sort_by_key(|(id, _)| id.0);
+
+        (
+            self.serde_operators,
+            self.serde_operators_per_def,
+            string_patterns_sortable
+                .into_iter()
+                .map(|(_, pattern)| pattern)
+                .collect(),
+        )
     }
 
     pub fn get_serde_operator_id(&mut self, type_def_id: DefId) -> Option<SerdeOperatorId> {
@@ -83,9 +106,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert_eq!(type_def_id, *def_id);
 
                 let literal = self.defs.get_string_literal(*def_id);
+                let string_pattern_id =
+                    self.alloc_string_pattern_id(StringPattern::Literal(literal.into()));
+
                 Some((
                     self.alloc_operator_id(*def_id),
-                    SerdeOperator::StringConstant(literal.into(), type_def_id),
+                    // SerdeOperator::StringConstant(literal.into(), type_def_id),
+                    SerdeOperator::StringPattern(string_pattern_id, type_def_id),
                 ))
             }
             Some(Type::Uuid(_)) => Some((
@@ -128,6 +155,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         self.serde_operators.push(SerdeOperator::Unit);
         self.serde_operators_per_def.insert(def_id, operator_id);
         operator_id
+    }
+
+    fn alloc_string_pattern_id(&mut self, string_pattern: StringPattern) -> StringPatternId {
+        if let Some(id) = self.string_patterns.get(&string_pattern) {
+            return *id;
+        }
+        let id = StringPatternId(self.string_patterns.len() as u32);
+        self.string_patterns.insert(string_pattern, id);
+        id
     }
 
     fn create_domain_type_serde_operator(

@@ -4,6 +4,7 @@ use std::fmt::Write;
 
 use crate::{
     cast::Cast,
+    string_pattern::FormatPattern,
     value::{Attribute, Data, FormatStringData, Value},
 };
 
@@ -35,6 +36,20 @@ impl<'e> SerdeProcessor<'e> {
                     serializer.serialize_str(&buf)
                 }
             },
+            SerdeOperator::StringPattern(pattern_id, _) => {
+                let pattern = &self.env.string_patterns[pattern_id.0 as usize];
+                let mut buf = String::new();
+                write!(
+                    &mut buf,
+                    "{}",
+                    FormatPattern {
+                        pattern,
+                        data: &value.data
+                    }
+                )
+                .unwrap();
+                serializer.serialize_str(&buf)
+            }
             SerdeOperator::Sequence(ranges, _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), ranges, serializer)
             }

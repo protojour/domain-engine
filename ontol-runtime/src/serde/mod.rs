@@ -9,6 +9,7 @@ use crate::{
     discriminator::VariantDiscriminator,
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
+    string_pattern::{DisplayPatternRoot, StringPatternId},
     value::PropertyId,
     DefId,
 };
@@ -51,6 +52,7 @@ pub enum SerdeOperator {
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),
+    StringPattern(StringPatternId, DefId),
     Sequence(SmallVec<[SequenceRange; 3]>, DefId),
     // A type with just one anonymous property
     ValueType(ValueType),
@@ -125,6 +127,10 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
+            SerdeOperator::StringPattern(pattern_id, _) => {
+                let pattern = &self.env.string_patterns[pattern_id.0 as usize];
+                write!(f, "{}", DisplayPatternRoot(pattern))
+            }
             SerdeOperator::Sequence(ranges, _) => {
                 let mut processors = vec![];
                 let mut finite = true;
