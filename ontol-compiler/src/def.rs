@@ -8,7 +8,9 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    relation::RelationshipId,
+    pattern::StringPatternSegment,
+    regex::uuid_regex,
+    relation::{Constructor, RelationshipId},
     source::{Package, SourceSpan, CORE_PKG},
     types::{Type, TypeRef},
 };
@@ -391,6 +393,11 @@ impl<'m> Compiler<'m> {
             DefKind::CoreFn(BuiltinProc::Append),
             string_string_to_string,
         );
+
+        // string-like types
+        self.relations
+            .properties_by_type_mut(self.defs.uuid)
+            .constructor = Constructor::StringPattern(StringPatternSegment::Regex(uuid_regex()));
 
         self
     }

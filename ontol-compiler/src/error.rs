@@ -97,6 +97,8 @@ pub enum CompileError {
     UnsupportedSequenceIndexType,
     #[error("constructor mismatch")]
     ConstructorMismatch,
+    #[error("cannot concatenate string pattern")]
+    CannotConcatenateStringPattern,
 }
 
 #[derive(Debug)]

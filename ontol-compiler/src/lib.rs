@@ -23,6 +23,7 @@ mod lowering;
 mod namespace;
 mod parse;
 mod pattern;
+mod regex;
 mod relation;
 mod sequence;
 mod source;

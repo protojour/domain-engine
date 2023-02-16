@@ -1,3 +1,6 @@
+use assert_matches::assert_matches;
+use ontol_runtime::value::Data;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 
@@ -31,6 +34,36 @@ fn concatenated_constant_string_pattern() {
         assert_error_msg!(
             foobar.deserialize_data(json!("fooba")),
             r#"invalid type: string "fooba", expected string matching /\Afoobar\z/ at line 1 column 7"#
+        );
+    })
+}
+
+#[test]
+fn uuid_in_string_pattern() {
+    "
+    (type! foo)
+    (rel! '' { 'foo/' } { uuid } foo)
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+
+        let data = foo.deserialize_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")).unwrap();
+
+        // FIXME: Map should have one property
+        assert_matches!(
+            &data,
+            Data::Map(map) if map.is_empty()
+        );
+
+        // FIXME: Should contain the UUID:
+        assert_eq!(
+            foo.serialize_data_json(env, &data),
+            json!("foo/")
+        );
+
+        assert_error_msg!(
+            foo.deserialize_data(json!("foo")),
+            r#"invalid type: string "foo", expected string matching /\Afoo/[0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12}\z/ at line 1 column 5"#
         );
     })
 }

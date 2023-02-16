@@ -36,6 +36,12 @@ pub struct Properties {
     pub map: MapProperties,
 }
 
+impl Properties {
+    pub fn constructor(&self) -> &Constructor {
+        &self.constructor
+    }
+}
+
 #[derive(Default, Debug)]
 pub enum Constructor {
     #[default]

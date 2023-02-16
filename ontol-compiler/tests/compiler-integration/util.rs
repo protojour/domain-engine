@@ -69,6 +69,10 @@ impl<'e> TypeBinding<'e> {
         Ok(value)
     }
 
+    pub fn serialize_data_json(&self, env: &Env, data: &Data) -> serde_json::Value {
+        self.serialize_json(env, &Value::new(data.clone(), self.def_id))
+    }
+
     pub fn serialize_json(&self, env: &Env, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         env.new_serde_processor(self.serde_operator_id)

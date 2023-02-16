@@ -9,7 +9,7 @@ use crate::{
     error::CompileError,
     mem::Intern,
     pattern::StringPatternSegment,
-    relation::{Constructor, MapProperties, RelationshipId},
+    relation::{Constructor, MapProperties, Properties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -135,7 +135,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (RelationIdent::Named(_), MapProperties::Empty, Constructor::StringPattern(_)) => {
+            (
+                RelationIdent::Named(_) | RelationIdent::Typed(_),
+                MapProperties::Empty,
+                Constructor::StringPattern(_),
+            ) => {
                 debug!("should concatenate string pattern");
             }
             _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
@@ -284,7 +288,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relation: &Relation,
         object_def: DefId,
         object_ty: TypeRef<'m>,
-        prefix: StringPatternSegment,
+        origin: StringPatternSegment,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let rel_def_id = match relation.ident {
@@ -292,9 +296,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => todo!(),
         };
 
-        let string = match self.defs.get_def_kind(rel_def_id) {
-            Some(DefKind::StringLiteral(str)) => str,
-            other => todo!("add {other:?} to string pattern"),
+        let appendee = match self.defs.get_def_kind(rel_def_id) {
+            Some(DefKind::StringLiteral(str)) => StringPatternSegment::literal(str),
+            _ => {
+                match self
+                    .relations
+                    .properties_by_type(rel_def_id)
+                    .map(Properties::constructor)
+                {
+                    Some(Constructor::StringPattern(rel_segment)) => rel_segment.clone(),
+                    _ => {
+                        return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
+                    }
+                }
+            }
         };
 
         let object_properties = self.relations.properties_by_type_mut(object_def);
@@ -302,10 +317,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match &mut object_properties.constructor {
             Constructor::Identity => {
                 object_properties.constructor =
-                    Constructor::StringPattern(StringPatternSegment::concat([
-                        prefix,
-                        StringPatternSegment::literal(string),
-                    ]));
+                    Constructor::StringPattern(StringPatternSegment::concat([origin, appendee]));
 
                 if !object_ty.is_anonymous() {
                     // constructors of unnamable types do not need to be processed..
