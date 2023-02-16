@@ -1,4 +1,5 @@
 use serde_json::json;
+use test_log::test;
 
 use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile};
 
@@ -26,10 +27,10 @@ fn concatenated_constant_string_pattern() {
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
-        assert_json_io_matches!(foobar, json!("foo"));
+        assert_json_io_matches!(foobar, json!("foobar"));
         assert_error_msg!(
-            foobar.deserialize_data(json!("fo")),
-            r#"invalid type: string "fo", expected string matching /\Afoo\z/ at line 1 column 4"#
+            foobar.deserialize_data(json!("fooba")),
+            r#"invalid type: string "fooba", expected string matching /\Afoobar\z/ at line 1 column 7"#
         );
     })
 }

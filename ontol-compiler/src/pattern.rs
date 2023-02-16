@@ -15,7 +15,7 @@ pub struct Patterns {
     pub string_patterns: HashMap<DefId, StringPattern>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub enum StringPatternSegment {
     #[default]
     Empty,

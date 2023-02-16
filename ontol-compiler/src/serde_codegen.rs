@@ -110,7 +110,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(Type::Domain(def_id) | Type::DomainEntity(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::DomainType(ident) | DefKind::DomainEntity(ident)) => ident,
+                    Some(DefKind::DomainType(Some(ident))) => ident,
+                    Some(DefKind::DomainType(None)) => "anonymous",
+                    Some(DefKind::DomainEntity(ident)) => ident,
                     _ => "Unknown type",
                 };
                 let operator_id = self.alloc_operator_id(type_def_id);
@@ -120,6 +122,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ))
             }
             Some(Type::Function { .. }) => None,
+            Some(Type::Anonymous(_)) => None,
             Some(Type::Tautology | Type::Infer(_) | Type::Error) => {
                 panic!("crap: {:?}", self.get_def_type(type_def_id));
             }

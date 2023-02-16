@@ -23,8 +23,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .expect("BUG: definition not found");
 
         match &def.kind {
-            DefKind::DomainType(_) => {
+            DefKind::DomainType(Some(_ident)) => {
                 let ty = self.types.intern(Type::Domain(def_id));
+                self.def_types.map.insert(def_id, ty);
+                ty
+            }
+            DefKind::DomainType(None) => {
+                let ty = self.types.intern(Type::Anonymous(def_id));
                 self.def_types.map.insert(def_id, ty);
                 ty
             }

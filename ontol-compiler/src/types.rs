@@ -41,6 +41,7 @@ pub enum Type<'m> {
     },
     // User-defined data type from a domain:
     Domain(DefId),
+    Anonymous(DefId),
     DomainEntity(DefId),
     Infer(TypeVar<'m>),
     Error,
@@ -62,9 +63,17 @@ impl<'m> Type<'m> {
             Self::Option(_) => None,
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
+            Self::Anonymous(def_id) => Some(*def_id),
             Self::DomainEntity(def_id) => Some(*def_id),
             Self::Infer(_) => None,
             Self::Error => None,
+        }
+    }
+
+    pub fn is_anonymous(&self) -> bool {
+        match self {
+            Self::Anonymous(_) => true,
+            _ => false,
         }
     }
 }
@@ -173,6 +182,9 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                     .opt_identifier()
                     .unwrap();
                 write!(f, "{ident}")
+            }
+            Type::Anonymous(_) => {
+                write!(f, "anonymous")
             }
             Type::Infer(_) => write!(f, "?infer"),
             Type::Error => write!(f, "error!"),
