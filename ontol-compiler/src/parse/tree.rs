@@ -21,6 +21,7 @@ pub enum Tree {
     Sym(String),
     Num(String),
     StringLiteral(String),
+    Regex(String),
     Comment(String),
 }
 
@@ -37,6 +38,7 @@ impl Display for Tree {
             Self::Sym(_) => write!(f, "symbol"),
             Self::Num(_) => write!(f, "number"),
             Self::StringLiteral(_) => write!(f, "string literal"),
+            Self::Regex(_) => write!(f, "regex"),
             Self::Comment(_) => write!(f, "comment"),
         }
     }
@@ -68,6 +70,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(num())
             .or(double_quote_string_literal().map(Tree::StringLiteral))
             .or(single_quote_string_literal().map(Tree::StringLiteral))
+            .or(regex())
             .or(ident().map(Tree::Sym))
             .or(comment());
 
@@ -119,6 +122,14 @@ fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
         .ignore_then(filter(|c: &char| *c != '\\' && *c != '\'').repeated())
         .then_ignore(just('\''))
         .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn regex() -> impl Parser<char, Tree, Error = Simple<char>> {
+    just('/')
+        .ignore_then(filter(|c: &char| *c != '/' && !c.is_whitespace()))
+        .chain::<char, Vec<_>, _>(filter(|c: &char| *c != '\\' && *c != '/').repeated())
+        .then_ignore(just('/'))
+        .map(|vec| Tree::Regex(String::from_iter(vec.into_iter())))
 }
 
 fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {

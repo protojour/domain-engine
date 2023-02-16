@@ -79,19 +79,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::String(type_def_id),
             )),
-            Some(Type::StringConstant(def_id)) => {
+            Some(Type::StringConstant(def_id) | Type::Regex(def_id)) => {
                 assert_eq!(type_def_id, *def_id);
 
-                let literal = self.defs.get_string_literal(*def_id);
-                /*
-                let string_pattern_id =
-                    self.alloc_string_pattern_id(StringPattern::Literal(literal.into()));
-                    */
+                let literal = self.defs.get_string_representation(*def_id);
 
                 Some((
                     self.alloc_operator_id(*def_id),
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
-                    // SerdeOperator::StringPattern(string_pattern_id, type_def_id),
                 ))
             }
             Some(Type::Uuid(_)) => Some((

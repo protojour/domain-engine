@@ -1,7 +1,14 @@
-use regex_syntax::hir::{
-    Class, ClassUnicode, ClassUnicodeRange, Hir, Literal, Repetition, RepetitionKind,
-    RepetitionRange,
+use crate::parse::Span;
+use ontol_runtime::smart_format;
+use regex_syntax::{
+    hir::{
+        Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Repetition, RepetitionKind,
+        RepetitionRange,
+    },
+    Parser,
 };
+use smartstring::alias::String;
+use tracing::debug;
 
 pub fn uuid_regex() -> Hir {
     let hex = Hir::class(Class::Unicode(ClassUnicode::new([
@@ -34,4 +41,42 @@ pub fn uuid_regex() -> Hir {
         opt_dash,
         repeat_exact(hex, 12),
     ])
+}
+
+pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
+    match hir.kind() {
+        HirKind::Literal(Literal::Unicode(char)) => parts.push(*char),
+        HirKind::Concat(hirs) => {
+            for child in hirs {
+                collect_hir_constant_parts(child, parts);
+            }
+        }
+        other => {
+            debug!("constant parts from {other:?}");
+        }
+    }
+}
+
+pub fn parse_regex_to_hir(re: &str, re_span: &Span) -> Result<Hir, (String, Span)> {
+    let mut parser = Parser::new();
+
+    fn project_span(ontol_span: &Span, regex_span: &regex_syntax::ast::Span) -> Span {
+        Span {
+            start: ontol_span.start + regex_span.start.offset,
+            end: ontol_span.start + regex_span.end.offset,
+        }
+    }
+
+    parser.parse(re).map_err(|err| match err {
+        regex_syntax::Error::Parse(err) => (
+            smart_format!("{}", err.kind()),
+            project_span(re_span, err.span()),
+        ),
+        regex_syntax::Error::Translate(err) => (
+            smart_format!("{}", err.kind()),
+            project_span(re_span, err.span()),
+        ),
+        // note: regex_syntax Error is a non-exhaustive enum
+        _ => panic!("BUG: unhandled regex error"),
+    })
 }

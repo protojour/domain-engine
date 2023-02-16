@@ -30,6 +30,7 @@ pub enum Type<'m> {
     String(DefId),
     /// A specific string
     StringConstant(DefId),
+    Regex(DefId),
     Uuid(DefId),
     Array(TypeRef<'m>),
     Option(TypeRef<'m>),
@@ -58,6 +59,7 @@ impl<'m> Type<'m> {
             Self::Number(def_id) => Some(*def_id),
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
+            Self::Regex(def_id) => Some(*def_id),
             Self::Uuid(def_id) => Some(*def_id),
             Self::Array(_) => None,
             Self::Option(_) => None,
@@ -163,6 +165,13 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 };
 
                 write!(f, "\"{lit}\"")
+            }
+            Type::Regex(def_id) => {
+                let Some(DefKind::Regex(lit)) = defs.get_def_kind(*def_id) else {
+                    panic!();
+                };
+
+                write!(f, "/{lit}/")
             }
             Type::Uuid(_) => write!(f, "uuid"),
             Type::Array(ty) => {

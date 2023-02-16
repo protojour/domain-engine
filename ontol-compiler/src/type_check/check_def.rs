@@ -43,6 +43,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
+            DefKind::Regex(_) => {
+                let ty = self.types.intern(Type::Regex(def_id));
+                self.def_types.map.insert(def_id, ty);
+                ty
+            }
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }

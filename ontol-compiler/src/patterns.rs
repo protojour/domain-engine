@@ -10,7 +10,7 @@ use smartstring::alias::String;
 use std::{collections::HashMap, fmt::Write};
 use tracing::debug;
 
-use crate::{compiler::Compiler, relation::Constructor};
+use crate::{compiler::Compiler, regex::collect_hir_constant_parts, relation::Constructor};
 
 #[derive(Default, Debug)]
 pub struct Patterns {
@@ -119,7 +119,13 @@ impl StringPatternSegment {
             Self::Literal(string) => {
                 parts.push(StringPatternConstantPart::Literal(string.clone()));
             }
-            Self::Regex(_) => {}
+            Self::Regex(hir) => {
+                let mut string = String::new();
+                collect_hir_constant_parts(hir, &mut string);
+                if !string.is_empty() {
+                    parts.push(StringPatternConstantPart::Literal(string));
+                }
+            }
             Self::Property {
                 property_id,
                 type_def_id,

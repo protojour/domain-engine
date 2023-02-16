@@ -69,6 +69,24 @@ fn uuid_in_string_pattern() {
 }
 
 #[test]
+fn test_simple_regex_pattern_constructor() {
+    "
+    (type! re)
+    (rel! '' { /a/ } { /bc*/ } re)
+    "
+    .compile_ok(|env| {
+        let re = TypeBinding::new(env, "re");
+        assert_json_io_matches!(re, json!("ab"));
+        assert_json_io_matches!(re, json!("abc"), json!("ab"));
+        assert_json_io_matches!(re, json!("abccccc"), json!("ab"));
+        assert_error_msg!(
+            re.deserialize_data(json!("a")),
+            r#"invalid type: string "a", expected string matching /\Aabc*\z/ at line 1 column 3"#
+        );
+    });
+}
+
+#[test]
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "
@@ -100,7 +118,7 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     "
     (type! lol)
-    (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR parse error: expected end of list
+    (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR invalid regex: unrecognized flag
     "
     .compile_fail()
 }

@@ -99,6 +99,8 @@ pub enum CompileError {
     ConstructorMismatch,
     #[error("cannot concatenate string pattern")]
     CannotConcatenateStringPattern,
+    #[error("invalid regex: {0}")]
+    InvalidRegex(String),
 }
 
 #[derive(Debug)]

@@ -298,6 +298,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let appendee = match self.defs.get_def_kind(rel_def_id) {
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::literal(str),
+            Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
+                self.defs
+                    .literal_regex_hirs
+                    .get(&rel_def_id)
+                    .expect("regex hir not found for literal regex")
+                    .clone(),
+            ),
             def_kind => {
                 match self
                     .relations

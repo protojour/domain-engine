@@ -2,16 +2,19 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId, RelationId};
 use smallvec::SmallVec;
+use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
+    parse::Span,
     patterns::StringPatternSegment,
-    regex::uuid_regex,
+    regex::{parse_regex_to_hir, uuid_regex},
     relation::{Constructor, RelationshipId},
     source::{Package, SourceSpan, CORE_PKG},
+    strings::Strings,
     types::{Type, TypeRef},
 };
 
@@ -29,6 +32,7 @@ pub enum DefKind<'m> {
     Primitive(Primitive),
     StringLiteral(&'m str),
     EmptySequence,
+    Regex(&'m str),
     DomainType(Option<&'m str>),
     DomainEntity(&'m str),
     Relation(Relation<'m>),
@@ -49,6 +53,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(Primitive::String) => Some("string".into()),
             Self::Primitive(Primitive::Uuid) => Some("uuid".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
+            Self::Regex(_) => None,
             Self::EmptySequence => None,
             Self::CoreFn(_) => None,
             Self::DomainType(opt_ident) => opt_ident.map(|ident| ident.into()),
@@ -180,6 +185,8 @@ pub struct Defs<'m> {
     uuid: DefId,
     pub(crate) map: HashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
+    pub(crate) regex_strings: HashMap<&'m str, DefId>,
+    pub(crate) literal_regex_hirs: HashMap<DefId, regex_syntax::hir::Hir>,
 }
 
 impl<'m> Defs<'m> {
@@ -198,6 +205,8 @@ impl<'m> Defs<'m> {
             uuid: DefId(0),
             map: Default::default(),
             string_literals: Default::default(),
+            regex_strings: Default::default(),
+            literal_regex_hirs: Default::default(),
         };
 
         defs.unit = defs.add_primitive(Primitive::Unit);
@@ -302,10 +311,11 @@ impl<'m> Defs<'m> {
         def_id
     }
 
-    pub fn def_string_literal(&mut self, lit: &'m str) -> DefId {
+    pub fn def_string_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
         match self.string_literals.get(&lit) {
             Some(def_id) => *def_id,
             None => {
+                let lit = strings.intern(lit);
                 let def_id =
                     self.add_def(DefKind::StringLiteral(lit), CORE_PKG, SourceSpan::none());
                 self.string_literals.insert(lit, def_id);
@@ -314,9 +324,30 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn get_string_literal(&self, def_id: DefId) -> &str {
+    pub fn def_regex(
+        &mut self,
+        lit: &str,
+        span: &Span,
+        strings: &mut Strings<'m>,
+    ) -> Result<DefId, (String, Span)> {
+        match self.regex_strings.get(&lit) {
+            Some(def_id) => Ok(*def_id),
+            None => {
+                let hir = parse_regex_to_hir(lit, span)?;
+                let lit = strings.intern(lit);
+                let def_id = self.add_def(DefKind::Regex(lit), CORE_PKG, SourceSpan::none());
+                self.regex_strings.insert(lit, def_id);
+                self.literal_regex_hirs.insert(def_id, hir);
+
+                Ok(def_id)
+            }
+        }
+    }
+
+    pub fn get_string_representation(&self, def_id: DefId) -> &str {
         match self.get_def_kind(def_id) {
             Some(DefKind::StringLiteral(lit)) => lit,
+            Some(DefKind::Regex(lit)) => lit,
             kind => panic!("BUG: not a string literal: {kind:?}"),
         }
     }

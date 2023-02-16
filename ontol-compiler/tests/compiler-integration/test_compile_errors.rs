@@ -417,3 +417,13 @@ fn invalid_relation_chain() {
     "#
     .compile_fail()
 }
+
+#[test]
+fn invalid_regex_gets_projected_span() {
+    // TODO: check exact span cursor
+    "
+    (type! lol)
+    (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR invalid regex: unrecognized flag
+    "
+    .compile_fail()
+}

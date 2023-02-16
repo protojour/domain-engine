@@ -84,7 +84,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     builder.string = StringDiscriminator::Any(variant_def);
                 }
                 Type::StringConstant(def_id) => {
-                    let string_literal = self.defs.get_string_literal(*def_id);
+                    let string_literal = self.defs.get_string_representation(*def_id);
                     builder.add_string_literal(string_literal, *def_id);
                 }
                 Type::Domain(domain_def_id) => {
@@ -226,7 +226,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     todo!("Cannot match against numeric constants yet");
                 }
                 Type::StringConstant(def_id) => {
-                    let string_literal = self.defs.get_string_literal(*def_id);
+                    let string_literal = self.defs.get_string_representation(*def_id);
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
                             relation_id: relationship.relation_id,

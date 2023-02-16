@@ -54,6 +54,7 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
             Ok((ty, type_span))
         }
         Tree::StringLiteral(lit) => Ok((Type::Literal(Literal::String(lit)), type_span)),
+        Tree::Regex(lit) => Ok((Type::Literal(Literal::Regex(lit)), type_span)),
         Tree::Underscore => Ok((Type::Unit, type_span)),
         Tree::Bracket(tree) => {
             if !tree.is_empty() {

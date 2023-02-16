@@ -80,6 +80,7 @@ pub enum Cardinality {
 pub enum Literal {
     String(String),
     Int(String),
+    Regex(String),
 }
 
 pub struct Path(pub Vec<Spanned<String>>);

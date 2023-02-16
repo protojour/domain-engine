@@ -262,11 +262,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Type::Literal(ast::Literal::String(lit)) => match lit.as_str() {
                 "" => Ok(self.compiler.defs.empty_string()),
-                _ => {
-                    let lit = self.compiler.strings.intern(&lit);
-                    Ok(self.compiler.defs.def_string_literal(lit))
-                }
+                _ => Ok(self
+                    .compiler
+                    .defs
+                    .def_string_literal(&lit, &mut self.compiler.strings)),
             },
+            ast::Type::Literal(ast::Literal::Regex(lit)) => self
+                .compiler
+                .defs
+                .def_regex(&lit, span, &mut self.compiler.strings)
+                .map_err(|(compile_error, err_span)| {
+                    self.error(CompileError::InvalidRegex(compile_error), &err_span)
+                }),
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
             ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
             ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
