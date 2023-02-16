@@ -45,10 +45,16 @@ macro_rules! assert_json_io_matches {
 }
 
 pub(crate) use assert_json_io_matches;
+use util::AnnotatedCompileError;
 
-trait TestCompile {
+trait TestCompile: Sized {
     fn compile_ok(self, validator: impl Fn(&Env));
-    fn compile_fail(self);
+
+    fn compile_fail(self) {
+        self.compile_fail_then(|_| {})
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
 impl TestCompile for &'static str {
@@ -68,7 +74,7 @@ impl TestCompile for &'static str {
         }
     }
 
-    fn compile_fail(self) {
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
         let mut mem = Mem::default();
         let mut compiler = Compiler::new(&mut mem).with_core();
         let compile_src = compiler
@@ -79,8 +85,25 @@ impl TestCompile for &'static str {
             panic!("Script did not fail to compile");
         };
 
-        util::diff_errors(self, compile_src, errors);
+        let annotated_errors = util::diff_errors(self, compile_src, errors);
+        validator(annotated_errors);
     }
+}
+
+#[test]
+#[should_panic(expected = "it works")]
+fn ok_validator_must_run() {
+    "".compile_ok(|_| {
+        panic!("it works");
+    })
+}
+
+#[test]
+#[should_panic(expected = "it works")]
+fn failure_validator_must_run() {
+    "( ;; ERROR lex error".compile_fail_then(|_| {
+        panic!("it works");
+    })
 }
 
 fn main() {}

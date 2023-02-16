@@ -1,4 +1,5 @@
 use crate::TestCompile;
+use pretty_assertions::assert_eq;
 use test_log::test;
 
 #[test]
@@ -266,7 +267,9 @@ fn eq_type_mismatch() {
         )
     )
     "
-    .compile_fail()
+    .compile_fail_then(|errors| {
+        assert_eq!("x", errors[0].span_text);
+    })
 }
 
 #[test]
@@ -419,11 +422,12 @@ fn invalid_relation_chain() {
 }
 
 #[test]
-fn invalid_regex_gets_projected_span() {
-    // TODO: check exact span cursor
+fn spans_are_correct_projected_from_regex_syntax_errors() {
     "
     (type! lol)
-    (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR invalid regex: unrecognized flag
+    (rel! _ { /abc(?P<42>.)/ } lol) ;; ERROR invalid regex: invalid capture group character
     "
-    .compile_fail()
+    .compile_fail_then(|errors| {
+        assert_eq!("4", errors[0].span_text);
+    })
 }

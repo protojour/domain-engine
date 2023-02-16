@@ -1,4 +1,7 @@
-use ontol_compiler::{error::UnifiedCompileError, CompileSrc, SpannedCompileError};
+use ontol_compiler::{
+    error::{CompileError, UnifiedCompileError},
+    CompileSrc, SpannedCompileError,
+};
 use ontol_runtime::{
     env::Env,
     serde::SerdeOperatorId,
@@ -103,7 +106,16 @@ struct DiagnosticsLine {
     errors: Vec<SpannedCompileError>,
 }
 
-pub fn diff_errors(source: &str, compile_src: CompileSrc, errors: UnifiedCompileError) {
+pub struct AnnotatedCompileError {
+    pub compile_error: CompileError,
+    pub span_text: String,
+}
+
+pub fn diff_errors(
+    source: &str,
+    compile_src: CompileSrc,
+    errors: UnifiedCompileError,
+) -> Vec<AnnotatedCompileError> {
     let mut builder = source
         .lines()
         .fold(DiagnosticBuilder::default(), |mut builder, line| {
@@ -143,15 +155,15 @@ pub fn diff_errors(source: &str, compile_src: CompileSrc, errors: UnifiedCompile
 
     let annotated_script = builder
         .lines
-        .into_iter()
+        .iter()
         .map(|line| {
-            let original = line.orig_stripped;
+            let original = &line.orig_stripped;
             if line.errors.is_empty() {
-                original
+                original.to_string()
             } else {
                 let joined_errors = line
                     .errors
-                    .into_iter()
+                    .iter()
                     .map(|spanned_error| format!(";; ERROR {}", spanned_error.error))
                     .collect::<Vec<_>>()
                     .join("");
@@ -162,4 +174,20 @@ pub fn diff_errors(source: &str, compile_src: CompileSrc, errors: UnifiedCompile
         .join("\n");
 
     pretty_assertions::assert_eq!(source, &annotated_script);
+
+    let mut annotated_errors = vec![];
+
+    for line in builder.lines {
+        for spanned_error in line.errors {
+            let text = compile_src.text.as_str();
+            let source = &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
+
+            annotated_errors.push(AnnotatedCompileError {
+                compile_error: spanned_error.error,
+                span_text: source.to_string(),
+            })
+        }
+    }
+
+    annotated_errors
 }

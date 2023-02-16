@@ -11,7 +11,7 @@ use crate::{
     namespace::Space,
     parse::Span,
     patterns::StringPatternSegment,
-    regex::{parse_regex_to_hir, uuid_regex},
+    regex::{parse_literal_regex_to_hir, uuid_regex},
     relation::{Constructor, RelationshipId},
     source::{Package, SourceSpan, CORE_PKG},
     strings::Strings,
@@ -333,7 +333,7 @@ impl<'m> Defs<'m> {
         match self.regex_strings.get(&lit) {
             Some(def_id) => Ok(*def_id),
             None => {
-                let hir = parse_regex_to_hir(lit, span)?;
+                let hir = parse_literal_regex_to_hir(lit, span)?;
                 let lit = strings.intern(lit);
                 let def_id = self.add_def(DefKind::Regex(lit), CORE_PKG, SourceSpan::none());
                 self.regex_strings.insert(lit, def_id);

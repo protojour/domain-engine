@@ -57,13 +57,15 @@ pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
     }
 }
 
-pub fn parse_regex_to_hir(re: &str, re_span: &Span) -> Result<Hir, (String, Span)> {
+pub fn parse_literal_regex_to_hir(re: &str, re_span: &Span) -> Result<Hir, (String, Span)> {
     let mut parser = Parser::new();
 
     fn project_span(ontol_span: &Span, regex_span: &regex_syntax::ast::Span) -> Span {
+        // literal regexes start with '/' so that's part of the ontol span,
+        // but regex-syntax never sees that, so add 1
         Span {
-            start: ontol_span.start + regex_span.start.offset,
-            end: ontol_span.start + regex_span.end.offset,
+            start: ontol_span.start + 1 + regex_span.start.offset,
+            end: ontol_span.start + 1 + regex_span.end.offset,
         }
     }
 
