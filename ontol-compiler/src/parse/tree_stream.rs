@@ -72,6 +72,22 @@ impl TreeStream {
         }
     }
 
+    pub fn peek_span(&mut self) -> Option<Span> {
+        loop {
+            match self.iterator.peek() {
+                Some((Tree::Comment(_), _)) => {
+                    self.iterator.next();
+                }
+                Some((_, span)) => {
+                    return Some(span.clone());
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+    }
+
     pub fn next<N: Next>(&mut self, msg: impl ToString) -> ParseResult<N::Data> {
         match self.next_opt() {
             Some((tree, span)) => match N::next((tree, span.clone())) {

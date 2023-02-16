@@ -403,3 +403,17 @@ fn invalid_subject_types() {
     "#
     .compile_fail()
 }
+
+#[test]
+fn invalid_relation_chain() {
+    r#"
+    (rel!
+        _ {_}
+        _ {_} {_}
+        _
+        _ ;; ERROR parse error: expected brace
+        {_}
+    )
+    "#
+    .compile_fail()
+}

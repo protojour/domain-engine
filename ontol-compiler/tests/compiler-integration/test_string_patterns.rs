@@ -19,6 +19,22 @@ fn constant_string_pattern() {
 }
 
 #[test]
+fn concatenated_constant_string_pattern() {
+    "
+    (type! foobar)
+    (rel! '' { 'foo' } { 'bar' } foobar)
+    "
+    .compile_ok(|env| {
+        let foobar = TypeBinding::new(env, "foobar");
+        assert_json_io_matches!(foobar, json!("foo"));
+        assert_error_msg!(
+            foobar.deserialize_data(json!("fo")),
+            r#"invalid type: string "fo", expected string matching /\Afoo\z/ at line 1 column 4"#
+        );
+    })
+}
+
+#[test]
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "

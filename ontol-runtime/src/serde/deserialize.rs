@@ -244,7 +244,6 @@ where
             .match_sequence()
             .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
 
-        let mut len = 0;
         let mut output = vec![];
 
         loop {
@@ -266,7 +265,6 @@ where
             match seq.next_element_seed(processor)? {
                 Some(attribute) => {
                     output.push(attribute);
-                    len += 1;
                 }
                 None => {
                     return match sequence_matcher.match_seq_end() {
@@ -274,7 +272,7 @@ where
                             data: Data::Sequence(output),
                             type_def_id: sequence_matcher.type_def_id,
                         })),
-                        Err(_) => Err(serde::de::Error::invalid_length(len, &self)),
+                        Err(_) => Err(serde::de::Error::invalid_length(output.len(), &self)),
                     };
                 }
             }

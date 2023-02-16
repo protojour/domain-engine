@@ -47,19 +47,25 @@ pub enum Type {
 
 pub struct Relationship {
     pub subject: Spanned<Type>,
-    pub relation: Relation,
+    pub connection: Connection,
+    pub chain: Vec<RelationshipChain>,
     pub object: Spanned<Type>,
 }
 
-pub struct Relation {
-    pub ty: Spanned<RelationType>,
+pub struct RelationshipChain {
+    pub subject: Option<Spanned<Type>>,
+    pub connection: Connection,
+}
+
+pub struct Connection {
+    pub ty: Spanned<ConnectionType>,
     pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
     pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
 }
 
-pub enum RelationType {
+pub enum ConnectionType {
     Type(Spanned<Type>),
     IntRange(Range<Option<u16>>),
 }

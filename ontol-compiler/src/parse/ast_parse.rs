@@ -68,25 +68,45 @@ fn parse_type(stream: &mut TreeStream) -> ParseResult<Type> {
 fn parse_relationship(mut stream: TreeStream) -> ParseResult<Ast> {
     let span = stream.span();
     let subject = parse_type(&mut stream)?;
-    let relation = parse_relation(&mut stream)?;
-    let object = parse_type(&mut stream)?;
+    let connection = parse_connection(&mut stream)?;
+
+    let mut chain = vec![];
+    let mut object = None;
+
+    while let Some(next_span) = stream.peek_span() {
+        if stream.peek::<Brace>() {
+            chain.push(RelationshipChain {
+                subject: object,
+                connection: parse_connection(&mut stream)?,
+            });
+            object = None;
+        } else if object.is_none() {
+            object = Some(parse_type(&mut stream)?);
+        } else {
+            return Err(error("expected brace", next_span));
+        }
+    }
+
     stream.end()?;
+
+    let object = object.ok_or_else(|| error("expected object type", stream.remain_span()))?;
 
     Ok((
         Ast::Relationship(Box::new(Relationship {
             subject,
-            relation,
+            connection,
+            chain,
             object,
         })),
         span,
     ))
 }
 
-fn parse_relation(stream: &mut TreeStream) -> Result<Relation, Simple<Tree>> {
+fn parse_connection(stream: &mut TreeStream) -> Result<Connection, Simple<Tree>> {
     let (brace, brace_span) = stream.next::<Brace>("expected brace")?;
     let mut brace = TreeStream::new(brace, brace_span);
 
-    let ident = RelationType::parse(&mut brace, "expected string literal or range")?;
+    let ty = ConnectionType::parse(&mut brace, "expected string literal or range")?;
     let subject_cardinality = parse_optional_cardinality(&mut brace)?;
 
     let (object_prop_ident, object_cardinality) = if brace.peek::<StringLiteral>() {
@@ -107,8 +127,8 @@ fn parse_relation(stream: &mut TreeStream) -> Result<Relation, Simple<Tree>> {
 
     brace.end()?;
 
-    Ok(Relation {
-        ty: ident,
+    Ok(Connection {
+        ty,
         subject_cardinality,
         rel_params,
         object_cardinality,
@@ -250,7 +270,7 @@ fn parse_list_expr(mut input: TreeStream) -> ParseResult<Expr> {
     }
 }
 
-impl RelationType {
+impl ConnectionType {
     fn parse(input: &mut TreeStream, _: impl ToString) -> ParseResult<Self> {
         if input.peek::<Num>() {
             let (num, span) = input.next::<Num>("").unwrap();

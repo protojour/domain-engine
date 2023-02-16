@@ -72,14 +72,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Ast::Relationship(rel) => {
                 let ast::Relationship {
                     subject,
-                    relation:
-                        ast::Relation {
+                    connection:
+                        ast::Connection {
                             ty: relation_ty,
                             subject_cardinality,
                             object_prop_ident,
                             object_cardinality,
                             rel_params,
                         },
+                    chain: _,
                     object,
                 } = *rel;
 
@@ -91,7 +92,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     _,
                     Option<Range<Option<u16>>>,
                 ) = match relation_ty {
-                    (ast::RelationType::Type((ast_ty, span)), _) => {
+                    (ast::ConnectionType::Type((ast_ty, span)), _) => {
                         let def_id = self.ast_type_to_def(ast_ty, &span)?;
 
                         match self.compiler.defs.get_def_kind(def_id) {
@@ -101,7 +102,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             _ => (RelationIdent::Typed(def_id), span, None),
                         }
                     }
-                    (ast::RelationType::IntRange(range), span) => {
+                    (ast::ConnectionType::IntRange(range), span) => {
                         (RelationIdent::Indexed, span, Some(range))
                     }
                 };
