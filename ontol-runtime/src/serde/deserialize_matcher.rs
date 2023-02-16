@@ -4,7 +4,7 @@ use crate::{
     discriminator::Discriminant,
     env::Env,
     format_utils::{Backticks, LogicOp, Missing},
-    string_pattern::{DisplayPatternRoot, StringPattern},
+    string_pattern::StringPattern,
     string_types::ParseError,
     value::{Data, Value},
     DefId,
@@ -143,7 +143,7 @@ pub struct StringPatternMatcher<'e> {
 
 impl<'e> ValueMatcher for StringPatternMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", DisplayPatternRoot(self.pattern))
+        write!(f, "string matching /{}/", self.pattern.regex)
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {

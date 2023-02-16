@@ -1,12 +1,21 @@
-use crate::TestCompile;
+use serde_json::json;
+
+use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile};
 
 #[test]
-fn simple_string_pattern() {
+fn constant_string_pattern() {
     "
     (type! foo)
     (rel! '' { 'foo' } foo)
     "
-    .compile_ok(|env| {})
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(foo, json!("foo"));
+        assert_error_msg!(
+            foo.deserialize_data(json!("fo")),
+            r#"invalid type: string "fo", expected string matching /\Afoo\z/ at line 1 column 4"#
+        );
+    })
 }
 
 #[test]

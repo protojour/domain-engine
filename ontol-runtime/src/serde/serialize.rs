@@ -36,8 +36,8 @@ impl<'e> SerdeProcessor<'e> {
                     serializer.serialize_str(&buf)
                 }
             },
-            SerdeOperator::StringPattern(pattern_id, _) => {
-                let pattern = &self.env.string_patterns[pattern_id.0 as usize];
+            SerdeOperator::StringPattern(def_id) => {
+                let pattern = &self.env.string_patterns.get(def_id).unwrap();
                 let mut buf = String::new();
                 write!(
                     &mut buf,

@@ -1,4 +1,7 @@
-use ontol_runtime::{string_pattern::StringPattern2, DefId};
+use ontol_runtime::{
+    string_pattern::{StringPattern, StringPatternConstantPart},
+    DefId,
+};
 use regex::Regex;
 use regex_syntax::hir::{Anchor, Hir, Literal};
 use smartstring::alias::String;
@@ -9,7 +12,7 @@ use crate::{compiler::Compiler, relation::Constructor};
 
 #[derive(Default, Debug)]
 pub struct Patterns {
-    pub string_patterns: HashMap<DefId, StringPattern2>,
+    pub string_patterns: HashMap<DefId, StringPattern>,
 }
 
 #[derive(Default, Debug)]
@@ -91,6 +94,23 @@ impl StringPatternSegment {
             ),
         }
     }
+
+    fn collect_constant_parts(&self, parts: &mut Vec<StringPatternConstantPart>) {
+        match self {
+            Self::Empty => {}
+            Self::Literal(string) => {
+                parts.push(StringPatternConstantPart::Literal(string.clone()));
+            }
+            Self::Regex(_) => {}
+            Self::Property => todo!(),
+            Self::Concat(segments) => {
+                for segment in segments {
+                    segment.collect_constant_parts(parts);
+                }
+            }
+            Self::Alternation(_) => {}
+        }
+    }
 }
 
 pub fn process_patterns(compiler: &mut Compiler) {
@@ -119,11 +139,14 @@ pub fn process_patterns(compiler: &mut Compiler) {
 
         let regex = Regex::new(&regex_string).unwrap();
 
+        let mut constant_parts = vec![];
+        segment.collect_constant_parts(&mut constant_parts);
+
         compiler.patterns.string_patterns.insert(
             def_id,
-            StringPattern2 {
+            StringPattern {
                 regex,
-                properties: vec![],
+                constant_parts,
             },
         );
     }
