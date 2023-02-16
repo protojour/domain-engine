@@ -30,14 +30,17 @@ pub(crate) use assert_error_msg;
 
 macro_rules! assert_json_io_matches {
     ($binding:expr, $json:expr) => {
-        let input = $json;
+        assert_json_io_matches!($binding, $json, $json);
+    };
+    ($binding:expr, $input:expr, $expected_output:expr) => {
+        let input = $input;
         let value = match $binding.deserialize_value(input.clone()) {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };
         let output = crate::util::serialize_json($binding.env(), &value);
 
-        pretty_assertions::assert_eq!(input, output);
+        pretty_assertions::assert_eq!($expected_output, output);
     };
 }
 

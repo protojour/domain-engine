@@ -1,14 +1,14 @@
-use ontol_runtime::{value::PropertyId, DefId, RelationId};
+use ontol_runtime::{string_types::StringLikeType, value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
     def::{
-        Cardinality, Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship,
-        ValueCardinality,
+        Cardinality, Def, DefKind, Primitive, PropertyCardinality, Relation, RelationIdent,
+        Relationship, ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
-    pattern::StringPatternSegment,
+    patterns::StringPatternSegment,
     relation::{Constructor, MapProperties, Properties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
@@ -206,7 +206,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
                 if let Err(e) = self.extend_string_pattern_constructor(
-                    relation.1,
+                    relation,
                     object.0,
                     object_ty,
                     StringPatternSegment::Empty,
@@ -224,7 +224,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match subject_constructor {
                     Some(Constructor::StringPattern(subject_pattern)) => {
                         if let Err(e) = self.extend_string_pattern_constructor(
-                            relation.1,
+                            relation,
                             object.0,
                             object_ty,
                             subject_pattern.clone(),
@@ -285,26 +285,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn extend_string_pattern_constructor(
         &mut self,
-        relation: &Relation,
+        relation: (RelationId, &Relation),
         object_def: DefId,
         object_ty: TypeRef<'m>,
         origin: StringPatternSegment,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
-        let rel_def_id = match relation.ident {
+        let rel_def_id = match relation.1.ident {
             RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
             _ => todo!(),
         };
 
         let appendee = match self.defs.get_def_kind(rel_def_id) {
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::literal(str),
-            _ => {
+            def_kind => {
                 match self
                     .relations
                     .properties_by_type(rel_def_id)
                     .map(Properties::constructor)
                 {
-                    Some(Constructor::StringPattern(rel_segment)) => rel_segment.clone(),
+                    Some(Constructor::StringPattern(rel_segment)) => {
+                        StringPatternSegment::Property {
+                            property_id: PropertyId::subject(relation.0),
+                            type_def_id: rel_def_id,
+                            // FIXME: Should be a common place to compute this:
+                            string_like_type: match def_kind {
+                                Some(DefKind::Primitive(Primitive::Uuid)) => {
+                                    Some(StringLikeType::Uuid)
+                                }
+                                _ => None,
+                            },
+                            segment: Box::new(rel_segment.clone()),
+                        }
+                    }
                     _ => {
                         return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
                     }

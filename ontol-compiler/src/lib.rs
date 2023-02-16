@@ -7,7 +7,7 @@ use error::{ChumskyError, CompileError, UnifiedCompileError};
 pub use error::*;
 use lowering::Lowering;
 use ontol_runtime::PackageId;
-use pattern::process_patterns;
+use patterns::process_patterns;
 pub use source::*;
 
 pub mod compiler;
@@ -22,7 +22,7 @@ mod expr;
 mod lowering;
 mod namespace;
 mod parse;
-mod pattern;
+mod patterns;
 mod regex;
 mod relation;
 mod sequence;

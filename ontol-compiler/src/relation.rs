@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId};
 
-use crate::{def::Cardinality, pattern::StringPatternSegment, sequence::Sequence, SourceSpan};
+use crate::{def::Cardinality, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RelationshipId(pub DefId);

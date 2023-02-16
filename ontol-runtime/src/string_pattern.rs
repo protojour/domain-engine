@@ -2,10 +2,11 @@ use std::{collections::BTreeMap, fmt::Display};
 
 use regex::Regex;
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     string_types::{ParseError, StringLikeType},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, FormatStringData, PropertyId, Value},
     DefId,
 };
 
@@ -30,6 +31,8 @@ impl StringPattern {
             for part in &self.constant_parts {
                 match part {
                     StringPatternConstantPart::Property(property) => {
+                        debug!("fetching capture group {}", property.capture_group);
+
                         let text = captures
                             .get(property.capture_group)
                             .expect("expected property match")
@@ -61,10 +64,10 @@ pub enum StringPatternConstantPart {
 
 #[derive(Debug)]
 pub struct StringPatternProperty {
-    property_id: PropertyId,
-    type_def_id: DefId,
-    capture_group: usize,
-    string_type: Option<StringLikeType>,
+    pub property_id: PropertyId,
+    pub type_def_id: DefId,
+    pub capture_group: usize,
+    pub string_type: Option<StringLikeType>,
 }
 
 pub struct FormatPattern<'a> {
@@ -75,9 +78,20 @@ pub struct FormatPattern<'a> {
 impl<'a> Display for FormatPattern<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
-            match constant_part {
-                StringPatternConstantPart::Property(_property) => todo!(),
-                StringPatternConstantPart::Literal(string) => write!(f, "{string}")?,
+            match (constant_part, self.data) {
+                (
+                    StringPatternConstantPart::Property(StringPatternProperty {
+                        property_id, ..
+                    }),
+                    Data::Map(map),
+                ) => {
+                    let attribute = map.get(property_id).unwrap();
+                    write!(f, "{}", FormatStringData(&attribute.value.data))?;
+                }
+                (StringPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,
+                (part, data) => {
+                    panic!("unable to format pattern - mismatch between {part:?} and {data:?}")
+                }
             }
         }
         Ok(())

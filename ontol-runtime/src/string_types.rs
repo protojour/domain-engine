@@ -5,7 +5,7 @@ use crate::{
     DefId,
 };
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum StringLikeType {
     Uuid,
 }

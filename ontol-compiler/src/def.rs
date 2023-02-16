@@ -8,7 +8,7 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    pattern::StringPatternSegment,
+    patterns::StringPatternSegment,
     regex::uuid_regex,
     relation::{Constructor, RelationshipId},
     source::{Package, SourceSpan, CORE_PKG},

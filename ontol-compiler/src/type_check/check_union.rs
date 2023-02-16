@@ -14,7 +14,7 @@ use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
-    pattern::StringPatternSegment,
+    patterns::StringPatternSegment,
     relation::{Constructor, MapProperties},
     sequence::Sequence,
     types::{FormatType, Type},

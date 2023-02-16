@@ -1,9 +1,11 @@
 use ontol_runtime::{
-    string_pattern::{StringPattern, StringPatternConstantPart},
+    string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
+    string_types::StringLikeType,
+    value::PropertyId,
     DefId,
 };
 use regex::Regex;
-use regex_syntax::hir::{Anchor, Hir, Literal};
+use regex_syntax::hir::{Anchor, Group, GroupKind, Hir, Literal};
 use smartstring::alias::String;
 use std::{collections::HashMap, fmt::Write};
 use tracing::debug;
@@ -21,7 +23,12 @@ pub enum StringPatternSegment {
     Empty,
     Literal(String),
     Regex(Hir),
-    Property,
+    Property {
+        property_id: PropertyId,
+        type_def_id: DefId,
+        string_like_type: Option<StringLikeType>,
+        segment: Box<StringPatternSegment>,
+    },
     Concat(Vec<StringPatternSegment>),
     Alternation(Vec<StringPatternSegment>),
 }
@@ -69,7 +76,7 @@ impl StringPatternSegment {
         }
     }
 
-    fn to_regex_hir(&self) -> Hir {
+    fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
             Self::Empty => Hir::empty(),
             Self::Literal(string) => Hir::concat(
@@ -79,33 +86,57 @@ impl StringPatternSegment {
                     .collect(),
             ),
             Self::Regex(hir) => hir.clone(),
-            Self::Property => todo!(),
+            Self::Property { segment, .. } => {
+                let index = capture_cursor.increment();
+                debug!("creating capture group with index {index}");
+                Hir::group(Group {
+                    kind: GroupKind::CaptureIndex(index),
+                    hir: Box::new(segment.to_regex_hir(capture_cursor)),
+                })
+            }
             Self::Concat(segments) => Hir::concat(
                 segments
                     .iter()
-                    .map(|segment| segment.to_regex_hir())
+                    .map(|segment| segment.to_regex_hir(capture_cursor))
                     .collect(),
             ),
             Self::Alternation(segments) => Hir::alternation(
                 segments
                     .iter()
-                    .map(|segment| segment.to_regex_hir())
+                    .map(|segment| segment.to_regex_hir(capture_cursor))
                     .collect(),
             ),
         }
     }
 
-    fn collect_constant_parts(&self, parts: &mut Vec<StringPatternConstantPart>) {
+    fn collect_constant_parts(
+        &self,
+        parts: &mut Vec<StringPatternConstantPart>,
+        capture_cursor: &mut CaptureCursor,
+    ) {
         match self {
             Self::Empty => {}
             Self::Literal(string) => {
                 parts.push(StringPatternConstantPart::Literal(string.clone()));
             }
             Self::Regex(_) => {}
-            Self::Property => todo!(),
+            Self::Property {
+                property_id,
+                type_def_id,
+                string_like_type,
+                ..
+            } => {
+                let index = capture_cursor.increment();
+                parts.push(StringPatternConstantPart::Property(StringPatternProperty {
+                    property_id: *property_id,
+                    type_def_id: *type_def_id,
+                    capture_group: index as usize,
+                    string_type: string_like_type.clone(),
+                }));
+            }
             Self::Concat(segments) => {
                 for segment in segments {
-                    segment.collect_constant_parts(parts);
+                    segment.collect_constant_parts(parts, capture_cursor);
                 }
             }
             Self::Alternation(_) => {}
@@ -126,10 +157,9 @@ pub fn process_patterns(compiler: &mut Compiler) {
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 
-        let hir = segment.to_regex_hir();
         let anchored_hir = Hir::concat(vec![
             Hir::anchor(Anchor::StartText),
-            hir,
+            segment.to_regex_hir(&mut CaptureCursor(1)),
             Hir::anchor(Anchor::EndText),
         ]);
         debug!("{def_id:?} regex: {anchored_hir}");
@@ -140,7 +170,7 @@ pub fn process_patterns(compiler: &mut Compiler) {
         let regex = Regex::new(&regex_string).unwrap();
 
         let mut constant_parts = vec![];
-        segment.collect_constant_parts(&mut constant_parts);
+        segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
 
         compiler.patterns.string_patterns.insert(
             def_id,
@@ -149,5 +179,15 @@ pub fn process_patterns(compiler: &mut Compiler) {
                 constant_parts,
             },
         );
+    }
+}
+
+struct CaptureCursor(u32);
+
+impl CaptureCursor {
+    fn increment(&mut self) -> u32 {
+        let cursor = self.0;
+        self.0 += 1;
+        cursor
     }
 }

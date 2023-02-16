@@ -9,7 +9,7 @@ use crate::{
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,
-    pattern::Patterns,
+    patterns::Patterns,
     relation::Relations,
     source::{Package, Sources},
     strings::Strings,

@@ -47,23 +47,23 @@ fn uuid_in_string_pattern() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
 
-        let data = foo.deserialize_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")).unwrap();
-
-        // FIXME: Map should have one property
         assert_matches!(
-            &data,
-            Data::Map(map) if map.is_empty()
+            foo.deserialize_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Data::Map(map)) if map.len() == 1
         );
-
-        // FIXME: Should contain the UUID:
-        assert_eq!(
-            foo.serialize_data_json(env, &data),
-            json!("foo/")
+        assert_json_io_matches!(
+            foo,
+            json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")
         );
-
+        // UUID gets normalized when serialized:
+        assert_json_io_matches!(
+            foo,
+            json!("foo/a1a2a3a4b1b2c1c2d1d2d3d4d5d6d7d8"),
+            json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")
+        );
         assert_error_msg!(
             foo.deserialize_data(json!("foo")),
-            r#"invalid type: string "foo", expected string matching /\Afoo/[0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12}\z/ at line 1 column 5"#
+            r#"invalid type: string "foo", expected string matching /\Afoo/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 5"#
         );
     })
 }
