@@ -224,11 +224,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(self.def(
             DefKind::Relationship(Relationship {
                 relation_id,
-                subject: (subject.0, self.src.span(&subject.1)),
+                subject: (subject.0, self.src.span(subject.1)),
                 subject_cardinality: subject_cardinality
                     .map(convert_cardinality)
                     .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
-                object: (object.0, self.src.span(&object.1)),
+                object: (object.0, self.src.span(object.1)),
                 object_cardinality: object_cardinality.map(convert_cardinality).unwrap_or_else(
                     || {
                         if has_object_prop {

@@ -71,10 +71,7 @@ impl<'m> Type<'m> {
     }
 
     pub fn is_anonymous(&self) -> bool {
-        match self {
-            Self::Anonymous(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Anonymous(_))
     }
 }
 

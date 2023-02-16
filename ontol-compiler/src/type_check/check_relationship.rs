@@ -201,37 +201,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
-                let rel_def_id = match relation.1.ident {
-                    RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
-                    _ => todo!(),
-                };
-
-                let string = match self.defs.get_def_kind(rel_def_id) {
-                    Some(DefKind::StringLiteral(str)) => str,
-                    other => todo!("add {other:?} to string pattern"),
-                };
-
-                let object_properties = self.relations.properties_by_type_mut(object.0);
-
-                match &mut object_properties.constructor {
-                    Constructor::Identity => {
-                        object_properties.constructor =
-                            Constructor::StringPattern(StringPatternSegment::literal(string));
-
-                        if !object_ty.is_anonymous() {
-                            // Register pattern processing for later
-                            self.relations.string_patterns.insert(object.0);
-                        }
-                    }
-                    Constructor::StringPattern(pattern) => {
-                        let pattern = std::mem::take(pattern);
-                        object_properties.constructor =
-                            Constructor::StringPattern(StringPatternSegment::concat([
-                                pattern,
-                                StringPatternSegment::literal(string),
-                            ]));
-                    }
-                    _ => return self.error(CompileError::ConstructorMismatch, span),
+                if let Err(e) = self.extend_string_pattern_constructor(
+                    relation.1,
+                    object.0,
+                    object_ty,
+                    StringPatternSegment::Empty,
+                    span,
+                ) {
+                    return e;
                 }
             }
             Type::Anonymous(_) => {
@@ -242,44 +219,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 match subject_constructor {
                     Some(Constructor::StringPattern(subject_pattern)) => {
-                        let subject_pattern = subject_pattern.clone();
-                        let rel_def_id = match relation.1.ident {
-                            RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
-                            _ => todo!(),
-                        };
-
-                        let string = match self.defs.get_def_kind(rel_def_id) {
-                            Some(DefKind::StringLiteral(str)) => str,
-                            other => todo!("add {other:?} to string pattern"),
-                        };
-
-                        let object_properties = self.relations.properties_by_type_mut(object.0);
-
-                        match &mut object_properties.constructor {
-                            Constructor::Identity => {
-                                object_properties.constructor =
-                                    Constructor::StringPattern(StringPatternSegment::concat([
-                                        subject_pattern,
-                                        StringPatternSegment::literal(string),
-                                    ]));
-
-                                if !object_ty.is_anonymous() {
-                                    // Register pattern processing for later
-                                    self.relations.string_patterns.insert(object.0);
-                                }
-                            }
-                            Constructor::StringPattern(_) => {
-                                panic!("this should not occur?");
-                                /*
-                                let pattern = std::mem::take(pattern);
-                                object_properties.constructor =
-                                    Constructor::StringPattern(StringPatternSegment::concat([
-                                        pattern,
-                                        StringPatternSegment::literal(string),
-                                    ]));
-                                    */
-                            }
-                            _ => return self.error(CompileError::ConstructorMismatch, span),
+                        if let Err(e) = self.extend_string_pattern_constructor(
+                            relation.1,
+                            object.0,
+                            object_ty,
+                            subject_pattern.clone(),
+                            span,
+                        ) {
+                            return e;
                         }
                     }
                     _ => {
@@ -330,6 +277,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         subject_ty
+    }
+
+    fn extend_string_pattern_constructor(
+        &mut self,
+        relation: &Relation,
+        object_def: DefId,
+        object_ty: TypeRef<'m>,
+        prefix: StringPatternSegment,
+        span: &SourceSpan,
+    ) -> Result<(), TypeRef<'m>> {
+        let rel_def_id = match relation.ident {
+            RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
+            _ => todo!(),
+        };
+
+        let string = match self.defs.get_def_kind(rel_def_id) {
+            Some(DefKind::StringLiteral(str)) => str,
+            other => todo!("add {other:?} to string pattern"),
+        };
+
+        let object_properties = self.relations.properties_by_type_mut(object_def);
+
+        match &mut object_properties.constructor {
+            Constructor::Identity => {
+                object_properties.constructor =
+                    Constructor::StringPattern(StringPatternSegment::concat([
+                        prefix,
+                        StringPatternSegment::literal(string),
+                    ]));
+
+                if !object_ty.is_anonymous() {
+                    // constructors of unnamable types do not need to be processed..
+                    // Register pattern processing for later:
+                    self.relations.string_patterns.insert(object_def);
+                }
+            }
+            _ => return Err(self.error(CompileError::ConstructorMismatch, span)),
+        }
+
+        Ok(())
     }
 }
 
