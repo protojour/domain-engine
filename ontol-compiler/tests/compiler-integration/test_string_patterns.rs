@@ -1,6 +1,15 @@
 use crate::TestCompile;
 
 #[test]
+fn simple_string_pattern() {
+    "
+    (type! foo)
+    (rel! '' { 'foo' } foo)
+    "
+    .compile_ok(|env| {})
+}
+
+#[test]
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "

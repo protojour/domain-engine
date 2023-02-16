@@ -1,11 +1,13 @@
 use std::{collections::BTreeMap, fmt::Display};
 
 use derive_debug_extras::DebugExtras;
+use regex::Regex;
 use smartstring::alias::String;
 
 use crate::{
     string_types::{ParseError, StringLikeType},
-    value::{Attribute, Data, FormatStringData, PropertyId},
+    value::{Attribute, Data, FormatStringData, PropertyId, Value},
+    DefId,
 };
 
 /// Extend as required.
@@ -58,6 +60,53 @@ impl StringPattern {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct StringPattern2 {
+    pub regex: Regex,
+    pub properties: Vec<StringPatternProperty>,
+}
+
+impl StringPattern2 {
+    pub fn try_match(&self, input: &str) -> Result<Data, ParseError> {
+        if self.properties.is_empty() {
+            if let Some(match_) = self.regex.find(input) {
+                Ok(Data::String(match_.as_str().into()))
+            } else {
+                Err(ParseError)
+            }
+        } else {
+            let captures = self.regex.captures(input).ok_or(ParseError)?;
+            let mut properties = BTreeMap::new();
+
+            for property in &self.properties {
+                let text = captures
+                    .get(property.capture_group)
+                    .expect("expected property match")
+                    .as_str();
+
+                let value = match &property.string_type {
+                    Some(string_like_type) => string_like_type
+                        .try_deserialize(property.type_def_id, text)
+                        .expect("BUG: string-like type did not match pattern"),
+                    None => Value::new(Data::String(text.into()), property.type_def_id),
+                };
+
+                properties.insert(property.property_id, Attribute::with_unit_params(value));
+            }
+
+            Ok(Data::Map(properties))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StringPatternProperty {
+    property_id: PropertyId,
+    type_def_id: DefId,
+    capture_group: usize,
+    string_type: Option<StringLikeType>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, DebugExtras)]

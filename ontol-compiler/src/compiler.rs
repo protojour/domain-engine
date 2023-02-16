@@ -9,6 +9,7 @@ use crate::{
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,
+    pattern::Patterns,
     relation::Relations,
     source::{Package, Sources},
     strings::Strings,
@@ -36,6 +37,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
+    pub(crate) patterns: Patterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
 
@@ -54,6 +56,7 @@ impl<'m> Compiler<'m> {
             expressions: Default::default(),
             def_types: Default::default(),
             relations: Relations::default(),
+            patterns: Patterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }
@@ -99,6 +102,7 @@ impl<'m> Compiler<'m> {
             serde_operators,
             string_like_types: [(self.defs.uuid(), StringLikeType::Uuid)].into(),
             string_patterns,
+            string_patterns2: self.patterns.string_patterns,
         }
     }
 

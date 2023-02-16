@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId};
 
-use crate::{def::Cardinality, sequence::Sequence, SourceSpan};
+use crate::{def::Cardinality, pattern::StringPatternSegment, sequence::Sequence, SourceSpan};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RelationshipId(pub DefId);
@@ -16,6 +16,7 @@ pub struct Relations {
     pub relationships_by_object: HashMap<(DefId, RelationId), RelationshipId>,
 
     pub value_unions: HashSet<DefId>,
+    pub string_patterns: HashSet<DefId>,
     pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
 }
 
@@ -36,13 +37,6 @@ pub struct Properties {
 }
 
 #[derive(Default, Debug)]
-pub enum MapProperties {
-    #[default]
-    Empty,
-    Map(IndexMap<PropertyId, Cardinality>),
-}
-
-#[derive(Default, Debug)]
 pub enum Constructor {
     #[default]
     Identity,
@@ -51,5 +45,12 @@ pub enum Constructor {
     /// serializers etc should try things in sequence anyway.
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
     Sequence(Sequence),
-    StringPattern,
+    StringPattern(StringPatternSegment),
+}
+
+#[derive(Default, Debug)]
+pub enum MapProperties {
+    #[default]
+    Empty,
+    Map(IndexMap<PropertyId, Cardinality>),
 }

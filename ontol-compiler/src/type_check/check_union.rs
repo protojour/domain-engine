@@ -14,6 +14,7 @@ use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
+    pattern::StringPatternSegment,
     relation::{Constructor, MapProperties},
     sequence::Sequence,
     types::{FormatType, Type},
@@ -108,7 +109,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 builder.sequence = Some(variant_def);
                             }
                         }
-                        Ok(DomainTypeMatchData::StringPattern) => {
+                        Ok(DomainTypeMatchData::StringPattern(_)) => {
                             builder.add_string_pattern(variant_def);
                         }
                         Err(error) => {
@@ -183,8 +184,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
                     }
-                    Constructor::StringPattern => {
-                        return Ok(DomainTypeMatchData::StringPattern);
+                    Constructor::StringPattern(segment) => {
+                        return Ok(DomainTypeMatchData::StringPattern(segment));
                     }
                 },
                 None => {
@@ -372,7 +373,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 enum DomainTypeMatchData<'a> {
     Map(&'a IndexMap<PropertyId, Cardinality>),
     Sequence(&'a Sequence),
-    StringPattern,
+    StringPattern(&'a StringPatternSegment),
 }
 
 #[derive(Default)]

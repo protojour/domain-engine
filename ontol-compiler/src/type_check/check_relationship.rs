@@ -7,6 +7,7 @@ use crate::{
     },
     error::CompileError,
     mem::Intern,
+    pattern::StringPatternSegment,
     relation::{Constructor, MapProperties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
@@ -192,6 +193,36 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => return self.error(CompileError::ConstructorMismatch, span),
             },
+            Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
+                let rel_def_id = match relation.1.ident {
+                    RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
+                    _ => todo!(),
+                };
+
+                let string = match self.defs.get_def_kind(rel_def_id) {
+                    Some(DefKind::StringLiteral(str)) => str,
+                    other => todo!("add {other:?} to string pattern"),
+                };
+
+                match &mut properties.constructor {
+                    Constructor::Identity => {
+                        properties.constructor =
+                            Constructor::StringPattern(StringPatternSegment::literal(string));
+
+                        // Register pattern processing for later
+                        self.relations.string_patterns.insert(object.0);
+                    }
+                    Constructor::StringPattern(pattern) => {
+                        let pattern = std::mem::take(pattern);
+                        properties.constructor =
+                            Constructor::StringPattern(StringPatternSegment::concat([
+                                pattern,
+                                StringPatternSegment::literal(string),
+                            ]));
+                    }
+                    _ => return self.error(CompileError::ConstructorMismatch, span),
+                }
+            }
             _ => match (&relation.1.object_prop, object_ty, &mut properties.map) {
                 (Some(_), Type::DomainEntity(_), MapProperties::Empty) => {
                     properties.map = MapProperties::Map(

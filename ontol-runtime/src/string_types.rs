@@ -5,11 +5,12 @@ use crate::{
     DefId,
 };
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Debug)]
 pub enum StringLikeType {
     Uuid,
 }
 
+#[derive(Debug)]
 pub struct ParseError;
 
 impl StringLikeType {
