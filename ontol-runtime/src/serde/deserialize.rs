@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
-use serde::de::{DeserializeSeed, Unexpected};
+use serde::{
+    de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
+    Deserializer,
+};
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -27,7 +30,7 @@ enum MapKey {
     RelParams(SerdeOperatorId),
 }
 
-struct MatcherVisitor<'e, M> {
+pub(super) struct MatcherVisitor<'e, M> {
     matcher: M,
     env: &'e Env,
 }
@@ -65,16 +68,23 @@ impl<'e> SerdeProcessor<'e> {
             self.value_operator
         );
     }
+}
 
-    fn matcher_visitor_no_params<M: ValueMatcher>(self, matcher: M) -> MatcherVisitor<'e, M> {
-        self.assert_no_rel_params();
-
+trait IntoVisitor: ValueMatcher + Sized {
+    fn into_visitor<'e>(self, processor: SerdeProcessor<'e>) -> MatcherVisitor<'e, Self> {
         MatcherVisitor {
-            matcher,
-            env: self.env,
+            matcher: self,
+            env: processor.env,
         }
     }
+
+    fn into_visitor_no_params<'e>(self, processor: SerdeProcessor<'e>) -> MatcherVisitor<'e, Self> {
+        processor.assert_no_rel_params();
+        self.into_visitor(processor)
+    }
 }
+
+impl<M: ValueMatcher + Sized> IntoVisitor for M {}
 
 /// The serde implementation deserializes Attributes instead of Values.
 ///
@@ -85,64 +95,51 @@ impl<'e> SerdeProcessor<'e> {
 ///
 /// This is also the reason that only map types may be related through parameterized relationships.
 /// Other types only support unparameterized relationships.
-impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
+impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
     type Value = Attribute;
 
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         match self.value_operator {
-            SerdeOperator::Unit => serde::de::Deserializer::deserialize_unit(
-                deserializer,
-                self.matcher_visitor_no_params(UnitMatcher),
-            ),
-            SerdeOperator::Int(def_id) => serde::de::Deserializer::deserialize_i64(
-                deserializer,
-                self.matcher_visitor_no_params(IntMatcher(*def_id)),
-            ),
-            SerdeOperator::Number(def_id) => serde::de::Deserializer::deserialize_i64(
-                deserializer,
-                self.matcher_visitor_no_params(IntMatcher(*def_id)),
-            ),
-            SerdeOperator::String(def_id) => serde::de::Deserializer::deserialize_str(
-                deserializer,
-                self.matcher_visitor_no_params(StringMatcher {
+            SerdeOperator::Unit => {
+                deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
+            }
+            SerdeOperator::Int(def_id) => {
+                deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
+            }
+            SerdeOperator::Number(def_id) => {
+                deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
+            }
+            SerdeOperator::String(def_id) => deserializer.deserialize_str(
+                StringMatcher {
                     def_id: *def_id,
                     env: self.env,
-                }),
+                }
+                .into_visitor_no_params(self),
             ),
-            SerdeOperator::StringConstant(literal, def_id) => {
-                serde::de::Deserializer::deserialize_str(
-                    deserializer,
-                    self.matcher_visitor_no_params(ConstantStringMatcher {
-                        literal,
-                        def_id: *def_id,
-                    }),
-                )
-            }
-            SerdeOperator::StringPattern(def_id) => serde::de::Deserializer::deserialize_str(
-                deserializer,
-                self.matcher_visitor_no_params(StringPatternMatcher {
+            SerdeOperator::StringConstant(literal, def_id) => deserializer.deserialize_str(
+                ConstantStringMatcher {
+                    literal,
+                    def_id: *def_id,
+                }
+                .into_visitor_no_params(self),
+            ),
+            SerdeOperator::StringPattern(def_id) => deserializer.deserialize_str(
+                StringPatternMatcher {
                     pattern: self.env.string_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
-                }),
+                }
+                .into_visitor_no_params(self),
             ),
-            SerdeOperator::CapturingStringPattern(def_id) => {
-                serde::de::Deserializer::deserialize_str(
-                    deserializer,
-                    self.matcher_visitor_no_params(CapturingStringPatternMatcher {
-                        pattern: self.env.string_patterns.get(def_id).unwrap(),
-                        def_id: *def_id,
-                    }),
-                )
-            }
-            SerdeOperator::Sequence(ranges, def_id) => serde::de::Deserializer::deserialize_seq(
-                deserializer,
-                MatcherVisitor {
-                    matcher: SequenceMatcher::new(ranges, *def_id, self.rel_params_operator_id),
-                    env: self.env,
-                },
+            SerdeOperator::CapturingStringPattern(def_id) => deserializer.deserialize_str(
+                CapturingStringPatternMatcher {
+                    pattern: self.env.string_patterns.get(def_id).unwrap(),
+                    def_id: *def_id,
+                }
+                .into_visitor_no_params(self),
+            ),
+            SerdeOperator::Sequence(ranges, def_id) => deserializer.deserialize_seq(
+                SequenceMatcher::new(ranges, *def_id, self.rel_params_operator_id)
+                    .into_visitor(self),
             ),
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
@@ -152,80 +149,60 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
 
                 Ok(typed_value)
             }
-            SerdeOperator::ValueUnionType(value_union_type) => {
-                serde::de::Deserializer::deserialize_any(
-                    deserializer,
-                    MatcherVisitor {
-                        matcher: UnionMatcher {
-                            value_union_type,
-                            rel_params_operator_id: self.rel_params_operator_id,
-                            env: self.env,
-                        },
-                        env: self.env,
-                    },
-                )
-            }
-            SerdeOperator::MapType(map_type) => serde::de::Deserializer::deserialize_map(
-                deserializer,
-                MapTypeVisitor {
-                    buffered_attrs: Default::default(),
-                    map_type,
+            SerdeOperator::ValueUnionType(value_union_type) => deserializer.deserialize_any(
+                UnionMatcher {
+                    value_union_type,
                     rel_params_operator_id: self.rel_params_operator_id,
                     env: self.env,
-                },
+                }
+                .into_visitor(self),
             ),
+            SerdeOperator::MapType(map_type) => deserializer.deserialize_map(MapTypeVisitor {
+                buffered_attrs: Default::default(),
+                map_type,
+                rel_params_operator_id: self.rel_params_operator_id,
+                env: self.env,
+            }),
         }
     }
 }
 
-impl<'e, 'de, M> serde::de::Visitor<'de> for MatcherVisitor<'e, M>
-where
-    M: ValueMatcher,
-{
+impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.matcher.expecting(f)
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
         let value = self
             .matcher
             .match_unit()
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unit, &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Unit, &self))?;
 
         Ok(Attribute::with_unit_params(value))
     }
 
-    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
         let type_def_id = self
             .matcher
             .match_u64(v)
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Unsigned(v), &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
         Ok(Attribute::with_unit_params(Value {
             data: Data::Int(
                 v.try_into()
-                    .map_err(|_| serde::de::Error::custom("u64 overflow".to_string()))?,
+                    .map_err(|_| Error::custom("u64 overflow".to_string()))?,
             ),
             type_def_id,
         }))
     }
 
-    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
         let type_def_id = self
             .matcher
             .match_i64(v)
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Signed(v), &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Signed(v), &self))?;
 
         Ok(Attribute::with_unit_params(Value {
             data: Data::Int(v),
@@ -233,26 +210,20 @@ where
         }))
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         let value = self
             .matcher
             .match_str(v)
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Str(v), &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Str(v), &self))?;
 
         Ok(Attribute::with_unit_params(value))
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::SeqAccess<'de>,
-    {
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         let mut sequence_matcher = self
             .matcher
             .match_sequence()
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Seq, &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Seq, &self))?;
 
         let mut output = vec![];
 
@@ -282,21 +253,18 @@ where
                             data: Data::Sequence(output),
                             type_def_id: sequence_matcher.type_def_id,
                         })),
-                        Err(_) => Err(serde::de::Error::invalid_length(output.len(), &self)),
+                        Err(_) => Err(Error::invalid_length(output.len(), &self)),
                     };
                 }
             }
         }
     }
 
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::MapAccess<'de>,
-    {
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         let map_matcher = self
             .matcher
             .match_map()
-            .map_err(|_| serde::de::Error::invalid_type(Unexpected::Map, &self))?;
+            .map_err(|_| Error::invalid_type(Unexpected::Map, &self))?;
 
         // Because serde is stream-oriented, we need to start storing attributes
         // into a buffer until the type can be properly recognized
@@ -306,7 +274,7 @@ where
             let property = map.next_key::<String>()?.ok_or_else(|| {
                 // key/property was None, i.e. the whole map was read
                 // without being able to recognize the type
-                serde::de::Error::custom(format!(
+                Error::custom(format!(
                     "invalid map value, expected {}",
                     ExpectingMatching(&self.matcher)
                 ))
@@ -333,17 +301,14 @@ where
     }
 }
 
-impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
+impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "type `{}`", self.map_type.typename)
     }
 
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::MapAccess<'de>,
-    {
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         let mut attributes = BTreeMap::new();
         let mut rel_params = Value::unit();
 
@@ -447,7 +412,7 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
                 logic_op: LogicOp::And,
             };
 
-            return Err(serde::de::Error::custom(format!(
+            return Err(Error::custom(format!(
                 "missing properties, expected {missing_keys}"
             )));
         }
@@ -462,36 +427,28 @@ impl<'e, 'de> serde::de::Visitor<'de> for MapTypeVisitor<'e> {
     }
 }
 
-impl<'s, 'de> serde::de::DeserializeSeed<'de> for PropertySet<'s> {
+impl<'s, 'de> DeserializeSeed<'de> for PropertySet<'s> {
     type Value = MapKey;
 
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        serde::de::Deserializer::deserialize_str(deserializer, self)
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        deserializer.deserialize_str(self)
     }
 }
 
-impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
+impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
     type Value = MapKey;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         match v {
             EDGE_PROPERTY => {
                 if let Some(operator_id) = self.rel_params_operator_id {
                     Ok(MapKey::RelParams(operator_id))
                 } else {
-                    Err(serde::de::Error::custom(
-                        "`_edge` property not accepted here",
-                    ))
+                    Err(Error::custom("`_edge` property not accepted here"))
                 }
             }
             _ => {
@@ -500,7 +457,7 @@ impl<'s, 'de> serde::de::Visitor<'de> for PropertySet<'s> {
                     None => {
                         // TODO: This error message could be improved to suggest valid fields.
                         // see OneOf in serde (this is a private struct)
-                        Err(serde::de::Error::custom(format!("unknown property `{v}`")))
+                        Err(Error::custom(format!("unknown property `{v}`")))
                     }
                 }
             }
