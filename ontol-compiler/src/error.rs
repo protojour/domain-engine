@@ -107,12 +107,14 @@ pub enum CompileError {
 
 #[derive(Debug)]
 pub struct ChumskyError<I: Eq + Hash> {
-    inner: Simple<I>,
+    inner: Box<Simple<I>>,
 }
 
 impl<I: Eq + Hash> ChumskyError<I> {
     pub fn new(inner: Simple<I>) -> Self {
-        Self { inner }
+        Self {
+            inner: Box::new(inner),
+        }
     }
 }
 

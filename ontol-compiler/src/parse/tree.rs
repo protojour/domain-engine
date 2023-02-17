@@ -107,27 +107,59 @@ fn ident() -> impl Parser<char, String, Error = Simple<char>> {
 }
 
 fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
-    // FIXME: other escape codes?
-    // see https://github.com/zesterer/chumsky/blob/940d531a7b4bc63062284bec6888fc5dae10a3d2/benches/json.rs
+    let escape = just('\\').ignore_then(choice((
+        just('\\'),
+        just('/'),
+        just('"'),
+        just('b').to('\x08'),
+        just('f').to('\x0C'),
+        just('n').to('\n'),
+        just('r').to('\r'),
+        just('t').to('\t'),
+    )));
+
     just('"')
-        .ignore_then(filter(|c: &char| *c != '\\' && *c != '"').repeated())
+        .ignore_then(
+            filter(|c: &char| *c != '\\' && *c != '"')
+                .or(escape)
+                .repeated(),
+        )
         .then_ignore(just('"'))
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
 fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
-    // FIXME: other escape codes?
-    // see https://github.com/zesterer/chumsky/blob/940d531a7b4bc63062284bec6888fc5dae10a3d2/benches/json.rs
+    let escape = just('\\').ignore_then(choice((
+        just('\\'),
+        just('/'),
+        just('\''),
+        just('b').to('\x08'),
+        just('f').to('\x0C'),
+        just('n').to('\n'),
+        just('r').to('\r'),
+        just('t').to('\t'),
+    )));
+
     just('\'')
-        .ignore_then(filter(|c: &char| *c != '\\' && *c != '\'').repeated())
+        .ignore_then(
+            filter(|c: &char| *c != '\\' && *c != '\'')
+                .or(escape)
+                .repeated(),
+        )
         .then_ignore(just('\''))
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
 fn regex() -> impl Parser<char, Tree, Error = Simple<char>> {
+    let escape = just('\\').ignore_then(just('/'));
+
     just('/')
-        .ignore_then(filter(|c: &char| *c != '/' && !c.is_whitespace()))
-        .chain::<char, Vec<_>, _>(filter(|c: &char| *c != '\\' && *c != '/').repeated())
+        .ignore_then(filter(|c: &char| *c != '/' && !c.is_whitespace()).or(escape))
+        .chain::<char, Vec<_>, _>(
+            filter(|c: &char| *c != '\\' && *c != '/')
+                .or(escape)
+                .repeated(),
+        )
         .then_ignore(just('/'))
         .map(|vec| Tree::Regex(String::from_iter(vec.into_iter())))
 }
@@ -225,6 +257,11 @@ mod tests {
     }
 
     #[test]
+    fn regex() {
+        assert_eq!((Tree::Regex("abc/".into()), 0..7), expect_one(r#"/abc\//"#));
+    }
+
+    #[test]
     fn many() {
         let trees = trees_parser().parse(" a (1) ").unwrap();
         assert_eq!(2, trees.len());
@@ -275,6 +312,22 @@ mod tests {
             )
             .unwrap();
         assert_matches!(trees.as_slice(), &[(Tree::StringLiteral(ref lit), _),] if lit == "literal");
+    }
+
+    #[test]
+    fn double_quote_string_literal_escapes() {
+        assert_eq!(
+            (Tree::StringLiteral("'a'\"b\"c\n".into()), 1..14),
+            expect_one(r#" "'a'\"b\"c\n" "#)
+        );
+    }
+
+    #[test]
+    fn single_quote_string_literal_escapes() {
+        assert_eq!(
+            (Tree::StringLiteral("'a'\"b\"c\n".into()), 1..14),
+            expect_one(r#" '\'a\'"b"c\n' "#)
+        );
     }
 
     #[test]

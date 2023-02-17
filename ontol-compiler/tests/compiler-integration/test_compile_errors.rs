@@ -423,10 +423,10 @@ fn invalid_relation_chain() {
 
 #[test]
 fn spans_are_correct_projected_from_regex_syntax_errors() {
-    "
+    r#"
     (type! lol)
-    (rel! _ { /abc(?P<42>.)/ } lol) ;; ERROR invalid regex: invalid capture group character
-    "
+    (rel! _ { /abc\/(?P<42>.)/ } lol) ;; ERROR invalid regex: invalid capture group character
+    "#
     .compile_fail_then(|errors| {
         assert_eq!("4", errors[0].span_text);
     })
