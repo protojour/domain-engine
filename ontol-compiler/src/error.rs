@@ -106,11 +106,11 @@ pub enum CompileError {
 }
 
 #[derive(Debug)]
-pub struct ChumskyError<I: Hash> {
+pub struct ChumskyError<I: Eq + Hash> {
     inner: Simple<I>,
 }
 
-impl<I: Hash> ChumskyError<I> {
+impl<I: Eq + Hash> ChumskyError<I> {
     pub fn new(inner: Simple<I>) -> Self {
         Self { inner }
     }

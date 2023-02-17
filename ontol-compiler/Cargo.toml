@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 ontol-runtime = { path = "../ontol-runtime" }
-chumsky = "0.8"
+chumsky = "0.9"
 smartstring = { version = "1", features = ["serde"] }
 smallvec = "1"
 fraction = "0.13"
