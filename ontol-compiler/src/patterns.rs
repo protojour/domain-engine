@@ -10,7 +10,11 @@ use smartstring::alias::String;
 use std::{collections::HashMap, fmt::Write};
 use tracing::debug;
 
-use crate::{compiler::Compiler, regex::collect_hir_constant_parts, relation::Constructor};
+use crate::{
+    compiler::Compiler,
+    regex::{collect_hir_constant_parts, constant_prefix, empty_string_regex},
+    relation::Constructor,
+};
 
 #[derive(Default, Debug)]
 pub struct Patterns {
@@ -19,8 +23,9 @@ pub struct Patterns {
 
 #[derive(Clone, Default, Debug)]
 pub enum StringPatternSegment {
+    /// Matches only the empty string:
     #[default]
-    Empty,
+    EmptyString,
     Literal(String),
     Regex(Hir),
     Property {
@@ -44,11 +49,17 @@ impl StringPatternSegment {
 
         for segment in segments {
             match (prev, segment) {
-                (None, segment) => {
+                (Some(Self::EmptyString), Self::EmptyString) => {
+                    prev = None;
+                }
+                (Some(Self::EmptyString), segment) => {
                     prev = Some(segment);
                 }
-                (Some(Self::Empty), Self::Empty) => {
-                    prev = Some(Self::Empty);
+                (Some(previous), Self::EmptyString) => {
+                    prev = Some(previous);
+                }
+                (None, segment) => {
+                    prev = Some(segment);
                 }
                 (Some(Self::Literal(s1)), Self::Literal(s2)) => prev = Some(Self::Literal(s1 + s2)),
                 (Some(Self::Regex(r1)), Self::Regex(r2)) => {
@@ -76,16 +87,20 @@ impl StringPatternSegment {
         }
     }
 
-    pub fn expect_regex(&self) -> &Hir {
+    pub fn constant_prefix(&self) -> Option<String> {
         match self {
-            Self::Regex(hir) => hir,
-            _ => panic!("expected regex"),
+            Self::EmptyString => None,
+            Self::Literal(string) => Some(string.clone()),
+            Self::Regex(hir) => constant_prefix(hir),
+            Self::Property { .. } => None,
+            Self::Concat(segments) => segments.iter().next().and_then(Self::constant_prefix),
+            Self::Alternation(_) => None,
         }
     }
 
     fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
-            Self::Empty => Hir::empty(),
+            Self::EmptyString => empty_string_regex(),
             Self::Literal(string) => Hir::concat(
                 string
                     .chars()
@@ -116,13 +131,13 @@ impl StringPatternSegment {
         }
     }
 
-    fn collect_constant_parts(
+    pub fn collect_constant_parts(
         &self,
         parts: &mut Vec<StringPatternConstantPart>,
         capture_cursor: &mut CaptureCursor,
     ) {
         match self {
-            Self::Empty => {}
+            Self::EmptyString => {}
             Self::Literal(string) => {
                 parts.push(StringPatternConstantPart::Literal(string.clone()));
             }
@@ -218,7 +233,7 @@ fn compile_regex(hir: Hir) -> Regex {
     Regex::new(&expression).unwrap()
 }
 
-struct CaptureCursor(u32);
+pub struct CaptureCursor(pub u32);
 
 impl CaptureCursor {
     fn increment(&mut self) -> u32 {

@@ -2,8 +2,8 @@ use crate::parse::Span;
 use ontol_runtime::smart_format;
 use regex_syntax::{
     hir::{
-        Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Repetition, RepetitionKind,
-        RepetitionRange,
+        Anchor, Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Repetition,
+        RepetitionKind, RepetitionRange,
     },
     Parser,
 };
@@ -43,6 +43,13 @@ pub fn uuid_regex() -> Hir {
     ])
 }
 
+pub fn empty_string_regex() -> Hir {
+    Hir::concat(vec![
+        Hir::anchor(Anchor::StartText),
+        Hir::anchor(Anchor::EndText),
+    ])
+}
+
 pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
     match hir.kind() {
         HirKind::Literal(Literal::Unicode(char)) => parts.push(*char),
@@ -54,6 +61,39 @@ pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
         other => {
             debug!("constant parts from {other:?}");
         }
+    }
+}
+
+pub fn constant_prefix(hir: &Hir) -> Option<String> {
+    if let HirKind::Concat(hirs) = hir.kind() {
+        let mut iterator = hirs.iter();
+        let first = iterator.next()?;
+
+        match first.kind() {
+            HirKind::Anchor(Anchor::StartLine | Anchor::StartText) => {}
+            _ => return None,
+        }
+
+        let mut prefix = String::new();
+
+        while let Some(next) = iterator.next() {
+            match next.kind() {
+                HirKind::Literal(Literal::Unicode(char)) => {
+                    prefix.push(*char);
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        if prefix.is_empty() {
+            None
+        } else {
+            Some(prefix)
+        }
+    } else {
+        None
     }
 }
 

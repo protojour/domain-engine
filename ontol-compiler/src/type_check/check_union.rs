@@ -7,6 +7,7 @@ use ontol_runtime::{
     value::PropertyId,
     DefId, RelationId,
 };
+use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -56,7 +57,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .get_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting property meta");
 
-            debug!("check union relationship {relationship:?}");
+            debug!("check union {relationship:?}");
 
             let variant_def = match relation.ident {
                 RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => def_id,
@@ -109,8 +110,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 builder.sequence = Some(variant_def);
                             }
                         }
-                        Ok(DomainTypeMatchData::StringPattern(_)) => {
-                            builder.add_string_pattern(variant_def);
+                        Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
+                            builder.add_string_pattern(segment, variant_def);
                         }
                         Err(error) => {
                             error_set.report(variant_def, error, span);
@@ -126,6 +127,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.limit_property_discriminators(
+            value_union_def_id,
+            union_def,
+            &mut builder,
+            &mut error_set,
+        );
+        self.verify_string_patterns_are_disjunctive(
             value_union_def_id,
             union_def,
             &mut builder,
@@ -185,7 +192,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
                     }
                     Constructor::StringPattern(segment) => {
-                        return Ok(DomainTypeMatchData::StringPattern(segment));
+                        return Ok(DomainTypeMatchData::ConstructorStringPattern(segment));
                     }
                 },
                 None => {
@@ -275,19 +282,102 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        let Some((selected_relation, _)) = relation_counters
+        if let Some((selected_relation, _)) = relation_counters
             .into_iter()
-            .find(|(_, count)| *count == total_candidates) else {
-            error_set.report(union_def_id, UnionCheckError::NoUniformDiscriminatorFound, &union_def.span);
+            .find(|(_, count)| *count == total_candidates)
+        {
+            debug!("selected relation {selected_relation:?}");
+
+            for discriminator in &mut builder.map_discriminator_candidates {
+                discriminator
+                    .property_candidates
+                    .retain(|property_candidate| {
+                        property_candidate.relation_id == selected_relation
+                    })
+            }
+        } else {
+            error_set.report(
+                union_def_id,
+                UnionCheckError::NoUniformDiscriminatorFound,
+                &union_def.span,
+            );
+        }
+    }
+
+    /// For now, patterns must have a unique constant prefix.
+    fn verify_string_patterns_are_disjunctive(
+        &self,
+        union_def_id: DefId,
+        union_def: &Def,
+        builder: &mut DiscriminatorBuilder,
+        error_set: &mut ErrorSet,
+    ) {
+        if builder.pattern_candidates.is_empty() {
             return;
-        };
+        }
 
-        debug!("selected relation {selected_relation:?}");
+        let mut literal_index: HashMap<String, HashSet<DefId>> = Default::default();
+        let mut prefix_index: PatriciaMap<HashSet<DefId>> = Default::default();
 
-        for discriminator in &mut builder.map_discriminator_candidates {
-            discriminator
-                .property_candidates
-                .retain(|property_candidate| property_candidate.relation_id == selected_relation)
+        for (variant_def_id, segment) in &builder.pattern_candidates {
+            let prefix = segment.constant_prefix();
+
+            if let Some(prefix) = prefix {
+                literal_index
+                    .entry(prefix.clone())
+                    .or_default()
+                    .insert(*variant_def_id);
+
+                if let Some(set) = prefix_index.get_mut(&prefix) {
+                    set.insert(*variant_def_id);
+                } else {
+                    prefix_index.insert(prefix, [*variant_def_id].into());
+                }
+            }
+        }
+
+        // Also check for ambiguity with string literals
+        if let StringDiscriminator::Literals(literals) = &builder.string {
+            for (literal, variant_def_id) in literals {
+                literal_index
+                    .entry(literal.clone())
+                    .or_default()
+                    .insert(*variant_def_id);
+
+                if let Some(set) = prefix_index.get_mut(&literal) {
+                    set.insert(*variant_def_id);
+                } else {
+                    prefix_index.insert(literal, [*variant_def_id].into());
+                }
+            }
+        }
+
+        let pattern_variants: HashSet<_> = builder.pattern_candidates.keys().copied().collect();
+        let mut is_error = false;
+
+        for (prefix, variant_set) in prefix_index.iter() {
+            for variant_def_id in variant_set {
+                if pattern_variants.contains(variant_def_id) {
+                    if variant_set.len() > 1 {
+                        // two or more variants have the same prefix
+                        is_error = true;
+                    }
+
+                    let common_prefixes_len = prefix_index.common_prefixes(&prefix).count();
+                    if common_prefixes_len > 1 {
+                        // another variant shares a common prefix with this one
+                        is_error = true;
+                    }
+                }
+            }
+        }
+
+        if is_error {
+            error_set.report(
+                union_def_id,
+                UnionCheckError::SharedPrefixInPatternUnion,
+                &union_def.span,
+            );
         }
     }
 
@@ -311,6 +401,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 result_type: number.0,
             })
         }
+
+        // match patterns before strings
+        for (variant_def_id, _) in builder.pattern_candidates {
+            union_discriminator.variants.push(VariantDiscriminator {
+                discriminant: Discriminant::MatchesCapturingStringPattern,
+                result_type: variant_def_id,
+            });
+        }
+
         match builder.string {
             StringDiscriminator::None => {}
             StringDiscriminator::Any(def_id) => {
@@ -366,6 +465,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             UnionCheckError::NoUniformDiscriminatorFound => {
                 CompileError::NoUniformDiscriminatorFound
             }
+            UnionCheckError::SharedPrefixInPatternUnion => CompileError::SharedPrefixInPatternUnion,
         }
     }
 }
@@ -373,19 +473,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 enum DomainTypeMatchData<'a> {
     Map(&'a IndexMap<PropertyId, Cardinality>),
     Sequence(&'a Sequence),
-    StringPattern(&'a StringPatternSegment),
+    ConstructorStringPattern(&'a StringPatternSegment),
 }
 
 #[derive(Default)]
-struct DiscriminatorBuilder {
+struct DiscriminatorBuilder<'a> {
     unit: Option<DefId>,
     number: Option<IntDiscriminator>,
     string: StringDiscriminator,
     sequence: Option<DefId>,
+    pattern_candidates: IndexMap<DefId, &'a StringPatternSegment>,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 
-impl DiscriminatorBuilder {
+impl<'a> DiscriminatorBuilder<'a> {
     fn add_string_literal(&mut self, lit: &str, def_id: DefId) {
         match &mut self.string {
             StringDiscriminator::None => {
@@ -398,8 +499,8 @@ impl DiscriminatorBuilder {
         }
     }
 
-    fn add_string_pattern(&mut self, _: DefId) {
-        todo!();
+    fn add_string_pattern(&mut self, segment: &'a StringPatternSegment, variant_def_id: DefId) {
+        self.pattern_candidates.insert(variant_def_id, segment);
     }
 }
 
@@ -445,4 +546,5 @@ enum UnionCheckError {
     UnionTreeNotSupported,
     DuplicateAnonymousRelation,
     NoUniformDiscriminatorFound,
+    SharedPrefixInPatternUnion,
 }

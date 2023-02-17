@@ -431,3 +431,22 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
         assert_eq!("4", errors[0].span_text);
     })
 }
+
+#[test]
+fn complains_about_ambiguous_pattern_based_unions() {
+    "
+    (type! foo)
+    (type! bar)
+    (type! barbar)
+    (type! union) ;; ERROR variants of the union have prefixes that are prefixes of other variants
+
+    (rel! '' { 'foo' } { uuid } foo)
+    (rel! '' { 'bar' } { uuid } bar)
+    (rel! '' { 'barbar' } { uuid } barbar)
+
+    (rel! _ { foo } union)
+    (rel! _ { bar } union)
+    (rel! _ { barbar } union)
+    "
+    .compile_fail();
+}

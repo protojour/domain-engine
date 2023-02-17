@@ -209,7 +209,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     relation,
                     object.0,
                     object_ty,
-                    StringPatternSegment::Empty,
+                    StringPatternSegment::EmptyString,
                     span,
                 ) {
                     return e;

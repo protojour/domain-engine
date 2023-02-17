@@ -23,7 +23,7 @@ fn constant_string_pattern() {
 }
 
 #[test]
-fn concatenated_constant_string_pattern() {
+fn concatenated_constant_string_constructor_pattern() {
     "
     (type! foobar)
     (rel! '' { 'foo' } { 'bar' } foobar)
@@ -39,7 +39,7 @@ fn concatenated_constant_string_pattern() {
 }
 
 #[test]
-fn uuid_in_string_pattern() {
+fn uuid_in_string_constructor_pattern() {
     "
     (type! foo)
     (rel! '' { 'foo/' } { uuid } foo)
@@ -69,21 +69,35 @@ fn uuid_in_string_pattern() {
 }
 
 #[test]
-fn test_simple_regex_pattern_constructor() {
+fn test_string_pattern_constructor_union() {
     "
-    (type! re)
-    (rel! '' { /a/ } { /bc*/ } re)
+    (type! foo)
+    (type! bar)
+    (type! foobar)
+
+    (rel! '' { 'foo/' } { uuid } foo)
+    (rel! '' { 'bar/' } { uuid } bar)
+
+    (rel! _ { foo } foobar)
+    (rel! _ { bar } foobar)
     "
     .compile_ok(|env| {
-        let re = TypeBinding::new(env, "re");
-        assert_json_io_matches!(re, json!("ab"));
-        assert_json_io_matches!(re, json!("abc"), json!("ab"));
-        assert_json_io_matches!(re, json!("abccccc"), json!("ab"));
-        assert_error_msg!(
-            re.deserialize_data(json!("a")),
-            r#"invalid type: string "a", expected string matching /\Aabc*\z/ at line 1 column 3"#
+        let foobar = TypeBinding::new(env, "foobar");
+        assert_matches!(
+            foobar.deserialize_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Data::Map(map)) if map.len() == 1
         );
-    });
+        assert_json_io_matches!(foobar, json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));
+        assert_json_io_matches!(foobar, json!("bar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));
+        assert_error_msg!(
+            foobar.deserialize_data(json!("foo/invalid-uuid")),
+            r#"invalid type: string "foo/invalid-uuid", expected `foobar` (`string_pattern` or `string_pattern`) at line 1 column 18"#
+        );
+        assert_error_msg!(
+            foobar.deserialize_data(json!("baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            r#"invalid type: string "baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8", expected `foobar` (`string_pattern` or `string_pattern`) at line 1 column 42"#
+        );
+    })
 }
 
 #[test]
@@ -100,6 +114,24 @@ fn test_regex_property() {
         assert_error_msg!(
             foo.deserialize_data(json!({ "prop": "123" })),
             r#"invalid type: string "123", expected string matching /abc*/ at line 1 column 13"#
+        );
+    });
+}
+
+#[test]
+fn test_simple_regex_pattern_constructor() {
+    "
+    (type! re)
+    (rel! '' { /a/ } { /bc*/ } re)
+    "
+    .compile_ok(|env| {
+        let re = TypeBinding::new(env, "re");
+        assert_json_io_matches!(re, json!("ab"));
+        assert_json_io_matches!(re, json!("abc"), json!("ab"));
+        assert_json_io_matches!(re, json!("abccccc"), json!("ab"));
+        assert_error_msg!(
+            re.deserialize_data(json!("a")),
+            r#"invalid type: string "a", expected string matching /\Aabc*\z/ at line 1 column 3"#
         );
     });
 }

@@ -81,6 +81,8 @@ pub enum CompileError {
     UnitTypePartOfUnion(String),
     #[error("no uniform discriminator found for union variants")]
     NoUniformDiscriminatorFound,
+    #[error("variants of the union have prefixes that are prefixes of other variants")]
+    SharedPrefixInPatternUnion,
     #[error("union in named relationship is not supported yet. Make a union type instead.")]
     UnionInNamedRelationshipNotSupported,
     #[error("unsupported cardinality")]
