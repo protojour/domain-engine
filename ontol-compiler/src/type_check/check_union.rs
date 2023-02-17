@@ -316,18 +316,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         }
 
-        let mut literal_index: HashMap<String, HashSet<DefId>> = Default::default();
         let mut prefix_index: PatriciaMap<HashSet<DefId>> = Default::default();
 
         for (variant_def_id, segment) in &builder.pattern_candidates {
             let prefix = segment.constant_prefix();
 
             if let Some(prefix) = prefix {
-                literal_index
-                    .entry(prefix.clone())
-                    .or_default()
-                    .insert(*variant_def_id);
-
                 if let Some(set) = prefix_index.get_mut(&prefix) {
                     set.insert(*variant_def_id);
                 } else {
@@ -339,12 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Also check for ambiguity with string literals
         if let StringDiscriminator::Literals(literals) = &builder.string {
             for (literal, variant_def_id) in literals {
-                literal_index
-                    .entry(literal.clone())
-                    .or_default()
-                    .insert(*variant_def_id);
-
-                if let Some(set) = prefix_index.get_mut(&literal) {
+                if let Some(set) = prefix_index.get_mut(literal) {
                     set.insert(*variant_def_id);
                 } else {
                     prefix_index.insert(literal, [*variant_def_id].into());

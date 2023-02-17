@@ -7,7 +7,7 @@ lint:
   script:
     - rustup component add rustfmt clippy
     - cargo fmt -- --check
-    - cargo clippy
+    - cargo clippy -- -D warnings
 
 test:
   stage: check

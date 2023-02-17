@@ -76,7 +76,7 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
 
         let mut prefix = String::new();
 
-        while let Some(next) = iterator.next() {
+        for next in iterator {
             match next.kind() {
                 HirKind::Literal(Literal::Unicode(char)) => {
                     prefix.push(*char);

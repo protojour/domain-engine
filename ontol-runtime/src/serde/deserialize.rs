@@ -71,14 +71,14 @@ impl<'e> SerdeProcessor<'e> {
 }
 
 trait IntoVisitor: ValueMatcher + Sized {
-    fn into_visitor<'e>(self, processor: SerdeProcessor<'e>) -> MatcherVisitor<'e, Self> {
+    fn into_visitor(self, processor: SerdeProcessor) -> MatcherVisitor<Self> {
         MatcherVisitor {
             matcher: self,
             env: processor.env,
         }
     }
 
-    fn into_visitor_no_params<'e>(self, processor: SerdeProcessor<'e>) -> MatcherVisitor<'e, Self> {
+    fn into_visitor_no_params(self, processor: SerdeProcessor) -> MatcherVisitor<Self> {
         processor.assert_no_rel_params();
         self.into_visitor(processor)
     }
