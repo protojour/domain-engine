@@ -51,13 +51,23 @@ pub enum SerdeOperator {
     Number(DefId),
     String(DefId),
     StringConstant(String, DefId),
+
+    /// Always deserializes into a string, ignores capture groups:
     StringPattern(DefId),
+
+    /// Deserializes into a Map if there are capture groups:
+    CapturingStringPattern(DefId),
+
+    /// Any sequence
     Sequence(SmallVec<[SequenceRange; 3]>, DefId),
-    // A type with just one anonymous property
+
+    /// A type with just one anonymous property
     ValueType(ValueType),
-    // A type with multiple anonymous properties, equivalent to a union of types
+
+    /// A type with multiple anonymous properties, equivalent to a union of types
     ValueUnionType(ValueUnionType),
-    // A type with many properties
+
+    /// A type with many properties
     MapType(MapType),
 }
 
@@ -126,7 +136,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
-            SerdeOperator::StringPattern(_) => {
+            SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
                 write!(f, "`string_pattern`")
             }
             SerdeOperator::Sequence(ranges, _) => {

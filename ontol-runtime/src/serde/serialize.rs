@@ -28,7 +28,9 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)
             }
-            SerdeOperator::String(_) | SerdeOperator::StringConstant(_, _) => match &value.data {
+            SerdeOperator::String(_)
+            | SerdeOperator::StringConstant(_, _)
+            | SerdeOperator::StringPattern(_) => match &value.data {
                 Data::String(s) => serializer.serialize_str(s),
                 data => {
                     let mut buf = String::new();
@@ -36,7 +38,7 @@ impl<'e> SerdeProcessor<'e> {
                     serializer.serialize_str(&buf)
                 }
             },
-            SerdeOperator::StringPattern(def_id) => {
+            SerdeOperator::CapturingStringPattern(def_id) => {
                 let pattern = &self.env.string_patterns.get(def_id).unwrap();
                 let mut buf = String::new();
                 write!(

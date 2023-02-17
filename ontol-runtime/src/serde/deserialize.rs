@@ -15,8 +15,9 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        ConstantStringMatcher, ExpectingMatching, IntMatcher, SequenceMatcher, StringMatcher,
-        StringPatternMatcher, UnionMatcher, UnitMatcher, ValueMatcher,
+        CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher,
+        SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher, UnitMatcher,
+        ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
 };
@@ -127,6 +128,15 @@ impl<'e, 'de> serde::de::DeserializeSeed<'de> for SerdeProcessor<'e> {
                     def_id: *def_id,
                 }),
             ),
+            SerdeOperator::CapturingStringPattern(def_id) => {
+                serde::de::Deserializer::deserialize_str(
+                    deserializer,
+                    self.matcher_visitor_no_params(CapturingStringPatternMatcher {
+                        pattern: self.env.string_patterns.get(def_id).unwrap(),
+                        def_id: *def_id,
+                    }),
+                )
+            }
             SerdeOperator::Sequence(ranges, def_id) => serde::de::Deserializer::deserialize_seq(
                 deserializer,
                 MatcherVisitor {

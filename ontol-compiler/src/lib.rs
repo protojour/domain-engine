@@ -7,7 +7,7 @@ use error::{ChumskyError, CompileError, UnifiedCompileError};
 pub use error::*;
 use lowering::Lowering;
 use ontol_runtime::PackageId;
-use patterns::process_patterns;
+use patterns::compile_all_patterns;
 pub use source::*;
 
 pub mod compiler;
@@ -95,7 +95,7 @@ impl Compile for CompileSrc {
         }
 
         // Call this after all source files have been compiled
-        process_patterns(compiler);
+        compile_all_patterns(compiler);
         compiler.type_check().check_unions();
         compiler.check_error()?;
 

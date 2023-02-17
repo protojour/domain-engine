@@ -297,7 +297,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         let appendee = match self.defs.get_def_kind(rel_def_id) {
-            Some(DefKind::StringLiteral(str)) => StringPatternSegment::literal(str),
+            Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
             Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
                 self.defs
                     .literal_regex_hirs
@@ -342,7 +342,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if !object_ty.is_anonymous() {
                     // constructors of unnamable types do not need to be processed..
                     // Register pattern processing for later:
-                    self.relations.string_patterns.insert(object_def);
+                    self.relations
+                        .string_pattern_constructors
+                        .insert(object_def);
                 }
             }
             _ => return Err(self.error(CompileError::ConstructorMismatch, span)),

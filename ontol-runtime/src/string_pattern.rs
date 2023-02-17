@@ -17,7 +17,7 @@ pub struct StringPattern {
 }
 
 impl StringPattern {
-    pub fn try_match(&self, input: &str) -> Result<Data, ParseError> {
+    pub fn try_capturing_match(&self, input: &str) -> Result<Data, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
                 Ok(Data::String(match_.as_str().into()))

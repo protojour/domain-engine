@@ -147,7 +147,29 @@ impl<'e> ValueMatcher for StringPatternMatcher<'e> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        let data = self.pattern.try_match(str).map_err(|_| ())?;
+        if self.pattern.regex.is_match(str) {
+            Ok(Value::new(Data::String(str.into()), self.def_id))
+        } else {
+            Err(())
+        }
+    }
+}
+
+/// This is a matcher that doesn't necessarily
+/// deserialize to a string, but can use capture groups
+/// extract various data.
+pub struct CapturingStringPatternMatcher<'e> {
+    pub pattern: &'e StringPattern,
+    pub def_id: DefId,
+}
+
+impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "string matching /{}/", self.pattern.regex)
+    }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        let data = self.pattern.try_capturing_match(str).map_err(|_| ())?;
         Ok(Value::new(data, self.def_id))
     }
 }

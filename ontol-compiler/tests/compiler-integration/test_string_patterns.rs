@@ -87,6 +87,24 @@ fn test_simple_regex_pattern_constructor() {
 }
 
 #[test]
+fn test_regex_property() {
+    "
+    (type! foo)
+    (rel! foo { 'prop' } /abc*/)
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(env, "foo");
+        assert_json_io_matches!(foo, json!({ "prop": "abc" }));
+        assert_json_io_matches!(foo, json!({ "prop": "123abc" }));
+        assert_json_io_matches!(foo, json!({ "prop": "123abcccc" }));
+        assert_error_msg!(
+            foo.deserialize_data(json!({ "prop": "123" })),
+            r#"invalid type: string "123", expected string matching /abc*/ at line 1 column 13"#
+        );
+    });
+}
+
+#[test]
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "

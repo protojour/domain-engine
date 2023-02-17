@@ -16,7 +16,7 @@ pub struct Relations {
     pub relationships_by_object: HashMap<(DefId, RelationId), RelationshipId>,
 
     pub value_unions: HashSet<DefId>,
-    pub string_patterns: HashSet<DefId>,
+    pub string_pattern_constructors: HashSet<DefId>,
     pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
 }
 

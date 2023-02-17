@@ -34,7 +34,7 @@ pub enum StringPatternSegment {
 }
 
 impl StringPatternSegment {
-    pub fn literal(string: &str) -> Self {
+    pub fn new_literal(string: &str) -> Self {
         Self::Literal(string.into())
     }
 
@@ -73,6 +73,13 @@ impl StringPatternSegment {
             output.into_iter().next().unwrap()
         } else {
             StringPatternSegment::Concat(output)
+        }
+    }
+
+    pub fn expect_regex(&self) -> &Hir {
+        match self {
+            Self::Regex(hir) => hir,
+            _ => panic!("expected regex"),
         }
     }
 
@@ -150,8 +157,29 @@ impl StringPatternSegment {
     }
 }
 
-pub fn process_patterns(compiler: &mut Compiler) {
-    let string_patterns = std::mem::take(&mut compiler.relations.string_patterns);
+pub fn compile_all_patterns(compiler: &mut Compiler) {
+    compile_regex_literals(compiler);
+    compile_string_pattern_constructors(compiler);
+}
+
+/// note: This processes all regex literals even if not "needed"
+/// by serializers etc
+fn compile_regex_literals(compiler: &mut Compiler) {
+    let literal_regex_hirs = std::mem::take(&mut compiler.defs.literal_regex_hirs);
+
+    for (def_id, hir) in literal_regex_hirs {
+        compiler.patterns.string_patterns.insert(
+            def_id,
+            StringPattern {
+                regex: compile_regex(hir),
+                constant_parts: vec![],
+            },
+        );
+    }
+}
+
+fn compile_string_pattern_constructors(compiler: &mut Compiler) {
+    let string_patterns = std::mem::take(&mut compiler.relations.string_pattern_constructors);
 
     for def_id in string_patterns {
         let segment = match compiler
@@ -170,22 +198,24 @@ pub fn process_patterns(compiler: &mut Compiler) {
         ]);
         debug!("{def_id:?} regex: {anchored_hir}");
 
-        let mut regex_string = String::new();
-        write!(&mut regex_string, "{anchored_hir}").unwrap();
-
-        let regex = Regex::new(&regex_string).unwrap();
-
         let mut constant_parts = vec![];
         segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
 
         compiler.patterns.string_patterns.insert(
             def_id,
             StringPattern {
-                regex,
+                regex: compile_regex(anchored_hir),
                 constant_parts,
             },
         );
     }
+}
+
+fn compile_regex(hir: Hir) -> Regex {
+    let mut expression = String::new();
+    write!(&mut expression, "{hir}").unwrap();
+
+    Regex::new(&expression).unwrap()
 }
 
 struct CaptureCursor(u32);

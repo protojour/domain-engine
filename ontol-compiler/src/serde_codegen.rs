@@ -16,6 +16,7 @@ use crate::{
     compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
+    patterns::Patterns,
     relation::{Constructor, MapProperties, Properties, Relations},
     types::{DefTypes, Type},
 };
@@ -24,6 +25,7 @@ pub struct SerdeGenerator<'c, 'm> {
     defs: &'c Defs<'m>,
     def_types: &'c DefTypes<'m>,
     relations: &'c Relations,
+    patterns: &'c Patterns,
     serde_operators: Vec<SerdeOperator>,
     serde_operators_per_def: HashMap<DefId, SerdeOperatorId>,
     array_operators: HashMap<SerdeOperatorId, SerdeOperatorId>,
@@ -35,6 +37,7 @@ impl<'m> Compiler<'m> {
             defs: &self.defs,
             def_types: &self.def_types,
             relations: &self.relations,
+            patterns: &self.patterns,
             serde_operators: Default::default(),
             serde_operators_per_def: Default::default(),
             array_operators: Default::default(),
@@ -52,8 +55,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Some(*id);
         }
 
-        if let Some((operator_id, kind)) = self.create_serde_operator(type_def_id) {
-            self.serde_operators[operator_id.0 as usize] = kind;
+        if let Some((operator_id, operator)) = self.create_serde_operator(type_def_id) {
+            debug!("created operator {operator_id:?} {operator:?}");
+            self.serde_operators[operator_id.0 as usize] = operator;
             Some(operator_id)
         } else {
             None
@@ -79,7 +83,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(type_def_id),
                 SerdeOperator::String(type_def_id),
             )),
-            Some(Type::StringConstant(def_id) | Type::Regex(def_id)) => {
+            Some(Type::StringConstant(def_id)) => {
                 assert_eq!(type_def_id, *def_id);
 
                 let literal = self.defs.get_string_representation(*def_id);
@@ -87,6 +91,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some((
                     self.alloc_operator_id(*def_id),
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
+                ))
+            }
+            Some(Type::Regex(def_id)) => {
+                assert_eq!(type_def_id, *def_id);
+                assert!(self.patterns.string_patterns.contains_key(&type_def_id));
+
+                Some((
+                    self.alloc_operator_id(*def_id),
+                    SerdeOperator::StringPattern(*def_id),
                 ))
             }
             Some(Type::Uuid(_)) => Some((
@@ -127,8 +140,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn alloc_operator_id(&mut self, def_id: DefId) -> SerdeOperatorId {
         let operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
-        // We just need a temporary placeholder for this operator kind,
-        // this will be properly overwritten after it's created:
+        // We just need a temporary placeholder for this operator,
+        // this will be properly overwritten afterwards:
         self.serde_operators.push(SerdeOperator::Unit);
         self.serde_operators_per_def.insert(def_id, operator_id);
         operator_id
@@ -229,7 +242,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 SerdeOperator::Sequence(sequence_range_builder.ranges, type_def_id)
             }
-            Constructor::StringPattern(_) => SerdeOperator::StringPattern(type_def_id),
+            Constructor::StringPattern(_) => {
+                assert!(self.patterns.string_patterns.contains_key(&type_def_id));
+                SerdeOperator::CapturingStringPattern(type_def_id)
+            }
         }
     }
 
