@@ -1,0 +1,43 @@
+# The keyword `rel` has three arguments: subject, relation and object:
+# The relation is always syntactically marked:
+rel subject { relation } object
+
+# subject and object may be omitted, if encolsed in contextual syntax.
+# The following simply _desugars_ into the full relation syntax.
+type T {
+    rel { relation } some_object   # T acts as the subject
+    rel some_subject { relation }  # T acts as the object, i.e. declare a new "incoming" relation!
+}
+
+type artist {
+    rel { 'plays' | 'played-by' } instrument
+    rel listener { 'listens-to' | 'listened-to-by' }
+}
+
+type my-id {
+    rel '' { 'my_id/' } { uuid }
+}
+
+type Geomtry {
+    rel _ { Point }
+    rel _ { MultiPoint }
+}
+
+# in eq expressions:
+# (just for fun, this example tries to "invert" a tree while translating..
+#   if that's even possible. At some point there is no parent, which would mean that the :siblings is totally undefined)
+# anyway it has to be two different types of trees.
+
+eq (:children* :siblings*) {
+    type tree_a {
+        rel { 'children' } :children
+        rel :siblings { 'children' }
+    }
+    type tree_b {
+        rel { 'children' } :siblings
+        rel :children { 'children' }
+    }
+}
+
+# variable syntax
+# a :colon syntax has been used. But that would conflict with how relation parameters are defined in new_syntax2.ont.
