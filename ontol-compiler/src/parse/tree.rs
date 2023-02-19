@@ -67,7 +67,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(just(":").map(|_| Tree::Colon))
             .or(just("?").map(|_| Tree::Questionmark))
             .or(just("_").map(|_| Tree::Underscore))
-            .or(num())
+            .or(num().map(Tree::Num))
             .or(double_quote_string_literal().map(Tree::StringLiteral))
             .or(single_quote_string_literal().map(Tree::StringLiteral))
             .or(regex().map(Tree::Regex))
@@ -88,13 +88,13 @@ pub fn trees_parser() -> impl Parser<char, Vec<Spanned<Tree>>, Error = Simple<ch
     tree_parser().repeated().then_ignore(end())
 }
 
-fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
+pub fn num() -> impl Parser<char, String, Error = Simple<char>> {
     filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
         .map(Some)
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| c.is_ascii_digit() && !special_char(*c)).repeated(),
         )
-        .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
+        .map(|vec| String::from_iter(vec.into_iter()))
 }
 
 pub fn ident() -> impl Parser<char, String, Error = Simple<char>> {

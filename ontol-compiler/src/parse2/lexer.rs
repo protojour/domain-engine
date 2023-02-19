@@ -6,22 +6,15 @@ use crate::parse::tree;
 
 use super::Spanned;
 
-/*
-fn span_map<T, U, F: Fn(T) -> U>(f: F) -> impl Fn(Spanned<T>) -> Spanned<U> {
-    move |(data, span)| (f(data), span)
-}
-*/
-
 #[allow(dead_code)]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Token {
-    Bracket(char),
-    Dot,
-    Colon,
-    Questionmark,
-    Underscore,
+    Open(char),
+    Close(char),
+    Sigil(char),
     Type,
     Rel,
+    Number(String),
     StringLiteral(String),
     Regex(String),
     Sym(String),
@@ -35,12 +28,11 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         _ => Token::Sym(ident),
     });
 
-    one_of("(){}[]")
-        .map(|c| Token::Bracket(c))
-        .or(just(".").map(|_| Token::Dot))
-        .or(just(":").map(|_| Token::Colon))
-        .or(just("?").map(|_| Token::Questionmark))
-        .or(just("_").map(|_| Token::Underscore))
+    one_of(".:?_+-/*|")
+        .map(|c| Token::Sigil(c))
+        .or(one_of("({[").map(|c| Token::Open(c)))
+        .or(one_of(")}]").map(|c| Token::Close(c)))
+        .or(tree::num().map(Token::Number))
         .or(tree::double_quote_string_literal().map(Token::StringLiteral))
         .or(tree::single_quote_string_literal().map(Token::StringLiteral))
         .or(tree::regex().map(Token::Regex))

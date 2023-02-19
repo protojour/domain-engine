@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use super::{
-    ast2::{RelConnection, RelStmt, Stmt, Type, TypeStmt},
+    ast2::{ChainedSubjectConnection, RelConnection, RelStmt, Stmt, Type, TypeStmt},
     lexer::Token,
     Span, Spanned,
 };
@@ -20,13 +20,14 @@ fn stmt() -> impl Parser<Token, Spanned<Stmt>, Error = Simple<Token>> {
 }
 
 fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> {
-    let rel_block = rel_stmt()
-        .repeated()
-        .delimited_by(just(Token::Bracket('{')), just(Token::Bracket('}')));
-
     keyword(Token::Type)
         .then(spanned(ident()))
-        .then(spanned(rel_block.or_not()))
+        .then(spanned(
+            rel_stmt()
+                .repeated()
+                .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
+                .or_not(),
+        ))
         .map(|((kw, ident), rel_block)| TypeStmt {
             kw,
             ident,
@@ -35,33 +36,64 @@ fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> {
 }
 
 fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> {
-    let connection = just(Token::Bracket('{'))
-        .ignore_then(spanned(ty()))
-        .then_ignore(just(Token::Bracket('}')))
-        .map(|ty| RelConnection {
-            ty,
-            rel_params: None,
-            object_prop_ident: None,
-        });
-
     keyword(Token::Rel)
+        // subject
         .then(spanned(ty()).or_not())
-        .then(connection)
+        // connection
+        .then(rel_connection())
+        // chain
+        .then(
+            spanned(ty())
+                .or_not()
+                .then(rel_connection())
+                .map(|(subject, connection)| ChainedSubjectConnection {
+                    subject,
+                    connection,
+                })
+                .repeated(),
+        )
+        // object
         .then(spanned(ty()).or_not())
-        .map(|(((kw, subject), connection), object)| RelStmt {
+        .map(|((((kw, subject), connection), chain), object)| RelStmt {
             kw,
             subject,
             connection,
+            chain,
             object,
         })
 }
 
-fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> {
-    let sym = ident().map(Type::Sym);
-    let string_literal =
-        select! { Token::StringLiteral(string) => string.clone() }.map(Type::StringLiteral);
+fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> {
+    // type
+    spanned(ty())
+        // many
+        .then(just(Token::Sigil('*')).or_not())
+        // optional
+        .then(just(Token::Sigil('?')).or_not())
+        // object prop ident
+        .then(spanned(just(Token::Sigil('|')).ignore_then(string_literal())).or_not())
+        // rel params
+        .then(spanned(just(Token::Sigil(':')).ignore_then(string_literal())).or_not())
+        // within {}
+        .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
+        .map(|((((ty, _), _), object_prop_ident), _)| RelConnection {
+            ty,
+            object_prop_ident,
+            rel_params: None,
+        })
+}
 
-    sym.or(string_literal)
+fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> {
+    let unit = just(Token::Sigil('.')).map(|_| Type::Unit);
+    let path = ident().map(Type::Path);
+    let number_literal = number_literal().map(Type::NumberLiteral);
+    let string_literal = string_literal().map(Type::StringLiteral);
+    let regex = select! { Token::Regex(string) => string.clone() }.map(Type::Regex);
+
+    unit.or(path)
+        .or(number_literal)
+        .or(string_literal)
+        .or(regex)
 }
 
 fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> {
@@ -70,6 +102,14 @@ fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> {
 
 fn ident() -> impl Parser<Token, String, Error = Simple<Token>> {
     select! { Token::Sym(ident) => ident.clone() }
+}
+
+fn number_literal() -> impl Parser<Token, String, Error = Simple<Token>> {
+    select! { Token::Number(string) => string.clone() }
+}
+
+fn string_literal() -> impl Parser<Token, String, Error = Simple<Token>> {
+    select! { Token::StringLiteral(string) => string.clone() }
 }
 
 fn spanned<P, O>(parser: P) -> impl Parser<Token, Spanned<O>, Error = Simple<Token>>
@@ -107,14 +147,17 @@ mod tests {
     }
 
     #[test]
-    fn parse_something() {
+    fn parse_type() {
         let source = "
-        type foo {
+        type foo
+        type bar {
             rel a { '' } b
-            rel b { lol } c
+            rel { lol } c
+            rel { '' } { '' }
+            rel { '' } b { '' }
         }
         ";
 
-        p(source).unwrap();
+        assert_eq!(2, p(source).unwrap().len());
     }
 }

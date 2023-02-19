@@ -61,8 +61,8 @@ pub struct Connection {
     pub ty: Spanned<ConnectionType>,
     pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
-    pub object_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
+    pub object_cardinality: Option<Cardinality>,
 }
 
 pub enum ConnectionType {
