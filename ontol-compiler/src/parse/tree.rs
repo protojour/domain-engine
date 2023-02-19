@@ -70,7 +70,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(num())
             .or(double_quote_string_literal().map(Tree::StringLiteral))
             .or(single_quote_string_literal().map(Tree::StringLiteral))
-            .or(regex())
+            .or(regex().map(Tree::Regex))
             .or(ident().map(Tree::Sym))
             .or(comment());
 
@@ -97,7 +97,7 @@ fn num() -> impl Parser<char, Tree, Error = Simple<char>> {
         .map(|vec| Tree::Num(String::from_iter(vec.into_iter())))
 }
 
-fn ident() -> impl Parser<char, String, Error = Simple<char>> {
+pub fn ident() -> impl Parser<char, String, Error = Simple<char>> {
     filter(|c: &char| !c.is_whitespace() && !special_char(*c) && !c.is_ascii_digit() && *c != '_')
         .map(Some)
         .chain::<char, Vec<_>, _>(
@@ -106,7 +106,7 @@ fn ident() -> impl Parser<char, String, Error = Simple<char>> {
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
-fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+pub fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
     let escape = just('\\').ignore_then(choice((
         just('\\'),
         just('/'),
@@ -128,7 +128,7 @@ fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
-fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+pub fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
     let escape = just('\\').ignore_then(choice((
         just('\\'),
         just('/'),
@@ -150,7 +150,7 @@ fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
         .map(|vec| String::from_iter(vec.into_iter()))
 }
 
-fn regex() -> impl Parser<char, Tree, Error = Simple<char>> {
+pub fn regex() -> impl Parser<char, String, Error = Simple<char>> {
     let escape = just('\\').ignore_then(just('/'));
 
     just('/')
@@ -161,7 +161,7 @@ fn regex() -> impl Parser<char, Tree, Error = Simple<char>> {
                 .repeated(),
         )
         .then_ignore(just('/'))
-        .map(|vec| Tree::Regex(String::from_iter(vec.into_iter())))
+        .map(|vec| String::from_iter(vec.into_iter()))
 }
 
 fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
@@ -171,7 +171,7 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
         .map(|vec| Tree::Comment(String::from_iter(vec.into_iter())))
 }
 
-fn special_char(c: char) -> bool {
+pub fn special_char(c: char) -> bool {
     matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?')
 }
 
