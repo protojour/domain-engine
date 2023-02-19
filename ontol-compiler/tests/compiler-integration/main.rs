@@ -28,6 +28,10 @@ macro_rules! assert_error_msg {
 
 pub(crate) use assert_error_msg;
 
+/// Assert that JSON that gets deserialized and then serialized again matches the expectation.
+///
+/// When passing one JSON parameter, the assertion means that input and output must match exactly.
+/// With passing two JSON parameters, the left one is the input and the right one is the expected output.
 macro_rules! assert_json_io_matches {
     ($binding:expr, $json:expr) => {
         assert_json_io_matches!($binding, $json, $json);
