@@ -10,12 +10,20 @@ use super::{
     Span, Spanned,
 };
 
+/// AstParser parses Tokens into AST nodes.
+///
+/// This is an extension trait that simplifies the use of chumsky's Parser trait in this module.
+pub trait AstParser<O>: Parser<Token, O, Error = Simple<Token>> + Clone {}
+
+impl<T, O> AstParser<O> for T where T: Parser<Token, O, Error = Simple<Token>> + Clone {}
+
+/// A parser for a sequence of statements (i.e. a source file)
 #[allow(dead_code)]
-pub fn stmt_seq() -> impl Parser<Token, Vec<Spanned<Stmt>>, Error = Simple<Token>> {
+pub fn stmt_seq() -> impl AstParser<Vec<Spanned<Stmt>>> {
     stmt().repeated().then_ignore(end())
 }
 
-fn stmt() -> impl Parser<Token, Spanned<Stmt>, Error = Simple<Token>> {
+fn stmt() -> impl AstParser<Spanned<Stmt>> {
     let type_stmt = spanned(type_stmt()).map(span_map(Stmt::Type));
     let rel_stmt = spanned(rel_stmt()).map(span_map(Stmt::Rel));
     let eq_stmt = spanned(eq_stmt()).map(span_map(Stmt::Eq));
@@ -23,7 +31,7 @@ fn stmt() -> impl Parser<Token, Spanned<Stmt>, Error = Simple<Token>> {
     type_stmt.or(rel_stmt).or(eq_stmt)
 }
 
-fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> + Clone {
+fn type_stmt() -> impl AstParser<TypeStmt> {
     keyword(Token::Type)
         .then(spanned(ident()))
         .then(spanned(
@@ -39,7 +47,7 @@ fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> + Clone {
         })
 }
 
-fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> + Clone {
+fn rel_stmt() -> impl AstParser<RelStmt> {
     keyword(Token::Rel)
         // subject
         .then(spanned(ty()).or_not())
@@ -67,7 +75,7 @@ fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> + Clone {
         })
 }
 
-fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> + Clone {
+fn rel_connection() -> impl AstParser<RelConnection> {
     // type
     spanned(ty())
         // many
@@ -87,7 +95,7 @@ fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> 
         })
 }
 
-fn eq_stmt() -> impl Parser<Token, EqStmt, Error = Simple<Token>> + Clone {
+fn eq_stmt() -> impl AstParser<EqStmt> {
     keyword(Token::Eq)
         .then(
             spanned(variable())
@@ -107,7 +115,7 @@ fn eq_stmt() -> impl Parser<Token, EqStmt, Error = Simple<Token>> + Clone {
         })
 }
 
-fn eq_type() -> impl Parser<Token, EqType, Error = Simple<Token>> + Clone {
+fn eq_type() -> impl AstParser<EqType> {
     spanned(path())
         .then(
             eq_attribute()
@@ -117,7 +125,7 @@ fn eq_type() -> impl Parser<Token, EqType, Error = Simple<Token>> + Clone {
         .map(|(path, attributes)| EqType { path, attributes })
 }
 
-fn eq_attribute() -> impl Parser<Token, EqAttribute, Error = Simple<Token>> + Clone {
+fn eq_attribute() -> impl AstParser<EqAttribute> {
     let variable = expr().map(EqAttribute::Expr);
     let rel = keyword(Token::Rel)
         .then(spanned(expr()).or_not())
@@ -135,7 +143,8 @@ fn eq_attribute() -> impl Parser<Token, EqAttribute, Error = Simple<Token>> + Cl
     variable.or(rel)
 }
 
-fn expr() -> impl Parser<Token, Expr, Error = Simple<Token>> + Clone {
+/// Expression parser
+fn expr() -> impl AstParser<Expr> {
     recursive(|expr| {
         let path = path().map(Expr::Path);
         let variable = variable().map(Expr::Variable);
@@ -169,7 +178,8 @@ fn expr() -> impl Parser<Token, Expr, Error = Simple<Token>> + Clone {
     })
 }
 
-fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> + Clone {
+/// Type parser
+fn ty() -> impl AstParser<Type> {
     let unit = just(Token::Sigil('.')).map(|_| Type::Unit);
     let path = ident().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
@@ -182,38 +192,40 @@ fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> + Clone {
         .or(regex)
 }
 
-fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> + Clone {
+fn keyword(token: Token) -> impl AstParser<Span> {
     just(token).map_with_span(|_, span| span)
 }
 
-fn path() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+fn path() -> impl AstParser<String> {
     select! { Token::Sym(ident) => ident }
 }
 
-fn ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+fn ident() -> impl AstParser<String> {
     select! { Token::Sym(ident) => ident }
 }
 
-fn variable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+fn variable() -> impl AstParser<String> {
     just(Token::Sigil(':')).ignore_then(ident())
 }
 
-fn number_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+fn number_literal() -> impl AstParser<String> {
     select! { Token::Number(string) => string }
 }
 
-fn string_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+fn string_literal() -> impl AstParser<String> {
     select! { Token::StringLiteral(string) => string }
 }
 
-fn spanned<P, O>(parser: P) -> impl Parser<Token, Spanned<O>, Error = Simple<Token>> + Clone
-where
-    P: Parser<Token, O, Error = Simple<Token>> + Clone,
-{
+/// Parser combinator that transforms an output type O into Spanned<O>.
+fn spanned<P: AstParser<O>, O>(parser: P) -> impl AstParser<Spanned<O>> {
     parser.map_with_span(|t, span| (t, span))
 }
 
-fn span_map<T, U, F: Fn(T) -> U>(f: F) -> impl Fn(Spanned<T>) -> Spanned<U> {
+/// Map the inner type T in Spanned<T> into U.
+fn span_map<T, U, F>(f: F) -> impl (Fn(Spanned<T>) -> Spanned<U>) + Clone
+where
+    F: (Fn(T) -> U) + Clone,
+{
     move |(data, span)| (f(data), span)
 }
 
