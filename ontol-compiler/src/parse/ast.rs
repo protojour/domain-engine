@@ -9,8 +9,19 @@ pub enum Stmt {
     Eq(EqStmt),
 }
 
+impl Stmt {
+    pub fn docs(&self) -> &[String] {
+        match self {
+            Self::Type(ty) => &ty.docs,
+            Self::Rel(rel) => &rel.docs,
+            Self::Eq(_) => &[],
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TypeStmt {
+    pub docs: Vec<String>,
     pub kw: Span,
     pub ident: Spanned<String>,
     pub rel_block: Spanned<Option<Vec<RelStmt>>>,
@@ -18,6 +29,7 @@ pub struct TypeStmt {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct RelStmt {
+    pub docs: Vec<String>,
     pub kw: Span,
     pub subject: Option<Spanned<Type>>,
     pub connection: RelConnection,

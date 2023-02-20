@@ -19,6 +19,7 @@ pub enum Token {
     StringLiteral(String),
     Regex(String),
     Sym(String),
+    DocComment(String),
 }
 
 #[allow(dead_code)]
@@ -30,8 +31,13 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         _ => Token::Sym(ident),
     });
 
-    one_of(".:?_+-*/|")
-        .map(Token::Sigil)
+    let comment = just("//")
+        .ignore_then(filter(|c: &char| *c != '/'))
+        .ignore_then(take_until(just('\n')))
+        .padded();
+
+    doc_comment()
+        .or(one_of(".:?_+-*/|").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
         .or(tree::num().map(Token::Number))
@@ -40,6 +46,13 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .or(tree::regex().map(Token::Regex))
         .or(ident)
         .map_with_span(|token, span| (token, span))
+        .padded_by(comment.repeated())
         .padded()
         .repeated()
+}
+
+pub fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
+    just("///")
+        .ignore_then(take_until(just('\n')))
+        .map(|(vec, _)| Token::DocComment(String::from_iter(vec.into_iter())))
 }

@@ -32,7 +32,8 @@ fn stmt() -> impl AstParser<Spanned<Stmt>> {
 }
 
 fn type_stmt() -> impl AstParser<TypeStmt> {
-    keyword(Token::Type)
+    doc_comments()
+        .then(keyword(Token::Type))
         .then(spanned(ident()))
         .then(spanned(
             rel_stmt()
@@ -40,7 +41,8 @@ fn type_stmt() -> impl AstParser<TypeStmt> {
                 .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
                 .or_not(),
         ))
-        .map(|((kw, ident), rel_block)| TypeStmt {
+        .map(|(((docs, kw), ident), rel_block)| TypeStmt {
+            docs,
             kw,
             ident,
             rel_block,
@@ -48,7 +50,8 @@ fn type_stmt() -> impl AstParser<TypeStmt> {
 }
 
 fn rel_stmt() -> impl AstParser<RelStmt> {
-    keyword(Token::Rel)
+    doc_comments()
+        .then(keyword(Token::Rel))
         // subject
         .then(spanned(ty()).or_not())
         // connection
@@ -66,13 +69,16 @@ fn rel_stmt() -> impl AstParser<RelStmt> {
         )
         // object
         .then(spanned(ty()).or_not())
-        .map(|((((kw, subject), connection), chain), object)| RelStmt {
-            kw,
-            subject,
-            connection,
-            chain,
-            object,
-        })
+        .map(
+            |(((((docs, kw), subject), connection), chain), object)| RelStmt {
+                docs,
+                kw,
+                subject,
+                connection,
+                chain,
+                object,
+            },
+        )
 }
 
 fn rel_connection() -> impl AstParser<RelConnection> {
@@ -192,6 +198,10 @@ fn ty() -> impl AstParser<Type> {
         .or(regex)
 }
 
+fn doc_comments() -> impl AstParser<Vec<String>> {
+    select! { Token::DocComment(string) => string }.repeated()
+}
+
 fn keyword(token: Token) -> impl AstParser<Span> {
     just(token).map_with_span(|_, span| span)
 }
@@ -231,6 +241,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
     use chumsky::Stream;
 
     use crate::parse::lexer::lexer;
@@ -255,7 +266,9 @@ mod tests {
     #[test]
     fn parse_type() {
         let source = "
+        /// doc comment
         type foo
+        /// doc comment
         type bar {
             rel a { '' } b
             rel { lol } c
@@ -264,7 +277,10 @@ mod tests {
         }
         ";
 
-        assert_eq!(2, parse(source).unwrap().len());
+        let stmts = parse(source).unwrap();
+        assert_matches!(stmts.as_slice(), [Stmt::Type(_), Stmt::Type(_)]);
+
+        assert_eq!(1, stmts[0].docs().len());
     }
 
     #[test]
@@ -277,14 +293,16 @@ mod tests {
             }
         }
 
+        // comment
         eq (:x :y) {
             foo { :x + 1 }
             bar {
-                rel { 'foo' } (:x + 3) * 4
+                rel { 'foo' } (:x / 3) + 4
             }
         }
         ";
 
-        assert_eq!(2, parse(source).unwrap().len());
+        let stmts = parse(source).unwrap();
+        assert_matches!(stmts.as_slice(), [Stmt::Eq(_), Stmt::Eq(_)]);
     }
 }
