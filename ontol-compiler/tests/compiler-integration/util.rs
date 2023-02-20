@@ -115,11 +115,14 @@ pub fn diff_errors(
     source: &str,
     compile_src: CompileSrc,
     errors: UnifiedCompileError,
+    error_pattern: &str,
 ) -> Vec<AnnotatedCompileError> {
+    let space_error_pattern = format!(" {error_pattern}");
+
     let mut builder = source
         .lines()
         .fold(DiagnosticBuilder::default(), |mut builder, line| {
-            let orig_stripped = if let Some(byte_index) = line.find(" ;; ERROR") {
+            let orig_stripped = if let Some(byte_index) = line.find(&space_error_pattern) {
                 &line[..byte_index]
             } else {
                 line
@@ -164,7 +167,7 @@ pub fn diff_errors(
                 let joined_errors = line
                     .errors
                     .iter()
-                    .map(|spanned_error| format!(";; ERROR {}", spanned_error.error))
+                    .map(|spanned_error| format!("{} {}", error_pattern, spanned_error.error))
                     .collect::<Vec<_>>()
                     .join("");
                 format!("{original} {joined_errors}")

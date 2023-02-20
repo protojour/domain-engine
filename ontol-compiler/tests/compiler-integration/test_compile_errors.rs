@@ -3,6 +3,11 @@ use pretty_assertions::assert_eq;
 use test_log::test;
 
 #[test]
+fn lex_error_new() {
+    "type // ERROR parse error: unexpected".compile_fail();
+}
+
+#[test]
 fn lex_error() {
     "( ;; ERROR lex error".s_compile_fail();
 }

@@ -52,6 +52,17 @@ pub(crate) use assert_json_io_matches;
 use util::AnnotatedCompileError;
 
 trait TestCompile: Sized {
+    /// Compile
+    fn compile_ok(self, validator: impl Fn(&Env));
+
+    /// Compile, expect failure
+    fn compile_fail(self) {
+        self.compile_fail_then(|_| {})
+    }
+
+    /// Compile, expect failure with error closure
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
+
     /// Compile using S-expr syntax
     fn s_compile_ok(self, validator: impl Fn(&Env));
 
@@ -65,6 +76,37 @@ trait TestCompile: Sized {
 }
 
 impl TestCompile for &'static str {
+    fn compile_ok(self, validator: impl Fn(&Env)) {
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem).with_core();
+        let compile_src = compiler.sources.add(TEST_PKG, "str".into(), self.into());
+
+        match compile_src.clone().compile(&mut compiler, TEST_PKG) {
+            Ok(()) => {
+                validator(&compiler.into_env());
+            }
+            Err(errors) => {
+                util::diff_errors(self, compile_src, errors, "// ERROR");
+                panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
+            }
+        }
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        let mut mem = Mem::default();
+        let mut compiler = Compiler::new(&mut mem).with_core();
+        let compile_src = compiler
+            .sources
+            .add(PackageId(666), "str".into(), self.into());
+
+        let Err(errors) = compile_src.clone().compile(&mut compiler, PackageId(1)) else {
+            panic!("Script did not fail to compile");
+        };
+
+        let annotated_errors = util::diff_errors(self, compile_src, errors, "// ERROR");
+        validator(annotated_errors);
+    }
+
     fn s_compile_ok(self, validator: impl Fn(&Env)) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
@@ -75,7 +117,7 @@ impl TestCompile for &'static str {
                 validator(&compiler.into_env());
             }
             Err(errors) => {
-                util::diff_errors(self, compile_src, errors);
+                util::diff_errors(self, compile_src, errors, ";; ERROR");
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
@@ -92,7 +134,7 @@ impl TestCompile for &'static str {
             panic!("Script did not fail to compile");
         };
 
-        let annotated_errors = util::diff_errors(self, compile_src, errors);
+        let annotated_errors = util::diff_errors(self, compile_src, errors, ";; ERROR");
         validator(annotated_errors);
     }
 }

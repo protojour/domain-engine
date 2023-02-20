@@ -6,6 +6,7 @@ use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
 
 pub use error::*;
+use lowering::Lowering;
 use ontol_runtime::{DefId, PackageId};
 use patterns::compile_all_patterns;
 use s_lowering::SExprLowering;
@@ -20,6 +21,7 @@ mod codegen;
 mod compiler_queries;
 mod def;
 mod expr;
+mod lowering;
 mod namespace;
 mod parse;
 mod patterns;
@@ -109,9 +111,15 @@ fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId
             );
         }
 
-        if let Some(statements) = statements {}
+        let mut lowering = Lowering::new(compiler, &src);
 
-        todo!()
+        if let Some(statements) = statements {
+            for stmt in statements {
+                let _ignored = lowering.lower_stmt(stmt);
+            }
+        }
+
+        lowering.finish()
     } else {
         vec![]
     }

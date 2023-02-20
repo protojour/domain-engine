@@ -3,8 +3,8 @@ use smartstring::alias::String;
 
 use super::{
     ast::{
-        ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr, RelConnection,
-        RelStmt, Stmt, Type, TypeStmt,
+        Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr,
+        RelConnection, RelStmt, Stmt, Type, TypeStmt,
     },
     lexer::Token,
     Span, Spanned,
@@ -84,20 +84,42 @@ fn rel_stmt() -> impl AstParser<RelStmt> {
 fn rel_connection() -> impl AstParser<RelConnection> {
     // type
     spanned(ty())
-        // many
-        .then(just(Token::Sigil('*')).or_not())
-        // optional
-        .then(just(Token::Sigil('?')).or_not())
-        // object prop ident
-        .then(spanned(just(Token::Sigil('|')).ignore_then(string_literal())).or_not())
+        .then(cardinality())
+        // object prop and cardinality
+        .then(
+            just(Token::Sigil('|'))
+                .ignore_then(spanned(string_literal()))
+                .then(cardinality())
+                .or_not(),
+        )
         // rel params
-        .then(spanned(just(Token::Sigil(':')).ignore_then(string_literal())).or_not())
+        .then(spanned(just(Token::Sigil(':')).ignore_then(ty())).or_not())
         // within {}
         .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
-        .map(|((((ty, _), _), object_prop_ident), _)| RelConnection {
-            ty,
-            object_prop_ident,
-            rel_params: None,
+        .map(|(((ty, subject_cardinality), object), rel_params)| {
+            let (object_prop_ident, object_cardinality) = match object {
+                Some((prop, cardinality)) => (Some(prop), cardinality),
+                None => (None, None),
+            };
+            RelConnection {
+                ty,
+                subject_cardinality,
+                object_prop_ident,
+                object_cardinality,
+                rel_params: None,
+            }
+        })
+}
+
+fn cardinality() -> impl AstParser<Option<Cardinality>> {
+    just(Token::Sigil('*'))
+        .or_not()
+        .then(just(Token::Sigil('?')).or_not())
+        .map(|(many, option)| match (many.is_some(), option.is_some()) {
+            (true, true) => Some(Cardinality::OptionalMany),
+            (true, false) => Some(Cardinality::Many),
+            (false, true) => Some(Cardinality::Optional),
+            (false, false) => None,
         })
 }
 
