@@ -9,7 +9,7 @@ use crate::{assert_error_msg, util::TypeBinding, TestCompile};
 
 #[test]
 fn deserialize_empty_type() {
-    "(type! foo)".s_compile_ok(|env| {
+    "type foo".compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_error_msg!(
             foo.deserialize_data(json!(42)),
@@ -29,10 +29,10 @@ fn deserialize_empty_type() {
 #[test]
 fn deserialize_int() {
     "
-    (type! foo)
-    (rel! _ { int } foo)
+    type foo
+    rel . { int } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(foo.deserialize_data_variant(json!(42)), Ok(Data::Int(42)));
         assert_matches!(foo.deserialize_data_variant(json!(-42)), Ok(Data::Int(-42)));
@@ -51,10 +51,10 @@ fn deserialize_int() {
 #[test]
 fn deserialize_string() {
     "
-    (type! foo)
-    (rel! _ { string } foo)
+    type foo
+    rel . { string } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(json!("hei")),
@@ -71,11 +71,11 @@ fn deserialize_string() {
 #[test]
 fn deserialize_object_properties() {
     "
-    (type! obj)
-    (rel! obj { 'a' } string)
-    (rel! obj { 'b' } int)
+    type obj
+    rel obj { 'a' } string
+    rel obj { 'b' } int
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let obj = TypeBinding::new(env, "obj");
         assert_matches!(
             obj.deserialize_data(json!({ "a": "hei", "b": 42 })),
@@ -100,15 +100,15 @@ fn deserialize_object_properties() {
 #[test]
 fn deserialize_nested() {
     "
-    (type! one)
-    (type! two)
-    (type! three)
-    (rel! one { 'x' } two)
-    (rel! one { 'y' } three)
-    (rel! two { 'y' } three)
-    (rel! _ { string } three)
+    type one
+    type two
+    type three
+    rel one { 'x' } two
+    rel one { 'y' } three
+    rel two { 'y' } three
+    rel . { string } three
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let one = TypeBinding::new(env, "one");
         assert_matches!(
             one.deserialize_data(json!({
@@ -125,12 +125,12 @@ fn deserialize_nested() {
 #[test]
 fn deserialize_recursive() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'b' } bar)
-    (rel! bar { 'f' } foo)
+    type foo
+    type bar
+    rel foo { 'b' } bar
+    rel bar { 'f' } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_error_msg!(
             foo.deserialize_data(json!({
@@ -148,11 +148,11 @@ fn deserialize_recursive() {
 #[test]
 fn deserialize_union_of_primitives() {
     "
-    (type! foo)
-    (rel! _ { string } foo)
-    (rel! _ { int } foo)
+    type foo
+    rel . { string } foo
+    rel . { int } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(json!(42)),
@@ -169,10 +169,10 @@ fn deserialize_union_of_primitives() {
 #[test]
 fn deserialize_string_constant() {
     "
-    (type! foo)
-    (rel! _ { 'my_value' } foo)
+    type foo
+    rel . { 'my_value' } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(json!("my_value")),
@@ -192,11 +192,11 @@ fn deserialize_string_constant() {
 #[test]
 fn deserialize_finite_non_uniform_sequence() {
     "
-    (type! foo)
-    (rel! foo { 0 } int)
-    (rel! foo { 1 } 'a')
+    type foo
+    rel foo { 0 } int
+    rel foo { 1 } 'a'
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data(json!([42, "a"])),
@@ -220,10 +220,10 @@ fn deserialize_finite_non_uniform_sequence() {
 #[test]
 fn deserialize_finite_uniform_sequence() {
     "
-    (type! foo)
-    (rel! foo { ..2 } int)
+    type foo
+    rel foo { ..2 } int
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data(json!([42, 42])),
@@ -247,11 +247,11 @@ fn deserialize_finite_uniform_sequence() {
 #[test]
 fn deserialize_string_union() {
     "
-    (type! foo)
-    (rel! _ { 'a' } foo)
-    (rel! _ { 'b' } foo)
+    type foo
+    rel . { 'a' } foo
+    rel . { 'b' } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_matches!(
             foo.deserialize_data_variant(json!("a")),
@@ -267,17 +267,17 @@ fn deserialize_string_union() {
 #[test]
 fn deserialize_map_union() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'variant' } 'foo')
-    (rel! bar { 'variant' } 'bar')
-    (rel! bar { 'prop' } int)
+    type foo
+    type bar
+    rel foo { 'variant' } 'foo'
+    rel bar { 'variant' } 'bar'
+    rel bar { 'prop' } int
 
-    (type! union)
-    (rel! _ { foo } union)
-    (rel! _ { bar } union)
+    type union
+    rel . { foo } union
+    rel . { bar } union
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let union = TypeBinding::new(env, "union");
         assert_matches!(
             union.deserialize_data_variant(json!({ "variant": "foo" })),
