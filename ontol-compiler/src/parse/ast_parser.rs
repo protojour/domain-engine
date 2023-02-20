@@ -5,8 +5,8 @@ use smartstring::alias::String;
 
 use super::{
     ast::{
-        Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr,
-        RelConnection, RelStmt, RelType, Stmt, Type, TypeStmt,
+        BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt,
+        EqType, Expr, RelConnection, RelStmt, RelType, Stmt, Type, TypeStmt,
     },
     lexer::Token,
     Span, Spanned,
@@ -180,23 +180,26 @@ fn eq_type() -> impl AstParser<EqType> {
 fn eq_attribute() -> impl AstParser<EqAttribute> {
     let variable = expr().map(EqAttribute::Expr);
     let rel = keyword(Token::Rel)
-        .then(spanned(expr()).or_not())
+        .then(expr().or_not())
         .then(spanned(ty()).delimited_by(just(Token::Open('{')), just(Token::Close('}'))))
-        .then(spanned(expr()).or_not())
-        .map(|(((kw, subject), connection), object)| {
-            EqAttribute::Rel(EqAttributeRel {
-                kw,
-                subject,
-                connection,
-                object,
-            })
+        .then(expr().or_not())
+        .map_with_span(|(((kw, subject), connection), object), span| {
+            EqAttribute::Rel((
+                EqAttributeRel {
+                    kw,
+                    subject,
+                    connection,
+                    object,
+                },
+                span,
+            ))
         });
 
     variable.or(rel)
 }
 
 /// Expression parser
-fn expr() -> impl AstParser<Expr> {
+fn expr() -> impl AstParser<Spanned<Expr>> {
     recursive(|expr| {
         let path = path().map(Expr::Path);
         let variable = variable().map(Expr::Variable);
@@ -204,10 +207,10 @@ fn expr() -> impl AstParser<Expr> {
         let string_literal = string_literal().map(Expr::StringLiteral);
         let group = expr.delimited_by(just(Token::Open('(')), just(Token::Close(')')));
 
-        let atom = path
-            .or(variable)
-            .or(number_literal)
-            .or(string_literal)
+        let atom = spanned(path)
+            .or(spanned(variable))
+            .or(spanned(number_literal))
+            .or(spanned(string_literal))
             .or(group);
 
         // Consume operators by precedende
@@ -215,18 +218,28 @@ fn expr() -> impl AstParser<Expr> {
         // these are large types and thus pretty slow to compile :(
 
         // infix precedence for multiplication and division:
-        let op = just(Token::Sigil('*')).or(just(Token::Sigil('/')));
+        let op = just(Token::Sigil('*'))
+            .map(|_| BinaryOp::Mul)
+            .or(just(Token::Sigil('/')).map(|_| BinaryOp::Div));
         let product = atom
             .clone()
             .then(op.then(atom).repeated())
-            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)));
+            .foldl(|left, (op, right)| {
+                let span = left.1.start..right.1.end;
+                (Expr::Binary(Box::new(left), op, Box::new(right)), span)
+            });
 
         // infix precedence for addition and subtraction:
-        let op = just(Token::Sigil('+')).or(just(Token::Sigil('-')));
+        let op = just(Token::Sigil('+'))
+            .map(|_| BinaryOp::Add)
+            .or(just(Token::Sigil('-')).map(|_| BinaryOp::Sub));
         product
             .clone()
             .then(op.then(product).repeated())
-            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)))
+            .foldl(|left, (op, right)| {
+                let span = left.1.start..right.1.end;
+                (Expr::Binary(Box::new(left), op, Box::new(right)), span)
+            })
     })
 }
 

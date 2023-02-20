@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use smartstring::alias::String;
 
-use super::{lexer::Token, Span, Spanned};
+use super::{Span, Spanned};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Stmt {
@@ -13,6 +13,7 @@ pub enum Stmt {
 }
 
 impl Stmt {
+    #[allow(unused)]
     pub fn docs(&self) -> &[String] {
         match self {
             Self::Type(ty) => &ty.docs,
@@ -92,8 +93,8 @@ pub struct EqType {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum EqAttribute {
-    Expr(Expr),
-    Rel(EqAttributeRel),
+    Expr(Spanned<Expr>),
+    Rel(Spanned<EqAttributeRel>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -120,6 +121,14 @@ pub enum Expr {
     Path(String),
     NumberLiteral(String),
     StringLiteral(String),
-    Binary(Box<Expr>, Token, Box<Expr>),
+    Binary(Box<Spanned<Expr>>, BinaryOp, Box<Spanned<Expr>>),
     // Call(Spanned<String>, Vec<Spanned<Expr>>),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
 }

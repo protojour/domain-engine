@@ -38,16 +38,20 @@ fn assert_translate(
 #[test]
 fn test_eq_simple() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'f' } string)
-    (rel! bar { 'b' } string)
-    (eq! (:x)
-        (obj! foo { 'f' :x })
-        (obj! bar { 'b' :x })
-    )
+    type foo
+    type bar
+    rel foo { 'f' } string
+    rel bar { 'b' } string
+    eq (:x) {
+        foo {
+            rel { 'f' } :x
+        }
+        bar {
+            rel { 'b' } :x
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(
             env,
             ("foo", "bar"),
@@ -66,16 +70,16 @@ fn test_eq_simple() {
 #[test]
 fn test_meters() {
     "
-    (type! meters)
-    (type! millimeters)
-    (rel! _ { int } meters)
-    (rel! _ { int } millimeters)
-    (eq! (:x)
-        (obj! meters (/ :x 1000))
-        (obj! millimeters :x)
-    )
+    type meters
+    type millimeters
+    rel . { int } meters
+    rel . { int } millimeters
+    eq (:x) {
+        meters { :x / 1000 }
+        millimeters { :x }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
         assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
     })
@@ -84,38 +88,40 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    (type! celsius)
-    (rel! _ { int } celsius)
+    type celsius
+    rel . { int } celsius
 
-    (type! fahrenheit)
-    (rel! _ { int } fahrenheit)
+    type fahrenheit
+    rel . { int } fahrenheit
 
-    (eq! (:x)
-        (obj! celsius :x)
-        (obj! fahrenheit (+ (* :x (/ 9 5)) 32))
-    )
+    eq (:x) {
+        celsius { :x }
+        fahrenheit { :x * 9 / 5 + 32 }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         // FIXME: No support for rational numbers yet, so the numeric result is wrong
         // (but code generation should work)
-        assert_translate(env, ("celsius", "fahrenheit"), json!(10), json!(42));
-        assert_translate(env, ("fahrenheit", "celsius"), json!(42), json!(10));
+        assert_translate(env, ("celsius", "fahrenheit"), json!(10), json!(50));
+        assert_translate(env, ("fahrenheit", "celsius"), json!(50), json!(10));
     })
 }
 
 #[test]
 fn test_eq_value_to_map() {
     "
-    (type! one)
-    (type! two)
-    (rel! _ { string } one)
-    (rel! two { 'a' } string)
-    (eq! (:x)
-        (obj! one :x)
-        (obj! two { 'a' :x })
-    )
+    type one
+    type two
+    rel . { string } one
+    rel two { 'a' } string
+    eq (:x) {
+        one { :x }
+        two {
+            rel { 'a' } :x
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
         assert_translate(env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
     })
@@ -124,16 +130,18 @@ fn test_eq_value_to_map() {
 #[test]
 fn test_eq_value_to_map_func() {
     "
-    (type! one)
-    (type! two)
-    (rel! _ { int } one)
-    (rel! two { 'a' } int)
-    (eq! (:x)
-        (obj! one :x)
-        (obj! two { 'a' (* :x 2) })
-    )
+    type one
+    type two
+    rel . { int } one
+    rel two { 'a' } int
+    eq (:x) {
+        one { :x }
+        two {
+            rel { 'a' } :x * 2
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(env, ("one", "two"), json!(2), json!({ "a": 4 }));
         assert_translate(env, ("two", "one"), json!({ "a": 4 }), json!(2));
     })
@@ -142,16 +150,20 @@ fn test_eq_value_to_map_func() {
 #[test]
 fn test_eq_simple_array() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a'* } int)
-    (rel! bar { 'b'* } int)
-    (eq! (:x)
-        (obj! foo { 'a' :x })
-        (obj! bar { 'b' :x })
-    )
+    type foo
+    type bar
+    rel foo { 'a'* } int
+    rel bar { 'b'* } int
+    eq (:x) {
+        foo {
+            rel { 'a' } :x
+        }
+        bar {
+            rel { 'b' } :x
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(
             env,
             ("foo", "bar"),
@@ -174,20 +186,28 @@ fn test_eq_complex_flow() {
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
-    (type! one)
-    (type! two)
-    (rel! one { 'a' } string)
-    (rel! one { 'b' } string)
-    (rel! two { 'a' } string)
-    (rel! two { 'b' } string)
-    (rel! two { 'c' } string)
-    (rel! two { 'd' } string)
-    (eq! (:x :y)
-        (obj! one { 'a' :x } { 'b' :y })
-        (obj! two { 'a' :x } { 'b' :y } { 'c' :x } { 'd' :y })
-    )
+    type one
+    type two
+    rel one { 'a' } string
+    rel one { 'b' } string
+    rel two { 'a' } string
+    rel two { 'b' } string
+    rel two { 'c' } string
+    rel two { 'd' } string
+    eq(:x :y) {
+        one {
+            rel { 'a' } :x
+            rel { 'b' } :y
+        }
+        two {
+            rel { 'a' } :x
+            rel { 'b' } :y
+            rel { 'c' } :x
+            rel { 'd' } :y
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(
             env,
             ("one", "two"),
@@ -212,29 +232,33 @@ fn test_eq_complex_flow() {
 #[test]
 fn test_eq_delegation() {
     "
-    (type! meters)
-    (rel! _ { int } meters)
+    type meters
+    rel . { int } meters
 
-    (type! millimeters)
-    (rel! _ { int } millimeters)
+    type millimeters
+    rel . { int } millimeters
 
-    (eq! (:m)
-        (obj! meters :m)
-        (obj! millimeters (* :m 1000))
-    )
+    eq(:m) {
+        meters { :m }
+        millimeters { :m * 1000 }
+    }
 
-    (type! car)
-    (rel! car { 'length' } meters)
+    type car
+    rel car { 'length' } meters
 
-    (type! vehicle)
-    (rel! vehicle { 'length' } millimeters)
+    type vehicle
+    rel vehicle { 'length' } millimeters
     
-    (eq! (:l)
-        (obj! car { 'length' :l })
-        (obj! vehicle { 'length' :l })
-    )
+    eq(:l) {
+        car {
+            rel { 'length' } :l
+        }
+        vehicle {
+            rel { 'length' } :l
+        }
+    }
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         assert_translate(
             env,
             ("car", "vehicle"),

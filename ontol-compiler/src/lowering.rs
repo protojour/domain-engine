@@ -11,13 +11,13 @@ use crate::{
     compiler::Compiler,
     def::{
         Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
-        ValueCardinality,
+        ValueCardinality, Variables,
     },
     error::{CompileError, SpannedCompileError},
-    expr::{Expr, ExprId, ExprKind},
+    expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     parse::{
-        ast::{self, RelType},
+        ast::{self, BinaryOp, EqAttribute, RelType},
         Span,
     },
     source::{CompileSrc, CORE_PKG},
@@ -75,7 +75,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Stmt::Rel(rel_stmt) => self.ast_relationship_chain_to_def(rel_stmt, span, None),
             ast::Stmt::Eq(ast::EqStmt {
-                kw,
+                kw: _,
                 variables: ast_variables,
                 first,
                 second,
@@ -89,16 +89,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                todo!()
-                /*
-                let first = self.lower_root_expr(first, &mut var_table)?;
-                let second = self.lower_root_expr(second, &mut var_table)?;
+                let first = self.lower_eq_type_to_obj(first, &mut var_table)?;
+                let second = self.lower_eq_type_to_obj(second, &mut var_table)?;
+
                 Ok([self.def(
                     DefKind::Equation(Variables(variables.into()), first, second),
                     &span,
                 )]
                 .into())
-                */
             }
         }
     }
@@ -314,10 +312,50 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lower_root_expr(&mut self, ast: (ast::Expr, Span), var_table: &mut VarTable) -> Res<ExprId> {
-        let expr = self.lower_expr(ast, var_table)?;
+    fn lower_eq_type_to_obj(
+        &mut self,
+        (eq_type, span): (ast::EqType, Span),
+        var_table: &mut VarTable,
+    ) -> Res<ExprId> {
+        let type_def_id = self.lookup_ident(&eq_type.path.0, &eq_type.path.1)?;
+        let attributes = eq_type
+            .attributes
+            .into_iter()
+            .map(|eq_attr| match eq_attr {
+                EqAttribute::Expr((expr, expr_span)) => {
+                    let key = (DefId::unit(), self.src.span(&expr_span));
+                    let expr = self.lower_expr((expr, expr_span), var_table)?;
+
+                    Ok((key, expr))
+                }
+                EqAttribute::Rel((rel, _rel_span)) => {
+                    // FIXME: For now:
+                    assert!(rel.subject.is_none());
+
+                    let connection = rel.connection;
+                    let (object, object_span) = rel.object.unwrap();
+
+                    let key = self.ast_type_to_def(connection.0, &connection.1)?;
+
+                    self.lower_expr((object, object_span), var_table)
+                        .map(|expr| ((key, self.src.span(&connection.1)), expr))
+                }
+            })
+            .collect::<Result<_, _>>()?;
+
+        let expr = self.expr(
+            ExprKind::Obj(
+                TypePath {
+                    def_id: type_def_id,
+                    span: self.src.span(&eq_type.path.1),
+                },
+                attributes,
+            ),
+            &span,
+        );
         let expr_id = self.compiler.defs.alloc_expr_id();
         self.compiler.expressions.insert(expr_id, expr);
+
         Ok(expr_id)
     }
 
@@ -334,16 +372,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.expr(ExprKind::Constant(int), &span))
             }
             ast::Expr::Binary(left, op, right) => {
-                /*
-                let args = ast_args
-                    .into_iter()
-                    .map(|ast_arg| self.lower_expr(ast_arg, var_table))
-                    .collect::<Result<_, _>>()?;
+                let fn_ident = match op {
+                    BinaryOp::Add => "+",
+                    BinaryOp::Sub => "-",
+                    BinaryOp::Mul => "*",
+                    BinaryOp::Div => "/",
+                };
 
-                let def_id = self.lookup_ident(&ident, &ident_span)?;
-                Ok(self.expr(ExprKind::Call(def_id, args), &span))
-                */
-                todo!()
+                let def_id = self.lookup_ident(fn_ident, &span)?;
+
+                let left = self.lower_expr(*left, var_table)?;
+                let right = self.lower_expr(*right, var_table)?;
+
+                Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }
             /*
             ast::Expr::Obj((ident, ident_span), ast_attributes) => {
