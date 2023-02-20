@@ -41,6 +41,8 @@ pub enum CompileError {
     Parse(ChumskyError<Token>),
     #[error("parse error: {0}")]
     SParse(ChumskyError<Tree>),
+    #[error("must speicify both subject and object in this relation")]
+    MustSpecifyBothSubjectAndObjectInRelation,
     #[error("function takes {expected} parameters, but {actual} was supplied")]
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
     #[error("not callable")]

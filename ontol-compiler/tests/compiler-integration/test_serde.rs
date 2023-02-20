@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "(type! foo)".s_compile_ok(|env| {
+    "type foo".compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({}));
     });
@@ -15,10 +15,10 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_value_type() {
     "
-    (type! foo)
-    (rel! _ { string } foo)
+    type foo
+    rel . { string } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!("string"));
     });
@@ -27,10 +27,10 @@ fn test_serde_value_type() {
 #[test]
 fn test_serde_map_type() {
     "
-    (type! foo)
-    (rel! foo { 'a' } string)
+    type foo
+    rel foo { 'a' } string
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "string" }));
     });
@@ -39,13 +39,13 @@ fn test_serde_map_type() {
 #[test]
 fn test_serde_complex_type() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a' } string)
-    (rel! foo { 'b' } bar)
-    (rel! bar { 'c' } string)
+    type foo
+    type bar
+    rel foo { 'a' } string
+    rel foo { 'b' } bar
+    rel bar { 'c' } string
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "A", "b": { "c": "C" }}));
     });
@@ -54,11 +54,11 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    (type! t)
-    (rel! t { 0 } string)
-    (rel! t { 1 } int)
+    type t
+    rel t { 0 } string
+    rel t { 1 } int
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let t = TypeBinding::new(env, "t");
         assert_json_io_matches!(t, json!(["a", 1]));
     });
@@ -67,11 +67,11 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    (type! u)
-    (rel! _ { 'a' } u)
-    (rel! _ { 'b' } u)
+    type u
+    rel . { 'a' } u
+    rel . { 'b' } u
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!("a"));
     });
@@ -80,14 +80,14 @@ fn test_serde_value_union1() {
 #[test]
 fn test_serde_string_or_unit() {
     "
-    (type! string-or-unit)
-    (rel! _ { string } string-or-unit)
-    (rel! _ { _ } string-or-unit)
+    type string-or-unit
+    rel . { string } string-or-unit
+    rel . { . } string-or-unit
 
-    (type! foo)
-    (rel! foo { 'a' } string-or-unit)
+    type foo
+    rel foo { 'a' } string-or-unit
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "string" }));
         assert_json_io_matches!(foo, json!({ "a": null }));

@@ -1,10 +1,12 @@
+use std::ops::Range;
+
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use super::{
     ast::{
         Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr,
-        RelConnection, RelStmt, Stmt, Type, TypeStmt,
+        RelConnection, RelStmt, RelType, Stmt, Type, TypeStmt,
     },
     lexer::Token,
     Span, Spanned,
@@ -82,8 +84,13 @@ fn rel_stmt() -> impl AstParser<RelStmt> {
 }
 
 fn rel_connection() -> impl AstParser<RelConnection> {
+    let rel_ty_int_range = spanned(u16_range()).map(|range| RelType::IntRange(range));
+    let rel_ty_type = spanned(ty()).map(|ty| RelType::Type(ty));
+
+    let rel_ty = rel_ty_int_range.or(rel_ty_type);
+
     // type
-    spanned(ty())
+    rel_ty
         .then(cardinality())
         // object prop and cardinality
         .then(
@@ -242,6 +249,22 @@ fn variable() -> impl AstParser<String> {
 
 fn number_literal() -> impl AstParser<String> {
     select! { Token::Number(string) => string }
+}
+
+fn u16() -> impl AstParser<u16> {
+    number_literal().try_map(|lit: String, span| {
+        let u: u16 = lit
+            .parse()
+            .map_err(|_| Simple::custom(span, "unable to parse number"))?;
+        Ok(u)
+    })
+}
+
+fn u16_range() -> impl AstParser<Range<Option<u16>>> {
+    u16().map(move |n| Range {
+        start: Some(n),
+        end: Some(n + 1),
+    })
 }
 
 fn string_literal() -> impl AstParser<String> {

@@ -16,7 +16,10 @@ use crate::{
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    parse::{ast, Span},
+    parse::{
+        ast::{self, RelType},
+        Span,
+    },
     source::{CompileSrc, CORE_PKG},
 };
 
@@ -72,7 +75,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok([def_id].into())
             }
             */
-            ast::Stmt::Rel(rel_stmt) => self.ast_relationship_chain_to_def(rel_stmt, span),
+            ast::Stmt::Rel(rel_stmt) => self.ast_relationship_chain_to_def(rel_stmt, span, None),
             ast::Stmt::Eq(ast::EqStmt {
                 kw,
                 variables: ast_variables,
@@ -102,7 +105,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn ast_relationship_chain_to_def(&mut self, rel: ast::RelStmt, span: Span) -> Res<RootDefs> {
+    fn ast_relationship_chain_to_def(
+        &mut self,
+        rel: ast::RelStmt,
+        span: Span,
+        contextual_def: Option<(DefId, Span)>,
+    ) -> Res<RootDefs> {
         let ast::RelStmt {
             docs: _,
             kw: _,
@@ -112,13 +120,35 @@ impl<'s, 'm> Lowering<'s, 'm> {
             object,
         } = rel;
 
-        todo!();
-
-        /*
         let mut root_defs = SmallVec::new();
 
-        let mut subject_def = self.ast_type_to_def(subject.0, &subject.1)?;
-        let mut subject_span = subject.1;
+        let (mut subject_def, mut subject_span, object_def, object_span) =
+            match (subject, object, contextual_def) {
+                (Some(subject), Some(object), None) => (
+                    self.ast_type_to_def(subject.0, &subject.1)?,
+                    subject.1,
+                    self.ast_type_to_def(object.0, &object.1)?,
+                    object.1,
+                ),
+                (Some(subject), None, Some(object)) => (
+                    self.ast_type_to_def(subject.0, &subject.1)?,
+                    subject.1,
+                    object.0,
+                    object.1,
+                ),
+                (None, Some(object), Some(subject)) => (
+                    subject.0,
+                    subject.1,
+                    self.ast_type_to_def(object.0, &object.1)?,
+                    object.1,
+                ),
+                _ => {
+                    return Err(self.error(
+                        CompileError::MustSpecifyBothSubjectAndObjectInRelation,
+                        &span,
+                    ))
+                }
+            };
 
         for chain_item in chain {
             let (next_ty, next_ty_span) = match chain_item.subject {
@@ -143,17 +173,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
             subject_span = next_ty_span;
         }
 
-        let object_def = self.ast_type_to_def(object.0, &object.1)?;
-
         root_defs.push(self.ast_relationship_to_def(
             (subject_def, &subject_span),
             connection,
-            (object_def, &object.1),
+            (object_def, &object_span),
             span,
         )?);
 
         Ok(root_defs)
-        */
     }
 
     fn ast_relationship_to_def(
@@ -176,8 +203,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             _,
             Option<Range<Option<u16>>>,
         ) = match relation_ty {
-            (relation_ty, _) => {
-                let def_id = self.ast_type_to_def(relation_ty, &span)?;
+            RelType::Type((ty, span)) => {
+                let def_id = self.ast_type_to_def(ty, &span)?;
 
                 match self.compiler.defs.get_def_kind(def_id) {
                     Some(DefKind::StringLiteral(_)) => {
@@ -185,11 +212,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     }
                     _ => (RelationIdent::Typed(def_id), span.clone(), None),
                 }
-            } /*
-              (ast::ConnectionType::IntRange(range), span) => {
-                  (RelationIdent::Indexed, span, Some(range))
-              }
-              */
+            }
+            RelType::IntRange((range, span)) => (RelationIdent::Indexed, span, Some(range)),
         };
 
         let has_object_prop = object_prop_ident.is_some();
