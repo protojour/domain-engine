@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
@@ -22,6 +24,22 @@ pub enum Token {
     DocComment(String),
 }
 
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
+            Self::Type => write!(f, "keyword `type`"),
+            Self::Rel => write!(f, "keyword `rel`"),
+            Self::Eq => write!(f, "keyword `eq`"),
+            Self::Number(_) => write!(f, "`number`"),
+            Self::StringLiteral(_) => write!(f, "`string`"),
+            Self::Regex(_) => write!(f, "`regex`"),
+            Self::Sym(sym) => write!(f, "`{sym}`"),
+            Self::DocComment(_) => write!(f, "`doc_comment`"),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let ident = tree::ident().map(|ident| match ident.as_str() {
@@ -37,7 +55,8 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .padded();
 
     doc_comment()
-        .or(one_of(".:?_+-*/|").map(Token::Sigil))
+        .or(one_of(".:?_+-*|").map(Token::Sigil))
+        .or(just('/').then_ignore(none_of("/")).map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
         .or(tree::num().map(Token::Number))

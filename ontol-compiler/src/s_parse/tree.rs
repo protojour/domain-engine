@@ -71,6 +71,7 @@ pub fn tree_parser() -> impl Parser<char, Spanned<Tree>, Error = Simple<char>> {
             .or(double_quote_string_literal().map(Tree::StringLiteral))
             .or(single_quote_string_literal().map(Tree::StringLiteral))
             .or(regex().map(Tree::Regex))
+            .or(just("/").map(|_| Tree::Sym("/".into())))
             .or(ident().map(Tree::Sym))
             .or(comment());
 
@@ -172,7 +173,10 @@ fn comment() -> impl Parser<char, Tree, Error = Simple<char>> {
 }
 
 pub fn special_char(c: char) -> bool {
-    matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?')
+    matches!(
+        c,
+        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?' | '/'
+    )
 }
 
 #[cfg(test)]

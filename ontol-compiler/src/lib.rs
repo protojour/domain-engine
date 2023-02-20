@@ -11,6 +11,7 @@ use ontol_runtime::{DefId, PackageId};
 use patterns::compile_all_patterns;
 use s_lowering::SExprLowering;
 pub use source::*;
+use tracing::debug;
 
 pub mod compiler;
 pub mod error;
@@ -71,11 +72,7 @@ impl Compile for &str {
 }
 
 impl Compile for CompileSrc {
-    fn compile(
-        self,
-        compiler: &mut Compiler,
-        package: PackageId,
-    ) -> Result<(), UnifiedCompileError> {
+    fn compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
         let root_defs = parse_and_lower_source(compiler, self);
         compile_all_packages(compiler, root_defs)
     }
@@ -99,6 +96,8 @@ fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId
     }
 
     if let Some(tokens) = tokens {
+        debug!("tokens: {tokens:#?}");
+
         let len = tokens.len();
         let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
         let (statements, parse_errors) = parse::ast_parser::stmt_seq().parse_recovery(stream);

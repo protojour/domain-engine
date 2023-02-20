@@ -4,7 +4,8 @@ use test_log::test;
 
 #[test]
 fn lex_error_new() {
-    "type // ERROR parse error: unexpected".compile_fail();
+    "type // ERROR parse error: unexpected end of file".compile_fail();
+    "type {} // ERROR parse error: found `{`".compile_fail();
 }
 
 #[test]

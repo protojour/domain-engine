@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-pub(super) struct Missing<T> {
+pub struct Missing<T> {
     pub items: Vec<T>,
     pub logic_op: LogicOp,
 }

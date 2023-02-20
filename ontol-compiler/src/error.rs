@@ -2,6 +2,7 @@ use std::{fmt::Display, hash::Hash};
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use miette::Diagnostic;
+use ontol_runtime::format_utils::{LogicOp, Missing};
 use smartstring::alias::String;
 use thiserror::Error;
 
@@ -121,11 +122,44 @@ impl<I: Eq + Hash> ChumskyError<I> {
     }
 }
 
-impl<I: Hash + Eq> Display for ChumskyError<I> {
+impl<I: Hash + Eq + Display> Display for ChumskyError<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.reason() {
             SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
-            SimpleReason::Unexpected => write!(f, "unexpected"),
+            SimpleReason::Unexpected => {
+                let mut reported = false;
+                if let Some(found) = self.inner.found() {
+                    write!(f, "found {found}")?;
+                    reported = true;
+                }
+                if self.inner.expected().len() > 0 {
+                    if self.inner.found().is_some() {
+                        write!(f, ", ")?;
+                    }
+
+                    let missing_items: Vec<_> = self
+                        .inner
+                        .expected()
+                        .filter_map(|item| item.as_ref())
+                        .collect();
+
+                    if !missing_items.is_empty() {
+                        let missing = Missing {
+                            items: missing_items,
+                            logic_op: LogicOp::Or,
+                        };
+
+                        write!(f, "expected {missing}")?;
+                        reported = true;
+                    }
+                }
+
+                if !reported {
+                    write!(f, "unexpected end of file")?;
+                }
+
+                Ok(())
+            }
             SimpleReason::Custom(str) => write!(f, "{str}"),
         }
     }
