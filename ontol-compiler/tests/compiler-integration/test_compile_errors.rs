@@ -20,6 +20,27 @@ fn underscore_not_allowed_at_start_of_identifier() {
 }
 
 #[test]
+fn bad_error_recovery() {
+    // what's up with this (caused by ;; below):
+    "
+    type foo
+    type bar
+    rel foo { 'prop' } string // ERROR parse error: expected one of `(`, `}`, `*`, `+`, `-`, `/`, `:`, `rel`
+    rel bar { 'prop' } int
+    eq(:x) {
+        foo {
+            rel { 'prop' } :x
+        }
+        bar {
+            rel { 'prop' }
+                :x ;; foobar
+        }
+    }
+    "
+    .compile_fail()
+}
+
+#[test]
 fn rel_type_not_found() {
     "
     type foo
@@ -165,247 +186,250 @@ fn sequence_ambiguous_infinite_tail() {
 #[test]
 fn eq_undeclared_variable() {
     "
-    (eq! ()
-        :x ;; ERROR undeclared variable
-        42
-    )
+    type foo
+    type bar
+    eq() {
+        foo { :x } // ERROR undeclared variable
+        bar {}
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
+#[ignore = "there are no functions right now, only infix operators"]
 fn eq_incorrect_function_arguments() {
     "
-    (eq! (:x)
+    eq(:x) {
         (+ ;; ERROR function takes 2 parameters, but 1 was supplied
             :x
         )
         42
-    )
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn eq_obj_non_domain_type_and_unit_type() {
     "
-    (type! foo)
-    (eq! (:x)
-        (obj!
-            number ;; ERROR expected domain type
-        )
-        (obj! ;; ERROR no properties expected
-            foo { 'prop' :x }
-        )
-    )
+    type foo
+    eq (:x) {
+        number {} // ERROR expected domain type
+        foo { // ERROR no properties expected
+            rel { 'prop' } :x
+        }
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn eq_attribute_mismatch() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'prop' } bar)
-    (rel! _ { int } bar)
-    (eq! (:x)
-        (obj! ;; ERROR missing property `prop`
-            foo
-            :x ;; ERROR expected named property
-        )
-        (obj! bar) ;; ERROR expected expression
-    )
+    type foo
+    type bar
+    rel foo { 'prop' } bar
+    rel . { int } bar
+    eq(:x) {
+        foo { // ERROR missing property `prop`
+            :x // ERROR expected named property
+        }
+        bar {} // ERROR expected expression
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn eq_duplicate_unknown_property() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a' } bar)
-    (eq! (:x)
-        (obj! foo
-            { 'a' :x }
-            { 'a' :x } ;; ERROR duplicate property
-            { 'b' :x } ;; ERROR unknown property
-        )
-        (obj! bar)
-    )
+    type foo
+    type bar
+    rel foo { 'a' } bar
+    eq(:x) {
+        foo {
+            rel { 'a' } :x
+            rel { 'a' } :x // ERROR duplicate property
+            rel { 'b' } :x // ERROR unknown property
+        }
+        bar {}
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn eq_type_mismatch() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'prop' } string)
-    (rel! bar { 'prop' } int)
-    (eq! (:x)
-        (obj! foo { 'prop' :x })
-        (obj! bar
-            { 'prop'
-                :x ;; ERROR type mismatch: expected `int`, found `string`
-            }
-        )
-    )
+    type foo
+    type bar
+    rel foo { 'prop' } string
+    rel bar { 'prop' } int
+    eq(:x) {
+        foo {
+            rel { 'prop' } :x
+        }
+        bar {
+            rel { 'prop' }
+                :x // ERROR type mismatch: expected `int`, found `string`
+        }
+    }
     "
-    .s_compile_fail_then(|errors| {
-        assert_eq!("x", errors[0].span_text);
+    .compile_fail_then(|errors| {
+        assert_eq!(":x", errors[0].span_text);
     })
 }
 
 #[test]
 fn eq_type_mismatch_in_func() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'prop' } string)
-    (rel! bar { 'prop' } int)
-    (eq! (:x)
-        (obj! foo { 'prop' :x })
-        (obj! bar
-            { 'prop'
-                (*
-                    :x ;; ERROR type mismatch: expected `int`, found `string`
-                    2
-                )
-            }
-        )
-    )
+    type foo
+    type bar
+    rel foo { 'prop' } string
+    rel bar { 'prop' } int
+    eq(:x) {
+        foo {
+            rel {'prop'} :x
+        }
+        bar {
+            rel { 'prop' }
+                :x // ERROR type mismatch: expected `int`, found `string`
+                * 2
+        }
+    }
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn eq_array_mismatch() {
     "
-    (type! foo)
-    (rel! foo { 'a'* } string)
-    (rel! foo { 'b'* } string)
+    type foo
+    rel foo { 'a'* } string
+    rel foo { 'b'* } string
 
-    (type! bar)
-    (rel! bar { 'a' } string)
-    (rel! bar { 'b'* } int)
+    type bar
+    rel bar { 'a' } string
+    rel bar { 'b'* } int
 
-    (eq! (:x :y)
-        (obj! foo { 'a' :x } { 'b' :y })
-        (obj! bar
-            { 'a' :x } ;; ERROR type mismatch: expected `string`, found `string[]`
-            { 'b' :y } ;; ERROR type mismatch: expected `int[]`, found `string[]`
-        )
-    )
+    eq(:x :y) {
+        foo {
+            rel { 'a' } :x
+            rel { 'b' } :y
+        }
+        bar {
+            rel { 'a' } :x // ERROR type mismatch: expected `string`, found `string[]`
+            rel { 'b' } :y // ERROR type mismatch: expected `int[]`, found `string[]`
+        }
+    }
     "
-    .s_compile_fail();
+    .compile_fail();
 }
 
 #[test]
 fn union_in_named_relationship() {
     "
-    (type! foo)
-    (rel! foo { 'a' } string)
-    (rel! foo { 'a' } int) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    type foo
+    rel foo { 'a' } string
+    rel foo { 'a' } int // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
-    .s_compile_fail();
+    .compile_fail();
 }
 
 #[test]
 fn test_serde_object_property_not_sugared() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a' 'aa'*: _ } bar) ;; ERROR only entities may have named reverse relationship
-    (rel! foo { 'b' 'bb'*: _ } string) ;; ERROR only entities may have named reverse relationship
+    type foo
+    type bar
+    rel foo { 'a' | 'aa'*: . } bar // ERROR only entities may have named reverse relationship
+    rel foo { 'b' | 'bb'*: . } string // ERROR only entities may have named reverse relationship
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn unresolved_transitive_eq() {
     "
-    (type! a)
-    (type! b)
-    (rel! _ { int } a)
-    (rel! _ { int } b)
+    type a
+    type b
+    rel . { int } a
+    rel . { int } b
 
-    (type! c)
-    (type! d)
-    (rel! c { 'p0' } a)
-    (rel! d { 'p1' } b)
+    type c
+    type d
+    rel c { 'p0' } a
+    rel d { 'p1' } b
 
-    (eq! (:x)
-        (obj! c { 'p0'
-            :x ;; ERROR cannot convert this `a` from `b`: These types are not equated.
-        })
-        (obj! d { 'p1'
-            :x ;; ERROR cannot convert this `b` from `a`: These types are not equated.
-        })
-    )
+    eq(:x) {
+        c {
+            rel { 'p0' }
+                :x // ERROR cannot convert this `a` from `b`: These types are not equated.
+        }
+        d {
+            rel { 'p1' }
+                :x // ERROR cannot convert this `b` from `a`: These types are not equated.
+        }
+    }
     "
-    .s_compile_fail();
+    .compile_fail();
 }
 
 #[test]
 fn various_monadic_properties() {
     "
-    (type! foo)
-    (rel! foo { 'a' } string)
-    (default! foo { 'a' } 'default') ;; ERROR parse error: unknown keyword
+    type foo
+    rel foo { 'a' } string
+    // default foo { 'a' } 'default'
 
-    (type! bar)
-    ; a is either a string or not present
-    (rel! bar { 'maybe'? } string)
+    type bar
+    // a is either a string or not present
+    rel bar { 'maybe'? } string
 
-    ; bar and string may be related via b many times
-    (rel! bar { 'array'* } string)
+    // bar and string may be related via b many times
+    rel bar { 'array'* } string
 
-    ; a is either a string or null
-    (rel! bar { 'nullable' } string)
-    ; FIXME: Should this work?
-    (rel! bar { 'nullable' } _) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
+    // a is either a string or null
+    rel bar { 'nullable' } string
+    // FIXME: Should this work?
+    rel bar { 'nullable' } . // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn mix_of_index_and_edge_type() {
     r#"
-    (type! foo)
-    (type! bar)
+    type foo
+    type bar
 
-    (rel! foo { 0: bar } string) ;; ERROR cannot mix index relation identifiers and edge types
+    rel foo { 0: bar } string // ERROR cannot mix index relation identifiers and edge types
     "#
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn invalid_subject_types() {
-    r#"
-    (rel!
-        'a' ;; ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
-        { _ }
+    "
+    rel
+        'a' // ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
+        { . }
         string
-    )
-    "#
-    .s_compile_fail()
+    "
+    .compile_fail()
 }
 
 #[test]
 fn invalid_relation_chain() {
-    r#"
-    (rel!
-        _ {_}
-        _ {_} {_}
-        _
-        _ ;; ERROR parse error: expected brace
-        {_}
-    )
-    "#
-    .s_compile_fail()
+    "
+    rel
+        . {.}
+        . {.} {.}
+        .
+        . // ERROR parse error: found `.`, expected one of `{`, `type`, `entity`, `rel`, `eq`
+        {.}
+    "
+    .compile_fail()
 }
 
 #[test]

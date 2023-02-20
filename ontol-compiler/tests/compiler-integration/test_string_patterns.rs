@@ -196,5 +196,5 @@ fn automata() {
         { position* }
         position-ring
     "#
-    .s_compile_fail();
+    .compile_fail();
 }
