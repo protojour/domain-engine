@@ -6,6 +6,7 @@ use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{
+    parse::lexer::Token,
     s_parse::tree::Tree,
     source::{SourceSpan, Sources},
 };
@@ -36,7 +37,9 @@ pub enum CompileError {
     #[error("lex error")]
     Lex(ChumskyError<char>),
     #[error("parse error: {0}")]
-    Parse(ChumskyError<Tree>),
+    Parse(ChumskyError<Token>),
+    #[error("parse error: {0}")]
+    SParse(ChumskyError<Tree>),
     #[error("function takes {expected} parameters, but {actual} was supplied")]
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
     #[error("not callable")]

@@ -1,5 +1,6 @@
 use ::chumsky::Parser;
 
+use chumsky::Stream;
 use codegen::execute_codegen_tasks;
 use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
@@ -34,6 +35,12 @@ mod typed_expr;
 mod types;
 
 pub trait Compile {
+    fn compile(
+        self,
+        compiler: &mut Compiler,
+        package: PackageId,
+    ) -> Result<(), UnifiedCompileError>;
+
     fn s_compile(
         self,
         compiler: &mut Compiler,
@@ -42,6 +49,15 @@ pub trait Compile {
 }
 
 impl Compile for &str {
+    fn compile(
+        self,
+        compiler: &mut Compiler,
+        package: PackageId,
+    ) -> Result<(), UnifiedCompileError> {
+        let src = compiler.sources.add(package, "str".into(), self.into());
+        src.compile(compiler, package)
+    }
+
     fn s_compile(
         self,
         compiler: &mut Compiler,
@@ -53,9 +69,51 @@ impl Compile for &str {
 }
 
 impl Compile for CompileSrc {
+    fn compile(
+        self,
+        compiler: &mut Compiler,
+        package: PackageId,
+    ) -> Result<(), UnifiedCompileError> {
+        let root_defs = parse_and_lower_source(compiler, self);
+        compile_all_packages(compiler, root_defs)
+    }
+
     fn s_compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
         let root_defs = parse_and_lower_s_source(compiler, self);
         compile_all_packages(compiler, root_defs)
+    }
+}
+
+/// Parse and lower a source of the new syntax
+fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
+    let (tokens, lex_errors) = parse::lexer::lexer().parse_recovery(src.text.as_str());
+
+    for lex_error in lex_errors {
+        let span = lex_error.span();
+        compiler.push_error(
+            CompileError::Lex(ChumskyError::new(lex_error))
+                .spanned(&compiler.sources, &src.span(&span)),
+        );
+    }
+
+    if let Some(tokens) = tokens {
+        let len = tokens.len();
+        let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
+        let (statements, parse_errors) = parse::ast_parser::stmt_seq().parse_recovery(stream);
+
+        for parse_error in parse_errors {
+            let span = parse_error.span();
+            compiler.push_error(
+                CompileError::Parse(ChumskyError::new(parse_error))
+                    .spanned(&compiler.sources, &src.span(&span)),
+            );
+        }
+
+        if let Some(statements) = statements {}
+
+        todo!()
+    } else {
+        vec![]
     }
 }
 
@@ -82,7 +140,7 @@ fn parse_and_lower_s_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<Def
                 Err(error) => {
                     let span = error.span();
                     compiler.push_error(
-                        CompileError::Parse(ChumskyError::new(error))
+                        CompileError::SParse(ChumskyError::new(error))
                             .spanned(&compiler.sources, &src.span(&span)),
                     );
                 }
