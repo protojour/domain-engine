@@ -26,16 +26,25 @@ pub fn stmt_seq() -> impl AstParser<Vec<Spanned<Stmt>>> {
 }
 
 fn stmt() -> impl AstParser<Spanned<Stmt>> {
-    let type_stmt = spanned(type_stmt()).map(span_map(Stmt::Type));
+    let type_stmt = type_or_entity_stmt();
     let rel_stmt = spanned(rel_stmt()).map(span_map(Stmt::Rel));
     let eq_stmt = spanned(eq_stmt()).map(span_map(Stmt::Eq));
 
     type_stmt.or(rel_stmt).or(eq_stmt)
 }
 
-fn type_stmt() -> impl AstParser<TypeStmt> {
+enum TypeKind {
+    Type,
+    Entity,
+}
+
+fn type_or_entity_stmt() -> impl AstParser<Spanned<Stmt>> {
+    let kw = keyword(Token::Type)
+        .map(|span| (span, TypeKind::Type))
+        .or(keyword(Token::Entity).map(|span| (span, TypeKind::Entity)));
+
     doc_comments()
-        .then(keyword(Token::Type))
+        .then(kw)
         .then(spanned(ident().labelled("identifier")))
         .then(spanned(
             rel_stmt()
@@ -43,11 +52,18 @@ fn type_stmt() -> impl AstParser<TypeStmt> {
                 .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
                 .or_not(),
         ))
-        .map(|(((docs, kw), ident), rel_block)| TypeStmt {
-            docs,
-            kw,
-            ident,
-            rel_block,
+        .map_with_span(|(((docs, (kw, type_kind)), ident), rel_block), span| {
+            let type_stmt = TypeStmt {
+                docs,
+                kw,
+                ident,
+                rel_block,
+            };
+
+            match type_kind {
+                TypeKind::Type => (Stmt::Type(type_stmt), span),
+                TypeKind::Entity => (Stmt::Entity(type_stmt), span),
+            }
         })
 }
 

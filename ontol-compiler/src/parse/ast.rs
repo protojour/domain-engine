@@ -7,6 +7,7 @@ use super::{lexer::Token, Span, Spanned};
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Stmt {
     Type(TypeStmt),
+    Entity(TypeStmt),
     Rel(RelStmt),
     Eq(EqStmt),
 }
@@ -15,6 +16,7 @@ impl Stmt {
     pub fn docs(&self) -> &[String] {
         match self {
             Self::Type(ty) => &ty.docs,
+            Self::Entity(ty) => &ty.docs,
             Self::Rel(rel) => &rel.docs,
             Self::Eq(_) => &[],
         }

@@ -4,7 +4,7 @@ use test_log::test;
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `type`, `rel`, `eq`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `type`, `entity`, `rel`, `eq`"
         .compile_fail();
 }
 

@@ -15,6 +15,7 @@ pub enum Token {
     Close(char),
     Sigil(char),
     Type,
+    Entity,
     Rel,
     Eq,
     Number(String),
@@ -29,6 +30,7 @@ impl Display for Token {
         match self {
             Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
             Self::Type => write!(f, "`type`"),
+            Self::Entity => write!(f, "`entity`"),
             Self::Rel => write!(f, "`rel`"),
             Self::Eq => write!(f, "`eq`"),
             Self::Number(_) => write!(f, "`number`"),
@@ -44,6 +46,7 @@ impl Display for Token {
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let ident = tree::ident().map(|ident| match ident.as_str() {
         "type" => Token::Type,
+        "entity" => Token::Entity,
         "rel" => Token::Rel,
         "eq" => Token::Eq,
         _ => Token::Sym(ident),

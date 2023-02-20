@@ -77,12 +77,12 @@ fn test_entity_experiment_etc() {
 #[test]
 fn test_entity_self_relationship() {
     "
-    (entity! node)
+    entity node
 
-    (rel! node { 'name' } string)
-    (rel! node { 'children'* 'parent'? } node)
+    rel node { 'name' } string
+    rel node { 'children'* | 'parent'? } node
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 
         assert_error_msg!(

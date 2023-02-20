@@ -11,10 +11,10 @@ use crate::{
     compiler::Compiler,
     def::{
         Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
-        ValueCardinality, Variables,
+        ValueCardinality,
     },
     error::{CompileError, SpannedCompileError},
-    expr::{Expr, ExprId, ExprKind, TypePath},
+    expr::{Expr, ExprId, ExprKind},
     namespace::Space,
     parse::{
         ast::{self, RelType},
@@ -61,20 +61,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn stmt_to_def(&mut self, (stmt, span): (ast::Stmt, Span)) -> Res<RootDefs> {
         match stmt {
             // ast::Ast::Import(_) => panic!("import not supported yet"),
-            ast::Stmt::Type(ty) => {
-                let def_id = self.named_def_id(Space::Type, &ty.ident.0);
-                let ident = self.compiler.strings.intern(&ty.ident.0);
+            ast::Stmt::Type(type_stmt) => {
+                let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
+                let ident = self.compiler.strings.intern(&type_stmt.ident.0);
                 self.set_def(def_id, DefKind::DomainType(Some(ident)), &span);
                 Ok([def_id].into())
             }
-            /*
-            ast::Ast::Entity((ident, _)) => {
-                let def_id = self.named_def_id(Space::Type, &ident);
-                let ident = self.compiler.strings.intern(&ident);
+            ast::Stmt::Entity(type_stmt) => {
+                let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
+                let ident = self.compiler.strings.intern(&type_stmt.ident.0);
                 self.set_def(def_id, DefKind::DomainEntity(ident), &span);
                 Ok([def_id].into())
             }
-            */
             ast::Stmt::Rel(rel_stmt) => self.ast_relationship_chain_to_def(rel_stmt, span, None),
             ast::Stmt::Eq(ast::EqStmt {
                 kw,
