@@ -3,4 +3,5 @@
 members = [
     "ontol-runtime",
     "ontol-compiler",
+    "ontol-parser",
 ]

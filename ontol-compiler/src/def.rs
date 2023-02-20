@@ -9,7 +9,6 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    parse::Span,
     patterns::StringPatternSegment,
     regex::{parse_literal_regex_to_hir, uuid_regex},
     relation::{Constructor, RelationshipId},
@@ -17,6 +16,7 @@ use crate::{
     strings::Strings,
     types::{Type, TypeRef},
 };
+use ontol_parser::Span;
 
 /// A definition in some package
 #[derive(Debug)]

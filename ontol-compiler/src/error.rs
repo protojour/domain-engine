@@ -2,14 +2,12 @@ use std::{fmt::Display, hash::Hash};
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use miette::Diagnostic;
+use ontol_parser::Token;
 use ontol_runtime::format_utils::{LogicOp, Missing};
 use smartstring::alias::String;
 use thiserror::Error;
 
-use crate::{
-    parse::lexer::Token,
-    source::{SourceSpan, Sources},
-};
+use crate::source::{SourceSpan, Sources};
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("oops")]

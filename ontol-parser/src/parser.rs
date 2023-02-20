@@ -324,7 +324,7 @@ mod tests {
     use assert_matches::assert_matches;
     use chumsky::Stream;
 
-    use crate::parse::lexer::lexer;
+    use crate::lexer::lexer;
 
     use super::*;
 

@@ -7,6 +7,11 @@ use ontol_runtime::{DefId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
+use ontol_parser::{
+    ast::{self, BinaryOp, EqAttribute, RelType},
+    Span,
+};
+
 use crate::{
     compiler::Compiler,
     def::{
@@ -16,10 +21,6 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    parse::{
-        ast::{self, BinaryOp, EqAttribute, RelType},
-        Span,
-    },
     source::{CompileSrc, CORE_PKG},
 };
 

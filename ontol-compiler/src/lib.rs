@@ -22,7 +22,6 @@ mod def;
 mod expr;
 mod lowering;
 mod namespace;
-mod parse;
 mod patterns;
 mod regex;
 mod relation;
@@ -61,7 +60,7 @@ impl Compile for CompileSrc {
 
 /// Parse and lower a source of the new syntax
 fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
-    let (tokens, lex_errors) = parse::lexer::lexer().parse_recovery(src.text.as_str());
+    let (tokens, lex_errors) = ontol_parser::lexer::lexer().parse_recovery(src.text.as_str());
 
     for lex_error in lex_errors {
         let span = lex_error.span();
@@ -74,7 +73,7 @@ fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId
     if let Some(tokens) = tokens {
         let len = tokens.len();
         let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
-        let (statements, parse_errors) = parse::ast_parser::stmt_seq().parse_recovery(stream);
+        let (statements, parse_errors) = ontol_parser::parser::stmt_seq().parse_recovery(stream);
 
         for parse_error in parse_errors {
             let span = parse_error.span();
