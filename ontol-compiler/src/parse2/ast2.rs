@@ -91,5 +91,5 @@ pub enum Expr {
     NumberLiteral(String),
     StringLiteral(String),
     Binary(Box<Expr>, Token, Box<Expr>),
-    Call(Spanned<String>, Vec<Spanned<Expr>>),
+    // Call(Spanned<String>, Vec<Spanned<Expr>>),
 }

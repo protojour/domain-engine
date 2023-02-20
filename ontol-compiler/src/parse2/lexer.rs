@@ -31,9 +31,9 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     });
 
     one_of(".:?_+-*/|")
-        .map(|c| Token::Sigil(c))
-        .or(one_of("({[").map(|c| Token::Open(c)))
-        .or(one_of(")}]").map(|c| Token::Close(c)))
+        .map(Token::Sigil)
+        .or(one_of("({[").map(Token::Open))
+        .or(one_of(")}]").map(Token::Close))
         .or(tree::num().map(Token::Number))
         .or(tree::double_quote_string_literal().map(Token::StringLiteral))
         .or(tree::single_quote_string_literal().map(Token::StringLiteral))

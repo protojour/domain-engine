@@ -162,12 +162,10 @@ fn expr() -> impl Parser<Token, Expr, Error = Simple<Token>> + Clone {
 
         // infix precedence for addition and subtraction:
         let op = just(Token::Sigil('+')).or(just(Token::Sigil('-')));
-        let sum = product
+        product
             .clone()
             .then(op.then(product).repeated())
-            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)));
-
-        sum
+            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)))
     })
 }
 
@@ -176,7 +174,7 @@ fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> + Clone {
     let path = ident().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
-    let regex = select! { Token::Regex(string) => string.clone() }.map(Type::Regex);
+    let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
 
     unit.or(path)
         .or(number_literal)
@@ -189,11 +187,11 @@ fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> + Cl
 }
 
 fn path() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-    select! { Token::Sym(ident) => ident.clone() }
+    select! { Token::Sym(ident) => ident }
 }
 
 fn ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-    select! { Token::Sym(ident) => ident.clone() }
+    select! { Token::Sym(ident) => ident }
 }
 
 fn variable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
@@ -201,11 +199,11 @@ fn variable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
 }
 
 fn number_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-    select! { Token::Number(string) => string.clone() }
+    select! { Token::Number(string) => string }
 }
 
 fn string_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-    select! { Token::StringLiteral(string) => string.clone() }
+    select! { Token::StringLiteral(string) => string }
 }
 
 fn spanned<P, O>(parser: P) -> impl Parser<Token, Spanned<O>, Error = Simple<Token>> + Clone
