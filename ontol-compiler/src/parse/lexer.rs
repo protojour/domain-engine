@@ -9,7 +9,7 @@ use crate::s_parse::tree;
 use super::Spanned;
 
 #[allow(dead_code)]
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Token {
     Open(char),
     Close(char),
@@ -28,9 +28,9 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
-            Self::Type => write!(f, "keyword `type`"),
-            Self::Rel => write!(f, "keyword `rel`"),
-            Self::Eq => write!(f, "keyword `eq`"),
+            Self::Type => write!(f, "`type`"),
+            Self::Rel => write!(f, "`rel`"),
+            Self::Eq => write!(f, "`eq`"),
             Self::Number(_) => write!(f, "`number`"),
             Self::StringLiteral(_) => write!(f, "`string`"),
             Self::Regex(_) => write!(f, "`regex`"),
@@ -56,13 +56,13 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 
     doc_comment()
         .or(one_of(".:?_+-*|").map(Token::Sigil))
-        .or(just('/').then_ignore(none_of("/")).map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
         .or(tree::num().map(Token::Number))
         .or(tree::double_quote_string_literal().map(Token::StringLiteral))
         .or(tree::single_quote_string_literal().map(Token::StringLiteral))
         .or(tree::regex().map(Token::Regex))
+        .or(just('/').then_ignore(none_of("/")).map(Token::Sigil))
         .or(ident)
         .map_with_span(|token, span| (token, span))
         .padded_by(comment.repeated())

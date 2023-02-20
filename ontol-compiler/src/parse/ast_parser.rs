@@ -36,7 +36,7 @@ fn stmt() -> impl AstParser<Spanned<Stmt>> {
 fn type_stmt() -> impl AstParser<TypeStmt> {
     doc_comments()
         .then(keyword(Token::Type))
-        .then(spanned(ident()))
+        .then(spanned(ident().labelled("identifier")))
         .then(spanned(
             rel_stmt()
                 .repeated()

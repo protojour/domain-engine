@@ -124,7 +124,7 @@ impl<I: Eq + Hash> ChumskyError<I> {
     }
 }
 
-impl<I: Hash + Eq + Display> Display for ChumskyError<I> {
+impl<I: Hash + Eq + Display + Ord> Display for ChumskyError<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.reason() {
             SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
@@ -134,16 +134,19 @@ impl<I: Hash + Eq + Display> Display for ChumskyError<I> {
                     write!(f, "found {found}")?;
                     reported = true;
                 }
+
                 if self.inner.expected().len() > 0 {
                     if self.inner.found().is_some() {
                         write!(f, ", ")?;
                     }
 
-                    let missing_items: Vec<_> = self
+                    let mut missing_items: Vec<_> = self
                         .inner
                         .expected()
                         .filter_map(|item| item.as_ref())
                         .collect();
+
+                    missing_items.sort();
 
                     if !missing_items.is_empty() {
                         let missing = Missing {
@@ -154,6 +157,13 @@ impl<I: Hash + Eq + Display> Display for ChumskyError<I> {
                         write!(f, "expected {missing}")?;
                         reported = true;
                     }
+                } else if let Some(label) = self.inner.label() {
+                    if self.inner.found().is_some() {
+                        write!(f, ", ")?;
+                    }
+
+                    write!(f, "expected {label}")?;
+                    reported = true;
                 }
 
                 if !reported {

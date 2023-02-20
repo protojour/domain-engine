@@ -3,182 +3,163 @@ use pretty_assertions::assert_eq;
 use test_log::test;
 
 #[test]
-fn lex_error_new() {
-    "type // ERROR parse error: unexpected end of file".compile_fail();
-    "type {} // ERROR parse error: found `{`".compile_fail();
+fn invalid_statement() {
+    "foobar // ERROR parse error: found `foobar`, expected one of `type`, `rel`, `eq`"
+        .compile_fail();
 }
 
 #[test]
-fn lex_error() {
-    "( ;; ERROR lex error".s_compile_fail();
-}
-
-#[test]
-fn parse_error1() {
-    "() ;; ERROR parse error: expected keyword".s_compile_fail()
+fn type_parse_error() {
+    "type // ERROR parse error: expected identifier".compile_fail();
+    "type {} // ERROR parse error: found `{`, expected identifier".compile_fail();
 }
 
 #[test]
 fn underscore_not_allowed_at_start_of_identifier() {
-    "(type! _foo) ;; ERROR parse error: expected ident".s_compile_fail()
+    "type _foo // ERROR parse error: found `_`, expected identifier".compile_fail()
 }
 
 #[test]
 fn rel_type_not_found() {
     "
-    (type! foo)
-    (rel! foo { 'bar' }
-        baz ;; ERROR type not found
-    )
+    type foo
+    rel foo { 'bar' }
+        baz // ERROR type not found
+    
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn rel_duplicate_anonymous_relation() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! ;; ERROR unit type `bar` cannot be part of a union
-        _ { bar } foo
-    )
-    (rel! ;; ERROR duplicate anonymous relationship
-        _ { bar } foo
-    )
+    type foo
+    type bar
+    rel // ERROR unit type `bar` cannot be part of a union
+        . { bar } foo    
+    rel // ERROR duplicate anonymous relationship
+        . { bar } foo
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn rel_mix_anonymous_and_named() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! _ { bar } foo)
-    (rel! ;; ERROR invalid mix of relationship type for subject
-        foo { 'foobar' } bar
-    )
-    "
-    .s_compile_fail()
-}
+    type foo
+    type bar
+    rel . { bar } foo
 
-#[test]
-fn rel_array_range_with_dots_is_illegal() {
+    rel // ERROR invalid mix of relationship type for subject
+        foo { 'foobar' } bar
     "
-    (type! foo)
-    (rel!
-        foo
-        { 'n'[..] } ;; ERROR parse error: expected end of list
-        int
-    )
-    "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn map_union_unit_type() {
     "
-    (type! foo)
-    (type! bar)
-    (type! u)
-    (rel! _ { foo } u) ;; ERROR unit type `foo` cannot be part of a union
-    (rel! _ { bar } u) ;; ERROR unit type `bar` cannot be part of a union
+    type foo
+    type bar
+    type u
+    rel . { foo } u // ERROR unit type `foo` cannot be part of a union
+    rel . { bar } u // ERROR unit type `bar` cannot be part of a union
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn map_union_missing_discriminator() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a' } 'constant')
-    (rel! bar { 'b' } string)
-    (type! u)
-    (rel! _ { foo } u)
-    (rel! _ { bar } u) ;; ERROR cannot discriminate type
+    type foo
+    type bar
+    rel foo { 'a' } 'constant'
+    rel bar { 'b' } string
+    type u
+    rel . { foo } u
+    rel . { bar } u // ERROR cannot discriminate type
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn map_union_non_uniform_discriminators() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'a' } 'constant')
-    (rel! bar { 'b' } 'other-constant')
-    (type! u) ;; ERROR no uniform discriminator found for union variants
-    (rel! _ { foo } u)
-    (rel! _ { bar } u)
+    type foo
+    type bar
+    rel foo { 'a' } 'constant'
+    rel bar { 'b' } 'other-constant'
+    type u // ERROR no uniform discriminator found for union variants
+    rel . { foo } u
+    rel . { bar } u
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn non_disjoint_string_union() {
     "
-    (type! u1)
-    (rel! _ { 'a' } u1)
-    (rel! _ { 'a' } u1) ;; ERROR duplicate anonymous relationship
+    type u1
+    rel . { 'a' } u1
+    rel . { 'a' } u1 // ERROR duplicate anonymous relationship
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn union_tree() {
     "
-    (type! u1)
-    (rel! _ { '1a' } u1)
-    (rel! _ { '1b' } u1)
-    (type! u2)
-    (rel! _ { '2a' } u2)
-    (rel! _ { '2b' } u2)
-    (type! u3)
-    (rel! _ { u1 } u3) ;; ERROR union tree not supported
-    (rel! _ { u2 } u3) ;; ERROR union tree not supported
+    type u1
+    rel . { '1a' } u1
+    rel . { '1b' } u1
+    type u2
+    rel . { '2a' } u2
+    rel . { '2b' } u2
+    type u3
+    rel . { u1 } u3 // ERROR union tree not supported
+    rel . { u2 } u3 // ERROR union tree not supported
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn sequence_mix1() {
-    r#"
-    (type! u)
-    (rel! _ { int } u)
-    (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
-    "#
-    .s_compile_fail();
+    "
+    type u
+    rel . { int } u
+    rel u { 0 } string // ERROR invalid mix of relationship type for subject
+    "
+    .compile_fail();
 }
 
 #[test]
 fn sequence_mix2() {
-    r#"
-    (type! u)
-    (rel! u { 'a' } int)
-    (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
-    "#
-    .s_compile_fail();
+    "
+    type u
+    rel u { 'a' } int
+    rel u { 0 } string // ERROR invalid mix of relationship type for subject
+    "
+    .compile_fail();
 }
 
 #[test]
 fn sequence_overlapping_indices() {
-    r#"
-    (type! u)
-    (rel! u { 0..3 } int)
-    (rel! u { 2..4 } string) ;; ERROR overlapping indexes
-    "#
-    .s_compile_fail();
+    "
+    type u
+    rel u { 0..3 } int
+    rel u { 2..4 } string // ERROR overlapping indexes
+    "
+    .compile_fail();
 }
 
 #[test]
 fn sequence_ambiguous_infinite_tail() {
     r#"
-    (type! u)
-    (rel! u { 0.. } int)
-    (rel! u { 1.. } string) ;; ERROR overlapping indexes
+    type u
+    rel u { 0.. } int
+    rel u { 1.. } string // ERROR overlapping indexes
     "#
-    .s_compile_fail();
+    .compile_fail();
 }
 
 #[test]
@@ -430,10 +411,10 @@ fn invalid_relation_chain() {
 #[test]
 fn spans_are_correct_projected_from_regex_syntax_errors() {
     r#"
-    (type! lol)
-    (rel! _ { /abc\/(?P<42>.)/ } lol) ;; ERROR invalid regex: invalid capture group character
+    type lol
+    rel . { /abc\/(?P<42>.)/ } lol // ERROR invalid regex: invalid capture group character
     "#
-    .s_compile_fail_then(|errors| {
+    .compile_fail_then(|errors| {
         assert_eq!("4", errors[0].span_text);
     })
 }
@@ -441,18 +422,18 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 #[test]
 fn complains_about_ambiguous_pattern_based_unions() {
     "
-    (type! foo)
-    (type! bar)
-    (type! barbar)
-    (type! union) ;; ERROR variants of the union have prefixes that are prefixes of other variants
+    type foo
+    type bar
+    type barbar
+    type union // ERROR variants of the union have prefixes that are prefixes of other variants
 
-    (rel! '' { 'foo' } { uuid } foo)
-    (rel! '' { 'bar' } { uuid } bar)
-    (rel! '' { 'barbar' } { uuid } barbar)
+    rel '' { 'foo' } { uuid } foo
+    rel '' { 'bar' } { uuid } bar
+    rel '' { 'barbar' } { uuid } barbar
 
-    (rel! _ { foo } union)
-    (rel! _ { bar } union)
-    (rel! _ { barbar } union)
+    rel . { foo } union
+    rel . { bar } union
+    rel . { barbar } union
     "
-    .s_compile_fail();
+    .compile_fail();
 }

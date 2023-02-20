@@ -25,6 +25,18 @@ pub enum Tree {
     Comment(String),
 }
 
+impl PartialOrd for Tree {
+    fn partial_cmp(&self, _: &Self) -> Option<std::cmp::Ordering> {
+        panic!("DELETE ME")
+    }
+}
+
+impl Ord for Tree {
+    fn cmp(&self, _: &Self) -> std::cmp::Ordering {
+        panic!("DELETE ME")
+    }
+}
+
 impl Display for Tree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
