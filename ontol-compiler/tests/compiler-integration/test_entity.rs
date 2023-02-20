@@ -8,29 +8,29 @@ use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCom
 #[test]
 fn test_entity_experiment_etc() {
     "
-    (type! artist-id)
+    type artist-id
 
-    (entity! artist)
-    (rel! artist { 'name' } string)
+    entity artist
+    rel artist { 'name' } string
 
-    (rel! _ { 'artist/{uuid}' } artist-id)
-    ; (rel! artist-id { uuid } string)
-    ; (rel! artist-id { id! } artist)
+    rel . { 'artist/{uuid}' } artist-id
+    // rel artist-id { uuid } string
+    // rel artist-id { id! } artist
 
-    (entity! record)
-    (rel! record { 'name' } string)
-    ; i.e. syntax sugar for:
-    ; (rel! record { 'name' 'name'*: () } string)
+    entity record
+    rel record { 'name' } string
+    // i.e. syntax sugar for:
+    // rel record { 'name' | 'name'*: () } string
 
-    (entity! instrument)
-    (rel! instrument { 'name' } string)
+    entity instrument
+    rel instrument { 'name' } string
 
-    (type! plays)
-    (rel! plays { 'how_much' } string)
+    type plays
+    rel plays { 'how_much' } string
 
-    (rel! artist { 'plays'* 'played_by'*: plays } instrument)
+    rel artist { 'plays'* | 'played_by'*: plays } instrument
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
         let instrument = TypeBinding::new(env, "instrument");
 
@@ -124,10 +124,10 @@ fn test_entity_self_relationship() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    (entity! node)
-    (rel! node { 'children'* 'parent' } node)
+    entity node
+    rel node { 'children'* | 'parent' } node
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 
         assert_error_msg!(

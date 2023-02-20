@@ -124,12 +124,13 @@ fn rel_connection() -> impl AstParser<RelConnection> {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
                 None => (None, None),
             };
+
             RelConnection {
                 ty,
                 subject_cardinality,
                 object_prop_ident,
                 object_cardinality,
-                rel_params: None,
+                rel_params,
             }
         })
 }
