@@ -261,10 +261,27 @@ fn u16() -> impl AstParser<u16> {
 }
 
 fn u16_range() -> impl AstParser<Range<Option<u16>>> {
-    u16().map(move |n| Range {
-        start: Some(n),
-        end: Some(n + 1),
-    })
+    let simple = u16()
+        .then(dot_dot().ignore_then(u16().or_not()).or_not())
+        .map(move |(start, end)| Range {
+            start: Some(start),
+            end: match end {
+                Some(end) => end,
+                None => Some(start + 1),
+            },
+        });
+    let dot_dot_following = dot_dot().ignore_then(u16()).map(|end| Range {
+        start: None,
+        end: Some(end),
+    });
+
+    simple.or(dot_dot_following)
+}
+
+fn dot_dot() -> impl AstParser<()> {
+    just(Token::Sigil('.'))
+        .ignored()
+        .then_ignore(just(Token::Sigil('.')))
 }
 
 fn string_literal() -> impl AstParser<String> {

@@ -97,18 +97,18 @@ fn test_serde_string_or_unit() {
 #[test]
 fn test_serde_map_union() {
     "
-    (type! foo)
-    (type! bar)
-    (rel! foo { 'type' } 'foo')
-    (rel! foo { 'c' } int)
-    (rel! bar { 'type' } 'bar')
-    (rel! bar { 'd' } int)
+    type foo
+    type bar
+    rel foo { 'type' } 'foo'
+    rel foo { 'c' } int
+    rel bar { 'type' } 'bar'
+    rel bar { 'd' } int
 
-    (type! u)
-    (rel! _ { foo } u)
-    (rel! _ { bar } u)
+    type u
+    rel . { foo } u
+    rel . { bar } u
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!({ "type": "foo", "c": 7}));
     });
@@ -117,10 +117,10 @@ fn test_serde_map_union() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    (type! foo)
-    (rel! foo { 's'* } string)
+    type foo
+    rel foo { 's'* } string
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "s": []}));
         assert_json_io_matches!(foo, json!({ "s": ["a", "b"]}));
@@ -130,13 +130,13 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    (type! foo)
-    (rel! foo {  ..2 } int)
-    (rel! foo { 2..4 } string)
-    (rel! foo { 5..6 } int)
-    (rel! foo { 6..  } int)
+    type foo
+    rel foo {  ..2 } int
+    rel foo { 2..4 } string
+    rel foo { 5..6 } int
+    rel foo { 6..  } int
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44]));
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44, 45, 46]));
@@ -150,10 +150,10 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    (type! my_id)
-    (rel! _ { uuid } my_id)
+    type my_id
+    rel . { uuid } my_id
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let my_id = TypeBinding::new(env, "my_id");
         assert_matches!(
             my_id.deserialize_data_variant(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -174,30 +174,30 @@ fn test_serde_uuid() {
 #[test]
 fn test_jsonml() {
     "
-    (type! element)
-    (type! tag)
-    (type! tag_name)
-    (type! attributes)
+    type element
+    type tag
+    type tag_name
+    type attributes
 
-    (rel! _ { tag } element)
-    (rel! _ { string } element)
+    rel . { tag } element
+    rel . { string } element
 
-    (rel! tag { 0 } tag_name)
+    rel tag { 0 } tag_name
 
-    ; BUG: should have default `{}` and serde would skip this if not a map
-    ; (also in serialization if this equals the default value!)
-    (rel! tag { 1 } attributes)
+    // BUG: should have default `{}` and serde would skip this if not a map
+    // (also in serialization if this equals the default value!)
+    rel tag { 1 } attributes
 
-    (rel! tag { 2.. } element)
+    rel tag { 2.. } element
 
-    (rel! _ { 'div' } tag_name)
-    (rel! _ { 'em' } tag_name)
-    (rel! _ { 'strong' } tag_name)
+    rel . { 'div' } tag_name
+    rel . { 'em' } tag_name
+    rel . { 'strong' } tag_name
 
-    ; BUG: should accept any string as key
-    (rel! attributes { 'class'? } string)
+    // BUG: should accept any string as key
+    rel attributes { 'class'? } string
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let element = TypeBinding::new(env, "element");
 
         assert_json_io_matches!(element, json!("text"));
