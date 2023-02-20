@@ -14,13 +14,18 @@ type artist {
     rel listener { 'listens-to' | 'listened-to-by' }
 }
 
+type meters {
+    rel . { int }
+}
+
 type my-id {
     rel '' { 'my_id/' } { uuid }
+    rel '' { 'my_id2/' } { uuid }
 }
 
 type Geomtry {
-    rel _ { Point }
-    rel _ { MultiPoint }
+    rel . { Point }
+    rel . { MultiPoint }
 }
 
 # in eq expressions:
@@ -29,14 +34,19 @@ type Geomtry {
 # anyway it has to be two different types of trees.
 
 eq (:children* :siblings*) {
-    type tree_a {
+    tree_a {
         rel { 'children' } :children
         rel :siblings { 'children' }
     }
-    type tree_b {
+    tree_b {
         rel { 'children' } :siblings
         rel :children { 'children' }
     }
+}
+
+eq (:x) {
+    meters { :x }
+    millimeters { :x * 1000 }
 }
 
 # variable syntax

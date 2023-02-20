@@ -1,11 +1,12 @@
 use smartstring::alias::String;
 
-use super::{Span, Spanned};
+use super::{lexer::Token, Span, Spanned};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Stmt {
     Type(TypeStmt),
     Rel(RelStmt),
+    Eq(EqStmt),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -46,6 +47,34 @@ pub struct RelChain {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqStmt {
+    pub kw: Span,
+    pub variables: Vec<Spanned<String>>,
+    pub first: Spanned<EqType>,
+    pub second: Spanned<EqType>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqType {
+    pub path: Spanned<String>,
+    pub attributes: Vec<EqAttribute>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum EqAttribute {
+    Expr(Expr),
+    Rel(EqAttributeRel),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqAttributeRel {
+    pub kw: Span,
+    pub subject: Option<Spanned<Expr>>,
+    pub connection: Spanned<Type>,
+    pub object: Option<Spanned<Expr>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Unit,
     // TODO: Support segments
@@ -53,4 +82,14 @@ pub enum Type {
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Expr {
+    Variable(String),
+    Path(String),
+    NumberLiteral(String),
+    StringLiteral(String),
+    Binary(Box<Expr>, Token, Box<Expr>),
+    Call(Spanned<String>, Vec<Spanned<Expr>>),
 }

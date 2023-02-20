@@ -14,6 +14,7 @@ pub enum Token {
     Sigil(char),
     Type,
     Rel,
+    Eq,
     Number(String),
     StringLiteral(String),
     Regex(String),
@@ -25,10 +26,11 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let ident = tree::ident().map(|ident| match ident.as_str() {
         "type" => Token::Type,
         "rel" => Token::Rel,
+        "eq" => Token::Eq,
         _ => Token::Sym(ident),
     });
 
-    one_of(".:?_+-/*|")
+    one_of(".:?_+-*/|")
         .map(|c| Token::Sigil(c))
         .or(one_of("({[").map(|c| Token::Open(c)))
         .or(one_of(")}]").map(|c| Token::Close(c)))

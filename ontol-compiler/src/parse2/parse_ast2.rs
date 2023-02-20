@@ -2,7 +2,10 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use super::{
-    ast2::{ChainedSubjectConnection, RelConnection, RelStmt, Stmt, Type, TypeStmt},
+    ast2::{
+        ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr, RelConnection,
+        RelStmt, Stmt, Type, TypeStmt,
+    },
     lexer::Token,
     Span, Spanned,
 };
@@ -15,11 +18,12 @@ pub fn stmt_seq() -> impl Parser<Token, Vec<Spanned<Stmt>>, Error = Simple<Token
 fn stmt() -> impl Parser<Token, Spanned<Stmt>, Error = Simple<Token>> {
     let type_stmt = spanned(type_stmt()).map(span_map(Stmt::Type));
     let rel_stmt = spanned(rel_stmt()).map(span_map(Stmt::Rel));
+    let eq_stmt = spanned(eq_stmt()).map(span_map(Stmt::Eq));
 
-    type_stmt.or(rel_stmt)
+    type_stmt.or(rel_stmt).or(eq_stmt)
 }
 
-fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> {
+fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> + Clone {
     keyword(Token::Type)
         .then(spanned(ident()))
         .then(spanned(
@@ -35,7 +39,7 @@ fn type_stmt() -> impl Parser<Token, TypeStmt, Error = Simple<Token>> {
         })
 }
 
-fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> {
+fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> + Clone {
     keyword(Token::Rel)
         // subject
         .then(spanned(ty()).or_not())
@@ -63,7 +67,7 @@ fn rel_stmt() -> impl Parser<Token, RelStmt, Error = Simple<Token>> {
         })
 }
 
-fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> {
+fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> + Clone {
     // type
     spanned(ty())
         // many
@@ -83,7 +87,91 @@ fn rel_connection() -> impl Parser<Token, RelConnection, Error = Simple<Token>> 
         })
 }
 
-fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> {
+fn eq_stmt() -> impl Parser<Token, EqStmt, Error = Simple<Token>> + Clone {
+    keyword(Token::Eq)
+        .then(
+            spanned(variable())
+                .repeated()
+                .delimited_by(just(Token::Open('(')), just(Token::Close(')'))),
+        )
+        .then(
+            spanned(eq_type())
+                .then(spanned(eq_type()))
+                .delimited_by(just(Token::Open('{')), just(Token::Close('}'))),
+        )
+        .map(|((kw, variables), (first, second))| EqStmt {
+            kw,
+            variables,
+            first,
+            second,
+        })
+}
+
+fn eq_type() -> impl Parser<Token, EqType, Error = Simple<Token>> + Clone {
+    spanned(path())
+        .then(
+            eq_attribute()
+                .repeated()
+                .delimited_by(just(Token::Open('{')), just(Token::Close('}'))),
+        )
+        .map(|(path, attributes)| EqType { path, attributes })
+}
+
+fn eq_attribute() -> impl Parser<Token, EqAttribute, Error = Simple<Token>> + Clone {
+    let variable = expr().map(EqAttribute::Expr);
+    let rel = keyword(Token::Rel)
+        .then(spanned(expr()).or_not())
+        .then(spanned(ty()).delimited_by(just(Token::Open('{')), just(Token::Close('}'))))
+        .then(spanned(expr()).or_not())
+        .map(|(((kw, subject), connection), object)| {
+            EqAttribute::Rel(EqAttributeRel {
+                kw,
+                subject,
+                connection,
+                object,
+            })
+        });
+
+    variable.or(rel)
+}
+
+fn expr() -> impl Parser<Token, Expr, Error = Simple<Token>> + Clone {
+    recursive(|expr| {
+        let path = path().map(Expr::Path);
+        let variable = variable().map(Expr::Variable);
+        let number_literal = number_literal().map(Expr::NumberLiteral);
+        let string_literal = string_literal().map(Expr::StringLiteral);
+        let group = expr.delimited_by(just(Token::Open('(')), just(Token::Close(')')));
+
+        let atom = path
+            .or(variable)
+            .or(number_literal)
+            .or(string_literal)
+            .or(group);
+
+        // Consume operators by precedende
+        // TODO: Migrate to Pratt parse when Chumsky supports it.
+        // these are large types and thus pretty slow to compile :(
+
+        // infix precedence for multiplication and division:
+        let op = just(Token::Sigil('*')).or(just(Token::Sigil('/')));
+        let product = atom
+            .clone()
+            .then(op.then(atom).repeated())
+            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)));
+
+        // infix precedence for addition and subtraction:
+        let op = just(Token::Sigil('+')).or(just(Token::Sigil('-')));
+        let sum = product
+            .clone()
+            .then(op.then(product).repeated())
+            .foldl(|a, (op, b)| Expr::Binary(Box::new(a), op, Box::new(b)));
+
+        sum
+    })
+}
+
+fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> + Clone {
     let unit = just(Token::Sigil('.')).map(|_| Type::Unit);
     let path = ident().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
@@ -96,25 +184,33 @@ fn ty() -> impl Parser<Token, Type, Error = Simple<Token>> {
         .or(regex)
 }
 
-fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> {
+fn keyword(token: Token) -> impl Parser<Token, Span, Error = Simple<Token>> + Clone {
     just(token).map_with_span(|_, span| span)
 }
 
-fn ident() -> impl Parser<Token, String, Error = Simple<Token>> {
+fn path() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
     select! { Token::Sym(ident) => ident.clone() }
 }
 
-fn number_literal() -> impl Parser<Token, String, Error = Simple<Token>> {
+fn ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+    select! { Token::Sym(ident) => ident.clone() }
+}
+
+fn variable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+    just(Token::Sigil(':')).ignore_then(ident())
+}
+
+fn number_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
     select! { Token::Number(string) => string.clone() }
 }
 
-fn string_literal() -> impl Parser<Token, String, Error = Simple<Token>> {
+fn string_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
     select! { Token::StringLiteral(string) => string.clone() }
 }
 
-fn spanned<P, O>(parser: P) -> impl Parser<Token, Spanned<O>, Error = Simple<Token>>
+fn spanned<P, O>(parser: P) -> impl Parser<Token, Spanned<O>, Error = Simple<Token>> + Clone
 where
-    P: Parser<Token, O, Error = Simple<Token>>,
+    P: Parser<Token, O, Error = Simple<Token>> + Clone,
 {
     parser.map_with_span(|t, span| (t, span))
 }
@@ -137,7 +233,7 @@ mod tests {
         Parse(Vec<Simple<Token>>),
     }
 
-    fn p(input: &str) -> Result<Vec<Stmt>, Error> {
+    fn parse(input: &str) -> Result<Vec<Stmt>, Error> {
         let tokens = lexer().parse(input).map_err(Error::Lex)?;
         let len = input.len();
         let stmts = stmt_seq()
@@ -158,6 +254,27 @@ mod tests {
         }
         ";
 
-        assert_eq!(2, p(source).unwrap().len());
+        assert_eq!(2, parse(source).unwrap().len());
+    }
+
+    #[test]
+    fn parse_eq() {
+        let source = "
+        eq (:x :y) {
+            foo { :x }
+            bar {
+                rel { 'foo' } :x
+            }
+        }
+
+        eq (:x :y) {
+            foo { :x + 1 }
+            bar {
+                rel { 'foo' } (:x + 3) * 4
+            }
+        }
+        ";
+
+        assert_eq!(2, parse(source).unwrap().len());
     }
 }
