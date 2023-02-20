@@ -1,4 +1,4 @@
-use ast::Stmt;
+use ast::Statement;
 use chumsky::{prelude::*, Stream};
 
 use std::ops::Range;
@@ -18,7 +18,7 @@ pub enum Error {
     Parse(Simple<Token>),
 }
 
-pub fn parse_statements(input: &str) -> Result<Vec<Spanned<Stmt>>, Vec<Error>> {
+pub fn parse_statements(input: &str) -> Result<Vec<Spanned<Statement>>, Vec<Error>> {
     let mut errors = vec![];
     let (tokens, lex_errors) = lexer::lexer().parse_recovery(input);
 
@@ -29,7 +29,7 @@ pub fn parse_statements(input: &str) -> Result<Vec<Spanned<Stmt>>, Vec<Error>> {
     let statements = if let Some(tokens) = tokens {
         let len = tokens.len();
         let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
-        let (statements, parse_errors) = parser::stmt_seq().parse_recovery(stream);
+        let (statements, parse_errors) = parser::statement_sequence().parse_recovery(stream);
 
         for parse_error in parse_errors {
             errors.push(Error::Parse(parse_error));

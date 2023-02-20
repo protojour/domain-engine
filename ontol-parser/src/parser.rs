@@ -5,8 +5,9 @@ use smartstring::alias::String;
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt,
-        EqType, Expr, RelConnection, RelStmt, RelType, Stmt, Type, TypeKind, TypeStmt,
+        BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStatement,
+        EqType, Expression, RelConnection, RelStatement, RelType, Statement, Type, TypeKind,
+        TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -21,19 +22,19 @@ impl<T, O> AstParser<O> for T where T: Parser<Token, O, Error = Simple<Token>> +
 
 /// A parser for a sequence of statements (i.e. a source file)
 #[allow(dead_code)]
-pub fn stmt_seq() -> impl AstParser<Vec<Spanned<Stmt>>> {
-    stmt().repeated().then_ignore(end())
+pub fn statement_sequence() -> impl AstParser<Vec<Spanned<Statement>>> {
+    statement().repeated().then_ignore(end())
 }
 
-fn stmt() -> impl AstParser<Spanned<Stmt>> {
-    let type_stmt = spanned(type_stmt()).map(span_map(Stmt::Type));
-    let rel_stmt = spanned(rel_stmt()).map(span_map(Stmt::Rel));
-    let eq_stmt = spanned(eq_stmt()).map(span_map(Stmt::Eq));
+fn statement() -> impl AstParser<Spanned<Statement>> {
+    let type_stmt = spanned(type_statement()).map(span_map(Statement::Type));
+    let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
+    let eq_stmt = spanned(eq_statement()).map(span_map(Statement::Eq));
 
     type_stmt.or(rel_stmt).or(eq_stmt)
 }
 
-fn type_stmt() -> impl AstParser<TypeStmt> {
+fn type_statement() -> impl AstParser<TypeStatement> {
     let kind = keyword(Token::Type)
         .map(|span| (TypeKind::Type, span))
         .or(keyword(Token::Entity).map(|span| (TypeKind::Entity, span)));
@@ -42,12 +43,12 @@ fn type_stmt() -> impl AstParser<TypeStmt> {
         .then(kind)
         .then(spanned(ident().labelled("identifier")))
         .then(spanned(
-            spanned(rel_stmt())
+            spanned(rel_statement())
                 .repeated()
-                .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
+                .delimited_by(open('{'), close('}'))
                 .or_not(),
         ))
-        .map(|(((docs, kind), ident), rel_block)| TypeStmt {
+        .map(|(((docs, kind), ident), rel_block)| TypeStatement {
             docs,
             kind,
             ident,
@@ -55,7 +56,7 @@ fn type_stmt() -> impl AstParser<TypeStmt> {
         })
 }
 
-fn rel_stmt() -> impl AstParser<RelStmt> {
+fn rel_statement() -> impl AstParser<RelStatement> {
     doc_comments()
         .then(keyword(Token::Rel))
         // subject
@@ -76,7 +77,7 @@ fn rel_stmt() -> impl AstParser<RelStmt> {
         // object
         .then(spanned(ty()).or_not())
         .map(
-            |(((((docs, kw), subject), connection), chain), object)| RelStmt {
+            |(((((docs, kw), subject), connection), chain), object)| RelStatement {
                 docs,
                 kw,
                 subject,
@@ -98,15 +99,15 @@ fn rel_connection() -> impl AstParser<RelConnection> {
         .then(cardinality())
         // object prop and cardinality
         .then(
-            just(Token::Sigil('|'))
+            sigil('|', ())
                 .ignore_then(spanned(string_literal()))
                 .then(cardinality())
                 .or_not(),
         )
         // rel params
-        .then(spanned(just(Token::Sigil(':')).ignore_then(ty())).or_not())
+        .then(spanned(sigil(':', ()).ignore_then(ty())).or_not())
         // within {}
-        .delimited_by(just(Token::Open('{')), just(Token::Close('}')))
+        .delimited_by(open('{'), close('}'))
         .map(|(((ty, subject_cardinality), object), rel_params)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
@@ -124,9 +125,8 @@ fn rel_connection() -> impl AstParser<RelConnection> {
 }
 
 fn cardinality() -> impl AstParser<Option<Cardinality>> {
-    just(Token::Sigil('*'))
-        .or_not()
-        .then(just(Token::Sigil('?')).or_not())
+    opt_sigil('*', ())
+        .then(opt_sigil('?', ()))
         .map(|(many, option)| match (many.is_some(), option.is_some()) {
             (true, true) => Some(Cardinality::OptionalMany),
             (true, false) => Some(Cardinality::Many),
@@ -135,19 +135,19 @@ fn cardinality() -> impl AstParser<Option<Cardinality>> {
         })
 }
 
-fn eq_stmt() -> impl AstParser<EqStmt> {
+fn eq_statement() -> impl AstParser<EqStatement> {
     keyword(Token::Eq)
         .then(
             spanned(variable())
                 .repeated()
-                .delimited_by(just(Token::Open('(')), just(Token::Close(')'))),
+                .delimited_by(open('('), close(')')),
         )
         .then(
             spanned(eq_type())
                 .then(spanned(eq_type()))
-                .delimited_by(just(Token::Open('{')), just(Token::Close('}'))),
+                .delimited_by(open('{'), close('}')),
         )
-        .map(|((kw, variables), (first, second))| EqStmt {
+        .map(|((kw, variables), (first, second))| EqStatement {
             kw,
             variables,
             first,
@@ -160,17 +160,17 @@ fn eq_type() -> impl AstParser<EqType> {
         .then(
             eq_attribute()
                 .repeated()
-                .delimited_by(just(Token::Open('{')), just(Token::Close('}'))),
+                .delimited_by(open('{'), close('}')),
         )
         .map(|(path, attributes)| EqType { path, attributes })
 }
 
 fn eq_attribute() -> impl AstParser<EqAttribute> {
-    let variable = expr().map(EqAttribute::Expr);
+    let variable = expression().map(EqAttribute::Expr);
     let rel = keyword(Token::Rel)
-        .then(expr().or_not())
-        .then(spanned(ty()).delimited_by(just(Token::Open('{')), just(Token::Close('}'))))
-        .then(expr().or_not())
+        .then(expression().or_not())
+        .then(spanned(ty()).delimited_by(open('{'), close('}')))
+        .then(expression().or_not())
         .map_with_span(|(((kw, subject), connection), object), span| {
             EqAttribute::Rel((
                 EqAttributeRel {
@@ -187,13 +187,13 @@ fn eq_attribute() -> impl AstParser<EqAttribute> {
 }
 
 /// Expression parser
-fn expr() -> impl AstParser<Spanned<Expr>> {
+fn expression() -> impl AstParser<Spanned<Expression>> {
     recursive(|expr| {
-        let path = path().map(Expr::Path);
-        let variable = variable().map(Expr::Variable);
-        let number_literal = number_literal().map(Expr::NumberLiteral);
-        let string_literal = string_literal().map(Expr::StringLiteral);
-        let group = expr.delimited_by(just(Token::Open('(')), just(Token::Close(')')));
+        let path = path().map(Expression::Path);
+        let variable = variable().map(Expression::Variable);
+        let number_literal = number_literal().map(Expression::NumberLiteral);
+        let string_literal = string_literal().map(Expression::StringLiteral);
+        let group = expr.delimited_by(open('('), close(')'));
 
         let atom = spanned(path)
             .or(spanned(variable))
@@ -206,34 +206,36 @@ fn expr() -> impl AstParser<Spanned<Expr>> {
         // these are large types and thus pretty slow to compile :(
 
         // infix precedence for multiplication and division:
-        let op = just(Token::Sigil('*'))
-            .map(|_| BinaryOp::Mul)
-            .or(just(Token::Sigil('/')).map(|_| BinaryOp::Div));
+        let op = sigil('*', BinaryOp::Mul).or(sigil('/', BinaryOp::Div));
         let product = atom
             .clone()
             .then(op.then(atom).repeated())
             .foldl(|left, (op, right)| {
                 let span = left.1.start..right.1.end;
-                (Expr::Binary(Box::new(left), op, Box::new(right)), span)
+                (
+                    Expression::Binary(Box::new(left), op, Box::new(right)),
+                    span,
+                )
             });
 
         // infix precedence for addition and subtraction:
-        let op = just(Token::Sigil('+'))
-            .map(|_| BinaryOp::Add)
-            .or(just(Token::Sigil('-')).map(|_| BinaryOp::Sub));
+        let op = sigil('+', BinaryOp::Add).or(sigil('-', BinaryOp::Sub));
         product
             .clone()
             .then(op.then(product).repeated())
             .foldl(|left, (op, right)| {
                 let span = left.1.start..right.1.end;
-                (Expr::Binary(Box::new(left), op, Box::new(right)), span)
+                (
+                    Expression::Binary(Box::new(left), op, Box::new(right)),
+                    span,
+                )
             })
     })
 }
 
 /// Type parser
 fn ty() -> impl AstParser<Type> {
-    let unit = just(Token::Sigil('.')).map(|_| Type::Unit);
+    let unit = sigil('.', Type::Unit);
     let path = ident().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
@@ -247,6 +249,22 @@ fn ty() -> impl AstParser<Type> {
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
     select! { Token::DocComment(string) => string }.repeated()
+}
+
+fn open(char: char) -> impl AstParser<Token> {
+    just(Token::Open(char))
+}
+
+fn close(char: char) -> impl AstParser<Token> {
+    just(Token::Close(char))
+}
+
+fn sigil<T: Clone>(char: char, to: T) -> impl AstParser<T> {
+    just(Token::Sigil(char)).map(move |_| to.clone())
+}
+
+fn opt_sigil<T: Clone>(char: char, to: T) -> impl AstParser<Option<T>> {
+    sigil(char, to).or_not()
 }
 
 fn keyword(token: Token) -> impl AstParser<Span> {
@@ -334,10 +352,10 @@ mod tests {
         Parse(Vec<Simple<Token>>),
     }
 
-    fn parse(input: &str) -> Result<Vec<Stmt>, Error> {
+    fn parse(input: &str) -> Result<Vec<Statement>, Error> {
         let tokens = lexer().parse(input).map_err(Error::Lex)?;
         let len = input.len();
-        let stmts = stmt_seq()
+        let stmts = statement_sequence()
             .parse(Stream::from_iter(len..len + 1, tokens.into_iter()))
             .map_err(Error::Parse)?;
         Ok(stmts.into_iter().map(|(stmt, _)| stmt).collect())
@@ -358,7 +376,7 @@ mod tests {
         ";
 
         let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Stmt::Type(_), Stmt::Type(_)]);
+        assert_matches!(stmts.as_slice(), [Statement::Type(_), Statement::Type(_)]);
 
         assert_eq!(1, stmts[0].docs().len());
     }
@@ -383,6 +401,6 @@ mod tests {
         ";
 
         let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Stmt::Eq(_), Stmt::Eq(_)]);
+        assert_matches!(stmts.as_slice(), [Statement::Eq(_), Statement::Eq(_)]);
     }
 }

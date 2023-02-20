@@ -62,7 +62,7 @@ fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId
             let mut lowering = Lowering::new(compiler, &src);
 
             for stmt in statements {
-                let _ignored = lowering.lower_stmt(stmt);
+                let _ignored = lowering.lower_statement(stmt);
             }
 
             lowering.finish()

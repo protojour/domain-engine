@@ -44,7 +44,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         self.root_defs
     }
 
-    pub fn lower_stmt(&mut self, stmt: (ast::Stmt, Span)) -> Result<(), ()> {
+    pub fn lower_statement(&mut self, stmt: (ast::Statement, Span)) -> Result<(), ()> {
         match self.stmt_to_def(stmt) {
             Ok(root_defs) => {
                 self.root_defs.extend(root_defs.into_iter());
@@ -62,10 +62,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .push_error(error.spanned(&self.compiler.sources, &self.src.span(&span)));
     }
 
-    fn stmt_to_def(&mut self, (stmt, span): (ast::Stmt, Span)) -> Res<RootDefs> {
+    fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {
         match stmt {
             // ast::Ast::Import(_) => panic!("import not supported yet"),
-            ast::Stmt::Type(type_stmt) => {
+            ast::Statement::Type(type_stmt) => {
                 let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
                 let kind = match type_stmt.kind.0 {
@@ -100,10 +100,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(root_defs)
             }
-            ast::Stmt::Rel(rel_stmt) => {
+            ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_chain_to_def(rel_stmt, span, BlockContext::NoContext)
             }
-            ast::Stmt::Eq(ast::EqStmt {
+            ast::Statement::Eq(ast::EqStatement {
                 kw: _,
                 variables: ast_variables,
                 first,
@@ -132,11 +132,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn ast_relationship_chain_to_def(
         &mut self,
-        rel: ast::RelStmt,
+        rel: ast::RelStatement,
         span: Span,
         contextual_def: BlockContext<(DefId, Span)>,
     ) -> Res<RootDefs> {
-        let ast::RelStmt {
+        let ast::RelStatement {
             docs: _,
             kw: _,
             subject,
@@ -385,17 +385,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_expr(
         &mut self,
-        (ast_expr, span): (ast::Expr, Span),
+        (ast_expr, span): (ast::Expression, Span),
         var_table: &VarTable,
     ) -> Res<Expr> {
         match ast_expr {
-            ast::Expr::NumberLiteral(int) => {
+            ast::Expression::NumberLiteral(int) => {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
                 Ok(self.expr(ExprKind::Constant(int), &span))
             }
-            ast::Expr::Binary(left, op, right) => {
+            ast::Expression::Binary(left, op, right) => {
                 let fn_ident = match op {
                     ast::BinaryOp::Add => "+",
                     ast::BinaryOp::Sub => "-",
@@ -410,7 +410,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }
-            ast::Expr::Variable(var_ident) => {
+            ast::Expression::Variable(var_ident) => {
                 let id = var_table
                     .get_var_id(var_ident.as_str())
                     .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;

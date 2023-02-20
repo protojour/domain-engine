@@ -5,13 +5,13 @@ use smartstring::alias::String;
 use super::{Span, Spanned};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Stmt {
-    Type(TypeStmt),
-    Rel(RelStmt),
-    Eq(EqStmt),
+pub enum Statement {
+    Type(TypeStatement),
+    Rel(RelStatement),
+    Eq(EqStatement),
 }
 
-impl Stmt {
+impl Statement {
     #[allow(unused)]
     pub fn docs(&self) -> &[String] {
         match self {
@@ -23,11 +23,11 @@ impl Stmt {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct TypeStmt {
+pub struct TypeStatement {
     pub docs: Vec<String>,
     pub kind: Spanned<TypeKind>,
     pub ident: Spanned<String>,
-    pub rel_block: Spanned<Option<Vec<Spanned<RelStmt>>>>,
+    pub rel_block: Spanned<Option<Vec<Spanned<RelStatement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -37,7 +37,7 @@ pub enum TypeKind {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct RelStmt {
+pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub subject: Option<Spanned<Type>>,
@@ -82,7 +82,7 @@ pub struct RelChain {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct EqStmt {
+pub struct EqStatement {
     pub kw: Span,
     pub variables: Vec<Spanned<String>>,
     pub first: Spanned<EqType>,
@@ -97,16 +97,16 @@ pub struct EqType {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum EqAttribute {
-    Expr(Spanned<Expr>),
+    Expr(Spanned<Expression>),
     Rel(Spanned<EqAttributeRel>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct EqAttributeRel {
     pub kw: Span,
-    pub subject: Option<Spanned<Expr>>,
+    pub subject: Option<Spanned<Expression>>,
     pub connection: Spanned<Type>,
-    pub object: Option<Spanned<Expr>>,
+    pub object: Option<Spanned<Expression>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -120,12 +120,12 @@ pub enum Type {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Expr {
+pub enum Expression {
     Variable(String),
     Path(String),
     NumberLiteral(String),
     StringLiteral(String),
-    Binary(Box<Spanned<Expr>>, BinaryOp, Box<Spanned<Expr>>),
+    Binary(Box<Spanned<Expression>>, BinaryOp, Box<Spanned<Expression>>),
     // Call(Spanned<String>, Vec<Spanned<Expr>>),
 }
 
