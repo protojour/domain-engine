@@ -1,6 +1,3 @@
-use ::chumsky::Parser;
-
-use chumsky::Stream;
 use codegen::execute_codegen_tasks;
 use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
@@ -60,40 +57,33 @@ impl Compile for CompileSrc {
 
 /// Parse and lower a source of the new syntax
 fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
-    let (tokens, lex_errors) = ontol_parser::lexer::lexer().parse_recovery(src.text.as_str());
+    match ontol_parser::parse_statements(&src.text) {
+        Ok(statements) => {
+            let mut lowering = Lowering::new(compiler, &src);
 
-    for lex_error in lex_errors {
-        let span = lex_error.span();
-        compiler.push_error(
-            CompileError::Lex(ChumskyError::new(lex_error))
-                .spanned(&compiler.sources, &src.span(&span)),
-        );
-    }
-
-    if let Some(tokens) = tokens {
-        let len = tokens.len();
-        let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
-        let (statements, parse_errors) = ontol_parser::parser::stmt_seq().parse_recovery(stream);
-
-        for parse_error in parse_errors {
-            let span = parse_error.span();
-            compiler.push_error(
-                CompileError::Parse(ChumskyError::new(parse_error))
-                    .spanned(&compiler.sources, &src.span(&span)),
-            );
-        }
-
-        let mut lowering = Lowering::new(compiler, &src);
-
-        if let Some(statements) = statements {
             for stmt in statements {
                 let _ignored = lowering.lower_stmt(stmt);
             }
-        }
 
-        lowering.finish()
-    } else {
-        vec![]
+            lowering.finish()
+        }
+        Err(errors) => {
+            for error in errors {
+                compiler.push_error(match error {
+                    ontol_parser::Error::Lex(lex_error) => {
+                        let span = lex_error.span();
+                        CompileError::Lex(ChumskyError::new(lex_error))
+                            .spanned(&compiler.sources, &src.span(&span))
+                    }
+                    ontol_parser::Error::Parse(parse_error) => {
+                        let span = parse_error.span();
+                        CompileError::Parse(ChumskyError::new(parse_error))
+                            .spanned(&compiler.sources, &src.span(&span))
+                    }
+                })
+            }
+            vec![]
+        }
     }
 }
 

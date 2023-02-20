@@ -3,14 +3,10 @@ use std::{
     ops::Range,
 };
 
+use ontol_parser::{ast, Span};
 use ontol_runtime::{DefId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
-
-use ontol_parser::{
-    ast::{self, BinaryOp, EqAttribute, RelType},
-    Span,
-};
 
 use crate::{
     compiler::Compiler,
@@ -227,7 +223,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             _,
             Option<Range<Option<u16>>>,
         ) = match relation_ty {
-            RelType::Type((ty, span)) => {
+            ast::RelType::Type((ty, span)) => {
                 let def_id = self.ast_type_to_def(ty, &span)?;
 
                 match self.compiler.defs.get_def_kind(def_id) {
@@ -237,7 +233,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     _ => (RelationIdent::Typed(def_id), span.clone(), None),
                 }
             }
-            RelType::IntRange((range, span)) => (RelationIdent::Indexed, span, Some(range)),
+            ast::RelType::IntRange((range, span)) => (RelationIdent::Indexed, span, Some(range)),
         };
 
         let has_object_prop = object_prop_ident.is_some();
@@ -350,13 +346,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .attributes
             .into_iter()
             .map(|eq_attr| match eq_attr {
-                EqAttribute::Expr((expr, expr_span)) => {
+                ast::EqAttribute::Expr((expr, expr_span)) => {
                     let key = (DefId::unit(), self.src.span(&expr_span));
                     let expr = self.lower_expr((expr, expr_span), var_table)?;
 
                     Ok((key, expr))
                 }
-                EqAttribute::Rel((rel, _rel_span)) => {
+                ast::EqAttribute::Rel((rel, _rel_span)) => {
                     // FIXME: For now:
                     assert!(rel.subject.is_none());
 
@@ -401,10 +397,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Expr::Binary(left, op, right) => {
                 let fn_ident = match op {
-                    BinaryOp::Add => "+",
-                    BinaryOp::Sub => "-",
-                    BinaryOp::Mul => "*",
-                    BinaryOp::Div => "/",
+                    ast::BinaryOp::Add => "+",
+                    ast::BinaryOp::Sub => "-",
+                    ast::BinaryOp::Mul => "*",
+                    ast::BinaryOp::Div => "/",
                 };
 
                 let def_id = self.lookup_ident(fn_ident, &span)?;
