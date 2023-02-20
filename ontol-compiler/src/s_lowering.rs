@@ -20,7 +20,7 @@ use crate::{
     source::{CompileSrc, CORE_PKG},
 };
 
-pub struct Lowering<'s, 'm> {
+pub struct SExprLowering<'s, 'm> {
     compiler: &'s mut Compiler<'m>,
     src: &'s CompileSrc,
     root_defs: Vec<DefId>,
@@ -29,7 +29,7 @@ pub struct Lowering<'s, 'm> {
 type Res<T> = Result<T, SpannedCompileError>;
 type RootDefs = SmallVec<[DefId; 1]>;
 
-impl<'s, 'm> Lowering<'s, 'm> {
+impl<'s, 'm> SExprLowering<'s, 'm> {
     pub fn new(compiler: &'s mut Compiler<'m>, src: &'s CompileSrc) -> Self {
         Self {
             compiler,

@@ -67,7 +67,7 @@ impl TestCompile for &'static str {
         let mut compiler = Compiler::new(&mem).with_core();
         let compile_src = compiler.sources.add(TEST_PKG, "str".into(), self.into());
 
-        match compile_src.clone().compile(&mut compiler, TEST_PKG) {
+        match compile_src.clone().s_compile(&mut compiler, TEST_PKG) {
             Ok(()) => {
                 validator(&compiler.into_env());
             }
@@ -85,7 +85,7 @@ impl TestCompile for &'static str {
             .sources
             .add(PackageId(666), "str".into(), self.into());
 
-        let Err(errors) = compile_src.clone().compile(&mut compiler, PackageId(1)) else {
+        let Err(errors) = compile_src.clone().s_compile(&mut compiler, PackageId(1)) else {
             panic!("Script did not fail to compile");
         };
 
