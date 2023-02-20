@@ -9,10 +9,10 @@ use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCom
 #[test]
 fn constant_string_pattern() {
     "
-    (type! foo)
-    (rel! '' { 'foo' } foo)
+    type foo
+    rel '' { 'foo' } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!("foo"));
         assert_error_msg!(
@@ -25,10 +25,10 @@ fn constant_string_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    (type! foobar)
-    (rel! '' { 'foo' } { 'bar' } foobar)
+    type foobar
+    rel '' { 'foo' } { 'bar' } foobar
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
         assert_json_io_matches!(foobar, json!("foobar"));
         assert_error_msg!(
@@ -41,10 +41,10 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    (type! foo)
-    (rel! '' { 'foo/' } { uuid } foo)
+    type foo
+    rel '' { 'foo/' } { uuid } foo
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
 
         assert_matches!(
@@ -71,17 +71,17 @@ fn uuid_in_string_constructor_pattern() {
 #[test]
 fn test_string_pattern_constructor_union() {
     "
-    (type! foo)
-    (type! bar)
-    (type! foobar)
+    type foo
+    type bar
+    type foobar
 
-    (rel! '' { 'foo/' } { uuid } foo)
-    (rel! '' { 'bar/' } { uuid } bar)
+    rel '' { 'foo/' } { uuid } foo
+    rel '' { 'bar/' } { uuid } bar
 
-    (rel! _ { foo } foobar)
-    (rel! _ { bar } foobar)
+    rel . { foo } foobar
+    rel . { bar } foobar
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
         assert_matches!(
             foobar.deserialize_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -103,10 +103,10 @@ fn test_string_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    (type! foo)
-    (rel! foo { 'prop' } /abc*/)
+    type foo
+    rel foo { 'prop' } /abc*/
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "prop": "abc" }));
         assert_json_io_matches!(foo, json!({ "prop": "123abc" }));
@@ -121,10 +121,10 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    (type! re)
-    (rel! '' { /a/ } { /bc*/ } re)
+    type re
+    rel '' { /a/ } { /bc*/ } re
     "
-    .s_compile_ok(|env| {
+    .compile_ok(|env| {
         let re = TypeBinding::new(env, "re");
         assert_json_io_matches!(re, json!("ab"));
         assert_json_io_matches!(re, json!("abc"), json!("ab"));
@@ -140,11 +140,11 @@ fn test_simple_regex_pattern_constructor() {
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "
-    (type! hex)
-    (rel! '' { /a-zA-Z0-9/ } hex)
+    type hex
+    rel '' { /a-zA-Z0-9/ } hex
 
-    (type! uuid)
-    (rel!
+    type uuid
+    rel
         ''
         { hex{8} }
         { '-' }
@@ -156,49 +156,45 @@ fn test_string_patterns() {
         { '-' }
         { hex{12} }
         uuid
-    )
 
-    (type! my_id)
-    (rel! '' { 'my/' } { uuid } my_id)
+    type my_id
+    rel '' { 'my/' } { uuid } my_id
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 fn regex_named_group_as_relation() {
     "
-    (type! lol)
-    (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR invalid regex: unrecognized flag
+    type lol
+    rel . { /abc(?<named>.)/ } lol // ERROR invalid regex: unrecognized flag
     "
-    .s_compile_fail()
+    .compile_fail()
 }
 
 #[test]
 #[ignore]
 fn automata() {
     r#"
-    (rel!
+    rel
         []
         { int }
         { int }
         position
-    )
 
-    (rel!
+    rel
         []
         { position }
         { position }
         { position* }
         position-list
-    )
-    
-    (rel!
+
+    rel
         position-list
         { position }
         { position }
         { position* }
         position-ring
-    )
     "#
     .s_compile_fail();
 }
