@@ -339,7 +339,7 @@ pub fn error(msg: impl ToString, span: Span) -> Simple<Tree> {
 mod tests {
     use chumsky::Parser;
 
-    use crate::parse::tree::tree_parser;
+    use crate::s_parse::tree::tree_parser;
 
     use super::*;
 

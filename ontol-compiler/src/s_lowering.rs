@@ -16,7 +16,7 @@ use crate::{
     error::{CompileError, SpannedCompileError},
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    parse::{ast, Span},
+    s_parse::{ast, Span},
     source::{CompileSrc, CORE_PKG},
 };
 

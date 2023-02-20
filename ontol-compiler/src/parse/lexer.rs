@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 // note: reusing some old parsers for now:
-use crate::parse::tree;
+use crate::s_parse::tree;
 
 use super::Spanned;
 

@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{
-    parse::tree::Tree,
+    s_parse::tree::Tree,
     source::{SourceSpan, Sources},
 };
 

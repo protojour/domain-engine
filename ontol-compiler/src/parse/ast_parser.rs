@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use super::{
-    ast2::{
+    ast::{
         ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStmt, EqType, Expr, RelConnection,
         RelStmt, Stmt, Type, TypeStmt,
     },
@@ -233,7 +233,7 @@ where
 mod tests {
     use chumsky::Stream;
 
-    use crate::parse2::lexer::lexer;
+    use crate::parse::lexer::lexer;
 
     use super::*;
 

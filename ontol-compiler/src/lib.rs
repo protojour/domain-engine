@@ -5,9 +5,9 @@ use compiler::Compiler;
 use error::{ChumskyError, CompileError, UnifiedCompileError};
 
 pub use error::*;
-use lowering::Lowering;
 use ontol_runtime::PackageId;
 use patterns::compile_all_patterns;
+use s_lowering::Lowering;
 pub use source::*;
 
 pub mod compiler;
@@ -19,13 +19,13 @@ mod codegen;
 mod compiler_queries;
 mod def;
 mod expr;
-mod lowering;
 mod namespace;
 mod parse;
-mod parse2;
 mod patterns;
 mod regex;
 mod relation;
+mod s_lowering;
+mod s_parse;
 mod sequence;
 mod source;
 mod strings;
@@ -54,7 +54,7 @@ impl Compile for &str {
 
 impl Compile for CompileSrc {
     fn compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
-        let (trees, lex_errors) = parse::tree::trees_parser().parse_recovery(self.text.as_str());
+        let (trees, lex_errors) = s_parse::tree::trees_parser().parse_recovery(self.text.as_str());
 
         for lex_error in lex_errors {
             let span = lex_error.span();
@@ -68,7 +68,7 @@ impl Compile for CompileSrc {
             let mut asts = vec![];
 
             for tree in trees {
-                match crate::parse::parse(tree) {
+                match crate::s_parse::parse(tree) {
                     Ok(ast) => {
                         asts.push(ast);
                     }

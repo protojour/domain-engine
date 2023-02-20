@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use chumsky::prelude::Simple;
 use smartstring::alias::String;
 
-use crate::{parse::ast::ParseResult, parse::tree::Tree};
+use crate::{s_parse::ast::ParseResult, s_parse::tree::Tree};
 
 use super::{ast_parse::error, Span, Spanned};
 

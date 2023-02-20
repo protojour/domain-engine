@@ -1,86 +1,95 @@
-use std::ops::Range;
-
-use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::parse::{tree::Tree, Spanned};
+use super::{lexer::Token, Span, Spanned};
 
-pub type ParseResult<T> = Result<Spanned<T>, Simple<Tree>>;
-
-pub enum Ast {
-    Import(Path),
-    Type(Spanned<String>),
-    Entity(Spanned<String>),
-    Relationship(Box<Relationship>),
-    Eq(Eq),
-    Comment(String),
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Stmt {
+    Type(TypeStmt),
+    Rel(RelStmt),
+    Eq(EqStmt),
 }
 
-pub struct Eq {
-    pub variables: Vec<Spanned<String>>,
-    pub first: Spanned<Expr>,
-    pub second: Spanned<Expr>,
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct TypeStmt {
+    pub kw: Span,
+    pub ident: Spanned<String>,
+    pub rel_block: Spanned<Option<Vec<RelStmt>>>,
 }
 
-#[derive(Debug)]
-pub enum Expr {
-    Variable(String),
-    Sym(String),
-    Literal(Literal),
-    Call(Spanned<String>, Vec<Spanned<Expr>>),
-    Obj(Spanned<String>, Vec<Spanned<Attribute>>),
-}
-
-#[derive(Debug)]
-pub struct Attribute {
-    pub ty: Spanned<Type>,
-    pub value: Spanned<Expr>,
-}
-
-#[derive(Debug)]
-pub enum Type {
-    Sym(String),
-    Literal(Literal),
-    Unit,
-    EmptySequence,
-}
-
-pub struct Relationship {
-    pub subject: Spanned<Type>,
-    pub connection: Connection,
-    pub chain: Vec<RelationshipChain>,
-    pub object: Spanned<Type>,
-}
-
-pub struct RelationshipChain {
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct RelStmt {
+    pub kw: Span,
     pub subject: Option<Spanned<Type>>,
-    pub connection: Connection,
+    pub connection: RelConnection,
+    pub chain: Vec<ChainedSubjectConnection>,
+    pub object: Option<Spanned<Type>>,
 }
 
-pub struct Connection {
-    pub ty: Spanned<ConnectionType>,
-    pub subject_cardinality: Option<Cardinality>,
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct ChainedSubjectConnection {
+    pub subject: Option<Spanned<Type>>,
+    pub connection: RelConnection,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct RelConnection {
+    pub ty: Spanned<Type>,
+    // pub subject_cardinality: Option<Cardinality>,
     pub rel_params: Option<Spanned<Type>>,
     pub object_prop_ident: Option<Spanned<String>>,
-    pub object_cardinality: Option<Cardinality>,
+    // pub object_cardinality: Option<Cardinality>,
 }
 
-pub enum ConnectionType {
-    Type(Spanned<Type>),
-    IntRange(Range<Option<u16>>),
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct RelChain {
+    pub subject: Option<Spanned<Type>>,
+    pub connection: RelConnection,
 }
 
-pub enum Cardinality {
-    Optional,
-    Many,
-    OptionalMany,
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqStmt {
+    pub kw: Span,
+    pub variables: Vec<Spanned<String>>,
+    pub first: Spanned<EqType>,
+    pub second: Spanned<EqType>,
 }
 
-#[derive(Debug)]
-pub enum Literal {
-    String(String),
-    Int(String),
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqType {
+    pub path: Spanned<String>,
+    pub attributes: Vec<EqAttribute>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum EqAttribute {
+    Expr(Expr),
+    Rel(EqAttributeRel),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EqAttributeRel {
+    pub kw: Span,
+    pub subject: Option<Spanned<Expr>>,
+    pub connection: Spanned<Type>,
+    pub object: Option<Spanned<Expr>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Type {
+    Unit,
+    // TODO: Support segments
+    Path(String),
+    NumberLiteral(String),
+    StringLiteral(String),
     Regex(String),
 }
 
-pub struct Path(pub Vec<Spanned<String>>);
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Expr {
+    Variable(String),
+    Path(String),
+    NumberLiteral(String),
+    StringLiteral(String),
+    Binary(Box<Expr>, Token, Box<Expr>),
+    // Call(Spanned<String>, Vec<Spanned<Expr>>),
+}
