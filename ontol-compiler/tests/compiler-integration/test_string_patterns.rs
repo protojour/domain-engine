@@ -12,7 +12,7 @@ fn constant_string_pattern() {
     (type! foo)
     (rel! '' { 'foo' } foo)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!("foo"));
         assert_error_msg!(
@@ -28,7 +28,7 @@ fn concatenated_constant_string_constructor_pattern() {
     (type! foobar)
     (rel! '' { 'foo' } { 'bar' } foobar)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
         assert_json_io_matches!(foobar, json!("foobar"));
         assert_error_msg!(
@@ -44,7 +44,7 @@ fn uuid_in_string_constructor_pattern() {
     (type! foo)
     (rel! '' { 'foo/' } { uuid } foo)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
 
         assert_matches!(
@@ -81,7 +81,7 @@ fn test_string_pattern_constructor_union() {
     (rel! _ { foo } foobar)
     (rel! _ { bar } foobar)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
         assert_matches!(
             foobar.deserialize_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -106,7 +106,7 @@ fn test_regex_property() {
     (type! foo)
     (rel! foo { 'prop' } /abc*/)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "prop": "abc" }));
         assert_json_io_matches!(foo, json!({ "prop": "123abc" }));
@@ -124,7 +124,7 @@ fn test_simple_regex_pattern_constructor() {
     (type! re)
     (rel! '' { /a/ } { /bc*/ } re)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let re = TypeBinding::new(env, "re");
         assert_json_io_matches!(re, json!("ab"));
         assert_json_io_matches!(re, json!("abc"), json!("ab"));
@@ -161,7 +161,7 @@ fn test_string_patterns() {
     (type! my_id)
     (rel! '' { 'my/' } { uuid } my_id)
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn regex_named_group_as_relation() {
     (type! lol)
     (rel! _ { /abc(?<named>.)/ } lol) ;; ERROR invalid regex: unrecognized flag
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -200,5 +200,5 @@ fn automata() {
         position-ring
     )
     "#
-    .compile_fail();
+    .s_compile_fail();
 }

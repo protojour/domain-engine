@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "(type! foo)".compile_ok(|env| {
+    "(type! foo)".s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({}));
     });
@@ -18,7 +18,7 @@ fn test_serde_value_type() {
     (type! foo)
     (rel! _ { string } foo)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!("string"));
     });
@@ -30,7 +30,7 @@ fn test_serde_map_type() {
     (type! foo)
     (rel! foo { 'a' } string)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "string" }));
     });
@@ -45,7 +45,7 @@ fn test_serde_complex_type() {
     (rel! foo { 'b' } bar)
     (rel! bar { 'c' } string)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "A", "b": { "c": "C" }}));
     });
@@ -58,7 +58,7 @@ fn test_serde_sequence() {
     (rel! t { 0 } string)
     (rel! t { 1 } int)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let t = TypeBinding::new(env, "t");
         assert_json_io_matches!(t, json!(["a", 1]));
     });
@@ -71,7 +71,7 @@ fn test_serde_value_union1() {
     (rel! _ { 'a' } u)
     (rel! _ { 'b' } u)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!("a"));
     });
@@ -87,7 +87,7 @@ fn test_serde_string_or_unit() {
     (type! foo)
     (rel! foo { 'a' } string-or-unit)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "a": "string" }));
         assert_json_io_matches!(foo, json!({ "a": null }));
@@ -108,7 +108,7 @@ fn test_serde_map_union() {
     (rel! _ { foo } u)
     (rel! _ { bar } u)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
         assert_json_io_matches!(u, json!({ "type": "foo", "c": 7}));
     });
@@ -120,7 +120,7 @@ fn test_serde_many_cardinality() {
     (type! foo)
     (rel! foo { 's'* } string)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!({ "s": []}));
         assert_json_io_matches!(foo, json!({ "s": ["a", "b"]}));
@@ -136,7 +136,7 @@ fn test_serde_infinite_sequence() {
     (rel! foo { 5..6 } int)
     (rel! foo { 6..  } int)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44]));
         assert_json_io_matches!(foo, json!([42, 43, "a", "b", null, 44, 45, 46]));
@@ -153,7 +153,7 @@ fn test_serde_uuid() {
     (type! my_id)
     (rel! _ { uuid } my_id)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let my_id = TypeBinding::new(env, "my_id");
         assert_matches!(
             my_id.deserialize_data_variant(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -197,7 +197,7 @@ fn test_jsonml() {
     ; BUG: should accept any string as key
     (rel! attributes { 'class'? } string)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let element = TypeBinding::new(env, "element");
 
         assert_json_io_matches!(element, json!("text"));

@@ -30,7 +30,7 @@ fn test_entity_experiment_etc() {
 
     (rel! artist { 'plays'* 'played_by'*: plays } instrument)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
         let instrument = TypeBinding::new(env, "instrument");
 
@@ -82,7 +82,7 @@ fn test_entity_self_relationship() {
     (rel! node { 'name' } string)
     (rel! node { 'children'* 'parent'? } node)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 
         assert_error_msg!(
@@ -127,7 +127,7 @@ fn test_entity_self_relationship_mandatory_object() {
     (entity! node)
     (rel! node { 'children'* 'parent' } node)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
 
         assert_error_msg!(

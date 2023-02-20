@@ -47,7 +47,7 @@ fn test_eq_simple() {
         (obj! bar { 'b' :x })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(
             env,
             ("foo", "bar"),
@@ -75,7 +75,7 @@ fn test_meters() {
         (obj! millimeters :x)
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
         assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
     })
@@ -95,7 +95,7 @@ fn test_temperature() {
         (obj! fahrenheit (+ (* :x (/ 9 5)) 32))
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         // FIXME: No support for rational numbers yet, so the numeric result is wrong
         // (but code generation should work)
         assert_translate(env, ("celsius", "fahrenheit"), json!(10), json!(42));
@@ -115,7 +115,7 @@ fn test_eq_value_to_map() {
         (obj! two { 'a' :x })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
         assert_translate(env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
     })
@@ -133,7 +133,7 @@ fn test_eq_value_to_map_func() {
         (obj! two { 'a' (* :x 2) })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(env, ("one", "two"), json!(2), json!({ "a": 4 }));
         assert_translate(env, ("two", "one"), json!({ "a": 4 }), json!(2));
     })
@@ -151,7 +151,7 @@ fn test_eq_simple_array() {
         (obj! bar { 'b' :x })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(
             env,
             ("foo", "bar"),
@@ -187,7 +187,7 @@ fn test_eq_complex_flow() {
         (obj! two { 'a' :x } { 'b' :y } { 'c' :x } { 'd' :y })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(
             env,
             ("one", "two"),
@@ -234,7 +234,7 @@ fn test_eq_delegation() {
         (obj! vehicle { 'length' :l })
     )
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         assert_translate(
             env,
             ("car", "vehicle"),

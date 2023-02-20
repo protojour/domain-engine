@@ -52,17 +52,20 @@ pub(crate) use assert_json_io_matches;
 use util::AnnotatedCompileError;
 
 trait TestCompile: Sized {
-    fn compile_ok(self, validator: impl Fn(&Env));
+    /// Compile using S-expr syntax
+    fn s_compile_ok(self, validator: impl Fn(&Env));
 
-    fn compile_fail(self) {
-        self.compile_fail_then(|_| {})
+    /// Compile using S-expr syntax, expect failure
+    fn s_compile_fail(self) {
+        self.s_compile_fail_then(|_| {})
     }
 
-    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
+    /// Compile using S-expr syntax, expect failure with error closure
+    fn s_compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(&Env)) {
+    fn s_compile_ok(self, validator: impl Fn(&Env)) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
         let compile_src = compiler.sources.add(TEST_PKG, "str".into(), self.into());
@@ -78,7 +81,7 @@ impl TestCompile for &'static str {
         }
     }
 
-    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+    fn s_compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
         let mut mem = Mem::default();
         let mut compiler = Compiler::new(&mut mem).with_core();
         let compile_src = compiler
@@ -97,7 +100,7 @@ impl TestCompile for &'static str {
 #[test]
 #[should_panic(expected = "it works")]
 fn ok_validator_must_run() {
-    "".compile_ok(|_| {
+    "".s_compile_ok(|_| {
         panic!("it works");
     })
 }
@@ -105,7 +108,7 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "( ;; ERROR lex error".compile_fail_then(|_| {
+    "( ;; ERROR lex error".s_compile_fail_then(|_| {
         panic!("it works");
     })
 }

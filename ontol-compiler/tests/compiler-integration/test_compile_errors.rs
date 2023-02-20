@@ -4,17 +4,17 @@ use test_log::test;
 
 #[test]
 fn lex_error() {
-    "( ;; ERROR lex error".compile_fail();
+    "( ;; ERROR lex error".s_compile_fail();
 }
 
 #[test]
 fn parse_error1() {
-    "() ;; ERROR parse error: expected keyword".compile_fail()
+    "() ;; ERROR parse error: expected keyword".s_compile_fail()
 }
 
 #[test]
 fn underscore_not_allowed_at_start_of_identifier() {
-    "(type! _foo) ;; ERROR parse error: expected ident".compile_fail()
+    "(type! _foo) ;; ERROR parse error: expected ident".s_compile_fail()
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn rel_type_not_found() {
         baz ;; ERROR type not found
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn rel_duplicate_anonymous_relation() {
         _ { bar } foo
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn rel_mix_anonymous_and_named() {
         foo { 'foobar' } bar
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn rel_array_range_with_dots_is_illegal() {
         int
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn map_union_unit_type() {
     (rel! _ { foo } u) ;; ERROR unit type `foo` cannot be part of a union
     (rel! _ { bar } u) ;; ERROR unit type `bar` cannot be part of a union
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn map_union_missing_discriminator() {
     (rel! _ { foo } u)
     (rel! _ { bar } u) ;; ERROR cannot discriminate type
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn map_union_non_uniform_discriminators() {
     (rel! _ { foo } u)
     (rel! _ { bar } u)
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn non_disjoint_string_union() {
     (rel! _ { 'a' } u1)
     (rel! _ { 'a' } u1) ;; ERROR duplicate anonymous relationship
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn union_tree() {
     (rel! _ { u1 } u3) ;; ERROR union tree not supported
     (rel! _ { u2 } u3) ;; ERROR union tree not supported
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn sequence_mix1() {
     (rel! _ { int } u)
     (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
     "#
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn sequence_mix2() {
     (rel! u { 'a' } int)
     (rel! u { 0 } string) ;; ERROR invalid mix of relationship type for subject
     "#
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn sequence_overlapping_indices() {
     (rel! u { 0..3 } int)
     (rel! u { 2..4 } string) ;; ERROR overlapping indexes
     "#
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -172,7 +172,7 @@ fn sequence_ambiguous_infinite_tail() {
     (rel! u { 0.. } int)
     (rel! u { 1.. } string) ;; ERROR overlapping indexes
     "#
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn eq_undeclared_variable() {
         42
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn eq_incorrect_function_arguments() {
         42
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn eq_obj_non_domain_type_and_unit_type() {
         )
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn eq_attribute_mismatch() {
         (obj! bar) ;; ERROR expected expression
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn eq_duplicate_unknown_property() {
         (obj! bar)
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn eq_type_mismatch() {
         )
     )
     "
-    .compile_fail_then(|errors| {
+    .s_compile_fail_then(|errors| {
         assert_eq!("x", errors[0].span_text);
     })
 }
@@ -291,7 +291,7 @@ fn eq_type_mismatch_in_func() {
         )
     )
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -313,7 +313,7 @@ fn eq_array_mismatch() {
         )
     )
     "
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -323,7 +323,7 @@ fn union_in_named_relationship() {
     (rel! foo { 'a' } string)
     (rel! foo { 'a' } int) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
     "
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -334,7 +334,7 @@ fn test_serde_object_property_not_sugared() {
     (rel! foo { 'a' 'aa'*: _ } bar) ;; ERROR only entities may have named reverse relationship
     (rel! foo { 'b' 'bb'*: _ } string) ;; ERROR only entities may have named reverse relationship
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -359,7 +359,7 @@ fn unresolved_transitive_eq() {
         })
     )
     "
-    .compile_fail();
+    .s_compile_fail();
 }
 
 #[test]
@@ -381,7 +381,7 @@ fn various_monadic_properties() {
     ; FIXME: Should this work?
     (rel! bar { 'nullable' } _) ;; ERROR union in named relationship is not supported yet. Make a union type instead.
     "
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -392,7 +392,7 @@ fn mix_of_index_and_edge_type() {
 
     (rel! foo { 0: bar } string) ;; ERROR cannot mix index relation identifiers and edge types
     "#
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -404,7 +404,7 @@ fn invalid_subject_types() {
         string
     )
     "#
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -418,7 +418,7 @@ fn invalid_relation_chain() {
         {_}
     )
     "#
-    .compile_fail()
+    .s_compile_fail()
 }
 
 #[test]
@@ -427,7 +427,7 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
     (type! lol)
     (rel! _ { /abc\/(?P<42>.)/ } lol) ;; ERROR invalid regex: invalid capture group character
     "#
-    .compile_fail_then(|errors| {
+    .s_compile_fail_then(|errors| {
         assert_eq!("4", errors[0].span_text);
     })
 }
@@ -448,5 +448,5 @@ fn complains_about_ambiguous_pattern_based_unions() {
     (rel! _ { bar } union)
     (rel! _ { barbar } union)
     "
-    .compile_fail();
+    .s_compile_fail();
 }

@@ -83,7 +83,7 @@ fn test_geojson() {
     (rel! FeatureCollection { 'type' } 'FeatureCollection')
     (rel! FeatureCollection { 'features'* } Feature)
     "
-    .compile_ok(|env| {
+    .s_compile_ok(|env| {
         let geometry = TypeBinding::new(env, "Geometry");
         assert_json_io_matches!(
             geometry,
