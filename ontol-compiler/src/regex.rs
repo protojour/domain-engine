@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-use crate::s_parse::Span;
+use crate::parse::Span;
 use ontol_runtime::smart_format;
 use regex_syntax::{
     hir::{

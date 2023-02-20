@@ -8,7 +8,6 @@ use thiserror::Error;
 
 use crate::{
     parse::lexer::Token,
-    s_parse::tree::Tree,
     source::{SourceSpan, Sources},
 };
 
@@ -39,8 +38,6 @@ pub enum CompileError {
     Lex(ChumskyError<char>),
     #[error("parse error: {0}")]
     Parse(ChumskyError<Token>),
-    #[error("parse error: {0}")]
-    SParse(ChumskyError<Tree>),
     #[error("must speicify both subject and object in this relation")]
     MustSpecifyBothSubjectAndObjectInRelation,
     #[error("function takes {expected} parameters, but {actual} was supplied")]

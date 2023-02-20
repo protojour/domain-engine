@@ -62,17 +62,6 @@ trait TestCompile: Sized {
 
     /// Compile, expect failure with error closure
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
-
-    /// Compile using S-expr syntax
-    fn s_compile_ok(self, validator: impl Fn(&Env));
-
-    /// Compile using S-expr syntax, expect failure
-    fn s_compile_fail(self) {
-        self.s_compile_fail_then(|_| {})
-    }
-
-    /// Compile using S-expr syntax, expect failure with error closure
-    fn s_compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
 impl TestCompile for &'static str {
@@ -106,43 +95,12 @@ impl TestCompile for &'static str {
         let annotated_errors = util::diff_errors(self, compile_src, errors, "// ERROR");
         validator(annotated_errors);
     }
-
-    fn s_compile_ok(self, validator: impl Fn(&Env)) {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-        let compile_src = compiler.sources.add(TEST_PKG, "str".into(), self.into());
-
-        match compile_src.clone().s_compile(&mut compiler, TEST_PKG) {
-            Ok(()) => {
-                validator(&compiler.into_env());
-            }
-            Err(errors) => {
-                util::diff_errors(self, compile_src, errors, ";; ERROR");
-                panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
-            }
-        }
-    }
-
-    fn s_compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        let mut mem = Mem::default();
-        let mut compiler = Compiler::new(&mut mem).with_core();
-        let compile_src = compiler
-            .sources
-            .add(PackageId(666), "str".into(), self.into());
-
-        let Err(errors) = compile_src.clone().s_compile(&mut compiler, PackageId(1)) else {
-            panic!("Script did not fail to compile");
-        };
-
-        let annotated_errors = util::diff_errors(self, compile_src, errors, ";; ERROR");
-        validator(annotated_errors);
-    }
 }
 
 #[test]
 #[should_panic(expected = "it works")]
 fn ok_validator_must_run() {
-    "".s_compile_ok(|_| {
+    "".compile_ok(|_| {
         panic!("it works");
     })
 }
@@ -150,9 +108,10 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "( ;; ERROR lex error".s_compile_fail_then(|_| {
-        panic!("it works");
-    })
+    "typo  // ERROR parse error: found `typo`, expected one of `type`, `entity`, `rel`, `eq`"
+        .compile_fail_then(|_| {
+            panic!("it works");
+        })
 }
 
 fn main() {}

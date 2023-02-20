@@ -3,9 +3,6 @@ use std::fmt::Display;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-// note: reusing some old parsers for now:
-use crate::s_parse::tree;
-
 use super::Spanned;
 
 #[allow(dead_code)]
@@ -44,7 +41,7 @@ impl Display for Token {
 
 #[allow(dead_code)]
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
-    let ident = tree::ident().map(|ident| match ident.as_str() {
+    let ident = ident().map(|ident| match ident.as_str() {
         "type" => Token::Type,
         "entity" => Token::Entity,
         "rel" => Token::Rel,
@@ -61,10 +58,10 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .or(one_of(".:?_+-*|").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
-        .or(tree::num().map(Token::Number))
-        .or(tree::double_quote_string_literal().map(Token::StringLiteral))
-        .or(tree::single_quote_string_literal().map(Token::StringLiteral))
-        .or(tree::regex().map(Token::Regex))
+        .or(num().map(Token::Number))
+        .or(double_quote_string_literal().map(Token::StringLiteral))
+        .or(single_quote_string_literal().map(Token::StringLiteral))
+        .or(regex().map(Token::Regex))
         .or(just('/').then_ignore(none_of("/")).map(Token::Sigil))
         .or(ident)
         .map_with_span(|token, span| (token, span))
@@ -73,8 +70,91 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .repeated()
 }
 
-pub fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
+fn num() -> impl Parser<char, String, Error = Simple<char>> {
+    filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
+        .map(Some)
+        .chain::<char, Vec<_>, _>(
+            filter(|c: &char| c.is_ascii_digit() && !special_char(*c)).repeated(),
+        )
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn ident() -> impl Parser<char, String, Error = Simple<char>> {
+    filter(|c: &char| !c.is_whitespace() && !special_char(*c) && !c.is_ascii_digit() && *c != '_')
+        .map(Some)
+        .chain::<char, Vec<_>, _>(
+            filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
+        )
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+    let escape = just('\\').ignore_then(choice((
+        just('\\'),
+        just('/'),
+        just('"'),
+        just('b').to('\x08'),
+        just('f').to('\x0C'),
+        just('n').to('\n'),
+        just('r').to('\r'),
+        just('t').to('\t'),
+    )));
+
+    just('"')
+        .ignore_then(
+            filter(|c: &char| *c != '\\' && *c != '"')
+                .or(escape)
+                .repeated(),
+        )
+        .then_ignore(just('"'))
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
+    let escape = just('\\').ignore_then(choice((
+        just('\\'),
+        just('/'),
+        just('\''),
+        just('b').to('\x08'),
+        just('f').to('\x0C'),
+        just('n').to('\n'),
+        just('r').to('\r'),
+        just('t').to('\t'),
+    )));
+
+    just('\'')
+        .ignore_then(
+            filter(|c: &char| *c != '\\' && *c != '\'')
+                .or(escape)
+                .repeated(),
+        )
+        .then_ignore(just('\''))
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn regex() -> impl Parser<char, String, Error = Simple<char>> {
+    let escape = just('\\').ignore_then(just('/'));
+
+    just('/')
+        .ignore_then(filter(|c: &char| *c != '/' && !c.is_whitespace()).or(escape))
+        .chain::<char, Vec<_>, _>(
+            filter(|c: &char| *c != '\\' && *c != '/')
+                .or(escape)
+                .repeated(),
+        )
+        .then_ignore(just('/'))
+        .map(|vec| String::from_iter(vec.into_iter()))
+}
+
+fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
     just("///")
         .ignore_then(take_until(just('\n')))
         .map(|(vec, _)| Token::DocComment(String::from_iter(vec.into_iter())))
+}
+
+fn special_char(c: char) -> bool {
+    matches!(
+        c,
+        '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?' | '/'
+    )
 }

@@ -9,7 +9,6 @@ pub use error::*;
 use lowering::Lowering;
 use ontol_runtime::{DefId, PackageId};
 use patterns::compile_all_patterns;
-use s_lowering::SExprLowering;
 pub use source::*;
 
 pub mod compiler;
@@ -27,8 +26,6 @@ mod parse;
 mod patterns;
 mod regex;
 mod relation;
-mod s_lowering;
-mod s_parse;
 mod sequence;
 mod source;
 mod strings;
@@ -38,12 +35,6 @@ mod types;
 
 pub trait Compile {
     fn compile(
-        self,
-        compiler: &mut Compiler,
-        package: PackageId,
-    ) -> Result<(), UnifiedCompileError>;
-
-    fn s_compile(
         self,
         compiler: &mut Compiler,
         package: PackageId,
@@ -59,25 +50,11 @@ impl Compile for &str {
         let src = compiler.sources.add(package, "str".into(), self.into());
         src.compile(compiler, package)
     }
-
-    fn s_compile(
-        self,
-        compiler: &mut Compiler,
-        package: PackageId,
-    ) -> Result<(), UnifiedCompileError> {
-        let src = compiler.sources.add(package, "str".into(), self.into());
-        src.s_compile(compiler, package)
-    }
 }
 
 impl Compile for CompileSrc {
     fn compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
         let root_defs = parse_and_lower_source(compiler, self);
-        compile_all_packages(compiler, root_defs)
-    }
-
-    fn s_compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
-        let root_defs = parse_and_lower_s_source(compiler, self);
         compile_all_packages(compiler, root_defs)
     }
 }
@@ -113,48 +90,6 @@ fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId
             for stmt in statements {
                 let _ignored = lowering.lower_stmt(stmt);
             }
-        }
-
-        lowering.finish()
-    } else {
-        vec![]
-    }
-}
-
-// Parse and lower a source of the S-expression language
-fn parse_and_lower_s_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
-    let (trees, lex_errors) = s_parse::tree::trees_parser().parse_recovery(src.text.as_str());
-
-    for lex_error in lex_errors {
-        let span = lex_error.span();
-        compiler.push_error(
-            CompileError::Lex(ChumskyError::new(lex_error))
-                .spanned(&compiler.sources, &src.span(&span)),
-        );
-    }
-
-    if let Some(trees) = trees {
-        let mut asts = vec![];
-
-        for tree in trees {
-            match crate::s_parse::parse(tree) {
-                Ok(ast) => {
-                    asts.push(ast);
-                }
-                Err(error) => {
-                    let span = error.span();
-                    compiler.push_error(
-                        CompileError::SParse(ChumskyError::new(error))
-                            .spanned(&compiler.sources, &src.span(&span)),
-                    );
-                }
-            }
-        }
-
-        let mut lowering = SExprLowering::new(compiler, &src);
-
-        for ast in asts {
-            let _ignored = lowering.lower_ast(ast);
         }
 
         lowering.finish()
