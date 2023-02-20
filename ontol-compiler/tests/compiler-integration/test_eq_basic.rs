@@ -88,11 +88,12 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    type celsius
-    rel . { int } celsius
-
-    type fahrenheit
-    rel . { int } fahrenheit
+    type celsius {
+        rel . { int }
+    }
+    type fahrenheit {
+        rel . { int }
+    }
 
     eq (:x) {
         celsius { :x }
@@ -100,8 +101,6 @@ fn test_temperature() {
     }
     "
     .compile_ok(|env| {
-        // FIXME: No support for rational numbers yet, so the numeric result is wrong
-        // (but code generation should work)
         assert_translate(env, ("celsius", "fahrenheit"), json!(10), json!(50));
         assert_translate(env, ("fahrenheit", "celsius"), json!(50), json!(10));
     })
@@ -186,14 +185,17 @@ fn test_eq_complex_flow() {
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
-    type one
-    type two
-    rel one { 'a' } string
-    rel one { 'b' } string
-    rel two { 'a' } string
-    rel two { 'b' } string
-    rel two { 'c' } string
-    rel two { 'd' } string
+    type one {
+        rel { 'a' } string
+        rel { 'b' } string
+    }
+    type two {
+        rel { 'a' } string
+        rel { 'b' } string
+        rel { 'c' } string
+        rel { 'd' } string
+    }
+
     eq(:x :y) {
         one {
             rel { 'a' } :x
@@ -232,22 +234,25 @@ fn test_eq_complex_flow() {
 #[test]
 fn test_eq_delegation() {
     "
-    type meters
-    rel . { int } meters
-
-    type millimeters
-    rel . { int } millimeters
+    type meters {
+        rel . { int }
+    }
+    type millimeters {
+        rel . { int }
+    }
 
     eq(:m) {
         meters { :m }
         millimeters { :m * 1000 }
     }
 
-    type car
-    rel car { 'length' } meters
+    type car {
+        rel { 'length' } meters
+    }
 
-    type vehicle
-    rel vehicle { 'length' } millimeters
+    type vehicle {
+        rel { 'length' } millimeters
+    }
     
     eq(:l) {
         car {
