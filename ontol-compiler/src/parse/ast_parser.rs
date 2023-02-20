@@ -100,8 +100,8 @@ fn rel_stmt() -> impl AstParser<RelStmt> {
 }
 
 fn rel_connection() -> impl AstParser<RelConnection> {
-    let rel_ty_int_range = spanned(u16_range()).map(|range| RelType::IntRange(range));
-    let rel_ty_type = spanned(ty()).map(|ty| RelType::Type(ty));
+    let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
+    let rel_ty_type = spanned(ty()).map(RelType::Type);
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 

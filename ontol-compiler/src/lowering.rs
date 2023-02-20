@@ -13,7 +13,7 @@ use crate::{
         Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
         ValueCardinality, Variables,
     },
-    error::{CompileError, SpannedCompileError},
+    error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     parse::{
@@ -29,7 +29,9 @@ pub struct Lowering<'s, 'm> {
     root_defs: Vec<DefId>,
 }
 
-type Res<T> = Result<T, SpannedCompileError>;
+type LoweringError = (CompileError, Span);
+
+type Res<T> = Result<T, LoweringError>;
 type RootDefs = SmallVec<[DefId; 1]>;
 
 impl<'s, 'm> Lowering<'s, 'm> {
@@ -51,8 +53,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.root_defs.extend(root_defs.into_iter());
                 Ok(())
             }
-            Err(error) => {
-                self.compiler.push_error(error);
+            Err((error, span)) => {
+                self.compiler
+                    .push_error(error.spanned(&self.compiler.sources, &self.src.span(&span)));
                 Err(())
             }
         }
@@ -424,7 +427,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, SpannedCompileError> {
+    fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
         match self
             .compiler
             .namespaces
@@ -486,8 +489,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn error(&self, compile_error: CompileError, span: &Span) -> SpannedCompileError {
-        compile_error.spanned(&self.compiler.sources, &self.src.span(span))
+    fn error(&self, compile_error: CompileError, span: &Span) -> LoweringError {
+        (compile_error, span.clone())
     }
 }
 
