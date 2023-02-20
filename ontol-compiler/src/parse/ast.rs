@@ -7,7 +7,6 @@ use super::{Span, Spanned};
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Stmt {
     Type(TypeStmt),
-    Entity(TypeStmt),
     Rel(RelStmt),
     Eq(EqStmt),
 }
@@ -17,7 +16,6 @@ impl Stmt {
     pub fn docs(&self) -> &[String] {
         match self {
             Self::Type(ty) => &ty.docs,
-            Self::Entity(ty) => &ty.docs,
             Self::Rel(rel) => &rel.docs,
             Self::Eq(_) => &[],
         }
@@ -27,9 +25,15 @@ impl Stmt {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TypeStmt {
     pub docs: Vec<String>,
-    pub kw: Span,
+    pub kind: Spanned<TypeKind>,
     pub ident: Spanned<String>,
-    pub rel_block: Spanned<Option<Vec<RelStmt>>>,
+    pub rel_block: Spanned<Option<Vec<Spanned<RelStmt>>>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum TypeKind {
+    Type,
+    Entity,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

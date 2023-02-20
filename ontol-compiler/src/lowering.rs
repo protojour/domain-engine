@@ -53,12 +53,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.root_defs.extend(root_defs.into_iter());
                 Ok(())
             }
-            Err((error, span)) => {
-                self.compiler
-                    .push_error(error.spanned(&self.compiler.sources, &self.src.span(&span)));
+            Err(error) => {
+                self.report_error(error);
                 Err(())
             }
         }
+    }
+
+    fn report_error(&mut self, (error, span): (CompileError, Span)) {
+        self.compiler
+            .push_error(error.spanned(&self.compiler.sources, &self.src.span(&span)));
     }
 
     fn stmt_to_def(&mut self, (stmt, span): (ast::Stmt, Span)) -> Res<RootDefs> {
@@ -67,16 +71,41 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Stmt::Type(type_stmt) => {
                 let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-                self.set_def(def_id, DefKind::DomainType(Some(ident)), &span);
-                Ok([def_id].into())
+                let kind = match type_stmt.kind.0 {
+                    ast::TypeKind::Type => DefKind::DomainType(Some(ident)),
+                    ast::TypeKind::Entity => DefKind::DomainEntity(ident),
+                };
+
+                self.set_def(def_id, kind, &span);
+
+                let mut root_defs: RootDefs = [def_id].into();
+
+                if let Some(rel_block) = type_stmt.rel_block.0 {
+                    // The inherent relation block on the type uses the just defined
+                    // type as its context
+                    let block_context = BlockContext::Context((def_id, span.clone()));
+
+                    for (rel_stmt, rel_span) in rel_block {
+                        match self.ast_relationship_chain_to_def(
+                            rel_stmt,
+                            rel_span,
+                            block_context.clone(),
+                        ) {
+                            Ok(mut defs) => {
+                                root_defs.append(&mut defs);
+                            }
+                            Err(error) => {
+                                self.report_error(error);
+                            }
+                        }
+                    }
+                }
+
+                Ok(root_defs)
             }
-            ast::Stmt::Entity(type_stmt) => {
-                let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
-                let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-                self.set_def(def_id, DefKind::DomainEntity(ident), &span);
-                Ok([def_id].into())
+            ast::Stmt::Rel(rel_stmt) => {
+                self.ast_relationship_chain_to_def(rel_stmt, span, BlockContext::NoContext)
             }
-            ast::Stmt::Rel(rel_stmt) => self.ast_relationship_chain_to_def(rel_stmt, span, None),
             ast::Stmt::Eq(ast::EqStmt {
                 kw: _,
                 variables: ast_variables,
@@ -108,7 +137,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         rel: ast::RelStmt,
         span: Span,
-        contextual_def: Option<(DefId, Span)>,
+        contextual_def: BlockContext<(DefId, Span)>,
     ) -> Res<RootDefs> {
         let ast::RelStmt {
             docs: _,
@@ -123,30 +152,25 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let (mut subject_def, mut subject_span, object_def, object_span) =
             match (subject, object, contextual_def) {
-                (Some(subject), Some(object), None) => (
+                (Some(subject), Some(object), BlockContext::NoContext) => (
                     self.ast_type_to_def(subject.0, &subject.1)?,
                     subject.1,
                     self.ast_type_to_def(object.0, &object.1)?,
                     object.1,
                 ),
-                (Some(subject), None, Some(object)) => (
+                (Some(subject), None, BlockContext::Context(object)) => (
                     self.ast_type_to_def(subject.0, &subject.1)?,
                     subject.1,
                     object.0,
                     object.1,
                 ),
-                (None, Some(object), Some(subject)) => (
+                (None, Some(object), BlockContext::Context(subject)) => (
                     subject.0,
                     subject.1,
                     self.ast_type_to_def(object.0, &object.1)?,
                     object.1,
                 ),
-                _ => {
-                    return Err(self.error(
-                        CompileError::MustSpecifyBothSubjectAndObjectInRelation,
-                        &span,
-                    ))
-                }
+                _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
             };
 
         for chain_item in chain {
@@ -239,9 +263,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some((_, span)) = rel_params {
-                return Err(self.error(
+                return Err((
                     CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
-                    &span,
+                    span,
                 ));
             }
 
@@ -292,7 +316,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &ident,
                 ) {
                     Some(type_def_id) => Ok(type_def_id),
-                    None => Err(self.error(CompileError::TypeNotFound, span)),
+                    None => Err((CompileError::TypeNotFound, span.clone())),
                 }
             }
             ast::Type::StringLiteral(lit) => match lit.as_str() {
@@ -307,9 +331,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 .defs
                 .def_regex(&lit, span, &mut self.compiler.strings)
                 .map_err(|(compile_error, err_span)| {
-                    self.error(CompileError::InvalidRegex(compile_error), &err_span)
+                    (CompileError::InvalidRegex(compile_error), err_span)
                 }),
-            _ => Err(self.error(CompileError::InvalidType, span)),
+            _ => Err((CompileError::InvalidType, span.clone())),
             //ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
             // ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
         }
@@ -371,7 +395,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Expr::NumberLiteral(int) => {
                 let int = int
                     .parse()
-                    .map_err(|_| self.error(CompileError::InvalidInteger, &span))?;
+                    .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
                 Ok(self.expr(ExprKind::Constant(int), &span))
             }
             ast::Expr::Binary(left, op, right) => {
@@ -389,35 +413,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }
-            /*
-            ast::Expr::Obj((ident, ident_span), ast_attributes) => {
-                let attributes = ast_attributes
-                    .into_iter()
-                    .map(|(ast_attr, _)| {
-                        let key = self.ast_type_to_def(ast_attr.ty.0, &ast_attr.ty.1)?;
-
-                        self.lower_expr(ast_attr.value, var_table)
-                            .map(|expr| ((key, self.src.span(&ast_attr.ty.1)), expr))
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                let type_def_id = self.lookup_ident(&ident, &ident_span)?;
-                Ok(self.expr(
-                    ExprKind::Obj(
-                        TypePath {
-                            def_id: type_def_id,
-                            span: self.src.span(&ident_span),
-                        },
-                        attributes,
-                    ),
-                    &span,
-                ))
-            }
-            */
             ast::Expr::Variable(var_ident) => {
                 let id = var_table
                     .get_var_id(var_ident.as_str())
-                    .ok_or_else(|| self.error(CompileError::UndeclaredVariable, &span))?;
+                    .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;
                 Ok(self.expr(ExprKind::Variable(id), &span))
             }
             expr => panic!(
@@ -434,7 +433,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .lookup(&[self.src.package, CORE_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
-            None => Err(self.error(CompileError::TypeNotFound, span)),
+            None => Err((CompileError::TypeNotFound, span.clone())),
         }
     }
 
@@ -488,10 +487,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
             span: self.src.span(span),
         }
     }
+}
 
-    fn error(&self, compile_error: CompileError, span: &Span) -> LoweringError {
-        (compile_error, span.clone())
-    }
+#[derive(Clone)]
+enum BlockContext<T> {
+    NoContext,
+    Context(T),
 }
 
 enum ImplicitRelationId {

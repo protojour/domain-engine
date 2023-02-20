@@ -38,8 +38,8 @@ pub enum CompileError {
     Lex(ChumskyError<char>),
     #[error("parse error: {0}")]
     Parse(ChumskyError<Token>),
-    #[error("must speicify both subject and object in this relation")]
-    MustSpecifyBothSubjectAndObjectInRelation,
+    #[error("this rel is contextual; specify only subject or object")]
+    TooMuchContextInContextualRel,
     #[error("function takes {expected} parameters, but {actual} was supplied")]
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
     #[error("not callable")]

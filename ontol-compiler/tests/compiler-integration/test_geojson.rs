@@ -38,13 +38,15 @@ fn test_geojson() {
     rel MultiLineString { 'type' } 'MultiLineString'
     rel MultiLineString { 'coordinates'* } position-list
 
-    type Polygon
-    rel Polygon { 'type' } 'Polygon'
-    rel Polygon { 'coordinates' } position-ring
+    type Polygon {
+        rel { 'type' } 'Polygon'
+        rel { 'coordinates' } position-ring
+    }
 
-    type MultiPolygon
-    rel MultiPolygon { 'type' } 'MultiPolygon'
-    rel MultiPolygon { 'coordinates'* } position-ring
+    type MultiPolygon {
+        rel { 'type' } 'MultiPolygon'
+        rel { 'coordinates'* } position-ring
+    }
 
     type GeometryCollection
     rel GeometryCollection { 'type' } 'GeometryCollection'
