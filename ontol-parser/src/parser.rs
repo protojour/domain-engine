@@ -41,7 +41,7 @@ fn type_statement() -> impl AstParser<TypeStatement> {
 
     doc_comments()
         .then(kind)
-        .then(spanned(ident().labelled("identifier")))
+        .then(spanned(ident()))
         .then(spanned(
             spanned(rel_statement())
                 .repeated()
@@ -99,13 +99,13 @@ fn rel_connection() -> impl AstParser<RelConnection> {
         .then(cardinality())
         // object prop and cardinality
         .then(
-            sigil('|', ())
+            sigil('|')
                 .ignore_then(spanned(string_literal()))
                 .then(cardinality())
                 .or_not(),
         )
         // rel params
-        .then(spanned(sigil(':', ()).ignore_then(ty())).or_not())
+        .then(spanned(sigil(':').ignore_then(ty())).or_not())
         // within {}
         .delimited_by(open('{'), close('}'))
         .map(|(((ty, subject_cardinality), object), rel_params)| {
@@ -125,14 +125,14 @@ fn rel_connection() -> impl AstParser<RelConnection> {
 }
 
 fn cardinality() -> impl AstParser<Option<Cardinality>> {
-    opt_sigil('*', ())
-        .then(opt_sigil('?', ()))
-        .map(|(many, option)| match (many.is_some(), option.is_some()) {
+    opt_sigil('*').then(opt_sigil('?')).map(|(many, option)| {
+        match (many.is_some(), option.is_some()) {
             (true, true) => Some(Cardinality::OptionalMany),
             (true, false) => Some(Cardinality::Many),
             (false, true) => Some(Cardinality::Optional),
             (false, false) => None,
-        })
+        }
+    })
 }
 
 fn eq_statement() -> impl AstParser<EqStatement> {
@@ -205,24 +205,27 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
         // TODO: Migrate to Pratt parse when Chumsky supports it.
         // these are large types and thus pretty slow to compile :(
 
+        let add = sigil('+').to(BinaryOp::Add);
+        let sub = sigil('-').to(BinaryOp::Sub);
+        let mul = sigil('*').to(BinaryOp::Mul);
+        let div = sigil('/').to(BinaryOp::Div);
+
         // infix precedence for multiplication and division:
-        let op = sigil('*', BinaryOp::Mul).or(sigil('/', BinaryOp::Div));
-        let product = atom
-            .clone()
-            .then(op.then(atom).repeated())
-            .foldl(|left, (op, right)| {
-                let span = left.1.start..right.1.end;
-                (
-                    Expression::Binary(Box::new(left), op, Box::new(right)),
-                    span,
-                )
-            });
+        let product =
+            atom.clone()
+                .then(mul.or(div).then(atom).repeated())
+                .foldl(|left, (op, right)| {
+                    let span = left.1.start..right.1.end;
+                    (
+                        Expression::Binary(Box::new(left), op, Box::new(right)),
+                        span,
+                    )
+                });
 
         // infix precedence for addition and subtraction:
-        let op = sigil('+', BinaryOp::Add).or(sigil('-', BinaryOp::Sub));
         product
             .clone()
-            .then(op.then(product).repeated())
+            .then(add.or(sub).then(product).repeated())
             .foldl(|left, (op, right)| {
                 let span = left.1.start..right.1.end;
                 (
@@ -235,7 +238,7 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
 
 /// Type parser
 fn ty() -> impl AstParser<Type> {
-    let unit = sigil('.', Type::Unit);
+    let unit = sigil('.').to(Type::Unit);
     let path = ident().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
@@ -245,6 +248,7 @@ fn ty() -> impl AstParser<Type> {
         .or(number_literal)
         .or(string_literal)
         .or(regex)
+        .labelled("type")
 }
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
@@ -259,32 +263,36 @@ fn close(char: char) -> impl AstParser<Token> {
     just(Token::Close(char))
 }
 
-fn sigil<T: Clone>(char: char, to: T) -> impl AstParser<T> {
-    just(Token::Sigil(char)).map(move |_| to.clone())
+fn sigil(char: char) -> impl AstParser<Token> {
+    just(Token::Sigil(char))
 }
 
-fn opt_sigil<T: Clone>(char: char, to: T) -> impl AstParser<Option<T>> {
-    sigil(char, to).or_not()
+fn opt_sigil(char: char) -> impl AstParser<Option<Token>> {
+    sigil(char).or_not()
 }
 
 fn keyword(token: Token) -> impl AstParser<Span> {
-    just(token).map_with_span(|_, span| span)
+    just(token)
+        .map_with_span(|_, span| span)
+        .labelled("keyword")
 }
 
 fn path() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }
+    select! { Token::Sym(ident) => ident }.labelled("path")
 }
 
 fn ident() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }
+    select! { Token::Sym(ident) => ident }.labelled("identifier")
 }
 
 fn variable() -> impl AstParser<String> {
-    just(Token::Sigil(':')).ignore_then(ident())
+    just(Token::Sigil(':'))
+        .ignore_then(ident())
+        .labelled("variable")
 }
 
 fn number_literal() -> impl AstParser<String> {
-    select! { Token::Number(string) => string }
+    select! { Token::Number(string) => string }.labelled("number")
 }
 
 fn u16() -> impl AstParser<u16> {
