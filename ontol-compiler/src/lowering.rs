@@ -7,6 +7,7 @@ use ontol_parser::{ast, Span};
 use ontol_runtime::{DefId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -66,9 +67,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {
         match stmt {
             ast::Statement::Use(_use_stmt) => {
-                todo!()
+                debug!("TODO");
+                Ok(Default::default())
             }
-            // ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Statement::Type(type_stmt) => {
                 let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);

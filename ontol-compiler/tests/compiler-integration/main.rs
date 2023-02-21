@@ -83,6 +83,15 @@ impl TestCompile for &'static str {
     }
 }
 
+#[derive(Eq, PartialEq, Hash)]
+struct SourceName(pub &'static str);
+
+impl SourceName {
+    pub fn root() -> Self {
+        Self(ROOT_SRC_NAME)
+    }
+}
+
 struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
     root_package_id: Option<PackageId>,
@@ -92,8 +101,17 @@ struct TestPackages {
 
 impl TestPackages {
     fn with_root(text: &'static str) -> Self {
+        Self::with_sources([(SourceName::root(), text)])
+    }
+
+    pub fn with_sources(
+        sources_by_name: impl IntoIterator<Item = (SourceName, &'static str)>,
+    ) -> Self {
         Self {
-            sources_by_name: [(ROOT_SRC_NAME, text)].into(),
+            sources_by_name: sources_by_name
+                .into_iter()
+                .map(|(name, text)| (name.0, text))
+                .collect(),
             root_package_id: None,
             sources: Default::default(),
             source_code_registry: Default::default(),
