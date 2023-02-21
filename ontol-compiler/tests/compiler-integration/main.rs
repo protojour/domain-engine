@@ -88,7 +88,11 @@ impl TestCompile for &'static str {
                     .find_source_by_package_id(root_package_id)
                     .unwrap();
 
+                // Show the error diff, a diff makes the test fail.
+                // This makes it possible to debug the test to make it compile.
                 util::diff_errors(self, src.clone(), errors, &source_code_registry, "// ERROR");
+
+                // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
@@ -106,18 +110,13 @@ impl TestCompile for &'static str {
                 panic!("Script did not fail to compile");
             }
             Err(errors) => {
-                let compile_src = compiler
+                let src = compiler
                     .sources
                     .find_source_by_package_id(root_package_id)
                     .unwrap();
 
-                let annotated_errors = util::diff_errors(
-                    self,
-                    compile_src.clone(),
-                    errors,
-                    &source_code_registry,
-                    "// ERROR",
-                );
+                let annotated_errors =
+                    util::diff_errors(self, src.clone(), errors, &source_code_registry, "// ERROR");
                 validator(annotated_errors);
             }
         }

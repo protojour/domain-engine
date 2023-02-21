@@ -12,7 +12,7 @@ use crate::typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable, Typed
 /// Rewrites are resolved by following pointers until
 /// a "root" is found that is not rewritten.
 ///
-/// Be careful to not introduce circular rewrites.
+/// Be careful not to introduce circular rewrites.
 #[derive(Default, Debug)]
 pub struct RewriteTable(SmallVec<[ExprRef; 32]>);
 
