@@ -5,12 +5,15 @@ use error::{CompileError, ParseError, UnifiedCompileError};
 pub use error::*;
 use lowering::Lowering;
 use ontol_runtime::{DefId, PackageId};
+use package::PackageTopology;
 use patterns::compile_all_patterns;
 pub use source::*;
+use tracing::debug;
 
 pub mod compiler;
 pub mod error;
 pub mod mem;
+pub mod package;
 pub mod serde_codegen;
 
 mod codegen;
@@ -29,57 +32,48 @@ mod type_check;
 mod typed_expr;
 mod types;
 
-pub trait Compile {
-    fn compile(
-        self,
-        compiler: &mut Compiler,
-        package: PackageId,
-    ) -> Result<(), UnifiedCompileError>;
-}
+pub fn compile_package_topology(
+    compiler: &mut Compiler,
+    topology: PackageTopology,
+) -> Result<(), UnifiedCompileError> {
+    let mut root_defs = vec![];
 
-impl Compile for &str {
-    fn compile(
-        self,
-        compiler: &mut Compiler,
-        package: PackageId,
-    ) -> Result<(), UnifiedCompileError> {
-        let src = compiler.sources.add(package, "str".into(), self.into());
-        src.compile(compiler, package)
-    }
-}
+    for package in topology.packages {
+        debug!("lower package {:?}", package.package_id);
+        let source_id = compiler
+            .sources
+            .source_id_for_package(package.package_id)
+            .expect("no source id available for package");
+        let src = compiler
+            .sources
+            .get_compiled_source(source_id)
+            .expect("no compiled source available");
 
-impl Compile for CompileSrc {
-    fn compile(self, compiler: &mut Compiler, _: PackageId) -> Result<(), UnifiedCompileError> {
-        let root_defs = parse_and_lower_source(compiler, self);
-        compile_all_packages(compiler, root_defs)
-    }
-}
+        for error in package.parser_errors {
+            compiler.push_error(match error {
+                ontol_parser::Error::Lex(lex_error) => {
+                    let span = lex_error.span();
+                    CompileError::Lex(LexError::new(lex_error))
+                        .spanned(&compiler.sources, &src.span(&span))
+                }
+                ontol_parser::Error::Parse(parse_error) => {
+                    let span = parse_error.span();
+                    CompileError::Parse(ParseError::new(parse_error))
+                        .spanned(&compiler.sources, &src.span(&span))
+                }
+            });
+        }
 
-/// Parse and lower a source of the new syntax
-fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
-    let (statements, errors) = ontol_parser::parse_statements(&src.text);
-    for error in errors {
-        compiler.push_error(match error {
-            ontol_parser::Error::Lex(lex_error) => {
-                let span = lex_error.span();
-                CompileError::Lex(LexError::new(lex_error))
-                    .spanned(&compiler.sources, &src.span(&span))
-            }
-            ontol_parser::Error::Parse(parse_error) => {
-                let span = parse_error.span();
-                CompileError::Parse(ParseError::new(parse_error))
-                    .spanned(&compiler.sources, &src.span(&span))
-            }
-        })
+        let mut lowering = Lowering::new(compiler, &src);
+
+        for stmt in package.statements {
+            let _ignored = lowering.lower_statement(stmt);
+        }
+
+        root_defs.append(&mut lowering.finish());
     }
 
-    let mut lowering = Lowering::new(compiler, &src);
-
-    for stmt in statements {
-        let _ignored = lowering.lower_statement(stmt);
-    }
-
-    lowering.finish()
+    compile_all_packages(compiler, root_defs)
 }
 
 fn compile_all_packages(

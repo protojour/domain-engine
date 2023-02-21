@@ -9,10 +9,11 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
+    package::{Package, CORE_PKG},
     patterns::StringPatternSegment,
     regex::{parse_literal_regex_to_hir, uuid_regex},
     relation::{Constructor, RelationshipId},
-    source::{Package, SourceSpan, CORE_PKG},
+    source::SourceSpan,
     strings::Strings,
     types::{Type, TypeRef},
 };

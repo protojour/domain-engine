@@ -2,16 +2,6 @@ use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
 
 use ontol_runtime::PackageId;
 
-pub const CORE_PKG: PackageId = PackageId(0);
-
-#[cfg(test)]
-pub const UNIT_TEST_PKG: PackageId = PackageId(1337);
-
-#[derive(Debug)]
-pub struct Package {
-    pub name: String,
-}
-
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct SourceId(pub u32);
 
@@ -91,6 +81,26 @@ impl Default for Sources {
 }
 
 impl Sources {
+    /// Need this while the architecture is kind of broken
+    pub fn source_id_for_package(&self, package: PackageId) -> Option<SourceId> {
+        self.compiled_sources
+            .iter()
+            .find_map(|(_, compiled_source)| {
+                if compiled_source.package == package {
+                    Some(compiled_source.id)
+                } else {
+                    None
+                }
+            })
+    }
+
+    pub fn find_compiled_source_by_name(&self, name: &str) -> Option<&CompileSrc> {
+        self.compiled_sources
+            .iter()
+            .find(|(_, src)| src.name.as_ref() == name)
+            .map(|(_, src)| src)
+    }
+
     pub fn get_compiled_source(&self, id: SourceId) -> Option<CompileSrc> {
         self.compiled_sources.get(&id).cloned()
     }

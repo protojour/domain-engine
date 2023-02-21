@@ -1,8 +1,11 @@
 #![allow(unused)]
 
 use ontol_compiler::{
-    compiler::Compiler, error::UnifiedCompileError, mem::Mem, Compile, CompileSrc,
-    SpannedCompileError,
+    compiler::Compiler,
+    error::UnifiedCompileError,
+    mem::Mem,
+    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
+    CompileSrc, SpannedCompileError,
 };
 use ontol_runtime::{env::Env, PackageId};
 
@@ -15,7 +18,10 @@ mod test_serde;
 mod test_string_patterns;
 mod util;
 
-const TEST_PKG: PackageId = PackageId(42);
+/// BUG: The generated package id is really dynamic
+const TEST_PKG: PackageId = PackageId(1);
+
+const SRC_NAME: &'static str = "str";
 
 macro_rules! assert_error_msg {
     ($e:expr, $msg:expr) => {
@@ -68,14 +74,19 @@ impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(&Env)) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
-        let compile_src = compiler.sources.add(TEST_PKG, "str".into(), self.into());
+        let package_topology = test_package_topology(&mut compiler, self);
 
-        match compile_src.clone().compile(&mut compiler, TEST_PKG) {
+        match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
             Ok(()) => {
                 validator(&compiler.into_env());
             }
             Err(errors) => {
-                util::diff_errors(self, compile_src, errors, "// ERROR");
+                let compile_src = compiler
+                    .sources
+                    .find_compiled_source_by_name(SRC_NAME)
+                    .unwrap();
+
+                util::diff_errors(self, compile_src.clone(), errors, "// ERROR");
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
@@ -84,16 +95,53 @@ impl TestCompile for &'static str {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
         let mut mem = Mem::default();
         let mut compiler = Compiler::new(&mut mem).with_core();
-        let compile_src = compiler
-            .sources
-            .add(PackageId(666), "str".into(), self.into());
+        let package_topology = test_package_topology(&mut compiler, self);
 
-        let Err(errors) = compile_src.clone().compile(&mut compiler, PackageId(1)) else {
-            panic!("Script did not fail to compile");
-        };
+        match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
+            Ok(()) => {
+                panic!("Script did not fail to compile");
+            }
+            Err(errors) => {
+                let compile_src = compiler
+                    .sources
+                    .find_compiled_source_by_name(SRC_NAME)
+                    .unwrap();
 
-        let annotated_errors = util::diff_errors(self, compile_src, errors, "// ERROR");
-        validator(annotated_errors);
+                let annotated_errors =
+                    util::diff_errors(self, compile_src.clone(), errors, "// ERROR");
+                validator(annotated_errors);
+            }
+        }
+    }
+}
+
+fn test_package_topology(compiler: &mut Compiler, source_text: &'static str) -> PackageTopology {
+    let mut graph_builder = PackageGraphBuilder::default();
+
+    loop {
+        match graph_builder.transition() {
+            GraphState::RequestPackages { builder, requests } => {
+                graph_builder = builder;
+
+                for request in requests {
+                    match request.reference {
+                        PackageReference::Root => {
+                            let compile_src = compiler.sources.add(
+                                request.package_id,
+                                SRC_NAME.into(),
+                                source_text.into(),
+                            );
+
+                            let parsed_package = ParsedPackage::parse(&compile_src);
+                            graph_builder.provide_package(parsed_package);
+                        }
+                    }
+                }
+            }
+            GraphState::Built(topology) => {
+                return topology;
+            }
+        }
     }
 }
 

@@ -17,7 +17,8 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    source::{CompileSrc, CORE_PKG},
+    package::CORE_PKG,
+    source::CompileSrc,
 };
 
 pub struct Lowering<'s, 'm> {
