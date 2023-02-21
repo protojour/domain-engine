@@ -53,13 +53,11 @@ pub fn compile_package_topology(
             compiler.push_error(match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span();
-                    CompileError::Lex(LexError::new(lex_error))
-                        .spanned(&compiler.sources, &src.span(&span))
+                    CompileError::Lex(LexError::new(lex_error)).spanned(&src.span(&span))
                 }
                 ontol_parser::Error::Parse(parse_error) => {
                     let span = parse_error.span();
-                    CompileError::Parse(ParseError::new(parse_error))
-                        .spanned(&compiler.sources, &src.span(&span))
+                    CompileError::Parse(ParseError::new(parse_error)).spanned(&src.span(&span))
                 }
             });
         }

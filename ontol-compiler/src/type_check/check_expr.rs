@@ -323,7 +323,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, ExprRef) {
-        self.errors.push(error.spanned(self.sources, span));
+        self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
     }
 }

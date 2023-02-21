@@ -50,7 +50,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                             input: format_def(compiler, translate_call.translation.0),
                             output: format_def(compiler, translate_call.translation.1),
                         }
-                        .spanned(&compiler.sources, &spans[index]),
+                        .spanned(&spans[index]),
                     );
                 }
             }

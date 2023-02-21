@@ -60,7 +60,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn report_error(&mut self, (error, span): (CompileError, Span)) {
         self.compiler
-            .push_error(error.spanned(&self.compiler.sources, &self.src.span(&span)));
+            .push_error(error.spanned(&self.src.span(&span)));
     }
 
     fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {

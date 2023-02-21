@@ -11,7 +11,7 @@ use crate::{
     mem::Intern,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, SourceSpan, Sources,
+    CompileErrors, SourceSpan,
 };
 
 pub mod check_def;
@@ -40,12 +40,11 @@ pub struct TypeCheck<'c, 'm> {
     codegen_tasks: &'c mut CodegenTasks<'m>,
     expressions: &'c HashMap<ExprId, Expr>,
     defs: &'c Defs<'m>,
-    sources: &'c Sources,
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
-        self.errors.push(error.spanned(self.sources, span));
+        self.errors.push(error.spanned(span));
         self.types.intern(Type::Error)
     }
 
@@ -82,7 +81,6 @@ impl<'m> Compiler<'m> {
             codegen_tasks: &mut self.codegen_tasks,
             expressions: &self.expressions,
             defs: &self.defs,
-            sources: &self.sources,
         }
     }
 }

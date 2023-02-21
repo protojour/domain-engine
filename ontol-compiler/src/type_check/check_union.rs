@@ -148,10 +148,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .errors
             .into_iter()
             .flat_map(|(_, errors)| errors.into_iter())
-            .map(|(union_error, span)| {
-                self.make_compile_error(union_error)
-                    .spanned(self.sources, &span)
-            })
+            .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span))
             .collect()
     }
 

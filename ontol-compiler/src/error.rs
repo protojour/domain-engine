@@ -7,7 +7,7 @@ use ontol_runtime::format_utils::{LogicOp, Missing};
 use smartstring::alias::String;
 use thiserror::Error;
 
-use crate::source::{SourceSpan, Sources};
+use crate::source::SourceSpan;
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("oops")]
@@ -22,12 +22,6 @@ pub struct SpannedCompileError {
     pub error: CompileError,
 
     pub span: SourceSpan,
-
-    #[source_code]
-    pub miette_source: miette::NamedSource,
-
-    #[label]
-    pub miette_span: miette::SourceSpan,
 }
 
 #[derive(Debug, Error, Diagnostic)]
@@ -206,19 +200,10 @@ impl Display for ParseError {
 }
 
 impl CompileError {
-    pub fn spanned(self, sources: &Sources, span: &SourceSpan) -> SpannedCompileError {
-        let source = sources
-            .get_compiled_source(span.source_id)
-            .expect("BUG: Source is not being compiled");
-
+    pub fn spanned(self, span: &SourceSpan) -> SpannedCompileError {
         SpannedCompileError {
             error: self,
             span: *span,
-            miette_source: miette::NamedSource::new(source.name.as_str(), source.text.clone()),
-            miette_span: miette::SourceSpan::new(
-                (span.start as usize).into(),
-                (span.end as usize).into(),
-            ),
         }
     }
 }
