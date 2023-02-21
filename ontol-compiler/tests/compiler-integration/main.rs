@@ -108,10 +108,9 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "typo  // ERROR parse error: found `typo`, expected one of `type`, `entity`, `rel`, `eq`"
-        .compile_fail_then(|_| {
-            panic!("it works");
-        })
+    "; // ERROR lex error: illegal character `;`".compile_fail_then(|_| {
+        panic!("it works");
+    })
 }
 
 fn main() {}

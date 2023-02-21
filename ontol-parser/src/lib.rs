@@ -18,7 +18,7 @@ pub enum Error {
     Parse(Simple<Token>),
 }
 
-pub fn parse_statements(input: &str) -> Result<Vec<Spanned<Statement>>, Vec<Error>> {
+pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
     let mut errors = vec![];
     let (tokens, lex_errors) = lexer::lexer().parse_recovery(input);
 
@@ -39,9 +39,5 @@ pub fn parse_statements(input: &str) -> Result<Vec<Spanned<Statement>>, Vec<Erro
         None
     };
 
-    if let Some(statements) = statements {
-        Ok(statements)
-    } else {
-        Err(errors)
-    }
+    (statements.unwrap_or_default(), errors)
 }

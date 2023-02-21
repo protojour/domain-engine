@@ -1,6 +1,6 @@
 use codegen::execute_codegen_tasks;
 use compiler::Compiler;
-use error::{ChumskyError, CompileError, UnifiedCompileError};
+use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
 use lowering::Lowering;
@@ -57,34 +57,29 @@ impl Compile for CompileSrc {
 
 /// Parse and lower a source of the new syntax
 fn parse_and_lower_source(compiler: &mut Compiler, src: CompileSrc) -> Vec<DefId> {
-    match ontol_parser::parse_statements(&src.text) {
-        Ok(statements) => {
-            let mut lowering = Lowering::new(compiler, &src);
-
-            for stmt in statements {
-                let _ignored = lowering.lower_statement(stmt);
+    let (statements, errors) = ontol_parser::parse_statements(&src.text);
+    for error in errors {
+        compiler.push_error(match error {
+            ontol_parser::Error::Lex(lex_error) => {
+                let span = lex_error.span();
+                CompileError::Lex(LexError::new(lex_error))
+                    .spanned(&compiler.sources, &src.span(&span))
             }
-
-            lowering.finish()
-        }
-        Err(errors) => {
-            for error in errors {
-                compiler.push_error(match error {
-                    ontol_parser::Error::Lex(lex_error) => {
-                        let span = lex_error.span();
-                        CompileError::Lex(ChumskyError::new(lex_error))
-                            .spanned(&compiler.sources, &src.span(&span))
-                    }
-                    ontol_parser::Error::Parse(parse_error) => {
-                        let span = parse_error.span();
-                        CompileError::Parse(ChumskyError::new(parse_error))
-                            .spanned(&compiler.sources, &src.span(&span))
-                    }
-                })
+            ontol_parser::Error::Parse(parse_error) => {
+                let span = parse_error.span();
+                CompileError::Parse(ParseError::new(parse_error))
+                    .spanned(&compiler.sources, &src.span(&span))
             }
-            vec![]
-        }
+        })
     }
+
+    let mut lowering = Lowering::new(compiler, &src);
+
+    for stmt in statements {
+        let _ignored = lowering.lower_statement(stmt);
+    }
+
+    lowering.finish()
 }
 
 fn compile_all_packages(

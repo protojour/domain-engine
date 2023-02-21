@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash::Hash};
+use std::fmt::Display;
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use miette::Diagnostic;
@@ -32,12 +32,14 @@ pub struct SpannedCompileError {
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum CompileError {
-    #[error("lex error")]
-    Lex(ChumskyError<char>),
+    #[error("lex error: {0}")]
+    Lex(LexError),
     #[error("parse error: {0}")]
-    Parse(ChumskyError<Token>),
+    Parse(ParseError),
     #[error("this rel is contextual; specify only subject or object")]
     TooMuchContextInContextualRel,
+    #[error("invalid expression")]
+    InvalidExpression,
     #[error("function takes {expected} parameters, but {actual} was supplied")]
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
     #[error("not callable")]
@@ -107,19 +109,50 @@ pub enum CompileError {
 }
 
 #[derive(Debug)]
-pub struct ChumskyError<I: Eq + Hash> {
-    inner: Box<Simple<I>>,
+pub struct LexError {
+    inner: Box<Simple<char>>,
 }
 
-impl<I: Eq + Hash> ChumskyError<I> {
-    pub fn new(inner: Simple<I>) -> Self {
+impl LexError {
+    pub fn new(inner: Simple<char>) -> Self {
         Self {
             inner: Box::new(inner),
         }
     }
 }
 
-impl<I: Hash + Eq + Display + Ord> Display for ChumskyError<I> {
+impl Display for LexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.inner.reason() {
+            SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
+            SimpleReason::Unexpected => {
+                if let Some(found) = self.inner.found() {
+                    write!(f, "illegal character `{found}`")?;
+                } else {
+                    write!(f, "illegal character")?;
+                }
+
+                Ok(())
+            }
+            SimpleReason::Custom(str) => write!(f, "{str}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParseError {
+    inner: Box<Simple<Token>>,
+}
+
+impl ParseError {
+    pub fn new(inner: Simple<Token>) -> Self {
+        Self {
+            inner: Box::new(inner),
+        }
+    }
+}
+
+impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.reason() {
             SimpleReason::Unclosed { .. } => write!(f, "unclosed"),

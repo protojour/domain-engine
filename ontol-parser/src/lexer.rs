@@ -51,7 +51,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 
     let comment = just("//")
         .ignore_then(filter(|c: &char| *c != '/'))
-        .ignore_then(take_until(just('\n')))
+        .ignore_then(take_until(just('\n').to(()).or(end())))
         .padded();
 
     doc_comment()
@@ -66,8 +66,11 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .or(ident)
         .map_with_span(|token, span| (token, span))
         .padded_by(comment.repeated())
+        .recover_with(skip_then_retry_until([]))
         .padded()
         .repeated()
+        .padded()
+        .then_ignore(end())
 }
 
 fn num() -> impl Parser<char, String, Error = Simple<char>> {
@@ -157,4 +160,25 @@ fn special_char(c: char) -> bool {
         c,
         '(' | ')' | '[' | ']' | '{' | '}' | '.' | ';' | ':' | '?' | '/'
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lex(input: &str) -> Result<Vec<Spanned<Token>>, Vec<Simple<char>>> {
+        let (tokens, errors) = lexer().parse_recovery(input);
+        if !errors.is_empty() {
+            Err(errors)
+        } else if let Some(tokens) = tokens {
+            Ok(tokens)
+        } else {
+            Err(vec![])
+        }
+    }
+
+    #[test]
+    fn comment_at_eof() {
+        lex("foobar // comment ").unwrap();
+    }
 }

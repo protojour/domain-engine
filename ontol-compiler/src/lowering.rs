@@ -416,10 +416,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;
                 Ok(self.expr(ExprKind::Variable(id), &span))
             }
-            expr => panic!(
-                "BUG: Unable to lower expression {expr:?} at {:?}",
-                self.src.span(&span)
-            ),
+            _ => Err((CompileError::InvalidExpression, span)),
         }
     }
 

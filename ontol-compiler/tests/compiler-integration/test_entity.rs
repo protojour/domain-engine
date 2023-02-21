@@ -19,8 +19,6 @@ fn test_entity_experiment_etc() {
 
     entity record
     rel record { 'name' } string
-    // i.e. syntax sugar for:
-    // rel record { 'name' | 'name'*: () } string
 
     entity instrument
     rel instrument { 'name' } string

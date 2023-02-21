@@ -3,6 +3,11 @@ use pretty_assertions::assert_eq;
 use test_log::test;
 
 #[test]
+fn lex_error() {
+    ";; // ERROR lex error: illegal character `;`".compile_fail();
+}
+
+#[test]
 fn invalid_statement() {
     "foobar // ERROR parse error: found `foobar`, expected one of `type`, `entity`, `rel`, `eq`"
         .compile_fail();
@@ -20,12 +25,11 @@ fn underscore_not_allowed_at_start_of_identifier() {
 }
 
 #[test]
-fn bad_error_recovery() {
-    // what's up with this (caused by ;; below):
+fn lex_error_recovery_works() {
     "
     type foo
     type bar
-    rel foo { 'prop' } string // ERROR parse error: expected one of `(`, `}`, `*`, `+`, `-`, `/`, `:`, `rel`
+    rel foo { 'prop' } string
     rel bar { 'prop' } int
     eq(:x) {
         foo {
@@ -33,7 +37,9 @@ fn bad_error_recovery() {
         }
         bar {
             rel { 'prop' }
-                :x ;; foobar
+                :x
+                ;; // ERROR lex error: illegal character `;`
+                foobar // ERROR invalid expression
         }
     }
     "
