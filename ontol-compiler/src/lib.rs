@@ -46,7 +46,7 @@ pub fn compile_package_topology(
             .expect("no source id available for package");
         let src = compiler
             .sources
-            .get_compiled_source(source_id)
+            .get_source(source_id)
             .expect("no compiled source available");
 
         for error in package.parser_errors {
@@ -91,6 +91,5 @@ fn compile_all_packages(
     execute_codegen_tasks(compiler);
     compiler.check_error()?;
 
-    compiler.sources.compile_finished();
     Ok(())
 }

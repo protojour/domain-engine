@@ -4,7 +4,7 @@ use ontol_parser::ast;
 use ontol_parser::Spanned;
 use ontol_runtime::PackageId;
 
-use crate::CompileSrc;
+use crate::Src;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
@@ -38,10 +38,10 @@ pub struct ParsedPackage {
 }
 
 impl ParsedPackage {
-    pub fn parse(src: &CompileSrc) -> Self {
-        let (statements, parser_errors) = ontol_parser::parse_statements(&src.text);
+    pub fn parse(src: Src, text: &str) -> Self {
+        let (statements, parser_errors) = ontol_parser::parse_statements(text);
         Self {
-            package_id: src.package,
+            package_id: src.package_id,
             statements,
             parser_errors,
         }

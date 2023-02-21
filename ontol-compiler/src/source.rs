@@ -5,10 +5,21 @@ use ontol_runtime::PackageId;
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct SourceId(pub u32);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Src {
+    pub id: SourceId,
     pub package_id: PackageId,
     pub name: Arc<String>,
+}
+
+impl Src {
+    pub fn span(&self, range: &Range<usize>) -> SourceSpan {
+        SourceSpan {
+            source_id: self.id,
+            start: range.start as u32,
+            end: range.end as u32,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -34,30 +45,12 @@ impl SourceSpan {
     }
 }
 
-#[derive(Clone)]
-pub struct CompileSrc {
-    pub package: PackageId,
-    pub id: SourceId,
-    pub name: Arc<String>,
-    pub text: Arc<String>,
-}
-
-impl Debug for CompileSrc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CompileSrc")
-            .field("name", &self.name)
-            .finish()
-    }
-}
-
-impl CompileSrc {
-    pub fn span(&self, range: &Range<usize>) -> SourceSpan {
-        SourceSpan {
-            source_id: self.id,
-            start: range.start as u32,
-            end: range.end as u32,
-        }
-    }
+/// A structured where compiled source code can be temporarily stored.
+/// This is useful for error diagnostics.
+/// The compiler does not hold an instance of this.
+#[derive(Default)]
+pub struct SourceTextRegistry {
+    pub registry: HashMap<SourceId, String>,
 }
 
 /// Sources currently being compiled
@@ -66,7 +59,6 @@ pub struct Sources {
     next_source_id: SourceId,
     package: PackageId,
     sources: HashMap<SourceId, Src>,
-    compiled_sources: HashMap<SourceId, CompileSrc>,
 }
 
 impl Default for Sources {
@@ -75,7 +67,6 @@ impl Default for Sources {
             next_source_id: SourceId(1),
             package: PackageId(0),
             sources: Default::default(),
-            compiled_sources: Default::default(),
         }
     }
 }
@@ -83,50 +74,36 @@ impl Default for Sources {
 impl Sources {
     /// Need this while the architecture is kind of broken
     pub fn source_id_for_package(&self, package: PackageId) -> Option<SourceId> {
-        self.compiled_sources
-            .iter()
-            .find_map(|(_, compiled_source)| {
-                if compiled_source.package == package {
-                    Some(compiled_source.id)
-                } else {
-                    None
-                }
-            })
+        self.sources.iter().find_map(|(_, src)| {
+            if src.package_id == package {
+                Some(src.id)
+            } else {
+                None
+            }
+        })
     }
 
-    pub fn find_compiled_source_by_name(&self, name: &str) -> Option<&CompileSrc> {
-        self.compiled_sources
+    pub fn find_source_by_name(&self, name: &str) -> Option<&Src> {
+        self.sources
             .iter()
             .find(|(_, src)| src.name.as_ref() == name)
             .map(|(_, src)| src)
     }
 
-    pub fn get_compiled_source(&self, id: SourceId) -> Option<CompileSrc> {
-        self.compiled_sources.get(&id).cloned()
+    pub fn get_source(&self, id: SourceId) -> Option<Src> {
+        self.sources.get(&id).cloned()
     }
 
-    pub fn add(&mut self, package: PackageId, name: String, text: String) -> CompileSrc {
+    pub fn add_source(&mut self, package: PackageId, name: String) -> Src {
         let id = self.next_source_id;
         self.next_source_id.0 += 1;
         self.package = package;
-        let src = CompileSrc {
-            package,
+        let src = Src {
             id,
-            name: Arc::new(name),
-            text: Arc::new(text),
+            package_id: package,
+            name: name.into(),
         };
-        self.compiled_sources.insert(id, src.clone());
-        self.sources.insert(
-            id,
-            Src {
-                package_id: package,
-                name: src.name.clone(),
-            },
-        );
+        self.sources.insert(id, src.clone());
         src
-    }
-
-    pub fn compile_finished(&mut self) {
-        self.compiled_sources.clear();
     }
 }

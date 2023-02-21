@@ -1,6 +1,6 @@
 use ontol_compiler::{
     error::{CompileError, UnifiedCompileError},
-    CompileSrc, SpannedCompileError,
+    SourceTextRegistry, SpannedCompileError, Src,
 };
 use ontol_runtime::{
     env::Env,
@@ -113,8 +113,9 @@ pub struct AnnotatedCompileError {
 
 pub fn diff_errors(
     source: &str,
-    compile_src: CompileSrc,
+    src: Src,
     errors: UnifiedCompileError,
+    source_text_registry: &SourceTextRegistry,
     error_pattern: &str,
 ) -> Vec<AnnotatedCompileError> {
     let space_error_pattern = format!(" {error_pattern}");
@@ -138,7 +139,7 @@ pub fn diff_errors(
         });
 
     for spanned_error in errors.errors {
-        if spanned_error.span.source_id != compile_src.id {
+        if spanned_error.span.source_id != src.id {
             panic!("Error not from tested script: {spanned_error:?}");
         }
         let byte_pos = spanned_error.span.start as usize;
@@ -182,7 +183,10 @@ pub fn diff_errors(
 
     for line in builder.lines {
         for spanned_error in line.errors {
-            let text = compile_src.text.as_str();
+            let text = source_text_registry
+                .registry
+                .get(&src.id)
+                .expect("no source text available");
             let source = &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
 
             annotated_errors.push(AnnotatedCompileError {

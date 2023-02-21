@@ -18,12 +18,12 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     package::CORE_PKG,
-    source::CompileSrc,
+    Src,
 };
 
 pub struct Lowering<'s, 'm> {
     compiler: &'s mut Compiler<'m>,
-    src: &'s CompileSrc,
+    src: &'s Src,
     root_defs: Vec<DefId>,
 }
 
@@ -33,7 +33,7 @@ type Res<T> = Result<T, LoweringError>;
 type RootDefs = SmallVec<[DefId; 1]>;
 
 impl<'s, 'm> Lowering<'s, 'm> {
-    pub fn new(compiler: &'s mut Compiler<'m>, src: &'s CompileSrc) -> Self {
+    pub fn new(compiler: &'s mut Compiler<'m>, src: &'s Src) -> Self {
         Self {
             compiler,
             src,
@@ -309,7 +309,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
             ast::Type::Path(ident) => {
                 match self.compiler.namespaces.lookup(
-                    &[self.src.package, CORE_PKG],
+                    &[self.src.package_id, CORE_PKG],
                     Space::Type,
                     &ident,
                 ) {
@@ -425,7 +425,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match self
             .compiler
             .namespaces
-            .lookup(&[self.src.package, CORE_PKG], Space::Type, ident)
+            .lookup(&[self.src.package_id, CORE_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
             None => Err((CompileError::TypeNotFound, span.clone())),
@@ -452,7 +452,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let def_id = self.compiler.defs.alloc_def_id();
         self.compiler
             .namespaces
-            .get_mut(self.src.package, space)
+            .get_mut(self.src.package_id, space)
             .insert(ident.clone(), def_id);
         def_id
     }
@@ -462,7 +462,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             def_id,
             self.compiler.defs.mem.bump.alloc(Def {
                 id: def_id,
-                package: self.src.package,
+                package: self.src.package_id,
                 kind,
                 span: self.src.span(span),
             }),
