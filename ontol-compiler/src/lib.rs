@@ -32,64 +32,64 @@ mod type_check;
 mod typed_expr;
 mod types;
 
-pub fn compile_package_topology(
-    compiler: &mut Compiler,
-    topology: PackageTopology,
-) -> Result<(), UnifiedCompileError> {
-    let mut root_defs = vec![];
+impl<'m> Compiler<'m> {
+    /// Entry point of all compilation: Compiles the full package topology
+    pub fn compile_package_topology(
+        &mut self,
+        topology: PackageTopology,
+    ) -> Result<(), UnifiedCompileError> {
+        let mut root_defs = vec![];
 
-    for package in topology.packages {
-        debug!("lower package {:?}", package.package_id);
-        let source_id = compiler
-            .sources
-            .source_id_for_package(package.package_id)
-            .expect("no source id available for package");
-        let src = compiler
-            .sources
-            .get_source(source_id)
-            .expect("no compiled source available");
+        for package in topology.packages {
+            debug!("lower package {:?}", package.package_id);
+            let source_id = self
+                .sources
+                .source_id_for_package(package.package_id)
+                .expect("no source id available for package");
+            let src = self
+                .sources
+                .get_source(source_id)
+                .expect("no compiled source available");
 
-        for error in package.parser_errors {
-            compiler.push_error(match error {
-                ontol_parser::Error::Lex(lex_error) => {
-                    let span = lex_error.span();
-                    CompileError::Lex(LexError::new(lex_error)).spanned(&src.span(&span))
-                }
-                ontol_parser::Error::Parse(parse_error) => {
-                    let span = parse_error.span();
-                    CompileError::Parse(ParseError::new(parse_error)).spanned(&src.span(&span))
-                }
-            });
+            for error in package.parser_errors {
+                self.push_error(match error {
+                    ontol_parser::Error::Lex(lex_error) => {
+                        let span = lex_error.span();
+                        CompileError::Lex(LexError::new(lex_error)).spanned(&src.span(&span))
+                    }
+                    ontol_parser::Error::Parse(parse_error) => {
+                        let span = parse_error.span();
+                        CompileError::Parse(ParseError::new(parse_error)).spanned(&src.span(&span))
+                    }
+                });
+            }
+
+            let mut lowering = Lowering::new(self, &src);
+
+            for stmt in package.statements {
+                let _ignored = lowering.lower_statement(stmt);
+            }
+
+            root_defs.append(&mut lowering.finish());
         }
 
-        let mut lowering = Lowering::new(compiler, &src);
+        self.compile_all_packages(root_defs)
+    }
 
-        for stmt in package.statements {
-            let _ignored = lowering.lower_statement(stmt);
+    fn compile_all_packages(&mut self, root_defs: Vec<DefId>) -> Result<(), UnifiedCompileError> {
+        let mut type_check = self.type_check();
+        for root_def in root_defs {
+            type_check.check_def(root_def);
         }
 
-        root_defs.append(&mut lowering.finish());
+        // Call this after all source files have been compiled
+        compile_all_patterns(self);
+        self.type_check().check_unions();
+        self.check_error()?;
+
+        execute_codegen_tasks(self);
+        self.check_error()?;
+
+        Ok(())
     }
-
-    compile_all_packages(compiler, root_defs)
-}
-
-fn compile_all_packages(
-    compiler: &mut Compiler,
-    root_defs: Vec<DefId>,
-) -> Result<(), UnifiedCompileError> {
-    let mut type_check = compiler.type_check();
-    for root_def in root_defs {
-        type_check.check_def(root_def);
-    }
-
-    // Call this after all source files have been compiled
-    compile_all_patterns(compiler);
-    compiler.type_check().check_unions();
-    compiler.check_error()?;
-
-    execute_codegen_tasks(compiler);
-    compiler.check_error()?;
-
-    Ok(())
 }

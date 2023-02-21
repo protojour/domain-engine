@@ -307,13 +307,13 @@ mod tests {
         mem::{Intern, Mem},
         typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
-        SourceSpan,
+        SourceSpan, Sources,
     };
 
     #[test]
     fn rewrite_test() {
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
+        let mut compiler = Compiler::new(&mem, Sources::default()).with_core();
         let int = compiler.types.intern(Type::Int(DefId(42)));
 
         let mut table = TypedExprTable::default();

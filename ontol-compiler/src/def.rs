@@ -9,7 +9,7 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    package::{Package, CORE_PKG},
+    package::CORE_PKG,
     patterns::StringPatternSegment,
     regex::{parse_literal_regex_to_hir, uuid_regex},
     relation::{Constructor, RelationshipId},
@@ -385,13 +385,6 @@ impl<'m> Compiler<'m> {
     }
 
     pub fn with_core(mut self) -> Self {
-        self.packages.insert(
-            CORE_PKG,
-            Package {
-                name: "core".into(),
-            },
-        );
-
         // fundamental types
         let _ = self.def_core_type(self.defs.unit, Type::Unit);
         let _ = self.def_core_type(self.defs.empty_sequence, Type::EmptySequence);

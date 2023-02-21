@@ -5,7 +5,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
-    SourceCodeRegistry, SpannedCompileError,
+    SourceCodeRegistry, Sources, SpannedCompileError,
 };
 use ontol_runtime::{env::Env, PackageId};
 
@@ -72,14 +72,13 @@ trait TestCompile: Sized {
 
 impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(&Env)) {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem).with_core();
-        let mut source_code_registry = SourceCodeRegistry::default();
-        let package_topology =
-            test_script_package_topology(self, &mut compiler, &mut source_code_registry);
+        let (sources, source_code_registry, package_topology) = load_test_script(self);
         let root_package_id = package_topology.root_package_id;
 
-        match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, sources).with_core();
+
+        match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
                 validator(&compiler.into_env());
             }
@@ -96,14 +95,13 @@ impl TestCompile for &'static str {
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        let mut mem = Mem::default();
-        let mut compiler = Compiler::new(&mut mem).with_core();
-        let mut source_code_registry = SourceCodeRegistry::default();
-        let package_topology =
-            test_script_package_topology(self, &mut compiler, &mut source_code_registry);
+        let (sources, source_code_registry, package_topology) = load_test_script(self);
         let root_package_id = package_topology.root_package_id;
 
-        match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
+        let mut mem = Mem::default();
+        let mut compiler = Compiler::new(&mut mem, sources).with_core();
+
+        match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
                 panic!("Script did not fail to compile");
             }
@@ -126,34 +124,32 @@ impl TestCompile for &'static str {
     }
 }
 
-fn test_script_package_topology(
-    source_text: &'static str,
-    compiler: &mut Compiler,
-    source_code_registry: &mut SourceCodeRegistry,
-) -> PackageTopology {
-    let mut graph_builder = PackageGraphBuilder::default();
+fn load_test_script(source_text: &'static str) -> (Sources, SourceCodeRegistry, PackageTopology) {
+    let mut sources = Sources::default();
+    let mut source_code_registry = SourceCodeRegistry::default();
+    let mut package_graph_builder = PackageGraphBuilder::default();
 
     loop {
-        match graph_builder.transition() {
+        match package_graph_builder.transition() {
             GraphState::RequestPackages { builder, requests } => {
-                graph_builder = builder;
+                package_graph_builder = builder;
 
                 for request in requests {
                     match request.reference {
                         PackageReference::Root => {
-                            graph_builder.provide_package(ParsedPackage::parse(
+                            package_graph_builder.provide_package(ParsedPackage::parse(
                                 request.package_id,
                                 SRC_NAME,
                                 source_text,
-                                &mut compiler.sources,
-                                source_code_registry,
+                                &mut sources,
+                                &mut source_code_registry,
                             ));
                         }
                     }
                 }
             }
             GraphState::Built(topology) => {
-                return topology;
+                return (sources, source_code_registry, topology);
             }
         }
     }

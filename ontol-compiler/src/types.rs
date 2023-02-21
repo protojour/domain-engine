@@ -201,7 +201,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::Compiler;
+    use crate::{compiler::Compiler, Sources};
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn dedup_types() {
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem);
+        let mut compiler = Compiler::new(&mem, Sources::default());
 
         let c0 = compiler.types.intern(Type::IntConstant(42));
         let c1 = compiler.types.intern(Type::IntConstant(42));
