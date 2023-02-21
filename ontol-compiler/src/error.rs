@@ -30,6 +30,8 @@ pub enum CompileError {
     Lex(LexError),
     #[error("parse error: {0}")]
     Parse(ParseError),
+    #[error("package not found")]
+    PackageNotFound,
     #[error("this rel is contextual; specify only subject or object")]
     TooMuchContextInContextualRel,
     #[error("invalid expression")]

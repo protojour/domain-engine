@@ -54,7 +54,7 @@ pub struct SourceCodeRegistry {
 }
 
 /// Sources currently being compiled
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Sources {
     next_source_id: SourceId,
     package: PackageId,

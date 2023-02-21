@@ -5,7 +5,9 @@ use serde_json::json;
 use test_log::test;
 
 #[test]
-#[ignore]
-fn test_import_package() {
-    "use 'foobar' as foobar".compile_ok(|env| {});
+fn import_package_not_found_error() {
+    "
+    use 'foobar' as foobar // ERROR package not found
+    "
+    .compile_fail()
 }

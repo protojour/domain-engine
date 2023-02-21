@@ -84,82 +84,108 @@ impl TestCompile for &'static str {
 }
 
 struct TestPackages {
-    sources: HashMap<&'static str, &'static str>,
+    sources_by_name: HashMap<&'static str, &'static str>,
+    root_package_id: Option<PackageId>,
+    sources: Sources,
+    source_code_registry: SourceCodeRegistry,
 }
 
 impl TestPackages {
     fn with_root(text: &'static str) -> Self {
         Self {
-            sources: [(ROOT_SRC_NAME, text)].into(),
+            sources_by_name: [(ROOT_SRC_NAME, text)].into(),
+            root_package_id: None,
+            sources: Default::default(),
+            source_code_registry: Default::default(),
         }
     }
 
-    fn load_sources(&self) -> (Sources, SourceCodeRegistry, PackageTopology) {
-        let mut sources = Sources::default();
-        let mut source_code_registry = SourceCodeRegistry::default();
+    fn load_topology(&mut self) -> Result<PackageTopology, UnifiedCompileError> {
         let mut package_graph_builder = PackageGraphBuilder::default();
 
         loop {
-            match package_graph_builder.transition().unwrap() {
+            match package_graph_builder.transition()? {
                 GraphState::RequestPackages { builder, requests } => {
                     package_graph_builder = builder;
 
                     for request in requests {
                         let source_name = match &request.package_source {
-                            PackageSource::Root => ROOT_SRC_NAME,
+                            PackageSource::Root => {
+                                self.root_package_id = Some(request.package_id);
+                                ROOT_SRC_NAME
+                            }
                             PackageSource::Named(source_name) => source_name.as_str(),
                         };
 
-                        if let Some(source_text) = self.sources.get(source_name) {
+                        if let Some(source_text) = self.sources_by_name.get(source_name) {
                             package_graph_builder.provide_package(
                                 &request.package_source,
                                 ParsedPackage::parse(
                                     request.package_id,
                                     ROOT_SRC_NAME,
                                     source_text,
-                                    &mut sources,
-                                    &mut source_code_registry,
+                                    &mut self.sources,
+                                    &mut self.source_code_registry,
                                 ),
                             );
                         }
                     }
                 }
-                GraphState::Built(topology) => {
-                    return (sources, source_code_registry, topology);
-                }
+                GraphState::Built(topology) => return Ok(topology),
             }
+        }
+    }
+
+    fn diff_errors(&self, error: UnifiedCompileError) -> Vec<AnnotatedCompileError> {
+        let root_source_text = self.sources_by_name.get(ROOT_SRC_NAME).unwrap();
+        let root_package_id = self.root_package_id.unwrap();
+        let src = self
+            .sources
+            .find_source_by_package_id(root_package_id)
+            .unwrap();
+
+        util::diff_errors(
+            root_source_text,
+            src.clone(),
+            error,
+            &self.source_code_registry,
+            "// ERROR",
+        )
+    }
+
+    fn expect_error(
+        &self,
+        error: UnifiedCompileError,
+        validator: impl Fn(Vec<AnnotatedCompileError>),
+    ) {
+        let annotated_errors = self.diff_errors(error);
+        validator(annotated_errors);
+    }
+
+    fn compile_topology(&mut self) -> Result<Env, UnifiedCompileError> {
+        let package_topology = self.load_topology()?;
+        let root_package_id = package_topology.root_package_id;
+
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, self.sources.clone()).with_core();
+
+        match compiler.compile_package_topology(package_topology) {
+            Ok(()) => Ok(compiler.into_env()),
+            Err(error) => Err(error),
         }
     }
 }
 
 impl TestCompile for TestPackages {
-    fn compile_ok(self, validator: impl Fn(&Env)) {
-        let (sources, source_code_registry, package_topology) = self.load_sources();
-        let root_package_id = package_topology.root_package_id;
-
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, sources).with_core();
-
-        match compiler.compile_package_topology(package_topology) {
-            Ok(()) => {
-                validator(&compiler.into_env());
+    fn compile_ok(mut self, validator: impl Fn(&Env)) {
+        match self.compile_topology() {
+            Ok(env) => {
+                validator(&env);
             }
-            Err(errors) => {
-                let root_source_text = self.sources.get(ROOT_SRC_NAME).unwrap();
-                let src = compiler
-                    .sources
-                    .find_source_by_package_id(root_package_id)
-                    .unwrap();
-
+            Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
-                util::diff_errors(
-                    root_source_text,
-                    src.clone(),
-                    errors,
-                    &source_code_registry,
-                    "// ERROR",
-                );
+                self.diff_errors(error);
 
                 // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
@@ -167,31 +193,13 @@ impl TestCompile for TestPackages {
         }
     }
 
-    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        let (sources, source_code_registry, package_topology) = self.load_sources();
-        let root_package_id = package_topology.root_package_id;
-
-        let mut mem = Mem::default();
-        let mut compiler = Compiler::new(&mut mem, sources).with_core();
-
-        match compiler.compile_package_topology(package_topology) {
-            Ok(()) => {
-                panic!("Script did not fail to compile");
+    fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        match self.compile_topology() {
+            Ok(env) => {
+                panic!("Scripts did not fail to compile");
             }
-            Err(errors) => {
-                let root_source_text = self.sources.get(ROOT_SRC_NAME).unwrap();
-                let src = compiler
-                    .sources
-                    .find_source_by_package_id(root_package_id)
-                    .unwrap();
-
-                let annotated_errors = util::diff_errors(
-                    root_source_text,
-                    src.clone(),
-                    errors,
-                    &source_code_registry,
-                    "// ERROR",
-                );
+            Err(error) => {
+                let annotated_errors = self.diff_errors(error);
                 validator(annotated_errors);
             }
         }

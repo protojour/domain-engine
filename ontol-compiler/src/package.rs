@@ -6,8 +6,13 @@ use ontol_parser::Spanned;
 use ontol_runtime::PackageId;
 use smartstring::alias::String;
 
+use crate::error::CompileError;
+use crate::error::UnifiedCompileError;
 use crate::SourceCodeRegistry;
+use crate::SourceSpan;
 use crate::Sources;
+use crate::SpannedCompileError;
+use crate::Src;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
@@ -38,6 +43,7 @@ pub enum PackageSource {
 
 pub struct ParsedPackage {
     pub package_id: PackageId,
+    pub src: Src,
     pub statements: Vec<Spanned<ast::Statement>>,
     pub parser_errors: Vec<ontol_parser::Error>,
 }
@@ -56,6 +62,7 @@ impl ParsedPackage {
         let (statements, parser_errors) = ontol_parser::parse_statements(text);
         Self {
             package_id: src.package_id,
+            src,
             statements,
             parser_errors,
         }
@@ -94,6 +101,7 @@ impl Default for PackageGraphBuilder {
                 PackageSource::Root,
                 RequestedPackage {
                     package_id: ROOT_PKG,
+                    use_source_span: SourceSpan::none(),
                     requested_at_generation: generation,
                     found: false,
                 },
@@ -108,13 +116,16 @@ impl PackageGraphBuilder {
     pub fn provide_package(&mut self, source: &PackageSource, package: ParsedPackage) {
         let requested_package = self
             .requested_packages
-            .get_mut(&source)
+            .get_mut(source)
             .expect("package not requested");
         requested_package.found = true;
 
         for statement in &package.statements {
             if let (ast::Statement::Use(use_stmt), _) = statement {
-                self.request_package(PackageSource::Named(use_stmt.source.0.clone()));
+                self.request_package(
+                    PackageSource::Named(use_stmt.source.0.clone()),
+                    package.src.span(&use_stmt.source.1),
+                );
             }
         }
 
@@ -123,14 +134,17 @@ impl PackageGraphBuilder {
 
     /// Try to transition the builder into a PackageTopology.
     /// Before it is able to do that, it may request more packages.
-    pub fn transition(mut self) -> Result<GraphState, PackageGraphError> {
+    pub fn transition(mut self) -> Result<GraphState, UnifiedCompileError> {
         let mut requests = vec![];
+        let mut load_errors = vec![];
+
         for (package_source, requested_package) in &self.requested_packages {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
-                    return Err(PackageGraphError::PackageNotFound(
-                        requested_package.package_id,
-                    ));
+                    load_errors.push(SpannedCompileError {
+                        error: CompileError::PackageNotFound,
+                        span: requested_package.use_source_span,
+                    });
                 } else {
                     requests.push(PackageRequest {
                         package_id: requested_package.package_id,
@@ -138,6 +152,12 @@ impl PackageGraphBuilder {
                     })
                 }
             }
+        }
+
+        if !load_errors.is_empty() {
+            return Err(UnifiedCompileError {
+                errors: load_errors,
+            });
         }
 
         self.generation += 1;
@@ -160,7 +180,7 @@ impl PackageGraphBuilder {
         }
     }
 
-    fn request_package(&mut self, source: PackageSource) {
+    fn request_package(&mut self, source: PackageSource, use_source_span: SourceSpan) {
         match self.requested_packages.entry(source) {
             Entry::Occupied(_) => {}
             Entry::Vacant(vacant) => {
@@ -169,6 +189,7 @@ impl PackageGraphBuilder {
 
                 vacant.insert(RequestedPackage {
                     package_id,
+                    use_source_span,
                     requested_at_generation: self.generation,
                     found: false,
                 });
@@ -179,6 +200,7 @@ impl PackageGraphBuilder {
 
 struct RequestedPackage {
     package_id: PackageId,
+    use_source_span: SourceSpan,
     requested_at_generation: usize,
     found: bool,
 }
