@@ -11,6 +11,7 @@ pub enum Token {
     Open(char),
     Close(char),
     Sigil(char),
+    Use,
     Type,
     Entity,
     Rel,
@@ -26,6 +27,7 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
+            Self::Use => write!(f, "`use`"),
             Self::Type => write!(f, "`type`"),
             Self::Entity => write!(f, "`entity`"),
             Self::Rel => write!(f, "`rel`"),
@@ -42,6 +44,7 @@ impl Display for Token {
 #[allow(dead_code)]
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let ident = ident().map(|ident| match ident.as_str() {
+        "use" => Token::Use,
         "type" => Token::Type,
         "entity" => Token::Entity,
         "rel" => Token::Rel,

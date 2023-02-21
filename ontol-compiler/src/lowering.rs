@@ -65,6 +65,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {
         match stmt {
+            ast::Statement::Use(_use_stmt) => {
+                todo!()
+            }
             // ast::Ast::Import(_) => panic!("import not supported yet"),
             ast::Statement::Type(type_stmt) => {
                 let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);

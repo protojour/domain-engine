@@ -3,6 +3,8 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
+use crate::ast::UseStatement;
+
 use super::{
     ast::{
         BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStatement,
@@ -23,15 +25,35 @@ impl<T, O> AstParser<O> for T where T: Parser<Token, O, Error = Simple<Token>> +
 /// A parser for a sequence of statements (i.e. a source file)
 #[allow(dead_code)]
 pub fn statement_sequence() -> impl AstParser<Vec<Spanned<Statement>>> {
-    statement().repeated().then_ignore(end())
+    header_statement()
+        .repeated()
+        .chain(domain_statement().repeated())
+        .then_ignore(end())
 }
 
-fn statement() -> impl AstParser<Spanned<Statement>> {
+/// Statement allowed only at the top/header section of a file
+fn header_statement() -> impl AstParser<Spanned<Statement>> {
+    spanned(use_statement()).map(span_map(Statement::Use))
+}
+
+fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     let type_stmt = spanned(type_statement()).map(span_map(Statement::Type));
     let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
     let eq_stmt = spanned(eq_statement()).map(span_map(Statement::Eq));
 
     type_stmt.or(rel_stmt).or(eq_stmt)
+}
+
+fn use_statement() -> impl AstParser<UseStatement> {
+    keyword(Token::Use)
+        .then(spanned(string_literal()))
+        .then_ignore(sym("as", "`as`"))
+        .then(spanned(ident()))
+        .map(|((kw, source), as_ident)| UseStatement {
+            kw,
+            source,
+            as_ident,
+        })
 }
 
 fn type_statement() -> impl AstParser<TypeStatement> {
@@ -279,6 +301,18 @@ fn keyword(token: Token) -> impl AstParser<Span> {
 
 fn path() -> impl AstParser<String> {
     select! { Token::Sym(ident) => ident }.labelled("path")
+}
+
+fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
+    select! { Token::Sym(string) => string }
+        .labelled(label)
+        .try_map(move |string, span| {
+            if string == str {
+                Ok(string)
+            } else {
+                Err(Simple::custom(span, format!("expected `{str}`")))
+            }
+        })
 }
 
 fn ident() -> impl AstParser<String> {

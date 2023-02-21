@@ -9,7 +9,7 @@ fn lex_error() {
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `type`, `entity`, `rel`, `eq`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `entity`, `rel`, `eq`"
         .compile_fail();
 }
 
@@ -17,6 +17,11 @@ fn invalid_statement() {
 fn type_parse_error() {
     "type // ERROR parse error: expected identifier".compile_fail();
     "type {} // ERROR parse error: found `{`, expected identifier".compile_fail();
+}
+
+#[test]
+fn incomplete_statement() {
+    "use 'foobar' // ERROR parse error: expected `as`".compile_fail()
 }
 
 #[test]

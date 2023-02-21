@@ -1,10 +1,12 @@
 #![allow(unused)]
 
+use std::collections::HashMap;
+
 use ontol_compiler::{
     compiler::Compiler,
     error::UnifiedCompileError,
     mem::Mem,
-    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
+    package::{GraphState, PackageGraphBuilder, PackageSource, PackageTopology, ParsedPackage},
     SourceCodeRegistry, Sources, SpannedCompileError,
 };
 use ontol_runtime::{env::Env, PackageId};
@@ -14,6 +16,7 @@ mod test_deserialize;
 mod test_entity;
 mod test_eq_basic;
 mod test_geojson;
+mod test_multi_package;
 mod test_serde;
 mod test_string_patterns;
 mod util;
@@ -21,7 +24,7 @@ mod util;
 /// BUG: The generated package id is really dynamic
 const TEST_PKG: PackageId = PackageId(1);
 
-const SRC_NAME: &'static str = "str";
+const ROOT_SRC_NAME: &'static str = "root";
 
 macro_rules! assert_error_msg {
     ($e:expr, $msg:expr) => {
@@ -72,7 +75,66 @@ trait TestCompile: Sized {
 
 impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(&Env)) {
-        let (sources, source_code_registry, package_topology) = load_test_script(self);
+        TestPackages::with_root(self).compile_ok(validator)
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_root(self).compile_fail_then(validator)
+    }
+}
+
+struct TestPackages {
+    sources: HashMap<&'static str, &'static str>,
+}
+
+impl TestPackages {
+    fn with_root(text: &'static str) -> Self {
+        Self {
+            sources: [(ROOT_SRC_NAME, text)].into(),
+        }
+    }
+
+    fn load_sources(&self) -> (Sources, SourceCodeRegistry, PackageTopology) {
+        let mut sources = Sources::default();
+        let mut source_code_registry = SourceCodeRegistry::default();
+        let mut package_graph_builder = PackageGraphBuilder::default();
+
+        loop {
+            match package_graph_builder.transition().unwrap() {
+                GraphState::RequestPackages { builder, requests } => {
+                    package_graph_builder = builder;
+
+                    for request in requests {
+                        let source_name = match &request.package_source {
+                            PackageSource::Root => ROOT_SRC_NAME,
+                            PackageSource::Named(source_name) => source_name.as_str(),
+                        };
+
+                        if let Some(source_text) = self.sources.get(source_name) {
+                            package_graph_builder.provide_package(
+                                &request.package_source,
+                                ParsedPackage::parse(
+                                    request.package_id,
+                                    ROOT_SRC_NAME,
+                                    source_text,
+                                    &mut sources,
+                                    &mut source_code_registry,
+                                ),
+                            );
+                        }
+                    }
+                }
+                GraphState::Built(topology) => {
+                    return (sources, source_code_registry, topology);
+                }
+            }
+        }
+    }
+}
+
+impl TestCompile for TestPackages {
+    fn compile_ok(self, validator: impl Fn(&Env)) {
+        let (sources, source_code_registry, package_topology) = self.load_sources();
         let root_package_id = package_topology.root_package_id;
 
         let mem = Mem::default();
@@ -83,6 +145,7 @@ impl TestCompile for &'static str {
                 validator(&compiler.into_env());
             }
             Err(errors) => {
+                let root_source_text = self.sources.get(ROOT_SRC_NAME).unwrap();
                 let src = compiler
                     .sources
                     .find_source_by_package_id(root_package_id)
@@ -90,7 +153,13 @@ impl TestCompile for &'static str {
 
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
-                util::diff_errors(self, src.clone(), errors, &source_code_registry, "// ERROR");
+                util::diff_errors(
+                    root_source_text,
+                    src.clone(),
+                    errors,
+                    &source_code_registry,
+                    "// ERROR",
+                );
 
                 // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
@@ -99,7 +168,7 @@ impl TestCompile for &'static str {
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        let (sources, source_code_registry, package_topology) = load_test_script(self);
+        let (sources, source_code_registry, package_topology) = self.load_sources();
         let root_package_id = package_topology.root_package_id;
 
         let mut mem = Mem::default();
@@ -110,45 +179,20 @@ impl TestCompile for &'static str {
                 panic!("Script did not fail to compile");
             }
             Err(errors) => {
+                let root_source_text = self.sources.get(ROOT_SRC_NAME).unwrap();
                 let src = compiler
                     .sources
                     .find_source_by_package_id(root_package_id)
                     .unwrap();
 
-                let annotated_errors =
-                    util::diff_errors(self, src.clone(), errors, &source_code_registry, "// ERROR");
+                let annotated_errors = util::diff_errors(
+                    root_source_text,
+                    src.clone(),
+                    errors,
+                    &source_code_registry,
+                    "// ERROR",
+                );
                 validator(annotated_errors);
-            }
-        }
-    }
-}
-
-fn load_test_script(source_text: &'static str) -> (Sources, SourceCodeRegistry, PackageTopology) {
-    let mut sources = Sources::default();
-    let mut source_code_registry = SourceCodeRegistry::default();
-    let mut package_graph_builder = PackageGraphBuilder::default();
-
-    loop {
-        match package_graph_builder.transition() {
-            GraphState::RequestPackages { builder, requests } => {
-                package_graph_builder = builder;
-
-                for request in requests {
-                    match request.reference {
-                        PackageReference::Root => {
-                            package_graph_builder.provide_package(ParsedPackage::parse(
-                                request.package_id,
-                                SRC_NAME,
-                                source_text,
-                                &mut sources,
-                                &mut source_code_registry,
-                            ));
-                        }
-                    }
-                }
-            }
-            GraphState::Built(topology) => {
-                return (sources, source_code_registry, topology);
             }
         }
     }

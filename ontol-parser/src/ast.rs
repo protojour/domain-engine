@@ -6,6 +6,7 @@ use super::{Span, Spanned};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Statement {
+    Use(UseStatement),
     Type(TypeStatement),
     Rel(RelStatement),
     Eq(EqStatement),
@@ -15,11 +16,19 @@ impl Statement {
     #[allow(unused)]
     pub fn docs(&self) -> &[String] {
         match self {
+            Self::Use(_) => &[],
             Self::Type(ty) => &ty.docs,
             Self::Rel(rel) => &rel.docs,
             Self::Eq(_) => &[],
         }
     }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct UseStatement {
+    pub kw: Span,
+    pub source: Spanned<String>,
+    pub as_ident: Spanned<String>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
