@@ -94,7 +94,7 @@ impl PackageGraphBuilder {
     /// Finish the package graph with a topological sort of packages
     fn topo_sort(self) -> PackageTopology {
         PackageTopology {
-            packages: self.packages.into_iter().map(|(_, pkg)| pkg).collect(),
+            packages: self.packages.into_values().collect(),
         }
     }
 }
