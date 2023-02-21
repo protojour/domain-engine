@@ -5,7 +5,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
-    SourceTextRegistry, SpannedCompileError,
+    SourceCodeRegistry, SpannedCompileError,
 };
 use ontol_runtime::{env::Env, PackageId};
 
@@ -74,24 +74,22 @@ impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(&Env)) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem).with_core();
-        let mut source_text_registry = SourceTextRegistry::default();
+        let mut source_code_registry = SourceCodeRegistry::default();
         let package_topology =
-            test_package_topology(&mut compiler, self, &mut source_text_registry);
+            test_script_package_topology(self, &mut compiler, &mut source_code_registry);
+        let root_package_id = package_topology.root_package_id;
 
         match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
             Ok(()) => {
                 validator(&compiler.into_env());
             }
             Err(errors) => {
-                let compile_src = compiler.sources.find_source_by_name(SRC_NAME).unwrap();
+                let src = compiler
+                    .sources
+                    .find_source_by_package_id(root_package_id)
+                    .unwrap();
 
-                util::diff_errors(
-                    self,
-                    compile_src.clone(),
-                    errors,
-                    &source_text_registry,
-                    "// ERROR",
-                );
+                util::diff_errors(self, src.clone(), errors, &source_code_registry, "// ERROR");
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
@@ -100,22 +98,26 @@ impl TestCompile for &'static str {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
         let mut mem = Mem::default();
         let mut compiler = Compiler::new(&mut mem).with_core();
-        let mut source_text_registry = SourceTextRegistry::default();
+        let mut source_code_registry = SourceCodeRegistry::default();
         let package_topology =
-            test_package_topology(&mut compiler, self, &mut source_text_registry);
+            test_script_package_topology(self, &mut compiler, &mut source_code_registry);
+        let root_package_id = package_topology.root_package_id;
 
         match ontol_compiler::compile_package_topology(&mut compiler, package_topology) {
             Ok(()) => {
                 panic!("Script did not fail to compile");
             }
             Err(errors) => {
-                let compile_src = compiler.sources.find_source_by_name(SRC_NAME).unwrap();
+                let compile_src = compiler
+                    .sources
+                    .find_source_by_package_id(root_package_id)
+                    .unwrap();
 
                 let annotated_errors = util::diff_errors(
                     self,
                     compile_src.clone(),
                     errors,
-                    &source_text_registry,
+                    &source_code_registry,
                     "// ERROR",
                 );
                 validator(annotated_errors);
@@ -124,10 +126,10 @@ impl TestCompile for &'static str {
     }
 }
 
-fn test_package_topology(
-    compiler: &mut Compiler,
+fn test_script_package_topology(
     source_text: &'static str,
-    registry: &mut SourceTextRegistry,
+    compiler: &mut Compiler,
+    source_code_registry: &mut SourceCodeRegistry,
 ) -> PackageTopology {
     let mut graph_builder = PackageGraphBuilder::default();
 
@@ -139,13 +141,13 @@ fn test_package_topology(
                 for request in requests {
                     match request.reference {
                         PackageReference::Root => {
-                            let src = compiler
-                                .sources
-                                .add_source(request.package_id, SRC_NAME.into());
-                            registry.registry.insert(src.id, source_text.into());
-
-                            let parsed_package = ParsedPackage::parse(src, source_text);
-                            graph_builder.provide_package(parsed_package);
+                            graph_builder.provide_package(ParsedPackage::parse(
+                                request.package_id,
+                                SRC_NAME,
+                                source_text,
+                                &mut compiler.sources,
+                                source_code_registry,
+                            ));
                         }
                     }
                 }

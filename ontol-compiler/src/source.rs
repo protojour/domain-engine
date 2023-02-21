@@ -49,7 +49,7 @@ impl SourceSpan {
 /// This is useful for error diagnostics.
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
-pub struct SourceTextRegistry {
+pub struct SourceCodeRegistry {
     pub registry: HashMap<SourceId, String>,
 }
 
@@ -83,10 +83,10 @@ impl Sources {
         })
     }
 
-    pub fn find_source_by_name(&self, name: &str) -> Option<&Src> {
+    pub fn find_source_by_package_id(&self, package_id: PackageId) -> Option<&Src> {
         self.sources
             .iter()
-            .find(|(_, src)| src.name.as_ref() == name)
+            .find(|(_, src)| src.package_id == package_id)
             .map(|(_, src)| src)
     }
 

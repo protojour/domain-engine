@@ -1,6 +1,6 @@
 use ontol_compiler::{
     error::{CompileError, UnifiedCompileError},
-    SourceTextRegistry, SpannedCompileError, Src,
+    SourceCodeRegistry, SpannedCompileError, Src,
 };
 use ontol_runtime::{
     env::Env,
@@ -115,7 +115,7 @@ pub fn diff_errors(
     source: &str,
     src: Src,
     errors: UnifiedCompileError,
-    source_text_registry: &SourceTextRegistry,
+    source_code_registry: &SourceCodeRegistry,
     error_pattern: &str,
 ) -> Vec<AnnotatedCompileError> {
     let space_error_pattern = format!(" {error_pattern}");
@@ -183,15 +183,17 @@ pub fn diff_errors(
 
     for line in builder.lines {
         for spanned_error in line.errors {
-            let text = source_text_registry
+            let text = source_code_registry
                 .registry
                 .get(&src.id)
                 .expect("no source text available");
-            let source = &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
+
+            let span_text =
+                &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
 
             annotated_errors.push(AnnotatedCompileError {
                 compile_error: spanned_error.error,
-                span_text: source.to_string(),
+                span_text: span_text.to_string(),
             })
         }
     }

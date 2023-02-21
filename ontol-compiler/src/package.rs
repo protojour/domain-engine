@@ -4,7 +4,8 @@ use ontol_parser::ast;
 use ontol_parser::Spanned;
 use ontol_runtime::PackageId;
 
-use crate::Src;
+use crate::SourceCodeRegistry;
+use crate::Sources;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
@@ -38,7 +39,16 @@ pub struct ParsedPackage {
 }
 
 impl ParsedPackage {
-    pub fn parse(src: Src, text: &str) -> Self {
+    pub fn parse(
+        package_id: PackageId,
+        source_name: &str,
+        text: &str,
+        sources: &mut Sources,
+        source_code_registry: &mut SourceCodeRegistry,
+    ) -> Self {
+        let src = sources.add_source(package_id, source_name.into());
+        source_code_registry.registry.insert(src.id, text.into());
+
         let (statements, parser_errors) = ontol_parser::parse_statements(text);
         Self {
             package_id: src.package_id,
@@ -50,10 +60,12 @@ impl ParsedPackage {
 
 /// Topological sort of the built package graph
 pub struct PackageTopology {
+    pub root_package_id: PackageId,
     pub packages: Vec<ParsedPackage>,
 }
 
 pub struct PackageGraphBuilder {
+    root_package_id: PackageId,
     packages: HashMap<PackageId, ParsedPackage>,
     requests: Vec<PackageRequest>,
 }
@@ -62,6 +74,7 @@ impl Default for PackageGraphBuilder {
     /// Create an empty builder, which should produce a request for the root package.
     fn default() -> Self {
         Self {
+            root_package_id: ROOT_PKG,
             packages: Default::default(),
             requests: vec![PackageRequest {
                 package_id: ROOT_PKG,
@@ -94,6 +107,7 @@ impl PackageGraphBuilder {
     /// Finish the package graph with a topological sort of packages
     fn topo_sort(self) -> PackageTopology {
         PackageTopology {
+            root_package_id: self.root_package_id,
             packages: self.packages.into_values().collect(),
         }
     }
