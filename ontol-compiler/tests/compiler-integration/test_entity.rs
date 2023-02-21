@@ -8,12 +8,13 @@ use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCom
 #[test]
 fn test_entity_experiment_etc() {
     "
-    type artist-id
+    type artist-id {
+        rel '' { 'artist/' } { uuid }
+    }
 
     entity artist
     rel artist { 'name' } string
 
-    rel . { 'artist/{uuid}' } artist-id
     // rel artist-id { uuid } string
     // rel artist-id { id! } artist
 

@@ -174,7 +174,7 @@ fn regex_named_group_as_relation() {
 
 #[test]
 #[ignore]
-fn automata() {
+fn sequence_automata() {
     r#"
     rel
         []
