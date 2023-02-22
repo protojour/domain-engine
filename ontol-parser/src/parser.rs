@@ -51,7 +51,7 @@ fn use_statement() -> impl AstParser<UseStatement> {
         .then(spanned(ident()))
         .map(|((kw, source), as_ident)| UseStatement {
             kw,
-            source,
+            reference: source,
             as_ident,
         })
 }

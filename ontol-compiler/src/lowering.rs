@@ -7,7 +7,6 @@ use ontol_parser::{ast, Span};
 use ontol_runtime::{DefId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
-use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -18,7 +17,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
-    package::CORE_PKG,
+    package::{PackageReference, CORE_PKG},
     Src,
 };
 
@@ -66,8 +65,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {
         match stmt {
-            ast::Statement::Use(_use_stmt) => {
-                debug!("TODO");
+            ast::Statement::Use(use_stmt) => {
+                let reference = PackageReference::Named(use_stmt.reference.0);
+                let self_package_def_id = self.src.package_id;
+                let used_package_def_id = self
+                    .compiler
+                    .packages
+                    .loaded_packages
+                    .get(&reference)
+                    .ok_or_else(|| (CompileError::PackageNotFound, use_stmt.reference.1))?;
+
+                let type_namespace = self
+                    .compiler
+                    .namespaces
+                    .get_mut(self_package_def_id, Space::Type);
+
+                type_namespace.insert(use_stmt.as_ident.0, *used_package_def_id);
+
                 Ok(Default::default())
             }
             ast::Statement::Type(type_stmt) => {

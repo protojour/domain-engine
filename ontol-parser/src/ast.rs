@@ -27,7 +27,7 @@ impl Statement {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct UseStatement {
     pub kw: Span,
-    pub source: Spanned<String>,
+    pub reference: Spanned<String>,
     pub as_ident: Spanned<String>,
 }
 

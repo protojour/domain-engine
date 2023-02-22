@@ -131,6 +131,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             Some(Type::Function { .. }) => None,
             Some(Type::Anonymous(_)) => None,
+            Some(Type::Namespace) => None,
             Some(Type::Tautology | Type::Infer(_) | Type::Error) => {
                 panic!("crap: {:?}", self.get_def_type(type_def_id));
             }

@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use ontol_parser::ast;
 use ontol_parser::Spanned;
+use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
 use smartstring::alias::String;
 
@@ -17,6 +18,12 @@ use crate::Src;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
+
+/// The compiler's loaded packages
+#[derive(Default, Debug)]
+pub(crate) struct Packages {
+    pub loaded_packages: HashMap<PackageReference, DefId>,
+}
 
 #[derive(Debug)]
 pub struct Package {
@@ -39,9 +46,8 @@ pub struct PackageRequest {
 }
 
 /// The reference by which a package is requested (file name, URL, etc)
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum PackageReference {
-    Root,
     Named(String),
 }
 
@@ -49,6 +55,7 @@ pub enum PackageReference {
 /// The parsed form is needed to know which dependencies to request.
 pub struct ParsedPackage {
     pub package_id: PackageId,
+    pub reference: PackageReference,
     pub src: Src,
     pub statements: Vec<Spanned<ast::Statement>>,
     pub parser_errors: Vec<ontol_parser::Error>,
@@ -56,18 +63,24 @@ pub struct ParsedPackage {
 
 impl ParsedPackage {
     pub fn parse(
-        package_id: PackageId,
-        source_name: &str,
+        request: PackageRequest,
         text: &str,
         sources: &mut Sources,
         source_code_registry: &mut SourceCodeRegistry,
     ) -> Self {
-        let src = sources.add_source(package_id, source_name.into());
+        let package_id = request.package_id;
+
+        let source_name = match &request.reference {
+            PackageReference::Named(source_name) => source_name.to_string(),
+        };
+
+        let src = sources.add_source(package_id, source_name);
         source_code_registry.registry.insert(src.id, text.into());
 
         let (statements, parser_errors) = ontol_parser::parse_statements(text);
         Self {
             package_id: src.package_id,
+            reference: request.reference,
             src,
             statements,
             parser_errors,
@@ -92,16 +105,16 @@ pub struct PackageGraphBuilder {
     package_graph: HashMap<PackageReference, PackageNode>,
 }
 
-impl Default for PackageGraphBuilder {
+impl PackageGraphBuilder {
     /// Create an empty builder, which should produce a request for the root package.
-    fn default() -> Self {
+    pub fn new(root_package_name: String) -> Self {
         let generation = 0;
         Self {
             next_package_id: PackageId(ROOT_PKG.0 + 1),
             generation,
             parsed_packages: Default::default(),
             package_graph: [(
-                PackageReference::Root,
+                PackageReference::Named(root_package_name),
                 PackageNode {
                     package_id: ROOT_PKG,
                     use_source_span: SourceSpan::none(),
@@ -113,18 +126,16 @@ impl Default for PackageGraphBuilder {
             .into(),
         }
     }
-}
 
-impl PackageGraphBuilder {
     /// Provide a package
-    pub fn provide_package(&mut self, source: &PackageReference, package: ParsedPackage) {
+    pub fn provide_package(&mut self, package: ParsedPackage) {
         let mut children: HashSet<PackageReference> = HashSet::default();
 
         for statement in &package.statements {
             if let (ast::Statement::Use(use_stmt), _) = statement {
-                let source = PackageReference::Named(use_stmt.source.0.clone());
+                let source = PackageReference::Named(use_stmt.reference.0.clone());
 
-                self.request_package(source.clone(), package.src.span(&use_stmt.source.1));
+                self.request_package(source.clone(), package.src.span(&use_stmt.reference.1));
                 children.insert(source);
             } else {
                 // all use statements are at the top of the source file (for now)
@@ -134,7 +145,7 @@ impl PackageGraphBuilder {
 
         let node = self
             .package_graph
-            .get_mut(source)
+            .get_mut(&package.reference)
             .expect("package not requested");
         node.found = true;
         node.dependencies.extend(children.into_iter());

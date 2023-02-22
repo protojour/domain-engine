@@ -117,7 +117,7 @@ impl TestPackages {
     }
 
     fn load_topology(&mut self) -> Result<PackageTopology, UnifiedCompileError> {
-        let mut package_graph_builder = PackageGraphBuilder::default();
+        let mut package_graph_builder = PackageGraphBuilder::new(ROOT_SRC_NAME.into());
 
         loop {
             match package_graph_builder.transition()? {
@@ -126,21 +126,16 @@ impl TestPackages {
 
                     for request in requests {
                         let source_name = match &request.reference {
-                            PackageReference::Root => ROOT_SRC_NAME,
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
                         if let Some(source_text) = self.sources_by_name.get(source_name) {
-                            package_graph_builder.provide_package(
-                                &request.reference,
-                                ParsedPackage::parse(
-                                    request.package_id,
-                                    source_name,
-                                    source_text,
-                                    &mut self.sources,
-                                    &mut self.source_code_registry,
-                                ),
-                            );
+                            package_graph_builder.provide_package(ParsedPackage::parse(
+                                request,
+                                source_text,
+                                &mut self.sources,
+                                &mut self.source_code_registry,
+                            ));
                         }
                     }
                 }

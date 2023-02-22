@@ -30,6 +30,7 @@ pub struct Def<'m> {
 
 #[derive(Debug)]
 pub enum DefKind<'m> {
+    Package(PackageId),
     Primitive(Primitive),
     StringLiteral(&'m str),
     EmptySequence,
@@ -48,6 +49,7 @@ pub enum DefKind<'m> {
 impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
+            Self::Package(_) => None,
             Self::Primitive(Primitive::Unit) => Some("unit".into()),
             Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
@@ -384,7 +386,25 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
+    pub fn define_package(&mut self, package_id: PackageId) -> DefId {
+        let def_id = self.defs.alloc_def_id();
+        self.defs.map.insert(
+            def_id,
+            self.defs.mem.bump.alloc(Def {
+                id: def_id,
+                package: package_id,
+                span: SourceSpan::none(),
+                kind: DefKind::Package(package_id),
+            }),
+        );
+        let ty = self.types.intern(Type::Namespace);
+        self.def_types.map.insert(def_id, ty);
+        def_id
+    }
+
     pub fn with_core(mut self) -> Self {
+        self.define_package(CORE_PKG);
+
         // fundamental types
         let _ = self.def_core_type(self.defs.unit, Type::Unit);
         let _ = self.def_core_type(self.defs.empty_sequence, Type::EmptySequence);

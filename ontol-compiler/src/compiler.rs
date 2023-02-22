@@ -9,6 +9,7 @@ use crate::{
     expr::{Expr, ExprId},
     mem::Mem,
     namespace::Namespaces,
+    package::Packages,
     patterns::Patterns,
     relation::Relations,
     source::Sources,
@@ -26,6 +27,8 @@ use smartstring::alias::String;
 #[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,
+
+    pub(crate) packages: Packages,
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
@@ -45,6 +48,7 @@ pub struct Compiler<'m> {
 impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem, sources: Sources) -> Self {
         Self {
+            packages: Default::default(),
             sources,
             strings: Strings::new(mem),
             types: Types::new(mem),

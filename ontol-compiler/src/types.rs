@@ -44,6 +44,8 @@ pub enum Type<'m> {
     Domain(DefId),
     Anonymous(DefId),
     DomainEntity(DefId),
+    /// The type of a package:
+    Namespace,
     Infer(TypeVar<'m>),
     Error,
 }
@@ -67,6 +69,7 @@ impl<'m> Type<'m> {
             Self::Domain(def_id) => Some(*def_id),
             Self::Anonymous(def_id) => Some(*def_id),
             Self::DomainEntity(def_id) => Some(*def_id),
+            Self::Namespace => None,
             Self::Infer(_) => None,
             Self::Error => None,
         }
@@ -192,6 +195,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Anonymous(_) => {
                 write!(f, "anonymous")
             }
+            Type::Namespace => write!(f, "namespace"),
             Type::Infer(_) => write!(f, "?infer"),
             Type::Error => write!(f, "error!"),
         }
