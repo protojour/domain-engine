@@ -6,7 +6,7 @@ use ontol_compiler::{
     compiler::Compiler,
     error::UnifiedCompileError,
     mem::Mem,
-    package::{GraphState, PackageGraphBuilder, PackageSource, PackageTopology, ParsedPackage},
+    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
     SourceCodeRegistry, Sources, SpannedCompileError,
 };
 use ontol_runtime::{env::Env, PackageId};
@@ -125,14 +125,14 @@ impl TestPackages {
                     package_graph_builder = builder;
 
                     for request in requests {
-                        let source_name = match &request.package_source {
-                            PackageSource::Root => ROOT_SRC_NAME,
-                            PackageSource::Named(source_name) => source_name.as_str(),
+                        let source_name = match &request.reference {
+                            PackageReference::Root => ROOT_SRC_NAME,
+                            PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
                         if let Some(source_text) = self.sources_by_name.get(source_name) {
                             package_graph_builder.provide_package(
-                                &request.package_source,
+                                &request.reference,
                                 ParsedPackage::parse(
                                     request.package_id,
                                     source_name,

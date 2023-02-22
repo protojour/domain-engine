@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use ontol_parser::ast;
 use ontol_parser::Spanned;
@@ -30,17 +31,22 @@ pub enum GraphState {
     Built(PackageTopology),
 }
 
+/// A package request originating from a source file.
+/// ONTOL itself does not know how to fetch any packages.
 pub struct PackageRequest {
     pub package_id: PackageId,
-    pub package_source: PackageSource,
+    pub reference: PackageReference,
 }
 
+/// The reference by which a package is requested (file name, URL, etc)
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub enum PackageSource {
+pub enum PackageReference {
     Root,
     Named(String),
 }
 
+/// A package in its parsed form.
+/// The parsed form is needed to know which dependencies to request.
 pub struct ParsedPackage {
     pub package_id: PackageId,
     pub src: Src,
@@ -71,7 +77,6 @@ impl ParsedPackage {
 
 /// Topological sort of the built package graph
 pub struct PackageTopology {
-    pub root_package_id: PackageId,
     pub packages: Vec<ParsedPackage>,
 }
 
@@ -81,11 +86,10 @@ pub enum PackageGraphError {
 }
 
 pub struct PackageGraphBuilder {
-    root_package_id: PackageId,
     next_package_id: PackageId,
     generation: usize,
     parsed_packages: HashMap<PackageId, ParsedPackage>,
-    requested_packages: HashMap<PackageSource, RequestedPackage>,
+    package_graph: HashMap<PackageReference, PackageNode>,
 }
 
 impl Default for PackageGraphBuilder {
@@ -93,16 +97,16 @@ impl Default for PackageGraphBuilder {
     fn default() -> Self {
         let generation = 0;
         Self {
-            root_package_id: ROOT_PKG,
             next_package_id: PackageId(ROOT_PKG.0 + 1),
             generation,
             parsed_packages: Default::default(),
-            requested_packages: [(
-                PackageSource::Root,
-                RequestedPackage {
+            package_graph: [(
+                PackageReference::Root,
+                PackageNode {
                     package_id: ROOT_PKG,
                     use_source_span: SourceSpan::none(),
                     requested_at_generation: generation,
+                    dependencies: Default::default(),
                     found: false,
                 },
             )]
@@ -113,21 +117,27 @@ impl Default for PackageGraphBuilder {
 
 impl PackageGraphBuilder {
     /// Provide a package
-    pub fn provide_package(&mut self, source: &PackageSource, package: ParsedPackage) {
-        let requested_package = self
-            .requested_packages
-            .get_mut(source)
-            .expect("package not requested");
-        requested_package.found = true;
+    pub fn provide_package(&mut self, source: &PackageReference, package: ParsedPackage) {
+        let mut children: HashSet<PackageReference> = HashSet::default();
 
         for statement in &package.statements {
             if let (ast::Statement::Use(use_stmt), _) = statement {
-                self.request_package(
-                    PackageSource::Named(use_stmt.source.0.clone()),
-                    package.src.span(&use_stmt.source.1),
-                );
+                let source = PackageReference::Named(use_stmt.source.0.clone());
+
+                self.request_package(source.clone(), package.src.span(&use_stmt.source.1));
+                children.insert(source);
+            } else {
+                // all use statements are at the top of the source file (for now)
+                break;
             }
         }
+
+        let node = self
+            .package_graph
+            .get_mut(source)
+            .expect("package not requested");
+        node.found = true;
+        node.dependencies.extend(children.into_iter());
 
         self.parsed_packages.insert(package.package_id, package);
     }
@@ -138,7 +148,7 @@ impl PackageGraphBuilder {
         let mut requests = vec![];
         let mut load_errors = vec![];
 
-        for (package_source, requested_package) in &self.requested_packages {
+        for (reference, requested_package) in &self.package_graph {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
                     load_errors.push(SpannedCompileError {
@@ -148,7 +158,7 @@ impl PackageGraphBuilder {
                 } else {
                     requests.push(PackageRequest {
                         package_id: requested_package.package_id,
-                        package_source: package_source.clone(),
+                        reference: reference.clone(),
                     })
                 }
             }
@@ -173,34 +183,80 @@ impl PackageGraphBuilder {
     }
 
     /// Finish the package graph with a topological sort of packages
-    fn topo_sort(self) -> PackageTopology {
+    fn topo_sort(mut self) -> PackageTopology {
+        let mut visited: HashSet<PackageId> = Default::default();
+        let mut topological_sort: Vec<ParsedPackage> = vec![];
+
+        fn traverse_graph(
+            reference: &PackageReference,
+            package_graph: &HashMap<PackageReference, PackageNode>,
+            parsed_packages: &mut HashMap<PackageId, ParsedPackage>,
+            visited: &mut HashSet<PackageId>,
+            topological_sort: &mut Vec<ParsedPackage>,
+        ) {
+            let node = package_graph.get(reference).unwrap();
+            if visited.contains(&node.package_id) {
+                return;
+            }
+            visited.insert(node.package_id);
+
+            for dep in &node.dependencies {
+                traverse_graph(
+                    dep,
+                    package_graph,
+                    parsed_packages,
+                    visited,
+                    topological_sort,
+                );
+            }
+
+            let parsed_package = parsed_packages.remove(&node.package_id).unwrap();
+            topological_sort.push(parsed_package);
+        }
+
+        for reference in self.package_graph.keys() {
+            traverse_graph(
+                reference,
+                &self.package_graph,
+                &mut self.parsed_packages,
+                &mut visited,
+                &mut topological_sort,
+            );
+        }
+
         PackageTopology {
-            root_package_id: self.root_package_id,
-            packages: self.parsed_packages.into_values().collect(),
+            packages: topological_sort,
         }
     }
 
-    fn request_package(&mut self, source: PackageSource, use_source_span: SourceSpan) {
-        match self.requested_packages.entry(source) {
-            Entry::Occupied(_) => {}
+    fn request_package(
+        &mut self,
+        source: PackageReference,
+        use_source_span: SourceSpan,
+    ) -> PackageId {
+        match self.package_graph.entry(source) {
+            Entry::Occupied(occupied) => occupied.get().package_id,
             Entry::Vacant(vacant) => {
                 let package_id = self.next_package_id;
                 self.next_package_id.0 += 1;
 
-                vacant.insert(RequestedPackage {
+                vacant.insert(PackageNode {
                     package_id,
                     use_source_span,
                     requested_at_generation: self.generation,
+                    dependencies: Default::default(),
                     found: false,
                 });
+                package_id
             }
         }
     }
 }
 
-struct RequestedPackage {
+struct PackageNode {
     package_id: PackageId,
     use_source_span: SourceSpan,
     requested_at_generation: usize,
+    dependencies: HashSet<PackageReference>,
     found: bool,
 }
