@@ -1,6 +1,6 @@
+use crate::assert_json_io_matches;
 use crate::{
-    assert_error_msg, assert_json_io_matches, util::TypeBinding, SourceName, TestCompile,
-    TestPackages, ROOT_SRC_NAME,
+    assert_error_msg, util::TypeBinding, SourceName, TestCompile, TestPackages, ROOT_SRC_NAME,
 };
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
@@ -23,15 +23,31 @@ fn load_package() {
         (
             SourceName("pkg"),
             "
-            type bar
+            type foo {
+                rel { 'prop' } int
+            }
             ",
         ),
         (
             SourceName::root(),
             "
-            use 'pkg' as foo
+            use 'pkg' as other
+
+            type bar {
+                rel { 'foo' } other.foo
+            }
             ",
         ),
     ])
-    .compile_ok(|env| {});
+    .compile_ok(|env| {
+        let bar = TypeBinding::new(env, "bar");
+        assert_json_io_matches!(
+            bar,
+            json!({
+                "foo": {
+                    "prop": 42
+                }
+            })
+        );
+    });
 }

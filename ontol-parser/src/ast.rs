@@ -100,7 +100,7 @@ pub struct EqStatement {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct EqType {
-    pub path: Spanned<String>,
+    pub path: Spanned<Path>,
     pub attributes: Vec<EqAttribute>,
 }
 
@@ -121,8 +121,7 @@ pub struct EqAttributeRel {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Unit,
-    // TODO: Support segments
-    Path(String),
+    Path(Path),
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),
@@ -131,11 +130,17 @@ pub enum Type {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Expression {
     Variable(String),
-    Path(String),
+    Path(Path),
     NumberLiteral(String),
     StringLiteral(String),
     Binary(Box<Spanned<Expression>>, BinaryOp, Box<Spanned<Expression>>),
     // Call(Spanned<String>, Vec<Spanned<Expr>>),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Path {
+    Ident(String),
+    Path(Vec<String>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

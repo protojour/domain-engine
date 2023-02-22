@@ -7,6 +7,7 @@ use ontol_parser::{ast, Span};
 use ontol_runtime::{DefId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     compiler::Compiler,
@@ -325,16 +326,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn ast_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
         match ast_ty {
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
-            ast::Type::Path(ident) => {
-                match self.compiler.namespaces.lookup(
-                    &[self.src.package_id, CORE_PKG],
-                    Space::Type,
-                    &ident,
-                ) {
-                    Some(type_def_id) => Ok(type_def_id),
-                    None => Err((CompileError::TypeNotFound, span.clone())),
-                }
-            }
+            ast::Type::Path(path) => self.lookup_path(&path, &span),
             ast::Type::StringLiteral(lit) => match lit.as_str() {
                 "" => Ok(self.compiler.defs.empty_string()),
                 _ => Ok(self
@@ -360,7 +352,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         (eq_type, span): (ast::EqType, Span),
         var_table: &mut VarTable,
     ) -> Res<ExprId> {
-        let type_def_id = self.lookup_ident(&eq_type.path.0, &eq_type.path.1)?;
+        let type_def_id = self.lookup_path(&eq_type.path.0, &eq_type.path.1)?;
         let attributes = eq_type
             .attributes
             .into_iter()
@@ -440,6 +432,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
+        // A single ident looks in both core and the current package
         match self
             .compiler
             .namespaces
@@ -447,6 +440,52 @@ impl<'s, 'm> Lowering<'s, 'm> {
         {
             Some(def_id) => Ok(def_id),
             None => Err((CompileError::TypeNotFound, span.clone())),
+        }
+    }
+
+    fn lookup_path(&mut self, path: &ast::Path, span: &Span) -> Result<DefId, LoweringError> {
+        match path {
+            ast::Path::Ident(ident) => self.lookup_ident(ident, span),
+            ast::Path::Path(segments) => {
+                // a path is fully qualified
+                let mut namespace = self
+                    .compiler
+                    .namespaces
+                    .namespaces
+                    .get(&self.src.package_id)
+                    .unwrap();
+
+                let mut segment_iter = segments.iter().peekable();
+                let mut def_id = None;
+
+                while let Some(segment) = segment_iter.next() {
+                    def_id = namespace.space(Space::Type).get(segment);
+                    if segment_iter.peek().is_some() {
+                        match def_id {
+                            Some(def_id) => match self.compiler.defs.get_def_kind(*def_id) {
+                                Some(DefKind::Package(package_id)) => {
+                                    namespace = self
+                                        .compiler
+                                        .namespaces
+                                        .namespaces
+                                        .get(package_id)
+                                        .unwrap();
+                                }
+                                other => {
+                                    debug!("namespace not found. def kind was {other:?}");
+                                    return Err((CompileError::NamespaceNotFound, span.clone()));
+                                }
+                            },
+                            None => return Err((CompileError::NamespaceNotFound, span.clone())),
+                        }
+                    }
+                }
+
+                match def_id {
+                    Some(def_id) => Ok(*def_id),
+                    None => Err((CompileError::TypeNotFound, span.clone())),
+                }
+            }
         }
     }
 

@@ -3,7 +3,7 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::ast::UseStatement;
+use crate::ast::{Path, UseStatement};
 
 use super::{
     ast::{
@@ -261,7 +261,7 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
 /// Type parser
 fn ty() -> impl AstParser<Type> {
     let unit = sigil('.').to(Type::Unit);
-    let path = ident().map(Type::Path);
+    let path = path().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
     let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
@@ -299,8 +299,22 @@ fn keyword(token: Token) -> impl AstParser<Span> {
         .labelled("keyword")
 }
 
-fn path() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }.labelled("path")
+fn path() -> impl AstParser<Path> {
+    any_sym()
+        .map(|ident| Path::Ident(ident))
+        .then(dot().ignore_then(any_sym()).repeated())
+        .foldl(|prev, next| match prev {
+            Path::Ident(ident) => Path::Path(vec![ident, next]),
+            Path::Path(mut path) => {
+                path.push(next);
+                Path::Path(path)
+            }
+        })
+        .labelled("path")
+}
+
+fn any_sym() -> impl AstParser<String> {
+    select! { Token::Sym(ident) => ident }
 }
 
 fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
@@ -356,10 +370,12 @@ fn u16_range() -> impl AstParser<Range<Option<u16>>> {
     simple.or(dot_dot_following)
 }
 
+fn dot() -> impl AstParser<()> {
+    just(Token::Sigil('.')).ignored()
+}
+
 fn dot_dot() -> impl AstParser<()> {
-    just(Token::Sigil('.'))
-        .ignored()
-        .then_ignore(just(Token::Sigil('.')))
+    dot().then_ignore(dot())
 }
 
 fn string_literal() -> impl AstParser<String> {
