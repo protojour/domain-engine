@@ -7,7 +7,7 @@ use ontol_compiler::{
 use ontol_runtime::{
     env::Env,
     serde::{SerdeModifier, SerdeOperatorId},
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
 use serde::de::DeserializeSeed;
@@ -50,6 +50,18 @@ impl<'e> TypeBinding<'e> {
         Ok(value.data)
     }
 
+    pub fn deserialize_data_map(
+        &self,
+        json: serde_json::Value,
+    ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
+        let value = self.deserialize_value(json)?;
+        assert_eq!(value.type_def_id, self.def_id);
+        match value.data {
+            Data::Map(map) => Ok(map),
+            other => panic!("not a map: {other:?}"),
+        }
+    }
+
     /// Deserialize data, but expect that the resulting type DefId
     /// is not the same as the nominal one for the TypeBinding.
     /// (i.e. it should deserialize to a _variant_ of the type)
@@ -74,13 +86,14 @@ impl<'e> TypeBinding<'e> {
         Ok(value)
     }
 
-    pub fn serialize_data_json(&self, env: &Env, data: &Data) -> serde_json::Value {
-        self.serialize_json(env, &Value::new(data.clone(), self.def_id))
+    pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
+        self.serialize_json(&Value::new(data.clone(), self.def_id))
     }
 
-    pub fn serialize_json(&self, env: &Env, value: &Value) -> serde_json::Value {
+    pub fn serialize_json(&self, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
-        env.new_serde_processor(self.serde_operator_id)
+        self.env
+            .new_serde_processor(self.serde_operator_id)
             .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()

@@ -291,8 +291,8 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             let property = match map.next_key::<String>()? {
                 Some(property) => property,
                 None => match map_matcher.match_fallback() {
-                    Ok(map_type) => {
-                        break map_type;
+                    Ok(map_match) => {
+                        break map_match;
                     }
                     Err(_) => {
                         return Err(Error::custom(format!(
@@ -305,13 +305,15 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
             let value: serde_value::Value = map.next_value()?;
 
-            if let Ok(map_type) = map_matcher.match_attribute(&property, &value) {
+            if let Ok(map_match) = map_matcher.match_attribute(&property, &value) {
                 buffered_attrs.push((property, value));
-                break map_type;
+                break map_match;
             }
 
             buffered_attrs.push((property, value));
         };
+
+        debug!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
 
         // delegate to the real map visitor
         match map_match {
@@ -327,7 +329,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                     map,
                     buffered_attrs,
                     &IndexMap::default(),
-                    1,
+                    0,
                     SpecialOperatorIds {
                         rel_params: map_matcher.edge_operator_id,
                         id: Some(serde_operator_id),
@@ -336,7 +338,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                 )?;
                 let id = deserialized_map
                     .id
-                    .ok_or_else(|| Error::custom(format!("missing _id attribute")))?;
+                    .ok_or_else(|| Error::custom("missing _id attribute".to_string()))?;
 
                 Ok(Attribute {
                     value: id,

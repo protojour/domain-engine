@@ -7,8 +7,6 @@ use ontol_runtime::{
         MapType, SequenceRange, SerdeModifier, SerdeOperator, SerdeOperatorId, SerdeProperty,
         ValueType, ValueUnionDiscriminator, ValueUnionType,
     },
-    smart_format,
-    value::PropertyId,
     DefId, Role,
 };
 use smallvec::SmallVec;
@@ -132,31 +130,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let object_operator_id = self
                         .get_serde_operator_id(object.0, SerdeModifier::Identity)
                         .expect("No object operator for _id property");
-                    let typename = match self.defs.get_def_kind(type_def_id) {
-                        Some(DefKind::DomainType(Some(ident))) => smart_format!("{ident}._id"),
-                        _ => smart_format!("Unknown type"),
-                    };
 
                     Some((
                         self.alloc_operator_id(type_def_id, modifier),
                         SerdeOperator::Id(object_operator_id),
-                        /*
-                        SerdeOperator::MapType(MapType {
-                            typename,
-                            type_def_id,
-                            properties: [(
-                                smart_format!("_id"),
-                                SerdeProperty {
-                                    property_id: PropertyId::subject(id_relation_id),
-                                    value_operator_id: object_operator_id,
-                                    optional: false,
-                                    rel_params_operator_id: None,
-                                },
-                            )]
-                            .into(),
-                            n_mandatory_properties: 1,
-                        }),
-                        */
                     ))
                 }
                 _ => None,
@@ -275,7 +252,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Constructor::Identity => self.create_identity_constructor_operator(
                 typename,
                 type_def_id,
-                &properties,
+                properties,
                 modifier,
             ),
             Constructor::Value(relationship_id, _, cardinality) => {
@@ -388,13 +365,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .expect("Problem getting subject property meta");
 
                     // Create a union between { '_id' } and the map properties itself
-                    let map_properties_operator_id = self
-                        .get_serde_operator_id(type_def_id, SerdeModifier::PropertyMap)
-                        .expect("No property map operator");
-
                     let id_operator_id = self
                         .get_serde_operator_id(type_def_id, SerdeModifier::IdMap)
                         .expect("No _id operator");
+                    let map_properties_operator_id = self
+                        .get_serde_operator_id(type_def_id, SerdeModifier::PropertyMap)
+                        .expect("No property map operator");
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
                         typename: typename.into(),
@@ -411,7 +387,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             },
                             ValueUnionDiscriminator {
                                 discriminator: VariantDiscriminator {
-                                    discriminant: Discriminant::IsMap,
+                                    discriminant: Discriminant::MapFallback,
                                     result_type: type_def_id,
                                 },
                                 operator_id: map_properties_operator_id,

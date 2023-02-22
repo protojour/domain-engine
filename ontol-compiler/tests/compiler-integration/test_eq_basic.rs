@@ -30,7 +30,7 @@ fn assert_translate(
     let mut translator = Translator::new(&env.lib);
     let value = translator.trace_eval(procedure, [value]);
 
-    let output_json = output_binding.serialize_json(env, &value);
+    let output_json = output_binding.serialize_json(&value);
 
     assert_eq!(expected, output_json);
 }

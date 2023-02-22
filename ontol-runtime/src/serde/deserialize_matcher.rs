@@ -376,7 +376,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             .any(|discriminator| {
                 matches!(
                     &discriminator.discriminator.discriminant,
-                    Discriminant::IsMap
+                    Discriminant::MapFallback
                         | Discriminant::HasProperty(_, _)
                         | Discriminant::HasStringAttribute(_, _, _)
                 )
@@ -412,6 +412,7 @@ pub struct MapMatcher<'e> {
     env: &'e Env,
 }
 
+#[derive(Debug)]
 pub enum MapMatch<'e> {
     MapType(&'e MapType),
     IdType(SerdeOperatorId),
@@ -425,7 +426,6 @@ impl<'e> MapMatcher<'e> {
     ) -> Result<MapMatch<'e>, MapMatchError> {
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
-                (Discriminant::IsMap, _) => true,
                 (
                     Discriminant::HasStringAttribute(_, match_name, match_value),
                     serde_value::Value::String(value),
@@ -446,7 +446,8 @@ impl<'e> MapMatcher<'e> {
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => MapMatch::MapType(map_type),
-                    _ => panic!("Matched discriminator is not a map type"),
+                    SerdeOperator::Id(operator_id) => MapMatch::IdType(*operator_id),
+                    other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
             })
             .ok_or(MapMatchError::Indecisive)
@@ -456,7 +457,7 @@ impl<'e> MapMatcher<'e> {
         for discriminator in &self.value_union_type.discriminators {
             if matches!(
                 discriminator.discriminator.discriminant,
-                Discriminant::IsMap
+                Discriminant::MapFallback
             ) {
                 match self
                     .env
@@ -464,7 +465,8 @@ impl<'e> MapMatcher<'e> {
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => return Ok(MapMatch::MapType(map_type)),
-                    _ => panic!("Matched discriminator is not a map type"),
+                    SerdeOperator::Id(operator_id) => return Ok(MapMatch::IdType(*operator_id)),
+                    other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
             }
         }

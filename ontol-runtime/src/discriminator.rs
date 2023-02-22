@@ -20,7 +20,7 @@ pub enum Discriminant {
     IsString,
     IsStringLiteral(String),
     IsSequence,
-    IsMap,
+    MapFallback,
     MatchesCapturingStringPattern,
     HasProperty(RelationId, String),
     HasStringAttribute(RelationId, String, String),

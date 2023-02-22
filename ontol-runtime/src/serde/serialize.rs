@@ -91,7 +91,7 @@ impl<'e> SerdeProcessor<'e> {
                 map.serialize_entry(
                     "_id",
                     &Proxy {
-                        value: &value,
+                        value,
                         rel_params: None,
                         processor: self.env.new_serde_processor(*inner_operator_id),
                     },
