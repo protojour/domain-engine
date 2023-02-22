@@ -100,6 +100,7 @@ pub fn serialize_json(env: &Env, value: &Value) -> serde_json::Value {
 struct DiagnosticBuilder {
     cursor: usize,
     lines: Vec<DiagnosticsLine>,
+    ends_with_newline: bool,
 }
 
 struct DiagnosticsLine {
@@ -125,23 +126,32 @@ pub fn diff_errors(
         .registry
         .iter()
         .map(|(source_id, text)| {
-            let builder = text
-                .lines()
-                .fold(DiagnosticBuilder::default(), |mut builder, line| {
-                    let orig_stripped = if let Some(byte_index) = line.find(&space_error_pattern) {
-                        &line[..byte_index]
-                    } else {
-                        line
-                    };
+            let mut builder =
+                text.lines()
+                    .fold(DiagnosticBuilder::default(), |mut builder, line| {
+                        let orig_stripped =
+                            if let Some(byte_index) = line.find(&space_error_pattern) {
+                                &line[..byte_index]
+                            } else {
+                                line
+                            };
 
-                    builder.lines.push(DiagnosticsLine {
-                        start: builder.cursor,
-                        orig_stripped: orig_stripped.to_string(),
-                        errors: vec![],
+                        builder.lines.push(DiagnosticsLine {
+                            start: builder.cursor,
+                            orig_stripped: orig_stripped.to_string(),
+                            errors: vec![],
+                        });
+                        builder.cursor += line.len() + 1;
+                        builder
                     });
-                    builder.cursor += line.len() + 1;
-                    builder
-                });
+
+            // .lines() does not record the final newline
+            match text.chars().last() {
+                Some('\n') => {
+                    builder.ends_with_newline = true;
+                }
+                _ => {}
+            }
 
             (*source_id, builder)
         })
@@ -169,7 +179,7 @@ pub fn diff_errors(
     let mut original = String::new();
     let mut annotated = String::new();
 
-    for (source_id, builder) in &builders {
+    for (source_id, builder) in builders.iter().rev() {
         let source = sources.get_source(*source_id).unwrap();
         let source_text = source_code_registry.registry.get(&source_id).unwrap();
 
@@ -193,13 +203,17 @@ pub fn diff_errors(
                     .collect::<Vec<_>>()
                     .join("");
 
-                annotated.push_str(" ");
+                annotated.push(' ');
                 annotated.push_str(&joined_errors);
             }
 
             if line_iter.peek().is_some() {
-                annotated.push_str("\n");
+                annotated.push('\n');
             }
+        }
+
+        if builder.ends_with_newline {
+            annotated.push('\n');
         }
     }
 
