@@ -139,6 +139,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     Some((
                         self.alloc_operator_id(type_def_id, modifier),
+                        SerdeOperator::Id(object_operator_id),
+                        /*
                         SerdeOperator::MapType(MapType {
                             typename,
                             type_def_id,
@@ -154,6 +156,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .into(),
                             n_mandatory_properties: 1,
                         }),
+                        */
                     ))
                 }
                 _ => None,

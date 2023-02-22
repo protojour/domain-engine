@@ -75,6 +75,9 @@ pub enum SerdeOperator {
     /// A type with multiple anonymous properties, equivalent to a union of types
     ValueUnionType(ValueUnionType),
 
+    /// A map with one property, "_id"
+    Id(SerdeOperatorId),
+
     /// A type with many properties
     MapType(MapType),
 }
@@ -172,6 +175,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
             SerdeOperator::ValueUnionType(_) => write!(f, "union"),
+            SerdeOperator::Id(_) => write!(f, "id"),
             SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
         }
     }

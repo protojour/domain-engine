@@ -157,6 +157,10 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor(self),
             ),
+            SerdeOperator::Id(_inner_operator_id) => {
+                //deserializer.deserialize_map()
+                todo!()
+            }
             SerdeOperator::MapType(map_type) => deserializer.deserialize_map(MapTypeVisitor {
                 buffered_attrs: Default::default(),
                 map_type,

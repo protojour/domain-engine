@@ -1,4 +1,7 @@
-use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{
+    ser::{SerializeMap, SerializeSeq},
+    Serializer,
+};
 use smartstring::alias::String;
 use std::fmt::Write;
 
@@ -14,7 +17,7 @@ type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Err
 
 impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
-    pub fn serialize_value<S: serde::Serializer>(
+    pub fn serialize_value<S: Serializer>(
         &self,
         value: &Value,
         rel_params: Option<&Value>,
@@ -77,6 +80,20 @@ impl<'e> SerdeProcessor<'e> {
                     }
                 }
             }
+            SerdeOperator::Id(inner_operator_id) => {
+                let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
+                map.serialize_entry(
+                    "_id",
+                    &Proxy {
+                        value: &value,
+                        rel_params: None,
+                        processor: self.env.new_serde_processor(*inner_operator_id),
+                    },
+                )?;
+                self.serialize_rel_params::<S>(rel_params, &mut map)?;
+
+                map.end()
+            }
             SerdeOperator::MapType(map_type) => {
                 self.serialize_map(map_type, rel_params, value, serializer)
             }
@@ -85,7 +102,7 @@ impl<'e> SerdeProcessor<'e> {
 }
 
 impl<'e> SerdeProcessor<'e> {
-    fn serialize_number<S: serde::Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
+    fn serialize_number<S: Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match &value.data {
             Data::Int(num) => serializer.serialize_i64(*num),
             Data::Float(f) => serializer.serialize_f64(*f),
@@ -93,7 +110,7 @@ impl<'e> SerdeProcessor<'e> {
         }
     }
 
-    fn serialize_sequence<S: serde::Serializer>(
+    fn serialize_sequence<S: Serializer>(
         &self,
         elements: &[Attribute],
         ranges: &[SequenceRange],
@@ -134,7 +151,7 @@ impl<'e> SerdeProcessor<'e> {
         seq.end()
     }
 
-    fn serialize_map<S: serde::Serializer>(
+    fn serialize_map<S: Serializer>(
         &self,
         map_type: &MapType,
         rel_params: Option<&Value>,
@@ -146,7 +163,7 @@ impl<'e> SerdeProcessor<'e> {
             other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
         };
 
-        let mut serialize_map = serializer.serialize_map(Some(attributes.len()))?;
+        let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
         for (name, serde_prop) in &map_type.properties {
             let attribute = match attributes.get(&serde_prop.property_id) {
@@ -163,7 +180,7 @@ impl<'e> SerdeProcessor<'e> {
                 }
             };
 
-            serialize_map.serialize_entry(
+            map.serialize_entry(
                 name,
                 &Proxy {
                     value: &attribute.value,
@@ -176,10 +193,20 @@ impl<'e> SerdeProcessor<'e> {
             )?;
         }
 
+        self.serialize_rel_params::<S>(rel_params, &mut map)?;
+
+        map.end()
+    }
+
+    fn serialize_rel_params<S: Serializer>(
+        &self,
+        rel_params: Option<&Value>,
+        map: &mut <S as Serializer>::SerializeMap,
+    ) -> Result<(), <S as Serializer>::Error> {
         match (rel_params, self.rel_params_operator_id) {
             (None, None) => {}
             (Some(rel_params), Some(operator_id)) => {
-                serialize_map.serialize_entry(
+                map.serialize_entry(
                     EDGE_PROPERTY,
                     &Proxy {
                         value: rel_params,
@@ -196,7 +223,14 @@ impl<'e> SerdeProcessor<'e> {
             }
         }
 
-        serialize_map.end()
+        Ok(())
+    }
+}
+
+fn option_len<T>(opt: &Option<T>) -> usize {
+    match opt {
+        Some(_) => 1,
+        None => 0,
     }
 }
 
