@@ -122,6 +122,7 @@ impl<'m> Relation<'m> {
 pub enum RelationIdent {
     Named(DefId),
     Typed(DefId),
+    Id,
     Indexed,
 }
 
@@ -179,6 +180,7 @@ pub struct Defs<'m> {
     next_def_id: DefId,
     next_expr_id: ExprId,
     unit: DefId,
+    id_relation: DefId,
     indexed_relation: DefId,
     empty_sequence: DefId,
     empty_string: DefId,
@@ -199,6 +201,7 @@ impl<'m> Defs<'m> {
             next_def_id: DefId(0),
             next_expr_id: ExprId(0),
             unit: DefId(0),
+            id_relation: DefId(0),
             indexed_relation: DefId(0),
             empty_sequence: DefId(0),
             empty_string: DefId(0),
@@ -217,7 +220,15 @@ impl<'m> Defs<'m> {
 
         // Add some extremely fundamental definitions here already.
         // These are even independent from CORE being defined.
-
+        defs.id_relation = defs.add_def(
+            DefKind::Relation(Relation {
+                ident: RelationIdent::Id,
+                subject_prop: None,
+                object_prop: None,
+            }),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
         defs.indexed_relation = defs.add_def(
             DefKind::Relation(Relation {
                 ident: RelationIdent::Indexed,
@@ -240,6 +251,10 @@ impl<'m> Defs<'m> {
 
     pub fn unit(&self) -> DefId {
         self.unit
+    }
+
+    pub fn id_relation(&self) -> DefId {
+        self.id_relation
     }
 
     pub fn indexed_relation(&self) -> DefId {
@@ -361,53 +376,13 @@ impl<'m> Defs<'m> {
 }
 
 impl<'m> Compiler<'m> {
-    pub fn add_named_def(
-        &mut self,
-        name: &str,
-        space: Space,
-        kind: DefKind<'m>,
-        package: PackageId,
-        span: SourceSpan,
-    ) -> DefId {
-        let def_id = self.defs.alloc_def_id();
-        self.namespaces
-            .get_mut(package, space)
-            .insert(name.into(), def_id);
-        self.defs.map.insert(
-            def_id,
-            self.defs.mem.bump.alloc(Def {
-                id: def_id,
-                package,
-                span,
-                kind,
-            }),
-        );
-
-        def_id
-    }
-
-    pub fn define_package(&mut self, package_id: PackageId) -> DefId {
-        let def_id = self.defs.alloc_def_id();
-        self.defs.map.insert(
-            def_id,
-            self.defs.mem.bump.alloc(Def {
-                id: def_id,
-                package: package_id,
-                span: SourceSpan::none(),
-                kind: DefKind::Package(package_id),
-            }),
-        );
-        let ty = self.types.intern(Type::Namespace);
-        self.def_types.map.insert(def_id, ty);
-        def_id
-    }
-
     pub fn with_core(mut self) -> Self {
         self.define_package(CORE_PKG);
 
         // fundamental types
         let _ = self.def_core_type(self.defs.unit, Type::Unit);
         let _ = self.def_core_type(self.defs.empty_sequence, Type::EmptySequence);
+        let _ = self.def_core_type_name(self.defs.id_relation, "id", |_| Type::BuiltinRelation);
         let int_ty = self.def_core_type_name(self.defs.int, "int", Type::Int);
         let _ = self.def_core_type_name(self.defs.number, "number", Type::Number);
         let string_ty = self.def_core_type_name(self.defs.string, "string", Type::String);
@@ -445,6 +420,47 @@ impl<'m> Compiler<'m> {
             .constructor = Constructor::StringPattern(StringPatternSegment::Regex(uuid_regex()));
 
         self
+    }
+
+    pub fn add_named_def(
+        &mut self,
+        name: &str,
+        space: Space,
+        kind: DefKind<'m>,
+        package: PackageId,
+        span: SourceSpan,
+    ) -> DefId {
+        let def_id = self.defs.alloc_def_id();
+        self.namespaces
+            .get_mut(package, space)
+            .insert(name.into(), def_id);
+        self.defs.map.insert(
+            def_id,
+            self.defs.mem.bump.alloc(Def {
+                id: def_id,
+                package,
+                span,
+                kind,
+            }),
+        );
+
+        def_id
+    }
+
+    pub fn define_package(&mut self, package_id: PackageId) -> DefId {
+        let def_id = self.defs.alloc_def_id();
+        self.defs.map.insert(
+            def_id,
+            self.defs.mem.bump.alloc(Def {
+                id: def_id,
+                package: package_id,
+                span: SourceSpan::none(),
+                kind: DefKind::Package(package_id),
+            }),
+        );
+        let ty = self.types.intern(Type::Package);
+        self.def_types.map.insert(def_id, ty);
+        def_id
     }
 
     fn def_core_type(

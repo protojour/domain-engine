@@ -34,6 +34,7 @@ impl Relations {
 pub struct Properties {
     pub constructor: Constructor,
     pub map: MapProperties,
+    pub id: Option<RelationId>,
 }
 
 impl Properties {

@@ -97,6 +97,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut properties.map,
             &mut properties.constructor,
         ) {
+            (RelationIdent::Id, _, _) => match properties.id {
+                Some(_) => todo!("Already has an id, report error"),
+                None => properties.id = Some(relation.0),
+            },
             (RelationIdent::Indexed, MapProperties::Empty, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 

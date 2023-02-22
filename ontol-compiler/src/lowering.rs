@@ -250,6 +250,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Some(DefKind::StringLiteral(_)) => {
                         (RelationIdent::Named(def_id), span.clone(), None)
                     }
+                    Some(DefKind::Relation(relation)) => {
+                        (relation.ident.clone(), span.clone(), None)
+                    }
                     _ => (RelationIdent::Typed(def_id), span.clone(), None),
                 }
             }
@@ -503,6 +506,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ),
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
+            }
+            RelationIdent::Id => {
+                ImplicitRelationId::Reused(RelationId(self.compiler.defs.id_relation()))
             }
             RelationIdent::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
