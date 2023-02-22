@@ -12,14 +12,14 @@ fn test_entity_experiment_etc() {
         rel '' { 'artist/' } { uuid }
     }
 
-    entity artist
+    type artist
     rel artist { 'name' } string
     rel artist { id } artist-id
 
-    entity record
+    type record
     rel record { 'name' } string
 
-    entity instrument {
+    type instrument {
         rel { id } string
         rel { 'name' } string
     }
@@ -76,7 +76,7 @@ fn test_entity_experiment_etc() {
 #[test]
 fn test_entity_self_relationship() {
     "
-    entity node {
+    type node {
         rel { id } string
         rel { 'name' } string
         rel { 'children'* | 'parent'? } node
@@ -124,7 +124,7 @@ fn test_entity_self_relationship() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    entity node {
+    type node {
         rel { id } string
         rel { 'children'* | 'parent' } node
     }

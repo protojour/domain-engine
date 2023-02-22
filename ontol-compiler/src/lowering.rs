@@ -88,10 +88,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Type(type_stmt) => {
                 let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-                let kind = match type_stmt.kind.0 {
-                    ast::TypeKind::Type => DefKind::DomainType(Some(ident)),
-                    ast::TypeKind::Entity => DefKind::DomainEntity(ident),
-                };
+                let kind = DefKind::DomainType(Some(ident));
 
                 self.set_def(def_id, kind, &span);
 
@@ -250,9 +247,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Some(DefKind::StringLiteral(_)) => {
                         (RelationIdent::Named(def_id), span.clone(), None)
                     }
-                    Some(DefKind::Relation(relation)) => {
-                        (relation.ident.clone(), span.clone(), None)
-                    }
+                    Some(DefKind::Relation(relation)) => (relation.ident, span.clone(), None),
                     _ => (RelationIdent::Typed(def_id), span.clone(), None),
                 }
             }

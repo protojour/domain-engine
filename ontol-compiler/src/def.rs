@@ -38,7 +38,6 @@ pub enum DefKind<'m> {
     EmptySequence,
     Regex(&'m str),
     DomainType(Option<&'m str>),
-    DomainEntity(&'m str),
     Relation(Relation<'m>),
     Relationship(Relationship),
     // FIXME: This should not be builtin proc directly.
@@ -62,7 +61,6 @@ impl<'m> DefKind<'m> {
             Self::EmptySequence => None,
             Self::CoreFn(_) => None,
             Self::DomainType(opt_ident) => opt_ident.map(|ident| ident.into()),
-            Self::DomainEntity(ident) => Some((*ident).into()),
             Self::Relation(_) => None,
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,

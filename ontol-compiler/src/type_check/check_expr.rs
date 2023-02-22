@@ -84,7 +84,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Obj(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
                 let subject_id = match domain_type {
-                    Type::Domain(subject_id) | Type::DomainEntity(subject_id) => subject_id,
+                    Type::Domain(subject_id) => subject_id,
                     _ => return self.expr_error(CompileError::DomainTypeExpected, &type_path.span),
                 };
 

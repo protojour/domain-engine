@@ -8,8 +8,7 @@ use crate::ast::{Path, UseStatement};
 use super::{
     ast::{
         BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStatement,
-        EqType, Expression, RelConnection, RelStatement, RelType, Statement, Type, TypeKind,
-        TypeStatement,
+        EqType, Expression, RelConnection, RelStatement, RelType, Statement, Type, TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -57,12 +56,8 @@ fn use_statement() -> impl AstParser<UseStatement> {
 }
 
 fn type_statement() -> impl AstParser<TypeStatement> {
-    let kind = keyword(Token::Type)
-        .map(|span| (TypeKind::Type, span))
-        .or(keyword(Token::Entity).map(|span| (TypeKind::Entity, span)));
-
     doc_comments()
-        .then(kind)
+        .then(keyword(Token::Type))
         .then(spanned(ident()))
         .then(spanned(
             spanned(rel_statement())
@@ -70,9 +65,9 @@ fn type_statement() -> impl AstParser<TypeStatement> {
                 .delimited_by(open('{'), close('}'))
                 .or_not(),
         ))
-        .map(|(((docs, kind), ident), rel_block)| TypeStatement {
+        .map(|(((docs, kw), ident), rel_block)| TypeStatement {
             docs,
-            kind,
+            kw,
             ident,
             rel_block,
         })

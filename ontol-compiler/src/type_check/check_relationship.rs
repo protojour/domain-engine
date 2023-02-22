@@ -3,8 +3,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Cardinality, Def, DefKind, Primitive, PropertyCardinality, Relation, RelationIdent,
-        Relationship, ValueCardinality,
+        Def, DefKind, Primitive, PropertyCardinality, Relation, RelationIdent, Relationship,
+        ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
@@ -76,7 +76,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypeRef<'m> {
         let subject_ty = self.check_def(subject.0);
         let object_ty = self.check_def(object.0);
-        let adapter = CardinalityAdapter::new(subject_ty, object_ty);
 
         match subject_ty {
             Type::Unit(_) | Type::EmptySequence(_) => return object_ty,
@@ -123,7 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 properties.map = MapProperties::Map(
                     [(
                         PropertyId::subject(relation.0),
-                        adapter.adapt(relationship.1.subject_cardinality),
+                        relationship.1.subject_cardinality,
                     )]
                     .into(),
                 );
@@ -132,7 +131,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if map
                     .insert(
                         PropertyId::subject(relation.0),
-                        adapter.adapt(relationship.1.subject_cardinality),
+                        relationship.1.subject_cardinality,
                     )
                     .is_some()
                 {
@@ -163,7 +162,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypeRef<'m> {
         let object_ty = self.check_def(object.0);
         let subject_ty = self.check_def(subject.0);
-        let adapter = CardinalityAdapter::new(object_ty, subject_ty);
 
         match subject_ty {
             Type::Unit(_) => {
@@ -250,20 +248,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     object_ty,
                     &mut object_properties.map,
                 ) {
-                    (Some(_), Type::Domain(_) | Type::DomainEntity(_), MapProperties::Empty) => {
+                    (Some(_), Type::Domain(_), MapProperties::Empty) => {
                         object_properties.map = MapProperties::Map(
                             [(
                                 PropertyId::object(relation.0),
-                                adapter.adapt(relationship.1.object_cardinality),
+                                relationship.1.object_cardinality,
                             )]
                             .into(),
                         );
                     }
-                    (Some(_), Type::Domain(_) | Type::DomainEntity(_), MapProperties::Map(map)) => {
+                    (Some(_), Type::Domain(_), MapProperties::Map(map)) => {
                         if map
                             .insert(
                                 PropertyId::object(relation.0),
-                                adapter.adapt(relationship.1.object_cardinality),
+                                relationship.1.object_cardinality,
                             )
                             .is_some()
                         {
@@ -272,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     }
                     (Some(_), _, _) => {
-                        // non-domain type in object relationship
+                        // non-domain type in object
                         return self.error(CompileError::NonEntityInReverseRelationship, span);
                     }
                     (None, _, _) => {
@@ -356,31 +354,5 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         Ok(())
-    }
-}
-
-struct CardinalityAdapter<'m> {
-    domain_ty: TypeRef<'m>,
-    codomain_ty: TypeRef<'m>,
-}
-
-impl<'m> CardinalityAdapter<'m> {
-    fn new(domain_ty: TypeRef<'m>, codomain_ty: TypeRef<'m>) -> Self {
-        Self {
-            domain_ty,
-            codomain_ty,
-        }
-    }
-
-    /// Relationships between _entities_ behave differently than relationships between values.
-    ///
-    /// Entity relationships are usually optional.
-    fn adapt(&self, cardinality: Cardinality) -> Cardinality {
-        match (self.domain_ty, self.codomain_ty, cardinality.1) {
-            (Type::DomainEntity(_), Type::DomainEntity(_), ValueCardinality::Many) => {
-                (PropertyCardinality::Optional, cardinality.1)
-            }
-            _ => cardinality,
-        }
     }
 }

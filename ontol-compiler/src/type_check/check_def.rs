@@ -33,11 +33,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
-            DefKind::DomainEntity(_) => {
-                let ty = self.types.intern(Type::DomainEntity(def_id));
-                self.def_types.map.insert(def_id, ty);
-                ty
-            }
             DefKind::StringLiteral(_) => {
                 let ty = self.types.intern(Type::StringConstant(def_id));
                 self.def_types.map.insert(def_id, ty);

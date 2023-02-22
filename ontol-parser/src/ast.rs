@@ -34,15 +34,9 @@ pub struct UseStatement {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TypeStatement {
     pub docs: Vec<String>,
-    pub kind: Spanned<TypeKind>,
+    pub kw: Span,
     pub ident: Spanned<String>,
     pub rel_block: Spanned<Option<Vec<Spanned<RelStatement>>>>,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum TypeKind {
-    Type,
-    Entity,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

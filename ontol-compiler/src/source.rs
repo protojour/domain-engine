@@ -71,13 +71,10 @@ impl<'m, T: Debug> Debug for SpannedBorrow<'m, T> {
 
 impl<'m, T> SpannedBorrow<'m, T> {
     pub fn filter<U>(self, f: impl Fn(&'m T) -> Option<&'m U>) -> Option<SpannedBorrow<'m, U>> {
-        match f(self.value) {
-            Some(u) => Some(SpannedBorrow {
-                value: u,
-                span: self.span,
-            }),
-            None => None,
-        }
+        f(self.value).map(|u| SpannedBorrow {
+            value: u,
+            span: self.span,
+        })
     }
 }
 

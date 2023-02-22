@@ -115,12 +115,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(Type::Option(_)) => {
                 panic!("Option not handled here")
             }
-            Some(Type::Domain(def_id) | Type::DomainEntity(def_id)) => {
+            Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::DomainType(Some(ident))) => ident,
                     Some(DefKind::DomainType(None)) => "anonymous",
-                    Some(DefKind::DomainEntity(ident)) => ident,
                     _ => "Unknown type",
                 };
                 let operator_id = self.alloc_operator_id(type_def_id);

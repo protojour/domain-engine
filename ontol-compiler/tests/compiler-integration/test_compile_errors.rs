@@ -9,7 +9,7 @@ fn lex_error() {
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `entity`, `rel`, `eq`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `eq`"
         .compile_fail();
 }
 
@@ -437,7 +437,7 @@ fn invalid_relation_chain() {
         . {.}
         . {.} {.}
         .
-        . // ERROR parse error: found `.`, expected one of `{`, `type`, `entity`, `rel`, `eq`
+        . // ERROR parse error: found `.`, expected one of `{`, `type`, `rel`, `eq`
         {.}
     "
     .compile_fail()
@@ -479,7 +479,7 @@ fn compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `entity`, `rel`, `eq`
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `eq`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),
