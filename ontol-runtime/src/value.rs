@@ -70,7 +70,7 @@ impl<'d> Display for FormatStringData<'d> {
         match self.0 {
             Data::String(s) => write!(f, "{s}"),
             Data::Uuid(uuid) => write!(f, "{uuid}"),
-            _ => panic!("not a string-like type"),
+            data => panic!("not a string-like type: {data:?}"),
         }
     }
 }

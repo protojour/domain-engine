@@ -60,7 +60,10 @@ impl<'e> SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_type) => self
                 .env
-                .new_serde_processor(value_type.inner_operator_id)
+                .new_serde_processor_parameterized(
+                    value_type.inner_operator_id,
+                    self.rel_params_operator_id,
+                )
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type
@@ -73,7 +76,10 @@ impl<'e> SerdeProcessor<'e> {
                 match discriminator {
                     Some(discriminator) => self
                         .env
-                        .new_serde_processor(discriminator.operator_id)
+                        .new_serde_processor_parameterized(
+                            discriminator.operator_id,
+                            self.rel_params_operator_id,
+                        )
                         .serialize_value(value, rel_params, serializer),
                     None => {
                         panic!("Discriminator not found while serializing union type");
@@ -219,7 +225,7 @@ impl<'e> SerdeProcessor<'e> {
                 panic!("Must serialize edge params, but attribute did not contain anything")
             }
             (Some(rel_params), None) => {
-                panic!("Attribute had rel params {rel_params:?}, but no serializer operator available: {self:?}")
+                panic!("Attribute had rel params {rel_params:#?}, but no serializer operator available: {self:#?}")
             }
         }
 

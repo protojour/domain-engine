@@ -12,14 +12,14 @@ use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::EDGE_PROPERTY,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
 
 use super::{
     deserialize_matcher::{
         CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher,
-        SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher, UnitMatcher,
+        MapMatch, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher, UnitMatcher,
         ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
@@ -274,7 +274,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         // into a buffer until the type can be properly recognized
         let mut buffered_attrs: Vec<(String, serde_value::Value)> = Default::default();
 
-        let map_type = loop {
+        let map_match = loop {
             let property = match map.next_key::<String>()? {
                 Some(property) => property,
                 None => match map_matcher.match_fallback() {
@@ -301,13 +301,26 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         };
 
         // delegate to the real map visitor
-        MapTypeVisitor {
-            buffered_attrs,
-            map_type,
-            rel_params_operator_id: map_matcher.edge_operator_id,
-            env: self.env,
+        match map_match {
+            MapMatch::MapType(map_type) => MapTypeVisitor {
+                buffered_attrs,
+                map_type,
+                rel_params_operator_id: map_matcher.edge_operator_id,
+                env: self.env,
+            }
+            .visit_map(map),
+            MapMatch::IdType => {
+                let (attributes, rel_params) = deserialize_map(
+                    map,
+                    buffered_attrs,
+                    &IndexMap::default(),
+                    1,
+                    map_matcher.edge_operator_id,
+                    self.env,
+                )?;
+                todo!();
+            }
         }
-        .visit_map(map)
     }
 }
 
@@ -318,123 +331,135 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
         write!(f, "type `{}`", self.map_type.typename)
     }
 
-    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        let mut attributes = BTreeMap::new();
-        let mut rel_params = Value::unit();
-
-        let mut n_mandatory_properties = 0;
-
-        // first parse buffered attributes, if any
-        for (serde_key, serde_value) in self.buffered_attrs {
-            match PropertySet::new(&self.map_type.properties, self.rel_params_operator_id)
-                .visit_str(&serde_key)?
-            {
-                MapKey::RelParams(operator_id) => {
-                    let Attribute { value, .. } = self
-                        .env
-                        .new_serde_processor(operator_id)
-                        .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
-
-                    rel_params = value;
-                }
-                MapKey::Property(serde_property) => {
-                    let Attribute { rel_params, value } = self
-                        .env
-                        .new_serde_processor_parameterized(
-                            serde_property.value_operator_id,
-                            serde_property.rel_params_operator_id,
-                        )
-                        .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
-
-                    if !serde_property.optional {
-                        n_mandatory_properties += 1;
-                    }
-
-                    attributes.insert(serde_property.property_id, Attribute { rel_params, value });
-                }
-            }
-        }
-
-        // parse rest of map
-        while let Some(map_key) = map.next_key_seed(PropertySet::new(
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+        let type_def_id = self.map_type.type_def_id;
+        let (attributes, rel_params) = deserialize_map(
+            map,
+            self.buffered_attrs,
             &self.map_type.properties,
+            self.map_type.n_mandatory_properties,
             self.rel_params_operator_id,
-        ))? {
-            match map_key {
-                MapKey::RelParams(operator_id) => {
-                    let Attribute { value, .. } =
-                        map.next_value_seed(self.env.new_serde_processor(operator_id))?;
-
-                    rel_params = value;
-                }
-                MapKey::Property(serde_property) => {
-                    let attribute =
-                        map.next_value_seed(self.env.new_serde_processor_parameterized(
-                            serde_property.value_operator_id,
-                            serde_property.rel_params_operator_id,
-                        ))?;
-
-                    if !serde_property.optional {
-                        n_mandatory_properties += 1;
-                    }
-
-                    attributes.insert(serde_property.property_id, attribute);
-                }
-            }
-        }
-
-        if n_mandatory_properties < self.map_type.n_mandatory_properties
-            || (rel_params.is_unit() != self.rel_params_operator_id.is_none())
-        {
-            debug!(
-                "Missing attributes. Rel params match: {}, {}",
-                rel_params.is_unit(),
-                self.rel_params_operator_id.is_none()
-            );
-            for attr in &attributes {
-                debug!("    attr {:?}", attr.0);
-            }
-            for prop in &self.map_type.properties {
-                debug!(
-                    "    prop {:?} '{}' optional={}",
-                    prop.1.property_id, prop.0, prop.1.optional
-                );
-            }
-
-            let mut items: Vec<DoubleQuote<String>> = self
-                .map_type
-                .properties
-                .iter()
-                .filter(|(_, property)| {
-                    !property.optional && !attributes.contains_key(&property.property_id)
-                })
-                .map(|(key, _)| DoubleQuote(key.clone()))
-                .collect();
-
-            if self.rel_params_operator_id.is_some() && rel_params.type_def_id == DefId::unit() {
-                items.push(DoubleQuote(EDGE_PROPERTY.into()));
-            }
-
-            debug!("items len: {}", items.len());
-
-            let missing_keys = Missing {
-                items,
-                logic_op: LogicOp::And,
-            };
-
-            return Err(Error::custom(format!(
-                "missing properties, expected {missing_keys}"
-            )));
-        }
-
+            self.env,
+        )?;
         Ok(Attribute {
             value: Value {
                 data: Data::Map(attributes),
-                type_def_id: self.map_type.type_def_id,
+                type_def_id,
             },
             rel_params,
         })
     }
+}
+
+fn deserialize_map<'de, A: MapAccess<'de>>(
+    mut map: A,
+    buffered_attrs: Vec<(String, serde_value::Value)>,
+    properties: &IndexMap<String, SerdeProperty>,
+    expected_mandatory_properties: usize,
+    rel_params_operator_id: Option<SerdeOperatorId>,
+    env: &Env,
+) -> Result<(BTreeMap<PropertyId, Attribute>, Value), A::Error> {
+    let mut attributes = BTreeMap::new();
+    let mut rel_params = Value::unit();
+
+    let mut n_mandatory_properties = 0;
+
+    // first parse buffered attributes, if any
+    for (serde_key, serde_value) in buffered_attrs {
+        match PropertySet::new(properties, rel_params_operator_id).visit_str(&serde_key)? {
+            MapKey::RelParams(operator_id) => {
+                let Attribute { value, .. } = env
+                    .new_serde_processor(operator_id)
+                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+
+                rel_params = value;
+            }
+            MapKey::Property(serde_property) => {
+                let Attribute { rel_params, value } = env
+                    .new_serde_processor_parameterized(
+                        serde_property.value_operator_id,
+                        serde_property.rel_params_operator_id,
+                    )
+                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+
+                if !serde_property.optional {
+                    n_mandatory_properties += 1;
+                }
+
+                attributes.insert(serde_property.property_id, Attribute { rel_params, value });
+            }
+        }
+    }
+
+    // parse rest of map
+    while let Some(map_key) =
+        map.next_key_seed(PropertySet::new(properties, rel_params_operator_id))?
+    {
+        match map_key {
+            MapKey::RelParams(operator_id) => {
+                let Attribute { value, .. } =
+                    map.next_value_seed(env.new_serde_processor(operator_id))?;
+
+                rel_params = value;
+            }
+            MapKey::Property(serde_property) => {
+                let attribute = map.next_value_seed(env.new_serde_processor_parameterized(
+                    serde_property.value_operator_id,
+                    serde_property.rel_params_operator_id,
+                ))?;
+
+                if !serde_property.optional {
+                    n_mandatory_properties += 1;
+                }
+
+                attributes.insert(serde_property.property_id, attribute);
+            }
+        }
+    }
+
+    if n_mandatory_properties < expected_mandatory_properties
+        || (rel_params.is_unit() != rel_params_operator_id.is_none())
+    {
+        debug!(
+            "Missing attributes. Rel params match: {}, {}",
+            rel_params.is_unit(),
+            rel_params_operator_id.is_none()
+        );
+        for attr in &attributes {
+            debug!("    attr {:?}", attr.0);
+        }
+        for prop in properties {
+            debug!(
+                "    prop {:?} '{}' optional={}",
+                prop.1.property_id, prop.0, prop.1.optional
+            );
+        }
+
+        let mut items: Vec<DoubleQuote<String>> = properties
+            .iter()
+            .filter(|(_, property)| {
+                !property.optional && !attributes.contains_key(&property.property_id)
+            })
+            .map(|(key, _)| DoubleQuote(key.clone()))
+            .collect();
+
+        if rel_params_operator_id.is_some() && rel_params.type_def_id == DefId::unit() {
+            items.push(DoubleQuote(EDGE_PROPERTY.into()));
+        }
+
+        debug!("    items len: {}", items.len());
+
+        let missing_keys = Missing {
+            items,
+            logic_op: LogicOp::And,
+        };
+
+        return Err(Error::custom(format!(
+            "missing properties, expected {missing_keys}"
+        )));
+    }
+
+    Ok((attributes, rel_params))
 }
 
 impl<'s, 'de> DeserializeSeed<'de> for PropertySet<'s> {

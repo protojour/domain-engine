@@ -134,7 +134,7 @@ impl<'e> Debug for SerdeProcessor<'e> {
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
             .field("operator", self.value_operator)
-            .field("edge_operator_id", &self.rel_params_operator_id)
+            .field("rel_params_operator_id", &self.rel_params_operator_id)
             .finish()
     }
 }

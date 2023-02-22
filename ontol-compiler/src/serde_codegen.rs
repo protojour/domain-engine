@@ -383,6 +383,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             _ => {
                 if let Some(id_relation_id) = &properties.id {
+                    let (relationship, _) = self
+                        .get_subject_property_meta(type_def_id, *id_relation_id)
+                        .expect("Problem getting subject property meta");
+
                     // Create a union between { '_id' } and the map properties itself
                     let map_properties_operator_id = self
                         .get_serde_operator_id(type_def_id, SerdeModifier::PropertyMap)
@@ -401,7 +405,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                         *id_relation_id,
                                         "_id".into(),
                                     ),
-                                    result_type: type_def_id,
+                                    result_type: relationship.object.0,
                                 },
                                 operator_id: id_operator_id,
                             },

@@ -412,12 +412,17 @@ pub struct MapMatcher<'e> {
     env: &'e Env,
 }
 
+pub enum MapMatch<'e> {
+    MapType(&'e MapType),
+    IdType,
+}
+
 impl<'e> MapMatcher<'e> {
     pub fn match_attribute(
         &self,
         property: &str,
         value: &serde_value::Value,
-    ) -> Result<&'e MapType, MapMatchError> {
+    ) -> Result<MapMatch<'e>, MapMatchError> {
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
                 (Discriminant::IsMap, _) => true,
@@ -440,14 +445,14 @@ impl<'e> MapMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id)
                     .value_operator
                 {
-                    SerdeOperator::MapType(map_type) => map_type,
+                    SerdeOperator::MapType(map_type) => MapMatch::MapType(map_type),
                     _ => panic!("Matched discriminator is not a map type"),
                 }
             })
             .ok_or(MapMatchError::Indecisive)
     }
 
-    pub fn match_fallback(&self) -> Result<&'e MapType, MapMatchError> {
+    pub fn match_fallback(&self) -> Result<MapMatch<'e>, MapMatchError> {
         for discriminator in &self.value_union_type.discriminators {
             if matches!(
                 discriminator.discriminator.discriminant,
@@ -458,7 +463,7 @@ impl<'e> MapMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id)
                     .value_operator
                 {
-                    SerdeOperator::MapType(map_type) => return Ok(map_type),
+                    SerdeOperator::MapType(map_type) => return Ok(MapMatch::MapType(map_type)),
                     _ => panic!("Matched discriminator is not a map type"),
                 }
             }
