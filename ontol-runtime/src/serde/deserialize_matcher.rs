@@ -414,7 +414,7 @@ pub struct MapMatcher<'e> {
 
 pub enum MapMatch<'e> {
     MapType(&'e MapType),
-    IdType,
+    IdType(SerdeOperatorId),
 }
 
 impl<'e> MapMatcher<'e> {

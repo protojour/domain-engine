@@ -22,12 +22,19 @@ use super::{
         MapMatch, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher, UnitMatcher,
         ValueMatcher,
     },
-    MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty,
+    MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty, ID_PROPERTY,
 };
 
 enum MapKey {
     Property(SerdeProperty),
     RelParams(SerdeOperatorId),
+    Id(SerdeOperatorId),
+}
+
+struct DeserializedMap {
+    attributes: BTreeMap<PropertyId, Attribute>,
+    id: Option<Value>,
+    rel_params: Value,
 }
 
 pub(super) struct MatcherVisitor<'e, M> {
@@ -43,19 +50,25 @@ struct MapTypeVisitor<'e> {
 }
 
 #[derive(Clone, Copy)]
+struct SpecialOperatorIds {
+    rel_params: Option<SerdeOperatorId>,
+    id: Option<SerdeOperatorId>,
+}
+
+#[derive(Clone, Copy)]
 struct PropertySet<'s> {
     properties: &'s IndexMap<String, SerdeProperty>,
-    rel_params_operator_id: Option<SerdeOperatorId>,
+    special_operator_ids: SpecialOperatorIds,
 }
 
 impl<'s> PropertySet<'s> {
     fn new(
         properties: &'s IndexMap<String, SerdeProperty>,
-        rel_params_operator_id: Option<SerdeOperatorId>,
+        special_operator_ids: SpecialOperatorIds,
     ) -> Self {
         Self {
             properties,
-            rel_params_operator_id,
+            special_operator_ids,
         }
     }
 }
@@ -309,16 +322,26 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                 env: self.env,
             }
             .visit_map(map),
-            MapMatch::IdType => {
-                let (attributes, rel_params) = deserialize_map(
+            MapMatch::IdType(serde_operator_id) => {
+                let deserialized_map = deserialize_map(
                     map,
                     buffered_attrs,
                     &IndexMap::default(),
                     1,
-                    map_matcher.edge_operator_id,
+                    SpecialOperatorIds {
+                        rel_params: map_matcher.edge_operator_id,
+                        id: Some(serde_operator_id),
+                    },
                     self.env,
                 )?;
-                todo!();
+                let id = deserialized_map
+                    .id
+                    .ok_or_else(|| Error::custom(format!("missing _id attribute")))?;
+
+                Ok(Attribute {
+                    value: id,
+                    rel_params: deserialized_map.rel_params,
+                })
             }
         }
     }
@@ -333,20 +356,23 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.map_type.type_def_id;
-        let (attributes, rel_params) = deserialize_map(
+        let deserialized_map = deserialize_map(
             map,
             self.buffered_attrs,
             &self.map_type.properties,
             self.map_type.n_mandatory_properties,
-            self.rel_params_operator_id,
+            SpecialOperatorIds {
+                rel_params: self.rel_params_operator_id,
+                id: None,
+            },
             self.env,
         )?;
         Ok(Attribute {
             value: Value {
-                data: Data::Map(attributes),
+                data: Data::Map(deserialized_map.attributes),
                 type_def_id,
             },
-            rel_params,
+            rel_params: deserialized_map.rel_params,
         })
     }
 }
@@ -356,23 +382,30 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
     expected_mandatory_properties: usize,
-    rel_params_operator_id: Option<SerdeOperatorId>,
+    special_operator_ids: SpecialOperatorIds,
     env: &Env,
-) -> Result<(BTreeMap<PropertyId, Attribute>, Value), A::Error> {
+) -> Result<DeserializedMap, A::Error> {
     let mut attributes = BTreeMap::new();
     let mut rel_params = Value::unit();
+    let mut id = None;
 
     let mut n_mandatory_properties = 0;
 
     // first parse buffered attributes, if any
     for (serde_key, serde_value) in buffered_attrs {
-        match PropertySet::new(properties, rel_params_operator_id).visit_str(&serde_key)? {
+        match PropertySet::new(properties, special_operator_ids).visit_str(&serde_key)? {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } = env
                     .new_serde_processor(operator_id)
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
+            }
+            MapKey::Id(operator_id) => {
+                let Attribute { value, .. } = env
+                    .new_serde_processor(operator_id)
+                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+                id = Some(value);
             }
             MapKey::Property(serde_property) => {
                 let Attribute { rel_params, value } = env
@@ -393,7 +426,7 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
 
     // parse rest of map
     while let Some(map_key) =
-        map.next_key_seed(PropertySet::new(properties, rel_params_operator_id))?
+        map.next_key_seed(PropertySet::new(properties, special_operator_ids))?
     {
         match map_key {
             MapKey::RelParams(operator_id) => {
@@ -401,6 +434,12 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
                     map.next_value_seed(env.new_serde_processor(operator_id))?;
 
                 rel_params = value;
+            }
+            MapKey::Id(operator_id) => {
+                let Attribute { value, .. } =
+                    map.next_value_seed(env.new_serde_processor(operator_id))?;
+
+                id = Some(value);
             }
             MapKey::Property(serde_property) => {
                 let attribute = map.next_value_seed(env.new_serde_processor_parameterized(
@@ -418,12 +457,12 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
     }
 
     if n_mandatory_properties < expected_mandatory_properties
-        || (rel_params.is_unit() != rel_params_operator_id.is_none())
+        || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
     {
         debug!(
             "Missing attributes. Rel params match: {}, {}",
             rel_params.is_unit(),
-            rel_params_operator_id.is_none()
+            special_operator_ids.rel_params.is_none()
         );
         for attr in &attributes {
             debug!("    attr {:?}", attr.0);
@@ -443,7 +482,7 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
 
-        if rel_params_operator_id.is_some() && rel_params.type_def_id == DefId::unit() {
+        if special_operator_ids.rel_params.is_some() && rel_params.type_def_id == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
         }
 
@@ -459,7 +498,11 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
         )));
     }
 
-    Ok((attributes, rel_params))
+    Ok(DeserializedMap {
+        attributes,
+        id,
+        rel_params,
+    })
 }
 
 impl<'s, 'de> DeserializeSeed<'de> for PropertySet<'s> {
@@ -480,10 +523,17 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         match v {
             EDGE_PROPERTY => {
-                if let Some(operator_id) = self.rel_params_operator_id {
+                if let Some(operator_id) = self.special_operator_ids.rel_params {
                     Ok(MapKey::RelParams(operator_id))
                 } else {
                     Err(Error::custom("`_edge` property not accepted here"))
+                }
+            }
+            ID_PROPERTY => {
+                if let Some(operator_id) = self.special_operator_ids.id {
+                    Ok(MapKey::Id(operator_id))
+                } else {
+                    Err(Error::custom("`_id` property not accepted here"))
                 }
             }
             _ => {

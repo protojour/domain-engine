@@ -18,6 +18,7 @@ mod deserialize_matcher;
 mod serialize;
 
 const EDGE_PROPERTY: &str = "_edge";
+const ID_PROPERTY: &str = "_id";
 
 /// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
