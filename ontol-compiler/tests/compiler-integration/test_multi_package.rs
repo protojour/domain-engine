@@ -51,3 +51,53 @@ fn load_package() {
         );
     });
 }
+
+#[test]
+fn dependency_dag() {
+    TestPackages::with_sources([
+        (SourceName("a"), "type a { rel . { int } }"),
+        (
+            SourceName("b"),
+            "
+            use 'a' as a
+            type b {
+                rel { 'a' } a.a
+            }
+            ",
+        ),
+        (
+            SourceName("c"),
+            "
+            use 'a' as a
+            type c {
+                rel { 'a' } a.a
+            }
+            ",
+        ),
+        (
+            SourceName::root(),
+            "
+            use 'b' as b
+            use 'c' as c
+
+            type foobar {
+                rel { 'b' } b.b
+                rel { 'c' } c.c
+            }
+            ",
+        ),
+    ])
+    .compile_ok(|env| {
+        // four user domains, plus core:
+        assert_eq!(5, env.domains.len());
+
+        let bar = TypeBinding::new(env, "foobar");
+        assert_json_io_matches!(
+            bar,
+            json!({
+                "b": { "a": 42 },
+                "c": { "a": 43 }
+            })
+        );
+    });
+}

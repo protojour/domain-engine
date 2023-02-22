@@ -41,7 +41,10 @@ impl<'m> Compiler<'m> {
         let mut root_defs = vec![];
 
         for parsed_package in topology.packages {
-            debug!("lower package {:?}", parsed_package.package_id);
+            debug!(
+                "lower package {:?}: {:?}",
+                parsed_package.package_id, parsed_package.reference
+            );
             let source_id = self
                 .sources
                 .source_id_for_package(parsed_package.package_id)
