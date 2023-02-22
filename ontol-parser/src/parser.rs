@@ -301,7 +301,7 @@ fn keyword(token: Token) -> impl AstParser<Span> {
 
 fn path() -> impl AstParser<Path> {
     any_sym()
-        .map(|ident| Path::Ident(ident))
+        .map(Path::Ident)
         .then(dot().ignore_then(any_sym()).repeated())
         .foldl(|prev, next| match prev {
             Path::Ident(ident) => Path::Path(vec![ident, next]),
