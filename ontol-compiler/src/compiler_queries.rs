@@ -6,6 +6,7 @@ use crate::{
     def::{Defs, Relation, Relationship},
     relation::{Relations, RelationshipId},
     types::{DefTypes, TypeRef},
+    SpannedBorrow,
 };
 
 fn get<T: AsRef<U>, U>(owner: &T) -> &U {
@@ -45,23 +46,28 @@ where
     }
 }
 
+pub type RelationshipMeta<'m> = (
+    SpannedBorrow<'m, Relationship>,
+    SpannedBorrow<'m, Relation<'m>>,
+);
+
 pub trait GetPropertyMeta<'m> {
     fn get_relationship_meta(
         &self,
         relationship_id: RelationshipId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
+    ) -> Result<RelationshipMeta<'m>, ()>;
 
     fn get_subject_property_meta(
         &self,
         subject_id: DefId,
         relation_id: RelationId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
+    ) -> Result<RelationshipMeta<'m>, ()>;
 
     fn get_object_property_meta(
         &self,
         object_id: DefId,
         relation_id: RelationId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()>;
+    ) -> Result<RelationshipMeta<'m>, ()>;
 }
 
 impl<'m, T> GetPropertyMeta<'m> for T
@@ -71,7 +77,7 @@ where
     fn get_relationship_meta(
         &self,
         relationship_id: RelationshipId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+    ) -> Result<RelationshipMeta<'m>, ()> {
         get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
     }
 
@@ -79,7 +85,7 @@ where
         &self,
         subject_id: DefId,
         relation_id: RelationId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+    ) -> Result<RelationshipMeta<'m>, ()> {
         let relationship_id = get::<_, Relations>(self)
             .relationships_by_subject
             .get(&(subject_id, relation_id))
@@ -93,7 +99,7 @@ where
         &self,
         object_id: DefId,
         relation_id: RelationId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
+    ) -> Result<RelationshipMeta<'m>, ()> {
         let relationship_id = get::<_, Relations>(self)
             .relationships_by_object
             .get(&(object_id, relation_id))

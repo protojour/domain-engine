@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    ops::{Deref, Range},
+    sync::Arc,
+};
 
 use ontol_runtime::PackageId;
 
@@ -41,6 +46,37 @@ impl SourceSpan {
             source_id: SourceId(0),
             start: 0,
             end: 0,
+        }
+    }
+}
+
+pub struct SpannedBorrow<'m, T> {
+    pub value: &'m T,
+    pub span: &'m SourceSpan,
+}
+
+impl<'m, T> Deref for SpannedBorrow<'m, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.value
+    }
+}
+
+impl<'m, T: Debug> Debug for SpannedBorrow<'m, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<'m, T> SpannedBorrow<'m, T> {
+    pub fn filter<U>(self, f: impl Fn(&'m T) -> Option<&'m U>) -> Option<SpannedBorrow<'m, U>> {
+        match f(self.value) {
+            Some(u) => Some(SpannedBorrow {
+                value: u,
+                span: self.span,
+            }),
+            None => None,
         }
     }
 }

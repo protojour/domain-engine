@@ -19,8 +19,10 @@ fn test_entity_experiment_etc() {
     entity record
     rel record { 'name' } string
 
-    entity instrument
-    rel instrument { 'name' } string
+    entity instrument {
+        rel { id } string
+        rel { 'name' } string
+    }
 
     type plays
     rel plays { 'how_much' } string
@@ -74,10 +76,11 @@ fn test_entity_experiment_etc() {
 #[test]
 fn test_entity_self_relationship() {
     "
-    entity node
-
-    rel node { 'name' } string
-    rel node { 'children'* | 'parent'? } node
+    entity node {
+        rel { id } string
+        rel { 'name' } string
+        rel { 'children'* | 'parent'? } node
+    }
     "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");
@@ -121,8 +124,10 @@ fn test_entity_self_relationship() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    entity node
-    rel node { 'children'* | 'parent' } node
+    entity node {
+        rel { id } string
+        rel { 'children'* | 'parent' } node
+    }
     "
     .compile_ok(|env| {
         let node = TypeBinding::new(env, "node");

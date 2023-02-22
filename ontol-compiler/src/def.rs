@@ -6,6 +6,7 @@ use smartstring::alias::String;
 
 use crate::{
     compiler::Compiler,
+    compiler_queries::RelationshipMeta,
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
@@ -16,6 +17,7 @@ use crate::{
     source::SourceSpan,
     strings::Strings,
     types::{Type, TypeRef},
+    SpannedBorrow,
 };
 use ontol_parser::Span;
 
@@ -289,16 +291,35 @@ impl<'m> Defs<'m> {
         self.map.get(&def_id).map(|def| &def.kind)
     }
 
+    pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'m, DefKind<'m>>> {
+        self.map.get(&def_id).map(|def| SpannedBorrow {
+            value: &def.kind,
+            span: &def.span,
+        })
+    }
+
     pub fn get_relationship_defs(
         &self,
         relationship_id: RelationshipId,
-    ) -> Result<(&'m Relationship, &'m Relation<'m>), ()> {
-        let DefKind::Relationship(relationship) = self.get_def_kind(relationship_id.0).ok_or(())? else {
-            return Err(());
-        };
-        let DefKind::Relation(relation) = self.get_def_kind(relationship.relation_id.0).ok_or(())? else {
-            return Err(());
-        };
+    ) -> Result<RelationshipMeta<'m>, ()> {
+        let relationship = self
+            .get_spanned_def_kind(relationship_id.0)
+            .ok_or(())?
+            .filter(|kind| match kind {
+                DefKind::Relationship(relationship) => Some(relationship),
+                _ => None,
+            })
+            .ok_or(())?;
+
+        let relation = self
+            .get_spanned_def_kind(relationship.relation_id.0)
+            .ok_or(())?
+            .filter(|kind| match kind {
+                DefKind::Relation(relation) => Some(relation),
+                _ => None,
+            })
+            .ok_or(())?;
+
         Ok((relationship, relation))
     }
 

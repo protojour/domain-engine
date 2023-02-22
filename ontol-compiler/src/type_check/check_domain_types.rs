@@ -3,6 +3,7 @@ use ontol_runtime::{DefId, Role};
 use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Def, DefKind},
+    error::CompileError,
     relation::MapProperties,
 };
 
@@ -21,27 +22,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_type(def_id)?;
         let is_entity = properties.id.is_some();
 
+        let mut errors = vec![];
+
         if let MapProperties::Map(map) = &properties.map {
             for (property_id, _) in map {
                 match property_id.role {
                     Role::Subject => {
-                        self.get_subject_property_meta(def_id, property_id.relation_id)
-                            .unwrap();
+                        // self.get_subject_property_meta(def_id, property_id.relation_id)
+                        //     .unwrap();
                     }
                     Role::Object => {
-                        let (_, _) = self
-                            .get_object_property_meta(def_id, property_id.relation_id)
-                            .unwrap();
-
                         if !is_entity {
-                            // let relationship = self.defs.map.get()
+                            let (relationship, _) = self
+                                .get_object_property_meta(def_id, property_id.relation_id)
+                                .unwrap();
 
-                            // self.error(CompileError::NonEntityInReverseRelationship, span);
-                            panic!("TODO: Report error");
+                            errors.push((
+                                CompileError::NonEntityInReverseRelationship,
+                                *relationship.span,
+                            ));
                         }
                     }
                 }
             }
+        }
+
+        for (compile_error, span) in errors {
+            self.error(compile_error, &span);
         }
 
         None

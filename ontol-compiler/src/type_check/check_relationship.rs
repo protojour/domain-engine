@@ -250,7 +250,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     object_ty,
                     &mut object_properties.map,
                 ) {
-                    (Some(_), Type::DomainEntity(_), MapProperties::Empty) => {
+                    (Some(_), Type::Domain(_) | Type::DomainEntity(_), MapProperties::Empty) => {
                         object_properties.map = MapProperties::Map(
                             [(
                                 PropertyId::object(relation.0),
@@ -259,7 +259,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .into(),
                         );
                     }
-                    (Some(_), Type::DomainEntity(_), MapProperties::Map(map)) => {
+                    (Some(_), Type::Domain(_) | Type::DomainEntity(_), MapProperties::Map(map)) => {
                         if map
                             .insert(
                                 PropertyId::object(relation.0),
@@ -272,6 +272,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     }
                     (Some(_), _, _) => {
+                        // non-domain type in object relationship
                         return self.error(CompileError::NonEntityInReverseRelationship, span);
                     }
                     (None, _, _) => {

@@ -312,23 +312,25 @@ fn create_map_operator(
                             let (relationship, relation) = generator
                                 .get_subject_property_meta(type_def_id, property_id.relation_id)
                                 .expect("Problem getting subject property meta");
+                            let object = relationship.object;
 
                             let prop_key = relation
                                 .subject_prop(generator.defs)
                                 .expect("Subject property has no name");
 
-                            (relationship, prop_key, relationship.object.0)
+                            (relationship, prop_key, object.0)
                         }
                         Role::Object => {
                             let (relationship, relation) = generator
                                 .get_object_property_meta(type_def_id, property_id.relation_id)
                                 .expect("Problem getting object property meta");
+                            let subject = relationship.subject;
 
                             let prop_key = relation
                                 .object_prop(generator.defs)
                                 .expect("Object property has no name");
 
-                            (relationship, prop_key, relationship.subject.0)
+                            (relationship, prop_key, subject.0)
                         }
                     };
 
