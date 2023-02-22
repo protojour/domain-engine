@@ -1,6 +1,8 @@
+use std::collections::{BTreeMap, HashMap};
+
 use ontol_compiler::{
     error::{CompileError, UnifiedCompileError},
-    SourceCodeRegistry, SpannedCompileError, Src,
+    SourceCodeRegistry, SourceId, Sources, SpannedCompileError, Src,
 };
 use ontol_runtime::{
     env::Env,
@@ -112,36 +114,43 @@ pub struct AnnotatedCompileError {
 }
 
 pub fn diff_errors(
-    source: &str,
-    src: Src,
     errors: UnifiedCompileError,
+    sources: &Sources,
     source_code_registry: &SourceCodeRegistry,
-    error_pattern: &str,
 ) -> Vec<AnnotatedCompileError> {
-    let space_error_pattern = format!(" {error_pattern}");
+    let error_pattern = "// ERROR";
+    let space_error_pattern = " // ERROR";
 
-    let mut builder = source
-        .lines()
-        .fold(DiagnosticBuilder::default(), |mut builder, line| {
-            let orig_stripped = if let Some(byte_index) = line.find(&space_error_pattern) {
-                &line[..byte_index]
-            } else {
-                line
-            };
+    let mut builders: BTreeMap<SourceId, DiagnosticBuilder> = source_code_registry
+        .registry
+        .iter()
+        .map(|(source_id, text)| {
+            let builder = text
+                .lines()
+                .fold(DiagnosticBuilder::default(), |mut builder, line| {
+                    let orig_stripped = if let Some(byte_index) = line.find(&space_error_pattern) {
+                        &line[..byte_index]
+                    } else {
+                        line
+                    };
 
-            builder.lines.push(DiagnosticsLine {
-                start: builder.cursor,
-                orig_stripped: orig_stripped.to_string(),
-                errors: vec![],
-            });
-            builder.cursor += line.len() + 1;
-            builder
-        });
+                    builder.lines.push(DiagnosticsLine {
+                        start: builder.cursor,
+                        orig_stripped: orig_stripped.to_string(),
+                        errors: vec![],
+                    });
+                    builder.cursor += line.len() + 1;
+                    builder
+                });
+
+            (*source_id, builder)
+        })
+        .collect();
 
     for spanned_error in errors.errors {
-        if spanned_error.span.source_id != src.id {
-            panic!("Error not from tested script: {spanned_error:?}");
-        }
+        let source_id = spanned_error.span.source_id;
+        let mut builder = builders.get_mut(&source_id).unwrap();
+
         let byte_pos = spanned_error.span.start as usize;
 
         let diagnostics_line = builder
@@ -157,44 +166,63 @@ pub fn diff_errors(
         }
     }
 
-    let annotated_script = builder
-        .lines
-        .iter()
-        .map(|line| {
-            let original = &line.orig_stripped;
-            if line.errors.is_empty() {
-                original.to_string()
-            } else {
+    let mut original = String::new();
+    let mut annotated = String::new();
+
+    for (source_id, builder) in &builders {
+        let source = sources.get_source(*source_id).unwrap();
+        let source_text = source_code_registry.registry.get(&source_id).unwrap();
+
+        let source_header = format!("\n// source '{}':\n", source.name);
+
+        original.push_str(&source_header);
+        original += source_text;
+
+        annotated.push_str(&source_header);
+
+        let mut line_iter = builder.lines.iter().peekable();
+        while let Some(line) = line_iter.next() {
+            let orig_stripped = &line.orig_stripped;
+            annotated.push_str(orig_stripped);
+
+            if !line.errors.is_empty() {
                 let joined_errors = line
                     .errors
                     .iter()
                     .map(|spanned_error| format!("{} {}", error_pattern, spanned_error.error))
                     .collect::<Vec<_>>()
                     .join("");
-                format!("{original} {joined_errors}")
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
 
-    pretty_assertions::assert_eq!(source, &annotated_script);
+                annotated.push_str(" ");
+                annotated.push_str(&joined_errors);
+            }
+
+            if line_iter.peek().is_some() {
+                annotated.push_str("\n");
+            }
+        }
+    }
+
+    pretty_assertions::assert_eq!(original, annotated);
 
     let mut annotated_errors = vec![];
 
-    for line in builder.lines {
-        for spanned_error in line.errors {
-            let text = source_code_registry
-                .registry
-                .get(&src.id)
-                .expect("no source text available");
+    for (source_id, builder) in builders {
+        for line in builder.lines {
+            for spanned_error in line.errors {
+                let text = source_code_registry
+                    .registry
+                    .get(&source_id)
+                    .expect("no source text available");
 
-            let span_text =
-                &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
+                let span_text =
+                    &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
 
-            annotated_errors.push(AnnotatedCompileError {
-                compile_error: spanned_error.error,
-                span_text: span_text.to_string(),
-            })
+                annotated_errors.push(AnnotatedCompileError {
+                    compile_error: spanned_error.error,
+                    span_text: span_text.to_string(),
+                })
+            }
         }
     }
 

@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
 
 use ontol_runtime::PackageId;
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SourceId(pub u32);
 
 #[derive(Clone, Debug)]

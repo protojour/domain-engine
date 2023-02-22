@@ -1,4 +1,4 @@
-use crate::TestCompile;
+use crate::{SourceName, TestCompile, TestPackages};
 use pretty_assertions::assert_eq;
 use test_log::test;
 
@@ -470,5 +470,19 @@ fn complains_about_ambiguous_pattern_based_unions() {
     rel . { bar } union
     rel . { barbar } union
     "
+    .compile_fail();
+}
+
+#[test]
+fn compile_error_in_dependency() {
+    TestPackages::with_sources([
+        (
+            SourceName("fail"),
+            "
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `entity`, `rel`, `eq`
+            ",
+        ),
+        (SourceName::root(), "use 'fail' as f"),
+    ])
     .compile_fail();
 }

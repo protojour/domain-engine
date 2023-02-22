@@ -24,7 +24,7 @@ mod util;
 /// BUG: The generated package id is really dynamic
 const TEST_PKG: PackageId = PackageId(1);
 
-const ROOT_SRC_NAME: &'static str = "root";
+const ROOT_SRC_NAME: &'static str = "test_root.ont";
 
 macro_rules! assert_error_msg {
     ($e:expr, $msg:expr) => {
@@ -94,7 +94,6 @@ impl SourceName {
 
 struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
-    root_package_id: Option<PackageId>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
 }
@@ -112,7 +111,6 @@ impl TestPackages {
                 .into_iter()
                 .map(|(name, text)| (name.0, text))
                 .collect(),
-            root_package_id: None,
             sources: Default::default(),
             source_code_registry: Default::default(),
         }
@@ -128,10 +126,7 @@ impl TestPackages {
 
                     for request in requests {
                         let source_name = match &request.package_source {
-                            PackageSource::Root => {
-                                self.root_package_id = Some(request.package_id);
-                                ROOT_SRC_NAME
-                            }
+                            PackageSource::Root => ROOT_SRC_NAME,
                             PackageSource::Named(source_name) => source_name.as_str(),
                         };
 
@@ -140,7 +135,7 @@ impl TestPackages {
                                 &request.package_source,
                                 ParsedPackage::parse(
                                     request.package_id,
-                                    ROOT_SRC_NAME,
+                                    source_name,
                                     source_text,
                                     &mut self.sources,
                                     &mut self.source_code_registry,
@@ -154,36 +149,8 @@ impl TestPackages {
         }
     }
 
-    fn diff_errors(&self, error: UnifiedCompileError) -> Vec<AnnotatedCompileError> {
-        let root_source_text = self.sources_by_name.get(ROOT_SRC_NAME).unwrap();
-        let root_package_id = self.root_package_id.unwrap();
-        let src = self
-            .sources
-            .find_source_by_package_id(root_package_id)
-            .unwrap();
-
-        util::diff_errors(
-            root_source_text,
-            src.clone(),
-            error,
-            &self.source_code_registry,
-            "// ERROR",
-        )
-    }
-
-    fn expect_error(
-        &self,
-        error: UnifiedCompileError,
-        validator: impl Fn(Vec<AnnotatedCompileError>),
-    ) {
-        let annotated_errors = self.diff_errors(error);
-        validator(annotated_errors);
-    }
-
     fn compile_topology(&mut self) -> Result<Env, UnifiedCompileError> {
         let package_topology = self.load_topology()?;
-        let root_package_id = package_topology.root_package_id;
-
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, self.sources.clone()).with_core();
 
@@ -203,7 +170,7 @@ impl TestCompile for TestPackages {
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
-                self.diff_errors(error);
+                util::diff_errors(error, &self.sources, &self.source_code_registry);
 
                 // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
@@ -217,7 +184,8 @@ impl TestCompile for TestPackages {
                 panic!("Scripts did not fail to compile");
             }
             Err(error) => {
-                let annotated_errors = self.diff_errors(error);
+                let annotated_errors =
+                    util::diff_errors(error, &self.sources, &self.source_code_registry);
                 validator(annotated_errors);
             }
         }
