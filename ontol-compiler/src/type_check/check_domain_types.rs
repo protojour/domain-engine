@@ -78,9 +78,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         None
     }
 
-    fn do_corrections(&mut self, def_id: DefId, errors: Vec<Correction>) {
-        for domain_type_error in errors {
-            match domain_type_error {
+    fn do_corrections(&mut self, def_id: DefId, corrections: Vec<Correction>) {
+        for correction in corrections {
+            match correction {
                 Correction::ReportNonEntityInObjectRelationship(relation_id) => {
                     let (relationship, _) =
                         self.get_object_property_meta(def_id, relation_id).unwrap();
