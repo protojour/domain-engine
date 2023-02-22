@@ -376,7 +376,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             .any(|discriminator| {
                 matches!(
                     &discriminator.discriminator.discriminant,
-                    Discriminant::HasProperty(_, _) | Discriminant::HasStringAttribute(_, _, _)
+                    Discriminant::IsMap
+                        | Discriminant::HasProperty(_, _)
+                        | Discriminant::HasStringAttribute(_, _, _)
                 )
             })
         {
@@ -418,6 +420,7 @@ impl<'e> MapMatcher<'e> {
     ) -> Result<&'e MapType, MapMatchError> {
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
+                (Discriminant::IsMap, _) => true,
                 (
                     Discriminant::HasStringAttribute(_, match_name, match_value),
                     serde_value::Value::String(value),
@@ -442,6 +445,26 @@ impl<'e> MapMatcher<'e> {
                 }
             })
             .ok_or(MapMatchError::Indecisive)
+    }
+
+    pub fn match_fallback(&self) -> Result<&'e MapType, MapMatchError> {
+        for discriminator in &self.value_union_type.discriminators {
+            if matches!(
+                discriminator.discriminator.discriminant,
+                Discriminant::IsMap
+            ) {
+                match self
+                    .env
+                    .new_serde_processor(discriminator.operator_id)
+                    .value_operator
+                {
+                    SerdeOperator::MapType(map_type) => return Ok(map_type),
+                    _ => panic!("Matched discriminator is not a map type"),
+                }
+            }
+        }
+
+        Err(MapMatchError::Indecisive)
     }
 }
 

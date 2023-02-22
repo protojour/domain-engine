@@ -6,7 +6,7 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     env::Env,
-    serde::SerdeOperatorId,
+    serde::{SerdeModifier, SerdeOperatorId},
     value::{Attribute, Data, Value},
     DefId,
 };
@@ -88,7 +88,10 @@ impl<'e> TypeBinding<'e> {
 }
 
 pub fn serialize_json(env: &Env, value: &Value) -> serde_json::Value {
-    let serde_operator_id = env.serde_operators_per_def.get(&value.type_def_id).unwrap();
+    let serde_operator_id = env
+        .serde_operators_per_def
+        .get(&(value.type_def_id, SerdeModifier::Identity))
+        .unwrap();
     let mut buf: Vec<u8> = vec![];
     env.new_serde_processor(*serde_operator_id)
         .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))

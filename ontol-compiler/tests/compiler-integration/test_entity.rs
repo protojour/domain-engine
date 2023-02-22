@@ -11,6 +11,9 @@ fn test_entity_experiment_etc() {
     type artist-id {
         rel '' { 'artist/' } { uuid }
     }
+    type instrument-id {
+        rel '' { 'instrument/' } { uuid }
+    }
 
     type artist
     rel artist { 'name' } string
@@ -20,7 +23,7 @@ fn test_entity_experiment_etc() {
     rel record { 'name' } string
 
     type instrument {
-        rel { id } string
+        rel { id } instrument-id
         rel { 'name' } string
     }
 
@@ -69,6 +72,21 @@ fn test_entity_experiment_etc() {
                 "plays": [{ "name": "piano" }]
             })),
             r#"missing properties, expected "_edge" at line 1 column 50"#
+        );
+
+        assert_json_io_matches!(
+            artist,
+            json!({
+                "name": "Jimi Hendrix",
+                "plays": [
+                    {
+                        "_id": "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                        "_edge": {
+                            "how_much": "all the time"
+                        }
+                    }
+                ]
+            })
         );
     });
 }

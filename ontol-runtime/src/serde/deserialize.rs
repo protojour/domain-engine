@@ -271,14 +271,20 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         let mut buffered_attrs: Vec<(String, serde_value::Value)> = Default::default();
 
         let map_type = loop {
-            let property = map.next_key::<String>()?.ok_or_else(|| {
-                // key/property was None, i.e. the whole map was read
-                // without being able to recognize the type
-                Error::custom(format!(
-                    "invalid map value, expected {}",
-                    ExpectingMatching(&self.matcher)
-                ))
-            })?;
+            let property = match map.next_key::<String>()? {
+                Some(property) => property,
+                None => match map_matcher.match_fallback() {
+                    Ok(map_type) => {
+                        break map_type;
+                    }
+                    Err(_) => {
+                        return Err(Error::custom(format!(
+                            "invalid map value, expected {}",
+                            ExpectingMatching(&self.matcher)
+                        )));
+                    }
+                },
+            };
 
             let value: serde_value::Value = map.next_value()?;
 

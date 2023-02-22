@@ -156,8 +156,8 @@ impl<'e> SerdeProcessor<'e> {
                         continue;
                     } else {
                         panic!(
-                            "While serializing `{}`, property `{}` was not found",
-                            map_type.typename, name
+                            "While serializing value {:?} with `{}`, property `{}` was not found",
+                            value, map_type.typename, name
                         )
                     }
                 }

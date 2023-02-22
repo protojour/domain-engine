@@ -44,6 +44,14 @@ pub struct SerdeProcessor<'e> {
 #[debug_single_tuple_inline]
 pub struct SerdeOperatorId(pub u32);
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum SerdeModifier {
+    Identity,
+    Array,
+    PropertyMap,
+    IdMap,
+}
+
 #[derive(Debug)]
 pub enum SerdeOperator {
     Unit,

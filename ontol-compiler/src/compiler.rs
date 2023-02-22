@@ -19,6 +19,7 @@ use crate::{
 };
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
+    serde::SerdeModifier,
     string_types::StringLikeType,
     PackageId,
 };
@@ -85,7 +86,8 @@ impl<'m> Compiler<'m> {
                     type_name,
                     TypeInfo {
                         def_id: type_def_id,
-                        serde_operator_id: serde_generator.get_serde_operator_id(type_def_id),
+                        serde_operator_id: serde_generator
+                            .get_serde_operator_id(type_def_id, SerdeModifier::Identity),
                     },
                 );
             }
