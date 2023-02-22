@@ -306,7 +306,7 @@ fn path() -> impl AstParser<Path> {
     }
 
     spanned(any_sym())
-        .map(|spanned_sym| SpannedPath::Ident(spanned_sym))
+        .map(SpannedPath::Ident)
         .then(dot().ignore_then(spanned(any_sym())).repeated())
         .foldl(|prev, next| match prev {
             SpannedPath::Ident(ident) => SpannedPath::Path(vec![ident, next]),
