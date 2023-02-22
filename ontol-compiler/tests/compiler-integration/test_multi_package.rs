@@ -55,37 +55,37 @@ fn load_package() {
 #[test]
 fn dependency_dag() {
     TestPackages::with_sources([
-        (SourceName("a"), "type a { rel . { int } }"),
-        (
-            SourceName("b"),
-            "
-            use 'a' as a
-            type b {
-                rel { 'a' } a.a
-            }
-            ",
-        ),
-        (
-            SourceName("c"),
-            "
-            use 'a' as a
-            type c {
-                rel { 'a' } a.a
-            }
-            ",
-        ),
         (
             SourceName::root(),
             "
+            use 'a' as a
             use 'b' as b
-            use 'c' as c
 
             type foobar {
+                rel { 'a' } a.a
                 rel { 'b' } b.b
+            }
+            ",
+        ),
+        (
+            SourceName("a"),
+            "
+            use 'c' as domain_c
+            type a {
+                rel { 'c' } domain_c.c
+            }
+            ",
+        ),
+        (
+            SourceName("b"),
+            "
+            use 'c' as c
+            type b {
                 rel { 'c' } c.c
             }
             ",
         ),
+        (SourceName("c"), "type c { rel . { int } }"),
     ])
     .compile_ok(|env| {
         // four user domains, plus core:
@@ -95,8 +95,8 @@ fn dependency_dag() {
         assert_json_io_matches!(
             bar,
             json!({
-                "b": { "a": 42 },
-                "c": { "a": 43 }
+                "a": { "c": 42 },
+                "b": { "c": 43 }
             })
         );
     });
