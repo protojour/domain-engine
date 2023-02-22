@@ -15,6 +15,7 @@ use crate::{
 };
 
 pub mod check_def;
+pub mod check_domain_types;
 pub mod check_union;
 pub mod inference;
 

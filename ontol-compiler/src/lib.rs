@@ -92,6 +92,8 @@ impl<'m> Compiler<'m> {
 
         // Call this after all source files have been compiled
         compile_all_patterns(self);
+
+        self.type_check().check_domain_types();
         self.type_check().check_unions();
         self.check_error()?;
 
