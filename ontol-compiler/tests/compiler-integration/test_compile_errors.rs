@@ -486,3 +486,15 @@ fn compile_error_in_dependency() {
     ])
     .compile_fail();
 }
+
+#[test]
+fn namespace_not_found() {
+    "
+    type foo {
+        rel { 'prop' }
+            dep // ERROR namespace not found
+            .foo
+    }
+    "
+    .compile_fail();
+}

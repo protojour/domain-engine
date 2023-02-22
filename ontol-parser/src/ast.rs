@@ -140,7 +140,7 @@ pub enum Expression {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Path {
     Ident(String),
-    Path(Vec<String>),
+    Path(Vec<Spanned<String>>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

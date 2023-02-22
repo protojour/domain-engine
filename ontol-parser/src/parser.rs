@@ -300,15 +300,26 @@ fn keyword(token: Token) -> impl AstParser<Span> {
 }
 
 fn path() -> impl AstParser<Path> {
-    any_sym()
-        .map(Path::Ident)
-        .then(dot().ignore_then(any_sym()).repeated())
+    enum SpannedPath {
+        Ident(Spanned<String>),
+        Path(Vec<Spanned<String>>),
+    }
+
+    spanned(any_sym())
+        .map(|spanned_sym| SpannedPath::Ident(spanned_sym))
+        .then(dot().ignore_then(spanned(any_sym())).repeated())
         .foldl(|prev, next| match prev {
-            Path::Ident(ident) => Path::Path(vec![ident, next]),
-            Path::Path(mut path) => {
+            SpannedPath::Ident(ident) => SpannedPath::Path(vec![ident, next]),
+            SpannedPath::Path(mut path) => {
                 path.push(next);
-                Path::Path(path)
+                SpannedPath::Path(path)
             }
+        })
+        .map(|tmp_path| match tmp_path {
+            // Remove the span from the ident case,
+            // this span will always be the same as the Path itself:
+            SpannedPath::Ident(spanned_sym) => Path::Ident(spanned_sym.0),
+            SpannedPath::Path(path) => Path::Path(path),
         })
         .labelled("path")
 }

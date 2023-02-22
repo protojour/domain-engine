@@ -458,7 +458,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut segment_iter = segments.iter().peekable();
                 let mut def_id = None;
 
-                while let Some(segment) = segment_iter.next() {
+                while let Some((segment, segment_span)) = segment_iter.next() {
                     def_id = namespace.space(Space::Type).get(segment);
                     if segment_iter.peek().is_some() {
                         match def_id {
@@ -473,10 +473,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                 }
                                 other => {
                                     debug!("namespace not found. def kind was {other:?}");
-                                    return Err((CompileError::NamespaceNotFound, span.clone()));
+                                    return Err((
+                                        CompileError::NamespaceNotFound,
+                                        segment_span.clone(),
+                                    ));
                                 }
                             },
-                            None => return Err((CompileError::NamespaceNotFound, span.clone())),
+                            None => {
+                                return Err((CompileError::NamespaceNotFound, segment_span.clone()))
+                            }
                         }
                     }
                 }
