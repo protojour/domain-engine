@@ -19,8 +19,8 @@ use crate::{
 use super::{
     deserialize_matcher::{
         CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher,
-        MapMatch, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher, UnitMatcher,
-        ValueMatcher,
+        MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher,
+        UnitMatcher, ValueMatcher,
     },
     MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty, ID_PROPERTY,
 };
@@ -278,7 +278,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        let mut map_matcher = self
+        let mut matcher = self
             .matcher
             .match_map()
             .map_err(|_| Error::invalid_type(Unexpected::Map, &self))?;
@@ -290,7 +290,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         let map_match = loop {
             let property = match map.next_key::<String>()? {
                 Some(property) => property,
-                None => match map_matcher.match_fallback() {
+                None => match matcher.match_fallback() {
                     MapMatchResult::Match(map_match) => {
                         break map_match;
                     }
@@ -305,13 +305,13 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
             let value: serde_value::Value = map.next_value()?;
 
-            match map_matcher.match_attribute(&property, &value) {
+            match matcher.match_attribute(&property, &value) {
                 MapMatchResult::Match(map_match) => {
                     buffered_attrs.push((property, value));
                     break map_match;
                 }
                 MapMatchResult::Indecisive(next_matcher) => {
-                    map_matcher = next_matcher;
+                    matcher = next_matcher;
                 }
             }
 
@@ -321,22 +321,22 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         debug!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
 
         // delegate to the real map visitor
-        match map_match {
-            MapMatch::MapType(map_type) => MapTypeVisitor {
+        match map_match.kind {
+            MapMatchKind::MapType(map_type) => MapTypeVisitor {
                 buffered_attrs,
                 map_type,
-                rel_params_operator_id: map_matcher.edge_operator_id,
+                rel_params_operator_id: map_match.rel_params_operator_id,
                 env: self.env,
             }
             .visit_map(map),
-            MapMatch::IdType(serde_operator_id) => {
+            MapMatchKind::IdType(serde_operator_id) => {
                 let deserialized_map = deserialize_map(
                     map,
                     buffered_attrs,
                     &IndexMap::default(),
                     0,
                     SpecialOperatorIds {
-                        rel_params: map_matcher.edge_operator_id,
+                        rel_params: map_match.rel_params_operator_id,
                         id: Some(serde_operator_id),
                     },
                     self.env,

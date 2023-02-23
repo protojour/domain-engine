@@ -390,7 +390,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
         Ok(MapMatcher {
             value_union_type: self.value_union_type,
-            edge_operator_id: self.rel_params_operator_id,
+            rel_params_operator_id: self.rel_params_operator_id,
             env: self.env,
         })
     }
@@ -411,7 +411,7 @@ impl<'e> UnionMatcher<'e> {
 #[derive(Clone)]
 pub struct MapMatcher<'e> {
     value_union_type: &'e ValueUnionType,
-    pub edge_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
 
@@ -421,17 +421,19 @@ pub enum MapMatchResult<'e> {
 }
 
 #[derive(Debug)]
-pub enum MapMatch<'e> {
+pub struct MapMatch<'e> {
+    pub kind: MapMatchKind<'e>,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
+}
+
+#[derive(Debug)]
+pub enum MapMatchKind<'e> {
     MapType(&'e MapType),
     IdType(SerdeOperatorId),
 }
 
 impl<'e> MapMatcher<'e> {
-    pub fn match_attribute(
-        &self,
-        property: &str,
-        value: &serde_value::Value,
-    ) -> MapMatchResult<'e> {
+    pub fn match_attribute(self, property: &str, value: &serde_value::Value) -> MapMatchResult<'e> {
         debug!("match_attribute '{property}': {:?}", self.value_union_type);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
@@ -457,14 +459,14 @@ impl<'e> MapMatcher<'e> {
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {
-                        MapMatchResult::Match(MapMatch::MapType(map_type))
+                        MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_type)))
                     }
                     SerdeOperator::Id(operator_id) => {
-                        MapMatchResult::Match(MapMatch::IdType(*operator_id))
+                        MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
                     }
                     SerdeOperator::ValueUnionType(value_union_type) => MapMatcher {
                         value_union_type,
-                        edge_operator_id: self.edge_operator_id,
+                        rel_params_operator_id: self.rel_params_operator_id,
                         env: self.env,
                     }
                     .match_attribute(property, value),
@@ -473,12 +475,12 @@ impl<'e> MapMatcher<'e> {
             });
 
         match result {
-            None => MapMatchResult::Indecisive(self.clone()),
+            None => MapMatchResult::Indecisive(self),
             Some(result) => result,
         }
     }
 
-    pub fn match_fallback(&self) -> MapMatchResult<'e> {
+    pub fn match_fallback(self) -> MapMatchResult<'e> {
         debug!("match_fallback");
 
         for discriminator in &self.value_union_type.discriminators {
@@ -492,17 +494,28 @@ impl<'e> MapMatcher<'e> {
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {
-                        return MapMatchResult::Match(MapMatch::MapType(map_type))
+                        return MapMatchResult::Match(
+                            self.new_match(MapMatchKind::MapType(map_type)),
+                        )
                     }
                     SerdeOperator::Id(operator_id) => {
-                        return MapMatchResult::Match(MapMatch::IdType(*operator_id))
+                        return MapMatchResult::Match(
+                            self.new_match(MapMatchKind::IdType(*operator_id)),
+                        )
                     }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
             }
         }
 
-        MapMatchResult::Indecisive(self.clone())
+        MapMatchResult::Indecisive(self)
+    }
+
+    fn new_match(&self, kind: MapMatchKind<'e>) -> MapMatch<'e> {
+        MapMatch {
+            kind,
+            rel_params_operator_id: self.rel_params_operator_id,
+        }
     }
 }
 
