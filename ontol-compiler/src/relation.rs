@@ -43,7 +43,7 @@ impl Properties {
     }
 
     pub fn insert_map_property(&mut self, property_id: PropertyId, cardinality: Cardinality) {
-        let map = self.map.get_or_insert_with(|| Default::default());
+        let map = self.map.get_or_insert_with(Default::default);
         map.insert(property_id, cardinality);
     }
 }

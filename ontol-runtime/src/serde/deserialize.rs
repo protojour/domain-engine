@@ -11,7 +11,7 @@ use tracing::debug;
 use crate::{
     env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
-    serde::EDGE_PROPERTY,
+    serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -278,7 +278,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        let map_matcher = self
+        let mut map_matcher = self
             .matcher
             .match_map()
             .map_err(|_| Error::invalid_type(Unexpected::Map, &self))?;
@@ -291,10 +291,10 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             let property = match map.next_key::<String>()? {
                 Some(property) => property,
                 None => match map_matcher.match_fallback() {
-                    Ok(map_match) => {
+                    MapMatchResult::Match(map_match) => {
                         break map_match;
                     }
-                    Err(_) => {
+                    MapMatchResult::Indecisive(_) => {
                         return Err(Error::custom(format!(
                             "invalid map value, expected {}",
                             ExpectingMatching(&self.matcher)
@@ -305,9 +305,14 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
             let value: serde_value::Value = map.next_value()?;
 
-            if let Ok(map_match) = map_matcher.match_attribute(&property, &value) {
-                buffered_attrs.push((property, value));
-                break map_match;
+            match map_matcher.match_attribute(&property, &value) {
+                MapMatchResult::Match(map_match) => {
+                    buffered_attrs.push((property, value));
+                    break map_match;
+                }
+                MapMatchResult::Indecisive(next_matcher) => {
+                    map_matcher = next_matcher;
+                }
             }
 
             buffered_attrs.push((property, value));

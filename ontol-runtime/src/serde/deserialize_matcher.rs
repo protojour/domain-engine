@@ -408,6 +408,7 @@ impl<'e> UnionMatcher<'e> {
     }
 }
 
+#[derive(Clone)]
 pub struct MapMatcher<'e> {
     value_union_type: &'e ValueUnionType,
     pub edge_operator_id: Option<SerdeOperatorId>,
@@ -430,7 +431,7 @@ impl<'e> MapMatcher<'e> {
         &self,
         property: &str,
         value: &serde_value::Value,
-    ) -> Result<MapMatch<'e>, MapMatchError> {
+    ) -> MapMatchResult<'e> {
         debug!("match_attribute '{property}': {:?}", self.value_union_type);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
@@ -455,8 +456,12 @@ impl<'e> MapMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id)
                     .value_operator
                 {
-                    SerdeOperator::MapType(map_type) => Ok(MapMatch::MapType(map_type)),
-                    SerdeOperator::Id(operator_id) => Ok(MapMatch::IdType(*operator_id)),
+                    SerdeOperator::MapType(map_type) => {
+                        MapMatchResult::Match(MapMatch::MapType(map_type))
+                    }
+                    SerdeOperator::Id(operator_id) => {
+                        MapMatchResult::Match(MapMatch::IdType(*operator_id))
+                    }
                     SerdeOperator::ValueUnionType(value_union_type) => MapMatcher {
                         value_union_type,
                         edge_operator_id: self.edge_operator_id,
@@ -467,15 +472,13 @@ impl<'e> MapMatcher<'e> {
                 }
             });
 
-        debug!("result: {result:?}");
-
         match result {
-            None => Err(MapMatchError::Indecisive),
+            None => MapMatchResult::Indecisive(self.clone()),
             Some(result) => result,
         }
     }
 
-    pub fn match_fallback(&self) -> Result<MapMatch<'e>, MapMatchError> {
+    pub fn match_fallback(&self) -> MapMatchResult<'e> {
         debug!("match_fallback");
 
         for discriminator in &self.value_union_type.discriminators {
@@ -488,32 +491,19 @@ impl<'e> MapMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id)
                     .value_operator
                 {
-                    SerdeOperator::MapType(map_type) => return Ok(MapMatch::MapType(map_type)),
-                    SerdeOperator::Id(operator_id) => return Ok(MapMatch::IdType(*operator_id)),
-                    SerdeOperator::ValueUnionType(value_union_type) => {
-                        let result = MapMatcher {
-                            value_union_type,
-                            edge_operator_id: self.edge_operator_id,
-                            env: self.env,
-                        }
-                        .match_fallback();
-                        match result {
-                            Ok(map_match) => return Ok(map_match),
-                            _ => {}
-                        }
+                    SerdeOperator::MapType(map_type) => {
+                        return MapMatchResult::Match(MapMatch::MapType(map_type))
+                    }
+                    SerdeOperator::Id(operator_id) => {
+                        return MapMatchResult::Match(MapMatch::IdType(*operator_id))
                     }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
             }
         }
 
-        Err(MapMatchError::Indecisive)
+        MapMatchResult::Indecisive(self.clone())
     }
-}
-
-#[derive(Debug)]
-pub enum MapMatchError {
-    Indecisive,
 }
 
 fn try_deserialize_custom_string(env: &Env, def_id: DefId, str: &str) -> Result<Value, ParseError> {
