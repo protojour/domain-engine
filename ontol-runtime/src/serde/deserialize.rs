@@ -278,6 +278,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        debug!("visit map\n");
         let mut matcher = self
             .matcher
             .match_map()

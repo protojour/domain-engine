@@ -55,7 +55,7 @@ pub enum SerdeOperatorKey {
     JoinedPropertyMap(DefId),
     InherentPropertyMap(DefId),
     IdMap(DefId),
-    MapIntersection(Box<BTreeSet<SerdeOperatorKey>>),
+    Intersection(Box<BTreeSet<SerdeOperatorKey>>),
 }
 
 #[derive(Debug)]
@@ -112,7 +112,7 @@ pub struct ValueUnionType {
     pub discriminators: Vec<ValueUnionDiscriminator>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ValueUnionDiscriminator {
     pub discriminator: VariantDiscriminator,
     pub operator_id: SerdeOperatorId,

@@ -24,4 +24,5 @@ pub enum Discriminant {
     MatchesCapturingStringPattern,
     HasProperty(RelationId, String),
     HasStringAttribute(RelationId, String, String),
+    HasAttributeMatchingCapturingStringPattern(RelationId, String, DefId),
 }

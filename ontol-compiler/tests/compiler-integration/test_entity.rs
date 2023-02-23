@@ -293,3 +293,21 @@ fn entity_union_with_object_relation() {
         );
     });
 }
+
+#[test]
+fn entity_union_in_relation_with_ids() {
+    GUITAR_SYNTH_UNION.compile_ok(|env| {
+        let artist = TypeBinding::new(env, "artist");
+
+        assert_json_io_matches!(
+            artist,
+            json!({
+                "name": "Someone",
+                "plays": [
+                    { "_id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+                    { "_id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+                ]
+            })
+        );
+    });
+}
