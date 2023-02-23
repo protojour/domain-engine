@@ -10,7 +10,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
-    relation::{Constructor, MapProperties},
+    relation::Constructor,
     typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     types::{Type, TypeRef},
     SourceSpan,
@@ -92,8 +92,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let typed_expr_ref = match properties.map(|props| &props.constructor) {
                     Some(Constructor::Identity) | None => {
-                        match properties.map(|props| &props.map) {
-                            Some(MapProperties::Map(property_set)) => {
+                        match properties.and_then(|props| props.map.as_ref()) {
+                            Some(property_set) => {
                                 struct MatchProperty {
                                     relation_id: RelationId,
                                     cardinality: Cardinality,
@@ -187,7 +187,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     span: expr.span,
                                 })
                             }
-                            Some(MapProperties::Empty) | None => {
+                            None => {
                                 if !attributes.is_empty() {
                                     return self.expr_error(
                                         CompileError::NoPropertiesExpected,

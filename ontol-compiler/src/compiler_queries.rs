@@ -78,7 +78,7 @@ where
         &self,
         relationship_id: RelationshipId,
     ) -> Result<RelationshipMeta<'m>, ()> {
-        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
+        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 
     fn get_subject_property_meta(
@@ -92,7 +92,7 @@ where
             .cloned()
             .ok_or(())?;
 
-        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
+        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 
     fn get_object_property_meta(
@@ -106,6 +106,6 @@ where
             .cloned()
             .ok_or(())?;
 
-        get::<_, Defs<'m>>(self).get_relationship_defs(relationship_id)
+        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 }

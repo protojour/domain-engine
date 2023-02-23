@@ -17,7 +17,7 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
     patterns::Patterns,
-    relation::{Constructor, MapProperties, Properties, Relations},
+    relation::{Constructor, Properties, Relations},
     types::{DefTypes, Type},
 };
 
@@ -410,7 +410,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut n_mandatory_properties = 0;
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
-        if let MapProperties::Map(map) = &properties.map {
+        if let Some(map) = &properties.map {
             for (property_id, cardinality) in map {
                 let (relationship, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {

@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use tracing::debug;
+
 use crate::{
     discriminator::Discriminant,
     env::Env,
@@ -412,6 +414,11 @@ pub struct MapMatcher<'e> {
     env: &'e Env,
 }
 
+pub enum MapMatchResult<'e> {
+    Match(MapMatch<'e>),
+    Indecisive(MapMatcher<'e>),
+}
+
 #[derive(Debug)]
 pub enum MapMatch<'e> {
     MapType(&'e MapType),
@@ -424,6 +431,8 @@ impl<'e> MapMatcher<'e> {
         property: &str,
         value: &serde_value::Value,
     ) -> Result<MapMatch<'e>, MapMatchError> {
+        debug!("match_attribute '{property}': {:?}", self.value_union_type);
+
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
                 (
@@ -435,7 +444,8 @@ impl<'e> MapMatcher<'e> {
             }
         };
 
-        self.value_union_type
+        let result = self
+            .value_union_type
             .discriminators
             .iter()
             .find(|discriminator| match_fn(&discriminator.discriminator.discriminant))
@@ -445,15 +455,29 @@ impl<'e> MapMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id)
                     .value_operator
                 {
-                    SerdeOperator::MapType(map_type) => MapMatch::MapType(map_type),
-                    SerdeOperator::Id(operator_id) => MapMatch::IdType(*operator_id),
+                    SerdeOperator::MapType(map_type) => Ok(MapMatch::MapType(map_type)),
+                    SerdeOperator::Id(operator_id) => Ok(MapMatch::IdType(*operator_id)),
+                    SerdeOperator::ValueUnionType(value_union_type) => MapMatcher {
+                        value_union_type,
+                        edge_operator_id: self.edge_operator_id,
+                        env: self.env,
+                    }
+                    .match_attribute(property, value),
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
-            })
-            .ok_or(MapMatchError::Indecisive)
+            });
+
+        debug!("result: {result:?}");
+
+        match result {
+            None => Err(MapMatchError::Indecisive),
+            Some(result) => result,
+        }
     }
 
     pub fn match_fallback(&self) -> Result<MapMatch<'e>, MapMatchError> {
+        debug!("match_fallback");
+
         for discriminator in &self.value_union_type.discriminators {
             if matches!(
                 discriminator.discriminator.discriminant,
@@ -466,6 +490,18 @@ impl<'e> MapMatcher<'e> {
                 {
                     SerdeOperator::MapType(map_type) => return Ok(MapMatch::MapType(map_type)),
                     SerdeOperator::Id(operator_id) => return Ok(MapMatch::IdType(*operator_id)),
+                    SerdeOperator::ValueUnionType(value_union_type) => {
+                        let result = MapMatcher {
+                            value_union_type,
+                            edge_operator_id: self.edge_operator_id,
+                            env: self.env,
+                        }
+                        .match_fallback();
+                        match result {
+                            Ok(map_match) => return Ok(map_match),
+                            _ => {}
+                        }
+                    }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
             }
@@ -475,6 +511,7 @@ impl<'e> MapMatcher<'e> {
     }
 }
 
+#[derive(Debug)]
 pub enum MapMatchError {
     Indecisive,
 }

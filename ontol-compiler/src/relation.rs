@@ -33,13 +33,18 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub map: MapProperties,
+    pub map: Option<IndexMap<PropertyId, Cardinality>>,
     pub id: Option<RelationId>,
 }
 
 impl Properties {
     pub fn constructor(&self) -> &Constructor {
         &self.constructor
+    }
+
+    pub fn insert_map_property(&mut self, property_id: PropertyId, cardinality: Cardinality) {
+        let map = self.map.get_or_insert_with(|| Default::default());
+        map.insert(property_id, cardinality);
     }
 }
 
@@ -53,11 +58,4 @@ pub enum Constructor {
     ValueUnion(Vec<(RelationshipId, SourceSpan)>),
     Sequence(Sequence),
     StringPattern(StringPatternSegment),
-}
-
-#[derive(Default, Debug)]
-pub enum MapProperties {
-    #[default]
-    Empty,
-    Map(IndexMap<PropertyId, Cardinality>),
 }

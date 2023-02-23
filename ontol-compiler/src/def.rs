@@ -296,7 +296,7 @@ impl<'m> Defs<'m> {
         })
     }
 
-    pub fn get_relationship_defs(
+    pub fn lookup_relationship_meta(
         &self,
         relationship_id: RelationshipId,
     ) -> Result<RelationshipMeta<'m>, ()> {

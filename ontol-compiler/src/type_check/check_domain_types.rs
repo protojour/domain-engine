@@ -1,18 +1,20 @@
 use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
+use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Def, DefKind, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, Def, DefKind, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
-    relation::MapProperties,
+    relation::Constructor,
 };
 
 use super::TypeCheck;
 
-enum Correction {
-    ReportNonEntityInObjectRelationship(RelationId),
+#[derive(Debug)]
+enum Action {
+    ReportNonEntityInObjectRelationship(DefId, RelationId),
     /// Many(*) value cardinality between two entities are always considered optional
-    AdjustEntityPropertyCardinality(PropertyId),
+    AdjustEntityPropertyCardinality(DefId, PropertyId),
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -26,62 +28,104 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_type(def_id)?;
-        let is_entity = properties.id.is_some();
 
-        let mut corrections = vec![];
+        let mut actions = vec![];
 
-        if let MapProperties::Map(map) = &properties.map {
-            for (property_id, _) in map {
-                match property_id.role {
-                    Role::Subject => {
-                        let (relationship, _) = self
-                            .get_subject_property_meta(def_id, property_id.relation_id)
-                            .unwrap();
-                        let object_properties = self
-                            .relations
-                            .properties_by_type(relationship.object.0)
-                            .unwrap();
+        let map = properties.map.as_ref()?;
 
-                        if is_entity && object_properties.id.is_some() {
-                            corrections
-                                .push(Correction::AdjustEntityPropertyCardinality(*property_id));
-                        }
+        for (property_id, cardinality) in map {
+            debug!("check {def_id:?} {property_id:?} {cardinality:?}");
+
+            match property_id.role {
+                Role::Subject => {
+                    let (relationship, _) = self
+                        .get_subject_property_meta(def_id, property_id.relation_id)
+                        .unwrap();
+                    let object_properties = self
+                        .relations
+                        .properties_by_type(relationship.object.0)
+                        .unwrap();
+
+                    if properties.id.is_some() && object_properties.id.is_some() {
+                        actions.push(Action::AdjustEntityPropertyCardinality(
+                            def_id,
+                            *property_id,
+                        ));
                     }
-                    Role::Object => {
-                        if !is_entity {
-                            // it is illegal to specify an object property to something that is not an entity (has no id)
-                            corrections.push(Correction::ReportNonEntityInObjectRelationship(
-                                property_id.relation_id,
-                            ));
-                        } else {
-                            let (relationship, _) = self
-                                .get_object_property_meta(def_id, property_id.relation_id)
-                                .unwrap();
-                            let subject_properties = self
-                                .relations
-                                .properties_by_type(relationship.subject.0)
-                                .unwrap();
+                }
+                Role::Object => {
+                    if properties.id.is_none() {
+                        match &properties.constructor {
+                            Constructor::ValueUnion(relationships) => {
+                                if let Some(map) = &properties.map {
+                                    assert!(map.get(property_id).is_some());
+                                } else {
+                                    panic!("No map in value union");
+                                }
 
-                            if subject_properties.id.is_some() {
-                                corrections.push(Correction::AdjustEntityPropertyCardinality(
-                                    *property_id,
+                                // TODO: Union visitor?
+                                for (relationship_id, _span) in relationships {
+                                    let (relationship, relation) = self
+                                        .get_relationship_meta(*relationship_id)
+                                        .expect("BUG: problem getting property meta");
+
+                                    let variant_def = match relation.ident {
+                                        RelationIdent::Named(def_id)
+                                        | RelationIdent::Typed(def_id) => def_id,
+                                        _ => relationship.object.0,
+                                    };
+
+                                    let subject_properties =
+                                        self.relations.properties_by_type(variant_def).unwrap();
+
+                                    if subject_properties.id.is_some() {
+                                        // Ok
+                                    } else {
+                                        actions.push(Action::ReportNonEntityInObjectRelationship(
+                                            variant_def,
+                                            property_id.relation_id,
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {
+                                // it is illegal to specify an object property to something that is not an entity (has no id)
+                                actions.push(Action::ReportNonEntityInObjectRelationship(
+                                    def_id,
+                                    property_id.relation_id,
                                 ));
                             }
+                        }
+                    } else {
+                        let (relationship, _) = self
+                            .get_object_property_meta(def_id, property_id.relation_id)
+                            .unwrap();
+                        let subject_properties = self
+                            .relations
+                            .properties_by_type(relationship.subject.0)
+                            .unwrap();
+
+                        if subject_properties.id.is_some() {
+                            actions.push(Action::AdjustEntityPropertyCardinality(
+                                def_id,
+                                *property_id,
+                            ));
                         }
                     }
                 }
             }
         }
 
-        self.do_corrections(def_id, corrections);
+        self.perform_actions(actions);
 
         None
     }
 
-    fn do_corrections(&mut self, def_id: DefId, corrections: Vec<Correction>) {
-        for correction in corrections {
-            match correction {
-                Correction::ReportNonEntityInObjectRelationship(relation_id) => {
+    fn perform_actions(&mut self, actions: Vec<Action>) {
+        for action in actions {
+            debug!("perform action {action:?}");
+            match action {
+                Action::ReportNonEntityInObjectRelationship(def_id, relation_id) => {
                     let (relationship, _) =
                         self.get_object_property_meta(def_id, relation_id).unwrap();
 
@@ -90,17 +134,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         relationship.span,
                     );
                 }
-                Correction::AdjustEntityPropertyCardinality(property_id) => {
+                Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
                     let properties = self.relations.properties_by_type_mut(def_id);
-                    if let MapProperties::Map(map) = &mut properties.map {
-                        let (property_cardinality, value_cardinality) =
-                            map.get_mut(&property_id).unwrap();
-                        if let ValueCardinality::Many = value_cardinality {
-                            *property_cardinality = PropertyCardinality::Optional;
-                        }
+                    if let Some(map) = &mut properties.map {
+                        let cardinality = map.get_mut(&property_id).unwrap();
+                        adjust_entity_prop_cardinality(cardinality);
                     }
                 }
             }
         }
+    }
+}
+
+fn adjust_entity_prop_cardinality(cardinality: &mut Cardinality) {
+    if let ValueCardinality::Many = cardinality.1 {
+        cardinality.0 = PropertyCardinality::Optional;
     }
 }

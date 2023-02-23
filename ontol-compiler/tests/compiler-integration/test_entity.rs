@@ -79,10 +79,11 @@ fn artist_and_instrument_basic() {
 }
 
 #[test]
-fn artist_and_instrument_relation_id() {
+fn artist_and_instrument_id_as_relation_object() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
         let instrument_id = TypeBinding::new(env, "instrument-id");
+        let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
         assert_json_io_matches!(
             artist,
@@ -90,7 +91,7 @@ fn artist_and_instrument_relation_id() {
                 "name": "Jimi Hendrix",
                 "plays": [
                     {
-                        "_id": "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                        "_id": example_id,
                         "_edge": {
                             "how_much": "all the time"
                         }
@@ -104,7 +105,7 @@ fn artist_and_instrument_relation_id() {
                 "name": "John McLaughlin",
                 "plays": [
                     {
-                        "_id": "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                        "_id": example_id,
                         "_edge": {
                             "how_much": "much."
                         }
@@ -124,7 +125,7 @@ fn artist_and_instrument_relation_id() {
         // The value of the `plays` attribute is an `artist-id`
         assert_eq!(
             instrument_id.serialize_json(&plays_attributes.first().unwrap().value),
-            json!("instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")
+            json!(example_id)
         );
 
         assert_error_msg!(
@@ -137,6 +138,29 @@ fn artist_and_instrument_relation_id() {
                 ]
             })),
             r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 43"#
+        );
+        assert_error_msg!(
+            artist.deserialize_data(json!({
+                "name": "Robert Fripp",
+                "plays": [{ "_id": example_id }]
+            })),
+            r#"missing properties, expected "_edge" at line 1 column 91"#
+        );
+
+        // The following tests show that { "_id" } and the property map is a type union:
+        assert_error_msg!(
+            artist.deserialize_data(json!({
+                "name": "Tony Levin",
+                "plays": [{ "_id": example_id, "name": "Chapman stick" }]
+            })),
+            r#"unknown property `name` at line 1 column 112"#
+        );
+        assert_error_msg!(
+            artist.deserialize_data(json!({
+                "name": "Allan Holdsworth",
+                "plays": [{ "name": "Synthaxe", "_id": example_id }]
+            })),
+            r#"unknown property `name` at line 1 column 113"#
         );
     });
 }
@@ -203,6 +227,57 @@ fn test_entity_self_relationship_mandatory_object() {
         assert_error_msg!(
             node.deserialize_data(json!({})),
             r#"missing properties, expected "parent" at line 1 column 2"#
+        );
+    });
+}
+
+#[test]
+fn entity_union_relation() {
+    "
+    type guitar_id {
+        rel '' { 'guitar/' } { uuid }
+    }
+    type synth_id {
+        rel '' { 'synth/' } { uuid }
+    }
+    type guitar {
+        rel { id } guitar_id
+        rel { 'type' } 'guitar'
+        rel { 'string_count' } int
+    }
+    type synth {
+        rel { id } synth_id
+        rel { 'type' } 'synth'
+        rel { 'polyphony' } int
+    }
+    type instrument {
+        rel . { guitar }
+        rel . { synth }
+    }
+
+    type artist {
+        rel { id } string
+        rel { 'name' } string
+        rel { 'plays'* | 'played-by'* } instrument
+    }
+    "
+    .compile_ok(|env| {
+        let artist = TypeBinding::new(env, "artist");
+        let instrument = TypeBinding::new(env, "instrument");
+
+        assert_json_io_matches!(
+            instrument,
+            json!({
+                "type": "synth",
+                "polyphony": 8,
+                /*
+                "played-by": [
+                    {
+                        "_id": "some_artist"
+                    }
+                ]
+                */
+            })
         );
     });
 }

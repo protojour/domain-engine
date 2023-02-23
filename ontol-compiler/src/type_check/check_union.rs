@@ -16,7 +16,7 @@ use crate::{
     def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
     error::CompileError,
     patterns::StringPatternSegment,
-    relation::{Constructor, MapProperties},
+    relation::Constructor,
     sequence::Sequence,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -160,11 +160,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.constructor {
                     Constructor::Identity => match &properties.map {
-                        MapProperties::Empty => {
-                            return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
-                        }
-                        MapProperties::Map(property_set) => {
+                        Some(property_set) => {
                             return Ok(DomainTypeMatchData::Map(property_set));
+                        }
+                        None => {
+                            return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                         }
                     },
                     Constructor::Value(

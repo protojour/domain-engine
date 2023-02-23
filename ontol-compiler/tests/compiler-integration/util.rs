@@ -34,7 +34,7 @@ impl<'e> TypeBinding<'e> {
             env,
         };
         debug!(
-            "deserializing `{type_name}` with {:?}",
+            "TypeBinding::new `{type_name}` with {:?}",
             env.new_serde_processor(serde_operator_id)
         );
         binding

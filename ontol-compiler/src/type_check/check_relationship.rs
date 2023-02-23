@@ -9,7 +9,7 @@ use crate::{
     error::CompileError,
     mem::Intern,
     patterns::StringPatternSegment,
-    relation::{Constructor, MapProperties, Properties, RelationshipId},
+    relation::{Constructor, Properties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -100,7 +100,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Some(_) => todo!("Already has an id, report error"),
                 None => properties.id = Some(relation.0),
             },
-            (RelationIdent::Indexed, MapProperties::Empty, Constructor::Identity) => {
+            (RelationIdent::Indexed, None, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -111,15 +111,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 properties.constructor = Constructor::Sequence(sequence);
             }
-            (RelationIdent::Indexed, MapProperties::Empty, Constructor::Sequence(sequence)) => {
+            (RelationIdent::Indexed, None, Constructor::Sequence(sequence)) => {
                 if let Err(error) =
                     sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
             }
-            (RelationIdent::Named(_), MapProperties::Empty, Constructor::Identity) => {
-                properties.map = MapProperties::Map(
+            (RelationIdent::Named(_), None, Constructor::Identity) => {
+                properties.map = Some(
                     [(
                         PropertyId::subject(relation.0),
                         relationship.1.subject_cardinality,
@@ -127,7 +127,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (RelationIdent::Named(_), MapProperties::Map(map), Constructor::Identity) => {
+            (RelationIdent::Named(_), Some(map), Constructor::Identity) => {
                 if map
                     .insert(
                         PropertyId::subject(relation.0),
@@ -140,7 +140,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (
                 RelationIdent::Named(_) | RelationIdent::Typed(_),
-                MapProperties::Empty,
+                None,
                 Constructor::StringPattern(_),
             ) => {
                 debug!("should concatenate string pattern");
@@ -248,8 +248,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     object_ty,
                     &mut object_properties.map,
                 ) {
-                    (Some(_), Type::Domain(_), MapProperties::Empty) => {
-                        object_properties.map = MapProperties::Map(
+                    (Some(_), Type::Domain(_), None) => {
+                        object_properties.map = Some(
                             [(
                                 PropertyId::object(relation.0),
                                 relationship.1.object_cardinality,
@@ -257,7 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .into(),
                         );
                     }
-                    (Some(_), Type::Domain(_), MapProperties::Map(map)) => {
+                    (Some(_), Type::Domain(_), Some(map)) => {
                         if map
                             .insert(
                                 PropertyId::object(relation.0),
