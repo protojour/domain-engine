@@ -4,6 +4,7 @@ use serde::{
 };
 use smartstring::alias::String;
 use std::fmt::Write;
+use tracing::debug;
 
 use crate::{
     cast::Cast,
@@ -60,10 +61,7 @@ impl<'e> SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_type) => self
                 .env
-                .new_serde_processor_parameterized(
-                    value_type.inner_operator_id,
-                    self.rel_params_operator_id,
-                )
+                .new_serde_processor(value_type.inner_operator_id, self.rel_params_operator_id)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type
@@ -74,13 +72,18 @@ impl<'e> SerdeProcessor<'e> {
                     });
 
                 match discriminator {
-                    Some(discriminator) => self
-                        .env
-                        .new_serde_processor_parameterized(
+                    Some(discriminator) => {
+                        let processor = self.env.new_serde_processor(
                             discriminator.operator_id,
                             self.rel_params_operator_id,
-                        )
-                        .serialize_value(value, rel_params, serializer),
+                        );
+                        debug!(
+                            "serializing union variant with {:?} {processor:}",
+                            discriminator.operator_id
+                        );
+
+                        processor.serialize_value(value, rel_params, serializer)
+                    }
                     None => {
                         panic!("Discriminator not found while serializing union type");
                     }
@@ -93,7 +96,7 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value,
                         rel_params: None,
-                        processor: self.env.new_serde_processor(*inner_operator_id),
+                        processor: self.env.new_serde_processor(*inner_operator_id, None),
                     },
                 )?;
                 self.serialize_rel_params::<S>(rel_params, &mut map)?;
@@ -134,10 +137,9 @@ impl<'e> SerdeProcessor<'e> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self.env.new_serde_processor_parameterized(
-                            range.operator_id,
-                            self.rel_params_operator_id,
-                        ),
+                        processor: self
+                            .env
+                            .new_serde_processor(range.operator_id, self.rel_params_operator_id),
                     })?;
                 }
             } else {
@@ -145,10 +147,9 @@ impl<'e> SerdeProcessor<'e> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self.env.new_serde_processor_parameterized(
-                            range.operator_id,
-                            self.rel_params_operator_id,
-                        ),
+                        processor: self
+                            .env
+                            .new_serde_processor(range.operator_id, self.rel_params_operator_id),
                     })?;
                 }
             }
@@ -191,7 +192,7 @@ impl<'e> SerdeProcessor<'e> {
                 &Proxy {
                     value: &attribute.value,
                     rel_params: attribute.rel_params.filter_non_unit(),
-                    processor: self.env.new_serde_processor_parameterized(
+                    processor: self.env.new_serde_processor(
                         serde_prop.value_operator_id,
                         serde_prop.rel_params_operator_id,
                     ),
@@ -217,7 +218,7 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value: rel_params,
                         rel_params: None,
-                        processor: self.env.new_serde_processor(operator_id),
+                        processor: self.env.new_serde_processor(operator_id, None),
                     },
                 )?;
             }

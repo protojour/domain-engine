@@ -48,13 +48,14 @@ pub struct SerdeProcessor<'e> {
 #[debug_single_tuple_inline]
 pub struct SerdeOperatorId(pub u32);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SerdeOperatorKey {
     Identity(DefId),
     Array(DefId),
-    PropertyMap(DefId),
+    JoinedPropertyMap(DefId),
+    InherentPropertyMap(DefId),
     IdMap(DefId),
-    Intersection(Box<BTreeSet<DefId>>),
+    MapIntersection(Box<BTreeSet<SerdeOperatorKey>>),
 }
 
 #[derive(Debug)]
@@ -117,7 +118,7 @@ pub struct ValueUnionDiscriminator {
     pub operator_id: SerdeOperatorId,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MapType {
     pub typename: String,
     pub type_def_id: DefId,
@@ -161,12 +162,12 @@ impl<'e> Display for SerdeProcessor<'e> {
                 for range in ranges {
                     if let Some(finite_repetition) = range.finite_repetition {
                         for _ in 0..finite_repetition {
-                            processors.push(self.env.new_serde_processor(range.operator_id));
+                            processors.push(self.env.new_serde_processor(range.operator_id, None));
                         }
                         finite = true;
                     } else {
                         finite = false;
-                        processors.push(self.env.new_serde_processor(range.operator_id));
+                        processors.push(self.env.new_serde_processor(range.operator_id, None));
                     }
                 }
 

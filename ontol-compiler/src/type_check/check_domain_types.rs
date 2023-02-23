@@ -59,33 +59,35 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Constructor::ValueUnion(relationships) => {
                                 if let Some(map) = &properties.map {
                                     assert!(map.get(property_id).is_some());
-                                } else {
-                                    panic!("No map in value union");
-                                }
 
-                                // TODO: Union visitor?
-                                for (relationship_id, _span) in relationships {
-                                    let (relationship, relation) = self
-                                        .get_relationship_meta(*relationship_id)
-                                        .expect("BUG: problem getting property meta");
+                                    let all_entities =
+                                        relationships.iter().all(|(relationship_id, _span)| {
+                                            let (relationship, relation) = self
+                                                .get_relationship_meta(*relationship_id)
+                                                .expect("BUG: problem getting property meta");
 
-                                    let variant_def = match relation.ident {
-                                        RelationIdent::Named(def_id)
-                                        | RelationIdent::Typed(def_id) => def_id,
-                                        _ => relationship.object.0,
-                                    };
+                                            let variant_def = match relation.ident {
+                                                RelationIdent::Named(def_id)
+                                                | RelationIdent::Typed(def_id) => def_id,
+                                                _ => relationship.object.0,
+                                            };
 
-                                    let subject_properties =
-                                        self.relations.properties_by_type(variant_def).unwrap();
+                                            let subject_properties = self
+                                                .relations
+                                                .properties_by_type(variant_def)
+                                                .unwrap();
 
-                                    if subject_properties.id.is_some() {
-                                        // Ok
-                                    } else {
-                                        actions.push(Action::ReportNonEntityInObjectRelationship(
-                                            variant_def,
-                                            property_id.relation_id,
+                                            subject_properties.id.is_some()
+                                        });
+
+                                    if all_entities {
+                                        actions.push(Action::AdjustEntityPropertyCardinality(
+                                            def_id,
+                                            *property_id,
                                         ));
                                     }
+                                } else {
+                                    panic!("No map in value union");
                                 }
                             }
                             _ => {

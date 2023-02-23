@@ -34,8 +34,8 @@ impl<'e> TypeBinding<'e> {
             env,
         };
         debug!(
-            "TypeBinding::new `{type_name}` with {:?}",
-            env.new_serde_processor(serde_operator_id)
+            "TypeBinding::new `{type_name}` with {serde_operator_id:?} {:?}",
+            env.new_serde_processor(serde_operator_id, None)
         );
         binding
     }
@@ -78,7 +78,7 @@ impl<'e> TypeBinding<'e> {
         let json_string = serde_json::to_string(&json).unwrap();
         let Attribute { value, rel_params } = self
             .env
-            .new_serde_processor(self.serde_operator_id)
+            .new_serde_processor(self.serde_operator_id, None)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
 
         assert_eq!(rel_params.type_def_id, DefId::unit());
@@ -93,23 +93,11 @@ impl<'e> TypeBinding<'e> {
     pub fn serialize_json(&self, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.env
-            .new_serde_processor(self.serde_operator_id)
+            .new_serde_processor(self.serde_operator_id, None)
             .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }
-}
-
-pub fn serialize_json(env: &Env, value: &Value) -> serde_json::Value {
-    let serde_operator_id = env
-        .serde_operators_per_def
-        .get(&SerdeOperatorKey::Identity(value.type_def_id))
-        .unwrap();
-    let mut buf: Vec<u8> = vec![];
-    env.new_serde_processor(*serde_operator_id)
-        .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
-        .expect("serialization failed");
-    serde_json::from_slice(&buf).unwrap()
 }
 
 #[derive(Default)]

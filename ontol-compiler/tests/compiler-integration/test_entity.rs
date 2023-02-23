@@ -275,7 +275,6 @@ fn entity_union_simple() {
 }
 
 #[test]
-#[ignore]
 fn entity_union_with_object_relation() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let instrument = TypeBinding::new(env, "instrument");

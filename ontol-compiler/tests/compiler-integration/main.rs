@@ -52,7 +52,7 @@ macro_rules! assert_json_io_matches {
             Err(err) => panic!("deserialize failed: {err}"),
         };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = crate::util::serialize_json($binding.env(), &value);
+        let output = $binding.serialize_json(&value);
 
         pretty_assertions::assert_eq!($expected_output, output);
     };

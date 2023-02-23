@@ -157,7 +157,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
                     .env
-                    .new_serde_processor(value_type.inner_operator_id)
+                    .new_serde_processor(value_type.inner_operator_id, None)
                     .deserialize(deserializer)?;
 
                 Ok(typed_value)
@@ -246,7 +246,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
-                Some(element_match) => self.env.new_serde_processor_parameterized(
+                Some(element_match) => self.env.new_serde_processor(
                     element_match.element_operator_id,
                     element_match.rel_params_operator_id,
                 ),
@@ -403,20 +403,20 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
         match PropertySet::new(properties, special_operator_ids).visit_str(&serde_key)? {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } = env
-                    .new_serde_processor(operator_id)
+                    .new_serde_processor(operator_id, None)
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
                 let Attribute { value, .. } = env
-                    .new_serde_processor(operator_id)
+                    .new_serde_processor(operator_id, None)
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
                 let Attribute { rel_params, value } = env
-                    .new_serde_processor_parameterized(
+                    .new_serde_processor(
                         serde_property.value_operator_id,
                         serde_property.rel_params_operator_id,
                     )
@@ -438,18 +438,18 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
         match map_key {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } =
-                    map.next_value_seed(env.new_serde_processor(operator_id))?;
+                    map.next_value_seed(env.new_serde_processor(operator_id, None))?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
                 let Attribute { value, .. } =
-                    map.next_value_seed(env.new_serde_processor(operator_id))?;
+                    map.next_value_seed(env.new_serde_processor(operator_id, None))?;
 
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
-                let attribute = map.next_value_seed(env.new_serde_processor_parameterized(
+                let attribute = map.next_value_seed(env.new_serde_processor(
                     serde_property.value_operator_id,
                     serde_property.rel_params_operator_id,
                 ))?;

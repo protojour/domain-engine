@@ -58,7 +58,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Some(*id);
         }
 
-        if let Some((operator_id, operator)) = self.create_serde_operator_with_modifier(key) {
+        if let Some((operator_id, operator)) = self.create_serde_operator_from_key(key) {
             debug!("created operator {operator_id:?} {operator:?}");
             self.serde_operators[operator_id.0 as usize] = operator;
             Some(operator_id)
@@ -86,12 +86,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn create_serde_operator_with_modifier(
+    fn create_serde_operator_from_key(
         &mut self,
         key: SerdeOperatorKey,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match &key {
-            SerdeOperatorKey::Identity(def_id) | SerdeOperatorKey::PropertyMap(def_id) => {
+            SerdeOperatorKey::Identity(def_id)
+            | SerdeOperatorKey::JoinedPropertyMap(def_id)
+            | SerdeOperatorKey::InherentPropertyMap(def_id) => {
                 let def_id = *def_id;
                 self.create_item_operator(key, def_id)
             }
@@ -114,7 +116,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             SerdeOperatorKey::IdMap(def_id) => match self.get_def_type(*def_id)? {
                 Type::Domain(_) => {
-                    let id_relation_id = self.relations.properties_by_type.get(&def_id)?.id?;
+                    let id_relation_id = self.relations.properties_by_type.get(def_id)?.id?;
 
                     let (relationship, _) = self
                         .get_subject_property_meta(*def_id, id_relation_id)
@@ -132,7 +134,59 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
                 _ => None,
             },
-            SerdeOperatorKey::Intersection(_) => todo!(),
+            SerdeOperatorKey::MapIntersection(keys) => {
+                let operator_id = self.alloc_operator_id(&key);
+                let mut iterator = keys.iter();
+                let first_id = self.get_serde_operator_id(iterator.next()?.clone())?;
+
+                let mut intersected_map = self
+                    .find_unambiguous_map_type(first_id)
+                    .unwrap_or_else(|operator| {
+                        panic!("Initial map not found for intersection: {operator:?}")
+                    })
+                    .clone();
+
+                for next_key in iterator {
+                    let next_id = self.get_serde_operator_id(next_key.clone()).unwrap();
+
+                    let next_map_type =
+                        self.find_unambiguous_map_type(next_id)
+                            .unwrap_or_else(|operator| {
+                                panic!("Map not found for intersection: {operator:?}")
+                            });
+                    for (key, value) in &next_map_type.properties {
+                        intersected_map.properties.insert(key.clone(), *value);
+                    }
+                }
+
+                Some((operator_id, SerdeOperator::MapType(intersected_map)))
+            }
+        }
+    }
+
+    fn find_unambiguous_map_type(&self, id: SerdeOperatorId) -> Result<&MapType, &SerdeOperator> {
+        let operator = &self.serde_operators[id.0 as usize];
+        match operator {
+            SerdeOperator::MapType(map_type) => Ok(map_type),
+            SerdeOperator::ValueUnionType(union_type) => {
+                let mut map_count = 0;
+                let mut result = Err(operator);
+
+                for discriminator in &union_type.discriminators {
+                    if let Ok(map_type) = self.find_unambiguous_map_type(discriminator.operator_id)
+                    {
+                        result = Ok(map_type);
+                        map_count += 1;
+                    }
+                }
+
+                if map_count > 1 {
+                    Err(operator)
+                } else {
+                    result
+                }
+            }
+            _ => Err(operator),
         }
     }
 
@@ -265,35 +319,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 })
             }
             Constructor::ValueUnion(_) => {
-                let union_disciminator = self
-                    .relations
-                    .union_discriminators
-                    .get(&type_def_id)
-                    .expect("no union discriminator available. Should fail earlier");
-
-                if let Some(_) = &properties.map {
-                    // todo!("value union inherent map properties: {map:?}");
+                if let SerdeOperatorKey::InherentPropertyMap(_) = key {
+                    // just the inherent properties are requested.
+                    // Don't build a union
+                    self.create_map_operator(typename, type_def_id, properties)
+                } else {
+                    self.create_value_union_operator(typename, type_def_id, properties)
                 }
-
-                SerdeOperator::ValueUnionType(ValueUnionType {
-                    typename: typename.into(),
-                    discriminators: union_disciminator
-                        .variants
-                        .iter()
-                        .map(|discriminator| {
-                            let operator_id = self
-                                .get_serde_operator_id(SerdeOperatorKey::Identity(
-                                    discriminator.result_type,
-                                ))
-                                .expect("No inner operator");
-
-                            ValueUnionDiscriminator {
-                                discriminator: discriminator.clone(),
-                                operator_id,
-                            }
-                        })
-                        .collect(),
-                })
             }
             Constructor::Sequence(sequence) => {
                 let mut sequence_range_builder = SequenceRangeBuilder {
@@ -346,7 +378,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         key: SerdeOperatorKey,
     ) -> SerdeOperator {
         match key {
-            SerdeOperatorKey::PropertyMap(_) => {
+            SerdeOperatorKey::JoinedPropertyMap(_) => {
                 self.create_map_operator(typename, type_def_id, properties)
             }
             _ => {
@@ -360,7 +392,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .get_serde_operator_id(SerdeOperatorKey::IdMap(type_def_id))
                         .expect("No _id operator");
                     let map_properties_operator_id = self
-                        .get_serde_operator_id(SerdeOperatorKey::PropertyMap(type_def_id))
+                        .get_serde_operator_id(SerdeOperatorKey::JoinedPropertyMap(type_def_id))
                         .expect("No property map operator");
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
@@ -390,6 +422,68 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
         }
+    }
+
+    fn create_value_union_operator(
+        &mut self,
+        typename: &str,
+        type_def_id: DefId,
+        properties: &Properties,
+    ) -> SerdeOperator {
+        let union_disciminator = self
+            .relations
+            .union_discriminators
+            .get(&type_def_id)
+            .expect("no union discriminator available. Should fail earlier");
+
+        let discriminators: Vec<_> = if properties.map.is_some() {
+            // Need to do an intersection of the union type's _inherent_
+            // properties and each variant's properties
+            let inherent_properties_key = SerdeOperatorKey::InherentPropertyMap(type_def_id);
+
+            union_disciminator
+                .variants
+                .iter()
+                .map(|discriminator| {
+                    let operator_id = self
+                        .get_serde_operator_id(SerdeOperatorKey::MapIntersection(Box::new(
+                            [
+                                inherent_properties_key.clone(),
+                                SerdeOperatorKey::Identity(discriminator.result_type),
+                            ]
+                            .into(),
+                        )))
+                        .expect("No inner operator");
+
+                    ValueUnionDiscriminator {
+                        discriminator: discriminator.clone(),
+                        operator_id,
+                    }
+                })
+                .collect()
+        } else {
+            union_disciminator
+                .variants
+                .iter()
+                .map(|discriminator| {
+                    let operator_id = self
+                        .get_serde_operator_id(SerdeOperatorKey::Identity(
+                            discriminator.result_type,
+                        ))
+                        .expect("No inner operator");
+
+                    ValueUnionDiscriminator {
+                        discriminator: discriminator.clone(),
+                        operator_id,
+                    }
+                })
+                .collect()
+        };
+
+        SerdeOperator::ValueUnionType(ValueUnionType {
+            typename: typename.into(),
+            discriminators,
+        })
     }
 
     fn create_map_operator(

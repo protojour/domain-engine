@@ -38,15 +38,7 @@ impl Env {
         self.translations.get(&(from, to)).cloned()
     }
 
-    pub fn new_serde_processor(&self, value_operator_id: SerdeOperatorId) -> SerdeProcessor {
-        SerdeProcessor {
-            value_operator: &self.serde_operators[value_operator_id.0 as usize],
-            rel_params_operator_id: None,
-            env: self,
-        }
-    }
-
-    pub(crate) fn new_serde_processor_parameterized(
+    pub fn new_serde_processor(
         &self,
         value_operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,

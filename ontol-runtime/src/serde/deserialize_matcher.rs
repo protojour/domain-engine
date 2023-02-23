@@ -295,7 +295,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     .value_union_type
                     .discriminators
                     .iter()
-                    .map(|discriminator| self.env.new_serde_processor(discriminator.operator_id))
+                    .map(|discriminator| self
+                        .env
+                        .new_serde_processor(discriminator.operator_id, None))
                     .collect(),
                 logic_op: LogicOp::Or,
             }
@@ -352,7 +354,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
         for discriminator in &self.value_union_type.discriminators {
             if discriminator.discriminator.discriminant == Discriminant::IsSequence {
-                let processor = self.env.new_serde_processor(discriminator.operator_id);
+                let processor = self
+                    .env
+                    .new_serde_processor(discriminator.operator_id, None);
 
                 match &processor.value_operator {
                     SerdeOperator::Sequence(ranges, def_id) => {
@@ -455,7 +459,7 @@ impl<'e> MapMatcher<'e> {
             .map(|discriminator| {
                 match self
                     .env
-                    .new_serde_processor(discriminator.operator_id)
+                    .new_serde_processor(discriminator.operator_id, None)
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {
@@ -490,7 +494,7 @@ impl<'e> MapMatcher<'e> {
             ) {
                 match self
                     .env
-                    .new_serde_processor(discriminator.operator_id)
+                    .new_serde_processor(discriminator.operator_id, None)
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {
