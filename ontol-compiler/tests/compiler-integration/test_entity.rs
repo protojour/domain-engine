@@ -231,38 +231,37 @@ fn test_entity_self_relationship_mandatory_object() {
     });
 }
 
-#[test]
-fn entity_union_relation() {
-    "
-    type guitar_id {
-        rel '' { 'guitar/' } { uuid }
-    }
-    type synth_id {
-        rel '' { 'synth/' } { uuid }
-    }
-    type guitar {
-        rel { id } guitar_id
-        rel { 'type' } 'guitar'
-        rel { 'string_count' } int
-    }
-    type synth {
-        rel { id } synth_id
-        rel { 'type' } 'synth'
-        rel { 'polyphony' } int
-    }
-    type instrument {
-        rel . { guitar }
-        rel . { synth }
-    }
+const GUITAR_SYNTH_UNION: &'static str = "
+type guitar_id {
+    rel '' { 'guitar/' } { uuid }
+}
+type synth_id {
+    rel '' { 'synth/' } { uuid }
+}
+type guitar {
+    rel { id } guitar_id
+    rel { 'type' } 'guitar'
+    rel { 'string_count' } int
+}
+type synth {
+    rel { id } synth_id
+    rel { 'type' } 'synth'
+    rel { 'polyphony' } int
+}
+type instrument {
+    rel . { guitar }
+    rel . { synth }
+}
+type artist {
+    rel { id } string
+    rel { 'name' } string
+    rel { 'plays'* | 'played-by'* } instrument
+}
+";
 
-    type artist {
-        rel { id } string
-        rel { 'name' } string
-        rel { 'plays'* | 'played-by'* } instrument
-    }
-    "
-    .compile_ok(|env| {
-        let artist = TypeBinding::new(env, "artist");
+#[test]
+fn entity_union_simple() {
+    GUITAR_SYNTH_UNION.compile_ok(|env| {
         let instrument = TypeBinding::new(env, "instrument");
 
         assert_json_io_matches!(
@@ -270,13 +269,27 @@ fn entity_union_relation() {
             json!({
                 "type": "synth",
                 "polyphony": 8,
-                /*
+            })
+        );
+    });
+}
+
+#[test]
+#[ignore]
+fn entity_union_with_object_relation() {
+    GUITAR_SYNTH_UNION.compile_ok(|env| {
+        let instrument = TypeBinding::new(env, "instrument");
+
+        assert_json_io_matches!(
+            instrument,
+            json!({
+                "type": "synth",
+                "polyphony": 8,
                 "played-by": [
                     {
                         "_id": "some_artist"
                     }
                 ]
-                */
             })
         );
     });

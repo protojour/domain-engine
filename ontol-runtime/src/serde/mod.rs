@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    collections::BTreeSet,
+    fmt::{Debug, Display},
+};
 
 use derive_debug_extras::DebugExtras;
 use indexmap::IndexMap;
@@ -45,12 +48,13 @@ pub struct SerdeProcessor<'e> {
 #[debug_single_tuple_inline]
 pub struct SerdeOperatorId(pub u32);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum SerdeModifier {
-    Identity,
-    Array,
-    PropertyMap,
-    IdMap,
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum SerdeOperatorKey {
+    Identity(DefId),
+    Array(DefId),
+    PropertyMap(DefId),
+    IdMap(DefId),
+    Intersection(Box<BTreeSet<DefId>>),
 }
 
 #[derive(Debug)]

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
     serde::{
-        MapType, SequenceRange, SerdeModifier, SerdeOperator, SerdeOperatorId, SerdeProperty,
+        MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeOperatorKey, SerdeProperty,
         ValueType, ValueUnionDiscriminator, ValueUnionType,
     },
     DefId, Role,
@@ -27,7 +27,7 @@ pub struct SerdeGenerator<'c, 'm> {
     relations: &'c Relations,
     patterns: &'c Patterns,
     serde_operators: Vec<SerdeOperator>,
-    serde_operators_per_def: HashMap<(DefId, SerdeModifier), SerdeOperatorId>,
+    serde_operators_per_def: HashMap<SerdeOperatorKey, SerdeOperatorId>,
 }
 
 impl<'m> Compiler<'m> {
@@ -48,23 +48,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         self,
     ) -> (
         Vec<SerdeOperator>,
-        HashMap<(DefId, SerdeModifier), SerdeOperatorId>,
+        HashMap<SerdeOperatorKey, SerdeOperatorId>,
     ) {
         (self.serde_operators, self.serde_operators_per_def)
     }
 
-    pub fn get_serde_operator_id(
-        &mut self,
-        type_def_id: DefId,
-        modifier: SerdeModifier,
-    ) -> Option<SerdeOperatorId> {
-        if let Some(id) = self.serde_operators_per_def.get(&(type_def_id, modifier)) {
+    pub fn get_serde_operator_id(&mut self, key: SerdeOperatorKey) -> Option<SerdeOperatorId> {
+        if let Some(id) = self.serde_operators_per_def.get(&key) {
             return Some(*id);
         }
 
-        if let Some((operator_id, operator)) =
-            self.create_serde_operator_with_modifier(type_def_id, modifier)
-        {
+        if let Some((operator_id, operator)) = self.create_serde_operator_with_modifier(key) {
             debug!("created operator {operator_id:?} {operator:?}");
             self.serde_operators[operator_id.0 as usize] = operator;
             Some(operator_id)
@@ -81,12 +75,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
-                self.get_serde_operator_id(type_def_id, SerdeModifier::Identity)
+                self.get_serde_operator_id(SerdeOperatorKey::Identity(type_def_id))
                     .expect("no property operator"),
             ),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.get_serde_operator_id(type_def_id, SerdeModifier::Array)
+                self.get_serde_operator_id(SerdeOperatorKey::Array(type_def_id))
                     .expect("no property operator"),
             ),
         }
@@ -94,19 +88,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn create_serde_operator_with_modifier(
         &mut self,
-        type_def_id: DefId,
-        modifier: SerdeModifier,
+        key: SerdeOperatorKey,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
-        match modifier {
-            SerdeModifier::Identity | SerdeModifier::PropertyMap => {
-                self.create_item_operator(type_def_id, modifier)
+        match &key {
+            SerdeOperatorKey::Identity(def_id) | SerdeOperatorKey::PropertyMap(def_id) => {
+                let def_id = *def_id;
+                self.create_item_operator(key, def_id)
             }
-            SerdeModifier::Array => {
+            SerdeOperatorKey::Array(def_id) => {
                 let item_operator_id =
-                    self.get_serde_operator_id(type_def_id, SerdeModifier::Identity)?;
+                    self.get_serde_operator_id(SerdeOperatorKey::Identity(*def_id))?;
 
                 Some((
-                    self.alloc_operator_id(type_def_id, modifier),
+                    self.alloc_operator_id(&key),
                     SerdeOperator::Sequence(
                         [SequenceRange {
                             operator_id: item_operator_id,
@@ -114,54 +108,52 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }]
                         .into_iter()
                         .collect(),
-                        type_def_id,
+                        *def_id,
                     ),
                 ))
             }
-            SerdeModifier::IdMap => match self.get_def_type(type_def_id)? {
+            SerdeOperatorKey::IdMap(def_id) => match self.get_def_type(*def_id)? {
                 Type::Domain(_) => {
-                    let id_relation_id = self.relations.properties_by_type.get(&type_def_id)?.id?;
+                    let id_relation_id = self.relations.properties_by_type.get(&def_id)?.id?;
 
                     let (relationship, _) = self
-                        .get_subject_property_meta(type_def_id, id_relation_id)
+                        .get_subject_property_meta(*def_id, id_relation_id)
                         .expect("Problem getting subject property meta");
                     let object = relationship.object;
 
                     let object_operator_id = self
-                        .get_serde_operator_id(object.0, SerdeModifier::Identity)
+                        .get_serde_operator_id(SerdeOperatorKey::Identity(object.0))
                         .expect("No object operator for _id property");
 
                     Some((
-                        self.alloc_operator_id(type_def_id, modifier),
+                        self.alloc_operator_id(&key),
                         SerdeOperator::Id(object_operator_id),
                     ))
                 }
                 _ => None,
             },
+            SerdeOperatorKey::Intersection(_) => todo!(),
         }
     }
 
     fn create_item_operator(
         &mut self,
+        key: SerdeOperatorKey,
         type_def_id: DefId,
-        modifier: SerdeModifier,
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match self.get_def_type(type_def_id) {
-            Some(Type::Unit(_)) => Some((
-                self.alloc_operator_id(type_def_id, modifier),
-                SerdeOperator::Unit,
-            )),
+            Some(Type::Unit(_)) => Some((self.alloc_operator_id(&key), SerdeOperator::Unit)),
             Some(Type::IntConstant(_)) => todo!(),
             Some(Type::Int(_)) => Some((
-                self.alloc_operator_id(type_def_id, modifier),
+                self.alloc_operator_id(&key),
                 SerdeOperator::Int(type_def_id),
             )),
             Some(Type::Number(_)) => Some((
-                self.alloc_operator_id(type_def_id, modifier),
+                self.alloc_operator_id(&key),
                 SerdeOperator::Number(type_def_id),
             )),
             Some(Type::String(_)) => Some((
-                self.alloc_operator_id(type_def_id, modifier),
+                self.alloc_operator_id(&key),
                 SerdeOperator::String(type_def_id),
             )),
             Some(Type::StringConstant(def_id)) => {
@@ -170,7 +162,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let literal = self.defs.get_string_representation(*def_id);
 
                 Some((
-                    self.alloc_operator_id(*def_id, modifier),
+                    self.alloc_operator_id(&key),
                     SerdeOperator::StringConstant(literal.into(), type_def_id),
                 ))
             }
@@ -179,12 +171,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert!(self.patterns.string_patterns.contains_key(&type_def_id));
 
                 Some((
-                    self.alloc_operator_id(*def_id, modifier),
+                    self.alloc_operator_id(&key),
                     SerdeOperator::StringPattern(*def_id),
                 ))
             }
             Some(Type::Uuid(_)) => Some((
-                self.alloc_operator_id(type_def_id, modifier),
+                self.alloc_operator_id(&key),
                 SerdeOperator::String(type_def_id),
             )),
             Some(Type::EmptySequence(_)) => {
@@ -203,10 +195,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     Some(DefKind::DomainType(None)) => "anonymous",
                     _ => "Unknown type",
                 };
-                let operator_id = self.alloc_operator_id(type_def_id, modifier);
+                let operator_id = self.alloc_operator_id(&key);
                 Some((
                     operator_id,
-                    self.create_domain_type_serde_operator(typename, *def_id, properties, modifier),
+                    self.create_domain_type_serde_operator(typename, *def_id, properties, key),
                 ))
             }
             Some(Type::Function { .. }) => None,
@@ -219,13 +211,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn alloc_operator_id(&mut self, def_id: DefId, modifier: SerdeModifier) -> SerdeOperatorId {
+    fn alloc_operator_id(&mut self, key: &SerdeOperatorKey) -> SerdeOperatorId {
         let operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
         // We just need a temporary placeholder for this operator,
         // this will be properly overwritten afterwards:
         self.serde_operators.push(SerdeOperator::Unit);
         self.serde_operators_per_def
-            .insert((def_id, modifier), operator_id);
+            .insert(key.clone(), operator_id);
         operator_id
     }
 
@@ -234,7 +226,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         type_def_id: DefId,
         properties: Option<&Properties>,
-        modifier: SerdeModifier,
+        key: SerdeOperatorKey,
     ) -> SerdeOperator {
         let properties = match properties {
             None => {
@@ -249,12 +241,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         };
 
         match &properties.constructor {
-            Constructor::Identity => self.create_identity_constructor_operator(
-                typename,
-                type_def_id,
-                properties,
-                modifier,
-            ),
+            Constructor::Identity => {
+                self.create_identity_constructor_operator(typename, type_def_id, properties, key)
+            }
             Constructor::Value(relationship_id, _, cardinality) => {
                 let Ok((_, relation)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
@@ -282,6 +271,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .get(&type_def_id)
                     .expect("no union discriminator available. Should fail earlier");
 
+                if let Some(_) = &properties.map {
+                    // todo!("value union inherent map properties: {map:?}");
+                }
+
                 SerdeOperator::ValueUnionType(ValueUnionType {
                     typename: typename.into(),
                     discriminators: union_disciminator
@@ -289,10 +282,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .iter()
                         .map(|discriminator| {
                             let operator_id = self
-                                .get_serde_operator_id(
+                                .get_serde_operator_id(SerdeOperatorKey::Identity(
                                     discriminator.result_type,
-                                    SerdeModifier::Identity,
-                                )
+                                ))
                                 .expect("No inner operator");
 
                             ValueUnionDiscriminator {
@@ -313,17 +305,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 while let Some((_, element)) = element_iterator.next() {
                     let operator_id = match element {
                         None => self
-                            .get_serde_operator_id(DefId::unit(), SerdeModifier::Identity)
+                            .get_serde_operator_id(SerdeOperatorKey::Identity(DefId::unit()))
                             .unwrap(),
                         Some(relationship_id) => {
                             let (relationship, _relation) = self
                                 .get_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
-                            self.get_serde_operator_id(
+                            self.get_serde_operator_id(SerdeOperatorKey::Identity(
                                 relationship.object.0,
-                                SerdeModifier::Identity,
-                            )
+                            ))
                             .expect("no inner operator")
                         }
                     };
@@ -352,10 +343,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         type_def_id: DefId,
         properties: &Properties,
-        modifier: SerdeModifier,
+        key: SerdeOperatorKey,
     ) -> SerdeOperator {
-        match modifier {
-            SerdeModifier::PropertyMap => {
+        match key {
+            SerdeOperatorKey::PropertyMap(_) => {
                 self.create_map_operator(typename, type_def_id, properties)
             }
             _ => {
@@ -366,10 +357,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     // Create a union between { '_id' } and the map properties itself
                     let id_operator_id = self
-                        .get_serde_operator_id(type_def_id, SerdeModifier::IdMap)
+                        .get_serde_operator_id(SerdeOperatorKey::IdMap(type_def_id))
                         .expect("No _id operator");
                     let map_properties_operator_id = self
-                        .get_serde_operator_id(type_def_id, SerdeModifier::PropertyMap)
+                        .get_serde_operator_id(SerdeOperatorKey::PropertyMap(type_def_id))
                         .expect("No property map operator");
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
@@ -444,7 +435,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let rel_params_operator_id = match relationship.rel_params {
                     RelParams::Type(def_id) => {
-                        self.get_serde_operator_id(def_id, SerdeModifier::Identity)
+                        self.get_serde_operator_id(SerdeOperatorKey::Identity(def_id))
                     }
                     RelParams::Unit => None,
                     _ => todo!(),
