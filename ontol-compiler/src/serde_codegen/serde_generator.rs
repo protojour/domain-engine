@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -7,41 +7,28 @@ use ontol_runtime::{
         MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeOperatorKey, SerdeProperty,
         ValueType, ValueUnionDiscriminator, ValueUnionType,
     },
-    smart_format, DefId, Role,
+    DefId, Role,
 };
-use smallvec::SmallVec;
-use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    compiler::Compiler,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
     patterns::Patterns,
     relation::{Constructor, Properties, Relations},
+    serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type},
 };
 
-pub struct SerdeGenerator<'c, 'm> {
-    defs: &'c Defs<'m>,
-    def_types: &'c DefTypes<'m>,
-    relations: &'c Relations,
-    patterns: &'c Patterns,
-    serde_operators: Vec<SerdeOperator>,
-    serde_operators_per_def: HashMap<SerdeOperatorKey, SerdeOperatorId>,
-}
+use super::union_builder::UnionBuilder;
 
-impl<'m> Compiler<'m> {
-    pub fn serde_generator(&self) -> SerdeGenerator<'_, 'm> {
-        SerdeGenerator {
-            defs: &self.defs,
-            def_types: &self.def_types,
-            relations: &self.relations,
-            patterns: &self.patterns,
-            serde_operators: Default::default(),
-            serde_operators_per_def: Default::default(),
-        }
-    }
+pub struct SerdeGenerator<'c, 'm> {
+    pub(super) defs: &'c Defs<'m>,
+    pub(super) def_types: &'c DefTypes<'m>,
+    pub(super) relations: &'c Relations,
+    pub(super) patterns: &'c Patterns,
+    pub(super) operators_by_id: Vec<SerdeOperator>,
+    pub(super) operators_by_key: HashMap<SerdeOperatorKey, SerdeOperatorId>,
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
@@ -51,22 +38,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         Vec<SerdeOperator>,
         HashMap<SerdeOperatorKey, SerdeOperatorId>,
     ) {
-        (self.serde_operators, self.serde_operators_per_def)
+        (self.operators_by_id, self.operators_by_key)
     }
 
     pub fn get_serde_operator(&mut self, key: SerdeOperatorKey) -> Option<&SerdeOperator> {
         let operator_id = self.get_serde_operator_id(key)?;
-        Some(&self.serde_operators[operator_id.0 as usize])
+        Some(&self.operators_by_id[operator_id.0 as usize])
     }
 
     pub fn get_serde_operator_id(&mut self, key: SerdeOperatorKey) -> Option<SerdeOperatorId> {
-        if let Some(id) = self.serde_operators_per_def.get(&key) {
+        if let Some(id) = self.operators_by_key.get(&key) {
             return Some(*id);
         }
 
         if let Some((operator_id, operator)) = self.create_serde_operator_from_key(key.clone()) {
             debug!("created operator {operator_id:?} {key:?} {operator:?}");
-            self.serde_operators[operator_id.0 as usize] = operator;
+            self.operators_by_id[operator_id.0 as usize] = operator;
             Some(operator_id)
         } else {
             None
@@ -171,7 +158,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 
     fn find_unambiguous_map_type(&self, id: SerdeOperatorId) -> Result<&MapType, &SerdeOperator> {
-        let operator = &self.serde_operators[id.0 as usize];
+        let operator = &self.operators_by_id[id.0 as usize];
         match operator {
             SerdeOperator::MapType(map_type) => Ok(map_type),
             SerdeOperator::ValueUnionType(union_type) => {
@@ -184,7 +171,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         result = Ok(map_type);
                         map_count += 1;
                     } else {
-                        let operator = &self.serde_operators[discriminator.operator_id.0 as usize];
+                        let operator = &self.operators_by_id[discriminator.operator_id.0 as usize];
                         debug!("SKIPPED SOMETHING: {operator:?}\n\n");
                     }
                 }
@@ -275,12 +262,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 
     fn alloc_operator_id(&mut self, key: &SerdeOperatorKey) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.serde_operators.len() as u32);
+        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
         // We just need a temporary placeholder for this operator,
         // this will be properly overwritten afterwards:
-        self.serde_operators.push(SerdeOperator::Unit);
-        self.serde_operators_per_def
-            .insert(key.clone(), operator_id);
+        self.operators_by_id.push(SerdeOperator::Unit);
+        self.operators_by_key.insert(key.clone(), operator_id);
         operator_id
     }
 
@@ -337,9 +323,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
             Constructor::Sequence(sequence) => {
-                let mut sequence_range_builder = SequenceRangeBuilder {
-                    ranges: Default::default(),
-                };
+                let mut sequence_range_builder = SequenceRangeBuilder::default();
 
                 let mut element_iterator = sequence.elements().peekable();
 
@@ -368,9 +352,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                 }
 
-                debug!("sequence ranges: {:#?}", sequence_range_builder.ranges);
+                let ranges = sequence_range_builder.build();
+                debug!("sequence ranges: {:#?}", ranges);
 
-                SerdeOperator::Sequence(sequence_range_builder.ranges, type_def_id)
+                SerdeOperator::Sequence(ranges, type_def_id)
             }
             Constructor::StringPattern(_) => {
                 assert!(self.patterns.string_patterns.contains_key(&type_def_id));
@@ -450,9 +435,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             // properties and each variant's properties
             let inherent_properties_key = SerdeOperatorKey::InherentPropertyMap(type_def_id);
 
-            let mut union_builder = UnionBuilder {
-                discriminator_candidates: vec![],
-            };
+            let mut union_builder = UnionBuilder::default();
             let mut root_types: HashSet<DefId> = Default::default();
 
             for root_discriminator in &union_disciminator.variants {
@@ -576,191 +559,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             properties: serde_properties,
             n_mandatory_properties,
         })
-    }
-}
-
-struct SequenceRangeBuilder {
-    ranges: SmallVec<[SequenceRange; 3]>,
-}
-
-impl SequenceRangeBuilder {
-    fn push_required_operator(&mut self, operator_id: SerdeOperatorId) {
-        match self.ranges.last_mut() {
-            Some(range) => {
-                if operator_id == range.operator_id {
-                    // two or more identical operator ids in row;
-                    // just increase repetition counter:
-                    let finite_repetition = range.finite_repetition.unwrap();
-                    range.finite_repetition = Some(finite_repetition + 1);
-                } else {
-                    self.ranges.push(SequenceRange {
-                        operator_id,
-                        finite_repetition: Some(1),
-                    });
-                }
-            }
-            None => {
-                self.ranges.push(SequenceRange {
-                    operator_id,
-                    finite_repetition: Some(1),
-                });
-            }
-        }
-    }
-
-    fn push_infinite_operator(&mut self, operator_id: SerdeOperatorId) {
-        self.ranges.push(SequenceRange {
-            operator_id,
-            finite_repetition: None,
-        })
-    }
-}
-
-struct UnionBuilder {
-    discriminator_candidates: Vec<ValueUnionDiscriminator>,
-}
-
-impl UnionBuilder {
-    fn build(
-        self,
-        generator: &mut SerdeGenerator,
-        mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
-    ) -> Result<Vec<ValueUnionDiscriminator>, String> {
-        let mut discriminators_by_discriminant: BTreeMap<
-            Discriminant,
-            Vec<(SerdeOperatorId, DefId)>,
-        > = Default::default();
-
-        for candidate in self.discriminator_candidates {
-            let result_type = candidate.discriminator.result_type;
-            let operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
-
-            match candidate.discriminator.discriminant {
-                Discriminant::MapFallback => {
-                    panic!("MapFallback should have been filtered already");
-                }
-                Discriminant::IsSingletonProperty(relation_id, prop) => {
-                    // TODO: We don't know that we have to do any disambiguation here
-                    // (there might be only one singleton property)
-                    let operator =
-                        generator.get_serde_operator(SerdeOperatorKey::Identity(result_type));
-
-                    match operator {
-                        Some(SerdeOperator::CapturingStringPattern(def_id)) => {
-                            // convert this
-                            discriminators_by_discriminant
-                                .entry(Discriminant::HasAttributeMatchingStringPattern(
-                                    relation_id,
-                                    prop,
-                                    *def_id,
-                                ))
-                                .or_default()
-                                .push((operator_id, result_type));
-                        }
-                        _ => {
-                            discriminators_by_discriminant
-                                .entry(Discriminant::IsSingletonProperty(relation_id, prop))
-                                .or_default()
-                                .push((operator_id, result_type));
-                        }
-                    }
-                }
-                discriminant => {
-                    discriminators_by_discriminant
-                        .entry(discriminant)
-                        .or_default()
-                        .push((operator_id, result_type));
-                }
-            }
-        }
-
-        let mut discriminators = vec![];
-
-        for (discriminant, entries) in discriminators_by_discriminant {
-            if entries.len() > 1 {
-                return Err(smart_format!(
-                    "BUG: Discriminant {discriminant:?} has multiple entries: {entries:?}"
-                ));
-            }
-
-            if let Some((operator_id, result_type)) = entries.into_iter().next() {
-                discriminators.push(ValueUnionDiscriminator {
-                    discriminator: VariantDiscriminator {
-                        discriminant,
-                        result_type,
-                    },
-                    operator_id,
-                });
-            }
-        }
-
-        Ok(discriminators)
-    }
-
-    fn add_root_discriminator(
-        &mut self,
-        generator: &mut SerdeGenerator,
-        discriminator: &VariantDiscriminator,
-    ) -> Result<(), String> {
-        let operator_id = match generator
-            .get_serde_operator_id(SerdeOperatorKey::Identity(discriminator.result_type))
-        {
-            Some(operator_id) => operator_id,
-            None => return Ok(()),
-        };
-
-        // Push with empty scope ('root scope')
-        self.push_discriminator(generator, &[], discriminator, operator_id)
-    }
-
-    fn push_discriminator(
-        &mut self,
-        generator: &SerdeGenerator,
-        scope: &[&VariantDiscriminator],
-        discriminator: &VariantDiscriminator,
-        operator_id: SerdeOperatorId,
-    ) -> Result<(), String> {
-        let operator = &generator.serde_operators[operator_id.0 as usize];
-        match operator {
-            SerdeOperator::ValueUnionType(value_union) => {
-                for inner_discriminator in &value_union.discriminators {
-                    let mut child_scope: Vec<&VariantDiscriminator> = vec![];
-                    child_scope.extend(scope.iter());
-                    child_scope.push(discriminator);
-
-                    self.push_discriminator(
-                        generator,
-                        &child_scope,
-                        &inner_discriminator.discriminator,
-                        inner_discriminator.operator_id,
-                    )?;
-                }
-                Ok(())
-            }
-            other => {
-                debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
-                match discriminator.discriminant {
-                    Discriminant::MapFallback => {
-                        if let Some(scoping) = scope.last() {
-                            self.discriminator_candidates.push(ValueUnionDiscriminator {
-                                discriminator: (*scoping).clone(),
-                                operator_id,
-                            });
-                            Ok(())
-                        } else {
-                            Err(smart_format!("MapFallback without scoping"))
-                        }
-                    }
-                    _ => {
-                        self.discriminator_candidates.push(ValueUnionDiscriminator {
-                            discriminator: discriminator.clone(),
-                            operator_id,
-                        });
-                        Ok(())
-                    }
-                }
-            }
-        }
     }
 }
 
