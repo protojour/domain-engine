@@ -86,7 +86,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(Default::default())
             }
             ast::Statement::Type(type_stmt) => {
-                let def_id = self.named_def_id(Space::Type, &type_stmt.ident.0);
+                let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
+                    Ok(def_id) => def_id,
+                    Err(_) => {
+                        return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1))
+                    }
+                };
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
                 let kind = DefKind::DomainType(Some(ident));
 
@@ -511,13 +516,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_def_id(&mut self, space: Space, ident: &String) -> DefId {
+    fn named_def_id(&mut self, space: Space, ident: &String) -> Result<DefId, DefId> {
         let def_id = self.compiler.defs.alloc_def_id();
-        self.compiler
+        match self
+            .compiler
             .namespaces
             .get_mut(self.src.package_id, space)
-            .insert(ident.clone(), def_id);
-        def_id
+            .insert(ident.clone(), def_id)
+        {
+            Some(old_def_id) => Err(old_def_id),
+            None => Ok(def_id),
+        }
     }
 
     fn set_def(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {

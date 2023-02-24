@@ -352,6 +352,8 @@ fn union_with_ambiguous_id_should_fail() {
     type animal {
         rel { id } string
         rel { 'class' } 'animal'
+        // TODO: Test this:
+        // rel { 'eats'* } lifeform
     }
     type plant {
         rel { id } string

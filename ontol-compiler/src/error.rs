@@ -42,6 +42,8 @@ pub enum CompileError {
     NotCallable,
     #[error("type not found")]
     TypeNotFound,
+    #[error("duplicate type definition")]
+    DuplicateTypeDefinition,
     #[error("namespace not found")]
     NamespaceNotFound,
     #[error("invalid type")]

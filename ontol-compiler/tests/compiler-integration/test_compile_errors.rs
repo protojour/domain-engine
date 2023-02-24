@@ -63,6 +63,15 @@ fn rel_type_not_found() {
 }
 
 #[test]
+fn duplicate_type() {
+    "
+    type foo
+    type foo // ERROR duplicate type definition
+    "
+    .compile_fail()
+}
+
+#[test]
 fn rel_duplicate_anonymous_relation() {
     "
     type foo
