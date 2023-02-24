@@ -20,7 +20,7 @@ pub enum Discriminant {
     IsString,
     IsStringLiteral(String),
     IsSequence,
-    MatchesCapturingStringPattern,
+    MatchesCapturingStringPattern(DefId),
     /// Matches any map
     MapFallback,
     /// Matches a map that has a single property, and only that property will be used for information

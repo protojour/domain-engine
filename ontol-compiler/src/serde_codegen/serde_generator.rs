@@ -430,21 +430,21 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             .get(&type_def_id)
             .expect("no union discriminator available. Should fail earlier");
 
+        let mut union_builder = UnionBuilder::default();
+        let mut root_types: HashSet<DefId> = Default::default();
+
+        for root_discriminator in &union_disciminator.variants {
+            union_builder
+                .add_root_discriminator(self, root_discriminator)
+                .expect("Could not add root discriminator to union builder");
+
+            root_types.insert(root_discriminator.result_type);
+        }
+
         let discriminators: Vec<_> = if properties.map.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_key = SerdeOperatorKey::InherentPropertyMap(type_def_id);
-
-            let mut union_builder = UnionBuilder::default();
-            let mut root_types: HashSet<DefId> = Default::default();
-
-            for root_discriminator in &union_disciminator.variants {
-                union_builder
-                    .add_root_discriminator(self, root_discriminator)
-                    .expect("Could not add root discriminator to union builder");
-
-                root_types.insert(root_discriminator.result_type);
-            }
 
             union_builder
                 .build(self, |this, operator_id, result_type| {
@@ -464,22 +464,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 })
                 .unwrap()
         } else {
-            union_disciminator
-                .variants
-                .iter()
-                .map(|discriminator| {
-                    let operator_id = self
-                        .get_serde_operator_id(SerdeOperatorKey::Identity(
-                            discriminator.result_type,
-                        ))
-                        .expect("No inner operator");
-
-                    ValueUnionDiscriminator {
-                        discriminator: discriminator.clone(),
-                        operator_id,
-                    }
-                })
-                .collect()
+            union_builder
+                .build(self, |_this, operator_id, _result_type| operator_id)
+                .unwrap()
         };
 
         SerdeOperator::ValueUnionType(ValueUnionType {

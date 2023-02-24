@@ -326,3 +326,52 @@ fn entity_union_in_relation_with_ids() {
         assert_eq!(synth_id_attr.value.type_def_id, synth_id.def_id);
     });
 }
+
+#[test]
+fn entity_relationship_without_reverse() {
+    "
+    type language { rel { id } string }
+    type programmer {
+        rel { id } string
+        rel { 'name' } string
+        rel { 'favorite-language' } language
+    }
+    "
+    .compile_ok(|env| {
+        let programmer = TypeBinding::new(env, "programmer");
+        assert_json_io_matches!(
+            programmer,
+            json!({ "name": "audun", "favorite-language": { "_id": "rust" }})
+        );
+    })
+}
+
+#[test]
+fn union_with_ambiguous_id_should_fail() {
+    "
+    type animal {
+        rel { id } string
+        rel { 'class' } 'animal'
+    }
+    type plant {
+        rel { id } string
+        rel { 'class' } 'plant'
+    }
+    type lifeform {
+        rel . { animal }
+        rel . { plant }
+    }
+    type owner {
+        rel { id } string
+        rel { 'name' } string
+        rel { 'owns'* } lifeform
+    }
+    "
+    .compile_ok(|env| {
+        let owner = TypeBinding::new(env, "owner");
+        assert_json_io_matches!(
+            owner,
+            json!({ "name": "some owner", "owns": [{ "_id": "lifeform" }]})
+        );
+    })
+}

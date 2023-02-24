@@ -17,20 +17,19 @@ pub struct UnionBuilder {
 
 impl UnionBuilder {
     pub fn build(
-        self,
+        mut self,
         generator: &mut SerdeGenerator,
         mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
     ) -> Result<Vec<ValueUnionDiscriminator>, String> {
-        let mut discriminators_by_discriminant: BTreeMap<
-            Discriminant,
-            Vec<(SerdeOperatorId, DefId)>,
-        > = Default::default();
+        // sanity check
+        let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
-        for candidate in self.discriminator_candidates {
+        for candidate in &mut self.discriminator_candidates {
             let result_type = candidate.discriminator.result_type;
-            let operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
 
-            match candidate.discriminator.discriminant {
+            candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
+
+            match &mut candidate.discriminator.discriminant {
                 Discriminant::MapFallback => {
                     panic!("MapFallback should have been filtered already");
                 }
@@ -43,53 +42,31 @@ impl UnionBuilder {
                     match operator {
                         Some(SerdeOperator::CapturingStringPattern(def_id)) => {
                             // convert this
-                            discriminators_by_discriminant
-                                .entry(Discriminant::HasAttributeMatchingStringPattern(
-                                    relation_id,
-                                    prop,
+                            candidate.discriminator.discriminant =
+                                Discriminant::HasAttributeMatchingStringPattern(
+                                    *relation_id,
+                                    prop.clone(),
                                     *def_id,
-                                ))
-                                .or_default()
-                                .push((operator_id, result_type));
+                                );
                         }
-                        _ => {
-                            discriminators_by_discriminant
-                                .entry(Discriminant::IsSingletonProperty(relation_id, prop))
-                                .or_default()
-                                .push((operator_id, result_type));
-                        }
+                        _ => {}
                     }
                 }
-                discriminant => {
-                    discriminators_by_discriminant
-                        .entry(discriminant)
-                        .or_default()
-                        .push((operator_id, result_type));
-                }
+                _ => {}
+            }
+
+            *ambiguous_discriminant_debug
+                .entry(candidate.discriminator.discriminant.clone())
+                .or_default() += 1;
+        }
+
+        for (discriminant, count) in ambiguous_discriminant_debug {
+            if count > 1 {
+                return Err(smart_format!("Discriminant {discriminant:?} is ambiguous"));
             }
         }
 
-        let mut discriminators = vec![];
-
-        for (discriminant, entries) in discriminators_by_discriminant {
-            if entries.len() > 1 {
-                return Err(smart_format!(
-                    "BUG: Discriminant {discriminant:?} has multiple entries: {entries:?}"
-                ));
-            }
-
-            if let Some((operator_id, result_type)) = entries.into_iter().next() {
-                discriminators.push(ValueUnionDiscriminator {
-                    discriminator: VariantDiscriminator {
-                        discriminant,
-                        result_type,
-                    },
-                    operator_id,
-                });
-            }
-        }
-
-        Ok(discriminators)
+        Ok(self.discriminator_candidates)
     }
 
     pub fn add_root_discriminator(

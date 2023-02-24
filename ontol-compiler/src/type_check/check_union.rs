@@ -391,7 +391,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // match patterns before strings
         for (variant_def_id, _) in builder.pattern_candidates {
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::MatchesCapturingStringPattern,
+                discriminant: Discriminant::MatchesCapturingStringPattern(variant_def_id),
                 result_type: variant_def_id,
             });
         }
