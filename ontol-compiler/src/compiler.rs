@@ -18,6 +18,7 @@ use crate::{
     SpannedCompileError,
 };
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
     serde::SerdeOperatorKey,
@@ -78,7 +79,7 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids {
-            let mut types: HashMap<String, TypeInfo> = Default::default();
+            let mut types: IndexMap<String, TypeInfo> = Default::default();
 
             let type_namespace = namespaces.remove(&package_id).unwrap().types;
 

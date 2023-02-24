@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
@@ -53,7 +54,7 @@ impl Env {
 }
 
 pub struct Domain {
-    pub types: HashMap<String, TypeInfo>,
+    pub types: IndexMap<String, TypeInfo>,
 }
 
 pub struct TypeInfo {
