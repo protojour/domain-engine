@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Display};
 
 use smartstring::alias::String;
 
-use crate::{DefId, RelationId, Role};
+use crate::{cast::Cast, DefId, RelationId, Role};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -38,6 +38,24 @@ impl Value {
         } else {
             Some(self)
         }
+    }
+
+    pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute> {
+        match &self.data {
+            Data::Map(map) => map.get(&property_id),
+            _ => None,
+        }
+    }
+
+    pub fn get_attribute_value(&self, property_id: PropertyId) -> Option<&Value> {
+        self.get_attribute(property_id).map(|attr| &attr.value)
+    }
+
+    pub fn cast_ref<T>(&self) -> &<Self as Cast<T>>::Ref
+    where
+        Self: Cast<T>,
+    {
+        <Self as Cast<T>>::cast_ref(&self)
     }
 }
 

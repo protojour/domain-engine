@@ -43,6 +43,36 @@ pub struct SerdeProcessor<'e> {
     pub(crate) env: &'e Env,
 }
 
+impl<'e> SerdeProcessor<'e> {
+    pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
+        self.search_property(prop, self.value_operator)
+    }
+
+    fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
+        match operator {
+            SerdeOperator::ValueUnionType(union_type) => {
+                for discriminator in &union_type.discriminators {
+                    let next_operator = self
+                        .env
+                        .new_serde_processor(discriminator.operator_id, None);
+                    if let Some(property_id) =
+                        self.search_property(prop, &next_operator.value_operator)
+                    {
+                        return Some(property_id);
+                    }
+                }
+
+                None
+            }
+            SerdeOperator::MapType(map_type) => map_type
+                .properties
+                .get(prop)
+                .map(|serde_property| serde_property.property_id),
+            _ => None,
+        }
+    }
+}
+
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
 #[debug_single_tuple_inline]

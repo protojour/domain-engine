@@ -82,6 +82,8 @@ fn artist_and_instrument_basic() {
 fn artist_and_instrument_id_as_relation_object() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
+        let plays = artist.find_property("plays").unwrap();
+
         let instrument_id = TypeBinding::new(env, "instrument-id");
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
@@ -100,7 +102,7 @@ fn artist_and_instrument_id_as_relation_object() {
             })
         );
 
-        let plays_attributes = artist.deserialize_data_map(
+        let john = artist.deserialize_value(
             json!({
                 "name": "John McLaughlin",
                 "plays": [
@@ -111,20 +113,16 @@ fn artist_and_instrument_id_as_relation_object() {
                         }
                     }
                 ]
-        }))
+        })).unwrap();
+
+        let plays_attributes = john
+            .get_attribute_value(plays)
             .unwrap()
-            .into_values()
-            .find_map(|attribute| {
-                match attribute.value.data {
-                    Data::Sequence(seq) => Some(seq),
-                    _ => None,
-                }
-            })
-            .unwrap();
+            .cast_ref::<Vec<_>>();
 
         // The value of the `plays` attribute is an `artist-id`
         assert_eq!(
-            instrument_id.serialize_json(&plays_attributes.first().unwrap().value),
+            instrument_id.serialize_json(&plays_attributes[0].value),
             json!(example_id)
         );
 
@@ -298,6 +296,8 @@ fn entity_union_with_object_relation() {
 fn entity_union_in_relation_with_ids() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
+        let plays = artist.find_property("plays").unwrap();
+
         let guitar_id = TypeBinding::new(env, "guitar_id");
         let synth_id = TypeBinding::new(env, "synth_id");
 
@@ -311,15 +311,12 @@ fn entity_union_in_relation_with_ids() {
 
         assert_json_io_matches!(artist, json.clone());
 
-        let plays_attributes = artist
-            .deserialize_data_map(json.clone())
+        let artist_value = artist.deserialize_value(json.clone()).unwrap();
+
+        let plays_attributes = artist_value
+            .get_attribute_value(plays)
             .unwrap()
-            .into_values()
-            .find_map(|attribute| match attribute.value.data {
-                Data::Sequence(seq) => Some(seq),
-                _ => None,
-            })
-            .unwrap();
+            .cast_ref::<Vec<_>>();
 
         let guitar_id_attr = &plays_attributes[0];
         let synth_id_attr = &plays_attributes[1];

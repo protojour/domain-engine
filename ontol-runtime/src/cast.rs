@@ -90,7 +90,7 @@ impl Cast<Vec<Attribute>> for Value {
     fn cast_ref(&self) -> &Self::Ref {
         match &self.data {
             Data::Sequence(v) => v.as_slice(),
-            _ => panic!("not an integer"),
+            _ => panic!("not a vector"),
         }
     }
 }

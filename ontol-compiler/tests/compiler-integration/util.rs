@@ -44,6 +44,12 @@ impl<'e> TypeBinding<'e> {
         self.env
     }
 
+    pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
+        self.env
+            .new_serde_processor(self.serde_operator_id, None)
+            .find_property(prop)
+    }
+
     pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
         let value = self.deserialize_value(json)?;
         assert_eq!(value.type_def_id, self.def_id);
