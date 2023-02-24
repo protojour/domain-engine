@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_runtime::DefId;
 use smartstring::alias::String;
 
@@ -13,21 +12,24 @@ pub enum Space {
     Rel,
 }
 
+/// The reason that BTreeMap is used here is determinism.
+/// The keys will then be sorted alphabetically, so that
+/// each compile behaves similar to the previous compile, easing debugging.
 #[derive(Default, Debug)]
 pub struct Namespace {
-    pub(crate) types: HashMap<String, DefId>,
-    pub(crate) relations: HashMap<String, DefId>,
+    pub(crate) types: IndexMap<String, DefId>,
+    pub(crate) relations: IndexMap<String, DefId>,
 }
 
 impl Namespace {
-    pub fn space(&self, space: Space) -> &HashMap<String, DefId> {
+    pub fn space(&self, space: Space) -> &IndexMap<String, DefId> {
         match space {
             Space::Type => &self.types,
             Space::Rel => &self.relations,
         }
     }
 
-    pub fn space_mut(&mut self, space: Space) -> &mut HashMap<String, DefId> {
+    pub fn space_mut(&mut self, space: Space) -> &mut IndexMap<String, DefId> {
         match space {
             Space::Type => &mut self.types,
             Space::Rel => &mut self.relations,
@@ -54,7 +56,7 @@ impl Namespaces {
         None
     }
 
-    pub fn get_mut(&mut self, package: PackageId, space: Space) -> &mut HashMap<String, DefId> {
+    pub fn get_mut(&mut self, package: PackageId, space: Space) -> &mut IndexMap<String, DefId> {
         self.namespaces.entry(package).or_default().space_mut(space)
     }
 }
