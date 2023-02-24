@@ -5,7 +5,7 @@ use ontol_compiler::{
     SourceCodeRegistry, SourceId, Sources, SpannedCompileError, Src,
 };
 use ontol_runtime::{
-    env::Env,
+    env::{Env, TypeInfo},
     serde::{SerdeOperatorId, SerdeOperatorKey},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
@@ -16,27 +16,28 @@ use tracing::debug;
 use crate::TEST_PKG;
 
 pub struct TypeBinding<'e> {
-    pub def_id: DefId,
-    serde_operator_id: SerdeOperatorId,
+    pub type_info: TypeInfo,
     env: &'e Env,
 }
 
 impl<'e> TypeBinding<'e> {
     pub fn new(env: &'e Env, type_name: &str) -> Self {
         let domain = env.get_domain(&TEST_PKG).unwrap();
-        let def_id = domain
-            .get_def_id(type_name)
-            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"));
-        let serde_operator_id = domain.get_serde_operator_id(type_name).unwrap();
-        let binding = Self {
-            def_id,
-            serde_operator_id,
-            env,
-        };
+        let type_info = domain
+            .types
+            .get(type_name)
+            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"))
+            .clone();
+
         debug!(
-            "TypeBinding::new `{type_name}` with {serde_operator_id:?} {:?}",
-            env.new_serde_processor(serde_operator_id, None)
+            "TypeBinding::new `{type_name}` with {operator_id:?} {processor:?}",
+            operator_id = type_info.serde_operator_id,
+            processor = type_info
+                .serde_operator_id
+                .map(|id| env.new_serde_processor(id, None))
         );
+        let binding = Self { type_info, env };
+
         binding
     }
 
@@ -44,15 +45,21 @@ impl<'e> TypeBinding<'e> {
         self.env
     }
 
+    fn serde_operator_id(&self) -> SerdeOperatorId {
+        self.type_info
+            .serde_operator_id
+            .expect("No serde operator id")
+    }
+
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
         self.env
-            .new_serde_processor(self.serde_operator_id, None)
+            .new_serde_processor(self.serde_operator_id(), None)
             .find_property(prop)
     }
 
     pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
         let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.def_id);
+        assert_eq!(value.type_def_id, self.type_info.def_id);
         Ok(value.data)
     }
 
@@ -61,7 +68,7 @@ impl<'e> TypeBinding<'e> {
         json: serde_json::Value,
     ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
         let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.def_id);
+        assert_eq!(value.type_def_id, self.type_info.def_id);
         match value.data {
             Data::Map(map) => Ok(map),
             other => panic!("not a map: {other:?}"),
@@ -76,7 +83,7 @@ impl<'e> TypeBinding<'e> {
         json: serde_json::Value,
     ) -> Result<Data, serde_json::Error> {
         let value = self.deserialize_value(json)?;
-        assert_ne!(value.type_def_id, self.def_id);
+        assert_ne!(value.type_def_id, self.type_info.def_id);
         Ok(value.data)
     }
 
@@ -84,7 +91,7 @@ impl<'e> TypeBinding<'e> {
         let json_string = serde_json::to_string(&json).unwrap();
         let Attribute { value, rel_params } = self
             .env
-            .new_serde_processor(self.serde_operator_id, None)
+            .new_serde_processor(self.serde_operator_id(), None)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
 
         assert_eq!(rel_params.type_def_id, DefId::unit());
@@ -93,13 +100,13 @@ impl<'e> TypeBinding<'e> {
     }
 
     pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
-        self.serialize_json(&Value::new(data.clone(), self.def_id))
+        self.serialize_json(&Value::new(data.clone(), self.type_info.def_id))
     }
 
     pub fn serialize_json(&self, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.env
-            .new_serde_processor(self.serde_operator_id, None)
+            .new_serde_processor(self.serde_operator_id(), None)
             .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()

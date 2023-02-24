@@ -57,11 +57,6 @@ pub struct Domain {
     pub types: IndexMap<String, TypeInfo>,
 }
 
-pub struct TypeInfo {
-    pub def_id: DefId,
-    pub serde_operator_id: Option<SerdeOperatorId>,
-}
-
 impl Domain {
     pub fn get_def_id(&self, type_name: &str) -> Option<DefId> {
         let type_info = self.types.get(type_name)?;
@@ -72,4 +67,14 @@ impl Domain {
         let type_info = self.types.get(type_name)?;
         type_info.serde_operator_id
     }
+}
+
+#[derive(Clone)]
+pub struct TypeInfo {
+    pub def_id: DefId,
+
+    // If this type is an entity, this is the type of its ID
+    pub entity_id: Option<DefId>,
+
+    pub serde_operator_id: Option<SerdeOperatorId>,
 }

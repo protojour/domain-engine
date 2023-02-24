@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     codegen::CodegenTasks,
+    compiler_queries::GetPropertyMeta,
     def::Defs,
     error::{CompileErrors, UnifiedCompileError},
     expr::{Expr, ExprId},
@@ -84,10 +85,26 @@ impl<'m> Compiler<'m> {
             let type_namespace = namespaces.remove(&package_id).unwrap().types;
 
             for (type_name, type_def_id) in type_namespace {
+                let entity_id =
+                    if let Some(properties) = self.relations.properties_by_type(type_def_id) {
+                        if let Some(id_relation_id) = &properties.id {
+                            let (relationship, _) = self
+                                .get_subject_property_meta(type_def_id, *id_relation_id)
+                                .expect("BUG: problem getting property meta");
+
+                            Some(relationship.object.0)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
                 types.insert(
                     type_name,
                     TypeInfo {
                         def_id: type_def_id,
+                        entity_id,
                         serde_operator_id: serde_generator
                             .get_serde_operator_id(SerdeOperatorKey::Identity(type_def_id)),
                     },

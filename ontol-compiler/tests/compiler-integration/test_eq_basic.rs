@@ -19,11 +19,14 @@ fn assert_translate(
 
     let value = input_binding.deserialize_value(input).unwrap();
 
-    let procedure = match env.get_translator(input_binding.def_id, output_binding.def_id) {
+    let procedure = match env.get_translator(
+        input_binding.type_info.def_id,
+        output_binding.type_info.def_id,
+    ) {
         Some(procedure) => procedure,
         None => panic!(
             "No translator found for ({:?}, {:?})",
-            input_binding.def_id, output_binding.def_id
+            input_binding.type_info.def_id, output_binding.type_info.def_id
         ),
     };
 

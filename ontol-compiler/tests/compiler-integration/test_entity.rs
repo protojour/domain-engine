@@ -298,8 +298,12 @@ fn entity_union_in_relation_with_ids() {
         let artist = TypeBinding::new(env, "artist");
         let plays = artist.find_property("plays").unwrap();
 
+        assert!(artist.type_info.entity_id.is_some());
+
         let guitar_id = TypeBinding::new(env, "guitar_id");
         let synth_id = TypeBinding::new(env, "synth_id");
+
+        assert!(guitar_id.type_info.entity_id.is_none());
 
         let json = json!({
             "name": "Someone",
@@ -321,9 +325,9 @@ fn entity_union_in_relation_with_ids() {
         let guitar_id_attr = &plays_attributes[0];
         let synth_id_attr = &plays_attributes[1];
 
-        assert_ne!(guitar_id.def_id, synth_id.def_id);
-        assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.def_id);
-        assert_eq!(synth_id_attr.value.type_def_id, synth_id.def_id);
+        assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
+        assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.type_info.def_id);
+        assert_eq!(synth_id_attr.value.type_def_id, synth_id.type_info.def_id);
     });
 }
 
