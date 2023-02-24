@@ -359,7 +359,7 @@ fn union_with_ambiguous_id_should_fail() {
         rel { id } string
         rel { 'class' } 'plant'
     }
-    type lifeform {
+    type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
         rel . { animal }
         rel . { plant }
     }
@@ -369,11 +369,5 @@ fn union_with_ambiguous_id_should_fail() {
         rel { 'owns'* } lifeform
     }
     "
-    .compile_ok(|env| {
-        let owner = TypeBinding::new(env, "owner");
-        assert_json_io_matches!(
-            owner,
-            json!({ "name": "some owner", "owns": [{ "_id": "lifeform" }]})
-        );
-    })
+    .compile_fail();
 }

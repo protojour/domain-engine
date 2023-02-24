@@ -338,7 +338,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
                     let result_type = discriminator.discriminator.result_type;
-                    let pattern = self.env.string_patterns.get(&def_id).unwrap();
+                    let pattern = self.env.string_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str) {
                         return Ok(Value::new(data, result_type));

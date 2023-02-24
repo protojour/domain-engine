@@ -39,17 +39,14 @@ impl UnionBuilder {
                     let operator =
                         generator.get_serde_operator(SerdeOperatorKey::Identity(result_type));
 
-                    match operator {
-                        Some(SerdeOperator::CapturingStringPattern(def_id)) => {
-                            // convert this
-                            candidate.discriminator.discriminant =
-                                Discriminant::HasAttributeMatchingStringPattern(
-                                    *relation_id,
-                                    prop.clone(),
-                                    *def_id,
-                                );
-                        }
-                        _ => {}
+                    if let Some(SerdeOperator::CapturingStringPattern(def_id)) = operator {
+                        // convert this
+                        candidate.discriminator.discriminant =
+                            Discriminant::HasAttributeMatchingStringPattern(
+                                *relation_id,
+                                prop.clone(),
+                                *def_id,
+                            );
                     }
                 }
                 _ => {}

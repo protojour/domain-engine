@@ -49,7 +49,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             panic!("not a union");
         };
 
-        let mut builder = DiscriminatorBuilder::default();
+        let mut inherent_builder = DiscriminatorBuilder::default();
+        // Also verify that entity ids are disjoint:
+        let mut entity_id_builder = DiscriminatorBuilder::default();
+
         let mut used_variants: HashSet<DefId> = Default::default();
 
         for (relationship_id, span) in relationship_ids {
@@ -73,53 +76,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 continue;
             }
 
-            let variant_ty = self.def_types.map.get(&variant_def).unwrap_or_else(|| {
-                let def = self.defs.get_def_kind(variant_def);
-                panic!("No type found for {def:?}");
-            });
+            self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
 
-            match variant_ty {
-                Type::Unit(def_id) => builder.unit = Some(*def_id),
-                Type::Int(_) => builder.number = Some(IntDiscriminator(variant_def)),
-                Type::String(_) => {
-                    builder.string = StringDiscriminator::Any(variant_def);
-                }
-                Type::StringConstant(def_id) => {
-                    let string_literal = self.defs.get_string_representation(*def_id);
-                    builder.add_string_literal(string_literal, *def_id);
-                }
-                Type::Domain(domain_def_id) => {
-                    match self.find_domain_type_match_data(*domain_def_id) {
-                        Ok(DomainTypeMatchData::Map(property_set)) => {
-                            self.add_property_set_to_discriminator(
-                                &mut builder,
-                                variant_def,
-                                property_set,
-                                span,
-                                &mut error_set,
-                            );
-                        }
-                        Ok(DomainTypeMatchData::Sequence(_)) => {
-                            if builder.sequence.is_some() {
-                                error_set.report(
-                                    variant_def,
-                                    UnionCheckError::CannotDiscriminateType,
-                                    span,
-                                );
-                            } else {
-                                builder.sequence = Some(variant_def);
-                            }
-                        }
-                        Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
-                            builder.add_string_pattern(segment, variant_def);
-                        }
-                        Err(error) => {
-                            error_set.report(variant_def, error, span);
-                        }
-                    }
-                }
-                _ => {
-                    error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
+            if let Some(properties) = self.relations.properties_by_type(variant_def) {
+                if let Some(id_relation_id) = &properties.id {
+                    let (relationship, _) = self
+                        .get_subject_property_meta(variant_def, *id_relation_id)
+                        .expect("BUG: problem getting property meta");
+
+                    self.add_variant_to_builder(
+                        &mut entity_id_builder,
+                        relationship.object.0,
+                        &mut error_set,
+                        span,
+                    );
                 }
             }
 
@@ -129,17 +99,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.limit_property_discriminators(
             value_union_def_id,
             union_def,
-            &mut builder,
+            &mut inherent_builder,
             &mut error_set,
         );
-        self.verify_string_patterns_are_disjunctive(
+        self.verify_disjoint_string_patterns(
             value_union_def_id,
             union_def,
-            &mut builder,
+            &mut inherent_builder,
+            UnionCheckError::SharedPrefixInPatternUnion,
+            &mut error_set,
+        );
+        self.verify_disjoint_string_patterns(
+            value_union_def_id,
+            union_def,
+            &mut entity_id_builder,
+            UnionCheckError::NonDisjointIdsInEntityUnion,
             &mut error_set,
         );
 
-        let union_discriminator = self.make_union_discriminator(builder, &error_set);
+        let union_discriminator = self.make_union_discriminator(inherent_builder, &error_set);
         self.relations
             .union_discriminators
             .insert(value_union_def_id, union_discriminator);
@@ -150,6 +128,67 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .flat_map(|(_, errors)| errors.into_iter())
             .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span))
             .collect()
+    }
+
+    fn add_variant_to_builder<'t, 'b>(
+        &'t self,
+        builder: &'b mut DiscriminatorBuilder<'t>,
+        variant_def: DefId,
+        error_set: &mut ErrorSet,
+        span: &SourceSpan,
+    ) where
+        't: 'b,
+    {
+        let variant_ty = self.def_types.map.get(&variant_def).unwrap_or_else(|| {
+            let def = self.defs.get_def_kind(variant_def);
+            panic!("No type found for {def:?}");
+        });
+
+        debug!("Add variant to builder variant_ty: {variant_ty:?}");
+
+        match variant_ty {
+            Type::Unit(def_id) => builder.unit = Some(*def_id),
+            Type::Int(_) => builder.number = Some(IntDiscriminator(variant_def)),
+            Type::String(_) => {
+                builder.string = StringDiscriminator::Any(variant_def);
+                builder.any_string.push(variant_def);
+            }
+            Type::StringConstant(def_id) => {
+                let string_literal = self.defs.get_string_representation(*def_id);
+                builder.add_string_literal(string_literal, *def_id);
+            }
+            Type::Domain(domain_def_id) => match self.find_domain_type_match_data(*domain_def_id) {
+                Ok(DomainTypeMatchData::Map(property_set)) => {
+                    self.add_property_set_to_discriminator(
+                        builder,
+                        variant_def,
+                        property_set,
+                        span,
+                        error_set,
+                    );
+                }
+                Ok(DomainTypeMatchData::Sequence(_)) => {
+                    if builder.sequence.is_some() {
+                        error_set.report(
+                            variant_def,
+                            UnionCheckError::CannotDiscriminateType,
+                            span,
+                        );
+                    } else {
+                        builder.sequence = Some(variant_def);
+                    }
+                }
+                Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
+                    builder.add_string_pattern(segment, variant_def);
+                }
+                Err(error) => {
+                    error_set.report(variant_def, error, span);
+                }
+            },
+            _ => {
+                error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
+            }
+        }
     }
 
     fn find_domain_type_match_data(
@@ -302,13 +341,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     /// For now, patterns must have a unique constant prefix.
-    fn verify_string_patterns_are_disjunctive(
+    fn verify_disjoint_string_patterns(
         &self,
         union_def_id: DefId,
         union_def: &Def,
         builder: &mut DiscriminatorBuilder,
+        error_variant: UnionCheckError,
         error_set: &mut ErrorSet,
     ) {
+        if builder.any_string.len() > 1 {
+            error_set.report(union_def_id, error_variant, &union_def.span);
+            return;
+        }
+
         if builder.pattern_candidates.is_empty() {
             return;
         }
@@ -338,6 +383,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
+        if !prefix_index.is_empty() && !builder.any_string.is_empty() {
+            error_set.report(union_def_id, error_variant, &union_def.span);
+            return;
+        }
+
         let pattern_variants: HashSet<_> = builder.pattern_candidates.keys().copied().collect();
         let mut is_error = false;
 
@@ -359,11 +409,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         if is_error {
-            error_set.report(
-                union_def_id,
-                UnionCheckError::SharedPrefixInPatternUnion,
-                &union_def.span,
-            );
+            error_set.report(union_def_id, error_variant, &union_def.span);
         }
     }
 
@@ -452,6 +498,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::NoUniformDiscriminatorFound
             }
             UnionCheckError::SharedPrefixInPatternUnion => CompileError::SharedPrefixInPatternUnion,
+            UnionCheckError::NonDisjointIdsInEntityUnion => {
+                CompileError::NonDisjointIdsInEntityUnion
+            }
         }
     }
 }
@@ -466,6 +515,7 @@ enum DomainTypeMatchData<'a> {
 struct DiscriminatorBuilder<'a> {
     unit: Option<DefId>,
     number: Option<IntDiscriminator>,
+    any_string: Vec<DefId>,
     string: StringDiscriminator,
     sequence: Option<DefId>,
     pattern_candidates: IndexMap<DefId, &'a StringPatternSegment>,
@@ -533,4 +583,5 @@ enum UnionCheckError {
     DuplicateAnonymousRelation,
     NoUniformDiscriminatorFound,
     SharedPrefixInPatternUnion,
+    NonDisjointIdsInEntityUnion,
 }
