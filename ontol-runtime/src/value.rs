@@ -55,7 +55,7 @@ impl Value {
     where
         Self: Cast<T>,
     {
-        <Self as Cast<T>>::cast_ref(&self)
+        <Self as Cast<T>>::cast_ref(self)
     }
 }
 

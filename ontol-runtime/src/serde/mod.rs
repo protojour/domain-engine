@@ -56,7 +56,7 @@ impl<'e> SerdeProcessor<'e> {
                         .env
                         .new_serde_processor(discriminator.operator_id, None);
                     if let Some(property_id) =
-                        self.search_property(prop, &next_operator.value_operator)
+                        self.search_property(prop, next_operator.value_operator)
                     {
                         return Some(property_id);
                     }
