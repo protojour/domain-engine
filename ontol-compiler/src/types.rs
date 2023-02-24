@@ -1,8 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::{collections::HashSet, fmt::Display};
 
+use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::DefId;
 
 use crate::{
@@ -82,7 +80,7 @@ impl<'m> Type<'m> {
 #[derive(Debug)]
 pub struct Types<'m> {
     mem: &'m Mem,
-    pub(crate) types: HashSet<&'m Type<'m>>,
+    pub(crate) types: FnvHashSet<&'m Type<'m>>,
     pub(crate) slices: HashSet<&'m [TypeRef<'m>]>,
 }
 
@@ -143,7 +141,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
 
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
-    pub map: HashMap<DefId, TypeRef<'m>>,
+    pub map: FnvHashMap<DefId, TypeRef<'m>>,
 }
 
 pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>);

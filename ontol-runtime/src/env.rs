@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use fnv::FnvHashMap;
 use smartstring::alias::String;
 
 use crate::{
@@ -13,13 +14,13 @@ use crate::{
 
 /// Runtime environment
 pub struct Env {
-    pub domains: HashMap<PackageId, Domain>,
+    pub domains: FnvHashMap<PackageId, Domain>,
     pub lib: Lib,
-    pub translations: HashMap<(DefId, DefId), Procedure>,
+    pub translations: FnvHashMap<(DefId, DefId), Procedure>,
     pub serde_operators_per_def: HashMap<SerdeOperatorKey, SerdeOperatorId>,
     pub serde_operators: Vec<SerdeOperator>,
-    pub string_like_types: HashMap<DefId, StringLikeType>,
-    pub string_patterns: HashMap<DefId, StringPattern>,
+    pub string_like_types: FnvHashMap<DefId, StringLikeType>,
+    pub string_patterns: FnvHashMap<DefId, StringPattern>,
 }
 
 impl Env {

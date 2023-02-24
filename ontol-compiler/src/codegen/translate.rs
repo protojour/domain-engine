@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use tracing::{debug, warn};
 
@@ -82,7 +81,7 @@ fn codegen_translate(
 #[derive(Default)]
 pub struct VarFlowTracker {
     // for determining whether to clone
-    states: HashMap<SyntaxVar, VarFlowState>,
+    states: FnvHashMap<SyntaxVar, VarFlowState>,
 }
 
 impl VarFlowTracker {

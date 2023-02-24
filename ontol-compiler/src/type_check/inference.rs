@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData};
+
+use fnv::FnvHashMap;
 
 use crate::{expr::ExprId, types::TypeRef};
 
@@ -58,7 +60,7 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
 }
 
 pub struct Inference<'m> {
-    variables: HashMap<ExprId, Vec<TypeVar<'m>>>,
+    variables: FnvHashMap<ExprId, Vec<TypeVar<'m>>>,
     pub(super) eq_relations: ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
 }
 

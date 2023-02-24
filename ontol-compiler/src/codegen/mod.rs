@@ -1,5 +1,6 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
+use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Lib, NParams, OpCode, Procedure},
     DefId,
@@ -31,7 +32,7 @@ use self::{
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
     pub result_lib: Lib,
-    pub result_translations: HashMap<(DefId, DefId), Procedure>,
+    pub result_translations: FnvHashMap<(DefId, DefId), Procedure>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -63,7 +64,7 @@ pub struct EqCodegenTask<'m> {
 
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub procedures: HashMap<(DefId, DefId), UnlinkedProc>,
+    pub procedures: FnvHashMap<(DefId, DefId), UnlinkedProc>,
     pub translate_calls: Vec<TranslateCall>,
 }
 

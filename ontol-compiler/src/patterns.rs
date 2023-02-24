@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use ontol_runtime::{
     string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
     string_types::StringLikeType,
@@ -7,7 +8,7 @@ use ontol_runtime::{
 use regex::Regex;
 use regex_syntax::hir::{Anchor, Group, GroupKind, Hir, Literal};
 use smartstring::alias::String;
-use std::{collections::HashMap, fmt::Write};
+use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
@@ -18,7 +19,7 @@ use crate::{
 
 #[derive(Default, Debug)]
 pub struct Patterns {
-    pub string_patterns: HashMap<DefId, StringPattern>,
+    pub string_patterns: FnvHashMap<DefId, StringPattern>,
 }
 
 #[derive(Clone, Default, Debug)]

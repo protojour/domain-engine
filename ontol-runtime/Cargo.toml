@@ -17,6 +17,7 @@ derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-in
 tracing = "0.1"
 uuid = "1"
 regex = "1"
+fnv = "1"
 
 [dev-dependencies]
 tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}

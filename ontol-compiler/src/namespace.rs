@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smartstring::alias::String;
 
@@ -36,7 +37,7 @@ impl Namespace {
 
 #[derive(Default, Debug)]
 pub struct Namespaces {
-    pub(crate) namespaces: HashMap<PackageId, Namespace>,
+    pub(crate) namespaces: FnvHashMap<PackageId, Namespace>,
 }
 
 impl Namespaces {

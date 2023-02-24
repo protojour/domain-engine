@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId};
 
@@ -10,14 +9,14 @@ pub struct RelationshipId(pub DefId);
 
 #[derive(Default, Debug)]
 pub struct Relations {
-    pub relations: HashMap<DefId, RelationId>,
-    pub properties_by_type: HashMap<DefId, Properties>,
-    pub relationships_by_subject: HashMap<(DefId, RelationId), RelationshipId>,
-    pub relationships_by_object: HashMap<(DefId, RelationId), RelationshipId>,
+    pub relations: FnvHashMap<DefId, RelationId>,
+    pub properties_by_type: FnvHashMap<DefId, Properties>,
+    pub relationships_by_subject: FnvHashMap<(DefId, RelationId), RelationshipId>,
+    pub relationships_by_object: FnvHashMap<(DefId, RelationId), RelationshipId>,
 
-    pub value_unions: HashSet<DefId>,
-    pub string_pattern_constructors: HashSet<DefId>,
-    pub union_discriminators: HashMap<DefId, UnionDiscriminator>,
+    pub value_unions: FnvHashSet<DefId>,
+    pub string_pattern_constructors: FnvHashSet<DefId>,
+    pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,
 }
 
 impl Relations {

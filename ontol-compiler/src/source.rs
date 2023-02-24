@@ -1,10 +1,10 @@
 use std::{
-    collections::HashMap,
     fmt::Debug,
     ops::{Deref, Range},
     sync::Arc,
 };
 
+use fnv::FnvHashMap;
 use ontol_runtime::PackageId;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -83,7 +83,7 @@ impl<'m, T> SpannedBorrow<'m, T> {
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
 pub struct SourceCodeRegistry {
-    pub registry: HashMap<SourceId, String>,
+    pub registry: FnvHashMap<SourceId, String>,
 }
 
 /// Sources currently being compiled
@@ -91,7 +91,7 @@ pub struct SourceCodeRegistry {
 pub struct Sources {
     next_source_id: SourceId,
     package: PackageId,
-    sources: HashMap<SourceId, Src>,
+    sources: FnvHashMap<SourceId, Src>,
 }
 
 impl Default for Sources {

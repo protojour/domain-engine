@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
+use fnv::FnvHashMap;
 use ontol_runtime::{proc::BuiltinProc, DefId, PackageId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -188,10 +189,10 @@ pub struct Defs<'m> {
     number: DefId,
     string: DefId,
     uuid: DefId,
-    pub(crate) map: HashMap<DefId, &'m Def<'m>>,
+    pub(crate) map: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
-    pub(crate) literal_regex_hirs: HashMap<DefId, regex_syntax::hir::Hir>,
+    pub(crate) literal_regex_hirs: FnvHashMap<DefId, regex_syntax::hir::Hir>,
 }
 
 impl<'m> Defs<'m> {

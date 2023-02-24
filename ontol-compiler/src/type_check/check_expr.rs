@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::warn;
@@ -24,7 +25,7 @@ use super::{
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
     pub typed_expr_table: TypedExprTable<'m>,
-    pub bound_variables: HashMap<ExprId, ExprRef>,
+    pub bound_variables: FnvHashMap<ExprId, ExprRef>,
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {

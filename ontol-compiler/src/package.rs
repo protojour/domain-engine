@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use fnv::FnvHashMap;
 use ontol_parser::ast;
 use ontol_parser::Spanned;
 use ontol_runtime::DefId;
@@ -101,7 +102,7 @@ pub enum PackageGraphError {
 pub struct PackageGraphBuilder {
     next_package_id: PackageId,
     generation: usize,
-    parsed_packages: HashMap<PackageId, ParsedPackage>,
+    parsed_packages: FnvHashMap<PackageId, ParsedPackage>,
     package_graph: HashMap<PackageReference, PackageNode>,
 }
 
@@ -201,7 +202,7 @@ impl PackageGraphBuilder {
         fn traverse_graph(
             reference: &PackageReference,
             package_graph: &HashMap<PackageReference, PackageNode>,
-            parsed_packages: &mut HashMap<PackageId, ParsedPackage>,
+            parsed_packages: &mut FnvHashMap<PackageId, ParsedPackage>,
             visited: &mut HashSet<PackageId>,
             topological_sort: &mut Vec<ParsedPackage>,
         ) {

@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Lib, OpCode, Procedure},
     smart_format, DefId,
@@ -12,11 +11,11 @@ use super::ProcTable;
 
 pub struct LinkResult {
     pub lib: Lib,
-    pub translations: HashMap<(DefId, DefId), Procedure>,
+    pub translations: FnvHashMap<(DefId, DefId), Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut translations: HashMap<(DefId, DefId), Procedure> = Default::default();
+    let mut translations: FnvHashMap<(DefId, DefId), Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
     let mut spans: Vec<SourceSpan> = vec![];

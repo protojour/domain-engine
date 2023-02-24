@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fnv::FnvHashMap;
 use ontol_runtime::smart_format;
 
 use crate::{
@@ -39,7 +38,7 @@ pub struct TypeCheck<'c, 'm> {
     relations: &'c mut Relations,
     errors: &'c mut CompileErrors,
     codegen_tasks: &'c mut CodegenTasks<'m>,
-    expressions: &'c HashMap<ExprId, Expr>,
+    expressions: &'c FnvHashMap<ExprId, Expr>,
     defs: &'c Defs<'m>,
 }
 

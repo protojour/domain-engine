@@ -193,7 +193,7 @@ impl VmDebug<ValueStack> for Tracer {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use fnv::FnvHashSet;
 
     use crate::{
         proc::{NParams, OpCode},
@@ -248,9 +248,9 @@ mod tests {
         let Data::Map(map) = output.data else {
             panic!();
         };
-        let properties = map.keys().cloned().collect::<HashSet<_>>();
+        let properties = map.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
-            HashSet::from([
+            FnvHashSet::from_iter([
                 PropertyId::subject(RelationId(DefId(3))),
                 PropertyId::subject(RelationId(DefId(4)))
             ]),

@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
@@ -53,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Also verify that entity ids are disjoint:
         let mut entity_id_builder = DiscriminatorBuilder::default();
 
-        let mut used_variants: HashSet<DefId> = Default::default();
+        let mut used_variants: FnvHashSet<DefId> = Default::default();
 
         for (relationship_id, span) in relationship_ids {
             let (relationship, relation) = self
@@ -308,7 +309,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         }
 
-        let mut relation_counters: HashMap<RelationId, usize> = Default::default();
+        let mut relation_counters: FnvHashMap<RelationId, usize> = Default::default();
 
         for discriminator in &builder.map_discriminator_candidates {
             for property_candidate in &discriminator.property_candidates {
@@ -358,7 +359,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         }
 
-        let mut prefix_index: PatriciaMap<HashSet<DefId>> = Default::default();
+        let mut prefix_index: PatriciaMap<FnvHashSet<DefId>> = Default::default();
 
         for (variant_def_id, segment) in &builder.pattern_candidates {
             let prefix = segment.constant_prefix();
@@ -367,7 +368,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if let Some(set) = prefix_index.get_mut(&prefix) {
                     set.insert(*variant_def_id);
                 } else {
-                    prefix_index.insert(prefix, [*variant_def_id].into());
+                    prefix_index.insert(prefix, HashSet::from_iter([*variant_def_id]));
                 }
             }
         }
@@ -378,7 +379,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if let Some(set) = prefix_index.get_mut(literal) {
                     set.insert(*variant_def_id);
                 } else {
-                    prefix_index.insert(literal, [*variant_def_id].into());
+                    prefix_index.insert(literal, HashSet::from_iter([*variant_def_id]));
                 }
             }
         }
@@ -562,7 +563,7 @@ struct PropertyDiscriminatorCandidate {
 
 #[derive(Default)]
 struct ErrorSet {
-    errors: HashMap<DefId, HashMap<UnionCheckError, SourceSpan>>,
+    errors: FnvHashMap<DefId, FnvHashMap<UnionCheckError, SourceSpan>>,
 }
 
 impl ErrorSet {

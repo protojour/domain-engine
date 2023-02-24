@@ -17,6 +17,7 @@ use crate::{
     types::{DefTypes, Types},
     SpannedCompileError,
 };
+use fnv::FnvHashMap;
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
     serde::SerdeOperatorKey,
@@ -33,7 +34,7 @@ pub struct Compiler<'m> {
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
-    pub(crate) expressions: HashMap<ExprId, Expr>,
+    pub(crate) expressions: FnvHashMap<ExprId, Expr>,
 
     pub(crate) strings: Strings<'m>,
     pub(crate) types: Types<'m>,
@@ -73,7 +74,7 @@ impl<'m> Compiler<'m> {
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut serde_generator = self.serde_generator();
 
-        let mut out_domains: HashMap<PackageId, Domain> = Default::default();
+        let mut out_domains: FnvHashMap<PackageId, Domain> = Default::default();
 
         // For now, create serde operators for every domain
         for package_id in package_ids {
@@ -103,7 +104,7 @@ impl<'m> Compiler<'m> {
             translations: self.codegen_tasks.result_translations,
             serde_operators_per_def,
             serde_operators,
-            string_like_types: [(self.defs.uuid(), StringLikeType::Uuid)].into(),
+            string_like_types: HashMap::from_iter([(self.defs.uuid(), StringLikeType::Uuid)]),
             string_patterns: self.patterns.string_patterns,
         }
     }
