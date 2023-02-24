@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -7,9 +7,10 @@ use ontol_runtime::{
         MapType, SequenceRange, SerdeOperator, SerdeOperatorId, SerdeOperatorKey, SerdeProperty,
         ValueType, ValueUnionDiscriminator, ValueUnionType,
     },
-    DefId, Role,
+    smart_format, DefId, Role,
 };
 use smallvec::SmallVec;
+use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
@@ -51,6 +52,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         HashMap<SerdeOperatorKey, SerdeOperatorId>,
     ) {
         (self.serde_operators, self.serde_operators_per_def)
+    }
+
+    pub fn get_serde_operator(&mut self, key: SerdeOperatorKey) -> Option<&SerdeOperator> {
+        let operator_id = self.get_serde_operator_id(key)?;
+        Some(&self.serde_operators[operator_id.0 as usize])
     }
 
     pub fn get_serde_operator_id(&mut self, key: SerdeOperatorKey) -> Option<SerdeOperatorId> {
@@ -403,7 +409,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         discriminators: vec![
                             ValueUnionDiscriminator {
                                 discriminator: VariantDiscriminator {
-                                    discriminant: Discriminant::HasProperty(
+                                    discriminant: Discriminant::IsSingletonProperty(
                                         *id_relation_id,
                                         "_id".into(),
                                     ),
@@ -445,64 +451,35 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let inherent_properties_key = SerdeOperatorKey::InherentPropertyMap(type_def_id);
 
             let mut union_builder = UnionBuilder {
-                unprocessed_discriminators: vec![],
+                discriminator_candidates: vec![],
             };
-
-            debug!("START BUILDING COMPLEX VALUE UNION");
+            let mut root_types: HashSet<DefId> = Default::default();
 
             for root_discriminator in &union_disciminator.variants {
-                union_builder.add_root_discriminator(self, root_discriminator);
-
-                if let Some(operator_id) = self.get_serde_operator_id(SerdeOperatorKey::Identity(
-                    root_discriminator.result_type,
-                )) {
-                    let operator = &self.serde_operators[operator_id.0 as usize];
-                    match operator {
-                        SerdeOperator::ValueUnionType(value_union) => {
-                            for discriminator in &value_union.discriminators {
-                                match &discriminator.discriminator.discriminant {
-                                    Discriminant::HasProperty(relation_id, property_name) => {
-                                        debug!(
-                                            "HERE: HasProperty {relation_id:?} {property_name:?} {:?}", discriminator.operator_id
-                                        );
-                                    }
-                                    Discriminant::MatchesCapturingStringPattern => {
-                                        todo!("HERE");
-                                    }
-                                    Discriminant::MapFallback => {}
-                                    other => {
-                                        todo!("FOUND discriminator {other:?}");
-                                    }
-                                }
-                            }
-                        }
-                        other => {
-                            todo!("FOUND {other:?}");
-                        }
-                    }
-                } else {
-                    todo!("DIDNT FIND ANYTHING");
-                }
-
-                let joined_type_operator_id = self
-                    .get_serde_operator_id(SerdeOperatorKey::Intersection(Box::new(
-                        [
-                            inherent_properties_key.clone(),
-                            SerdeOperatorKey::Identity(root_discriminator.result_type),
-                        ]
-                        .into(),
-                    )))
-                    .expect("No inner operator");
-
                 union_builder
-                    .unprocessed_discriminators
-                    .push(ValueUnionDiscriminator {
-                        discriminator: root_discriminator.clone(),
-                        operator_id: joined_type_operator_id,
-                    });
+                    .add_root_discriminator(self, root_discriminator)
+                    .expect("Could not add root discriminator to union builder");
+
+                root_types.insert(root_discriminator.result_type);
             }
 
-            union_builder.unprocessed_discriminators
+            union_builder
+                .build(self, |this, operator_id, result_type| {
+                    if root_types.contains(&result_type) {
+                        // Make the intersection:
+                        this.get_serde_operator_id(SerdeOperatorKey::Intersection(Box::new(
+                            [
+                                inherent_properties_key.clone(),
+                                SerdeOperatorKey::Identity(result_type),
+                            ]
+                            .into(),
+                        )))
+                        .expect("No inner operator")
+                    } else {
+                        operator_id
+                    }
+                })
+                .unwrap()
         } else {
             union_disciminator
                 .variants
@@ -640,24 +617,100 @@ impl SequenceRangeBuilder {
 }
 
 struct UnionBuilder {
-    unprocessed_discriminators: Vec<ValueUnionDiscriminator>,
+    discriminator_candidates: Vec<ValueUnionDiscriminator>,
 }
 
 impl UnionBuilder {
+    fn build(
+        self,
+        generator: &mut SerdeGenerator,
+        mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
+    ) -> Result<Vec<ValueUnionDiscriminator>, String> {
+        let mut discriminators_by_discriminant: BTreeMap<
+            Discriminant,
+            Vec<(SerdeOperatorId, DefId)>,
+        > = Default::default();
+
+        for candidate in self.discriminator_candidates {
+            let result_type = candidate.discriminator.result_type;
+            let operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
+
+            match candidate.discriminator.discriminant {
+                Discriminant::MapFallback => {
+                    panic!("MapFallback should have been filtered already");
+                }
+                Discriminant::IsSingletonProperty(relation_id, prop) => {
+                    // TODO: We don't know that we have to do any disambiguation here
+                    // (there might be only one singleton property)
+                    let operator =
+                        generator.get_serde_operator(SerdeOperatorKey::Identity(result_type));
+
+                    match operator {
+                        Some(SerdeOperator::CapturingStringPattern(def_id)) => {
+                            // convert this
+                            discriminators_by_discriminant
+                                .entry(Discriminant::HasAttributeMatchingStringPattern(
+                                    relation_id,
+                                    prop,
+                                    *def_id,
+                                ))
+                                .or_default()
+                                .push((operator_id, result_type));
+                        }
+                        _ => {
+                            discriminators_by_discriminant
+                                .entry(Discriminant::IsSingletonProperty(relation_id, prop))
+                                .or_default()
+                                .push((operator_id, result_type));
+                        }
+                    }
+                }
+                discriminant => {
+                    discriminators_by_discriminant
+                        .entry(discriminant)
+                        .or_default()
+                        .push((operator_id, result_type));
+                }
+            }
+        }
+
+        let mut discriminators = vec![];
+
+        for (discriminant, entries) in discriminators_by_discriminant {
+            if entries.len() > 1 {
+                return Err(smart_format!(
+                    "BUG: Discriminant {discriminant:?} has multiple entries: {entries:?}"
+                ));
+            }
+
+            if let Some((operator_id, result_type)) = entries.into_iter().next() {
+                discriminators.push(ValueUnionDiscriminator {
+                    discriminator: VariantDiscriminator {
+                        discriminant,
+                        result_type,
+                    },
+                    operator_id,
+                });
+            }
+        }
+
+        Ok(discriminators)
+    }
+
     fn add_root_discriminator(
         &mut self,
         generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
-    ) {
+    ) -> Result<(), String> {
         let operator_id = match generator
             .get_serde_operator_id(SerdeOperatorKey::Identity(discriminator.result_type))
         {
             Some(operator_id) => operator_id,
-            None => return,
+            None => return Ok(()),
         };
 
         // Push with empty scope ('root scope')
-        self.push_discriminator(generator, &[], discriminator, operator_id);
+        self.push_discriminator(generator, &[], discriminator, operator_id)
     }
 
     fn push_discriminator(
@@ -666,7 +719,7 @@ impl UnionBuilder {
         scope: &[&VariantDiscriminator],
         discriminator: &VariantDiscriminator,
         operator_id: SerdeOperatorId,
-    ) {
+    ) -> Result<(), String> {
         let operator = &generator.serde_operators[operator_id.0 as usize];
         match operator {
             SerdeOperator::ValueUnionType(value_union) => {
@@ -680,22 +733,31 @@ impl UnionBuilder {
                         &child_scope,
                         &inner_discriminator.discriminator,
                         inner_discriminator.operator_id,
-                    );
+                    )?;
                 }
+                Ok(())
             }
             other => {
                 debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
                 match discriminator.discriminant {
-                    Discriminant::IsUnit => {}
-                    Discriminant::IsInt => {}
-                    Discriminant::IsString => {}
-                    Discriminant::IsStringLiteral(_) => {}
-                    Discriminant::IsSequence => {}
-                    Discriminant::MapFallback => {}
-                    Discriminant::MatchesCapturingStringPattern => {}
-                    Discriminant::HasProperty(..) => {}
-                    Discriminant::HasStringAttribute(..) => {}
-                    Discriminant::HasAttributeMatchingCapturingStringPattern(..) => {}
+                    Discriminant::MapFallback => {
+                        if let Some(scoping) = scope.last() {
+                            self.discriminator_candidates.push(ValueUnionDiscriminator {
+                                discriminator: (*scoping).clone(),
+                                operator_id,
+                            });
+                            Ok(())
+                        } else {
+                            Err(smart_format!("MapFallback without scoping"))
+                        }
+                    }
+                    _ => {
+                        self.discriminator_candidates.push(ValueUnionDiscriminator {
+                            discriminator: discriminator.clone(),
+                            operator_id,
+                        });
+                        Ok(())
+                    }
                 }
             }
         }

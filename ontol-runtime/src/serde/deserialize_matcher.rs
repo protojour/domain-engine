@@ -383,8 +383,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 matches!(
                     &discriminator.discriminator.discriminant,
                     Discriminant::MapFallback
-                        | Discriminant::HasProperty(_, _)
-                        | Discriminant::HasStringAttribute(_, _, _)
+                        | Discriminant::IsSingletonProperty(..)
+                        | Discriminant::HasStringAttribute(..)
+                        | Discriminant::HasAttributeMatchingStringPattern(..)
                 )
             })
         {
@@ -446,7 +447,18 @@ impl<'e> MapMatcher<'e> {
                     Discriminant::HasStringAttribute(_, match_name, match_value),
                     serde_value::Value::String(value),
                 ) => property == match_name && value == match_value,
-                (Discriminant::HasProperty(_, match_name), _) => property == match_name,
+                (Discriminant::IsSingletonProperty(_, match_name), _) => property == match_name,
+                (
+                    Discriminant::HasAttributeMatchingStringPattern(_, match_name, def_id),
+                    serde_value::Value::String(value),
+                ) => {
+                    if property == match_name {
+                        let pattern = self.env.string_patterns.get(def_id).unwrap();
+                        pattern.regex.is_match(value)
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             }
         };

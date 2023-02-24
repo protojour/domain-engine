@@ -298,16 +298,34 @@ fn entity_union_with_object_relation() {
 fn entity_union_in_relation_with_ids() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
+        let guitar_id = TypeBinding::new(env, "guitar_id");
+        let synth_id = TypeBinding::new(env, "synth_id");
 
-        assert_json_io_matches!(
-            artist,
-            json!({
-                "name": "Someone",
-                "plays": [
-                    { "_id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
-                    { "_id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
-                ]
+        let json = json!({
+            "name": "Someone",
+            "plays": [
+                { "_id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+                { "_id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+            ]
+        });
+
+        assert_json_io_matches!(artist, json.clone());
+
+        let plays_attributes = artist
+            .deserialize_data_map(json.clone())
+            .unwrap()
+            .into_values()
+            .find_map(|attribute| match attribute.value.data {
+                Data::Sequence(seq) => Some(seq),
+                _ => None,
             })
-        );
+            .unwrap();
+
+        let guitar_id_attr = &plays_attributes[0];
+        let synth_id_attr = &plays_attributes[1];
+
+        assert_ne!(guitar_id.def_id, synth_id.def_id);
+        assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.def_id);
+        assert_eq!(synth_id_attr.value.type_def_id, synth_id.def_id);
     });
 }
