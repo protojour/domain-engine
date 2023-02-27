@@ -18,6 +18,7 @@ use crate::{
 
 mod deserialize;
 mod deserialize_matcher;
+mod json_schema;
 mod serialize;
 
 const EDGE_PROPERTY: &str = "_edge";
@@ -44,6 +45,10 @@ pub struct SerdeProcessor<'e> {
 }
 
 impl<'e> SerdeProcessor<'e> {
+    pub fn schema(self) -> JsonSchema<'e> {
+        JsonSchema { processor: self }
+    }
+
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
         self.search_property(prop, self.value_operator)
     }
@@ -71,6 +76,10 @@ impl<'e> SerdeProcessor<'e> {
             _ => None,
         }
     }
+}
+
+pub struct JsonSchema<'e> {
+    processor: SerdeProcessor<'e>,
 }
 
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
