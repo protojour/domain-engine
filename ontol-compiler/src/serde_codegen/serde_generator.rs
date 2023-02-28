@@ -391,6 +391,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
                         typename: typename.into(),
+                        union_def_id: type_def_id,
                         discriminators: vec![
                             ValueUnionDiscriminator {
                                 discriminator: VariantDiscriminator {
@@ -471,6 +472,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         SerdeOperator::ValueUnionType(ValueUnionType {
             typename: typename.into(),
+            union_def_id: type_def_id,
             discriminators,
         })
     }
