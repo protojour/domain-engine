@@ -39,7 +39,9 @@ impl<'e> TypeBinding<'e> {
         );
 
         let json_schema = build_standalone_schema(env, &type_info).unwrap();
-        let json_schema_json = serde_json::to_string(&json_schema);
+        let json_schema_json = serde_json::to_string_pretty(&json_schema).unwrap();
+
+        debug!("json schema: {json_schema_json}");
 
         let binding = Self { type_info, env };
 
