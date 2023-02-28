@@ -135,11 +135,22 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
     }
 
     fn reference(&self, link: SerdeOperatorId) -> SchemaReference<'c, 'e> {
-        SchemaReference { ctx: *self, link }
+        SchemaReference {
+            ctx: *self,
+            operator_id: link,
+        }
     }
 
     fn items_ref_links(&self, ranges: &'e [SequenceRange]) -> ArrayItemsRefLinks<'c, 'e> {
         ArrayItemsRefLinks { ctx: *self, ranges }
+    }
+
+    /// Returns something that serializes as `{ "$ref": "some link" }`
+    fn ref_object(&self, type_def_id: DefId) -> RefObject {
+        RefObject {
+            ctx: *self,
+            type_def_id,
+        }
     }
 
     /// Derive a new context with rel_params_operator_id removed.
@@ -156,7 +167,7 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
         smart_format!("{}_{}", def_id.0 .0, def_id.1)
     }
 
-    fn format_link(&self, def_id: DefId) -> String {
+    fn format_ref_link(&self, def_id: DefId) -> String {
         smart_format!("{}{}_{}", self.link_prefix, def_id.0 .0, def_id.1)
     }
 }
@@ -174,7 +185,7 @@ impl<'c, 'e> Serialize for JsonSchema<'c, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
 
-        serialize_schema::<S>(&self.ctx, self.value_operator, None, &mut map)?;
+        serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, &mut map)?;
 
         if let Some(defs) = self.defs {
             map.serialize_entry(
@@ -190,16 +201,16 @@ impl<'c, 'e> Serialize for JsonSchema<'c, 'e> {
     }
 }
 
-/// A link to another schema
+/// Some kind of reference to another schema
 #[derive(Clone, Copy)]
 struct SchemaReference<'c, 'e> {
     ctx: SchemaCtx<'c, 'e>,
-    link: SerdeOperatorId,
+    operator_id: SerdeOperatorId,
 }
 
 impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.env.get_serde_operator(self.link);
+        let value_operator = self.ctx.env.get_serde_operator(self.operator_id);
 
         match value_operator {
             SerdeOperator::Unit
@@ -211,65 +222,59 @@ impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
             | SerdeOperator::CapturingStringPattern(_) => {
                 // These are inline schemas
                 let mut map = serializer.serialize_map(None)?;
-                serialize_schema::<S>(&self.ctx, value_operator, None, &mut map)?;
+                serialize_schema_inline::<S>(&self.ctx, value_operator, None, &mut map)?;
                 map.end()
             }
             SerdeOperator::Sequence(_, type_def_id) => {
-                serialize_link(&self.ctx, self.link, *type_def_id, serializer)
+                self.serialize_reference(serializer, self.ctx.ref_object(*type_def_id))
             }
             SerdeOperator::ValueType(value_type) => {
-                serialize_link(&self.ctx, self.link, value_type.type_def_id, serializer)
+                self.serialize_reference(serializer, self.ctx.ref_object(value_type.type_def_id))
             }
-            SerdeOperator::ValueUnionType(value_union_type) => serialize_link(
-                &self.ctx,
-                self.link,
-                value_union_type.union_def_id,
+            SerdeOperator::ValueUnionType(value_union_type) => self.serialize_reference(
                 serializer,
+                self.ctx.ref_object(value_union_type.union_def_id),
             ),
-            SerdeOperator::Id(id_operator_id) => {
-                // This is a special inline schema
-                // BUG: Need allOf in case of rel_params
-                let mut map = serializer.serialize_map(None)?;
-
-                let properties: HashMap<_, _> =
-                    [("_id", self.ctx.reference(*id_operator_id))].into();
-
-                map.serialize_entry("type", "object")?;
-                map.serialize_entry("properties", &properties)?;
-                map.serialize_entry("required", &["_id"])?;
-
-                map.end()
-            }
+            SerdeOperator::Id(id_operator_id) => self.serialize_reference(
+                serializer,
+                IdObject {
+                    ctx: self.ctx,
+                    id_operator_id: *id_operator_id,
+                },
+            ),
             SerdeOperator::MapType(map_type) => {
-                serialize_link(&self.ctx, self.link, map_type.type_def_id, serializer)
+                self.serialize_reference(serializer, self.ctx.ref_object(map_type.type_def_id))
             }
         }
     }
 }
 
-fn serialize_link<S: Serializer>(
-    ctx: &SchemaCtx,
-    link: SerdeOperatorId,
-    type_def_id: DefId,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let mut map = serializer.serialize_map(Some(1))?;
-    if let Some(rel_params_operator_id) = ctx.rel_params_operator_id {
-        map.serialize_entry(
-            "allOf",
-            &RefLinkSlice {
-                // Remove the rel params to avoid infinite loop!
-                ctx: ctx.reset(),
-                links: &[link, rel_params_operator_id],
-            },
-        )?;
-    } else {
-        map.serialize_entry("$ref", &ctx.format_link(type_def_id))?;
+impl<'c, 'e> SchemaReference<'c, 'e> {
+    /// Serialize the value that is interpreted as the "reference" to self.operator_id.
+    /// This function makes sure to to merge in required extra properties like rel_params/`_edge`.
+    fn serialize_reference<S: Serializer>(
+        &self,
+        serializer: S,
+        value: impl Serialize,
+    ) -> Result<S::Ok, S::Error> {
+        if let Some(rel_params_operator_id) = self.ctx.rel_params_operator_id {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(
+                "allOf",
+                &ReferenceSlice {
+                    // Remove the rel params to avoid infinite loop!
+                    ctx: self.ctx.reset(),
+                    references: &[self.operator_id, rel_params_operator_id],
+                },
+            )?;
+            map.end()
+        } else {
+            value.serialize(serializer)
+        }
     }
-    map.end()
 }
 
-fn serialize_schema<S: Serializer>(
+fn serialize_schema_inline<S: Serializer>(
     ctx: &SchemaCtx,
     value_operator: &SerdeOperator,
     _description: Option<&str>,
@@ -319,7 +324,7 @@ fn serialize_schema<S: Serializer>(
             }
         }
         SerdeOperator::ValueType(value_type) => {
-            serialize_schema::<S>(
+            serialize_schema_inline::<S>(
                 ctx,
                 ctx.env.get_serde_operator(value_type.inner_operator_id),
                 Some("TODO: overridden description"),
@@ -373,15 +378,15 @@ impl<'c, 'e> Serialize for UnionRefLinks<'c, 'e> {
     }
 }
 
-struct RefLinkSlice<'a, 'c, 'e> {
+struct ReferenceSlice<'a, 'c, 'e> {
     ctx: SchemaCtx<'c, 'e>,
-    links: &'a [SerdeOperatorId],
+    references: &'a [SerdeOperatorId],
 }
 
-impl<'a, 'c, 'e> Serialize for RefLinkSlice<'a, 'c, 'e> {
+impl<'a, 'c, 'e> Serialize for ReferenceSlice<'a, 'c, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.links.len()))?;
-        for link in self.links {
+        let mut seq = serializer.serialize_seq(Some(self.references.len()))?;
+        for link in self.references {
             seq.serialize_element(&self.ctx.reference(*link))?;
         }
         seq.end()
@@ -424,6 +429,7 @@ impl<'c, 'e> Serialize for MapProperties<'c, 'e> {
     }
 }
 
+// ["a", "b"] in { "required": _ }
 struct RequiredMapProperties<'e> {
     map_type: &'e MapType,
 }
@@ -437,6 +443,40 @@ impl<'e> Serialize for RequiredMapProperties<'e> {
             }
         }
         seq.end()
+    }
+}
+
+// { "_id": "id" }
+struct IdObject<'c, 'e> {
+    ctx: SchemaCtx<'c, 'e>,
+    id_operator_id: SerdeOperatorId,
+}
+
+impl<'c, 'e> Serialize for IdObject<'c, 'e> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+
+        let properties: HashMap<_, _> = [("_id", self.ctx.reference(self.id_operator_id))].into();
+
+        map.serialize_entry("type", "object")?;
+        map.serialize_entry("properties", &properties)?;
+        map.serialize_entry("required", &["_id"])?;
+
+        map.end()
+    }
+}
+
+// { "_ref": "some-link" }
+struct RefObject<'c, 'e> {
+    ctx: SchemaCtx<'c, 'e>,
+    type_def_id: DefId,
+}
+
+impl<'c, 'e> Serialize for RefObject<'c, 'e> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("$ref", &self.ctx.format_ref_link(self.type_def_id))?;
+        map.end()
     }
 }
 
