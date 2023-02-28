@@ -5,7 +5,6 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
-use tracing::debug;
 
 use crate::env::TypeInfo;
 use crate::serde::{MapType, SequenceRange, ValueUnionType};
@@ -42,16 +41,12 @@ pub fn build_standalone_schema<'e>(
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    debug!("build standalone schema {type_info:?}");
-
     let operator_id = type_info
         .serde_operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 
     let mut graph = graph_builder.graph;
-
-    debug!("graph {graph:#?}");
 
     let root_operator_id = graph
         .remove(&DefVariant::identity(type_info.def_id))
@@ -274,8 +269,8 @@ impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
                 serialize_schema_inline::<S>(&self.ctx, value_operator, None, &mut map)?;
                 map.end()
             }
-            SerdeOperator::Sequence(_, def_variant) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(*def_variant))
+            SerdeOperator::Sequence(sequence_type) => {
+                self.serialize_reference(serializer, self.ctx.ref_link(sequence_type.def_variant))
             }
             SerdeOperator::ValueType(value_type) => {
                 self.serialize_reference(serializer, self.ctx.ref_link(value_type.def_variant))
@@ -352,25 +347,35 @@ fn serialize_schema_inline<S: Serializer>(
             map.serialize_entry("type", "string")?;
             map.serialize_entry("pattern", pattern.regex.as_str())?;
         }
-        SerdeOperator::Sequence(ranges, _) => {
+        SerdeOperator::Sequence(sequence_type) => {
             map.serialize_entry("type", "array")?;
+
+            let ranges = &sequence_type.ranges;
 
             if ranges.is_empty() {
                 map.serialize_entry::<str, [&'static str]>("items", &[])?;
             } else {
                 let len = ranges.len();
                 let last_range = ranges.last().unwrap();
+                let len_range = sequence_type.length_range();
 
                 if last_range.finite_repetition.is_some() {
                     // a finite sequence/tuple
-                    map.serialize_entry("items", &ctx.items_ref_links(ranges))?;
+                    map.serialize_entry("prefixItems", &ctx.items_ref_links(ranges))?;
+                    map.serialize_entry("items", &false)?;
+                    if let Some(min) = len_range.start {
+                        map.serialize_entry("minItems", &min)?;
+                    }
                 } else if len == 1 {
                     // normal array: all items are uniform
                     map.serialize_entry("items", &ctx.reference(last_range.operator_id))?;
                 } else {
                     // tuple followed by array
-                    map.serialize_entry("items", &ctx.items_ref_links(&ranges[..len - 1]))?;
-                    map.serialize_entry("additionalItems", &ctx.reference(last_range.operator_id))?;
+                    map.serialize_entry("prefixItems", &ctx.items_ref_links(&ranges[..len - 1]))?;
+                    map.serialize_entry("items", &ctx.reference(last_range.operator_id))?;
+                    if let Some(min) = len_range.start {
+                        map.serialize_entry("minItems", &min)?;
+                    }
                 }
             }
         }
@@ -406,6 +411,7 @@ fn serialize_schema_inline<S: Serializer>(
             if map_type.n_mandatory_properties > 0 {
                 map.serialize_entry("required", &RequiredMapProperties { map_type })?;
             }
+            map.serialize_entry("additionalProperties", &false)?;
         }
     };
 
@@ -552,8 +558,6 @@ impl SchemaGraphBuilder {
 
         let operator = env.get_serde_operator(operator_id);
 
-        debug!("visit {operator_id:?}: {operator:#?}");
-
         match operator {
             SerdeOperator::Unit
             | SerdeOperator::Int(_)
@@ -562,9 +566,9 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
-            SerdeOperator::Sequence(ranges, def_variant) => {
-                self.add_to_graph(*def_variant, operator_id);
-                for range in ranges {
+            SerdeOperator::Sequence(sequence_type) => {
+                self.add_to_graph(sequence_type.def_variant, operator_id);
+                for range in &sequence_type.ranges {
                     self.visit(range.operator_id, env);
                 }
             }

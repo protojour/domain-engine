@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeSet,
     fmt::{Debug, Display},
+    ops::Range,
 };
 
 use derive_debug_extras::DebugExtras;
@@ -109,7 +110,7 @@ pub enum SerdeOperator {
     CapturingStringPattern(DefId),
 
     /// Any sequence
-    Sequence(SmallVec<[SequenceRange; 3]>, DefVariant),
+    Sequence(SequenceType),
 
     /// A type with just one anonymous property
     ValueType(ValueType),
@@ -122,6 +123,31 @@ pub enum SerdeOperator {
 
     /// A type with many properties
     MapType(MapType),
+}
+
+#[derive(Debug)]
+pub struct SequenceType {
+    pub ranges: SmallVec<[SequenceRange; 3]>,
+    pub def_variant: DefVariant,
+}
+
+impl SequenceType {
+    pub fn length_range(&self) -> Range<Option<u16>> {
+        let mut count = 0;
+        let mut finite = true;
+        for range in &self.ranges {
+            if let Some(repetition) = range.finite_repetition {
+                count += repetition;
+            } else {
+                finite = false;
+            }
+        }
+
+        Range {
+            start: if count > 0 { Some(count) } else { None },
+            end: if finite { Some(count) } else { None },
+        }
+    }
 }
 
 /// A matcher for a range within a sequence
@@ -193,10 +219,10 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
                 write!(f, "`string_pattern`")
             }
-            SerdeOperator::Sequence(ranges, _) => {
+            SerdeOperator::Sequence(sequence_type) => {
                 let mut processors = vec![];
                 let mut finite = true;
-                for range in ranges {
+                for range in &sequence_type.ranges {
                     if let Some(finite_repetition) = range.finite_repetition {
                         for _ in 0..finite_repetition {
                             processors.push(self.env.new_serde_processor(range.operator_id, None));

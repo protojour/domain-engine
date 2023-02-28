@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use jsonschema::JSONSchema;
 use ontol_compiler::{
     error::{CompileError, UnifiedCompileError},
     SourceCodeRegistry, SourceId, Sources, SpannedCompileError, Src,
@@ -18,6 +19,7 @@ use crate::TEST_PKG;
 
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
+    json_schema: JSONSchema,
     env: &'e Env,
 }
 
@@ -38,13 +40,13 @@ impl<'e> TypeBinding<'e> {
                 .map(|id| env.new_serde_processor(id, None))
         );
 
-        let json_schema = build_standalone_schema(env, &type_info).unwrap();
-        let json_schema_json = serde_json::to_string_pretty(&json_schema).unwrap();
+        let json_schema = compile_json_schema(env, &type_info);
 
-        debug!("json schema: {json_schema_json}");
-        // panic!();
-
-        let binding = Self { type_info, env };
+        let binding = Self {
+            type_info,
+            json_schema,
+            env,
+        };
 
         binding
     }
@@ -97,14 +99,33 @@ impl<'e> TypeBinding<'e> {
 
     pub fn deserialize_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
-        let Attribute { value, rel_params } = self
+
+        let attribute_result = self
             .env
             .new_serde_processor(self.serde_operator_id(), None)
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))?;
+            .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
-        assert_eq!(rel_params.type_def_id, DefId::unit());
+        let json_schema_result = self.json_schema.validate(&json);
 
-        Ok(value)
+        match (attribute_result, json_schema_result) {
+            (Ok(Attribute { value, rel_params }), Ok(())) => {
+                assert_eq!(rel_params.type_def_id, DefId::unit());
+
+                Ok(value)
+            }
+            (Err(json_error), Err(_)) => Err(json_error),
+            (Ok(attribute), Err(validation_errors)) => {
+                for error in validation_errors {
+                    println!("JSON schema error: {error:?}");
+                }
+                panic!("BUG: JSON schema did not accept input {json_string}");
+            }
+            (Err(json_error), Ok(())) => {
+                panic!(
+                    "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
+                );
+            }
+        }
     }
 
     pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
@@ -119,6 +140,20 @@ impl<'e> TypeBinding<'e> {
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }
+}
+
+fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
+    let standalone_schema = build_standalone_schema(env, &type_info).unwrap();
+
+    debug!(
+        "outputted json schema: {}",
+        serde_json::to_string_pretty(&standalone_schema).unwrap()
+    );
+
+    JSONSchema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .compile(&serde_json::to_value(&standalone_schema).unwrap())
+        .unwrap()
 }
 
 #[derive(Default)]
