@@ -146,6 +146,7 @@ pub struct ValueType {
 pub struct ValueUnionType {
     pub typename: String,
     pub union_def_id: DefId,
+    pub def_variant: DefVariant,
     pub discriminators: Vec<ValueUnionDiscriminator>,
 }
 
