@@ -145,6 +145,8 @@ impl Attribute {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
+    use crate::PackageId;
+
     use super::*;
     use indexmap::IndexMap;
     use num::rational::BigRational;
@@ -176,8 +178,8 @@ mod tests {
     fn attributes() {
         let mut map = BTreeMap::new();
         map.insert(
-            RelationId(DefId(666)),
-            Attribute::with_unit_params(Value::new(Data::Int(42), DefId(42))),
+            RelationId(DefId(PackageId(0), 666)),
+            Attribute::with_unit_params(Value::new(Data::Int(42), DefId(PackageId(0), 42))),
         );
     }
 }

@@ -18,8 +18,8 @@ use crate::{
 
 mod deserialize;
 mod deserialize_matcher;
-mod json_schema;
 mod serialize;
+mod serialize_json_schema;
 
 const EDGE_PROPERTY: &str = "_edge";
 const ID_PROPERTY: &str = "_id";

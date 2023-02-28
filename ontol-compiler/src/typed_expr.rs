@@ -153,7 +153,7 @@ impl<'m> TypedExprTable<'m> {
                     .iter()
                     .map(|(property_id, expr_ref)| {
                         let val = self.debug_tree_guard(rewrites, *expr_ref, depth + 1);
-                        format!("({} {})", (property_id.relation_id.0 .0), val)
+                        format!("({:?} {})", (property_id.relation_id.0 .0), val)
                     })
                     .collect::<Vec<_>>()
                     .join(" ");

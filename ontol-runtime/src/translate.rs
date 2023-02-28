@@ -198,10 +198,14 @@ mod tests {
     use crate::{
         proc::{NParams, OpCode},
         value::{Attribute, Value},
-        DefId, RelationId,
+        DefId, PackageId, RelationId,
     };
 
     use super::*;
+
+    fn def_id(n: u16) -> DefId {
+        DefId(PackageId(0), n)
+    }
 
     #[test]
     fn translate_map() {
@@ -209,11 +213,11 @@ mod tests {
         let proc = lib.append_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(42)),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(DefId(1)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(DefId(3)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(DefId(2)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(DefId(4)))),
+                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(42)),
+                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(1)))),
+                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -225,23 +229,23 @@ mod tests {
                 Data::Map(
                     [
                         (
-                            PropertyId::subject(RelationId(DefId(1))),
+                            PropertyId::subject(RelationId(def_id(1))),
                             Attribute::with_unit_params(Value::new(
                                 Data::String("foo".into()),
-                                DefId(0),
+                                def_id(0),
                             )),
                         ),
                         (
-                            PropertyId::subject(RelationId(DefId(2))),
+                            PropertyId::subject(RelationId(def_id(2))),
                             Attribute::with_unit_params(Value::new(
                                 Data::String("bar".into()),
-                                DefId(0),
+                                def_id(0),
                             )),
                         ),
                     ]
                     .into(),
                 ),
-                DefId(0),
+                def_id(0),
             )],
         );
 
@@ -251,8 +255,8 @@ mod tests {
         let properties = map.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
             FnvHashSet::from_iter([
-                PropertyId::subject(RelationId(DefId(3))),
-                PropertyId::subject(RelationId(DefId(4)))
+                PropertyId::subject(RelationId(def_id(3))),
+                PropertyId::subject(RelationId(def_id(4)))
             ]),
             properties
         );
@@ -265,14 +269,14 @@ mod tests {
             NParams(1),
             [
                 OpCode::Clone(Local(0)),
-                OpCode::CallBuiltin(BuiltinProc::Add, DefId(0)),
+                OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
                 OpCode::Return0,
             ],
         );
         let add_then_double = lib.append_procedure(
             NParams(2),
             [
-                OpCode::CallBuiltin(BuiltinProc::Add, DefId(0)),
+                OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
                 OpCode::Call(double),
                 OpCode::Return0,
             ],
@@ -280,14 +284,14 @@ mod tests {
         let translate = lib.append_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap, DefId(0)),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(DefId(1)))),
+                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
+                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::Call(double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(DefId(4)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(DefId(2)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(DefId(3)))),
+                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(3)))),
                 OpCode::Call(add_then_double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(DefId(5)))),
+                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(5)))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -299,31 +303,31 @@ mod tests {
                 Data::Map(
                     [
                         (
-                            PropertyId::subject(RelationId(DefId(1))),
-                            Attribute::with_unit_params(Value::new(Data::Int(333), DefId(0))),
+                            PropertyId::subject(RelationId(def_id(1))),
+                            Attribute::with_unit_params(Value::new(Data::Int(333), def_id(0))),
                         ),
                         (
-                            PropertyId::subject(RelationId(DefId(2))),
-                            Attribute::with_unit_params(Value::new(Data::Int(10), DefId(0))),
+                            PropertyId::subject(RelationId(def_id(2))),
+                            Attribute::with_unit_params(Value::new(Data::Int(10), def_id(0))),
                         ),
                         (
-                            PropertyId::subject(RelationId(DefId(3))),
-                            Attribute::with_unit_params(Value::new(Data::Int(11), DefId(0))),
+                            PropertyId::subject(RelationId(def_id(3))),
+                            Attribute::with_unit_params(Value::new(Data::Int(11), def_id(0))),
                         ),
                     ]
                     .into(),
                 ),
-                DefId(0),
+                def_id(0),
             )],
         );
 
         let Data::Map(mut map) = output.data else {
             panic!();
         };
-        let Data::Int(a) = map.remove(&PropertyId::subject(RelationId(DefId(4)))).unwrap().value.data else {
+        let Data::Int(a) = map.remove(&PropertyId::subject(RelationId(def_id(4)))).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = map.remove(&PropertyId::subject(RelationId(DefId(5)))).unwrap().value.data else {
+        let Data::Int(b) = map.remove(&PropertyId::subject(RelationId(def_id(5)))).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);

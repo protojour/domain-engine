@@ -197,7 +197,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Some((ast_ty, ty_span)) => (self.ast_type_to_def(ast_ty, &ty_span)?, ty_span),
                 None => {
                     // implicit, anonymous type:
-                    let anonymous_def_id = self.compiler.defs.alloc_def_id();
+                    let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
                     self.set_def(anonymous_def_id, DefKind::DomainType(None), &span);
                     (anonymous_def_id, span.clone())
                 }
@@ -501,9 +501,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match kind {
             RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => {
                 match self.compiler.relations.relations.entry(def_id) {
-                    Entry::Vacant(vacant) => ImplicitRelationId::New(
-                        *vacant.insert(RelationId(self.compiler.defs.alloc_def_id())),
-                    ),
+                    Entry::Vacant(vacant) => ImplicitRelationId::New(*vacant.insert(RelationId(
+                        self.compiler.defs.alloc_def_id(self.src.package_id),
+                    ))),
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
@@ -517,7 +517,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn named_def_id(&mut self, space: Space, ident: &String) -> Result<DefId, DefId> {
-        let def_id = self.compiler.defs.alloc_def_id();
+        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         match self
             .compiler
             .namespaces
@@ -542,7 +542,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn def(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
-        let def_id = self.compiler.defs.alloc_def_id();
+        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def(def_id, kind, span);
         def_id
     }

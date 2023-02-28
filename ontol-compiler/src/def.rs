@@ -178,7 +178,7 @@ pub enum ValueCardinality {
 #[derive(Debug)]
 pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
-    next_def_id: DefId,
+    def_id_allocators: FnvHashMap<PackageId, u16>,
     next_expr_id: ExprId,
     unit: DefId,
     id_relation: DefId,
@@ -199,17 +199,17 @@ impl<'m> Defs<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         let mut defs = Self {
             mem,
-            next_def_id: DefId(0),
+            def_id_allocators: Default::default(),
             next_expr_id: ExprId(0),
-            unit: DefId(0),
-            id_relation: DefId(0),
-            indexed_relation: DefId(0),
-            empty_sequence: DefId(0),
-            empty_string: DefId(0),
-            int: DefId(0),
-            number: DefId(0),
-            string: DefId(0),
-            uuid: DefId(0),
+            unit: DefId::unit(),
+            id_relation: DefId::unit(),
+            indexed_relation: DefId::unit(),
+            empty_sequence: DefId::unit(),
+            empty_string: DefId::unit(),
+            int: DefId::unit(),
+            number: DefId::unit(),
+            string: DefId::unit(),
+            uuid: DefId::unit(),
             map: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
@@ -322,10 +322,12 @@ impl<'m> Defs<'m> {
         Ok((relationship, relation))
     }
 
-    pub fn alloc_def_id(&mut self) -> DefId {
-        let id = self.next_def_id;
-        self.next_def_id.0 += 1;
-        id
+    pub fn alloc_def_id(&mut self, package_id: PackageId) -> DefId {
+        let idx = self.def_id_allocators.entry(package_id).or_default();
+        let def_id = DefId(package_id, *idx);
+        *idx += 1;
+
+        def_id
     }
 
     pub fn alloc_expr_id(&mut self) -> ExprId {
@@ -335,7 +337,7 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_def(&mut self, kind: DefKind<'m>, package: PackageId, span: SourceSpan) -> DefId {
-        let def_id = self.alloc_def_id();
+        let def_id = self.alloc_def_id(package);
         self.map.insert(
             def_id,
             self.mem.bump.alloc(Def {
@@ -450,7 +452,7 @@ impl<'m> Compiler<'m> {
         package: PackageId,
         span: SourceSpan,
     ) -> DefId {
-        let def_id = self.defs.alloc_def_id();
+        let def_id = self.defs.alloc_def_id(package);
         self.namespaces
             .get_mut(package, space)
             .insert(name.into(), def_id);
@@ -468,7 +470,7 @@ impl<'m> Compiler<'m> {
     }
 
     pub fn define_package(&mut self, package_id: PackageId) -> DefId {
-        let def_id = self.defs.alloc_def_id();
+        let def_id = self.defs.alloc_def_id(package_id);
         self.defs.map.insert(
             def_id,
             self.defs.mem.bump.alloc(Def {
@@ -529,6 +531,6 @@ impl DefIdSource for DefId {
 
 impl DefIdSource for () {
     fn get(self, compiler: &mut Compiler) -> DefId {
-        compiler.defs.alloc_def_id()
+        compiler.defs.alloc_def_id(CORE_PKG)
     }
 }

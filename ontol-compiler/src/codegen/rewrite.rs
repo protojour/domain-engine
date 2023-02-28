@@ -299,7 +299,7 @@ mod rules {
 
 #[cfg(test)]
 mod tests {
-    use ontol_runtime::{proc::BuiltinProc, DefId};
+    use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
     use tracing::info;
 
     use crate::{
@@ -314,7 +314,7 @@ mod tests {
     fn rewrite_test() {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, Sources::default()).with_core();
-        let int = compiler.types.intern(Type::Int(DefId(42)));
+        let int = compiler.types.intern(Type::Int(DefId(PackageId(0), 42)));
 
         let mut table = TypedExprTable::default();
         let var = table.add_expr(TypedExpr {
