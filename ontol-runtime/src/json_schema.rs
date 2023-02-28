@@ -68,7 +68,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
         let mut map = serializer.serialize_map(None)?;
 
         let ctx = SchemaCtx {
-            env: &self.env,
+            env: self.env,
             rel_params_operator_id: None,
             link_prefix: "#/components/schemas/",
         };
@@ -100,7 +100,7 @@ pub struct StandaloneJsonSchema<'e> {
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ctx = SchemaCtx {
-            env: &self.env,
+            env: self.env,
             rel_params_operator_id: None,
             link_prefix: "#/$defs/",
         };
@@ -199,7 +199,7 @@ struct SchemaReference<'c, 'e> {
 
 impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = &self.ctx.env.get_serde_operator(self.link);
+        let value_operator = self.ctx.env.get_serde_operator(self.link);
 
         match value_operator {
             SerdeOperator::Unit
@@ -247,8 +247,8 @@ impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
     }
 }
 
-fn serialize_link<'c, 'e, S: Serializer>(
-    ctx: &SchemaCtx<'c, 'e>,
+fn serialize_link<S: Serializer>(
+    ctx: &SchemaCtx,
     link: SerdeOperatorId,
     type_def_id: DefId,
     serializer: S,
@@ -269,9 +269,9 @@ fn serialize_link<'c, 'e, S: Serializer>(
     map.end()
 }
 
-fn serialize_schema<'c, 'e, S: Serializer>(
-    ctx: &SchemaCtx<'c, 'e>,
-    value_operator: &'e SerdeOperator,
+fn serialize_schema<S: Serializer>(
+    ctx: &SchemaCtx,
+    value_operator: &SerdeOperator,
     _description: Option<&str>,
     map: &mut <S as Serializer>::SerializeMap,
 ) -> Result<(), S::Error> {
@@ -321,7 +321,7 @@ fn serialize_schema<'c, 'e, S: Serializer>(
         SerdeOperator::ValueType(value_type) => {
             serialize_schema::<S>(
                 ctx,
-                &ctx.env.get_serde_operator(value_type.inner_operator_id),
+                ctx.env.get_serde_operator(value_type.inner_operator_id),
                 Some("TODO: overridden description"),
                 map,
             )?;
@@ -472,7 +472,7 @@ impl SchemaGraphBuilder {
             return;
         }
 
-        let operator = &env.get_serde_operator(operator_id);
+        let operator = env.get_serde_operator(operator_id);
         match operator {
             SerdeOperator::Unit
             | SerdeOperator::Int(_)
