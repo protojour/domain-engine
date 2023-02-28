@@ -8,12 +8,12 @@ use tracing::debug;
 
 use crate::env::TypeInfo;
 use crate::serde::{MapType, SequenceRange, ValueUnionType};
-use crate::smart_format;
 use crate::{
     env::{Domain, Env},
     serde::{SerdeOperator, SerdeOperatorId},
     DefId, PackageId,
 };
+use crate::{smart_format, DefVariant};
 
 pub fn build_openapi_schemas<'e>(
     env: &'e Env,
@@ -52,7 +52,9 @@ pub fn build_standalone_schema<'e>(
 
     debug!("graph {graph:#?}");
 
-    let root_operator_id = graph.remove(&type_info.def_id).unwrap_or(operator_id);
+    let root_operator_id = graph
+        .remove(&DefVariant::identity(type_info.def_id))
+        .unwrap_or(operator_id);
 
     // assert_eq!(root_operator_id, operator_id);
 
@@ -65,7 +67,7 @@ pub fn build_standalone_schema<'e>(
 
 /// Includes all the schemas in a domain, for use in OpenApi
 pub struct OpenApiSchemas<'e> {
-    schema_graph: BTreeMap<DefId, SerdeOperatorId>,
+    schema_graph: BTreeMap<DefVariant, SerdeOperatorId>,
     package_id: PackageId,
     env: &'e Env,
 }
@@ -83,16 +85,16 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
         };
 
         // serialize schemas belonging to the domain package first
-        for (def_id, operator_id) in self
-            .schema_graph
-            .range(DefId(package_id, 0)..DefId(next_package_id, 0))
-        {
+        for (def_id, operator_id) in self.schema_graph.range(
+            DefVariant::identity(DefId(package_id, 0))
+                ..DefVariant::identity(DefId(next_package_id, 0)),
+        ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.schema(*operator_id))?;
         }
 
-        for (def_id, operator_id) in &self.schema_graph {
-            if def_id.0 != self.package_id {
-                map.serialize_entry(&ctx.format_key(*def_id), &ctx.schema(*operator_id))?;
+        for (def_variant, operator_id) in &self.schema_graph {
+            if def_variant.id().0 != self.package_id {
+                map.serialize_entry(&ctx.format_key(*def_variant), &ctx.schema(*operator_id))?;
             }
         }
 
@@ -103,7 +105,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 /// Schema for a single type, for use in JSON schema
 pub struct StandaloneJsonSchema<'e> {
     operator_id: SerdeOperatorId,
-    defs: BTreeMap<DefId, SerdeOperatorId>,
+    defs: BTreeMap<DefVariant, SerdeOperatorId>,
     env: &'e Env,
 }
 
@@ -168,10 +170,10 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
     }
 
     /// Returns something that serializes as `{ "$ref": "some link" }`
-    fn ref_link(&self, type_def_id: DefId) -> RefLink {
+    fn ref_link(&self, def_variant: DefVariant) -> RefLink {
         RefLink {
             ctx: *self,
-            type_def_id,
+            def_variant,
         }
     }
 
@@ -185,12 +187,17 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
         }
     }
 
-    fn format_key(&self, def_id: DefId) -> String {
-        smart_format!("{}_{}", def_id.0 .0, def_id.1)
+    fn format_key(&self, def_variant: DefVariant) -> String {
+        smart_format!("{}_{}", def_variant.id().0 .0, def_variant.id().1)
     }
 
-    fn format_ref_link(&self, def_id: DefId) -> String {
-        smart_format!("{}{}_{}", self.link_prefix, def_id.0 .0, def_id.1)
+    fn format_ref_link(&self, def_variant: DefVariant) -> String {
+        smart_format!(
+            "{}{}_{}",
+            self.link_prefix,
+            def_variant.id().0 .0,
+            def_variant.id().1
+        )
     }
 }
 
@@ -198,7 +205,7 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
 struct JsonSchema<'c, 'e> {
     ctx: SchemaCtx<'c, 'e>,
     value_operator: &'e SerdeOperator,
-    defs: Option<&'c BTreeMap<DefId, SerdeOperatorId>>,
+    defs: Option<&'c BTreeMap<DefVariant, SerdeOperatorId>>,
 }
 
 impl<'c, 'e> JsonSchema<'c, 'e> {}
@@ -248,21 +255,21 @@ impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
                 map.end()
             }
             SerdeOperator::Sequence(_, def_variant) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(def_variant.id()))
+                self.serialize_reference(serializer, self.ctx.ref_link(*def_variant))
             }
             SerdeOperator::ValueType(value_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(value_type.def_variant.id()))
+                self.serialize_reference(serializer, self.ctx.ref_link(value_type.def_variant))
             }
             SerdeOperator::ValueUnionType(value_union_type) => self.serialize_reference(
                 serializer,
-                self.ctx.ref_link(value_union_type.union_def_variant.id()),
+                self.ctx.ref_link(value_union_type.union_def_variant),
             ),
             SerdeOperator::Id(id_operator_id) => self.serialize_reference(
                 serializer,
                 self.ctx.singleton_object("_id", *id_operator_id),
             ),
             SerdeOperator::MapType(map_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(map_type.def_variant.id()))
+                self.serialize_reference(serializer, self.ctx.ref_link(map_type.def_variant))
             }
         }
     }
@@ -480,20 +487,20 @@ impl<'c, 'e> Serialize for SingletonObjectSchema<'c, 'e> {
 // { "_ref": "some-link" }
 struct RefLink<'c, 'e> {
     ctx: SchemaCtx<'c, 'e>,
-    type_def_id: DefId,
+    def_variant: DefVariant,
 }
 
 impl<'c, 'e> Serialize for RefLink<'c, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-        map.serialize_entry("$ref", &self.ctx.format_ref_link(self.type_def_id))?;
+        map.serialize_entry("$ref", &self.ctx.format_ref_link(self.def_variant))?;
         map.end()
     }
 }
 
 struct Defs<'c, 'e> {
     ctx: SchemaCtx<'c, 'e>,
-    defs: &'c BTreeMap<DefId, SerdeOperatorId>,
+    defs: &'c BTreeMap<DefVariant, SerdeOperatorId>,
 }
 
 impl<'c, 'e> Serialize for Defs<'c, 'e> {
@@ -513,7 +520,7 @@ impl<'c, 'e> Serialize for Defs<'c, 'e> {
 
 #[derive(Default)]
 struct SchemaGraphBuilder {
-    graph: BTreeMap<DefId, SerdeOperatorId>,
+    graph: BTreeMap<DefVariant, SerdeOperatorId>,
     visited: FnvHashSet<SerdeOperatorId>,
 }
 
@@ -536,17 +543,17 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
             SerdeOperator::Sequence(ranges, def_variant) => {
-                self.add_to_graph(def_variant.id(), operator_id);
+                self.add_to_graph(*def_variant, operator_id);
                 for range in ranges {
                     self.visit(range.operator_id, env);
                 }
             }
             SerdeOperator::ValueType(value_type) => {
-                self.add_to_graph(value_type.def_variant.id(), operator_id);
+                self.add_to_graph(value_type.def_variant, operator_id);
                 self.visit(value_type.inner_operator_id, env);
             }
             SerdeOperator::ValueUnionType(value_union_type) => {
-                self.add_to_graph(value_union_type.union_def_variant.id(), operator_id);
+                self.add_to_graph(value_union_type.union_def_variant, operator_id);
 
                 for discriminator in &value_union_type.discriminators {
                     self.visit(discriminator.operator_id, env);
@@ -557,7 +564,7 @@ impl SchemaGraphBuilder {
                 self.visit(*id_operator_id, env);
             }
             SerdeOperator::MapType(map_type) => {
-                self.add_to_graph(map_type.def_variant.id(), operator_id);
+                self.add_to_graph(map_type.def_variant, operator_id);
 
                 for (_, property) in &map_type.properties {
                     self.visit(property.value_operator_id, env);
@@ -569,8 +576,8 @@ impl SchemaGraphBuilder {
         }
     }
 
-    fn add_to_graph(&mut self, def_id: DefId, operator_id: SerdeOperatorId) {
-        if self.graph.insert(def_id, operator_id).is_some() {
+    fn add_to_graph(&mut self, def_variant: DefVariant, operator_id: SerdeOperatorId) {
+        if self.graph.insert(def_variant, operator_id).is_some() {
             // panic!("{def_id:?} was already in graph");
         }
     }
