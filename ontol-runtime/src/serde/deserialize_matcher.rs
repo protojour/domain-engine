@@ -323,7 +323,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
                         self.env,
-                        discriminator.discriminator.result_type,
+                        discriminator.discriminator.def_variant.id(),
                         str,
                     )
                     .map_err(|_| ())
@@ -331,13 +331,13 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsStringLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.env,
-                        discriminator.discriminator.result_type,
+                        discriminator.discriminator.def_variant.id(),
                         str,
                     )
                     .map_err(|_| ())
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
-                    let result_type = discriminator.discriminator.result_type;
+                    let result_type = discriminator.discriminator.def_variant.id();
                     let pattern = self.env.string_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str) {
@@ -405,7 +405,7 @@ impl<'e> UnionMatcher<'e> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
         for discriminator in &self.value_union_type.discriminators {
             if discriminator.discriminator.discriminant == discriminant {
-                return Ok(discriminator.discriminator.result_type);
+                return Ok(discriminator.discriminator.def_variant.id());
             }
         }
 

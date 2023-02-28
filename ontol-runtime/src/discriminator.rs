@@ -1,6 +1,6 @@
 use smartstring::alias::String;
 
-use crate::{DefId, RelationId};
+use crate::{DefId, DefVariant, RelationId};
 
 #[derive(Debug)]
 pub struct UnionDiscriminator {
@@ -10,7 +10,7 @@ pub struct UnionDiscriminator {
 #[derive(Clone, Debug)]
 pub struct VariantDiscriminator {
     pub discriminant: Discriminant,
-    pub result_type: DefId,
+    pub def_variant: DefVariant,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]

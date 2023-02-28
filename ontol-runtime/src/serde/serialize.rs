@@ -68,7 +68,7 @@ impl<'e> SerdeProcessor<'e> {
                     .discriminators
                     .iter()
                     .find(|discriminator| {
-                        value.type_def_id == discriminator.discriminator.result_type
+                        value.type_def_id == discriminator.discriminator.def_variant.id()
                     });
 
                 match discriminator {

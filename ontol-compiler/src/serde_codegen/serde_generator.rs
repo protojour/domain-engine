@@ -390,18 +390,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .get_subject_property_meta(def_variant.id(), *id_relation_id)
                         .expect("Problem getting subject property meta");
 
+                    let id_def_variant = DefVariant(DataVariant::IdMap, def_variant.id());
+                    let map_def_variant =
+                        DefVariant(DataVariant::JoinedPropertyMap, def_variant.id());
+
                     // Create a union between { '_id' } and the map properties itself
                     let id_operator_id = self
-                        .get_serde_operator_id(SerdeKey::variant(
-                            DataVariant::IdMap,
-                            def_variant.id(),
-                        ))
+                        .get_serde_operator_id(SerdeKey::Variant(id_def_variant))
                         .expect("No _id operator");
                     let map_properties_operator_id = self
-                        .get_serde_operator_id(SerdeKey::variant(
-                            DataVariant::JoinedPropertyMap,
-                            def_variant.id(),
-                        ))
+                        .get_serde_operator_id(SerdeKey::Variant(map_def_variant))
                         .expect("No property map operator");
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
@@ -414,14 +412,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                         *id_relation_id,
                                         "_id".into(),
                                     ),
-                                    result_type: relationship.object.0,
+                                    def_variant: DefVariant(
+                                        DataVariant::Identity,
+                                        relationship.object.0,
+                                    ),
                                 },
                                 operator_id: id_operator_id,
                             },
                             ValueUnionDiscriminator {
                                 discriminator: VariantDiscriminator {
                                     discriminant: Discriminant::MapFallback,
-                                    result_type: def_variant.id(),
+                                    def_variant: map_def_variant,
                                 },
                                 operator_id: map_properties_operator_id,
                             },
@@ -454,7 +455,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .add_root_discriminator(self, root_discriminator)
                 .expect("Could not add root discriminator to union builder");
 
-            root_types.insert(root_discriminator.result_type);
+            root_types.insert(root_discriminator.def_variant.id());
         }
 
         let discriminators: Vec<_> = if properties.map.is_some() {

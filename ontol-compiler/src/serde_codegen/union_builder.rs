@@ -25,7 +25,7 @@ impl UnionBuilder {
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
         for candidate in &mut self.discriminator_candidates {
-            let result_type = candidate.discriminator.result_type;
+            let result_type = candidate.discriminator.def_variant.id();
 
             candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
 
@@ -70,11 +70,12 @@ impl UnionBuilder {
         generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
     ) -> Result<(), String> {
-        let operator_id =
-            match generator.get_serde_operator_id(SerdeKey::identity(discriminator.result_type)) {
-                Some(operator_id) => operator_id,
-                None => return Ok(()),
-            };
+        let operator_id = match generator
+            .get_serde_operator_id(SerdeKey::identity(discriminator.def_variant.id()))
+        {
+            Some(operator_id) => operator_id,
+            None => return Ok(()),
+        };
 
         // Push with empty scope ('root scope')
         self.push_discriminator(generator, &[], discriminator, operator_id)

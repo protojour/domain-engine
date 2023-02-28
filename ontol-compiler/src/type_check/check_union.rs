@@ -6,7 +6,7 @@ use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
     smart_format,
     value::PropertyId,
-    DefId, RelationId,
+    DataVariant, DefId, DefVariant, RelationId,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
@@ -424,14 +424,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(def_id) = builder.unit {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsUnit,
-                result_type: def_id,
+                def_variant: DefVariant(DataVariant::Identity, def_id),
             })
         }
 
         if let Some(number) = builder.number {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsInt,
-                result_type: number.0,
+                def_variant: DefVariant(DataVariant::Identity, number.0),
             })
         }
 
@@ -439,7 +439,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (variant_def_id, _) in builder.pattern_candidates {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::MatchesCapturingStringPattern(variant_def_id),
-                result_type: variant_def_id,
+                def_variant: DefVariant(DataVariant::Identity, variant_def_id),
             });
         }
 
@@ -448,14 +448,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             StringDiscriminator::Any(def_id) => {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: Discriminant::IsString,
-                    result_type: def_id,
+                    def_variant: DefVariant(DataVariant::Identity, def_id),
                 });
             }
             StringDiscriminator::Literals(literals) => {
                 for (literal, def_id) in literals {
                     union_discriminator.variants.push(VariantDiscriminator {
                         discriminant: Discriminant::IsStringLiteral(literal),
-                        result_type: def_id,
+                        def_variant: DefVariant(DataVariant::Identity, def_id),
                     });
                 }
             }
@@ -464,7 +464,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(sequence_def_id) = builder.sequence {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsSequence,
-                result_type: sequence_def_id,
+                def_variant: DefVariant(DataVariant::Identity, sequence_def_id),
             });
         }
 
@@ -472,7 +472,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             for candidate in map_discriminator.property_candidates {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: candidate.discriminant,
-                    result_type: map_discriminator.result_type,
+                    def_variant: DefVariant(DataVariant::Identity, map_discriminator.result_type),
                 })
             }
         }
