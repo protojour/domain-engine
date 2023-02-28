@@ -7,7 +7,7 @@ use ontol_compiler::{
 use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
-    serde::{SerdeOperatorId, SerdeOperatorKey},
+    serde::SerdeOperatorId,
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -42,6 +42,7 @@ impl<'e> TypeBinding<'e> {
         let json_schema_json = serde_json::to_string_pretty(&json_schema).unwrap();
 
         debug!("json schema: {json_schema_json}");
+        // panic!();
 
         let binding = Self { type_info, env };
 

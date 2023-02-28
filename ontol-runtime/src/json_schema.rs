@@ -4,6 +4,7 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::env::TypeInfo;
 use crate::serde::{MapType, SequenceRange, ValueUnionType};
@@ -40,16 +41,23 @@ pub fn build_standalone_schema<'e>(
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
+    debug!("build standalone schema {type_info:?}");
+
     let operator_id = type_info
         .serde_operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 
     let mut graph = graph_builder.graph;
-    let operator_id = graph.remove(&type_info.def_id).unwrap_or(operator_id);
+
+    debug!("graph {graph:#?}");
+
+    let root_operator_id = graph.remove(&type_info.def_id).unwrap_or(operator_id);
+
+    // assert_eq!(root_operator_id, operator_id);
 
     Ok(StandaloneJsonSchema {
-        operator_id,
+        operator_id: root_operator_id,
         defs: graph,
         env,
     })
@@ -514,6 +522,9 @@ impl SchemaGraphBuilder {
         }
 
         let operator = env.get_serde_operator(operator_id);
+
+        debug!("visit {operator_id:?}: {operator:#?}");
+
         match operator {
             SerdeOperator::Unit
             | SerdeOperator::Int(_)
@@ -523,18 +534,17 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
             SerdeOperator::Sequence(ranges, def_id) => {
-                self.graph.insert(*def_id, operator_id);
+                self.add_to_graph(*def_id, operator_id);
                 for range in ranges {
                     self.visit(range.operator_id, env);
                 }
             }
             SerdeOperator::ValueType(value_type) => {
-                self.graph.insert(value_type.type_def_id, operator_id);
+                self.add_to_graph(value_type.type_def_id, operator_id);
                 self.visit(value_type.inner_operator_id, env);
             }
             SerdeOperator::ValueUnionType(value_union_type) => {
-                self.graph
-                    .insert(value_union_type.union_def_id, operator_id);
+                self.add_to_graph(value_union_type.union_def_id, operator_id);
 
                 for discriminator in &value_union_type.discriminators {
                     self.visit(discriminator.operator_id, env);
@@ -545,7 +555,7 @@ impl SchemaGraphBuilder {
                 self.visit(*id_operator_id, env);
             }
             SerdeOperator::MapType(map_type) => {
-                self.graph.insert(map_type.type_def_id, operator_id);
+                self.add_to_graph(map_type.type_def_id, operator_id);
 
                 for (_, property) in &map_type.properties {
                     self.visit(property.value_operator_id, env);
@@ -554,6 +564,12 @@ impl SchemaGraphBuilder {
                     }
                 }
             }
+        }
+    }
+
+    fn add_to_graph(&mut self, def_id: DefId, operator_id: SerdeOperatorId) {
+        if self.graph.insert(def_id, operator_id).is_some() {
+            // panic!("{def_id:?} was already in graph");
         }
     }
 

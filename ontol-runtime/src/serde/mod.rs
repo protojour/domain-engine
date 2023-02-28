@@ -13,7 +13,7 @@ use crate::{
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     value::PropertyId,
-    DefId,
+    DataVariant, DefId, DefVariant,
 };
 
 mod deserialize;
@@ -79,13 +79,19 @@ impl<'e> SerdeProcessor<'e> {
 pub struct SerdeOperatorId(pub u32);
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum SerdeOperatorKey {
-    Identity(DefId),
-    Array(DefId),
-    JoinedPropertyMap(DefId),
-    InherentPropertyMap(DefId),
-    IdMap(DefId),
-    Intersection(Box<BTreeSet<SerdeOperatorKey>>),
+pub enum SerdeKey {
+    Variant(DefVariant),
+    Intersection(Box<BTreeSet<SerdeKey>>),
+}
+
+impl SerdeKey {
+    pub const fn variant(variant: DataVariant, def_id: DefId) -> Self {
+        Self::Variant(DefVariant(variant, def_id))
+    }
+
+    pub const fn identity(def_id: DefId) -> Self {
+        Self::Variant(DefVariant(DataVariant::Identity, def_id))
+    }
 }
 
 #[derive(Debug)]

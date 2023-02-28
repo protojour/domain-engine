@@ -22,7 +22,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
-    serde::SerdeOperatorKey,
+    serde::SerdeKey,
     string_types::StringLikeType,
     PackageId,
 };
@@ -106,7 +106,7 @@ impl<'m> Compiler<'m> {
                         def_id: type_def_id,
                         entity_id,
                         serde_operator_id: serde_generator
-                            .get_serde_operator_id(SerdeOperatorKey::Identity(type_def_id)),
+                            .get_serde_operator_id(SerdeKey::identity(type_def_id)),
                     },
                 );
             }

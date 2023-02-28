@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
-    serde::{SerdeOperator, SerdeOperatorId, SerdeOperatorKey, ValueUnionDiscriminator},
+    serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator},
     smart_format, DefId,
 };
 use smartstring::alias::String;
@@ -36,8 +36,7 @@ impl UnionBuilder {
                 Discriminant::IsSingletonProperty(relation_id, prop) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
-                    let operator =
-                        generator.get_serde_operator(SerdeOperatorKey::Identity(result_type));
+                    let operator = generator.get_serde_operator(SerdeKey::identity(result_type));
 
                     if let Some(SerdeOperator::CapturingStringPattern(def_id)) = operator {
                         // convert this
@@ -71,12 +70,11 @@ impl UnionBuilder {
         generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
     ) -> Result<(), String> {
-        let operator_id = match generator
-            .get_serde_operator_id(SerdeOperatorKey::Identity(discriminator.result_type))
-        {
-            Some(operator_id) => operator_id,
-            None => return Ok(()),
-        };
+        let operator_id =
+            match generator.get_serde_operator_id(SerdeKey::identity(discriminator.result_type)) {
+                Some(operator_id) => operator_id,
+                None => return Ok(()),
+            };
 
         // Push with empty scope ('root scope')
         self.push_discriminator(generator, &[], discriminator, operator_id)

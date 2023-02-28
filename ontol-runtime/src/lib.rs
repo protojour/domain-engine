@@ -42,6 +42,38 @@ impl DefId {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum DataVariant {
+    Identity,
+    Array,
+    JoinedPropertyMap,
+    InherentPropertyMap,
+    IdMap,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DefVariant(pub DataVariant, pub DefId);
+
+impl DefVariant {
+    pub fn data_variant(self) -> DataVariant {
+        self.0
+    }
+
+    pub fn id(self) -> DefId {
+        self.1
+    }
+}
+
+impl Debug for DefVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DefVariant({:?}, {}, {})",
+            self.0, self.1 .0 .0, self.1 .1
+        )
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
 #[debug_single_tuple_inline]
 pub struct RelationId(pub DefId);
