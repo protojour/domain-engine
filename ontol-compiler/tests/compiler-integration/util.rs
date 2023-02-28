@@ -6,6 +6,7 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     env::{Env, TypeInfo},
+    json_schema::build_standalone_schema,
     serde::{SerdeOperatorId, SerdeOperatorKey},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
@@ -36,6 +37,10 @@ impl<'e> TypeBinding<'e> {
                 .serde_operator_id
                 .map(|id| env.new_serde_processor(id, None))
         );
+
+        let json_schema = build_standalone_schema(env, &type_info).unwrap();
+        let json_schema_json = serde_json::to_string(&json_schema);
+
         let binding = Self { type_info, env };
 
         binding
