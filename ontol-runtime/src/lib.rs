@@ -59,11 +59,11 @@ impl DefVariant {
         Self(def_id, DataVariant::Identity)
     }
 
-    pub const fn id(self) -> DefId {
+    pub const fn id(&self) -> DefId {
         self.0
     }
 
-    pub const fn data_variant(self) -> DataVariant {
+    pub const fn data_variant(&self) -> DataVariant {
         self.1
     }
 }

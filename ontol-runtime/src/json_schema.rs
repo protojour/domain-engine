@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 
 use fnv::FnvHashSet;
 use serde::Serialize;
@@ -13,7 +14,7 @@ use crate::{
     serde::{SerdeOperator, SerdeOperatorId},
     DefId, PackageId,
 };
-use crate::{smart_format, DefVariant};
+use crate::{smart_format, DataVariant, DefVariant};
 
 pub fn build_openapi_schemas<'e>(
     env: &'e Env,
@@ -188,15 +189,34 @@ impl<'c, 'e> SchemaCtx<'c, 'e> {
     }
 
     fn format_key(&self, def_variant: DefVariant) -> String {
-        smart_format!("{}_{}", def_variant.id().0 .0, def_variant.id().1)
+        smart_format!("{}", Key(def_variant))
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
-        smart_format!(
-            "{}{}_{}",
-            self.link_prefix,
-            def_variant.id().0 .0,
-            def_variant.id().1
+        smart_format!("{}{}", self.link_prefix, Key(def_variant))
+    }
+}
+
+struct Key(DefVariant);
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let variant = &self.0;
+        let def_id = variant.id();
+        let package = def_id.0;
+
+        write!(
+            f,
+            "{}_{}{}",
+            package.0,
+            def_id.1,
+            match variant.data_variant() {
+                DataVariant::Identity => "",
+                DataVariant::Array => "_array",
+                DataVariant::IdMap => "_id",
+                DataVariant::InherentPropertyMap => "_inherent_props",
+                DataVariant::JoinedPropertyMap => "_joined_props",
+            }
         )
     }
 }
