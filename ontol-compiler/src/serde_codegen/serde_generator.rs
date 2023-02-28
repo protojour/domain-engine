@@ -68,7 +68,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.get_serde_operator_id(SerdeKey::variant(DataVariant::Array, type_def_id))
+                self.get_serde_operator_id(SerdeKey::variant(type_def_id, DataVariant::Array))
                     .expect("no property operator"),
             ),
         }
@@ -81,13 +81,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match &key {
             SerdeKey::Variant(
                 def_variant @ DefVariant(
+                    _,
                     DataVariant::Identity
                     | DataVariant::JoinedPropertyMap
                     | DataVariant::InherentPropertyMap,
-                    _,
                 ),
             ) => self.create_item_operator(*def_variant),
-            SerdeKey::Variant(def_variant @ DefVariant(DataVariant::Array, def_id)) => {
+            SerdeKey::Variant(def_variant @ DefVariant(def_id, DataVariant::Array)) => {
                 let item_operator_id = self.get_serde_operator_id(SerdeKey::identity(*def_id))?;
 
                 Some((
@@ -103,7 +103,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ),
                 ))
             }
-            SerdeKey::Variant(DefVariant(DataVariant::IdMap, def_id)) => {
+            SerdeKey::Variant(DefVariant(def_id, DataVariant::IdMap)) => {
                 match self.get_def_type(*def_id)? {
                     Type::Domain(_) => {
                         let id_relation_id = self.relations.properties_by_type.get(def_id)?.id?;
@@ -251,7 +251,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some((
                     operator_id,
                     self.create_domain_type_serde_operator(
-                        DefVariant(def_variant.data_variant(), *def_id),
+                        DefVariant(*def_id, def_variant.data_variant()),
                         typename,
                         properties,
                     ),
@@ -390,9 +390,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .get_subject_property_meta(def_variant.id(), *id_relation_id)
                         .expect("Problem getting subject property meta");
 
-                    let id_def_variant = DefVariant(DataVariant::IdMap, def_variant.id());
+                    let id_def_variant = DefVariant(def_variant.id(), DataVariant::IdMap);
                     let map_def_variant =
-                        DefVariant(DataVariant::JoinedPropertyMap, def_variant.id());
+                        DefVariant(def_variant.id(), DataVariant::JoinedPropertyMap);
 
                     // Create a union between { '_id' } and the map properties itself
                     let id_operator_id = self
@@ -412,10 +412,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                         *id_relation_id,
                                         "_id".into(),
                                     ),
-                                    def_variant: DefVariant(
-                                        DataVariant::Identity,
-                                        relationship.object.0,
-                                    ),
+                                    def_variant: DefVariant::identity(relationship.object.0),
                                 },
                                 operator_id: id_operator_id,
                             },
@@ -462,7 +459,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_key =
-                SerdeKey::variant(DataVariant::InherentPropertyMap, def_variant.id());
+                SerdeKey::variant(def_variant.id(), DataVariant::InherentPropertyMap);
 
             union_builder
                 .build(self, |this, operator_id, result_type| {

@@ -85,12 +85,12 @@ pub enum SerdeKey {
 }
 
 impl SerdeKey {
-    pub const fn variant(variant: DataVariant, def_id: DefId) -> Self {
-        Self::Variant(DefVariant(variant, def_id))
+    pub const fn variant(def_id: DefId, variant: DataVariant) -> Self {
+        Self::Variant(DefVariant(def_id, variant))
     }
 
     pub const fn identity(def_id: DefId) -> Self {
-        Self::Variant(DefVariant(DataVariant::Identity, def_id))
+        Self::Variant(DefVariant(def_id, DataVariant::Identity))
     }
 }
 

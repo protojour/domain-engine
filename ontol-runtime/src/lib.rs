@@ -52,14 +52,18 @@ pub enum DataVariant {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct DefVariant(pub DataVariant, pub DefId);
+pub struct DefVariant(pub DefId, pub DataVariant);
 
 impl DefVariant {
-    pub fn data_variant(self) -> DataVariant {
+    pub const fn identity(def_id: DefId) -> Self {
+        Self(def_id, DataVariant::Identity)
+    }
+
+    pub const fn id(self) -> DefId {
         self.0
     }
 
-    pub fn id(self) -> DefId {
+    pub const fn data_variant(self) -> DataVariant {
         self.1
     }
 }
@@ -68,8 +72,8 @@ impl Debug for DefVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "DefVariant({:?}, {}, {})",
-            self.0, self.1 .0 .0, self.1 .1
+            "DefVariant({}, {}, {:?})",
+            self.0 .0 .0, self.0 .1, self.1,
         )
     }
 }
