@@ -150,8 +150,8 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::Sequence(ranges, def_id) => deserializer.deserialize_seq(
-                SequenceMatcher::new(ranges, *def_id, self.rel_params_operator_id)
+            SerdeOperator::Sequence(ranges, def_variant) => deserializer.deserialize_seq(
+                SequenceMatcher::new(ranges, def_variant.id(), self.rel_params_operator_id)
                     .into_visitor(self),
             ),
             SerdeOperator::ValueType(value_type) => {
@@ -363,7 +363,7 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-        let type_def_id = self.map_type.type_def_id;
+        let type_def_id = self.map_type.def_variant.id();
         let deserialized_map = deserialize_map(
             map,
             self.buffered_attrs,

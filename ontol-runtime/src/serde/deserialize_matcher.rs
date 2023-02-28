@@ -359,10 +359,10 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     .new_serde_processor(discriminator.operator_id, None);
 
                 match &processor.value_operator {
-                    SerdeOperator::Sequence(ranges, def_id) => {
+                    SerdeOperator::Sequence(ranges, def_variant) => {
                         return Ok(SequenceMatcher::new(
                             ranges,
-                            *def_id,
+                            def_variant.id(),
                             self.rel_params_operator_id,
                         ))
                     }

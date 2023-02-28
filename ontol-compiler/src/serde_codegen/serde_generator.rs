@@ -80,14 +80,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> Option<(SerdeOperatorId, SerdeOperator)> {
         match &key {
             SerdeKey::Variant(
-                variant @ DefVariant(
+                def_variant @ DefVariant(
                     DataVariant::Identity
                     | DataVariant::JoinedPropertyMap
                     | DataVariant::InherentPropertyMap,
                     _,
                 ),
-            ) => self.create_item_operator(*variant),
-            SerdeKey::Variant(DefVariant(DataVariant::Array, def_id)) => {
+            ) => self.create_item_operator(*def_variant),
+            SerdeKey::Variant(def_variant @ DefVariant(DataVariant::Array, def_id)) => {
                 let item_operator_id = self.get_serde_operator_id(SerdeKey::identity(*def_id))?;
 
                 Some((
@@ -99,7 +99,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }]
                         .into_iter()
                         .collect(),
-                        *def_id,
+                        *def_variant,
                     ),
                 ))
             }
@@ -290,7 +290,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             None => {
                 return SerdeOperator::MapType(MapType {
                     typename: typename.into(),
-                    type_def_id: def_variant.id(),
+                    def_variant,
                     properties: Default::default(),
                     n_mandatory_properties: 0,
                 })
@@ -318,7 +318,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 SerdeOperator::ValueType(ValueType {
                     typename: typename.into(),
-                    type_def_id: def_variant.id(),
+                    def_variant,
                     inner_operator_id,
                 })
             }
@@ -362,7 +362,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let ranges = sequence_range_builder.build();
                 debug!("sequence ranges: {:#?}", ranges);
 
-                SerdeOperator::Sequence(ranges, def_variant.id())
+                SerdeOperator::Sequence(ranges, def_variant)
             }
             Constructor::StringPattern(_) => {
                 assert!(self
@@ -406,8 +406,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     SerdeOperator::ValueUnionType(ValueUnionType {
                         typename: typename.into(),
-                        union_def_id: def_variant.id(),
-                        def_variant,
+                        union_def_variant: def_variant,
                         discriminators: vec![
                             ValueUnionDiscriminator {
                                 discriminator: VariantDiscriminator {
@@ -489,8 +488,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         SerdeOperator::ValueUnionType(ValueUnionType {
             typename: typename.into(),
-            union_def_id: def_variant.id(),
-            def_variant,
+            union_def_variant: def_variant,
             discriminators,
         })
     }
@@ -562,7 +560,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         SerdeOperator::MapType(MapType {
             typename: typename.into(),
-            type_def_id: def_variant.id(),
+            def_variant,
             properties: serde_properties,
             n_mandatory_properties,
         })

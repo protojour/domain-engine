@@ -109,7 +109,7 @@ pub enum SerdeOperator {
     CapturingStringPattern(DefId),
 
     /// Any sequence
-    Sequence(SmallVec<[SequenceRange; 3]>, DefId),
+    Sequence(SmallVec<[SequenceRange; 3]>, DefVariant),
 
     /// A type with just one anonymous property
     ValueType(ValueType),
@@ -138,15 +138,14 @@ pub struct SequenceRange {
 #[derive(Debug)]
 pub struct ValueType {
     pub typename: String,
-    pub type_def_id: DefId,
+    pub def_variant: DefVariant,
     pub inner_operator_id: SerdeOperatorId,
 }
 
 #[derive(Debug)]
 pub struct ValueUnionType {
     pub typename: String,
-    pub union_def_id: DefId,
-    pub def_variant: DefVariant,
+    pub union_def_variant: DefVariant,
     pub discriminators: Vec<ValueUnionDiscriminator>,
 }
 
@@ -159,7 +158,7 @@ pub struct ValueUnionDiscriminator {
 #[derive(Clone, Debug)]
 pub struct MapType {
     pub typename: String,
-    pub type_def_id: DefId,
+    pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,
     pub n_mandatory_properties: usize,
 }

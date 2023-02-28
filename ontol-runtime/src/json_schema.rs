@@ -247,20 +247,22 @@ impl<'c, 'e> Serialize for SchemaReference<'c, 'e> {
                 serialize_schema_inline::<S>(&self.ctx, value_operator, None, &mut map)?;
                 map.end()
             }
-            SerdeOperator::Sequence(_, type_def_id) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(*type_def_id))
+            SerdeOperator::Sequence(_, def_variant) => {
+                self.serialize_reference(serializer, self.ctx.ref_link(def_variant.id()))
             }
             SerdeOperator::ValueType(value_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(value_type.type_def_id))
+                self.serialize_reference(serializer, self.ctx.ref_link(value_type.def_variant.id()))
             }
-            SerdeOperator::ValueUnionType(value_union_type) => self
-                .serialize_reference(serializer, self.ctx.ref_link(value_union_type.union_def_id)),
+            SerdeOperator::ValueUnionType(value_union_type) => self.serialize_reference(
+                serializer,
+                self.ctx.ref_link(value_union_type.union_def_variant.id()),
+            ),
             SerdeOperator::Id(id_operator_id) => self.serialize_reference(
                 serializer,
                 self.ctx.singleton_object("_id", *id_operator_id),
             ),
             SerdeOperator::MapType(map_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(map_type.type_def_id))
+                self.serialize_reference(serializer, self.ctx.ref_link(map_type.def_variant.id()))
             }
         }
     }
@@ -533,18 +535,18 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
-            SerdeOperator::Sequence(ranges, def_id) => {
-                self.add_to_graph(*def_id, operator_id);
+            SerdeOperator::Sequence(ranges, def_variant) => {
+                self.add_to_graph(def_variant.id(), operator_id);
                 for range in ranges {
                     self.visit(range.operator_id, env);
                 }
             }
             SerdeOperator::ValueType(value_type) => {
-                self.add_to_graph(value_type.type_def_id, operator_id);
+                self.add_to_graph(value_type.def_variant.id(), operator_id);
                 self.visit(value_type.inner_operator_id, env);
             }
             SerdeOperator::ValueUnionType(value_union_type) => {
-                self.add_to_graph(value_union_type.union_def_id, operator_id);
+                self.add_to_graph(value_union_type.union_def_variant.id(), operator_id);
 
                 for discriminator in &value_union_type.discriminators {
                     self.visit(discriminator.operator_id, env);
@@ -555,7 +557,7 @@ impl SchemaGraphBuilder {
                 self.visit(*id_operator_id, env);
             }
             SerdeOperator::MapType(map_type) => {
-                self.add_to_graph(map_type.type_def_id, operator_id);
+                self.add_to_graph(map_type.def_variant.id(), operator_id);
 
                 for (_, property) in &map_type.properties {
                     self.visit(property.value_operator_id, env);
