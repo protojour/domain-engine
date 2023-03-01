@@ -221,11 +221,8 @@ pub fn diff_errors(
                     });
 
             // .lines() does not record the final newline
-            match text.chars().last() {
-                Some('\n') => {
-                    builder.ends_with_newline = true;
-                }
-                _ => {}
+            if let Some(b'\n') = text.as_bytes().last() {
+                builder.ends_with_newline = true;
             }
 
             (*source_id, builder)
