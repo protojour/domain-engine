@@ -5,7 +5,7 @@ use ontol_runtime::value::Data;
 use serde_json::json;
 use test_log::test;
 
-use crate::{assert_error_msg, util::TypeBinding, TestCompile};
+use crate::{assert_error_msg, util::type_binding::TypeBinding, TestCompile};
 
 #[test]
 fn deserialize_empty_type() {

@@ -1,3 +1,4 @@
+// This is just a test suite so care less about certain lints:
 #![allow(unused)]
 
 use std::collections::HashMap;
@@ -7,7 +8,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
-    SourceCodeRegistry, Sources, SpannedCompileError,
+    SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{env::Env, PackageId};
 
@@ -59,7 +60,7 @@ macro_rules! assert_json_io_matches {
 }
 
 pub(crate) use assert_json_io_matches;
-use util::AnnotatedCompileError;
+use util::diagnostics::AnnotatedCompileError;
 
 trait TestCompile: Sized {
     /// Compile
@@ -166,7 +167,7 @@ impl TestCompile for TestPackages {
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
-                util::diff_errors(error, &self.sources, &self.source_code_registry);
+                util::diagnostics::diff_errors(error, &self.sources, &self.source_code_registry);
 
                 // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
@@ -176,12 +177,15 @@ impl TestCompile for TestPackages {
 
     fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
         match self.compile_topology() {
-            Ok(env) => {
+            Ok(_) => {
                 panic!("Scripts did not fail to compile");
             }
             Err(error) => {
-                let annotated_errors =
-                    util::diff_errors(error, &self.sources, &self.source_code_registry);
+                let annotated_errors = util::diagnostics::diff_errors(
+                    error,
+                    &self.sources,
+                    &self.source_code_registry,
+                );
                 validator(annotated_errors);
             }
         }

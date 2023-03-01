@@ -1,4 +1,6 @@
-use crate::{assert_error_msg, assert_json_io_matches, util::TypeBinding, TestCompile};
+use crate::{
+    assert_error_msg, assert_json_io_matches, util::type_binding::TypeBinding, TestCompile,
+};
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
 use serde_json::json;

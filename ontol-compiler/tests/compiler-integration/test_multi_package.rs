@@ -1,9 +1,5 @@
 use crate::assert_json_io_matches;
-use crate::{
-    assert_error_msg, util::TypeBinding, SourceName, TestCompile, TestPackages, ROOT_SRC_NAME,
-};
-use assert_matches::assert_matches;
-use ontol_runtime::value::Data;
+use crate::{util::type_binding::TypeBinding, SourceName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
 
