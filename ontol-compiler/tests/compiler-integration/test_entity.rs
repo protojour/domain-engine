@@ -33,11 +33,9 @@ rel artist { 'plays'* | 'played_by'*: plays } instrument
 ";
 
 #[test]
-fn artist_and_instrument_basic() {
+fn artist_and_instrument_io_artist() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let artist = TypeBinding::new(env, "artist");
-        let instrument = TypeBinding::new(env, "instrument");
-
         assert_json_io_matches!(
             artist,
             json!({
@@ -52,7 +50,13 @@ fn artist_and_instrument_basic() {
                 ]
             })
         );
+    });
+}
 
+#[test]
+fn artist_and_instrument_io_instrument() {
+    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
+        let instrument = TypeBinding::new(env, "instrument");
         assert_json_io_matches!(
             instrument,
             json!({
@@ -67,7 +71,13 @@ fn artist_and_instrument_basic() {
                 ]
             })
         );
+    });
+}
 
+#[test]
+fn artist_and_instrument_error_artist() {
+    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
+        let artist = TypeBinding::new(env, "artist");
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Herbie Hancock",

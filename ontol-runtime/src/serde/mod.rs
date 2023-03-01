@@ -129,6 +129,7 @@ pub enum SerdeOperator {
 pub struct SequenceType {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def_variant: DefVariant,
+    pub is_constructor: bool,
 }
 
 impl SequenceType {

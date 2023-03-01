@@ -100,6 +100,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .into_iter()
                         .collect(),
                         def_variant: *def_variant,
+                        is_constructor: false,
                     }),
                 ))
             }
@@ -365,6 +366,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 SerdeOperator::Sequence(SequenceType {
                     ranges,
                     def_variant,
+                    is_constructor: true,
                 })
             }
             Constructor::StringPattern(_) => {

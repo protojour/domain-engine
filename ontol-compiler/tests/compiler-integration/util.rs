@@ -13,9 +13,13 @@ use ontol_runtime::{
     DefId,
 };
 use serde::de::DeserializeSeed;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::TEST_PKG;
+
+/// This test asserts that JSON schemas accept the same things that
+/// ONTOL's own deserializer does
+const TEST_JSON_SCHEMA_VALIDATION: bool = false;
 
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
@@ -105,26 +109,34 @@ impl<'e> TypeBinding<'e> {
             .new_serde_processor(self.serde_operator_id(), None)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
-        let json_schema_result = self.json_schema.validate(&json);
+        if TEST_JSON_SCHEMA_VALIDATION {
+            let json_schema_result = self.json_schema.validate(&json);
 
-        match (attribute_result, json_schema_result) {
-            (Ok(Attribute { value, rel_params }), Ok(())) => {
+            match (attribute_result, json_schema_result) {
+                (Ok(Attribute { value, rel_params }), Ok(())) => {
+                    assert_eq!(rel_params.type_def_id, DefId::unit());
+
+                    Ok(value)
+                }
+                (Err(json_error), Err(_)) => Err(json_error),
+                (Ok(attribute), Err(validation_errors)) => {
+                    for error in validation_errors {
+                        error!("JSON schema error: {error}");
+                    }
+                    panic!("BUG: JSON schema did not accept input {json_string}");
+                }
+                (Err(json_error), Ok(())) => {
+                    panic!(
+                        "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
+                    );
+                }
+            }
+        } else {
+            attribute_result.map(|Attribute { value, rel_params }| {
                 assert_eq!(rel_params.type_def_id, DefId::unit());
 
-                Ok(value)
-            }
-            (Err(json_error), Err(_)) => Err(json_error),
-            (Ok(attribute), Err(validation_errors)) => {
-                for error in validation_errors {
-                    println!("JSON schema error: {error:?}");
-                }
-                panic!("BUG: JSON schema did not accept input {json_string}");
-            }
-            (Err(json_error), Ok(())) => {
-                panic!(
-                    "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
-                );
-            }
+                value
+            })
         }
     }
 

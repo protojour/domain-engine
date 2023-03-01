@@ -5,6 +5,7 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::env::TypeInfo;
 use crate::serde::{MapType, SequenceRange, ValueUnionType};
@@ -41,25 +42,19 @@ pub fn build_standalone_schema<'e>(
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    let def_variant = DefVariant::identity(type_info.def_id);
     let operator_id = type_info
         .serde_operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 
-    let mut graph = graph_builder.graph;
-
-    let root_operator_id = graph.remove(&def_variant).unwrap_or(operator_id);
-
-    // assert_eq!(root_operator_id, operator_id);
-
     Ok(StandaloneJsonSchema {
-        def_variant,
-        operator_id: root_operator_id,
-        defs: graph,
+        operator_id,
+        defs: graph_builder.graph,
         env,
     })
 }
+
+type DefMap = BTreeMap<DefVariant, SerdeOperatorId>;
 
 /// Includes all the schemas in a domain, for use in OpenApi
 pub struct OpenApiSchemas<'e> {
@@ -78,19 +73,20 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
             link_anchor: LinkAnchor::ComponentsSchemas,
             env: self.env,
             rel_params_operator_id: None,
+            allof_reference_depth: 0,
         };
 
-        // serialize schemas belonging to the domain package first
+        // serialize schema definitions belonging to the domain package first
         for (def_id, operator_id) in self.schema_graph.range(
             DefVariant::identity(DefId(package_id, 0))
                 ..DefVariant::identity(DefId(next_package_id, 0)),
         ) {
-            map.serialize_entry(&ctx.format_key(*def_id), &ctx.schema(*operator_id))?;
+            map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
         }
 
         for (def_variant, operator_id) in &self.schema_graph {
             if def_variant.id().0 != self.package_id {
-                map.serialize_entry(&ctx.format_key(*def_variant), &ctx.schema(*operator_id))?;
+                map.serialize_entry(&ctx.format_key(*def_variant), &ctx.definition(*operator_id))?;
             }
         }
 
@@ -100,7 +96,6 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
 /// Schema for a single type, for use in JSON schema
 pub struct StandaloneJsonSchema<'e> {
-    def_variant: DefVariant,
     operator_id: SerdeOperatorId,
     defs: BTreeMap<DefVariant, SerdeOperatorId>,
     env: &'e Env,
@@ -109,15 +104,16 @@ pub struct StandaloneJsonSchema<'e> {
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ctx = SchemaCtx {
-            link_anchor: LinkAnchor::SchemaFor(self.def_variant),
+            link_anchor: LinkAnchor::Defs,
             env: self.env,
             rel_params_operator_id: None,
+            allof_reference_depth: 0,
         };
 
-        JsonSchema {
+        SchemaReference {
             ctx,
-            value_operator: self.env.get_serde_operator(self.operator_id),
-            defs: if self.defs.is_empty() {
+            operator_id: self.operator_id,
+            def_map: if self.defs.is_empty() {
                 None
             } else {
                 Some(&self.defs)
@@ -130,23 +126,37 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
 #[derive(Clone, Copy)]
 struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
-    rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
+    rel_params_operator_id: Option<SerdeOperatorId>,
+    allof_reference_depth: u8,
 }
 
 impl<'e> SchemaCtx<'e> {
-    fn schema(self, operator_id: SerdeOperatorId) -> JsonSchema<'static, 'e> {
-        JsonSchema {
+    fn definition(self, operator_id: SerdeOperatorId) -> SchemaDefinition<'e> {
+        SchemaDefinition {
             ctx: self,
             value_operator: self.env.get_serde_operator(operator_id),
-            defs: None,
         }
     }
 
-    fn reference(&self, link: SerdeOperatorId) -> SchemaReference<'e> {
+    fn reference(&self, link: SerdeOperatorId) -> SchemaReference<'static, 'e> {
         SchemaReference {
             ctx: *self,
             operator_id: link,
+            def_map: None,
+        }
+    }
+
+    fn allof_reference(&self, link: SerdeOperatorId) -> SchemaReference<'static, 'e> {
+        SchemaReference {
+            ctx: Self {
+                link_anchor: self.link_anchor,
+                env: self.env,
+                rel_params_operator_id: self.rel_params_operator_id,
+                allof_reference_depth: self.allof_reference_depth + 1,
+            },
+            operator_id: link,
+            def_map: None,
         }
     }
 
@@ -174,13 +184,12 @@ impl<'e> SchemaCtx<'e> {
         }
     }
 
-    /// Derive a new context with rel_params_operator_id removed.
-    /// This is important when serializing properties
-    fn reset(&self) -> Self {
-        SchemaCtx {
+    fn with_rel_params(&self, rel_params_operator_id: Option<SerdeOperatorId>) -> Self {
+        Self {
             link_anchor: self.link_anchor,
-            rel_params_operator_id: None,
             env: self.env,
+            rel_params_operator_id,
+            allof_reference_depth: self.allof_reference_depth,
         }
     }
 
@@ -189,22 +198,29 @@ impl<'e> SchemaCtx<'e> {
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
-        smart_format!(
-            "{}",
-            RefLinkDisplay {
-                link_anchor: self.link_anchor,
-                key: Key(def_variant)
-            }
-        )
+        smart_format!("{}{}", self.link_anchor, Key(def_variant))
     }
 }
 
 #[derive(Clone, Copy)]
 enum LinkAnchor {
     /// A JSON schema for a specific def variant
-    SchemaFor(DefVariant),
+    Defs,
     /// The #/components/schemas location inside an OpenAPI document
     ComponentsSchemas,
+}
+
+impl Display for LinkAnchor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LinkAnchor::Defs => {
+                write!(f, "#/$defs/")
+            }
+            LinkAnchor::ComponentsSchemas => {
+                write!(f, "#/components/schemas/")
+            }
+        }
+    }
 }
 
 struct Key(DefVariant);
@@ -225,133 +241,23 @@ impl Display for Key {
                 DataVariant::Array => "_array",
                 DataVariant::IdMap => "_id",
                 DataVariant::InherentPropertyMap => "_inherent_props",
-                DataVariant::JoinedPropertyMap => "_joined_props",
+                DataVariant::JoinedPropertyMap => "_props",
             }
         )
     }
 }
 
-struct RefLinkDisplay {
-    link_anchor: LinkAnchor,
-    key: Key,
-}
-
-impl Display for RefLinkDisplay {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.link_anchor {
-            LinkAnchor::SchemaFor(def_variant) => {
-                if self.key.0 == def_variant {
-                    write!(f, "#")
-                } else {
-                    write!(f, "#/$defs/{}", self.key)
-                }
-            }
-            LinkAnchor::ComponentsSchemas => {
-                write!(f, "#/components/schemas/{}", self.key)
-            }
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
-struct JsonSchema<'d, 'e> {
+struct SchemaDefinition<'e> {
     ctx: SchemaCtx<'e>,
     value_operator: &'e SerdeOperator,
-    defs: Option<&'d BTreeMap<DefVariant, SerdeOperatorId>>,
 }
 
-impl<'d, 'e> Serialize for JsonSchema<'d, 'e> {
+impl<'e> Serialize for SchemaDefinition<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-
-        serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, &mut map)?;
-
-        if let Some(defs) = self.defs {
-            map.serialize_entry(
-                "$defs",
-                &Defs {
-                    ctx: self.ctx,
-                    defs,
-                },
-            )?;
-        }
-
+        serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, None, &mut map)?;
         map.end()
-    }
-}
-
-/// Some kind of reference to another schema
-#[derive(Clone, Copy)]
-struct SchemaReference<'e> {
-    ctx: SchemaCtx<'e>,
-    operator_id: SerdeOperatorId,
-}
-
-impl<'e> Serialize for SchemaReference<'e> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.env.get_serde_operator(self.operator_id);
-
-        match value_operator {
-            SerdeOperator::Unit
-            | SerdeOperator::Int(_)
-            | SerdeOperator::Number(_)
-            | SerdeOperator::String(_)
-            | SerdeOperator::StringConstant(..)
-            | SerdeOperator::StringPattern(_)
-            | SerdeOperator::CapturingStringPattern(_) => {
-                // These are inline schemas
-                let mut map = serializer.serialize_map(None)?;
-                serialize_schema_inline::<S>(&self.ctx, value_operator, None, &mut map)?;
-                map.end()
-            }
-            SerdeOperator::Sequence(sequence_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(sequence_type.def_variant))
-            }
-            SerdeOperator::ValueType(value_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(value_type.def_variant))
-            }
-            SerdeOperator::ValueUnionType(value_union_type) => self.serialize_reference(
-                serializer,
-                self.ctx.ref_link(value_union_type.union_def_variant),
-            ),
-            SerdeOperator::Id(id_operator_id) => self.serialize_reference(
-                serializer,
-                self.ctx.singleton_object("_id", *id_operator_id),
-            ),
-            SerdeOperator::MapType(map_type) => {
-                self.serialize_reference(serializer, self.ctx.ref_link(map_type.def_variant))
-            }
-        }
-    }
-}
-
-impl<'e> SchemaReference<'e> {
-    /// Serialize the target that is interpreted as the "reference" to self.operator_id.
-    /// This function makes sure to to merge in required extra properties like rel_params/`_edge`.
-    fn serialize_reference<S: Serializer>(
-        &self,
-        serializer: S,
-        target: impl Serialize,
-    ) -> Result<S::Ok, S::Error> {
-        if let Some(rel_params_operator_id) = self.ctx.rel_params_operator_id {
-            let mut map = serializer.serialize_map(Some(1))?;
-
-            // Remove the rel params to avoid infinite recursion!
-            let ctx = self.ctx.reset();
-
-            map.serialize_entry(
-                "allOf",
-                // note: serializing a tuple results in a sequence
-                &(
-                    // This should go into the else clause below because of ctx.reset:
-                    ctx.reference(self.operator_id),
-                    ctx.singleton_object("_edge", rel_params_operator_id),
-                ),
-            )?;
-            map.end()
-        } else {
-            target.serialize(serializer)
-        }
     }
 }
 
@@ -359,6 +265,7 @@ fn serialize_schema_inline<S: Serializer>(
     ctx: &SchemaCtx,
     value_operator: &SerdeOperator,
     _description: Option<&str>,
+    def_map: Option<&DefMap>,
     map: &mut <S as Serializer>::SerializeMap,
 ) -> Result<(), S::Error> {
     match value_operator {
@@ -419,6 +326,7 @@ fn serialize_schema_inline<S: Serializer>(
                 ctx,
                 ctx.env.get_serde_operator(value_type.inner_operator_id),
                 Some("TODO: overridden description"),
+                None,
                 map,
             )?;
         }
@@ -439,18 +347,159 @@ fn serialize_schema_inline<S: Serializer>(
             map.serialize_entry(
                 "properties",
                 &MapProperties {
-                    ctx: ctx.reset(),
+                    ctx: ctx.with_rel_params(None),
                     map_type,
                 },
             )?;
             if map_type.n_mandatory_properties > 0 {
                 map.serialize_entry("required", &RequiredMapProperties { map_type })?;
             }
-            map.serialize_entry("additionalProperties", &false)?;
+            // map.serialize_entry("additionalProperties", &false)?;
         }
     };
 
+    Defs::serialize_if_present::<S>(ctx, &def_map, map)?;
+
     Ok(())
+}
+
+/// A reference to a schema, at use-site
+#[derive(Clone, Copy)]
+struct SchemaReference<'d, 'e> {
+    ctx: SchemaCtx<'e>,
+    operator_id: SerdeOperatorId,
+    def_map: Option<&'d DefMap>,
+}
+
+impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let value_operator = self.ctx.env.get_serde_operator(self.operator_id);
+
+        match value_operator {
+            SerdeOperator::Unit
+            | SerdeOperator::Int(_)
+            | SerdeOperator::Number(_)
+            | SerdeOperator::String(_)
+            | SerdeOperator::StringConstant(..)
+            | SerdeOperator::StringPattern(_)
+            | SerdeOperator::CapturingStringPattern(_) => {
+                // These are inline schemas
+                let mut map = serializer.serialize_map(None)?;
+                serialize_schema_inline::<S>(
+                    &self.ctx,
+                    value_operator,
+                    None,
+                    self.def_map,
+                    &mut map,
+                )?;
+                map.end()
+            }
+            SerdeOperator::Sequence(sequence_type) => {
+                if sequence_type.is_constructor {
+                    self.compose(self.ctx.ref_link(sequence_type.def_variant))
+                        .serialize(serializer)
+                } else {
+                    let mut map = serializer.serialize_map(None)?;
+                    serialize_schema_inline::<S>(
+                        &self.ctx,
+                        value_operator,
+                        None,
+                        self.def_map,
+                        &mut map,
+                    )?;
+                    map.end()
+                }
+            }
+            SerdeOperator::ValueType(value_type) => self
+                .compose(self.ctx.ref_link(value_type.def_variant))
+                .serialize(serializer),
+            SerdeOperator::ValueUnionType(value_union_type) => self
+                .compose(self.ctx.ref_link(value_union_type.union_def_variant))
+                .serialize(serializer),
+            SerdeOperator::Id(id_operator_id) => self
+                .compose(self.ctx.singleton_object("_id", *id_operator_id))
+                .serialize(serializer),
+            SerdeOperator::MapType(map_type) => self
+                .compose(self.ctx.ref_link(map_type.def_variant))
+                .serialize(serializer),
+        }
+    }
+}
+
+impl<'d, 'e> SchemaReference<'d, 'e> {
+    fn compose<T: Serialize>(&self, inner: T) -> Compose<T> {
+        Compose {
+            ctx: self.ctx,
+            operator_id: self.operator_id,
+            inner,
+            def_map: self.def_map,
+        }
+    }
+}
+
+struct Compose<'d, 'e, T> {
+    ctx: SchemaCtx<'e>,
+    operator_id: SerdeOperatorId,
+    inner: T,
+    def_map: Option<&'d DefMap>,
+}
+
+impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        debug!("allof_reference_depth: {}", self.ctx.allof_reference_depth);
+
+        if let Some(rel_params_operator_id) = self.ctx.rel_params_operator_id {
+            let mut map = serializer.serialize_map(Some(1))?;
+
+            // Remove the rel params to avoid infinite recursion!
+            let ctx = self.ctx.with_rel_params(None);
+
+            map.serialize_entry(
+                "allOf",
+                // note: serializing a tuple results in a sequence:
+                &(
+                    // This reference should eventually hit the else clause below, because new ctx has no rel_params:
+                    ctx.allof_reference(self.operator_id),
+                    ctx.singleton_object("_edge", rel_params_operator_id),
+                ),
+            )?;
+            map.serialize_entry("properties", &HashMap::<String, String>::default())?;
+
+            // FIXME: This is not working correctly
+            map.serialize_entry("unevaluatedProperties", &false)?;
+
+            Defs::serialize_if_present::<S>(&self.ctx, &self.def_map, &mut map)?;
+
+            map.end()
+        } else {
+            ClosedMap {
+                ctx: self.ctx,
+                inner: &self.inner,
+                def_map: self.def_map,
+            }
+            .serialize(serializer)
+        }
+    }
+}
+
+struct ClosedMap<'d, 'e, T> {
+    ctx: SchemaCtx<'e>,
+    inner: T,
+    def_map: Option<&'d BTreeMap<DefVariant, SerdeOperatorId>>,
+}
+
+impl<'d, 'e, T: Serialize> Serialize for ClosedMap<'d, 'e, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+
+        map.serialize_entry("allOf", &[&self.inner])?;
+        map.serialize_entry("properties", &HashMap::<String, String>::default())?;
+        map.serialize_entry("unevaluatedProperties", &false)?;
+
+        Defs::serialize_if_present::<S>(&self.ctx, &self.def_map, &mut map)?;
+
+        map.end()
+    }
 }
 
 struct UnionRefLinks<'e> {
@@ -501,7 +550,14 @@ impl<'e> Serialize for MapProperties<'e> {
         for (key, property) in &self.map_type.properties {
             // FIXME: Need to merge the documentation of the _property_
             // and the documentation of the type
-            map.serialize_entry(key, &self.ctx.reference(property.value_operator_id))?;
+
+            map.serialize_entry(
+                key,
+                &self
+                    .ctx
+                    .with_rel_params(property.rel_params_operator_id)
+                    .reference(property.value_operator_id),
+            )?;
         }
         map.end()
     }
@@ -559,19 +615,34 @@ impl<'e> Serialize for RefLink<'e> {
     }
 }
 
+// { "$defs": { .. } }
 struct Defs<'d, 'e> {
     ctx: SchemaCtx<'e>,
-    defs: &'d BTreeMap<DefVariant, SerdeOperatorId>,
+    def_map: &'d BTreeMap<DefVariant, SerdeOperatorId>,
+}
+
+impl<'d, 'e> Defs<'d, 'e> {
+    fn serialize_if_present<S: Serializer>(
+        ctx: &SchemaCtx<'e>,
+        def_map: &Option<&'d DefMap>,
+        map: &mut <S as Serializer>::SerializeMap,
+    ) -> Result<(), S::Error> {
+        if let Some(def_map) = def_map {
+            map.serialize_entry("$defs", &Self { ctx: *ctx, def_map })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<'d, 'e> Serialize for Defs<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
 
-        for (def_id, operator_id) in self.defs {
+        for (def_id, operator_id) in self.def_map {
             map.serialize_entry(
                 &self.ctx.format_key(*def_id),
-                &self.ctx.schema(*operator_id),
+                &self.ctx.definition(*operator_id),
             )?;
         }
 
@@ -602,7 +673,10 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
             SerdeOperator::Sequence(sequence_type) => {
-                self.add_to_graph(sequence_type.def_variant, operator_id);
+                if sequence_type.is_constructor {
+                    self.add_to_graph(sequence_type.def_variant, operator_id);
+                }
+
                 for range in &sequence_type.ranges {
                     self.visit(range.operator_id, env);
                 }

@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use tracing::debug;
-
 use crate::{
     discriminator::Discriminant,
     env::Env,
@@ -439,7 +437,7 @@ pub enum MapMatchKind<'e> {
 
 impl<'e> MapMatcher<'e> {
     pub fn match_attribute(self, property: &str, value: &serde_value::Value) -> MapMatchResult<'e> {
-        debug!("match_attribute '{property}': {:#?}", self.value_union_type);
+        // debug!("match_attribute '{property}': {:#?}", self.value_union_type);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
@@ -497,7 +495,7 @@ impl<'e> MapMatcher<'e> {
     }
 
     pub fn match_fallback(self) -> MapMatchResult<'e> {
-        debug!("match_fallback");
+        // debug!("match_fallback");
 
         for discriminator in &self.value_union_type.discriminators {
             if matches!(
