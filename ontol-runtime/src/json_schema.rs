@@ -463,9 +463,8 @@ impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
                     ctx.singleton_object("_edge", rel_params_operator_id),
                 ),
             )?;
-            map.serialize_entry("properties", &HashMap::<String, String>::default())?;
 
-            // FIXME: This is not working correctly
+            // FIXME: This is not validated in jsonschema-rs (https://github.com/Stranger6667/jsonschema-rs/issues/288)
             map.serialize_entry("unevaluatedProperties", &false)?;
 
             Defs::serialize_if_present::<S>(&self.ctx, &self.def_map, &mut map)?;
@@ -493,7 +492,6 @@ impl<'d, 'e, T: Serialize> Serialize for ClosedMap<'d, 'e, T> {
         let mut map = serializer.serialize_map(None)?;
 
         map.serialize_entry("allOf", &[&self.inner])?;
-        map.serialize_entry("properties", &HashMap::<String, String>::default())?;
         map.serialize_entry("unevaluatedProperties", &false)?;
 
         Defs::serialize_if_present::<S>(&self.ctx, &self.def_map, &mut map)?;
