@@ -5,7 +5,6 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
-use tracing::debug;
 
 use crate::env::TypeInfo;
 use crate::serde::{MapType, SequenceRange, ValueUnionType};
@@ -73,7 +72,6 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
             link_anchor: LinkAnchor::ComponentsSchemas,
             env: self.env,
             rel_params_operator_id: None,
-            allof_reference_depth: 0,
         };
 
         // serialize schema definitions belonging to the domain package first
@@ -107,7 +105,6 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
             link_anchor: LinkAnchor::Defs,
             env: self.env,
             rel_params_operator_id: None,
-            allof_reference_depth: 0,
         };
 
         SchemaReference {
@@ -128,7 +125,6 @@ struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
     env: &'e Env,
     rel_params_operator_id: Option<SerdeOperatorId>,
-    allof_reference_depth: u8,
 }
 
 impl<'e> SchemaCtx<'e> {
@@ -142,19 +138,6 @@ impl<'e> SchemaCtx<'e> {
     fn reference(&self, link: SerdeOperatorId) -> SchemaReference<'static, 'e> {
         SchemaReference {
             ctx: *self,
-            operator_id: link,
-            def_map: None,
-        }
-    }
-
-    fn allof_reference(&self, link: SerdeOperatorId) -> SchemaReference<'static, 'e> {
-        SchemaReference {
-            ctx: Self {
-                link_anchor: self.link_anchor,
-                env: self.env,
-                rel_params_operator_id: self.rel_params_operator_id,
-                allof_reference_depth: self.allof_reference_depth + 1,
-            },
             operator_id: link,
             def_map: None,
         }
@@ -189,7 +172,6 @@ impl<'e> SchemaCtx<'e> {
             link_anchor: self.link_anchor,
             env: self.env,
             rel_params_operator_id,
-            allof_reference_depth: self.allof_reference_depth,
         }
     }
 
@@ -446,8 +428,6 @@ struct Compose<'d, 'e, T> {
 
 impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        debug!("allof_reference_depth: {}", self.ctx.allof_reference_depth);
-
         if let Some(rel_params_operator_id) = self.ctx.rel_params_operator_id {
             let mut map = serializer.serialize_map(Some(1))?;
 
@@ -459,7 +439,7 @@ impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
                 // note: serializing a tuple results in a sequence:
                 &(
                     // This reference should eventually hit the else clause below, because new ctx has no rel_params:
-                    ctx.allof_reference(self.operator_id),
+                    ctx.reference(self.operator_id),
                     ctx.singleton_object("_edge", rel_params_operator_id),
                 ),
             )?;
