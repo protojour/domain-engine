@@ -36,15 +36,15 @@ fn lex_error_recovery_works() {
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(:x) {
+    eq(x) {
         foo {
-            rel ['prop'] :x
+            rel ['prop'] x
         }
         bar {
             rel ['prop']
-                :x
+                x
                 ;; // ERROR lex error: illegal character `;`
-                foobar // ERROR invalid expression
+                foobar // ERROR undeclared variable
         }
     }
     "
@@ -209,7 +209,7 @@ fn eq_undeclared_variable() {
     type foo
     type bar
     eq() {
-        foo { :x } // ERROR undeclared variable
+        foo { x } // ERROR undeclared variable
         bar {}
     }
     "
@@ -220,9 +220,9 @@ fn eq_undeclared_variable() {
 #[ignore = "there are no functions right now, only infix operators"]
 fn eq_incorrect_function_arguments() {
     "
-    eq(:x) {
+    eq(x) {
         (+ ;; ERROR function takes 2 parameters, but 1 was supplied
-            :x
+            x
         )
         42
     }
@@ -234,10 +234,10 @@ fn eq_incorrect_function_arguments() {
 fn eq_obj_non_domain_type_and_unit_type() {
     "
     type foo
-    eq (:x) {
+    eq(x) {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
-            rel ['prop'] :x
+            rel ['prop'] x
         }
     }
     "
@@ -251,9 +251,9 @@ fn eq_attribute_mismatch() {
     type bar
     rel foo ['prop'] bar
     rel . [int] bar
-    eq(:x) {
+    eq(x) {
         foo { // ERROR missing property `prop`
-            :x // ERROR expected named property
+            x // ERROR expected named property
         }
         bar {} // ERROR expected expression
     }
@@ -267,11 +267,11 @@ fn eq_duplicate_unknown_property() {
     type foo
     type bar
     rel foo ['a'] bar
-    eq(:x) {
+    eq(x) {
         foo {
-            rel ['a'] :x
-            rel ['a'] :x // ERROR duplicate property
-            rel ['b'] :x // ERROR unknown property
+            rel ['a'] x
+            rel ['a'] x // ERROR duplicate property
+            rel ['b'] x // ERROR unknown property
         }
         bar {}
     }
@@ -286,18 +286,18 @@ fn eq_type_mismatch() {
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(:x) {
+    eq(x) {
         foo {
-            rel ['prop'] :x
+            rel ['prop'] x
         }
         bar {
             rel ['prop']
-                :x // ERROR type mismatch: expected `int`, found `string`
+                x // ERROR type mismatch: expected `int`, found `string`
         }
     }
     "
     .compile_fail_then(|errors| {
-        assert_eq!(":x", errors[0].span_text);
+        assert_eq!("x", errors[0].span_text);
     })
 }
 
@@ -308,13 +308,13 @@ fn eq_type_mismatch_in_func() {
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(:x) {
+    eq(x) {
         foo {
-            rel ['prop'] :x
+            rel ['prop'] x
         }
         bar {
             rel ['prop']
-                :x // ERROR type mismatch: expected `int`, found `string`
+                x // ERROR type mismatch: expected `int`, found `string`
                 * 2
         }
     }
@@ -333,14 +333,14 @@ fn eq_array_mismatch() {
     rel bar ['a'] string
     rel bar ['b'*] int
 
-    eq(:x :y) {
+    eq(x y) {
         foo {
-            rel ['a'] :x
-            rel ['b'] :y
+            rel ['a'] x
+            rel ['b'] y
         }
         bar {
-            rel ['a'] :x // ERROR type mismatch: expected `string`, found `string[]`
-            rel ['b'] :y // ERROR type mismatch: expected `int[]`, found `string[]`
+            rel ['a'] x // ERROR type mismatch: expected `string`, found `string[]`
+            rel ['b'] y // ERROR type mismatch: expected `int[]`, found `string[]`
         }
     }
     "
@@ -381,14 +381,14 @@ fn unresolved_transitive_eq() {
     rel c ['p0'] a
     rel d ['p1'] b
 
-    eq(:x) {
+    eq(x) {
         c {
             rel ['p0']
-                :x // ERROR cannot convert this `a` from `b`: These types are not equated.
+                x // ERROR cannot convert this `a` from `b`: These types are not equated.
         }
         d {
             rel ['p1']
-                :x // ERROR cannot convert this `b` from `a`: These types are not equated.
+                x // ERROR cannot convert this `b` from `a`: These types are not equated.
         }
     }
     "

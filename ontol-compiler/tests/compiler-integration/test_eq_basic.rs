@@ -41,12 +41,12 @@ fn test_eq_simple() {
     type bar
     rel foo ['f'] string
     rel bar ['b'] string
-    eq (:x) {
+    eq (x) {
         foo {
-            rel ['f'] :x
+            rel ['f'] x
         }
         bar {
-            rel ['b'] :x
+            rel ['b'] x
         }
     }
     "
@@ -73,9 +73,9 @@ fn test_meters() {
     type millimeters
     rel . [int] meters
     rel . [int] millimeters
-    eq (:x) {
-        meters { :x / 1000 }
-        millimeters { :x }
+    eq (x) {
+        meters { x / 1000 }
+        millimeters { x }
     }
     "
     .compile_ok(|env| {
@@ -94,9 +94,9 @@ fn test_temperature() {
         rel . [int]
     }
 
-    eq (:x) {
-        celsius { :x }
-        fahrenheit { :x * 9 / 5 + 32 }
+    eq(x) {
+        celsius { x }
+        fahrenheit { x * 9 / 5 + 32 }
     }
     "
     .compile_ok(|env| {
@@ -112,10 +112,10 @@ fn test_eq_value_to_map() {
     type two
     rel . [string] one
     rel two ['a'] string
-    eq (:x) {
-        one { :x }
+    eq(x) {
+        one { x }
         two {
-            rel ['a'] :x
+            rel ['a'] x
         }
     }
     "
@@ -132,10 +132,10 @@ fn test_eq_value_to_map_func() {
     type two
     rel . [int] one
     rel two ['a'] int
-    eq (:x) {
-        one { :x }
+    eq(x) {
+        one { x }
         two {
-            rel ['a'] :x * 2
+            rel ['a'] x * 2
         }
     }
     "
@@ -152,12 +152,12 @@ fn test_eq_simple_array() {
     type bar
     rel foo ['a'*] int
     rel bar ['b'*] int
-    eq (:x) {
+    eq(x) {
         foo {
-            rel ['a'] :x
+            rel ['a'] x
         }
         bar {
-            rel ['b'] :x
+            rel ['b'] x
         }
     }
     "
@@ -195,16 +195,16 @@ fn test_eq_complex_flow() {
         rel ['d'] string
     }
 
-    eq(:x :y) {
+    eq(x y) {
         one {
-            rel ['a'] :x
-            rel ['b'] :y
+            rel ['a'] x
+            rel ['b'] y
         }
         two {
-            rel ['a'] :x
-            rel ['b'] :y
-            rel ['c'] :x
-            rel ['d'] :y
+            rel ['a'] x
+            rel ['b'] y
+            rel ['c'] x
+            rel ['d'] y
         }
     }
     "
@@ -240,9 +240,9 @@ fn test_eq_delegation() {
         rel . [int]
     }
 
-    eq(:m) {
-        meters { :m }
-        millimeters { :m * 1000 }
+    eq(m) {
+        meters { m }
+        millimeters { m * 1000 }
     }
 
     type car {
@@ -253,12 +253,12 @@ fn test_eq_delegation() {
         rel ['length'] millimeters
     }
     
-    eq(:l) {
+    eq(l) {
         car {
-            rel ['length'] :l
+            rel ['length'] l
         }
         vehicle {
-            rel ['length'] :l
+            rel ['length'] l
         }
     }
     "

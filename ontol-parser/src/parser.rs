@@ -206,14 +206,12 @@ fn eq_attribute() -> impl AstParser<EqAttribute> {
 /// Expression parser
 fn expression() -> impl AstParser<Spanned<Expression>> {
     recursive(|expr| {
-        let path = path().map(Expression::Path);
         let variable = variable().map(Expression::Variable);
         let number_literal = number_literal().map(Expression::NumberLiteral);
         let string_literal = string_literal().map(Expression::StringLiteral);
         let group = expr.delimited_by(open('('), close(')'));
 
-        let atom = spanned(path)
-            .or(spanned(variable))
+        let atom = spanned(variable)
             .or(spanned(number_literal))
             .or(spanned(string_literal))
             .or(group);
@@ -340,9 +338,7 @@ fn ident() -> impl AstParser<String> {
 }
 
 fn variable() -> impl AstParser<String> {
-    just(Token::Sigil(':'))
-        .ignore_then(ident())
-        .labelled("variable")
+    select! { Token::Sym(ident) => ident }.labelled("variable")
 }
 
 fn number_literal() -> impl AstParser<String> {
@@ -448,18 +444,18 @@ mod tests {
     #[test]
     fn parse_eq() {
         let source = "
-        eq (:x :y) {
-            foo { :x }
+        eq(x y) {
+            foo { x }
             bar {
-                rel ['foo'] :x
+                rel ['foo'] x
             }
         }
 
         // comment
-        eq (:x :y) {
-            foo { :x + 1 }
+        eq(x y) {
+            foo { x + 1 }
             bar {
-                rel ['foo'] (:x / 3) + 4
+                rel ['foo'] (x / 3) + 4
             }
         }
         ";

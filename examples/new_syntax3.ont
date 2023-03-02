@@ -33,20 +33,20 @@ type Geomtry {
 #   if that's even possible. At some point there is no parent, which would mean that the :siblings is totally undefined)
 # anyway it has to be two different types of trees.
 
-eq(:children* :siblings*) {
+eq(children* siblings*) {
     tree_a {
-        rel ['children'] :children
-        rel :siblings ['children']
+        rel ['children'] children
+        rel siblings ['children']
     }
     tree_b {
-        rel ['children'] :siblings
-        rel :children ['children']
+        rel ['children'] siblings
+        rel children ['children']
     }
 }
 
-eq(:x) {
-    meters { :x }
-    millimeters { :x * 1000 }
+eq(x) {
+    meters { x }
+    millimeters { x * 1000 }
 }
 
 # variable syntax
