@@ -30,7 +30,7 @@ fn deserialize_empty_type() {
 fn deserialize_int() {
     "
     type foo
-    rel . { int } foo
+    rel . [int] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -52,7 +52,7 @@ fn deserialize_int() {
 fn deserialize_string() {
     "
     type foo
-    rel . { string } foo
+    rel . [string] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -72,8 +72,8 @@ fn deserialize_string() {
 fn deserialize_object_properties() {
     "
     type obj
-    rel obj { 'a' } string
-    rel obj { 'b' } int
+    rel obj ['a'] string
+    rel obj ['b'] int
     "
     .compile_ok(|env| {
         let obj = TypeBinding::new(env, "obj");
@@ -103,10 +103,10 @@ fn deserialize_nested() {
     type one
     type two
     type three
-    rel one { 'x' } two
-    rel one { 'y' } three
-    rel two { 'y' } three
-    rel . { string } three
+    rel one ['x'] two
+    rel one ['y'] three
+    rel two ['y'] three
+    rel . [string] three
     "
     .compile_ok(|env| {
         let one = TypeBinding::new(env, "one");
@@ -127,8 +127,8 @@ fn deserialize_recursive() {
     "
     type foo
     type bar
-    rel foo { 'b' } bar
-    rel bar { 'f' } foo
+    rel foo ['b'] bar
+    rel bar ['f'] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -149,8 +149,8 @@ fn deserialize_recursive() {
 fn deserialize_union_of_primitives() {
     "
     type foo
-    rel . { string } foo
-    rel . { int } foo
+    rel . [string] foo
+    rel . [int] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -170,7 +170,7 @@ fn deserialize_union_of_primitives() {
 fn deserialize_string_constant() {
     "
     type foo
-    rel . { 'my_value' } foo
+    rel . ['my_value'] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -193,8 +193,8 @@ fn deserialize_string_constant() {
 fn deserialize_finite_non_uniform_sequence() {
     "
     type foo
-    rel foo { 0 } int
-    rel foo { 1 } 'a'
+    rel foo [0] int
+    rel foo [1] 'a'
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -221,7 +221,7 @@ fn deserialize_finite_non_uniform_sequence() {
 fn deserialize_finite_uniform_sequence() {
     "
     type foo
-    rel foo { ..2 } int
+    rel foo [..2] int
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -248,8 +248,8 @@ fn deserialize_finite_uniform_sequence() {
 fn deserialize_string_union() {
     "
     type foo
-    rel . { 'a' } foo
-    rel . { 'b' } foo
+    rel . ['a'] foo
+    rel . ['b'] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -269,13 +269,13 @@ fn deserialize_map_union() {
     "
     type foo
     type bar
-    rel foo { 'variant' } 'foo'
-    rel bar { 'variant' } 'bar'
-    rel bar { 'prop' } int
+    rel foo ['variant'] 'foo'
+    rel bar ['variant'] 'bar'
+    rel bar ['prop'] int
 
     type union
-    rel . { foo } union
-    rel . { bar } union
+    rel . [foo] union
+    rel . [bar] union
     "
     .compile_ok(|env| {
         let union = TypeBinding::new(env, "union");

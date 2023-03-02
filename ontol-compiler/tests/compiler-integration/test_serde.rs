@@ -18,7 +18,7 @@ fn test_serde_empty_type() {
 fn test_serde_value_type() {
     "
     type foo
-    rel . { string } foo
+    rel . [string] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -30,7 +30,7 @@ fn test_serde_value_type() {
 fn test_serde_map_type() {
     "
     type foo
-    rel foo { 'a' } string
+    rel foo ['a'] string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -43,9 +43,9 @@ fn test_serde_complex_type() {
     "
     type foo
     type bar
-    rel foo { 'a' } string
-    rel foo { 'b' } bar
-    rel bar { 'c' } string
+    rel foo ['a'] string
+    rel foo ['b'] bar
+    rel bar ['c'] string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -57,8 +57,8 @@ fn test_serde_complex_type() {
 fn test_serde_sequence() {
     "
     type t
-    rel t { 0 } string
-    rel t { 1 } int
+    rel t [0] string
+    rel t [1] int
     "
     .compile_ok(|env| {
         let t = TypeBinding::new(env, "t");
@@ -70,8 +70,8 @@ fn test_serde_sequence() {
 fn test_serde_value_union1() {
     "
     type u
-    rel . { 'a' } u
-    rel . { 'b' } u
+    rel . ['a'] u
+    rel . ['b'] u
     "
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
@@ -83,11 +83,11 @@ fn test_serde_value_union1() {
 fn test_serde_string_or_unit() {
     "
     type string-or-unit
-    rel . { string } string-or-unit
-    rel . { . } string-or-unit
+    rel . [string] string-or-unit
+    rel . [.] string-or-unit
 
     type foo
-    rel foo { 'a' } string-or-unit
+    rel foo ['a'] string-or-unit
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -101,14 +101,14 @@ fn test_serde_map_union() {
     "
     type foo
     type bar
-    rel foo { 'type' } 'foo'
-    rel foo { 'c' } int
-    rel bar { 'type' } 'bar'
-    rel bar { 'd' } int
+    rel foo ['type'] 'foo'
+    rel foo ['c'] int
+    rel bar ['type'] 'bar'
+    rel bar ['d'] int
 
     type u
-    rel . { foo } u
-    rel . { bar } u
+    rel . [foo] u
+    rel . [bar] u
     "
     .compile_ok(|env| {
         let u = TypeBinding::new(env, "u");
@@ -120,7 +120,7 @@ fn test_serde_map_union() {
 fn test_serde_many_cardinality() {
     "
     type foo
-    rel foo { 's'* } string
+    rel foo ['s'*] string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -133,10 +133,10 @@ fn test_serde_many_cardinality() {
 fn test_serde_infinite_sequence() {
     "
     type foo
-    rel foo {  ..2 } int
-    rel foo { 2..4 } string
-    rel foo { 5..6 } int
-    rel foo { 6..  } int
+    rel foo [ ..2] int
+    rel foo [2..4] string
+    rel foo [5..6] int
+    rel foo [6.. ] int
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -153,7 +153,7 @@ fn test_serde_infinite_sequence() {
 fn test_serde_uuid() {
     "
     type my_id
-    rel . { uuid } my_id
+    rel . [uuid] my_id
     "
     .compile_ok(|env| {
         let my_id = TypeBinding::new(env, "my_id");
@@ -181,23 +181,23 @@ fn test_jsonml() {
     type tag_name
     type attributes
 
-    rel . { tag } element
-    rel . { string } element
+    rel . [tag] element
+    rel . [string] element
 
-    rel tag { 0 } tag_name
+    rel tag [0] tag_name
 
     // BUG: should have default `{}` and serde would skip this if not a map
     // (also in serialization if this equals the default value!)
-    rel tag { 1 } attributes
+    rel tag [1] attributes
 
-    rel tag { 2.. } element
+    rel tag [2..] element
 
-    rel . { 'div' } tag_name
-    rel . { 'em' } tag_name
-    rel . { 'strong' } tag_name
+    rel . ['div'] tag_name
+    rel . ['em'] tag_name
+    rel . ['strong'] tag_name
 
     // BUG: should accept any string as key
-    rel attributes { 'class'? } string
+    rel attributes ['class'?] string
     "
     .compile_ok(|env| {
         let element = TypeBinding::new(env, "element");

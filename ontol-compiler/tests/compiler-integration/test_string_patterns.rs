@@ -11,7 +11,7 @@ use crate::{
 fn constant_string_pattern() {
     "
     type foo
-    rel '' { 'foo' } foo
+    rel '' ['foo'] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -27,7 +27,7 @@ fn constant_string_pattern() {
 fn concatenated_constant_string_constructor_pattern() {
     "
     type foobar
-    rel '' { 'foo' } { 'bar' } foobar
+    rel '' ['foo'] ['bar'] foobar
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
@@ -43,7 +43,7 @@ fn concatenated_constant_string_constructor_pattern() {
 fn uuid_in_string_constructor_pattern() {
     "
     type foo
-    rel '' { 'foo/' } { uuid } foo
+    rel '' ['foo/'] [uuid] foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -76,11 +76,11 @@ fn test_string_pattern_constructor_union() {
     type bar
     type foobar
 
-    rel '' { 'foo/' } { uuid } foo
-    rel '' { 'bar/' } { uuid } bar
+    rel '' ['foo/'] [uuid] foo
+    rel '' ['bar/'] [uuid] bar
 
-    rel . { foo } foobar
-    rel . { bar } foobar
+    rel . [foo] foobar
+    rel . [bar] foobar
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(env, "foobar");
@@ -105,7 +105,7 @@ fn test_string_pattern_constructor_union() {
 fn test_regex_property() {
     "
     type foo
-    rel foo { 'prop' } /abc*/
+    rel foo ['prop'] /abc*/
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(env, "foo");
@@ -123,7 +123,7 @@ fn test_regex_property() {
 fn test_simple_regex_pattern_constructor() {
     "
     type re
-    rel '' { /a/ } { /bc*/ } re
+    rel '' [/a/] [/bc*/] re
     "
     .compile_ok(|env| {
         let re = TypeBinding::new(env, "re");
@@ -142,24 +142,24 @@ fn test_simple_regex_pattern_constructor() {
 fn test_string_patterns() {
     "
     type hex
-    rel '' { /a-zA-Z0-9/ } hex
+    rel '' [/a-zA-Z0-9/] hex
 
     type uuid
     rel
         ''
-        { hex{8} }
-        { '-' }
-        { hex{4} }
-        { '-' }
-        { hex{4} }
-        { '-' }
-        { hex{4} }
-        { '-' }
-        { hex{12} }
+        [hex{8}]
+        ['-']
+        [hex{4}]
+        ['-']
+        [hex{4}]
+        ['-']
+        [hex{4}]
+        ['-']
+        [hex{12}]
         uuid
 
     type my_id
-    rel '' { 'my/' } { uuid } my_id
+    rel '' ['my/'] [uuid] my_id
     "
     .compile_fail()
 }
@@ -168,7 +168,7 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     "
     type lol
-    rel . { /abc(?<named>.)/ } lol // ERROR invalid regex: unrecognized flag
+    rel . [/abc(?<named>.)/] lol // ERROR invalid regex: unrecognized flag
     "
     .compile_fail()
 }
@@ -179,22 +179,22 @@ fn sequence_automata() {
     r#"
     rel
         []
-        { int }
-        { int }
+        [int]
+        [int]
         position
 
     rel
         []
-        { position }
-        { position }
-        { position* }
+        [position]
+        [position]
+        [position*]
         position-list
 
     rel
         position-list
-        { position }
-        { position }
-        { position* }
+        [position]
+        [position]
+        [position*]
         position-ring
     "#
     .compile_fail();

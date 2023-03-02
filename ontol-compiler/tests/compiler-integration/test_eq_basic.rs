@@ -39,14 +39,14 @@ fn test_eq_simple() {
     "
     type foo
     type bar
-    rel foo { 'f' } string
-    rel bar { 'b' } string
+    rel foo ['f'] string
+    rel bar ['b'] string
     eq (:x) {
         foo {
-            rel { 'f' } :x
+            rel ['f'] :x
         }
         bar {
-            rel { 'b' } :x
+            rel ['b'] :x
         }
     }
     "
@@ -71,8 +71,8 @@ fn test_meters() {
     "
     type meters
     type millimeters
-    rel . { int } meters
-    rel . { int } millimeters
+    rel . [int] meters
+    rel . [int] millimeters
     eq (:x) {
         meters { :x / 1000 }
         millimeters { :x }
@@ -88,10 +88,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     type celsius {
-        rel . { int }
+        rel . [int]
     }
     type fahrenheit {
-        rel . { int }
+        rel . [int]
     }
 
     eq (:x) {
@@ -110,12 +110,12 @@ fn test_eq_value_to_map() {
     "
     type one
     type two
-    rel . { string } one
-    rel two { 'a' } string
+    rel . [string] one
+    rel two ['a'] string
     eq (:x) {
         one { :x }
         two {
-            rel { 'a' } :x
+            rel ['a'] :x
         }
     }
     "
@@ -130,12 +130,12 @@ fn test_eq_value_to_map_func() {
     "
     type one
     type two
-    rel . { int } one
-    rel two { 'a' } int
+    rel . [int] one
+    rel two ['a'] int
     eq (:x) {
         one { :x }
         two {
-            rel { 'a' } :x * 2
+            rel ['a'] :x * 2
         }
     }
     "
@@ -150,14 +150,14 @@ fn test_eq_simple_array() {
     "
     type foo
     type bar
-    rel foo { 'a'* } int
-    rel bar { 'b'* } int
+    rel foo ['a'*] int
+    rel bar ['b'*] int
     eq (:x) {
         foo {
-            rel { 'a' } :x
+            rel ['a'] :x
         }
         bar {
-            rel { 'b' } :x
+            rel ['b'] :x
         }
     }
     "
@@ -185,26 +185,26 @@ fn test_eq_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     type one {
-        rel { 'a' } string
-        rel { 'b' } string
+        rel ['a'] string
+        rel ['b'] string
     }
     type two {
-        rel { 'a' } string
-        rel { 'b' } string
-        rel { 'c' } string
-        rel { 'd' } string
+        rel ['a'] string
+        rel ['b'] string
+        rel ['c'] string
+        rel ['d'] string
     }
 
     eq(:x :y) {
         one {
-            rel { 'a' } :x
-            rel { 'b' } :y
+            rel ['a'] :x
+            rel ['b'] :y
         }
         two {
-            rel { 'a' } :x
-            rel { 'b' } :y
-            rel { 'c' } :x
-            rel { 'd' } :y
+            rel ['a'] :x
+            rel ['b'] :y
+            rel ['c'] :x
+            rel ['d'] :y
         }
     }
     "
@@ -234,10 +234,10 @@ fn test_eq_complex_flow() {
 fn test_eq_delegation() {
     "
     type meters {
-        rel . { int }
+        rel . [int]
     }
     type millimeters {
-        rel . { int }
+        rel . [int]
     }
 
     eq(:m) {
@@ -246,19 +246,19 @@ fn test_eq_delegation() {
     }
 
     type car {
-        rel { 'length' } meters
+        rel ['length'] meters
     }
 
     type vehicle {
-        rel { 'length' } millimeters
+        rel ['length'] millimeters
     }
     
     eq(:l) {
         car {
-            rel { 'length' } :l
+            rel ['length'] :l
         }
         vehicle {
-            rel { 'length' } :l
+            rel ['length'] :l
         }
     }
     "

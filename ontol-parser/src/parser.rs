@@ -124,7 +124,7 @@ fn rel_connection() -> impl AstParser<RelConnection> {
         // rel params
         .then(spanned(sigil(':').ignore_then(ty())).or_not())
         // within {}
-        .delimited_by(open('{'), close('}'))
+        .delimited_by(open('['), close(']'))
         .map(|(((ty, subject_cardinality), object), rel_params)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
@@ -186,7 +186,7 @@ fn eq_attribute() -> impl AstParser<EqAttribute> {
     let variable = expression().map(EqAttribute::Expr);
     let rel = keyword(Token::Rel)
         .then(expression().or_not())
-        .then(spanned(ty()).delimited_by(open('{'), close('}')))
+        .then(spanned(ty()).delimited_by(open('['), close(']')))
         .then(expression().or_not())
         .map_with_span(|(((kw, subject), connection), object), span| {
             EqAttribute::Rel((
@@ -432,10 +432,10 @@ mod tests {
         type foo
         /// doc comment
         type bar {
-            rel a { '' } b
-            rel { lol } c
-            rel { '' } { '' }
-            rel { '' } b { '' }
+            rel a [''] b
+            rel [lol] c
+            rel [''] ['']
+            rel [''] b ['']
         }
         ";
 
@@ -451,7 +451,7 @@ mod tests {
         eq (:x :y) {
             foo { :x }
             bar {
-                rel { 'foo' } :x
+                rel ['foo'] :x
             }
         }
 
@@ -459,7 +459,7 @@ mod tests {
         eq (:x :y) {
             foo { :x + 1 }
             bar {
-                rel { 'foo' } (:x / 3) + 4
+                rel ['foo'] (:x / 3) + 4
             }
         }
         ";

@@ -20,7 +20,7 @@ fn load_package() {
             SourceName("pkg"),
             "
             type foo {
-                rel { 'prop' } int
+                rel ['prop'] int
             }
             ",
         ),
@@ -30,7 +30,7 @@ fn load_package() {
             use 'pkg' as other
 
             type bar {
-                rel { 'foo' } other.foo
+                rel ['foo'] other.foo
             }
             ",
         ),
@@ -58,8 +58,8 @@ fn dependency_dag() {
             use 'b' as b
 
             type foobar {
-                rel { 'a' } a.a
-                rel { 'b' } b.b
+                rel ['a'] a.a
+                rel ['b'] b.b
             }
             ",
         ),
@@ -68,7 +68,7 @@ fn dependency_dag() {
             "
             use 'c' as domain_c
             type a {
-                rel { 'c' } domain_c.c
+                rel ['c'] domain_c.c
             }
             ",
         ),
@@ -77,11 +77,11 @@ fn dependency_dag() {
             "
             use 'c' as c
             type b {
-                rel { 'c' } c.c
+                rel ['c'] c.c
             }
             ",
         ),
-        (SourceName("c"), "type c { rel . { int } }"),
+        (SourceName("c"), "type c { rel . [int] }"),
     ])
     .compile_ok(|env| {
         // four user domains, plus core:

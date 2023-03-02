@@ -8,28 +8,28 @@ use crate::{
 
 const ARTIST_AND_INSTRUMENT: &'static str = "
 type artist-id {
-    rel '' { 'artist/' } { uuid }
+    rel '' ['artist/'] [uuid]
 }
 type instrument-id {
-    rel '' { 'instrument/' } { uuid }
+    rel '' ['instrument/'] [uuid]
 }
 
 type artist
-rel artist { 'name' } string
-rel artist { id } artist-id
+rel artist ['name'] string
+rel artist [id] artist-id
 
 type record
-rel record { 'name' } string
+rel record ['name'] string
 
 type instrument {
-    rel { id } instrument-id
-    rel { 'name' } string
+    rel [id] instrument-id
+    rel ['name'] string
 }
 
 type plays
-rel plays { 'how_much' } string
+rel plays ['how_much'] string
 
-rel artist { 'plays'* | 'played_by'*: plays } instrument
+rel artist ['plays'* | 'played_by'*: plays] instrument
 ";
 
 #[test]
@@ -177,9 +177,9 @@ fn artist_and_instrument_id_as_relation_object() {
 fn test_entity_self_relationship_optional_object() {
     "
     type node {
-        rel { id } string
-        rel { 'name' } string
-        rel { 'children'* | 'parent'? } node
+        rel [id] string
+        rel ['name'] string
+        rel ['children'* | 'parent'?] node
     }
     "
     .compile_ok(|env| {
@@ -225,8 +225,8 @@ fn test_entity_self_relationship_optional_object() {
 fn test_entity_self_relationship_mandatory_object() {
     "
     type node {
-        rel { id } string
-        rel { 'children'* | 'parent' } node
+        rel [id] string
+        rel ['children'* | 'parent'] node
     }
     "
     .compile_ok(|env| {
@@ -241,29 +241,29 @@ fn test_entity_self_relationship_mandatory_object() {
 
 const GUITAR_SYNTH_UNION: &'static str = "
 type guitar_id {
-    rel '' { 'guitar/' } { uuid }
+    rel '' ['guitar/'] [uuid]
 }
 type synth_id {
-    rel '' { 'synth/' } { uuid }
+    rel '' ['synth/'] [uuid]
 }
 type guitar {
-    rel { id } guitar_id
-    rel { 'type' } 'guitar'
-    rel { 'string_count' } int
+    rel [id] guitar_id
+    rel ['type'] 'guitar'
+    rel ['string_count'] int
 }
 type synth {
-    rel { id } synth_id
-    rel { 'type' } 'synth'
-    rel { 'polyphony' } int
+    rel [id] synth_id
+    rel ['type'] 'synth'
+    rel ['polyphony'] int
 }
 type instrument {
-    rel . { guitar }
-    rel . { synth }
+    rel . [guitar]
+    rel . [synth]
 }
 type artist {
-    rel { id } string
-    rel { 'name' } string
-    rel { 'plays'* | 'played-by'* } instrument
+    rel [id] string
+    rel ['name'] string
+    rel ['plays'* | 'played-by'*] instrument
 }
 ";
 
@@ -344,11 +344,11 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    type language { rel { id } string }
+    type language { rel [id] string }
     type programmer {
-        rel { id } string
-        rel { 'name' } string
-        rel { 'favorite-language' } language
+        rel [id] string
+        rel ['name'] string
+        rel ['favorite-language'] language
     }
     "
     .compile_ok(|env| {
@@ -364,23 +364,23 @@ fn entity_relationship_without_reverse() {
 fn union_with_ambiguous_id_should_fail() {
     "
     type animal {
-        rel { id } string
-        rel { 'class' } 'animal'
+        rel [id] string
+        rel ['class'] 'animal'
         // TODO: Test this:
-        // rel { 'eats'* } lifeform
+        // rel ['eats'*] lifeform
     }
     type plant {
-        rel { id } string
-        rel { 'class' } 'plant'
+        rel [id] string
+        rel ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
-        rel . { animal }
-        rel . { plant }
+        rel . [animal]
+        rel . [plant]
     }
     type owner {
-        rel { id } string
-        rel { 'name' } string
-        rel { 'owns'* } lifeform
+        rel [id] string
+        rel ['name'] string
+        rel ['owns'*] lifeform
     }
     "
     .compile_fail();
