@@ -27,9 +27,9 @@ impl juniper::GraphQLValue<GqlScalar> for CustomScalar {
 
     fn resolve(
         &self,
-        info: &Self::TypeInfo,
-        selection_set: Option<&[juniper::Selection<GqlScalar>]>,
-        executor: &juniper::Executor<Self::Context, GqlScalar>,
+        _info: &Self::TypeInfo,
+        _selection_set: Option<&[juniper::Selection<GqlScalar>]>,
+        _executor: &juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::ExecutionResult<GqlScalar> {
         todo!("serialize")
     }
@@ -74,14 +74,14 @@ impl juniper::ToInputValue<GqlScalar> for CustomScalar {
 }
 
 impl juniper::FromInputValue<GqlScalar> for CustomScalar {
-    fn from_input_value(v: &juniper::InputValue<GqlScalar>) -> Option<Self> {
+    fn from_input_value(_v: &juniper::InputValue<GqlScalar>) -> Option<Self> {
         panic!("BUG: This also panics inside the official juniper scalar macro")
     }
 }
 
 impl juniper::ParseScalarValue<GqlScalar> for CustomScalar {
     fn from_str(
-        value: juniper::parser::ScalarToken<'_>,
+        _value: juniper::parser::ScalarToken<'_>,
     ) -> juniper::ParseScalarResult<'_, GqlScalar> {
         panic!("TODO: this won't work")
     }

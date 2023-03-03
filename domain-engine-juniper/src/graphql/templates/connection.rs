@@ -24,8 +24,8 @@ impl juniper::GraphQLType<GqlScalar> for Connection {
     }
 
     fn meta<'r>(
-        type_info: &Self::TypeInfo,
-        registry: &mut juniper::Registry<'r, GqlScalar>,
+        _type_info: &Self::TypeInfo,
+        _registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
         GqlScalar: 'r,

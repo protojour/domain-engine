@@ -1,4 +1,5 @@
-mod adapter;
+pub mod adapter;
+
 mod macros;
 mod scalar;
 mod templates;
@@ -19,7 +20,7 @@ where
         juniper::Value::scalar(self.0.to_owned())
     }
 
-    fn from_input_value(value: &juniper::InputValue) -> Option<Lolle> {
+    fn from_input_value(_value: &juniper::InputValue) -> Option<Lolle> {
         panic!()
     }
 

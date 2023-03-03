@@ -23,7 +23,7 @@ pub fn adapt_domain(env: Arc<Env>, package_id: PackageId) -> Result<DomainAdapte
             },
         );
 
-        if let Some(_) = type_info.entity_id {
+        if type_info.entity_id.is_some() {
             let entity_data = EntityData {
                 def_id: type_info.def_id,
                 connection_type_name: smart_format!("{}Connection", typename),
@@ -52,18 +52,15 @@ pub struct DomainAdapter {
 
 impl DomainAdapter {
     pub fn iter_entities(&self) -> impl Iterator<Item = EntityRef> {
-        self.domain_data
-            .entities
-            .iter()
-            .map(|(def_id, entity_data)| {
-                let entity_data = &self.domain_data.entities.get(def_id).unwrap();
-                let type_data = &self.domain_data.types.get(def_id).unwrap();
+        self.domain_data.entities.keys().map(|def_id| {
+            let entity_data = &self.domain_data.entities.get(def_id).unwrap();
+            let type_data = &self.domain_data.types.get(def_id).unwrap();
 
-                EntityRef {
-                    entity_data,
-                    type_data,
-                }
-            })
+            EntityRef {
+                entity_data,
+                type_data,
+            }
+        })
     }
 
     pub fn type_adapter(&self, def_id: DefId) -> TypeAdapter<TypeKind> {
@@ -86,7 +83,7 @@ impl DomainAdapter {
 pub trait Kind {
     type DataRef<'d>;
 
-    fn get_data_ref<'d>(domain_data: &'d DomainData, def_id: DefId) -> Self::DataRef<'d>;
+    fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_>;
 }
 
 #[derive(Clone)]
@@ -101,7 +98,7 @@ pub struct ScalarKind;
 impl Kind for TypeKind {
     type DataRef<'d> = DynamicTypeRef<'d>;
 
-    fn get_data_ref<'d>(domain_data: &'d DomainData, def_id: DefId) -> Self::DataRef<'d> {
+    fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
         let type_data = domain_data.types.get(&def_id).unwrap();
 
         if let Some(entity_data) = domain_data.entities.get(&def_id) {
@@ -118,7 +115,7 @@ impl Kind for TypeKind {
 impl Kind for EntityKind {
     type DataRef<'d> = EntityRef<'d>;
 
-    fn get_data_ref<'d>(domain_data: &'d DomainData, def_id: DefId) -> Self::DataRef<'d> {
+    fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
         let entity_data = domain_data.entities.get(&def_id).unwrap();
         let type_data = domain_data.types.get(&def_id).unwrap();
 
@@ -132,7 +129,7 @@ impl Kind for EntityKind {
 impl Kind for ScalarKind {
     type DataRef<'d> = ScalarRef<'d>;
 
-    fn get_data_ref<'d>(domain_data: &'d DomainData, def_id: DefId) -> Self::DataRef<'d> {
+    fn get_data_ref(_domain_data: &DomainData, _def_id: DefId) -> Self::DataRef<'_> {
         todo!()
     }
 }
@@ -192,5 +189,5 @@ pub struct TypeData {
 
 #[derive(Clone)]
 pub struct ScalarData {
-    serde_operator_id: SerdeOperatorId,
+    _serde_operator_id: SerdeOperatorId,
 }
