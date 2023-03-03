@@ -2,9 +2,10 @@ use crate::{SourceName, TestCompile, TestPackages};
 use pretty_assertions::assert_eq;
 use test_log::test;
 
+// BUG: This should recognize the `//` comment token
 #[test]
 fn lex_error() {
-    ";; // ERROR lex error: illegal character `;`".compile_fail();
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `eq`".compile_fail();
 }
 
 #[test]

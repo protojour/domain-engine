@@ -203,9 +203,10 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "; // ERROR lex error: illegal character `;`".compile_fail_then(|_| {
-        panic!("it works");
-    })
+    "foo // ERROR parse error: found `foo`, expected one of `use`, `type`, `rel`, `eq`"
+        .compile_fail_then(|_| {
+            panic!("it works");
+        })
 }
 
 fn main() {}
