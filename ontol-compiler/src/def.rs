@@ -481,6 +481,10 @@ impl<'m> Compiler<'m> {
         );
         let ty = self.types.intern(Type::Package);
         self.def_types.map.insert(def_id, ty);
+
+        // make sure the namespace exists
+        self.namespaces.get_mut(package_id, Space::Type);
+
         def_id
     }
 
