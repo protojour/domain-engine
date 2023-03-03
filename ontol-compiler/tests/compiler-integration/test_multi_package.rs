@@ -37,7 +37,7 @@ fn load_package() {
         ),
     ])
     .compile_ok(|env| {
-        let bar = TypeBinding::new(env, "bar");
+        let bar = TypeBinding::new(&env, "bar");
         assert_json_io_matches!(
             bar,
             json!({
@@ -88,7 +88,7 @@ fn dependency_dag() {
         // four user domains, plus core:
         assert_eq!(5, env.domains.len());
 
-        let bar = TypeBinding::new(env, "foobar");
+        let bar = TypeBinding::new(&env, "foobar");
         assert_json_io_matches!(
             bar,
             json!({

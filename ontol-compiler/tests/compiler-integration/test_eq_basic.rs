@@ -51,13 +51,13 @@ fn test_eq_simple() {
     "
     .compile_ok(|env| {
         assert_translate(
-            env,
+            &env,
             ("foo", "bar"),
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
         assert_translate(
-            env,
+            &env,
             ("bar", "foo"),
             json!({ "b": "my_value"}),
             json!({ "f": "my_value"}),
@@ -78,8 +78,8 @@ fn test_meters() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(env, ("meters", "millimeters"), json!(5), json!(5000));
-        assert_translate(env, ("millimeters", "meters"), json!(5000), json!(5));
+        assert_translate(&env, ("meters", "millimeters"), json!(5), json!(5000));
+        assert_translate(&env, ("millimeters", "meters"), json!(5000), json!(5));
     })
 }
 
@@ -99,8 +99,8 @@ fn test_temperature() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(env, ("celsius", "fahrenheit"), json!(10), json!(50));
-        assert_translate(env, ("fahrenheit", "celsius"), json!(50), json!(10));
+        assert_translate(&env, ("celsius", "fahrenheit"), json!(10), json!(50));
+        assert_translate(&env, ("fahrenheit", "celsius"), json!(50), json!(10));
     })
 }
 
@@ -119,8 +119,8 @@ fn test_eq_value_to_map() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
-        assert_translate(env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
+        assert_translate(&env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
+        assert_translate(&env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
     })
 }
 
@@ -139,8 +139,8 @@ fn test_eq_value_to_map_func() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(env, ("one", "two"), json!(2), json!({ "a": 4 }));
-        assert_translate(env, ("two", "one"), json!({ "a": 4 }), json!(2));
+        assert_translate(&env, ("one", "two"), json!(2), json!({ "a": 4 }));
+        assert_translate(&env, ("two", "one"), json!({ "a": 4 }), json!(2));
     })
 }
 
@@ -162,13 +162,13 @@ fn test_eq_simple_array() {
     "
     .compile_ok(|env| {
         assert_translate(
-            env,
+            &env,
             ("foo", "bar"),
             json!({ "a": [42] }),
             json!({ "b": [42] }),
         );
         assert_translate(
-            env,
+            &env,
             ("bar", "foo"),
             json!({ "b": [42] }),
             json!({ "a": [42] }),
@@ -209,7 +209,7 @@ fn test_eq_complex_flow() {
     "
     .compile_ok(|env| {
         assert_translate(
-            env,
+            &env,
             ("one", "two"),
             json!({ "a": "A", "b": "B" }),
             json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
@@ -220,7 +220,7 @@ fn test_eq_complex_flow() {
         let mut property_probe = PropertyProbe::new(&env.lib);
         let property_map = property_probe
             .probe_from_serde_operator(
-                env,
+                &env,
                 domain.types.get("one").unwrap(),
                 domain.types.get("two").unwrap(),
             )
@@ -263,13 +263,13 @@ fn test_eq_delegation() {
     "
     .compile_ok(|env| {
         assert_translate(
-            env,
+            &env,
             ("car", "vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
         );
         assert_translate(
-            env,
+            &env,
             ("vehicle", "car"),
             json!({ "length": 2000 }),
             json!({ "length": 2 }),

@@ -11,3 +11,9 @@ smartstring = { version = "1", features = ["serde"] }
 serde = "1"
 juniper = "0.15"
 serde_json = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+ontol-test-utils.path = "../ontol-test-utils"
+tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
+test-log = { version = "0.2", default-features = false, features = ["trace"] }

@@ -88,7 +88,7 @@ rel FeatureCollection ['features'*] Feature
 #[test]
 fn test_geojson() {
     GEOJSON.compile_ok(|env| {
-        let geometry = TypeBinding::new(env, "Geometry");
+        let geometry = TypeBinding::new(&env, "Geometry");
         assert_json_io_matches!(
             geometry,
             json!({ "type": "Point", "coordinates": [1, 2]})

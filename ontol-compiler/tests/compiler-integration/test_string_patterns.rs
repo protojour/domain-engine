@@ -13,7 +13,7 @@ fn constant_string_pattern() {
     rel '' ['foo'] foo
     "
     .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
+        let foo = TypeBinding::new(&env, "foo");
         assert_json_io_matches!(foo, json!("foo"));
         assert_error_msg!(
             foo.deserialize_data(json!("fo")),
@@ -29,7 +29,7 @@ fn concatenated_constant_string_constructor_pattern() {
     rel '' ['foo'] ['bar'] foobar
     "
     .compile_ok(|env| {
-        let foobar = TypeBinding::new(env, "foobar");
+        let foobar = TypeBinding::new(&env, "foobar");
         assert_json_io_matches!(foobar, json!("foobar"));
         assert_error_msg!(
             foobar.deserialize_data(json!("fooba")),
@@ -45,7 +45,7 @@ fn uuid_in_string_constructor_pattern() {
     rel '' ['foo/'] [uuid] foo
     "
     .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
+        let foo = TypeBinding::new(&env, "foo");
 
         assert_matches!(
             foo.deserialize_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -82,7 +82,7 @@ fn test_string_pattern_constructor_union() {
     rel . [bar] foobar
     "
     .compile_ok(|env| {
-        let foobar = TypeBinding::new(env, "foobar");
+        let foobar = TypeBinding::new(&env, "foobar");
         assert_matches!(
             foobar.deserialize_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Map(map)) if map.len() == 1
@@ -107,7 +107,7 @@ fn test_regex_property() {
     rel foo ['prop'] /abc*/
     "
     .compile_ok(|env| {
-        let foo = TypeBinding::new(env, "foo");
+        let foo = TypeBinding::new(&env, "foo");
         assert_json_io_matches!(foo, json!({ "prop": "abc" }));
         assert_json_io_matches!(foo, json!({ "prop": "123abc" }));
         assert_json_io_matches!(foo, json!({ "prop": "123abcccc" }));
@@ -125,7 +125,7 @@ fn test_simple_regex_pattern_constructor() {
     rel '' [/a/] [/bc*/] re
     "
     .compile_ok(|env| {
-        let re = TypeBinding::new(env, "re");
+        let re = TypeBinding::new(&env, "re");
         assert_json_io_matches!(re, json!("ab"));
         assert_json_io_matches!(re, json!("abc"), json!("ab"));
         assert_json_io_matches!(re, json!("abccccc"), json!("ab"));

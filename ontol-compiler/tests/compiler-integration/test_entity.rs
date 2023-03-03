@@ -34,7 +34,7 @@ rel artist ['plays'* | 'played_by'*: plays] instrument
 #[test]
 fn artist_and_instrument_io_artist() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(env, "artist");
+        let artist = TypeBinding::new(&env, "artist");
         assert_json_io_matches!(
             artist,
             json!({
@@ -55,7 +55,7 @@ fn artist_and_instrument_io_artist() {
 #[test]
 fn artist_and_instrument_io_instrument() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let instrument = TypeBinding::new(env, "instrument");
+        let instrument = TypeBinding::new(&env, "instrument");
         assert_json_io_matches!(
             instrument,
             json!({
@@ -76,7 +76,7 @@ fn artist_and_instrument_io_instrument() {
 #[test]
 fn artist_and_instrument_error_artist() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(env, "artist");
+        let artist = TypeBinding::new(&env, "artist");
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Herbie Hancock",
@@ -90,10 +90,10 @@ fn artist_and_instrument_error_artist() {
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(env, "artist");
+        let artist = TypeBinding::new(&env, "artist");
         let plays = artist.find_property("plays").unwrap();
 
-        let instrument_id = TypeBinding::new(env, "instrument-id");
+        let instrument_id = TypeBinding::new(&env, "instrument-id");
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
         assert_json_io_matches!(
@@ -182,7 +182,7 @@ fn test_entity_self_relationship_optional_object() {
     }
     "
     .compile_ok(|env| {
-        let node = TypeBinding::new(env, "node");
+        let node = TypeBinding::new(&env, "node");
 
         assert_error_msg!(
             node.deserialize_data(json!({})),
@@ -229,7 +229,7 @@ fn test_entity_self_relationship_mandatory_object() {
     }
     "
     .compile_ok(|env| {
-        let node = TypeBinding::new(env, "node");
+        let node = TypeBinding::new(&env, "node");
 
         assert_error_msg!(
             node.deserialize_data(json!({})),
@@ -269,7 +269,7 @@ type artist {
 #[test]
 fn entity_union_simple() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let instrument = TypeBinding::new(env, "instrument");
+        let instrument = TypeBinding::new(&env, "instrument");
 
         assert_json_io_matches!(
             instrument,
@@ -284,7 +284,7 @@ fn entity_union_simple() {
 #[test]
 fn entity_union_with_object_relation() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let instrument = TypeBinding::new(env, "instrument");
+        let instrument = TypeBinding::new(&env, "instrument");
 
         assert_json_io_matches!(
             instrument,
@@ -304,13 +304,13 @@ fn entity_union_with_object_relation() {
 #[test]
 fn entity_union_in_relation_with_ids() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let artist = TypeBinding::new(env, "artist");
+        let artist = TypeBinding::new(&env, "artist");
         let plays = artist.find_property("plays").unwrap();
 
         assert!(artist.type_info.entity_id.is_some());
 
-        let guitar_id = TypeBinding::new(env, "guitar_id");
-        let synth_id = TypeBinding::new(env, "synth_id");
+        let guitar_id = TypeBinding::new(&env, "guitar_id");
+        let synth_id = TypeBinding::new(&env, "synth_id");
 
         assert!(guitar_id.type_info.entity_id.is_none());
 
@@ -351,7 +351,7 @@ fn entity_relationship_without_reverse() {
     }
     "
     .compile_ok(|env| {
-        let programmer = TypeBinding::new(env, "programmer");
+        let programmer = TypeBinding::new(&env, "programmer");
         assert_json_io_matches!(
             programmer,
             json!({ "name": "audun", "favorite-language": { "_id": "rust" }})

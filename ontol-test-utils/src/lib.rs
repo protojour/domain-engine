@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -52,7 +52,7 @@ macro_rules! assert_json_io_matches {
 
 pub trait TestCompile: Sized {
     /// Compile
-    fn compile_ok(self, validator: impl Fn(&Env));
+    fn compile_ok(self, validator: impl Fn(Arc<Env>));
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -64,7 +64,7 @@ pub trait TestCompile: Sized {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(&Env)) {
+    fn compile_ok(self, validator: impl Fn(Arc<Env>)) {
         TestPackages::with_root(self).compile_ok(validator)
     }
 
@@ -147,10 +147,10 @@ impl TestPackages {
 }
 
 impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(&Env)) {
+    fn compile_ok(mut self, validator: impl Fn(Arc<Env>)) {
         match self.compile_topology() {
             Ok(env) => {
-                validator(&env);
+                validator(Arc::new(env));
             }
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.

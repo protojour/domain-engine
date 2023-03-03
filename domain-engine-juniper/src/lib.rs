@@ -23,6 +23,7 @@ pub type Schema = juniper::RootNode<
     GqlScalar,
 >;
 
+#[derive(Debug)]
 pub enum SchemaBuildError {
     UnknownPackage,
 }
