@@ -5,7 +5,7 @@ use ontol_runtime::{
 };
 use smartstring::alias::String;
 
-use crate::{compiler::Compiler, error::CompileError, types::FormatType, SourceSpan};
+use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
 
 use super::ProcTable;
 

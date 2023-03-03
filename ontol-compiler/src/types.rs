@@ -203,7 +203,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compiler::Compiler, Sources};
+    use crate::{Compiler, Sources};
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize

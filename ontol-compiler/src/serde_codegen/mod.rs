@@ -1,4 +1,4 @@
-use crate::compiler::Compiler;
+use crate::Compiler;
 
 use serde_generator::SerdeGenerator;
 

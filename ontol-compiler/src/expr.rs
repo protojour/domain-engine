@@ -1,6 +1,6 @@
 use ontol_runtime::DefId;
 
-use crate::{compiler::Compiler, source::SourceSpan};
+use crate::{source::SourceSpan, Compiler};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ExprId(pub u32);

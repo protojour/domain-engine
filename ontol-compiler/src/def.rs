@@ -6,7 +6,6 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    compiler::Compiler,
     compiler_queries::RelationshipMeta,
     expr::ExprId,
     mem::{Intern, Mem},
@@ -18,7 +17,7 @@ use crate::{
     source::SourceSpan,
     strings::Strings,
     types::{Type, TypeRef},
-    SpannedBorrow,
+    Compiler, SpannedBorrow,
 };
 use ontol_parser::Span;
 

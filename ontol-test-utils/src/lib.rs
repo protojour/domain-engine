@@ -2,11 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
-    compiler::Compiler,
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
-    SourceCodeRegistry, Sources,
+    Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{env::Env, PackageId};
 

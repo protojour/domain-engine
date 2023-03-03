@@ -303,11 +303,10 @@ mod tests {
     use tracing::info;
 
     use crate::{
-        compiler::Compiler,
         mem::{Intern, Mem},
         typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
-        SourceSpan, Sources,
+        Compiler, SourceSpan, Sources,
     };
 
     #[test]

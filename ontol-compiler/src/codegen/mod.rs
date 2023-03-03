@@ -17,10 +17,9 @@ use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
-    compiler::Compiler,
     typed_expr::{ExprRef, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
-    SourceSpan,
+    Compiler, SourceSpan,
 };
 
 use self::{

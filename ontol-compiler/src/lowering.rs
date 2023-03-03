@@ -10,7 +10,6 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    compiler::Compiler,
     def::{
         Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
         ValueCardinality, Variables,
@@ -19,7 +18,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     package::{PackageReference, CORE_PKG},
-    Src,
+    Compiler, Src,
 };
 
 pub struct Lowering<'s, 'm> {

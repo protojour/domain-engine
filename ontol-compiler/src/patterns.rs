@@ -12,9 +12,9 @@ use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    compiler::Compiler,
     regex::{collect_hir_constant_parts, constant_prefix, empty_string_regex},
     relation::Constructor,
+    Compiler,
 };
 
 #[derive(Default, Debug)]

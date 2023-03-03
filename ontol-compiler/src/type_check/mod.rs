@@ -3,14 +3,13 @@ use ontol_runtime::smart_format;
 
 use crate::{
     codegen::CodegenTasks,
-    compiler::Compiler,
     def::Defs,
     error::CompileError,
     expr::{Expr, ExprId},
     mem::Intern,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, SourceSpan,
+    CompileErrors, Compiler, SourceSpan,
 };
 
 pub mod check_def;
