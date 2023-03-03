@@ -1,14 +1,19 @@
-# ONTOL
+# Domain Engine
 
-A proof of concept domain description and mapping language.
+A domain description and mapping engine.
+
+This repo is a workspace with multiple inter-dependent crates.
+
+## ONTOL
+A domain description and mapping _language_.
 
 The name is a silly spin on ALGOL (for algorithms!), this is a language for ontologies.
 
-## Language fundamentals
+### Language fundamentals
 
 Work in progress. See [MDP 6](https://gitlab.com/protojour/x-design-proposals/-/issues/8).
 
-## Architecture
+### ONTOL Architecture
 
 Ideal high level data flow:
 
@@ -25,7 +30,7 @@ In the future, we may support precompiled environments.
 
 Every feature must be properly tested and every encountered bug must have a regression test.
 
-Every language feature must have a test in `ontol-compiler/tests/compiler-integration`.
+Every ONTOL language feature must have a test in `ontol-compiler/tests/compiler-integration`.
 
 Tests must use the `test_log::test` attribute for proper tracing.
 
