@@ -3,14 +3,15 @@ use std::{collections::HashMap, sync::Arc};
 use ontol_runtime::{env::Env, serde::SerdeOperatorId, smart_format, DefId, PackageId};
 use smartstring::alias::String;
 
-pub enum AdapterError {
-    UnknownPackage,
-}
+use crate::SchemaBuildError;
 
-pub fn adapt_domain(env: Arc<Env>, package_id: PackageId) -> Result<DomainAdapter, AdapterError> {
+pub fn adapt_domain(
+    env: Arc<Env>,
+    package_id: PackageId,
+) -> Result<DomainAdapter, SchemaBuildError> {
     let domain = env
         .get_domain(&package_id)
-        .ok_or(AdapterError::UnknownPackage)?;
+        .ok_or(SchemaBuildError::UnknownPackage)?;
 
     let mut types: HashMap<_, _> = Default::default();
     let mut entities: HashMap<_, _> = Default::default();

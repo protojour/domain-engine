@@ -1,3 +1,5 @@
+pub mod query;
+
 mod connection;
 mod custom_scalar;
-mod query;
+mod map_type;

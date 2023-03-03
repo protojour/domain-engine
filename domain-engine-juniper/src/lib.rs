@@ -1,3 +1,9 @@
+use std::sync::Arc;
+
+use adapter::adapt_domain;
+use gql_scalar::GqlScalar;
+use ontol_runtime::{env::Env, PackageId};
+
 pub mod adapter;
 
 mod gql_scalar;
@@ -8,6 +14,34 @@ mod type_info;
 pub struct GqlContext;
 
 impl juniper::Context for GqlContext {}
+
+pub type Schema = juniper::RootNode<
+    'static,
+    templates::query::Query,
+    juniper::EmptyMutation<GqlContext>,
+    juniper::EmptySubscription<GqlContext>,
+    GqlScalar,
+>;
+
+pub enum SchemaBuildError {
+    UnknownPackage,
+}
+
+pub fn create_graphql_schema(
+    env: Arc<Env>,
+    package_id: PackageId,
+) -> Result<Schema, SchemaBuildError> {
+    let adapter = Arc::new(adapt_domain(env, package_id)?);
+
+    Ok(Schema::new_with_info(
+        templates::query::Query,
+        juniper::EmptyMutation::new(),
+        juniper::EmptySubscription::new(),
+        templates::query::QueryTypeInfo(adapter),
+        (),
+        (),
+    ))
+}
 
 /// Just some test code to be able to look at some macro expansions
 #[cfg(test)]
