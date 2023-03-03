@@ -1,4 +1,4 @@
-use crate::{SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use pretty_assertions::assert_eq;
 use test_log::test;
 

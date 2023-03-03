@@ -1,0 +1,15 @@
+[package]
+name = "ontol-test-utils"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ontol-compiler.path = "../ontol-compiler"
+ontol-runtime.path = "../ontol-runtime"
+pretty_assertions = "1"
+serde = "1"
+serde_json = "1"
+jsonschema = { version = "0.16", default-features = false, features = ["draft202012"] }
+tracing = "0.1"

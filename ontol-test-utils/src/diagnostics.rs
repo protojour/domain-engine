@@ -38,12 +38,12 @@ pub fn diff_errors(
             let mut builder =
                 text.lines()
                     .fold(DiagnosticBuilder::default(), |mut builder, line| {
-                        let orig_stripped =
-                            if let Some(byte_index) = line.find(&space_error_pattern) {
-                                &line[..byte_index]
-                            } else {
-                                line
-                            };
+                        let orig_stripped = if let Some(byte_index) = line.find(space_error_pattern)
+                        {
+                            &line[..byte_index]
+                        } else {
+                            line
+                        };
 
                         builder.lines.push(DiagnosticsLine {
                             start: builder.cursor,
@@ -85,7 +85,7 @@ pub fn diff_errors(
 
     for (source_id, builder) in builders.iter().rev() {
         let source = sources.get_source(*source_id).unwrap();
-        let source_text = source_code_registry.registry.get(&source_id).unwrap();
+        let source_text = source_code_registry.registry.get(source_id).unwrap();
 
         let source_header = format!("\n// source '{}':\n", source.name);
 

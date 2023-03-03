@@ -1,10 +1,9 @@
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
+};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
-
-use crate::{
-    assert_error_msg, assert_json_io_matches, util::type_binding::TypeBinding, TestCompile,
-};
 
 const ARTIST_AND_INSTRUMENT: &'static str = "
 type artist-id {

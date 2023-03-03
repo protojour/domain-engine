@@ -1,11 +1,10 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
+};
 use serde_json::json;
 use test_log::test;
-
-use crate::{
-    assert_error_msg, assert_json_io_matches, util::type_binding::TypeBinding, TestCompile,
-};
 
 #[test]
 fn constant_string_pattern() {

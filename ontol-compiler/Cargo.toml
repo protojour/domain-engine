@@ -24,6 +24,7 @@ patricia_tree = "0.5"
 fnv = "1"
 
 [dev-dependencies]
+ontol-test-utils.path = "../ontol-test-utils"
 assert_matches = "1"
 pretty_assertions = "1"
 serde = "1"

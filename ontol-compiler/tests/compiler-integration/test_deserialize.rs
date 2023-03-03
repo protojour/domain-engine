@@ -2,10 +2,9 @@
 
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
+use ontol_test_utils::{assert_error_msg, type_binding::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
-
-use crate::{assert_error_msg, util::type_binding::TypeBinding, TestCompile};
 
 #[test]
 fn deserialize_empty_type() {

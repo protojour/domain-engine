@@ -1,5 +1,6 @@
-use crate::assert_json_io_matches;
-use crate::{util::type_binding::TypeBinding, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
 

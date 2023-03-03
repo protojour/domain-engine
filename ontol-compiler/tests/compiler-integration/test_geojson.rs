@@ -1,6 +1,6 @@
-use crate::{
-    assert_error_msg, assert_json_io_matches, util::type_binding::TypeBinding, SourceName,
-    TestCompile, TestPackages,
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile,
+    TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -164,5 +164,5 @@ fn test_municipalities() {
             ",
         ),
     ])
-    .compile_ok(|env| {});
+    .compile_ok(|_env| {});
 }

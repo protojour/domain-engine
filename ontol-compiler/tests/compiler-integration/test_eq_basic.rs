@@ -1,8 +1,7 @@
 use ontol_runtime::{env::Env, property_probe::PropertyProbe, translate::Translator};
+use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TEST_PKG};
 use serde_json::json;
 use test_log::test;
-
-use crate::{util::type_binding::TypeBinding, TestCompile, TEST_PKG};
 
 fn assert_translate(
     env: &Env,

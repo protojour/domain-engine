@@ -45,13 +45,11 @@ impl<'e> TypeBinding<'e> {
 
         let json_schema = compile_json_schema(env, &type_info);
 
-        let binding = Self {
+        Self {
             type_info,
             json_schema,
             env,
-        };
-
-        binding
+        }
     }
 
     pub fn env(&self) -> &Env {
@@ -147,14 +145,14 @@ impl<'e> TypeBinding<'e> {
         let mut buf: Vec<u8> = vec![];
         self.env
             .new_serde_processor(self.serde_operator_id(), None)
-            .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
+            .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }
 }
 
 fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
-    let standalone_schema = build_standalone_schema(env, &type_info).unwrap();
+    let standalone_schema = build_standalone_schema(env, type_info).unwrap();
 
     debug!(
         "outputted json schema: {}",
