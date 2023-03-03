@@ -1,0 +1,13 @@
+[package]
+name = "domain-engine-juniper"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ontol-runtime.path = "../ontol-runtime"
+smartstring = { version = "1", features = ["serde"] }
+serde = "1"
+juniper = "0.15"
+serde_json = "1"

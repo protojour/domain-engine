@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "domain-engine-juniper",
     "ontol-runtime",
     "ontol-compiler",
     "ontol-parser",
