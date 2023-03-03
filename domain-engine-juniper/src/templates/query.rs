@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::graphql::{
+use crate::{
     adapter::{DomainAdapter, EntityRef},
+    gql_scalar::GqlScalar,
     macros::impl_graphql_value,
-    scalar::GqlScalar,
     type_info::GraphqlTypeName,
     GqlContext,
 };

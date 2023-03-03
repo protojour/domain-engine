@@ -1,7 +1,7 @@
-use crate::graphql::{
+use crate::{
     adapter::{EntityKind, TypeAdapter},
+    gql_scalar::GqlScalar,
     macros::impl_graphql_value,
-    scalar::GqlScalar,
     type_info::GraphqlTypeName,
 };
 
