@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ontol-runtime = { path = "../ontol-runtime" }
-ontol-parser = { path = "../ontol-parser" }
+ontol-runtime.path = "../ontol-runtime"
+ontol-parser.path = "../ontol-parser"
 chumsky = "0.9"
 smartstring = { version = "1", features = ["serde"] }
 smallvec = "1"
@@ -27,8 +27,6 @@ fnv = "1"
 ontol-test-utils.path = "../ontol-test-utils"
 assert_matches = "1"
 pretty_assertions = "1"
-serde = "1"
 serde_json = "1"
 tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
-jsonschema = { version = "0.16", default-features = false, features = ["draft202012"] }
