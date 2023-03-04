@@ -52,7 +52,7 @@ impl Env {
         }
     }
 
-    pub(crate) fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
+    pub fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
         &self.serde_operators[operator_id.0 as usize]
     }
 }

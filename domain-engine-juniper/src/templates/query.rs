@@ -24,24 +24,24 @@ impl GraphqlTypeName for QueryTypeInfo {
 impl_graphql_value!(Query, TypeInfo = QueryTypeInfo);
 
 impl juniper::GraphQLType<GqlScalar> for Query {
-    fn name(type_info: &Self::TypeInfo) -> Option<&str> {
-        Some(type_info.graphql_type_name())
+    fn name(info: &Self::TypeInfo) -> Option<&str> {
+        Some(info.graphql_type_name())
     }
 
     fn meta<'r>(
-        type_info: &Self::TypeInfo,
+        info: &Self::TypeInfo,
         registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
         GqlScalar: 'r,
     {
-        let fields: Vec<_> = type_info
+        let fields: Vec<_> = info
             .0
             .iter_entities()
-            .map(|entity_ref| query_field(&type_info.0, entity_ref, registry))
+            .map(|entity_ref| query_field(&info.0, entity_ref, registry))
             .collect();
 
-        let meta = registry.build_object_type::<Query>(type_info, &fields);
+        let meta = registry.build_object_type::<Query>(info, &fields);
         meta.into_meta()
     }
 }
@@ -53,7 +53,7 @@ pub fn query_field<'r>(
 ) -> juniper::meta::Field<'r, GqlScalar> {
     registry.field_convert::<Option<Connection>, _, GqlContext>(
         &entity_ref.type_data.type_name,
-        &ConnectionTypeInfo(domain_adapter.entity_adapter(&entity_ref)),
+        &ConnectionTypeInfo(domain_adapter.root_edge_adapter(&entity_ref)),
     )
     // .argument(registry.arg::<Option<i32>>("skip", &()))
     // .argument(registry.arg::<Option<i32>>("limit", &()))

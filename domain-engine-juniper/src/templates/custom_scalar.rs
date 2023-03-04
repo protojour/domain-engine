@@ -13,7 +13,7 @@ pub struct CustomScalarTypeInfo(pub TypeAdapter<ScalarKind>);
 
 impl GraphqlTypeName for CustomScalarTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.get_type_data().type_name
+        &self.0.type_data().type_name
     }
 }
 
@@ -21,13 +21,13 @@ impl juniper::GraphQLValue<GqlScalar> for CustomScalar {
     type Context = GqlContext;
     type TypeInfo = CustomScalarTypeInfo;
 
-    fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+    fn type_name<'i>(&self, info: &'i CustomScalarTypeInfo) -> Option<&'i str> {
         Some(info.graphql_type_name())
     }
 
     fn resolve(
         &self,
-        _info: &Self::TypeInfo,
+        _info: &CustomScalarTypeInfo,
         _selection_set: Option<&[juniper::Selection<GqlScalar>]>,
         _executor: &juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::ExecutionResult<GqlScalar> {
@@ -38,7 +38,7 @@ impl juniper::GraphQLValue<GqlScalar> for CustomScalar {
 impl juniper::GraphQLValueAsync<GqlScalar> for CustomScalar {
     fn resolve_async<'a>(
         &'a self,
-        info: &'a Self::TypeInfo,
+        info: &'a CustomScalarTypeInfo,
         selection_set: Option<&'a [juniper::Selection<GqlScalar>]>,
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
@@ -48,7 +48,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for CustomScalar {
 }
 
 impl juniper::GraphQLType<GqlScalar> for CustomScalar {
-    fn name(info: &Self::TypeInfo) -> Option<&str> {
+    fn name(info: &CustomScalarTypeInfo) -> Option<&str> {
         Some(info.graphql_type_name())
     }
 

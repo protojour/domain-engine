@@ -1,35 +1,45 @@
 use crate::{
-    adapter::{EntityKind, TypeAdapter},
-    gql_scalar::GqlScalar,
-    macros::impl_graphql_value,
+    adapter::EdgeAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
     type_info::GraphqlTypeName,
 };
+
+use super::edge::{Edge, EdgeTypeInfo};
 
 pub struct Connection {}
 
 #[derive(Clone)]
-pub struct ConnectionTypeInfo(pub TypeAdapter<EntityKind>);
+pub struct ConnectionTypeInfo(pub EdgeAdapter);
 
 impl GraphqlTypeName for ConnectionTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.get_kind().entity_data.connection_type_name
+        &self.0.data().connection_type_name
     }
 }
 
 impl_graphql_value!(Connection, TypeInfo = ConnectionTypeInfo);
 
 impl juniper::GraphQLType<GqlScalar> for Connection {
-    fn name(type_info: &Self::TypeInfo) -> Option<&str> {
-        Some(type_info.graphql_type_name())
+    fn name(info: &ConnectionTypeInfo) -> Option<&str> {
+        Some(info.graphql_type_name())
     }
 
     fn meta<'r>(
-        _type_info: &Self::TypeInfo,
-        _registry: &mut juniper::Registry<'r, GqlScalar>,
+        info: &ConnectionTypeInfo,
+        registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
         GqlScalar: 'r,
     {
-        panic!()
+        let fields = [
+            // TODO: page info
+            registry.field_convert::<Vec<Edge>, _, Self::Context>(
+                "edges",
+                &EdgeTypeInfo(info.0.clone()),
+            ),
+        ];
+
+        registry
+            .build_object_type::<Connection>(info, &fields)
+            .into_meta()
     }
 }

@@ -1,6 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use ontol_runtime::{env::Env, serde::SerdeOperatorId, smart_format, DefId, PackageId};
+use ontol_runtime::{
+    env::Env,
+    serde::{SerdeOperator, SerdeOperatorId},
+    smart_format, DefId, PackageId,
+};
 use smartstring::alias::String;
 
 use crate::SchemaBuildError;
@@ -15,22 +19,37 @@ pub fn adapt_domain(
 
     let mut types: HashMap<_, _> = Default::default();
     let mut entities: HashMap<_, _> = Default::default();
+    let mut root_edges: HashMap<_, _> = Default::default();
 
     for (typename, type_info) in &domain.types {
+        let serde_operator_id = match type_info.serde_operator_id {
+            Some(id) => id,
+            None => continue,
+        };
+
         types.insert(
             type_info.def_id,
             TypeData {
                 type_name: typename.clone(),
+                serde_operator_id,
             },
         );
 
         if type_info.entity_id.is_some() {
-            let entity_data = EntityData {
-                def_id: type_info.def_id,
-                connection_type_name: smart_format!("{}Connection", typename),
-            };
+            entities.insert(
+                type_info.def_id,
+                EntityData {
+                    def_id: type_info.def_id,
+                },
+            );
 
-            entities.insert(type_info.def_id, entity_data);
+            root_edges.insert(
+                type_info.def_id,
+                EdgeData {
+                    edge_type_name: smart_format!("{typename}ConnectionEdge"),
+                    connection_type_name: smart_format!("{typename}Connection"),
+                },
+            );
         }
     }
 
@@ -39,6 +58,7 @@ pub fn adapt_domain(
         package_id,
         types,
         entities,
+        root_edges,
     };
 
     Ok(DomainAdapter {
@@ -64,7 +84,7 @@ impl DomainAdapter {
         })
     }
 
-    pub fn type_adapter(&self, def_id: DefId) -> TypeAdapter<TypeKind> {
+    pub fn type_adapter(&self, def_id: DefId) -> TypeAdapter<DynamicTypeKind> {
         TypeAdapter {
             domain_data: self.domain_data.clone(),
             def_id,
@@ -79,6 +99,13 @@ impl DomainAdapter {
             _kind: std::marker::PhantomData,
         }
     }
+
+    pub fn root_edge_adapter(&self, entity_ref: &EntityRef) -> EdgeAdapter {
+        EdgeAdapter {
+            domain_data: self.domain_data.clone(),
+            node_def_id: entity_ref.entity_data.def_id,
+        }
+    }
 }
 
 pub trait Kind {
@@ -88,7 +115,7 @@ pub trait Kind {
 }
 
 #[derive(Clone)]
-pub struct TypeKind;
+pub struct DynamicTypeKind;
 
 #[derive(Clone)]
 pub struct EntityKind;
@@ -96,7 +123,7 @@ pub struct EntityKind;
 #[derive(Clone)]
 pub struct ScalarKind;
 
-impl Kind for TypeKind {
+impl Kind for DynamicTypeKind {
     type DataRef<'d> = DynamicTypeRef<'d>;
 
     fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
@@ -143,12 +170,38 @@ pub struct TypeAdapter<K: Kind> {
 }
 
 impl<K: Kind> TypeAdapter<K> {
-    pub fn get_type_data(&self) -> &TypeData {
-        self.domain_data.types.get(&self.def_id).unwrap()
+    pub fn data(&self) -> <K as Kind>::DataRef<'_> {
+        <K as Kind>::get_data_ref(&self.domain_data, self.def_id)
     }
 
-    pub fn get_kind(&self) -> <K as Kind>::DataRef<'_> {
-        <K as Kind>::get_data_ref(&self.domain_data, self.def_id)
+    pub fn serde_operator(&self) -> &SerdeOperator {
+        self.domain_data
+            .env
+            .get_serde_operator(self.type_data().serde_operator_id)
+    }
+
+    pub fn type_data(&self) -> &TypeData {
+        self.domain_data.types.get(&self.def_id).unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct EdgeAdapter {
+    pub domain_data: Arc<DomainData>,
+    pub node_def_id: DefId,
+}
+
+impl EdgeAdapter {
+    pub fn data(&self) -> &EdgeData {
+        self.domain_data.root_edges.get(&self.node_def_id).unwrap()
+    }
+
+    pub fn node_adapter(&self) -> TypeAdapter<DynamicTypeKind> {
+        TypeAdapter {
+            domain_data: self.domain_data.clone(),
+            def_id: self.node_def_id,
+            _kind: std::marker::PhantomData,
+        }
     }
 }
 
@@ -158,6 +211,7 @@ pub struct DomainData {
 
     pub types: HashMap<DefId, TypeData>,
     pub entities: HashMap<DefId, EntityData>,
+    pub root_edges: HashMap<DefId, EdgeData>,
 }
 
 #[derive(Clone)]
@@ -181,14 +235,19 @@ pub struct ScalarRef<'d> {
 
 pub struct EntityData {
     pub def_id: DefId,
-    pub connection_type_name: String,
 }
 
 pub struct TypeData {
     pub type_name: String,
+    pub serde_operator_id: SerdeOperatorId,
 }
 
 #[derive(Clone)]
 pub struct ScalarData {
     _serde_operator_id: SerdeOperatorId,
+}
+
+pub struct EdgeData {
+    pub edge_type_name: String,
+    pub connection_type_name: String,
 }

@@ -10,3 +10,16 @@ fn test_create_empty_schema() {
         create_graphql_schema(env, TEST_PKG).unwrap();
     });
 }
+
+#[test]
+fn test_basic_schema() {
+    "
+    type foo {
+        rel [id] string
+        rel ['prop'] int
+    }
+    "
+    .compile_ok(|env| {
+        create_graphql_schema(env, TEST_PKG).unwrap();
+    });
+}
