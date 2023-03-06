@@ -171,15 +171,20 @@ fn register_node_type(
             .insert(data.query_field_name.clone(), serde_operator_id);
         domain_data.mutations.insert(
             data.create_mutation_field_name.clone(),
-            (MutationKind::Create, serde_operator_id),
+            MutationKind::Create {
+                input_operator_id: serde_operator_id,
+            },
         );
         domain_data.mutations.insert(
             data.update_mutation_field_name.clone(),
-            (MutationKind::Update, serde_operator_id),
+            MutationKind::Update {
+                id_operator_id,
+                input_operator_id: serde_operator_id, // BUG: Partial input
+            },
         );
         domain_data.mutations.insert(
             data.delete_mutation_field_name.clone(),
-            (MutationKind::Delete, serde_operator_id),
+            MutationKind::Delete { id_operator_id },
         );
 
         domain_data.entities.insert(serde_operator_id, data);

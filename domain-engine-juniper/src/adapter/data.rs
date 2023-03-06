@@ -17,13 +17,20 @@ pub struct DomainData {
     pub mutation_type_name: String,
 
     pub queries: IndexMap<String, SerdeOperatorId>,
-    pub mutations: IndexMap<String, (MutationKind, SerdeOperatorId)>,
+    pub mutations: IndexMap<String, MutationKind>,
 }
 
 pub enum MutationKind {
-    Create,
-    Update,
-    Delete,
+    Create {
+        input_operator_id: SerdeOperatorId,
+    },
+    Update {
+        id_operator_id: SerdeOperatorId,
+        input_operator_id: SerdeOperatorId,
+    },
+    Delete {
+        id_operator_id: SerdeOperatorId,
+    },
 }
 
 pub struct EntityData {

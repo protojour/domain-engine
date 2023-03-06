@@ -3,16 +3,13 @@ use std::sync::Arc;
 use crate::{
     adapter::{data::MutationKind, DomainAdapter},
     gql_scalar::GqlScalar,
-    input::register_domain_argument,
+    input::{deserialize_argument, register_domain_argument},
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
     GqlContext,
 };
 
-use super::{
-    map_input_value::MapInputValue,
-    node::{Node, NodeTypeInfo},
-};
+use super::node::{Node, NodeTypeInfo};
 
 pub struct Mutation;
 
@@ -125,7 +122,8 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let (mutation_kind, _operator_id) = info
+            let env = info.0.domain_data.env.as_ref();
+            let mutation_kind = info
                 .0
                 .domain_data
                 .mutations
@@ -133,15 +131,20 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
                 .expect("No such field");
 
             match mutation_kind {
-                MutationKind::Create => {
-                    let _input = arguments.get::<MapInputValue>("input");
+                MutationKind::Create { input_operator_id } => {
+                    let _input_value =
+                        deserialize_argument(arguments, "input", *input_operator_id, env)?;
                 }
-                MutationKind::Update => {
-                    let _id = arguments.get::<String>("_id");
-                    let _input = arguments.get::<MapInputValue>("input");
+                MutationKind::Update {
+                    id_operator_id,
+                    input_operator_id,
+                } => {
+                    let _id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
+                    let _input_value =
+                        deserialize_argument(arguments, "input", *input_operator_id, env)?;
                 }
-                MutationKind::Delete => {
-                    let _id = arguments.get::<String>("_id");
+                MutationKind::Delete { id_operator_id: id } => {
+                    let _id_value = deserialize_argument(arguments, "_id", *id, env)?;
                 }
             };
 

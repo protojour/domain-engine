@@ -1,9 +1,15 @@
-use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
+use juniper::graphql_value;
+use ontol_runtime::{
+    env::Env,
+    serde::{SerdeOperator, SerdeOperatorId},
+};
+use serde::de::DeserializeSeed;
 use tracing::debug;
 
 use crate::{
     adapter::DomainAdapter,
     gql_scalar::GqlScalar,
+    input_value_deserializer::InputValueDeserializer,
     templates::map_input_value::{MapInputValue, MapInputValueTypeInfo},
 };
 
@@ -47,4 +53,19 @@ pub fn register_domain_argument<'r>(
             &MapInputValueTypeInfo(domain_adapter.node_adapter(operator_id)),
         ),
     }
+}
+
+pub fn deserialize_argument(
+    arguments: &juniper::Arguments<GqlScalar>,
+    name: &str,
+    operator_id: SerdeOperatorId,
+    env: &Env,
+) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
+    let input_value = arguments.get::<MapInputValue>(name).unwrap();
+    env.new_serde_processor(operator_id, None)
+        .deserialize(InputValueDeserializer::<serde_json::Error> {
+            value: input_value.input_value,
+            error: std::marker::PhantomData,
+        })
+        .map_err(|json_error| juniper::FieldError::new(json_error, graphql_value!(None)))
 }

@@ -1,5 +1,4 @@
 use ontol_runtime::serde::SerdeOperator;
-use tracing::error;
 
 use crate::{
     adapter::{DomainAdapter, NodeKind, TypeAdapter},
@@ -10,7 +9,7 @@ use crate::{
 };
 
 pub struct MapInputValue {
-    pub json_value: serde_json::Value,
+    pub input_value: juniper::InputValue<GqlScalar>,
 }
 
 pub struct MapInputValueTypeInfo(pub TypeAdapter<NodeKind>);
@@ -78,8 +77,9 @@ impl juniper::ToInputValue<GqlScalar> for MapInputValue {
 
 impl juniper::FromInputValue<GqlScalar> for MapInputValue {
     fn from_input_value(value: &juniper::InputValue<GqlScalar>) -> Option<Self> {
-        let json_value = value_to_json(value)?;
-        Some(MapInputValue { json_value })
+        Some(MapInputValue {
+            input_value: value.clone(),
+        })
     }
 }
 
@@ -91,6 +91,7 @@ impl juniper::ParseScalarValue<GqlScalar> for MapInputValue {
     }
 }
 
+/*
 fn value_to_json(value: &juniper::InputValue<GqlScalar>) -> Option<serde_json::Value> {
     use serde_json::{Number, Value};
     match value {
@@ -130,3 +131,4 @@ fn value_to_json(value: &juniper::InputValue<GqlScalar>) -> Option<serde_json::V
         }
     }
 }
+*/

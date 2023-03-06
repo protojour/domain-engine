@@ -7,6 +7,7 @@ pub mod adapter;
 pub mod gql_scalar;
 
 mod input;
+mod input_value_deserializer;
 mod macros;
 mod templates;
 mod type_info;
