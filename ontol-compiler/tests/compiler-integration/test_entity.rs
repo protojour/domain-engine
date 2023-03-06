@@ -5,31 +5,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 
-const ARTIST_AND_INSTRUMENT: &'static str = "
-type artist-id {
-    rel '' ['artist/'] [uuid]
-}
-type instrument-id {
-    rel '' ['instrument/'] [uuid]
-}
-
-type artist
-rel artist ['name'] string
-rel artist [id] artist-id
-
-type record
-rel record ['name'] string
-
-type instrument {
-    rel [id] instrument-id
-    rel ['name'] string
-}
-
-type plays
-rel plays ['how_much'] string
-
-rel artist ['plays'* | 'played_by'*: plays] instrument
-";
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
 
 #[test]
 fn artist_and_instrument_io_artist() {

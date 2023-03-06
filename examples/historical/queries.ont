@@ -1,0 +1,17 @@
+
+
+artist {
+    rel ['plays'*] _: instrument {
+        rel {
+            rel['name'] == 'artist name'
+        }['played-by']
+    }
+
+    rel ['plays'?] ['played-by'?] ['name'] name where name == 'artist name'
+
+    // single variable:
+    rel ['plays'?] ['played-by'?] ['name'] name
+
+    // single variable:
+    rel ['plays'] ['played-by'..4] ['name'] names
+}
