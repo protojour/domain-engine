@@ -6,6 +6,7 @@ use serde_json::json;
 use test_log::test;
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
+const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
 
 #[test]
 fn artist_and_instrument_io_artist() {
@@ -213,34 +214,6 @@ fn test_entity_self_relationship_mandatory_object() {
         );
     });
 }
-
-const GUITAR_SYNTH_UNION: &'static str = "
-type guitar_id {
-    rel '' ['guitar/'] [uuid]
-}
-type synth_id {
-    rel '' ['synth/'] [uuid]
-}
-type guitar {
-    rel [id] guitar_id
-    rel ['type'] 'guitar'
-    rel ['string_count'] int
-}
-type synth {
-    rel [id] synth_id
-    rel ['type'] 'synth'
-    rel ['polyphony'] int
-}
-type instrument {
-    rel . [guitar]
-    rel . [synth]
-}
-type artist {
-    rel [id] string
-    rel ['name'] string
-    rel ['plays'* | 'played-by'*] instrument
-}
-";
 
 #[test]
 fn entity_union_simple() {

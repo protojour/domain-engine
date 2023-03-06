@@ -1,0 +1,25 @@
+type guitar_id {
+    rel '' ['guitar/'] [uuid]
+}
+type synth_id {
+    rel '' ['synth/'] [uuid]
+}
+type guitar {
+    rel [id] guitar_id
+    rel ['type'] 'guitar'
+    rel ['string_count'] int
+}
+type synth {
+    rel [id] synth_id
+    rel ['type'] 'synth'
+    rel ['polyphony'] int
+}
+type instrument {
+    rel . [guitar]
+    rel . [synth]
+}
+type artist {
+    rel [id] string
+    rel ['name'] string
+    rel ['plays'* | 'played-by'*] instrument
+}
