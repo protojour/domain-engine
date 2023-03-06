@@ -64,11 +64,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let _entity_ref = info
+            let _operator_id = info
                 .0
-                .iter_entities()
-                .find(|entity_ref| entity_ref.entity_data.query_field_name == field_name)
-                .expect("not found");
+                .domain_data
+                .queries
+                .get(field_name)
+                .expect("BUG: Query not found");
 
             Ok(juniper::Value::Null)
         })

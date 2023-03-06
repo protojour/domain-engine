@@ -12,7 +12,8 @@ use tracing::debug;
 
 use crate::{
     adapter::data::{
-        DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, TypeData,
+        DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, MutationKind,
+        TypeData,
     },
     SchemaBuildError,
 };
@@ -35,6 +36,8 @@ pub fn adapt_domain(
         root_edges: Default::default(),
         query_type_name: "Query".into(),
         mutation_type_name: "Mutation".into(),
+        queries: Default::default(),
+        mutations: Default::default(),
     };
 
     for (typename, type_info) in &domain.types {
@@ -149,17 +152,31 @@ fn register_node_type(
     }
 
     if type_info.entity_id.is_some() {
-        domain_data.entities.insert(
-            serde_operator_id,
-            EntityData {
-                def_id: type_info.def_id,
-                query_field_name: smart_format!("{typename}List"),
-                create_mutation_field_name: smart_format!("create{typename}"),
-                update_mutation_field_name: smart_format!("update{typename}"),
-                delete_mutation_field_name: smart_format!("delete{typename}"),
-            },
+        let data = EntityData {
+            def_id: type_info.def_id,
+            query_field_name: smart_format!("{typename}List"),
+            create_mutation_field_name: smart_format!("create{typename}"),
+            update_mutation_field_name: smart_format!("update{typename}"),
+            delete_mutation_field_name: smart_format!("delete{typename}"),
+        };
+
+        domain_data
+            .queries
+            .insert(data.query_field_name.clone(), serde_operator_id);
+        domain_data.mutations.insert(
+            data.create_mutation_field_name.clone(),
+            (MutationKind::Create, serde_operator_id),
+        );
+        domain_data.mutations.insert(
+            data.update_mutation_field_name.clone(),
+            (MutationKind::Update, serde_operator_id),
+        );
+        domain_data.mutations.insert(
+            data.delete_mutation_field_name.clone(),
+            (MutationKind::Delete, serde_operator_id),
         );
 
+        domain_data.entities.insert(serde_operator_id, data);
         domain_data.root_edges.insert(
             serde_operator_id,
             EdgeData {

@@ -99,11 +99,20 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
 impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
     fn resolve_field_async<'a>(
         &'a self,
-        _info: &'a Self::TypeInfo,
-        _field_name: &'a str,
+        info: &'a Self::TypeInfo,
+        field_name: &'a str,
         _arguments: &'a juniper::Arguments<GqlScalar>,
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
-        Box::pin(async move { Ok(juniper::Value::Null) })
+        Box::pin(async move {
+            let (_mutation_kind, _operator_id) = info
+                .0
+                .domain_data
+                .mutations
+                .get(field_name)
+                .expect("No such field");
+
+            Ok(juniper::Value::null())
+        })
     }
 }
