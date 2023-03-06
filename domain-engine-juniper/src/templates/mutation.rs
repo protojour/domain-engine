@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tracing::debug;
+
 use crate::{
     adapter::{data::MutationKind, DomainAdapter},
     gql_scalar::GqlScalar,
@@ -132,19 +134,24 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
 
             match mutation_kind {
                 MutationKind::Create { input_operator_id } => {
-                    let _input_value =
+                    let input_value =
                         deserialize_argument(arguments, "input", *input_operator_id, env)?;
+
+                    debug!("CREATE {input_value:?}");
                 }
                 MutationKind::Update {
                     id_operator_id,
                     input_operator_id,
                 } => {
-                    let _id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
-                    let _input_value =
+                    let id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
+                    let input_value =
                         deserialize_argument(arguments, "input", *input_operator_id, env)?;
+
+                    debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
-                MutationKind::Delete { id_operator_id: id } => {
-                    let _id_value = deserialize_argument(arguments, "_id", *id, env)?;
+                MutationKind::Delete { id_operator_id } => {
+                    let id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
+                    debug!("DELETE {id_value:?}");
                 }
             };
 

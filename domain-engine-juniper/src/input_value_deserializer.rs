@@ -122,7 +122,9 @@ struct MapDeserializer<E, I> {
     error: std::marker::PhantomData<fn() -> E>,
 }
 
+#[derive(Default)]
 enum MapState {
+    #[default]
     NextKey,
     NextValue(Spanning<juniper::InputValue<GqlScalar>>),
 }
@@ -163,10 +165,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let mut state = MapState::NextKey;
-        std::mem::swap(&mut self.state, &mut state);
-
-        match state {
+        match std::mem::take(&mut self.state) {
             MapState::NextValue(value) => seed.deserialize(InputValueDeserializer {
                 value: value.item,
                 error: std::marker::PhantomData,
