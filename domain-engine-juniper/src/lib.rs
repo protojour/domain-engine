@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use adapter::adapt_domain;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 
@@ -32,7 +31,7 @@ pub fn create_graphql_schema(
     env: Arc<Env>,
     package_id: PackageId,
 ) -> Result<Schema, SchemaBuildError> {
-    let adapter = Arc::new(adapt_domain(env, package_id)?);
+    let adapter = Arc::new(adapter::adapt::adapt_domain(env, package_id)?);
 
     Ok(Schema::new_with_info(
         templates::query::Query,

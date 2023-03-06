@@ -1,7 +1,7 @@
 use ontol_runtime::serde::SerdeOperator;
 
 use crate::{
-    adapter::{FieldKind, NodeKind, TypeAdapter},
+    adapter::{data::FieldKind, NodeKind, TypeAdapter},
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
