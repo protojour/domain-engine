@@ -5,7 +5,7 @@ use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
     serde::{
         MapType, SequenceRange, SequenceType, SerdeKey, SerdeOperator, SerdeOperatorId,
-        SerdeProperty, ValueType, ValueUnionDiscriminator, ValueUnionType,
+        SerdeProperty, ValueType, ValueUnionType, ValueUnionVariant,
     },
     DataVariant, DefId, DefVariant, Role,
 };
@@ -164,7 +164,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let mut map_count = 0;
                 let mut result = Err(operator);
 
-                for discriminator in &union_type.discriminators {
+                for discriminator in &union_type.variants {
                     if let Ok(map_type) = self.find_unambiguous_map_type(discriminator.operator_id)
                     {
                         result = Ok(map_type);
@@ -385,55 +385,51 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        match def_variant.data_variant() {
-            DataVariant::JoinedPropertyMap => {
+        match (def_variant.data_variant(), &properties.id) {
+            (DataVariant::JoinedPropertyMap, _) => {
                 self.create_map_operator(def_variant, typename, properties)
             }
-            _ => {
-                if let Some(id_relation_id) = &properties.id {
-                    let (relationship, _) = self
-                        .get_subject_property_meta(def_variant.id(), *id_relation_id)
-                        .expect("Problem getting subject property meta");
+            (_, Some(id_relation_id)) => {
+                let (relationship, _) = self
+                    .get_subject_property_meta(def_variant.id(), *id_relation_id)
+                    .expect("Problem getting subject property meta");
 
-                    let id_def_variant = DefVariant(def_variant.id(), DataVariant::IdMap);
-                    let map_def_variant =
-                        DefVariant(def_variant.id(), DataVariant::JoinedPropertyMap);
+                let id_def_variant = DefVariant(def_variant.id(), DataVariant::IdMap);
+                let map_def_variant = DefVariant(def_variant.id(), DataVariant::JoinedPropertyMap);
 
-                    // Create a union between { '_id' } and the map properties itself
-                    let id_operator_id = self
-                        .get_serde_operator_id(SerdeKey::Variant(id_def_variant))
-                        .expect("No _id operator");
-                    let map_properties_operator_id = self
-                        .get_serde_operator_id(SerdeKey::Variant(map_def_variant))
-                        .expect("No property map operator");
+                // Create a union between { '_id' } and the map properties itself
+                let id_operator_id = self
+                    .get_serde_operator_id(SerdeKey::Variant(id_def_variant))
+                    .expect("No _id operator");
+                let map_properties_operator_id = self
+                    .get_serde_operator_id(SerdeKey::Variant(map_def_variant))
+                    .expect("No property map operator");
 
-                    SerdeOperator::ValueUnionType(ValueUnionType {
-                        typename: typename.into(),
-                        union_def_variant: def_variant,
-                        discriminators: vec![
-                            ValueUnionDiscriminator {
-                                discriminator: VariantDiscriminator {
-                                    discriminant: Discriminant::IsSingletonProperty(
-                                        *id_relation_id,
-                                        "_id".into(),
-                                    ),
-                                    def_variant: DefVariant::identity(relationship.object.0),
-                                },
-                                operator_id: id_operator_id,
+                SerdeOperator::ValueUnionType(ValueUnionType {
+                    typename: typename.into(),
+                    union_def_variant: def_variant,
+                    variants: vec![
+                        ValueUnionVariant {
+                            discriminator: VariantDiscriminator {
+                                discriminant: Discriminant::IsSingletonProperty(
+                                    *id_relation_id,
+                                    "_id".into(),
+                                ),
+                                def_variant: DefVariant::identity(relationship.object.0),
                             },
-                            ValueUnionDiscriminator {
-                                discriminator: VariantDiscriminator {
-                                    discriminant: Discriminant::MapFallback,
-                                    def_variant: map_def_variant,
-                                },
-                                operator_id: map_properties_operator_id,
+                            operator_id: id_operator_id,
+                        },
+                        ValueUnionVariant {
+                            discriminator: VariantDiscriminator {
+                                discriminant: Discriminant::MapFallback,
+                                def_variant: map_def_variant,
                             },
-                        ],
-                    })
-                } else {
-                    self.create_map_operator(def_variant, typename, properties)
-                }
+                            operator_id: map_properties_operator_id,
+                        },
+                    ],
+                })
             }
+            _ => self.create_map_operator(def_variant, typename, properties),
         }
     }
 
@@ -492,7 +488,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         SerdeOperator::ValueUnionType(ValueUnionType {
             typename: typename.into(),
             union_def_variant: def_variant,
-            discriminators,
+            variants: discriminators,
         })
     }
 

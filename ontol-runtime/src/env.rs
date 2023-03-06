@@ -32,6 +32,15 @@ impl Env {
         }
     }
 
+    pub fn find_type_info(&self, def_id: DefId) -> Option<(&str, &TypeInfo)> {
+        let domain = self.get_domain(&def_id.0)?;
+        domain
+            .types
+            .iter()
+            .find(|(_, type_info)| type_info.def_id == def_id)
+            .map(|(type_name, type_info)| (type_name.as_str(), type_info))
+    }
+
     pub fn get_domain(&self, package_id: &PackageId) -> Option<&Domain> {
         self.domains.get(package_id)
     }

@@ -1,4 +1,4 @@
-use domain_engine_juniper::create_graphql_schema;
+use domain_engine_juniper::{create_graphql_schema, GqlContext};
 use ontol_test_utils::{TestCompile, TEST_PKG};
 use test_log::test;
 
@@ -20,6 +20,11 @@ fn test_basic_schema() {
     }
     "
     .compile_ok(|env| {
-        create_graphql_schema(env, TEST_PKG).unwrap();
+        let schema = create_graphql_schema(env, TEST_PKG).unwrap();
+
+        let introspection =
+            juniper::introspect(&schema, &GqlContext, juniper::IntrospectionFormat::All).unwrap();
+
+        println!("{introspection:?}");
     });
 }

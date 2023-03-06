@@ -3,7 +3,7 @@ use crate::{
     type_info::GraphqlTypeName,
 };
 
-use super::map_type::{MapType, MapTypeInfo};
+use super::node::{Node, NodeTypeInfo};
 
 pub struct Edge;
 
@@ -33,9 +33,9 @@ impl juniper::GraphQLType<GqlScalar> for Edge {
         let fields = [
             // TODO: edge rel params, cursor
             registry.field_convert::<std::string::String, _, Self::Context>("cursor", &()),
-            registry.field_convert::<MapType, _, Self::Context>(
+            registry.field_convert::<Node, _, Self::Context>(
                 "node",
-                &MapTypeInfo(info.0.node_adapter()),
+                &NodeTypeInfo(info.0.node_adapter()),
             ),
         ];
 

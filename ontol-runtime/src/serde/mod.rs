@@ -52,7 +52,7 @@ impl<'e> SerdeProcessor<'e> {
     fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
         match operator {
             SerdeOperator::ValueUnionType(union_type) => {
-                for discriminator in &union_type.discriminators {
+                for discriminator in &union_type.variants {
                     let next_operator = self
                         .env
                         .new_serde_processor(discriminator.operator_id, None);
@@ -173,11 +173,11 @@ pub struct ValueType {
 pub struct ValueUnionType {
     pub typename: String,
     pub union_def_variant: DefVariant,
-    pub discriminators: Vec<ValueUnionDiscriminator>,
+    pub variants: Vec<ValueUnionVariant>,
 }
 
 #[derive(Clone, Debug)]
-pub struct ValueUnionDiscriminator {
+pub struct ValueUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub operator_id: SerdeOperatorId,
 }

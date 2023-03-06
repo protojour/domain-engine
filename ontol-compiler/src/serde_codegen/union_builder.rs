@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
-    serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionDiscriminator},
+    serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionVariant},
     smart_format, DefId,
 };
 use smartstring::alias::String;
@@ -12,7 +12,7 @@ use super::serde_generator::SerdeGenerator;
 
 #[derive(Default)]
 pub struct UnionBuilder {
-    discriminator_candidates: Vec<ValueUnionDiscriminator>,
+    discriminator_candidates: Vec<ValueUnionVariant>,
 }
 
 impl UnionBuilder {
@@ -20,7 +20,7 @@ impl UnionBuilder {
         mut self,
         generator: &mut SerdeGenerator,
         mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
-    ) -> Result<Vec<ValueUnionDiscriminator>, String> {
+    ) -> Result<Vec<ValueUnionVariant>, String> {
         // sanity check
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
@@ -91,7 +91,7 @@ impl UnionBuilder {
         let operator = &generator.operators_by_id[operator_id.0 as usize];
         match operator {
             SerdeOperator::ValueUnionType(value_union) => {
-                for inner_discriminator in &value_union.discriminators {
+                for inner_discriminator in &value_union.variants {
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
                     child_scope.push(discriminator);
@@ -110,7 +110,7 @@ impl UnionBuilder {
                 match discriminator.discriminant {
                     Discriminant::MapFallback => {
                         if let Some(scoping) = scope.last() {
-                            self.discriminator_candidates.push(ValueUnionDiscriminator {
+                            self.discriminator_candidates.push(ValueUnionVariant {
                                 discriminator: (*scoping).clone(),
                                 operator_id,
                             });
@@ -120,7 +120,7 @@ impl UnionBuilder {
                         }
                     }
                     _ => {
-                        self.discriminator_candidates.push(ValueUnionDiscriminator {
+                        self.discriminator_candidates.push(ValueUnionVariant {
                             discriminator: discriminator.clone(),
                             operator_id,
                         });

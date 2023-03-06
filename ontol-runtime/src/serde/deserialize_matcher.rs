@@ -291,7 +291,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             Missing {
                 items: self
                     .value_union_type
-                    .discriminators
+                    .variants
                     .iter()
                     .map(|discriminator| self
                         .env
@@ -316,12 +316,12 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        for discriminator in &self.value_union_type.discriminators {
-            match &discriminator.discriminator.discriminant {
+        for variant in &self.value_union_type.variants {
+            match &variant.discriminator.discriminant {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
                         self.env,
-                        discriminator.discriminator.def_variant.id(),
+                        variant.discriminator.def_variant.id(),
                         str,
                     )
                     .map_err(|_| ())
@@ -329,13 +329,13 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsStringLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.env,
-                        discriminator.discriminator.def_variant.id(),
+                        variant.discriminator.def_variant.id(),
                         str,
                     )
                     .map_err(|_| ())
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
-                    let result_type = discriminator.discriminator.def_variant.id();
+                    let result_type = variant.discriminator.def_variant.id();
                     let pattern = self.env.string_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str) {
@@ -350,11 +350,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
-        for discriminator in &self.value_union_type.discriminators {
-            if discriminator.discriminator.discriminant == Discriminant::IsSequence {
-                let processor = self
-                    .env
-                    .new_serde_processor(discriminator.operator_id, None);
+        for variant in &self.value_union_type.variants {
+            if variant.discriminator.discriminant == Discriminant::IsSequence {
+                let processor = self.env.new_serde_processor(variant.operator_id, None);
 
                 match &processor.value_operator {
                     SerdeOperator::Sequence(sequence_type) => {
@@ -373,20 +371,15 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_map(&self) -> Result<MapMatcher, ()> {
-        if !self
-            .value_union_type
-            .discriminators
-            .iter()
-            .any(|discriminator| {
-                matches!(
-                    &discriminator.discriminator.discriminant,
-                    Discriminant::MapFallback
-                        | Discriminant::IsSingletonProperty(..)
-                        | Discriminant::HasStringAttribute(..)
-                        | Discriminant::HasAttributeMatchingStringPattern(..)
-                )
-            })
-        {
+        if !self.value_union_type.variants.iter().any(|variant| {
+            matches!(
+                &variant.discriminator.discriminant,
+                Discriminant::MapFallback
+                    | Discriminant::IsSingletonProperty(..)
+                    | Discriminant::HasStringAttribute(..)
+                    | Discriminant::HasAttributeMatchingStringPattern(..)
+            )
+        }) {
             // None of the discriminators are matching a map.
             return Err(());
         }
@@ -401,9 +394,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
 impl<'e> UnionMatcher<'e> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
-        for discriminator in &self.value_union_type.discriminators {
-            if discriminator.discriminator.discriminant == discriminant {
-                return Ok(discriminator.discriminator.def_variant.id());
+        for variant in &self.value_union_type.variants {
+            if variant.discriminator.discriminant == discriminant {
+                return Ok(variant.discriminator.def_variant.id());
             }
         }
 
@@ -463,13 +456,13 @@ impl<'e> MapMatcher<'e> {
 
         let result = self
             .value_union_type
-            .discriminators
+            .variants
             .iter()
-            .find(|discriminator| match_fn(&discriminator.discriminator.discriminant))
-            .map(|discriminator| {
+            .find(|variant| match_fn(&variant.discriminator.discriminant))
+            .map(|variant| {
                 match self
                     .env
-                    .new_serde_processor(discriminator.operator_id, None)
+                    .new_serde_processor(variant.operator_id, None)
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {
@@ -497,14 +490,14 @@ impl<'e> MapMatcher<'e> {
     pub fn match_fallback(self) -> MapMatchResult<'e> {
         // debug!("match_fallback");
 
-        for discriminator in &self.value_union_type.discriminators {
+        for variant in &self.value_union_type.variants {
             if matches!(
-                discriminator.discriminator.discriminant,
+                variant.discriminator.discriminant,
                 Discriminant::MapFallback
             ) {
                 match self
                     .env
-                    .new_serde_processor(discriminator.operator_id, None)
+                    .new_serde_processor(variant.operator_id, None)
                     .value_operator
                 {
                     SerdeOperator::MapType(map_type) => {

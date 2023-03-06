@@ -489,7 +489,7 @@ impl<'e> Serialize for UnionRefLinks<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
 
-        for discriminator in &self.value_union_type.discriminators {
+        for discriminator in &self.value_union_type.variants {
             seq.serialize_element(&self.ctx.reference(discriminator.operator_id))?;
         }
 
@@ -666,7 +666,7 @@ impl SchemaGraphBuilder {
             SerdeOperator::ValueUnionType(value_union_type) => {
                 self.add_to_graph(value_union_type.union_def_variant, operator_id);
 
-                for discriminator in &value_union_type.discriminators {
+                for discriminator in &value_union_type.variants {
                     self.visit(discriminator.operator_id, env);
                 }
             }
