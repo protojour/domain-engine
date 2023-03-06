@@ -5,8 +5,8 @@ use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 
 pub mod adapter;
+pub mod gql_scalar;
 
-mod gql_scalar;
 mod macros;
 mod templates;
 mod type_info;

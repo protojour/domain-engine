@@ -19,7 +19,7 @@ fn constant_string_pattern() {
             foo.deserialize_data(json!("fo")),
             r#"invalid type: string "fo", expected string matching /\Afoo\z/ at line 1 column 4"#
         );
-    })
+    });
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn concatenated_constant_string_constructor_pattern() {
             foobar.deserialize_data(json!("fooba")),
             r#"invalid type: string "fooba", expected string matching /\Afoobar\z/ at line 1 column 7"#
         );
-    })
+    });
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn uuid_in_string_constructor_pattern() {
             foo.deserialize_data(json!("foo")),
             r#"invalid type: string "foo", expected string matching /\Afoo/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 5"#
         );
-    })
+    });
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn test_string_pattern_constructor_union() {
             foobar.deserialize_data(json!("baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             r#"invalid type: string "baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8", expected `foobar` (`string_pattern` or `string_pattern`) at line 1 column 42"#
         );
-    })
+    });
 }
 
 #[test]

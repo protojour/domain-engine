@@ -2,11 +2,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
+    discriminator::Discriminant,
     env::{Env, TypeInfo},
     serde::{MapType, SerdeOperator, SerdeOperatorId},
     smart_format, DefId, PackageId,
 };
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::SchemaBuildError;
 
@@ -27,23 +29,9 @@ pub fn adapt_domain(
     };
 
     for (typename, type_info) in &domain.types {
-        let serde_operator_id = match type_info.serde_operator_id {
-            Some(id) => id,
-            None => continue,
-        };
-
-        match env.get_serde_operator(serde_operator_id) {
-            SerdeOperator::MapType(map_type) => {
-                register_map_type(
-                    &mut domain_data,
-                    typename,
-                    type_info,
-                    serde_operator_id,
-                    map_type,
-                );
-            }
-            _ => {}
-        };
+        if let Some(operator_id) = type_info.serde_operator_id {
+            register_type(&env, &mut domain_data, typename, type_info, operator_id);
+        }
     }
 
     Ok(DomainAdapter {
@@ -51,7 +39,53 @@ pub fn adapt_domain(
     })
 }
 
-fn register_map_type(
+fn register_type(
+    env: &Env,
+    domain_data: &mut DomainData,
+    typename: &String,
+    type_info: &TypeInfo,
+    operator_id: SerdeOperatorId,
+) {
+    match env.get_serde_operator(operator_id) {
+        SerdeOperator::MapType(map_type) => {
+            register_node_type(env, domain_data, typename, type_info, operator_id, map_type);
+        }
+        SerdeOperator::ValueUnionType(value_union_type) => {
+            let mut found_id = None;
+            let mut found_map_fallback = None;
+            for variant in &value_union_type.variants {
+                match &variant.discriminator.discriminant {
+                    Discriminant::IsSingletonProperty(_, prop) if prop == "_id" => {
+                        found_id = Some(variant);
+                    }
+                    Discriminant::MapFallback => {
+                        found_map_fallback = Some(variant);
+                    }
+                    _ => {}
+                }
+            }
+
+            match (found_id, found_map_fallback) {
+                (Some(_id), Some(map_fallback)) => register_type(
+                    env,
+                    domain_data,
+                    typename,
+                    type_info,
+                    map_fallback.operator_id,
+                ),
+                _ => {
+                    panic!("Unprocessed union");
+                }
+            }
+        }
+        other => {
+            panic!("other operator: {other:?}");
+        }
+    };
+}
+
+fn register_node_type(
+    _env: &Env,
     domain_data: &mut DomainData,
     typename: &String,
     type_info: &TypeInfo,
@@ -59,6 +93,8 @@ fn register_map_type(
     map_type: &MapType,
 ) {
     let env = domain_data.env.as_ref();
+
+    debug!("register_map_type {type_info:?}");
 
     let mut fields: IndexMap<String, Field> = Default::default();
 
@@ -103,13 +139,12 @@ fn register_map_type(
         }
     }
 
-    if let Some(_) = type_info.entity_id {
-        // fields.insert("_id".into(), FieldData::Id(entity_id));
-
+    if type_info.entity_id.is_some() {
         domain_data.entities.insert(
             serde_operator_id,
             EntityData {
                 def_id: type_info.def_id,
+                query_field_name: smart_format!("{typename}List"),
             },
         );
 
@@ -297,6 +332,7 @@ pub struct ScalarRef<'d> {
 
 pub struct EntityData {
     pub def_id: DefId,
+    pub query_field_name: String,
 }
 
 pub struct TypeData {

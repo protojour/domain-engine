@@ -51,7 +51,7 @@ macro_rules! assert_json_io_matches {
 
 pub trait TestCompile: Sized {
     /// Compile
-    fn compile_ok(self, validator: impl Fn(Arc<Env>));
+    fn compile_ok(self, validator: impl Fn(Arc<Env>)) -> Arc<Env>;
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -63,7 +63,7 @@ pub trait TestCompile: Sized {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(Arc<Env>)) {
+    fn compile_ok(self, validator: impl Fn(Arc<Env>)) -> Arc<Env> {
         TestPackages::with_root(self).compile_ok(validator)
     }
 
@@ -146,10 +146,12 @@ impl TestPackages {
 }
 
 impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(Arc<Env>)) {
+    fn compile_ok(mut self, validator: impl Fn(Arc<Env>)) -> Arc<Env> {
         match self.compile_topology() {
             Ok(env) => {
-                validator(Arc::new(env));
+                let env = Arc::new(env);
+                validator(env.clone());
+                env
             }
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
@@ -181,7 +183,7 @@ impl TestCompile for TestPackages {
 fn ok_validator_must_run() {
     "".compile_ok(|_| {
         panic!("it works");
-    })
+    });
 }
 
 #[test]

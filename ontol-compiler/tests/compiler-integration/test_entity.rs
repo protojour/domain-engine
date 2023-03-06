@@ -356,7 +356,7 @@ fn entity_relationship_without_reverse() {
             programmer,
             json!({ "name": "audun", "favorite-language": { "_id": "rust" }})
         );
-    })
+    });
 }
 
 #[test]

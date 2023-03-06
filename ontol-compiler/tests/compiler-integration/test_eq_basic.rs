@@ -62,7 +62,7 @@ fn test_eq_simple() {
             json!({ "b": "my_value"}),
             json!({ "f": "my_value"}),
         );
-    })
+    });
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_meters() {
     .compile_ok(|env| {
         assert_translate(&env, ("meters", "millimeters"), json!(5), json!(5000));
         assert_translate(&env, ("millimeters", "meters"), json!(5000), json!(5));
-    })
+    });
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_temperature() {
     .compile_ok(|env| {
         assert_translate(&env, ("celsius", "fahrenheit"), json!(10), json!(50));
         assert_translate(&env, ("fahrenheit", "celsius"), json!(50), json!(10));
-    })
+    });
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn test_eq_value_to_map() {
     .compile_ok(|env| {
         assert_translate(&env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
         assert_translate(&env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
-    })
+    });
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn test_eq_value_to_map_func() {
     .compile_ok(|env| {
         assert_translate(&env, ("one", "two"), json!(2), json!({ "a": 4 }));
         assert_translate(&env, ("two", "one"), json!({ "a": 4 }), json!(2));
-    })
+    });
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn test_eq_simple_array() {
             json!({ "b": [42] }),
             json!({ "a": [42] }),
         );
-    })
+    });
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn test_eq_complex_flow() {
             )
             .unwrap();
         println!("{property_map:?}");
-    })
+    });
 }
 
 #[test]
@@ -274,5 +274,5 @@ fn test_eq_delegation() {
             json!({ "length": 2000 }),
             json!({ "length": 2 }),
         );
-    })
+    });
 }

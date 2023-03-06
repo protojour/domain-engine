@@ -18,3 +18,4 @@ tracing = "0.1"
 ontol-test-utils.path = "../ontol-test-utils"
 tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
+tokio = { version = "1", features = ["macros", "rt"] }
