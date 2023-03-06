@@ -26,12 +26,24 @@ struct TestSchema {
     schema: Schema,
 }
 
-impl TestSchema {
-    async fn exec<'a>(&'a self, doc: &'a str) -> Result<juniper::Value<GqlScalar>, TestError<'a>> {
+#[async_trait::async_trait]
+trait Exec {
+    async fn exec<'a>(
+        self,
+        schema: &'a TestSchema,
+    ) -> Result<juniper::Value<GqlScalar>, TestError<'a>>;
+}
+
+#[async_trait::async_trait]
+impl Exec for &'static str {
+    async fn exec<'a>(
+        self,
+        test_schema: &'a TestSchema,
+    ) -> Result<juniper::Value<GqlScalar>, TestError<'a>> {
         match juniper::execute(
-            doc,
+            self,
             None,
-            &self.schema,
+            &test_schema.schema,
             &juniper::Variables::new(),
             &GqlContext,
         )
@@ -66,21 +78,38 @@ async fn test_basic_schema() {
     "
     .compile_schema();
 
-    let doc = "{
-        fooList {
-            edges {
-                node {
-                    prop
-                }
-            }
-        }
-    }";
-
     assert_eq!(
+        "{
+            fooList {
+                edges {
+                    node {
+                        prop
+                    }
+                }
+            }    
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
         graphql_value!({
             "fooList": None,
         }),
-        schema.exec(doc).await.unwrap()
+    );
+
+    assert_eq!(
+        "mutation {
+            createfoo(
+                input: {
+                    prop: 42
+                }
+            ) {
+                prop
+            }
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
+        graphql_value!(None),
     );
 }
 

@@ -86,7 +86,7 @@ impl Domain {
 pub struct TypeInfo {
     pub def_id: DefId,
 
-    // If this type is an entity, this is the type of its ID
+    /// If this type is an entity, this is the type of its ID
     pub entity_id: Option<DefId>,
 
     pub serde_operator_id: Option<SerdeOperatorId>,

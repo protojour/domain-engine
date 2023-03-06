@@ -1,5 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{env::Env, serde::SerdeOperatorId, DefId, PackageId};
 use smartstring::alias::String;
@@ -8,9 +9,9 @@ pub struct DomainData {
     pub env: Arc<Env>,
     pub package_id: PackageId,
 
-    pub types: HashMap<SerdeOperatorId, TypeData>,
-    pub entities: HashMap<SerdeOperatorId, EntityData>,
-    pub root_edges: HashMap<SerdeOperatorId, EdgeData>,
+    pub types: FnvHashMap<SerdeOperatorId, TypeData>,
+    pub entities: FnvHashMap<SerdeOperatorId, EntityData>,
+    pub root_edges: FnvHashMap<SerdeOperatorId, EdgeData>,
 
     pub query_type_name: String,
     pub mutation_type_name: String,
@@ -27,6 +28,7 @@ pub enum MutationKind {
 
 pub struct EntityData {
     pub def_id: DefId,
+    pub id_operator_id: SerdeOperatorId,
     pub query_field_name: String,
     pub create_mutation_field_name: String,
     pub update_mutation_field_name: String,
@@ -35,6 +37,7 @@ pub struct EntityData {
 
 pub struct TypeData {
     pub type_name: String,
+    pub input_type_name: String,
     pub operator_id: SerdeOperatorId,
     pub fields: IndexMap<String, Field>,
 }

@@ -25,7 +25,7 @@ impl DomainAdapter {
         })
     }
 
-    pub fn dynamic_type_adapter(&self, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {
+    pub fn node_adapter(&self, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {
         TypeAdapter {
             domain_data: self.domain_data.clone(),
             operator_id,
@@ -55,6 +55,10 @@ pub trait Kind {
     fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_>;
 }
 
+/// Fully dynamic type (node, scalar, anything)
+#[derive(Clone)]
+pub struct DynamicKind;
+
 /// Any data that is not a scalar
 #[derive(Clone)]
 pub struct NodeKind;
@@ -64,6 +68,26 @@ pub struct EntityKind;
 
 #[derive(Clone)]
 pub struct ScalarKind;
+
+impl Kind for DynamicKind {
+    type DataRef<'d> = DynamicRef<'d>;
+
+    fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_> {
+        let type_data = domain_data.types.get(&operator_id).unwrap();
+
+        if let Some(entity_data) = domain_data.entities.get(&operator_id) {
+            DynamicRef::Entity(EntityRef {
+                entity_data,
+                type_data,
+            })
+        } else {
+            DynamicRef::Node(NodeRef {
+                entity_data: None,
+                type_data,
+            })
+        }
+    }
+}
 
 impl Kind for NodeKind {
     type DataRef<'d> = NodeRef<'d>;
@@ -141,6 +165,13 @@ impl EdgeAdapter {
             _kind: std::marker::PhantomData,
         }
     }
+}
+
+#[derive(Copy, Clone)]
+pub enum DynamicRef<'d> {
+    Node(NodeRef<'d>),
+    Entity(EntityRef<'d>),
+    Scalar(ScalarRef<'d>),
 }
 
 #[derive(Copy, Clone)]

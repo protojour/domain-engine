@@ -151,9 +151,15 @@ fn register_node_type(
         }
     }
 
-    if type_info.entity_id.is_some() {
+    if let Some(entity_id) = type_info.entity_id {
+        let (_, id_type_info) = env
+            .find_type_info(entity_id)
+            .expect("Id definition not found");
+        let id_operator_id = id_type_info.serde_operator_id.expect("No id_operator_id");
+
         let data = EntityData {
             def_id: type_info.def_id,
+            id_operator_id,
             query_field_name: smart_format!("{typename}List"),
             create_mutation_field_name: smart_format!("create{typename}"),
             update_mutation_field_name: smart_format!("update{typename}"),
@@ -190,6 +196,7 @@ fn register_node_type(
         serde_operator_id,
         TypeData {
             type_name: typename.clone(),
+            input_type_name: smart_format!("{typename}Input"),
             operator_id: serde_operator_id,
             fields,
         },
