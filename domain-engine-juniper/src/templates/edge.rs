@@ -40,7 +40,7 @@ impl juniper::GraphQLType<GqlScalar> for Edge {
         ];
 
         registry
-            .build_object_type::<Edge>(info, &fields)
+            .build_object_type::<Self>(info, &fields)
             .into_meta()
     }
 }

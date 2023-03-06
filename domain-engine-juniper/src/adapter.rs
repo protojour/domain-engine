@@ -26,6 +26,8 @@ pub fn adapt_domain(
         types: Default::default(),
         entities: Default::default(),
         root_edges: Default::default(),
+        query_type_name: "Query".into(),
+        mutation_type_name: "Mutation".into(),
     };
 
     for (typename, type_info) in &domain.types {
@@ -145,6 +147,9 @@ fn register_node_type(
             EntityData {
                 def_id: type_info.def_id,
                 query_field_name: smart_format!("{typename}List"),
+                create_mutation_field_name: smart_format!("create{typename}"),
+                update_mutation_field_name: smart_format!("update{typename}"),
+                delete_mutation_field_name: smart_format!("delete{typename}"),
             },
         );
 
@@ -310,6 +315,9 @@ pub struct DomainData {
     pub types: HashMap<SerdeOperatorId, TypeData>,
     pub entities: HashMap<SerdeOperatorId, EntityData>,
     pub root_edges: HashMap<SerdeOperatorId, EdgeData>,
+
+    pub query_type_name: String,
+    pub mutation_type_name: String,
 }
 
 #[derive(Copy, Clone)]
@@ -333,6 +341,9 @@ pub struct ScalarRef<'d> {
 pub struct EntityData {
     pub def_id: DefId,
     pub query_field_name: String,
+    pub create_mutation_field_name: String,
+    pub update_mutation_field_name: String,
+    pub delete_mutation_field_name: String,
 }
 
 pub struct TypeData {

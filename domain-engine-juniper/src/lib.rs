@@ -18,7 +18,7 @@ impl juniper::Context for GqlContext {}
 pub type Schema = juniper::RootNode<
     'static,
     templates::query::Query,
-    juniper::EmptyMutation<GqlContext>,
+    templates::mutation::Mutation,
     juniper::EmptySubscription<GqlContext>,
     GqlScalar,
 >;
@@ -36,10 +36,10 @@ pub fn create_graphql_schema(
 
     Ok(Schema::new_with_info(
         templates::query::Query,
-        juniper::EmptyMutation::new(),
+        templates::mutation::Mutation,
         juniper::EmptySubscription::new(),
-        templates::query::QueryTypeInfo(adapter),
-        (),
+        templates::query::QueryTypeInfo(adapter.clone()),
+        templates::mutation::MutationTypeInfo(adapter),
         (),
     ))
 }

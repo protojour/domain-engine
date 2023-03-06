@@ -70,7 +70,7 @@ impl juniper::GraphQLType<GqlScalar> for Node {
         }
 
         registry
-            .build_object_type::<Node>(info, &fields)
+            .build_object_type::<Self>(info, &fields)
             .into_meta()
     }
 }

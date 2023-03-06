@@ -14,7 +14,7 @@ pub struct QueryTypeInfo(pub Arc<DomainAdapter>);
 
 impl GraphqlTypeName for QueryTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        "Query"
+        &self.0.domain_data.query_type_name
     }
 }
 
@@ -48,8 +48,9 @@ impl juniper::GraphQLType<GqlScalar> for Query {
             })
             .collect();
 
-        let meta = registry.build_object_type::<Query>(info, &fields);
-        meta.into_meta()
+        registry
+            .build_object_type::<Self>(info, &fields)
+            .into_meta()
     }
 }
 

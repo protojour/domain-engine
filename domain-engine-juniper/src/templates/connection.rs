@@ -39,7 +39,7 @@ impl juniper::GraphQLType<GqlScalar> for Connection {
         ];
 
         registry
-            .build_object_type::<Connection>(info, &fields)
+            .build_object_type::<Self>(info, &fields)
             .into_meta()
     }
 }
