@@ -21,3 +21,4 @@ tracing-subscriber = {version = "0.3", default-features = false, features = ["en
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 tokio = { version = "1", features = ["macros", "rt"] }
 async-trait = "0.1"
+pretty_assertions = "1"

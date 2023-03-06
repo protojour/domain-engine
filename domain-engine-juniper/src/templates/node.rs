@@ -53,7 +53,10 @@ impl juniper::GraphQLType<GqlScalar> for Node {
                         SerdeOperator::Number(_) => {
                             todo!("number fields");
                         }
-                        SerdeOperator::String(_) => {
+                        SerdeOperator::String(_)
+                        | SerdeOperator::StringConstant(..)
+                        | SerdeOperator::StringPattern(_)
+                        | SerdeOperator::CapturingStringPattern(_) => {
                             fields.push(
                                 registry.field_convert::<std::string::String, _, Self::Context>(
                                     field_name,

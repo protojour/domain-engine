@@ -19,13 +19,14 @@ pub fn register_domain_argument<'r>(
     domain_adapter: &DomainAdapter,
     registry: &mut juniper::Registry<'r, GqlScalar>,
 ) -> juniper::meta::Argument<'r, GqlScalar> {
-    debug!("register argument {name}");
-
-    match domain_adapter
+    let operator = domain_adapter
         .domain_data
         .env
-        .get_serde_operator(operator_id)
-    {
+        .get_serde_operator(operator_id);
+
+    debug!("register argument {name} {operator:?}");
+
+    match operator {
         SerdeOperator::Unit => {
             panic!()
         }
@@ -62,6 +63,9 @@ pub fn deserialize_argument(
     env: &Env,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let input_value = arguments.get::<MapInputValue>(name).unwrap();
+
+    debug!("deserializing {:?}", input_value.input_value);
+
     env.new_serde_processor(operator_id, None)
         .deserialize(InputValueDeserializer::<serde_json::Error> {
             value: input_value.input_value,

@@ -1,7 +1,10 @@
+use std::fmt::Display;
+
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
-use juniper::graphql_value;
 use ontol_test_utils::{TestCompile, TEST_PKG};
-use test_log::test;
+
+mod test_basic;
+mod test_input;
 
 trait TestCompileSchema {
     fn compile_schema(self) -> TestSchema;
@@ -20,6 +23,34 @@ impl<T: TestCompile> TestCompileSchema for T {
 enum TestError<'a> {
     GraphQL(juniper::GraphQLError<'a>),
     Execution(Vec<juniper::ExecutionError<GqlScalar>>),
+}
+
+impl<'a> Display for TestError<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GraphQL(err) => write!(f, "GraphQL: {err}"),
+            Self::Execution(errors) => {
+                write!(f, "Execution: ")?;
+                let mut iter = errors.iter().peekable();
+                while let Some(execution_error) = iter.next() {
+                    let message = execution_error.error().message();
+                    let pos = execution_error.location();
+
+                    write!(
+                        f,
+                        "{message} (at line {} column {})",
+                        pos.line(),
+                        pos.column()
+                    )?;
+                    if iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    }
 }
 
 struct TestSchema {
@@ -59,58 +90,6 @@ impl Exec for &'static str {
             Err(error) => Err(TestError::GraphQL(error)),
         }
     }
-}
-
-#[test]
-fn test_create_empty_schema() {
-    "".compile_ok(|env| {
-        create_graphql_schema(env, TEST_PKG).unwrap();
-    });
-}
-
-#[test(tokio::test)]
-async fn test_basic_schema() {
-    let schema = "
-    type foo {
-        rel [id] string
-        rel ['prop'] int
-    }
-    "
-    .compile_schema();
-
-    assert_eq!(
-        "{
-            fooList {
-                edges {
-                    node {
-                        prop
-                    }
-                }
-            }    
-        }"
-        .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
-            "fooList": None,
-        }),
-    );
-
-    assert_eq!(
-        "mutation {
-            createfoo(
-                input: {
-                    prop: 42
-                }
-            ) {
-                prop
-            }
-        }"
-        .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!(None),
-    );
 }
 
 fn main() {}
