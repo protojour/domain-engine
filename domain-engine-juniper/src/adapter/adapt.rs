@@ -51,9 +51,7 @@ pub fn adapt_domain(
         }
     }
 
-    Ok(DomainAdapter {
-        domain_data: Arc::new(domain_data),
-    })
+    Ok(Arc::new(domain_data))
 }
 
 fn adapt_type(

@@ -1,13 +1,30 @@
 use std::fmt::Display;
 
-use juniper::{InputValue, Spanning};
-use ontol_runtime::smart_format;
-use serde::de::{self, IntoDeserializer};
+use juniper::{graphql_value, InputValue, Spanning};
+use ontol_runtime::{env::Env, serde::SerdeOperatorId, smart_format};
+use serde::de::{self, DeserializeSeed, IntoDeserializer};
+use tracing::debug;
 
 use crate::gql_scalar::GqlScalar;
 
+/// Deserialize some named juniper input argument using the given SerdeOperatorId.
+pub fn deserialize_argument(
+    arguments: &juniper::Arguments<GqlScalar>,
+    name: &str,
+    operator_id: SerdeOperatorId,
+    env: &Env,
+) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
+    let value = arguments.get_input_value(name).unwrap();
+
+    debug!("deserializing {value:?}");
+
+    env.new_serde_processor(operator_id, None)
+        .deserialize(InputValueDeserializer { value })
+        .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+}
+
 #[derive(Debug)]
-pub struct Error {
+struct Error {
     msg: smartstring::alias::String,
     start: juniper::parser::SourcePosition,
 }
@@ -38,8 +55,8 @@ impl de::Error for Error {
     }
 }
 
-pub struct InputValueDeserializer<'v> {
-    pub value: &'v Spanning<juniper::InputValue<GqlScalar>>,
+struct InputValueDeserializer<'v> {
+    value: &'v Spanning<juniper::InputValue<GqlScalar>>,
 }
 
 impl<'v, 'de> de::Deserializer<'de> for InputValueDeserializer<'v> {

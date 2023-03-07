@@ -11,15 +11,12 @@ use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionDa
 pub mod adapt;
 pub mod data;
 
-#[derive(Clone)]
-pub struct DomainAdapter {
-    pub domain_data: Arc<DomainData>,
-}
+pub type DomainAdapter = Arc<DomainData>;
 
-impl DomainAdapter {
+impl DomainData {
     pub fn entity_ref(&self, entity_id: SerdeOperatorId) -> EntityRef {
-        let entity_data = &self.domain_data.entities.get(&entity_id).unwrap();
-        let type_data = &self.domain_data.types.get(&entity_id).unwrap();
+        let entity_data = &self.entities.get(&entity_id).unwrap();
+        let type_data = &self.types.get(&entity_id).unwrap();
 
         EntityRef {
             entity_data,
@@ -27,25 +24,25 @@ impl DomainAdapter {
         }
     }
 
-    pub fn node_adapter(&self, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {
+    pub fn node_adapter(self: &Arc<Self>, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {
         TypeAdapter {
-            domain_data: self.domain_data.clone(),
+            domain_data: self.clone(),
             operator_id,
             _kind: std::marker::PhantomData,
         }
     }
 
-    pub fn entity_adapter(&self, entity_ref: &EntityRef) -> TypeAdapter<EntityKind> {
+    pub fn entity_adapter(self: &Arc<Self>, entity_ref: &EntityRef) -> TypeAdapter<EntityKind> {
         TypeAdapter {
-            domain_data: self.domain_data.clone(),
+            domain_data: self.clone(),
             operator_id: entity_ref.type_data.operator_id,
             _kind: std::marker::PhantomData,
         }
     }
 
-    pub fn root_edge_adapter(&self, entity_ref: &EntityRef) -> EdgeAdapter {
+    pub fn root_edge_adapter(self: &Arc<Self>, entity_ref: &EntityRef) -> EdgeAdapter {
         EdgeAdapter {
-            domain_data: self.domain_data.clone(),
+            domain_data: self.clone(),
             subject: None,
             node_operator_id: entity_ref.type_data.operator_id,
         }

@@ -3,8 +3,9 @@ use tracing::debug;
 use crate::{
     adapter::{data::MutationKind, DomainAdapter},
     gql_scalar::GqlScalar,
-    input::{deserialize_argument, register_domain_argument},
+    input_value_deserializer::deserialize_argument,
     macros::impl_graphql_value,
+    registry_wrapper::RegistryWrapper,
     type_info::GraphqlTypeName,
     GqlContext,
 };
@@ -18,7 +19,7 @@ pub struct MutationTypeInfo(pub DomainAdapter);
 
 impl GraphqlTypeName for MutationTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.domain_data.mutation_type_name
+        &self.0.mutation_type_name
     }
 }
 
@@ -36,13 +37,12 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
     where
         GqlScalar: 'r,
     {
-        let domain_adapter = DomainAdapter {
-            domain_data: info.0.domain_data.clone(),
-        };
+        let mut reg = RegistryWrapper::new(registry, &info.0);
+
+        let domain_adapter = &info.0;
 
         let fields: Vec<_> = info
             .0
-            .domain_data
             .mutations
             .iter()
             .map(|(name, mutation_data)| {
@@ -50,35 +50,35 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
                 let type_name = &entity_ref.type_data.type_name;
 
                 match mutation_data.kind {
-                    MutationKind::Create { input } => registry
+                    MutationKind::Create { input } => reg
                         .field_convert::<Node, _, GqlContext>(
                             name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument("input", input, &domain_adapter, registry)
+                            reg.register_domain_argument("input", input)
                                 .description(&format!("Input data for new {type_name}")),
                         ),
-                    MutationKind::Update { input, id } => registry
+                    MutationKind::Update { input, id } => reg
                         .field_convert::<Node, _, GqlContext>(
                             name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument("_id", id, &domain_adapter, registry)
+                            reg.register_domain_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),
                         )
                         .argument(
-                            register_domain_argument("input", input, &domain_adapter, registry)
+                            reg.register_domain_argument("input", input)
                                 .description(&format!("Input data for the {type_name} update")),
                         ),
-                    MutationKind::Delete { id } => registry
+                    MutationKind::Delete { id } => reg
                         .field_convert::<Node, _, GqlContext>(
                             name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument("_id", id, &domain_adapter, registry)
+                            reg.register_domain_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),
                         ),
                 }
@@ -100,13 +100,8 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let env = info.0.domain_data.env.as_ref();
-            let mutation_data = info
-                .0
-                .domain_data
-                .mutations
-                .get(field_name)
-                .expect("No such field");
+            let env = info.0.env.as_ref();
+            let mutation_data = info.0.mutations.get(field_name).expect("No such field");
 
             match mutation_data.kind {
                 MutationKind::Create { input } => {

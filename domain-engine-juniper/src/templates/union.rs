@@ -1,7 +1,7 @@
 use crate::{
     adapter::{TypeAdapter, UnionAdapter},
     gql_scalar::GqlScalar,
-    registry_utils::get_domain_type,
+    registry_wrapper::RegistryWrapper,
     type_info::GraphqlTypeName,
     GqlContext,
 };
@@ -51,20 +51,19 @@ impl juniper::GraphQLType<GqlScalar> for Union {
     where
         GqlScalar: 'r,
     {
+        let mut reg = RegistryWrapper::new(registry, &info.0.domain_data);
+
         let types = info
             .0
             .data()
             .variants
             .iter()
             .map(|variant_operator_id| {
-                get_domain_type(
-                    TypeAdapter {
-                        domain_data: info.0.domain_data.clone(),
-                        operator_id: *variant_operator_id,
-                        _kind: std::marker::PhantomData,
-                    },
-                    registry,
-                )
+                reg.get_domain_type(TypeAdapter {
+                    domain_data: info.0.domain_data.clone(),
+                    operator_id: *variant_operator_id,
+                    _kind: std::marker::PhantomData,
+                })
             })
             .collect::<Vec<_>>();
 

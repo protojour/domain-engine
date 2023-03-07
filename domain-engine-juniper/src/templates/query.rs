@@ -1,6 +1,6 @@
 use crate::{
     adapter::DomainAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
-    type_info::GraphqlTypeName, GqlContext,
+    registry_wrapper::RegistryWrapper, type_info::GraphqlTypeName, GqlContext,
 };
 
 use super::connection::{Connection, ConnectionTypeInfo};
@@ -12,7 +12,7 @@ pub struct QueryTypeInfo(pub DomainAdapter);
 
 impl GraphqlTypeName for QueryTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.domain_data.query_type_name
+        &self.0.query_type_name
     }
 }
 
@@ -30,15 +30,16 @@ impl juniper::GraphQLType<GqlScalar> for Query {
     where
         GqlScalar: 'r,
     {
+        let mut reg = RegistryWrapper::new(registry, &info.0);
+
         let fields: Vec<_> = info
             .0
-            .domain_data
             .queries
             .iter()
             .map(|(name, operator_id)| {
                 let entity_ref = info.0.entity_ref(*operator_id);
 
-                registry.field_convert::<Option<Connection>, _, GqlContext>(
+                reg.field_convert::<Option<Connection>, _, GqlContext>(
                     name,
                     &ConnectionTypeInfo(info.0.root_edge_adapter(&entity_ref)),
                 )
@@ -68,7 +69,6 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         Box::pin(async move {
             let _operator_id = info
                 .0
-                .domain_data
                 .queries
                 .get(field_name)
                 .expect("BUG: Query not found");

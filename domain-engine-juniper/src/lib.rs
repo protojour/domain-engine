@@ -6,10 +6,9 @@ use ontol_runtime::{env::Env, PackageId};
 pub mod adapter;
 pub mod gql_scalar;
 
-mod input;
 mod input_value_deserializer;
 mod macros;
-mod registry_utils;
+mod registry_wrapper;
 mod templates;
 mod type_info;
 
