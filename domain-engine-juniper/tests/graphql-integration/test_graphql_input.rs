@@ -4,7 +4,7 @@ use test_log::test;
 use crate::{Exec, TestCompileSchema};
 
 #[test(tokio::test)]
-async fn test_input_deserialization_error() {
+async fn test_graphql_input_deserialization_error() {
     let schema = "
     type foo {
         rel [id] string

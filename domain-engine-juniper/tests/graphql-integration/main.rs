@@ -3,8 +3,8 @@ use std::fmt::Display;
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_test_utils::{TestCompile, TEST_PKG};
 
-mod test_basic;
-mod test_input;
+mod test_graphql_basic;
+mod test_graphql_input;
 
 trait TestCompileSchema {
     fn compile_schema(self) -> TestSchema;

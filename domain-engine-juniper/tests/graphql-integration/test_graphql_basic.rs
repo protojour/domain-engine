@@ -5,15 +5,18 @@ use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
 
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
+const _GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
+
 #[test]
-fn test_create_empty_schema() {
+fn test_graphql_empty_schema() {
     "".compile_ok(|env| {
         create_graphql_schema(env, TEST_PKG).unwrap();
     });
 }
 
 #[test(tokio::test)]
-async fn test_basic_schema() {
+async fn test_graphql_basic_schema() {
     let schema = "
     type foo {
         rel [id] string
@@ -55,4 +58,10 @@ async fn test_basic_schema() {
         .unwrap(),
         graphql_value!(None),
     );
+}
+
+#[test(tokio::test)]
+#[ignore = "not fully implemented yet"]
+async fn test_artist_and_instrument() {
+    let _schema = ARTIST_AND_INSTRUMENT.compile_schema();
 }
