@@ -5,3 +5,4 @@ pub mod map_input_value;
 pub mod mutation;
 pub mod node;
 pub mod query;
+pub mod union;

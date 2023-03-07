@@ -1,12 +1,12 @@
 use domain_engine_juniper::create_graphql_schema;
 use juniper::graphql_value;
-use ontol_test_utils::{TestCompile, TEST_PKG};
+use ontol_test_utils::{assert_error_msg, TestCompile, TEST_PKG};
 use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
-const _GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
+const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
 
 #[test]
 fn test_graphql_empty_schema() {
@@ -118,10 +118,11 @@ async fn test_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-async fn test_guitar_synth_union_connections() {
-    let schema = _GUITAR_SYNTH_UNION.compile_schema();
+async fn test_guitar_synth_union_smoke_test() {
+    let schema = GUITAR_SYNTH_UNION.compile_schema();
 
-    assert_eq!(
+    // `instrument` is a union so fields cannot be queries directly
+    assert_error_msg!(
         "{
             artistList {
                 edges {
@@ -138,34 +139,7 @@ async fn test_guitar_synth_union_connections() {
             }
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
-            "artistList": None,
-        }),
-    );
-
-    assert_eq!(
-        "{
-            instrumentList {
-                edges {
-                    node {
-                        played_by {
-                            edges {
-                                node {
-                                    name
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }"
-        .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
-            "instrumentList": None,
-        }),
+        .await,
+        r#"GraphQL: Unknown field "name" on type "instrument". At 7:36"#
     );
 }

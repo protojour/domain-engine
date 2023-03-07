@@ -22,7 +22,7 @@ macro_rules! assert_error_msg {
     ($e:expr, $msg:expr) => {
         match $e {
             Ok(v) => panic!("Expected error, was Ok({v:?})"),
-            Err(e) => pretty_assertions::assert_eq!($msg, format!("{e}").as_str()),
+            Err(e) => pretty_assertions::assert_eq!($msg, format!("{e}").trim()),
         }
     };
 }

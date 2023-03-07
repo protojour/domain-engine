@@ -11,6 +11,7 @@ pub struct DomainData {
 
     pub types: FnvHashMap<SerdeOperatorId, TypeData>,
     pub entities: FnvHashMap<SerdeOperatorId, EntityData>,
+    pub unions: FnvHashMap<SerdeOperatorId, UnionData>,
     pub edges: FnvHashMap<(Option<DefId>, SerdeOperatorId), EdgeData>,
 
     pub query_type_name: String,
@@ -50,6 +51,22 @@ pub struct TypeData {
     pub fields: IndexMap<String, Field>,
 }
 
+pub struct UnionData {
+    pub type_name: String,
+    pub operator_id: SerdeOperatorId,
+    pub variants: Vec<SerdeOperatorId>,
+}
+
+#[derive(Clone)]
+pub struct ScalarData {
+    _serde_operator_id: SerdeOperatorId,
+}
+
+pub struct EdgeData {
+    pub edge_type_name: String,
+    pub connection_type_name: String,
+}
+
 pub struct Field {
     pub cardinality: FieldCardinality,
     pub kind: FieldKind,
@@ -72,14 +89,4 @@ pub enum FieldKind {
         node: SerdeOperatorId,
         rel: Option<SerdeOperatorId>,
     },
-}
-
-#[derive(Clone)]
-pub struct ScalarData {
-    _serde_operator_id: SerdeOperatorId,
-}
-
-pub struct EdgeData {
-    pub edge_type_name: String,
-    pub connection_type_name: String,
 }

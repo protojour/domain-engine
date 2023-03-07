@@ -13,7 +13,7 @@ use tracing::debug;
 use crate::{
     adapter::data::{
         DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, MutationKind,
-        TypeData,
+        TypeData, UnionData,
     },
     SchemaBuildError,
 };
@@ -33,6 +33,7 @@ pub fn adapt_domain(
         package_id,
         types: Default::default(),
         entities: Default::default(),
+        unions: Default::default(),
         edges: Default::default(),
         query_type_name: "Query".into(),
         mutation_type_name: "Mutation".into(),
@@ -40,9 +41,11 @@ pub fn adapt_domain(
         mutations: Default::default(),
     };
 
-    for (typename, type_info) in &domain.types {
+    for (type_name, type_info) in &domain.types {
         if let Some(operator_id) = type_info.serde_operator_id {
-            register_type(&env, &mut domain_data, typename, type_info, operator_id);
+            debug!("type `{type_name}`");
+
+            adapt_type(&env, &mut domain_data, type_name, type_info, operator_id);
         }
     }
 
@@ -51,16 +54,23 @@ pub fn adapt_domain(
     })
 }
 
-fn register_type(
+fn adapt_type(
     env: &Env,
     domain_data: &mut DomainData,
-    typename: &String,
+    type_name: &String,
     type_info: &TypeInfo,
     operator_id: SerdeOperatorId,
 ) {
     match env.get_serde_operator(operator_id) {
         SerdeOperator::MapType(map_type) => {
-            register_node_type(env, domain_data, typename, type_info, operator_id, map_type);
+            adapt_node_type(
+                env,
+                domain_data,
+                type_name,
+                type_info,
+                operator_id,
+                map_type,
+            );
         }
         SerdeOperator::ValueUnionType(value_union_type) => {
             let mut found_id = None;
@@ -78,15 +88,33 @@ fn register_type(
             }
 
             match (found_id, found_map_fallback) {
-                (Some(_id), Some(map_fallback)) => register_type(
-                    env,
-                    domain_data,
-                    typename,
-                    type_info,
-                    map_fallback.operator_id,
-                ),
+                (Some(_id), Some(map_fallback)) => {
+                    debug!("found _id and map fallback");
+                    adapt_type(
+                        env,
+                        domain_data,
+                        type_name,
+                        type_info,
+                        map_fallback.operator_id,
+                    )
+                }
                 _ => {
-                    panic!("Unprocessed union");
+                    let mut variant_operators = vec![];
+
+                    for variant in &value_union_type.variants {
+                        variant_operators.push(variant.operator_id);
+                    }
+
+                    domain_data.unions.insert(
+                        operator_id,
+                        UnionData {
+                            type_name: type_name.clone(),
+                            operator_id,
+                            variants: variant_operators,
+                        },
+                    );
+
+                    debug!("created a union for `{type_name}`");
                 }
             }
         }
@@ -96,17 +124,17 @@ fn register_type(
     };
 }
 
-fn register_node_type(
+fn adapt_node_type(
     _env: &Env,
     domain_data: &mut DomainData,
-    typename: &String,
+    type_name: &String,
     type_info: &TypeInfo,
     serde_operator_id: SerdeOperatorId,
     map_type: &MapType,
 ) {
     let env = domain_data.env.as_ref();
 
-    debug!("register_map_type {type_info:?}");
+    debug!("node type `{type_name}` {type_info:?}");
 
     let mut fields: IndexMap<String, Field> = Default::default();
 
@@ -127,10 +155,10 @@ fn register_node_type(
         let data = EntityData {
             def_id: type_info.def_id,
             id_operator_id,
-            query_field_name: smart_format!("{typename}List"),
-            create_mutation_field_name: smart_format!("create{typename}"),
-            update_mutation_field_name: smart_format!("update{typename}"),
-            delete_mutation_field_name: smart_format!("delete{typename}"),
+            query_field_name: smart_format!("{type_name}List"),
+            create_mutation_field_name: smart_format!("create{type_name}"),
+            update_mutation_field_name: smart_format!("update{type_name}"),
+            delete_mutation_field_name: smart_format!("delete{type_name}"),
         };
 
         domain_data
@@ -158,13 +186,15 @@ fn register_node_type(
         domain_data.edges.insert(
             (None, serde_operator_id),
             EdgeData {
-                edge_type_name: smart_format!("{typename}ConnectionEdge"),
-                connection_type_name: smart_format!("{typename}Connection"),
+                edge_type_name: smart_format!("{type_name}ConnectionEdge"),
+                connection_type_name: smart_format!("{type_name}Connection"),
             },
         );
     }
 
     for (property_name, property) in &map_type.properties {
+        debug!("  adapting property {property_name}");
+
         match env.get_serde_operator(property.value_operator_id) {
             SerdeOperator::ValueUnionType(_) => {
                 // let object_def_id = value_union_type.union_def_variant.id();
@@ -201,10 +231,10 @@ fn register_node_type(
                             (Some(type_info.def_id), entity_operator_id),
                             EdgeData {
                                 edge_type_name: smart_format!(
-                                    "{typename}{property_name}ConnectionEdge"
+                                    "{type_name}{property_name}ConnectionEdge"
                                 ),
                                 connection_type_name: smart_format!(
-                                    "{typename}{property_name}Connection"
+                                    "{type_name}{property_name}Connection"
                                 ),
                             },
                         );
@@ -231,8 +261,14 @@ fn register_node_type(
                             },
                         );
                     }
+                    TypeClassification::Id => {
+                        debug!("Id not handled here");
+                    }
                     TypeClassification::Scalar => {
-                        panic!("Unhandled scalar")
+                        panic!(
+                            "Unhandled scalar: {:?}",
+                            env.get_serde_operator(sequence_type.ranges[0].operator_id)
+                        )
                     }
                 }
             }
@@ -255,9 +291,9 @@ fn register_node_type(
     domain_data.types.insert(
         serde_operator_id,
         TypeData {
-            type_name: typename.clone(),
+            type_name: type_name.clone(),
             def_id: type_info.def_id,
-            input_type_name: smart_format!("{typename}Input"),
+            input_type_name: smart_format!("{type_name}Input"),
             operator_id: serde_operator_id,
             fields,
         },
@@ -267,11 +303,15 @@ fn register_node_type(
 enum TypeClassification {
     Entity(SerdeOperatorId),
     Node(SerdeOperatorId),
+    Id,
     Scalar,
 }
 
 fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
-    match env.get_serde_operator(operator_id) {
+    let operator = env.get_serde_operator(operator_id);
+    // debug!("    classify operator: {operator:?}");
+
+    match operator {
         SerdeOperator::MapType(map_type) => match env.find_type_info(map_type.def_variant.id()) {
             Some((_, type_info)) => {
                 if type_info.entity_id.is_some() {
@@ -289,8 +329,34 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
                 }
             }
 
+            debug!("   no MapFallback");
+
+            // start with the "highest" classification and downgrade as "lower" variants are found.
+            let mut classification = TypeClassification::Entity(operator_id);
+
+            for variant in &union_type.variants {
+                let variant_classification = classify_type(env, variant.operator_id);
+                match (&classification, variant_classification) {
+                    (TypeClassification::Entity(_), TypeClassification::Node(_)) => {
+                        // downgrade
+                        debug!("    Downgrade to Node");
+                        classification = TypeClassification::Node(operator_id);
+                    }
+                    (_, TypeClassification::Scalar) => {
+                        // downgrade
+                        debug!("    Downgrade to Scalar");
+                        classification = TypeClassification::Scalar;
+                    }
+                    _ => {}
+                }
+            }
+
+            classification
+        }
+        SerdeOperator::Id(_) => TypeClassification::Id,
+        operator => {
+            debug!("    operator interpreted as Scalar: {operator:?}");
             TypeClassification::Scalar
         }
-        _ => TypeClassification::Scalar,
     }
 }

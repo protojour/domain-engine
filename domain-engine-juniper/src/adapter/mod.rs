@@ -5,7 +5,7 @@ use ontol_runtime::{
     DefId,
 };
 
-use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData};
+use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionData};
 
 pub mod adapt;
 pub mod data;
@@ -77,18 +77,22 @@ impl Kind for DynamicKind {
     type DataRef<'d> = DynamicRef<'d>;
 
     fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_> {
-        let type_data = domain_data.types.get(&operator_id).unwrap();
-
-        if let Some(entity_data) = domain_data.entities.get(&operator_id) {
-            DynamicRef::Entity(EntityRef {
-                entity_data,
-                type_data,
-            })
+        if let Some(union_data) = domain_data.unions.get(&operator_id) {
+            DynamicRef::Union(UnionRef { union_data })
         } else {
-            DynamicRef::Node(NodeRef {
-                entity_data: None,
-                type_data,
-            })
+            let type_data = domain_data.types.get(&operator_id).unwrap();
+
+            if let Some(entity_data) = domain_data.entities.get(&operator_id) {
+                DynamicRef::Entity(EntityRef {
+                    entity_data,
+                    type_data,
+                })
+            } else {
+                DynamicRef::Node(NodeRef {
+                    entity_data: None,
+                    type_data,
+                })
+            }
         }
     }
 }
@@ -155,6 +159,21 @@ impl<K: Kind> TypeAdapter<K> {
 }
 
 #[derive(Clone)]
+pub struct UnionAdapter {
+    pub domain_data: Arc<DomainData>,
+    pub operator_id: SerdeOperatorId,
+}
+
+impl UnionAdapter {
+    pub fn data(&self) -> &UnionData {
+        self.domain_data
+            .unions
+            .get(&self.operator_id)
+            .expect("No union data found")
+    }
+}
+
+#[derive(Clone)]
 pub struct EdgeAdapter {
     pub domain_data: Arc<DomainData>,
     pub subject: Option<DefId>,
@@ -182,6 +201,7 @@ impl EdgeAdapter {
 pub enum DynamicRef<'d> {
     Node(NodeRef<'d>),
     Entity(EntityRef<'d>),
+    Union(UnionRef<'d>),
     Scalar(ScalarRef<'d>),
 }
 
@@ -195,6 +215,11 @@ pub struct NodeRef<'d> {
 pub struct EntityRef<'d> {
     pub entity_data: &'d EntityData,
     pub type_data: &'d TypeData,
+}
+
+#[derive(Copy, Clone)]
+pub struct UnionRef<'d> {
+    pub union_data: &'d UnionData,
 }
 
 #[derive(Copy, Clone)]
