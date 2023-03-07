@@ -150,7 +150,15 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::Sequence(sequence_type) => deserializer.deserialize_seq(
+            SerdeOperator::RelationSequence(sequence_type) => deserializer.deserialize_seq(
+                SequenceMatcher::new(
+                    &sequence_type.ranges,
+                    sequence_type.def_variant.id(),
+                    self.rel_params_operator_id,
+                )
+                .into_visitor(self),
+            ),
+            SerdeOperator::ConstructorSequence(sequence_type) => deserializer.deserialize_seq(
                 SequenceMatcher::new(
                     &sequence_type.ranges,
                     sequence_type.def_variant.id(),

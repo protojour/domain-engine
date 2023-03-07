@@ -36,7 +36,11 @@ pub fn register_domain_argument<'r>(
         SerdeOperator::StringConstant(_, _) => registry.arg::<String>(name, &()),
         SerdeOperator::StringPattern(_) => registry.arg::<String>(name, &()),
         SerdeOperator::CapturingStringPattern(_) => registry.arg::<String>(name, &()),
-        SerdeOperator::Sequence(_) => {
+        SerdeOperator::RelationSequence(_) => {
+            todo!()
+            // registry.arg::<CustomScalar>(name, &()),
+        }
+        SerdeOperator::ConstructorSequence(_) => {
             todo!()
             // registry.arg::<CustomScalar>(name, &()),
         }
@@ -64,7 +68,7 @@ pub fn deserialize_argument(
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let value = arguments.get_input_value(name).unwrap();
 
-    debug!("deserializing {:?}", value);
+    debug!("deserializing {value:?}");
 
     env.new_serde_processor(operator_id, None)
         .deserialize(InputValueDeserializer { value })

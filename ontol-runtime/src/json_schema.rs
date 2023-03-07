@@ -271,7 +271,14 @@ fn serialize_schema_inline<S: Serializer>(
             map.serialize_entry("type", "string")?;
             map.serialize_entry("pattern", pattern.regex.as_str())?;
         }
-        SerdeOperator::Sequence(sequence_type) => {
+        SerdeOperator::RelationSequence(sequence_type) => {
+            map.serialize_entry("type", "array")?;
+
+            let range = &sequence_type.ranges[0];
+            // normal array: all items are uniform
+            map.serialize_entry("items", &ctx.reference(range.operator_id))?;
+        }
+        SerdeOperator::ConstructorSequence(sequence_type) => {
             map.serialize_entry("type", "array")?;
 
             let ranges = &sequence_type.ranges;
@@ -376,22 +383,20 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
                 )?;
                 map.end()
             }
-            SerdeOperator::Sequence(sequence_type) => {
-                if sequence_type.is_constructor {
-                    self.compose(self.ctx.ref_link(sequence_type.def_variant))
-                        .serialize(serializer)
-                } else {
-                    let mut map = serializer.serialize_map(None)?;
-                    serialize_schema_inline::<S>(
-                        &self.ctx,
-                        value_operator,
-                        None,
-                        self.def_map,
-                        &mut map,
-                    )?;
-                    map.end()
-                }
+            SerdeOperator::RelationSequence(_sequence_type) => {
+                let mut map = serializer.serialize_map(None)?;
+                serialize_schema_inline::<S>(
+                    &self.ctx,
+                    value_operator,
+                    None,
+                    self.def_map,
+                    &mut map,
+                )?;
+                map.end()
             }
+            SerdeOperator::ConstructorSequence(sequence_type) => self
+                .compose(self.ctx.ref_link(sequence_type.def_variant))
+                .serialize(serializer),
             SerdeOperator::ValueType(value_type) => self
                 .compose(self.ctx.ref_link(value_type.def_variant))
                 .serialize(serializer),
@@ -650,11 +655,13 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => {}
-            SerdeOperator::Sequence(sequence_type) => {
-                if sequence_type.is_constructor {
-                    self.add_to_graph(sequence_type.def_variant, operator_id);
+            SerdeOperator::ConstructorSequence(sequence_type) => {
+                self.add_to_graph(sequence_type.def_variant, operator_id);
+                for range in &sequence_type.ranges {
+                    self.visit(range.operator_id, env);
                 }
-
+            }
+            SerdeOperator::RelationSequence(sequence_type) => {
                 for range in &sequence_type.ranges {
                     self.visit(range.operator_id, env);
                 }

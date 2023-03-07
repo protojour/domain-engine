@@ -355,7 +355,14 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 let processor = self.env.new_serde_processor(variant.operator_id, None);
 
                 match &processor.value_operator {
-                    SerdeOperator::Sequence(sequence_type) => {
+                    SerdeOperator::RelationSequence(sequence_type) => {
+                        return Ok(SequenceMatcher::new(
+                            &sequence_type.ranges,
+                            sequence_type.def_variant.id(),
+                            self.rel_params_operator_id,
+                        ))
+                    }
+                    SerdeOperator::ConstructorSequence(sequence_type) => {
                         return Ok(SequenceMatcher::new(
                             &sequence_type.ranges,
                             sequence_type.def_variant.id(),

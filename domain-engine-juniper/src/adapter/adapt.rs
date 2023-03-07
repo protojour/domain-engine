@@ -90,8 +90,8 @@ fn register_type(
                 }
             }
         }
-        other => {
-            panic!("other operator: {other:?}");
+        _other => {
+            // panic!("other operator: {other:?}");
         }
     };
 }
@@ -132,8 +132,21 @@ fn register_node_type(
                     },
                 );
             }
-            SerdeOperator::Sequence(_) => {
-                todo!()
+            SerdeOperator::RelationSequence(_sequence_type) => {
+                fields.insert(
+                    property_name.clone(),
+                    Field {
+                        cardinality: if property.optional {
+                            FieldCardinality::ManyOptional
+                        } else {
+                            FieldCardinality::ManyMandatory
+                        },
+                        kind: FieldKind::Node {
+                            value: property.value_operator_id,
+                            rel: property.rel_params_operator_id,
+                        },
+                    },
+                );
             }
             _ => {
                 fields.insert(

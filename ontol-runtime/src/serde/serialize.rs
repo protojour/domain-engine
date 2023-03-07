@@ -56,7 +56,12 @@ impl<'e> SerdeProcessor<'e> {
                 .unwrap();
                 serializer.serialize_str(&buf)
             }
-            SerdeOperator::Sequence(sequence_type) => self.serialize_sequence(
+            SerdeOperator::RelationSequence(sequence_type) => self.serialize_sequence(
+                cast_ref::<Vec<_>>(value),
+                &sequence_type.ranges,
+                serializer,
+            ),
+            SerdeOperator::ConstructorSequence(sequence_type) => self.serialize_sequence(
                 cast_ref::<Vec<_>>(value),
                 &sequence_type.ranges,
                 serializer,

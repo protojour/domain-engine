@@ -4,8 +4,9 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
     serde::{
-        MapType, SequenceRange, SequenceType, SerdeKey, SerdeOperator, SerdeOperatorId,
-        SerdeProperty, ValueType, ValueUnionType, ValueUnionVariant,
+        ConstructorSequenceType, MapType, RelationSequenceType, SequenceRange, SerdeKey,
+        SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType,
+        ValueUnionVariant,
     },
     DataVariant, DefId, DefVariant, Role,
 };
@@ -92,15 +93,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some((
                     self.alloc_operator_id_for_key(&key),
-                    SerdeOperator::Sequence(SequenceType {
+                    SerdeOperator::RelationSequence(RelationSequenceType {
                         ranges: [SequenceRange {
                             operator_id: item_operator_id,
                             finite_repetition: None,
-                        }]
-                        .into_iter()
-                        .collect(),
+                        }],
                         def_variant: *def_variant,
-                        is_constructor: false,
                     }),
                 ))
             }
@@ -363,10 +361,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let ranges = sequence_range_builder.build();
                 debug!("sequence ranges: {:#?}", ranges);
 
-                SerdeOperator::Sequence(SequenceType {
+                SerdeOperator::ConstructorSequence(ConstructorSequenceType {
                     ranges,
                     def_variant,
-                    is_constructor: true,
                 })
             }
             Constructor::StringPattern(_) => {

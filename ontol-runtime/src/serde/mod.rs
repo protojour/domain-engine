@@ -109,8 +109,13 @@ pub enum SerdeOperator {
     /// Deserializes into a Map if there are capture groups:
     CapturingStringPattern(DefId),
 
-    /// Any sequence
-    Sequence(SequenceType),
+    /// A sequence representing a relationship between one subject and many objects.
+    /// This is simple and does not support any tuples.
+    RelationSequence(RelationSequenceType),
+
+    /// A sequence for constructing a value.
+    /// This may include tuple-like sequences.
+    ConstructorSequence(ConstructorSequenceType),
 
     /// A type with just one anonymous property
     ValueType(ValueType),
@@ -126,13 +131,18 @@ pub enum SerdeOperator {
 }
 
 #[derive(Debug)]
-pub struct SequenceType {
-    pub ranges: SmallVec<[SequenceRange; 3]>,
+pub struct RelationSequenceType {
+    pub ranges: [SequenceRange; 1],
     pub def_variant: DefVariant,
-    pub is_constructor: bool,
 }
 
-impl SequenceType {
+#[derive(Debug)]
+pub struct ConstructorSequenceType {
+    pub ranges: SmallVec<[SequenceRange; 3]>,
+    pub def_variant: DefVariant,
+}
+
+impl ConstructorSequenceType {
     pub fn length_range(&self) -> Range<Option<u16>> {
         let mut count = 0;
         let mut finite = true;
@@ -220,7 +230,15 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
                 write!(f, "`string_pattern`")
             }
-            SerdeOperator::Sequence(sequence_type) => {
+            SerdeOperator::RelationSequence(sequence_type) => {
+                write!(
+                    f,
+                    "[{}..]",
+                    self.env
+                        .new_serde_processor(sequence_type.ranges[0].operator_id, None)
+                )
+            }
+            SerdeOperator::ConstructorSequence(sequence_type) => {
                 let mut processors = vec![];
                 let mut finite = true;
                 for range in &sequence_type.ranges {
