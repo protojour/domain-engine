@@ -2,6 +2,7 @@
 
 members = [
     "domain-engine-juniper",
+    "domain-engine-wasm",
     "ontol-runtime",
     "ontol-compiler",
     "ontol-parser",
