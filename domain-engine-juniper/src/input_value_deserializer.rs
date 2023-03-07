@@ -58,13 +58,13 @@ impl<'v, 'de> de::Deserializer<'de> for InputValueDeserializer<'v> {
             InputValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
             InputValue::Scalar(GqlScalar::Bool(value)) => visitor.visit_bool(*value),
             InputValue::Scalar(GqlScalar::String(value)) => visitor.visit_str(value),
-            InputValue::Enum(value) => visitor.visit_str(&value),
+            InputValue::Enum(value) => visitor.visit_str(value),
             InputValue::Variable(var) => Err(de::Error::invalid_value(
-                de::Unexpected::Str(&var),
+                de::Unexpected::Str(var),
                 &"variable",
             )),
             InputValue::List(vec) => {
-                let mut iterator = vec.into_iter().fuse();
+                let mut iterator = vec.iter().fuse();
                 let value = visitor.visit_seq(SeqDeserializer::<_>::new(&mut iterator))?;
                 match iterator.next() {
                     Some(item) => Err(Error {
@@ -75,7 +75,7 @@ impl<'v, 'de> de::Deserializer<'de> for InputValueDeserializer<'v> {
                 }
             }
             InputValue::Object(vec) => {
-                let mut iterator = vec.into_iter().fuse();
+                let mut iterator = vec.iter().fuse();
                 let value = visitor.visit_map(MapDeserializer::<_>::new(&mut iterator))?;
                 match iterator.next() {
                     Some((key, _)) => Err(Error {
