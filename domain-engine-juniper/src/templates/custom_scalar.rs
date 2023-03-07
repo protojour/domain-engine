@@ -74,15 +74,15 @@ impl juniper::ToInputValue<GqlScalar> for CustomScalar {
 }
 
 impl juniper::FromInputValue<GqlScalar> for CustomScalar {
-    fn from_input_value(_v: &juniper::InputValue<GqlScalar>) -> Option<Self> {
-        panic!("BUG: This also panics inside the official juniper scalar macro")
+    type Error = String;
+
+    fn from_input_value(_v: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
+        Err("BUG: This also panics inside the official juniper scalar macro".into())
     }
 }
 
 impl juniper::ParseScalarValue<GqlScalar> for CustomScalar {
-    fn from_str(
-        _value: juniper::parser::ScalarToken<'_>,
-    ) -> juniper::ParseScalarResult<'_, GqlScalar> {
+    fn from_str(_value: juniper::parser::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {
         panic!("TODO: this won't work")
     }
 }

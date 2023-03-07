@@ -9,7 +9,7 @@ edition = "2021"
 ontol-runtime.path = "../ontol-runtime"
 smartstring = { version = "1", features = ["serde"] }
 serde = "1"
-juniper = "0.15"
+juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods" }
 indexmap = { version = "1", features = ["serde"] }
 serde_json = "1"
 tracing = "0.1"

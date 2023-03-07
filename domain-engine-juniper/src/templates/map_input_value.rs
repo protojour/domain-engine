@@ -76,17 +76,17 @@ impl juniper::ToInputValue<GqlScalar> for MapInputValue {
 }
 
 impl juniper::FromInputValue<GqlScalar> for MapInputValue {
-    fn from_input_value(value: &juniper::InputValue<GqlScalar>) -> Option<Self> {
-        Some(MapInputValue {
+    type Error = String;
+
+    fn from_input_value(value: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
+        Ok(MapInputValue {
             input_value: value.clone(),
         })
     }
 }
 
 impl juniper::ParseScalarValue<GqlScalar> for MapInputValue {
-    fn from_str(
-        _value: juniper::parser::ScalarToken<'_>,
-    ) -> juniper::ParseScalarResult<'_, GqlScalar> {
+    fn from_str(_value: juniper::parser::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {
         panic!("TODO: this won't work")
     }
 }

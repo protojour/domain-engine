@@ -62,7 +62,7 @@ pub fn deserialize_argument(
     operator_id: SerdeOperatorId,
     env: &Env,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-    let input_value = arguments.get::<MapInputValue>(name).unwrap();
+    let input_value = arguments.get::<MapInputValue>(name).unwrap().unwrap();
 
     debug!("deserializing {:?}", input_value.input_value);
 

@@ -47,8 +47,6 @@ impl Display for GqlScalar {
 }
 
 impl ScalarValue for GqlScalar {
-    type Visitor = ScalarDeserializeVisitor;
-
     fn as_int(&self) -> Option<i32> {
         match self {
             Self::I32(i) => Some(*i),
@@ -56,7 +54,7 @@ impl ScalarValue for GqlScalar {
         }
     }
 
-    fn as_boolean(&self) -> Option<bool> {
+    fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(b) => Some(*b),
             _ => None,
@@ -90,6 +88,15 @@ impl ScalarValue for GqlScalar {
             Self::String(s) => Some(s.into()),
             _ => None,
         }
+    }
+}
+
+impl<'de> serde::de::Deserialize<'de> for GqlScalar {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(ScalarDeserializeVisitor)
     }
 }
 

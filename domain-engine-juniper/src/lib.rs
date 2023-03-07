@@ -48,6 +48,7 @@ pub fn create_graphql_schema(
 /// Just some test code to be able to look at some macro expansions
 #[cfg(test)]
 mod test_derivations {
+    /*
     struct TestScalar(String);
 
     #[juniper::graphql_scalar]
@@ -67,6 +68,7 @@ mod test_derivations {
             <String as juniper::ParseScalarValue<S>>::from_str(value)
         }
     }
+    */
 
     #[derive(juniper::GraphQLInputObject)]
     struct TestInputObject {

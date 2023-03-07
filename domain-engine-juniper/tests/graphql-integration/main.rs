@@ -20,12 +20,12 @@ impl<T: TestCompile> TestCompileSchema for T {
 }
 
 #[derive(Debug)]
-enum TestError<'a> {
-    GraphQL(juniper::GraphQLError<'a>),
+enum TestError {
+    GraphQL(juniper::GraphQLError),
     Execution(Vec<juniper::ExecutionError<GqlScalar>>),
 }
 
-impl<'a> Display for TestError<'a> {
+impl Display for TestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GraphQL(err) => write!(f, "GraphQL: {err}"),
@@ -59,18 +59,12 @@ struct TestSchema {
 
 #[async_trait::async_trait]
 trait Exec {
-    async fn exec<'a>(
-        self,
-        schema: &'a TestSchema,
-    ) -> Result<juniper::Value<GqlScalar>, TestError<'a>>;
+    async fn exec(self, schema: &TestSchema) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
 #[async_trait::async_trait]
 impl Exec for &'static str {
-    async fn exec<'a>(
-        self,
-        test_schema: &'a TestSchema,
-    ) -> Result<juniper::Value<GqlScalar>, TestError<'a>> {
+    async fn exec(self, test_schema: &TestSchema) -> Result<juniper::Value<GqlScalar>, TestError> {
         match juniper::execute(
             self,
             None,
