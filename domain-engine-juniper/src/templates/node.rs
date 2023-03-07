@@ -1,11 +1,13 @@
 use ontol_runtime::serde::SerdeOperator;
 
 use crate::{
-    adapter::{data::FieldKind, NodeKind, TypeAdapter},
+    adapter::{data::FieldKind, EdgeAdapter, NodeKind, TypeAdapter},
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
 };
+
+use super::connection::{Connection, ConnectionTypeInfo};
 
 pub struct Node;
 
@@ -32,7 +34,6 @@ impl juniper::GraphQLType<GqlScalar> for Node {
     where
         GqlScalar: 'r,
     {
-        let _serde_operator = info.0.serde_operator();
         let env = info.0.domain_data.env.as_ref();
         let node_ref = info.0.data();
 
@@ -68,7 +69,18 @@ impl juniper::GraphQLType<GqlScalar> for Node {
                     }
                 }
                 FieldKind::Node { .. } => {}
-                FieldKind::EntityRelationship { .. } => {}
+                FieldKind::EntityRelationship { node, .. } => {
+                    fields.push(
+                        registry.field_convert::<Option<Connection>, _, Self::Context>(
+                            field_name,
+                            &ConnectionTypeInfo(EdgeAdapter {
+                                domain_data: info.0.domain_data.clone(),
+                                subject: Some(node_ref.type_data.def_id),
+                                node_operator_id: *node,
+                            }),
+                        ),
+                    );
+                }
             }
         }
 

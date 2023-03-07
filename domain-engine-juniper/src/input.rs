@@ -4,7 +4,7 @@ use ontol_runtime::{
     serde::{SerdeOperator, SerdeOperatorId},
 };
 use serde::de::DeserializeSeed;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     adapter::DomainAdapter,
@@ -37,11 +37,13 @@ pub fn register_domain_argument<'r>(
         SerdeOperator::StringPattern(_) => registry.arg::<String>(name, &()),
         SerdeOperator::CapturingStringPattern(_) => registry.arg::<String>(name, &()),
         SerdeOperator::RelationSequence(_) => {
-            todo!()
+            warn!("Skipping relation sequence for now");
+            registry.arg::<String>(name, &())
             // registry.arg::<CustomScalar>(name, &()),
         }
         SerdeOperator::ConstructorSequence(_) => {
-            todo!()
+            warn!("Skipping constructor sequence for now");
+            registry.arg::<String>(name, &())
             // registry.arg::<CustomScalar>(name, &()),
         }
         SerdeOperator::ValueType(value_type) => {

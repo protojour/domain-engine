@@ -11,7 +11,7 @@ pub struct DomainData {
 
     pub types: FnvHashMap<SerdeOperatorId, TypeData>,
     pub entities: FnvHashMap<SerdeOperatorId, EntityData>,
-    pub root_edges: FnvHashMap<SerdeOperatorId, EdgeData>,
+    pub edges: FnvHashMap<(Option<DefId>, SerdeOperatorId), EdgeData>,
 
     pub query_type_name: String,
     pub mutation_type_name: String,
@@ -45,6 +45,7 @@ pub struct EntityData {
 pub struct TypeData {
     pub type_name: String,
     pub input_type_name: String,
+    pub def_id: DefId,
     pub operator_id: SerdeOperatorId,
     pub fields: IndexMap<String, Field>,
 }
@@ -64,10 +65,13 @@ pub enum FieldCardinality {
 pub enum FieldKind {
     Scalar(SerdeOperatorId),
     Node {
-        value: SerdeOperatorId,
+        node: SerdeOperatorId,
         rel: Option<SerdeOperatorId>,
     },
-    EntityRelationship {},
+    EntityRelationship {
+        node: SerdeOperatorId,
+        rel: Option<SerdeOperatorId>,
+    },
 }
 
 #[derive(Clone)]

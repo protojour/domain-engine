@@ -61,7 +61,54 @@ async fn test_graphql_basic_schema() {
 }
 
 #[test(tokio::test)]
-#[ignore = "not fully implemented yet"]
-async fn test_artist_and_instrument() {
-    let _schema = ARTIST_AND_INSTRUMENT.compile_schema();
+async fn test_artist_and_instrument_connections() {
+    let schema = ARTIST_AND_INSTRUMENT.compile_schema();
+
+    assert_eq!(
+        "{
+            artistList {
+                edges {
+                    node {
+                        plays {
+                            edges {
+                                node {
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
+        graphql_value!({
+            "artistList": None,
+        }),
+    );
+
+    assert_eq!(
+        "{
+            instrumentList {
+                edges {
+                    node {
+                        played_by {
+                            edges {
+                                node {
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
+        graphql_value!({
+            "instrumentList": None,
+        }),
+    );
 }

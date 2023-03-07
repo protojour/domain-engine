@@ -33,7 +33,7 @@ pub fn adapt_domain(
         package_id,
         types: Default::default(),
         entities: Default::default(),
-        root_edges: Default::default(),
+        edges: Default::default(),
         query_type_name: "Query".into(),
         mutation_type_name: "Mutation".into(),
         queries: Default::default(),
@@ -117,36 +117,70 @@ fn register_node_type(
                 // let object_type_info = env.find_type_info(object_def_id);
             }
             SerdeOperator::MapType(_) => {
+                let cardinality = if property.optional {
+                    FieldCardinality::UnitOptional
+                } else {
+                    FieldCardinality::UnitMandatory
+                };
+
                 fields.insert(
                     property_name.clone(),
                     Field {
-                        cardinality: if property.optional {
-                            FieldCardinality::UnitOptional
-                        } else {
-                            FieldCardinality::UnitMandatory
-                        },
+                        cardinality,
                         kind: FieldKind::Node {
-                            value: property.value_operator_id,
+                            node: property.value_operator_id,
                             rel: property.rel_params_operator_id,
                         },
                     },
                 );
             }
-            SerdeOperator::RelationSequence(_sequence_type) => {
-                fields.insert(
-                    property_name.clone(),
-                    Field {
-                        cardinality: if property.optional {
-                            FieldCardinality::ManyOptional
-                        } else {
-                            FieldCardinality::ManyMandatory
-                        },
-                        kind: FieldKind::Node {
-                            value: property.value_operator_id,
-                            rel: property.rel_params_operator_id,
-                        },
-                    },
-                );
+            SerdeOperator::RelationSequence(sequence_type) => {
+                let cardinality = if property.optional {
+                    FieldCardinality::ManyOptional
+                } else {
+                    FieldCardinality::ManyMandatory
+                };
+
+                match classify_type(env, sequence_type.ranges[0].operator_id) {
+                    TypeClassification::Entity(entity_operator_id) => {
+                        domain_data.edges.insert(
+                            (Some(type_info.def_id), entity_operator_id),
+                            EdgeData {
+                                edge_type_name: smart_format!(
+                                    "{typename}{property_name}ConnectionEdge"
+                                ),
+                                connection_type_name: smart_format!(
+                                    "{typename}{property_name}Connection"
+                                ),
+                            },
+                        );
+                        fields.insert(
+                            property_name.clone(),
+                            Field {
+                                cardinality,
+                                kind: FieldKind::EntityRelationship {
+                                    node: entity_operator_id,
+                                    rel: property.rel_params_operator_id,
+                                },
+                            },
+                        );
+                    }
+                    TypeClassification::Node(node_operator_id) => {
+                        fields.insert(
+                            property_name.clone(),
+                            Field {
+                                cardinality,
+                                kind: FieldKind::Node {
+                                    node: node_operator_id,
+                                    rel: property.rel_params_operator_id,
+                                },
+                            },
+                        );
+                    }
+                    TypeClassification::Scalar => {
+                        panic!("Unhandled scalar")
+                    }
+                }
             }
             _ => {
                 fields.insert(
@@ -201,8 +235,8 @@ fn register_node_type(
         );
 
         domain_data.entities.insert(serde_operator_id, data);
-        domain_data.root_edges.insert(
-            serde_operator_id,
+        domain_data.edges.insert(
+            (None, serde_operator_id),
             EdgeData {
                 edge_type_name: smart_format!("{typename}ConnectionEdge"),
                 connection_type_name: smart_format!("{typename}Connection"),
@@ -214,9 +248,44 @@ fn register_node_type(
         serde_operator_id,
         TypeData {
             type_name: typename.clone(),
+            def_id: type_info.def_id,
             input_type_name: smart_format!("{typename}Input"),
             operator_id: serde_operator_id,
             fields,
         },
     );
+}
+
+enum TypeClassification {
+    Entity(SerdeOperatorId),
+    Node(SerdeOperatorId),
+    Scalar,
+}
+
+fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
+    match env.get_serde_operator(operator_id) {
+        SerdeOperator::MapType(map_type) => match env.find_type_info(map_type.def_variant.id()) {
+            Some((_, type_info)) => {
+                if type_info.entity_id.is_some() {
+                    TypeClassification::Entity(operator_id)
+                } else {
+                    TypeClassification::Node(operator_id)
+                }
+            }
+            None => TypeClassification::Scalar,
+        },
+        SerdeOperator::ValueUnionType(union_type) => {
+            for variant in &union_type.variants {
+                match variant.discriminator.discriminant {
+                    Discriminant::MapFallback => {
+                        return classify_type(env, variant.operator_id);
+                    }
+                    _ => {}
+                }
+            }
+
+            TypeClassification::Scalar
+        }
+        _ => TypeClassification::Scalar,
+    }
 }

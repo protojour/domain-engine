@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
+use ontol_runtime::{
+    serde::{SerdeOperator, SerdeOperatorId},
+    DefId,
+};
 
 use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData};
 
@@ -44,7 +47,8 @@ impl DomainAdapter {
     pub fn root_edge_adapter(&self, entity_ref: &EntityRef) -> EdgeAdapter {
         EdgeAdapter {
             domain_data: self.domain_data.clone(),
-            operator_id: entity_ref.type_data.operator_id,
+            subject: None,
+            node_operator_id: entity_ref.type_data.operator_id,
         }
     }
 }
@@ -143,25 +147,32 @@ impl<K: Kind> TypeAdapter<K> {
     }
 
     pub fn type_data(&self) -> &TypeData {
-        self.domain_data.types.get(&self.operator_id).unwrap()
+        self.domain_data
+            .types
+            .get(&self.operator_id)
+            .expect("Type has not been registered")
     }
 }
 
 #[derive(Clone)]
 pub struct EdgeAdapter {
     pub domain_data: Arc<DomainData>,
-    pub operator_id: SerdeOperatorId,
+    pub subject: Option<DefId>,
+    pub node_operator_id: SerdeOperatorId,
 }
 
 impl EdgeAdapter {
     pub fn data(&self) -> &EdgeData {
-        self.domain_data.root_edges.get(&self.operator_id).unwrap()
+        self.domain_data
+            .edges
+            .get(&(self.subject, self.node_operator_id))
+            .expect("No edge data found")
     }
 
     pub fn node_adapter(&self) -> TypeAdapter<NodeKind> {
         TypeAdapter {
             domain_data: self.domain_data.clone(),
-            operator_id: self.operator_id,
+            operator_id: self.node_operator_id,
             _kind: std::marker::PhantomData,
         }
     }

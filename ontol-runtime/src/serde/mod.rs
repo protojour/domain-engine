@@ -132,6 +132,7 @@ pub enum SerdeOperator {
 
 #[derive(Debug)]
 pub struct RelationSequenceType {
+    // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
     pub def_variant: DefVariant,
 }
