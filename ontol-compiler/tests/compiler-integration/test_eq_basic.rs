@@ -216,13 +216,13 @@ fn test_eq_complex_flow() {
         );
 
         // FIXME: Property probe does not make completely sense for this translation:
-        let domain = env.get_domain(&TEST_PKG).unwrap();
+        let domain = env.find_domain(&TEST_PKG).unwrap();
         let mut property_probe = PropertyProbe::new(&env.lib);
         let property_map = property_probe
             .probe_from_serde_operator(
                 &env,
-                domain.types.get("one").unwrap(),
-                domain.types.get("two").unwrap(),
+                domain.type_info(*domain.type_names.get("one").unwrap()),
+                domain.type_info(*domain.type_names.get("two").unwrap()),
             )
             .unwrap();
         println!("{property_map:?}");

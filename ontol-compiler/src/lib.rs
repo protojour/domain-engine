@@ -8,7 +8,6 @@ use error::{CompileError, ParseError, UnifiedCompileError};
 pub use error::*;
 use expr::{Expr, ExprId};
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
@@ -21,7 +20,6 @@ use ontol_runtime::{
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use relation::Relations;
-use smartstring::alias::String;
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
@@ -168,7 +166,7 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids {
-            let mut types: IndexMap<String, TypeInfo> = Default::default();
+            let mut domain = Domain::default();
 
             let type_namespace = namespaces.remove(&package_id).unwrap().types;
 
@@ -188,10 +186,11 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
-                types.insert(
-                    type_name,
+                domain.add_type(
+                    type_name.clone(),
                     TypeInfo {
                         def_id: type_def_id,
+                        name: type_name.clone(),
                         entity_id,
                         serde_operator_id: serde_generator
                             .get_serde_operator_id(SerdeKey::identity(type_def_id)),
@@ -199,7 +198,7 @@ impl<'m> Compiler<'m> {
                 );
             }
 
-            out_domains.insert(package_id, Domain { types });
+            out_domains.insert(package_id, domain);
         }
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();

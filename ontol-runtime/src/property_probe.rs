@@ -31,7 +31,7 @@ impl<'l> PropertyProbe<'l> {
         destination: &TypeInfo,
     ) -> Option<HashMap<PropertyId, HashSet<PropertyId>>> {
         let dest_serde_operator_id = destination.serde_operator_id?;
-        let serde_operator = &env.serde_operators[dest_serde_operator_id.0 as usize];
+        let serde_operator = &env.get_serde_operator(dest_serde_operator_id);
 
         let translation_proc = env.translations.get(&(destination.def_id, origin.def_id))?;
 

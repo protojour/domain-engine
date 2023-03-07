@@ -25,7 +25,7 @@ pub fn adapt_domain(
     package_id: PackageId,
 ) -> Result<DomainAdapter, SchemaBuildError> {
     let domain = env
-        .get_domain(&package_id)
+        .find_domain(&package_id)
         .ok_or(SchemaBuildError::UnknownPackage)?;
 
     let mut domain_data = DomainData {
@@ -41,11 +41,13 @@ pub fn adapt_domain(
         mutations: Default::default(),
     };
 
-    for (type_name, type_info) in &domain.types {
-        if let Some(operator_id) = type_info.serde_operator_id {
-            debug!("type `{type_name}`");
+    for (_, def_id) in &domain.type_names {
+        let type_info = domain.type_info(*def_id);
 
-            adapt_type(&env, &mut domain_data, type_name, type_info, operator_id);
+        if let Some(operator_id) = type_info.serde_operator_id {
+            debug!("type `{}`", type_info.name);
+
+            adapt_type(&env, &mut domain_data, type_info, operator_id);
         }
     }
 
@@ -57,20 +59,12 @@ pub fn adapt_domain(
 fn adapt_type(
     env: &Env,
     domain_data: &mut DomainData,
-    type_name: &String,
     type_info: &TypeInfo,
     operator_id: SerdeOperatorId,
 ) {
     match env.get_serde_operator(operator_id) {
         SerdeOperator::MapType(map_type) => {
-            adapt_node_type(
-                env,
-                domain_data,
-                type_name,
-                type_info,
-                operator_id,
-                map_type,
-            );
+            adapt_node_type(env, domain_data, type_info, operator_id, map_type);
         }
         SerdeOperator::ValueUnionType(value_union_type) => {
             let mut found_id = None;
@@ -90,13 +84,7 @@ fn adapt_type(
             match (found_id, found_map_fallback) {
                 (Some(_id), Some(map_fallback)) => {
                     debug!("found _id and map fallback");
-                    adapt_type(
-                        env,
-                        domain_data,
-                        type_name,
-                        type_info,
-                        map_fallback.operator_id,
-                    )
+                    adapt_type(env, domain_data, type_info, map_fallback.operator_id)
                 }
                 _ => {
                     let mut variant_operator_ids = vec![];
@@ -113,12 +101,12 @@ fn adapt_type(
                         }
                     }
 
-                    debug!("created a union for `{type_name}`: {operator_id:?} variants={variant_operator_ids:?}");
+                    debug!("created a union for `{type_name}`: {operator_id:?} variants={variant_operator_ids:?}", type_name = type_info.name);
 
                     domain_data.unions.insert(
                         operator_id,
                         UnionData {
-                            type_name: type_name.clone(),
+                            type_name: type_info.name.clone(),
                             operator_id,
                             variants: variant_operator_ids,
                         },
@@ -135,21 +123,19 @@ fn adapt_type(
 fn adapt_node_type(
     _env: &Env,
     domain_data: &mut DomainData,
-    type_name: &String,
     type_info: &TypeInfo,
     serde_operator_id: SerdeOperatorId,
     map_type: &MapType,
 ) {
     let env = domain_data.env.as_ref();
+    let type_name = &type_info.name;
 
     debug!("node type `{type_name}` {type_info:?}");
 
     let mut fields: IndexMap<String, Field> = Default::default();
 
     if let Some(entity_id) = type_info.entity_id {
-        let (_, id_type_info) = env
-            .find_type_info(entity_id)
-            .expect("Id definition not found");
+        let id_type_info = env.get_type_info(entity_id);
         let id_operator_id = id_type_info.serde_operator_id.expect("No id_operator_id");
 
         fields.insert(
@@ -320,16 +306,14 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
     // debug!("    classify operator: {operator:?}");
 
     match operator {
-        SerdeOperator::MapType(map_type) => match env.find_type_info(map_type.def_variant.id()) {
-            Some((_, type_info)) => {
-                if type_info.entity_id.is_some() {
-                    TypeClassification::Entity(operator_id)
-                } else {
-                    TypeClassification::Node(operator_id)
-                }
+        SerdeOperator::MapType(map_type) => {
+            let type_info = env.get_type_info(map_type.def_variant.id());
+            if type_info.entity_id.is_some() {
+                TypeClassification::Entity(operator_id)
+            } else {
+                TypeClassification::Node(operator_id)
             }
-            None => TypeClassification::Scalar,
-        },
+        }
         SerdeOperator::ValueUnionType(union_type) => {
             for variant in &union_type.variants {
                 if variant.discriminator.discriminant == Discriminant::MapFallback {

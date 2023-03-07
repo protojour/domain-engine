@@ -28,12 +28,12 @@ pub struct TypeBinding<'e> {
 
 impl<'e> TypeBinding<'e> {
     pub fn new(env: &'e Env, type_name: &str) -> Self {
-        let domain = env.get_domain(&TEST_PKG).unwrap();
-        let type_info = domain
-            .types
+        let domain = env.find_domain(&TEST_PKG).unwrap();
+        let def_id = domain
+            .type_names
             .get(type_name)
-            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"))
-            .clone();
+            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"));
+        let type_info = domain.type_info(*def_id).clone();
 
         debug!(
             "TypeBinding::new `{type_name}` with {operator_id:?} {processor:?}",

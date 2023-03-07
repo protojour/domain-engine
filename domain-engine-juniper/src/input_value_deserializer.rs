@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use juniper::{InputValue, Spanning};
 use ontol_runtime::smart_format;
-use serde::de;
-use serde::de::IntoDeserializer;
+use serde::de::{self, IntoDeserializer};
 
 use crate::gql_scalar::GqlScalar;
 

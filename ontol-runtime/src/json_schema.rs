@@ -22,7 +22,8 @@ pub fn build_openapi_schemas<'e>(
 ) -> OpenApiSchemas<'e> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    for (_, type_info) in &domain.types {
+    for (_, def_id) in &domain.type_names {
+        let type_info = domain.type_info(*def_id);
         if let Some(operator_id) = &type_info.serde_operator_id {
             graph_builder.visit(*operator_id, env);
         }
