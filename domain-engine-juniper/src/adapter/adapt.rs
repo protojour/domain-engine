@@ -110,6 +110,60 @@ fn register_node_type(
 
     let mut fields: IndexMap<String, Field> = Default::default();
 
+    if let Some(entity_id) = type_info.entity_id {
+        let (_, id_type_info) = env
+            .find_type_info(entity_id)
+            .expect("Id definition not found");
+        let id_operator_id = id_type_info.serde_operator_id.expect("No id_operator_id");
+
+        fields.insert(
+            "_id".into(),
+            Field {
+                cardinality: FieldCardinality::UnitMandatory,
+                kind: FieldKind::Scalar(id_operator_id),
+            },
+        );
+
+        let data = EntityData {
+            def_id: type_info.def_id,
+            id_operator_id,
+            query_field_name: smart_format!("{typename}List"),
+            create_mutation_field_name: smart_format!("create{typename}"),
+            update_mutation_field_name: smart_format!("update{typename}"),
+            delete_mutation_field_name: smart_format!("delete{typename}"),
+        };
+
+        domain_data
+            .queries
+            .insert(data.query_field_name.clone(), serde_operator_id);
+        domain_data.mutations.insert(
+            data.create_mutation_field_name.clone(),
+            MutationKind::Create {
+                input_operator_id: serde_operator_id,
+            },
+        );
+        domain_data.mutations.insert(
+            data.update_mutation_field_name.clone(),
+            MutationKind::Update {
+                id_operator_id,
+                input_operator_id: serde_operator_id, // BUG: Partial input
+            },
+        );
+        domain_data.mutations.insert(
+            data.delete_mutation_field_name.clone(),
+            MutationKind::Delete { id_operator_id },
+        );
+
+        domain_data.entities.insert(serde_operator_id, data);
+        domain_data.edges.insert(
+            (None, serde_operator_id),
+            EdgeData {
+                edge_type_name: smart_format!("{typename}ConnectionEdge"),
+                connection_type_name: smart_format!("{typename}Connection"),
+            },
+        );
+    }
+
     for (property_name, property) in &map_type.properties {
         match env.get_serde_operator(property.value_operator_id) {
             SerdeOperator::ValueUnionType(_) => {
@@ -196,52 +250,6 @@ fn register_node_type(
                 );
             }
         }
-    }
-
-    if let Some(entity_id) = type_info.entity_id {
-        let (_, id_type_info) = env
-            .find_type_info(entity_id)
-            .expect("Id definition not found");
-        let id_operator_id = id_type_info.serde_operator_id.expect("No id_operator_id");
-
-        let data = EntityData {
-            def_id: type_info.def_id,
-            id_operator_id,
-            query_field_name: smart_format!("{typename}List"),
-            create_mutation_field_name: smart_format!("create{typename}"),
-            update_mutation_field_name: smart_format!("update{typename}"),
-            delete_mutation_field_name: smart_format!("delete{typename}"),
-        };
-
-        domain_data
-            .queries
-            .insert(data.query_field_name.clone(), serde_operator_id);
-        domain_data.mutations.insert(
-            data.create_mutation_field_name.clone(),
-            MutationKind::Create {
-                input_operator_id: serde_operator_id,
-            },
-        );
-        domain_data.mutations.insert(
-            data.update_mutation_field_name.clone(),
-            MutationKind::Update {
-                id_operator_id,
-                input_operator_id: serde_operator_id, // BUG: Partial input
-            },
-        );
-        domain_data.mutations.insert(
-            data.delete_mutation_field_name.clone(),
-            MutationKind::Delete { id_operator_id },
-        );
-
-        domain_data.entities.insert(serde_operator_id, data);
-        domain_data.edges.insert(
-            (None, serde_operator_id),
-            EdgeData {
-                edge_type_name: smart_format!("{typename}ConnectionEdge"),
-                connection_type_name: smart_format!("{typename}Connection"),
-            },
-        );
     }
 
     domain_data.types.insert(

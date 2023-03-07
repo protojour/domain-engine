@@ -69,6 +69,64 @@ async fn test_artist_and_instrument_connections() {
             artistList {
                 edges {
                     node {
+                        _id
+                        plays {
+                            edges {
+                                node {
+                                    _id
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
+        graphql_value!({
+            "artistList": None,
+        }),
+    );
+
+    assert_eq!(
+        "{
+            instrumentList {
+                edges {
+                    node {
+                        _id
+                        name
+                        played_by {
+                            edges {
+                                node {
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"
+        .exec(&schema)
+        .await
+        .unwrap(),
+        graphql_value!({
+            "instrumentList": None,
+        }),
+    );
+}
+
+#[test(tokio::test)]
+#[ignore = "unions"]
+async fn test_guitar_synth_union_connections() {
+    let schema = _GUITAR_SYNTH_UNION.compile_schema();
+
+    assert_eq!(
+        "{
+            artistList {
+                edges {
+                    node {
                         plays {
                             edges {
                                 node {
