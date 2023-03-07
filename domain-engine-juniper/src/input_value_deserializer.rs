@@ -5,7 +5,7 @@ use serde::de::IntoDeserializer;
 use crate::gql_scalar::GqlScalar;
 
 pub struct InputValueDeserializer<'v, E> {
-    pub value: &'v juniper::InputValue<GqlScalar>,
+    pub value: &'v Spanning<juniper::InputValue<GqlScalar>>,
     pub error: std::marker::PhantomData<fn() -> E>,
 }
 
@@ -13,7 +13,7 @@ impl<'v, 'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<'v,
     type Error = E;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        match self.value {
+        match &self.value.item {
             InputValue::Null => visitor.visit_none(),
             InputValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(*value),
             InputValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
@@ -101,7 +101,7 @@ where
             Some(value) => {
                 self.count += 1;
                 seed.deserialize(InputValueDeserializer {
-                    value: &value.item,
+                    value,
                     error: std::marker::PhantomData,
                 })
                 .map(Some)
@@ -168,7 +168,7 @@ where
     {
         match std::mem::take(&mut self.state) {
             MapState::NextValue(value) => seed.deserialize(InputValueDeserializer {
-                value: &value.item,
+                value,
                 error: std::marker::PhantomData,
             }),
             MapState::NextKey => panic!("should call next_key"),
