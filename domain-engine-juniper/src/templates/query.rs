@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     adapter::DomainAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
     type_info::GraphqlTypeName, GqlContext,
@@ -10,7 +8,7 @@ use super::connection::{Connection, ConnectionTypeInfo};
 pub struct Query;
 
 #[derive(Clone)]
-pub struct QueryTypeInfo(pub Arc<DomainAdapter>);
+pub struct QueryTypeInfo(pub DomainAdapter);
 
 impl GraphqlTypeName for QueryTypeInfo {
     fn graphql_type_name(&self) -> &str {
@@ -34,10 +32,14 @@ impl juniper::GraphQLType<GqlScalar> for Query {
     {
         let fields: Vec<_> = info
             .0
-            .iter_entities()
-            .map(|entity_ref| {
+            .domain_data
+            .queries
+            .iter()
+            .map(|(name, operator_id)| {
+                let entity_ref = info.0.entity_ref(*operator_id);
+
                 registry.field_convert::<Option<Connection>, _, GqlContext>(
-                    &entity_ref.entity_data.query_field_name,
+                    name,
                     &ConnectionTypeInfo(info.0.root_edge_adapter(&entity_ref)),
                 )
                 // .argument(registry.arg::<Option<i32>>("skip", &()))

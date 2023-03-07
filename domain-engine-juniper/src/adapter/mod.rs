@@ -17,16 +17,14 @@ pub struct DomainAdapter {
 }
 
 impl DomainAdapter {
-    pub fn iter_entities(&self) -> impl Iterator<Item = EntityRef> {
-        self.domain_data.entities.keys().map(|def_id| {
-            let entity_data = &self.domain_data.entities.get(def_id).unwrap();
-            let type_data = &self.domain_data.types.get(def_id).unwrap();
+    pub fn entity_ref(&self, entity_id: SerdeOperatorId) -> EntityRef {
+        let entity_data = &self.domain_data.entities.get(&entity_id).unwrap();
+        let type_data = &self.domain_data.types.get(&entity_id).unwrap();
 
-            EntityRef {
-                entity_data,
-                type_data,
-            }
-        })
+        EntityRef {
+            entity_data,
+            type_data,
+        }
     }
 
     pub fn node_adapter(&self, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {

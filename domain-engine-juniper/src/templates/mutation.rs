@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use tracing::debug;
 
 use crate::{
@@ -16,7 +14,7 @@ use super::node::{Node, NodeTypeInfo};
 pub struct Mutation;
 
 #[derive(Clone)]
-pub struct MutationTypeInfo(pub Arc<DomainAdapter>);
+pub struct MutationTypeInfo(pub DomainAdapter);
 
 impl GraphqlTypeName for MutationTypeInfo {
     fn graphql_type_name(&self) -> &str {
@@ -44,68 +42,46 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
 
         let fields: Vec<_> = info
             .0
-            .iter_entities()
-            .flat_map(|entity_ref| {
-                let input_operator_id = entity_ref.type_data.operator_id;
-                let id_operator_id = entity_ref.entity_data.id_operator_id;
-                let type_name = entity_ref.type_data.type_name.as_str();
+            .domain_data
+            .mutations
+            .iter()
+            .map(|(name, mutation_data)| {
+                let entity_ref = domain_adapter.entity_ref(mutation_data.entity_operator_id);
+                let type_name = &entity_ref.type_data.type_name;
 
-                [
-                    // CREATE
-                    registry
+                match mutation_data.kind {
+                    MutationKind::Create { input } => registry
                         .field_convert::<Node, _, GqlContext>(
-                            &entity_ref.entity_data.create_mutation_field_name,
+                            name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument(
-                                "input",
-                                input_operator_id,
-                                &domain_adapter,
-                                registry,
-                            )
-                            .description(&format!("Input data for new {type_name}")),
+                            register_domain_argument("input", input, &domain_adapter, registry)
+                                .description(&format!("Input data for new {type_name}")),
                         ),
-                    // UPDATE
-                    registry
+                    MutationKind::Update { input, id } => registry
                         .field_convert::<Node, _, GqlContext>(
-                            &entity_ref.entity_data.update_mutation_field_name,
+                            name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument(
-                                "_id",
-                                id_operator_id,
-                                &domain_adapter,
-                                registry,
-                            )
-                            .description(&format!("Identifier for the {type_name} object")),
+                            register_domain_argument("_id", id, &domain_adapter, registry)
+                                .description(&format!("Identifier for the {type_name} object")),
                         )
                         .argument(
-                            register_domain_argument(
-                                "input",
-                                input_operator_id,
-                                &domain_adapter,
-                                registry,
-                            )
-                            .description(&format!("Input data for the {type_name} update")),
+                            register_domain_argument("input", input, &domain_adapter, registry)
+                                .description(&format!("Input data for the {type_name} update")),
                         ),
-                    // DELETE
-                    registry
+                    MutationKind::Delete { id } => registry
                         .field_convert::<Node, _, GqlContext>(
-                            &entity_ref.entity_data.delete_mutation_field_name,
+                            name,
                             &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
                         )
                         .argument(
-                            register_domain_argument(
-                                "_id",
-                                id_operator_id,
-                                &domain_adapter,
-                                registry,
-                            )
-                            .description(&format!("Identifier for the {type_name} object")),
+                            register_domain_argument("_id", id, &domain_adapter, registry)
+                                .description(&format!("Identifier for the {type_name} object")),
                         ),
-                ]
+                }
             })
             .collect();
 
@@ -125,32 +101,27 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
             let env = info.0.domain_data.env.as_ref();
-            let mutation_kind = info
+            let mutation_data = info
                 .0
                 .domain_data
                 .mutations
                 .get(field_name)
                 .expect("No such field");
 
-            match mutation_kind {
-                MutationKind::Create { input_operator_id } => {
-                    let input_value =
-                        deserialize_argument(arguments, "input", *input_operator_id, env)?;
+            match mutation_data.kind {
+                MutationKind::Create { input } => {
+                    let input_value = deserialize_argument(arguments, "input", input, env)?;
 
                     debug!("CREATE {input_value:?}");
                 }
-                MutationKind::Update {
-                    id_operator_id,
-                    input_operator_id,
-                } => {
-                    let id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
-                    let input_value =
-                        deserialize_argument(arguments, "input", *input_operator_id, env)?;
+                MutationKind::Update { id, input } => {
+                    let id_value = deserialize_argument(arguments, "_id", id, env)?;
+                    let input_value = deserialize_argument(arguments, "input", input, env)?;
 
                     debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
-                MutationKind::Delete { id_operator_id } => {
-                    let id_value = deserialize_argument(arguments, "_id", *id_operator_id, env)?;
+                MutationKind::Delete { id } => {
+                    let id_value = deserialize_argument(arguments, "_id", id, env)?;
                     debug!("DELETE {id_value:?}");
                 }
             };

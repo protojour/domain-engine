@@ -18,29 +18,31 @@ pub struct DomainData {
     pub mutation_type_name: String,
 
     pub queries: IndexMap<String, SerdeOperatorId>,
-    pub mutations: IndexMap<String, MutationKind>,
+    pub mutations: IndexMap<String, MutationData>,
 }
 
+pub struct MutationData {
+    pub entity_operator_id: SerdeOperatorId,
+    pub kind: MutationKind,
+}
+
+#[derive(Clone, Copy)]
 pub enum MutationKind {
     Create {
-        input_operator_id: SerdeOperatorId,
+        input: SerdeOperatorId,
     },
     Update {
-        id_operator_id: SerdeOperatorId,
-        input_operator_id: SerdeOperatorId,
+        id: SerdeOperatorId,
+        input: SerdeOperatorId,
     },
     Delete {
-        id_operator_id: SerdeOperatorId,
+        id: SerdeOperatorId,
     },
 }
 
 pub struct EntityData {
     pub def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
-    pub query_field_name: String,
-    pub create_mutation_field_name: String,
-    pub update_mutation_field_name: String,
-    pub delete_mutation_field_name: String,
 }
 
 pub struct TypeData {

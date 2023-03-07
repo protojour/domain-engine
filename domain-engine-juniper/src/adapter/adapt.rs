@@ -12,8 +12,8 @@ use tracing::debug;
 
 use crate::{
     adapter::data::{
-        DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, MutationKind,
-        TypeData, UnionData,
+        DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, MutationData,
+        MutationKind, TypeData, UnionData,
     },
     SchemaBuildError,
 };
@@ -149,31 +149,37 @@ fn adapt_node_type(
         let data = EntityData {
             def_id: type_info.def_id,
             id_operator_id,
-            query_field_name: smart_format!("{type_name}List"),
-            create_mutation_field_name: smart_format!("create{type_name}"),
-            update_mutation_field_name: smart_format!("update{type_name}"),
-            delete_mutation_field_name: smart_format!("delete{type_name}"),
         };
 
         domain_data
             .queries
-            .insert(data.query_field_name.clone(), serde_operator_id);
+            .insert(smart_format!("{type_name}List"), serde_operator_id);
+
         domain_data.mutations.insert(
-            data.create_mutation_field_name.clone(),
-            MutationKind::Create {
-                input_operator_id: serde_operator_id,
+            smart_format!("create{type_name}"),
+            MutationData {
+                entity_operator_id: serde_operator_id,
+                kind: MutationKind::Create {
+                    input: serde_operator_id,
+                },
             },
         );
         domain_data.mutations.insert(
-            data.update_mutation_field_name.clone(),
-            MutationKind::Update {
-                id_operator_id,
-                input_operator_id: serde_operator_id, // BUG: Partial input
+            smart_format!("update{type_name}"),
+            MutationData {
+                entity_operator_id: serde_operator_id,
+                kind: MutationKind::Update {
+                    id: id_operator_id,
+                    input: serde_operator_id, // BUG: Partial input
+                },
             },
         );
         domain_data.mutations.insert(
-            data.delete_mutation_field_name.clone(),
-            MutationKind::Delete { id_operator_id },
+            smart_format!("delete{type_name}"),
+            MutationData {
+                entity_operator_id: serde_operator_id,
+                kind: MutationKind::Delete { id: id_operator_id },
+            },
         );
 
         domain_data.entities.insert(serde_operator_id, data);
