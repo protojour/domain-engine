@@ -1,6 +1,6 @@
 use crate::{
-    adapter::EdgeAdapter, field::domain_field, gql_scalar::GqlScalar, macros::impl_graphql_value,
-    type_info::GraphqlTypeName,
+    adapter::EdgeAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
+    registry_utils::domain_field, type_info::GraphqlTypeName,
 };
 
 pub struct Edge;

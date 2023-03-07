@@ -99,22 +99,30 @@ fn adapt_type(
                     )
                 }
                 _ => {
-                    let mut variant_operators = vec![];
+                    let mut variant_operator_ids = vec![];
 
                     for variant in &value_union_type.variants {
-                        variant_operators.push(variant.operator_id);
+                        match classify_type(env, variant.operator_id) {
+                            TypeClassification::Entity(id) | TypeClassification::Node(id) => {
+                                variant_operator_ids.push(id);
+                            }
+                            TypeClassification::Id => {}
+                            TypeClassification::Scalar => {
+                                panic!("BUG: Scalar in union");
+                            }
+                        }
                     }
+
+                    debug!("created a union for `{type_name}`: {operator_id:?} variants={variant_operator_ids:?}");
 
                     domain_data.unions.insert(
                         operator_id,
                         UnionData {
                             type_name: type_name.clone(),
                             operator_id,
-                            variants: variant_operators,
+                            variants: variant_operator_ids,
                         },
                     );
-
-                    debug!("created a union for `{type_name}`");
                 }
             }
         }

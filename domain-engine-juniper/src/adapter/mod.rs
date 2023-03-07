@@ -4,6 +4,7 @@ use ontol_runtime::{
     serde::{SerdeOperator, SerdeOperatorId},
     DefId,
 };
+use tracing::debug;
 
 use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionData};
 
@@ -77,10 +78,14 @@ impl Kind for DynamicKind {
     type DataRef<'d> = DynamicRef<'d>;
 
     fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_> {
+        debug!("dynamic get_data_ref {operator_id:?}");
         if let Some(union_data) = domain_data.unions.get(&operator_id) {
             DynamicRef::Union(UnionRef { union_data })
         } else {
-            let type_data = domain_data.types.get(&operator_id).unwrap();
+            let type_data = domain_data
+                .types
+                .get(&operator_id)
+                .expect("BUG: Type data for non-union not found");
 
             if let Some(entity_data) = domain_data.entities.get(&operator_id) {
                 DynamicRef::Entity(EntityRef {

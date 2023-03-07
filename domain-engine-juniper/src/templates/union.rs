@@ -1,4 +1,10 @@
-use crate::{adapter::UnionAdapter, gql_scalar::GqlScalar, type_info::GraphqlTypeName, GqlContext};
+use crate::{
+    adapter::{TypeAdapter, UnionAdapter},
+    gql_scalar::GqlScalar,
+    registry_utils::get_domain_type,
+    type_info::GraphqlTypeName,
+    GqlContext,
+};
 
 pub struct Union;
 
@@ -45,10 +51,23 @@ impl juniper::GraphQLType<GqlScalar> for Union {
     where
         GqlScalar: 'r,
     {
-        let _env = info.0.domain_data.env.as_ref();
-        let _node_ref = info.0.data();
+        let types = info
+            .0
+            .data()
+            .variants
+            .iter()
+            .map(|variant_operator_id| {
+                get_domain_type(
+                    TypeAdapter {
+                        domain_data: info.0.domain_data.clone(),
+                        operator_id: *variant_operator_id,
+                        _kind: std::marker::PhantomData,
+                    },
+                    registry,
+                )
+            })
+            .collect::<Vec<_>>();
 
-        let types = [];
         registry.build_union_type::<Self>(info, &types).into_meta()
     }
 }
