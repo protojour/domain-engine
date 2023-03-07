@@ -1,20 +1,59 @@
+use std::fmt::Display;
+
+use juniper::parser::SourcePosition;
 use juniper::{InputValue, Spanning};
+use ontol_runtime::smart_format;
 use serde::de;
 use serde::de::IntoDeserializer;
 
 use crate::gql_scalar::GqlScalar;
 
-pub struct InputValueDeserializer<'v, E> {
-    pub value: &'v Spanning<juniper::InputValue<GqlScalar>>,
-    pub error: std::marker::PhantomData<fn() -> E>,
+#[derive(Debug)]
+pub struct Error {
+    msg: smartstring::alias::String,
+    start: SourcePosition,
 }
 
-impl<'v, 'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<'v, E> {
-    type Error = E;
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} in input at line {} column {}",
+            self.msg,
+            self.start.line(),
+            self.start.column()
+        )
+    }
+}
+
+impl de::StdError for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+impl de::Error for Error {
+    fn custom<T>(msg: T) -> Self
+    where
+        T: std::fmt::Display,
+    {
+        Self {
+            msg: smart_format!("{}", msg),
+            start: SourcePosition::new_origin(),
+        }
+    }
+}
+
+pub struct InputValueDeserializer<'v> {
+    pub value: &'v Spanning<juniper::InputValue<GqlScalar>>,
+}
+
+impl<'v, 'de> de::Deserializer<'de> for InputValueDeserializer<'v> {
+    type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        match &self.value.item {
-            InputValue::Null => visitor.visit_none(),
+        let result = match &self.value.item {
+            InputValue::Null => visitor.visit_none::<Error>(),
             InputValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(*value),
             InputValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
             InputValue::Scalar(GqlScalar::Bool(value)) => visitor.visit_bool(*value),
@@ -25,42 +64,60 @@ impl<'v, 'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<'v,
                 &"variable",
             )),
             InputValue::List(vec) => {
-                visitor.visit_seq(SeqDeserializer::<E, _>::new(vec.into_iter()))
+                let mut iterator = vec.into_iter().fuse();
+                let value = visitor.visit_seq(SeqDeserializer::<_>::new(&mut iterator))?;
+                match iterator.next() {
+                    Some(item) => Err(Error {
+                        msg: "trailing characters".into(),
+                        start: item.start,
+                    }),
+                    None => Ok(value),
+                }
             }
             InputValue::Object(vec) => {
-                visitor.visit_map(MapDeserializer::<E, _>::new(vec.into_iter()))
+                let mut iterator = vec.into_iter().fuse();
+                let value = visitor.visit_map(MapDeserializer::<_>::new(&mut iterator))?;
+                match iterator.next() {
+                    Some((key, _)) => Err(Error {
+                        msg: "trailing characters".into(),
+                        start: key.start,
+                    }),
+                    None => Ok(value),
+                }
+            }
+        };
+
+        match result {
+            Ok(value) => Ok(value),
+            Err(mut error) => {
+                if error.start.line() == 0 {
+                    error.start = self.value.start;
+                }
+
+                Err(error)
             }
         }
     }
 
-    fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+    fn deserialize_option<V: de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+        unimplemented!()
     }
 
-    fn deserialize_newtype_struct<V>(
+    fn deserialize_newtype_struct<V: de::Visitor<'de>>(
         self,
         _name: &'static str,
         _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+    ) -> Result<V::Value, Self::Error> {
+        unimplemented!()
     }
 
-    fn deserialize_enum<V>(
+    fn deserialize_enum<V: de::Visitor<'de>>(
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
         _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+    ) -> Result<V::Value, Self::Error> {
+        unimplemented!()
     }
 
     serde::forward_to_deserialize_any!(
@@ -70,28 +127,22 @@ impl<'v, 'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<'v,
     );
 }
 
-struct SeqDeserializer<E, I> {
-    iter: std::iter::Fuse<I>,
+struct SeqDeserializer<'i, I> {
+    iter: &'i mut std::iter::Fuse<I>,
     count: usize,
-    error: std::marker::PhantomData<fn() -> E>,
 }
 
-impl<E, I: Iterator> SeqDeserializer<E, I> {
-    fn new(iterator: I) -> Self {
-        Self {
-            iter: iterator.fuse(),
-            count: 0,
-            error: std::marker::PhantomData,
-        }
+impl<'i, I: Iterator> SeqDeserializer<'i, I> {
+    fn new(iter: &'i mut std::iter::Fuse<I>) -> Self {
+        Self { iter, count: 0 }
     }
 }
 
-impl<'v, 'de, E: de::Error, I> de::SeqAccess<'de> for SeqDeserializer<E, I>
+impl<'v, 'i, 'de, I> de::SeqAccess<'de> for SeqDeserializer<'i, I>
 where
-    E: de::Error,
     I: Iterator<Item = &'v Spanning<juniper::InputValue<GqlScalar>>>,
 {
-    type Error = E;
+    type Error = Error;
 
     fn next_element_seed<V>(&mut self, seed: V) -> Result<Option<V::Value>, Self::Error>
     where
@@ -100,11 +151,7 @@ where
         match self.iter.next() {
             Some(value) => {
                 self.count += 1;
-                seed.deserialize(InputValueDeserializer {
-                    value,
-                    error: std::marker::PhantomData,
-                })
-                .map(Some)
+                seed.deserialize(InputValueDeserializer { value }).map(Some)
             }
             None => Ok(None),
         }
@@ -115,11 +162,10 @@ where
     }
 }
 
-struct MapDeserializer<'v, E, I> {
-    iter: std::iter::Fuse<I>,
+struct MapDeserializer<'v, 'i, I> {
+    iter: &'i mut std::iter::Fuse<I>,
     state: MapState<'v>,
     _count: usize,
-    error: std::marker::PhantomData<fn() -> E>,
 }
 
 #[derive(Default)]
@@ -129,23 +175,21 @@ enum MapState<'v> {
     NextValue(&'v Spanning<juniper::InputValue<GqlScalar>>),
 }
 
-impl<'v, E, I: Iterator> MapDeserializer<'v, E, I> {
-    fn new(iterator: I) -> Self {
+impl<'v, 'i, I: Iterator> MapDeserializer<'v, 'i, I> {
+    fn new(iter: &'i mut std::iter::Fuse<I>) -> Self {
         Self {
-            iter: iterator.fuse(),
+            iter,
             state: MapState::NextKey,
             _count: 0,
-            error: std::marker::PhantomData,
         }
     }
 }
 
-impl<'v, 'de, E: de::Error, I> de::MapAccess<'de> for MapDeserializer<'v, E, I>
+impl<'v, 'i, 'de, I> de::MapAccess<'de> for MapDeserializer<'v, 'i, I>
 where
-    E: de::Error,
     I: Iterator<Item = &'v (Spanning<String>, Spanning<juniper::InputValue<GqlScalar>>)>,
 {
-    type Error = E;
+    type Error = Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -167,10 +211,7 @@ where
         V: de::DeserializeSeed<'de>,
     {
         match std::mem::take(&mut self.state) {
-            MapState::NextValue(value) => seed.deserialize(InputValueDeserializer {
-                value,
-                error: std::marker::PhantomData,
-            }),
+            MapState::NextValue(value) => seed.deserialize(InputValueDeserializer { value }),
             MapState::NextKey => panic!("should call next_key"),
         }
     }

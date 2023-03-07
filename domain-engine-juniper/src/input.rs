@@ -67,9 +67,6 @@ pub fn deserialize_argument(
     debug!("deserializing {:?}", value);
 
     env.new_serde_processor(operator_id, None)
-        .deserialize(InputValueDeserializer::<serde_json::Error> {
-            value,
-            error: std::marker::PhantomData,
-        })
-        .map_err(|json_error| juniper::FieldError::new(json_error, graphql_value!(None)))
+        .deserialize(InputValueDeserializer { value })
+        .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
 }

@@ -15,17 +15,17 @@ async fn test_input_deserialization_error() {
 
     assert_error_msg!(
         r#"
-        mutation {
-            createfoo(
-                input: {
-                    prop: "invalid"
-                }
-            ) {
-                prop
-            }
-        }"#
+mutation {
+    createfoo(
+        input: {
+            prop: "invalid"
+        }
+    ) {
+        prop
+    }
+}"#
         .exec(&schema)
         .await,
-        r#"Execution: invalid type: string "invalid", expected "const" (at line 2 column 12)"#
+        r#"Execution: invalid type: string "invalid", expected "const" in input at line 4 column 18 (field at line 2 column 4)"#
     );
 }

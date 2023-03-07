@@ -38,7 +38,7 @@ impl Display for TestError {
 
                     write!(
                         f,
-                        "{message} (at line {} column {})",
+                        "{message} (field at line {} column {})",
                         pos.line(),
                         pos.column()
                     )?;
