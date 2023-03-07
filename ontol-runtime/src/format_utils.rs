@@ -78,10 +78,10 @@ where
 /// Macro for formatting into a SmartString instead of a std::String
 #[macro_export]
 macro_rules! smart_format {
-    ($fmt:expr $(,$args:expr)*) => {{
+    ($($arg:tt)*) => {{
         use std::fmt::Write;
         let mut buf = ::smartstring::alias::String::new();
-        write!(&mut buf, $fmt $(,$args)*).unwrap();
+        buf.write_fmt(std::format_args!($($arg)*)).unwrap();
         buf
     }};
 }

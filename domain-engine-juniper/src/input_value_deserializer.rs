@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use juniper::parser::SourcePosition;
 use juniper::{InputValue, Spanning};
 use ontol_runtime::smart_format;
 use serde::de;
@@ -11,7 +10,7 @@ use crate::gql_scalar::GqlScalar;
 #[derive(Debug)]
 pub struct Error {
     msg: smartstring::alias::String,
-    start: SourcePosition,
+    start: juniper::parser::SourcePosition,
 }
 
 impl Display for Error {
@@ -26,11 +25,7 @@ impl Display for Error {
     }
 }
 
-impl de::StdError for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+impl de::StdError for Error {}
 
 impl de::Error for Error {
     fn custom<T>(msg: T) -> Self
@@ -39,7 +34,7 @@ impl de::Error for Error {
     {
         Self {
             msg: smart_format!("{}", msg),
-            start: SourcePosition::new_origin(),
+            start: juniper::parser::SourcePosition::new_origin(),
         }
     }
 }

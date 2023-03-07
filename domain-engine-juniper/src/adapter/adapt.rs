@@ -284,11 +284,8 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
         },
         SerdeOperator::ValueUnionType(union_type) => {
             for variant in &union_type.variants {
-                match variant.discriminator.discriminant {
-                    Discriminant::MapFallback => {
-                        return classify_type(env, variant.operator_id);
-                    }
-                    _ => {}
+                if variant.discriminator.discriminant == Discriminant::MapFallback {
+                    return classify_type(env, variant.operator_id);
                 }
             }
 
