@@ -6,25 +6,50 @@ use smartstring::alias::String;
 
 use crate::{
     proc::{Lib, Procedure},
+    property_probe::PropertyProbe,
     serde::{SerdeKey, SerdeOperator, SerdeOperatorId, SerdeProcessor},
     string_pattern::StringPattern,
     string_types::StringLikeType,
+    translate::Translator,
     value::{Data, Value},
     DefId, PackageId,
 };
 
 /// Runtime environment
 pub struct Env {
-    pub domains: FnvHashMap<PackageId, Domain>,
-    pub lib: Lib,
-    pub translations: FnvHashMap<(DefId, DefId), Procedure>,
-    pub serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
-    pub serde_operators: Vec<SerdeOperator>,
-    pub string_like_types: FnvHashMap<DefId, StringLikeType>,
-    pub string_patterns: FnvHashMap<DefId, StringPattern>,
+    pub(crate) translations: FnvHashMap<(DefId, DefId), Procedure>,
+    pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
+    pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
+
+    domains: FnvHashMap<PackageId, Domain>,
+    lib: Lib,
+    serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
+    serde_operators: Vec<SerdeOperator>,
 }
 
 impl Env {
+    pub fn builder() -> EnvBuilder {
+        EnvBuilder {
+            env: Self {
+                translations: Default::default(),
+                string_like_types: Default::default(),
+                string_patterns: Default::default(),
+                domains: Default::default(),
+                lib: Lib::default(),
+                serde_operators_per_def: Default::default(),
+                serde_operators: Default::default(),
+            },
+        }
+    }
+
+    pub fn new_translator(&self) -> Translator<'_> {
+        Translator::new(&self.lib)
+    }
+
+    pub fn new_property_probe(&self) -> PropertyProbe<'_> {
+        PropertyProbe::new(&self.lib)
+    }
+
     pub fn unit_value(&self) -> Value {
         Value {
             type_def_id: DefId::unit(),
@@ -39,6 +64,10 @@ impl Env {
                 panic!("No domain for {:?}", def_id.0)
             }
         }
+    }
+
+    pub fn domain_count(&self) -> usize {
+        self.domains.len()
     }
 
     pub fn find_domain(&self, package_id: &PackageId) -> Option<&Domain> {
@@ -80,8 +109,9 @@ impl Domain {
         &self.info[def_id.1 as usize]
     }
 
-    pub fn add_type(&mut self, type_name: String, type_info: TypeInfo) {
+    pub fn add_type(&mut self, type_info: TypeInfo) {
         let def_id = type_info.def_id;
+        let type_name = type_info.name.clone();
         self.register_type_info(type_info);
         self.type_names.insert(type_name, def_id);
     }
@@ -113,4 +143,48 @@ pub struct TypeInfo {
     pub entity_id: Option<DefId>,
 
     pub serde_operator_id: Option<SerdeOperatorId>,
+}
+
+pub struct EnvBuilder {
+    env: Env,
+}
+
+impl EnvBuilder {
+    pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
+        self.env.domains.insert(package_id, domain);
+    }
+
+    pub fn lib(mut self, lib: Lib) -> Self {
+        self.env.lib = lib;
+        self
+    }
+
+    pub fn translations(mut self, translations: FnvHashMap<(DefId, DefId), Procedure>) -> Self {
+        self.env.translations = translations;
+        self
+    }
+
+    pub fn serde_operators(
+        mut self,
+        operators: Vec<SerdeOperator>,
+        per_def: HashMap<SerdeKey, SerdeOperatorId>,
+    ) -> Self {
+        self.env.serde_operators = operators;
+        self.env.serde_operators_per_def = per_def;
+        self
+    }
+
+    pub fn string_like_types(mut self, types: FnvHashMap<DefId, StringLikeType>) -> Self {
+        self.env.string_like_types = types;
+        self
+    }
+
+    pub fn string_patterns(mut self, patterns: FnvHashMap<DefId, StringPattern>) -> Self {
+        self.env.string_patterns = patterns;
+        self
+    }
+
+    pub fn build(self) -> Env {
+        self.env
+    }
 }

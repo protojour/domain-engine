@@ -162,7 +162,7 @@ impl<'m> Compiler<'m> {
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut serde_generator = self.serde_generator();
 
-        let mut out_domains: FnvHashMap<PackageId, Domain> = Default::default();
+        let mut builder = Env::builder();
 
         // For now, create serde operators for every domain
         for package_id in package_ids {
@@ -186,32 +186,30 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
-                domain.add_type(
-                    type_name.clone(),
-                    TypeInfo {
-                        def_id: type_def_id,
-                        name: type_name.clone(),
-                        entity_id,
-                        serde_operator_id: serde_generator
-                            .get_serde_operator_id(SerdeKey::identity(type_def_id)),
-                    },
-                );
+                domain.add_type(TypeInfo {
+                    def_id: type_def_id,
+                    name: type_name,
+                    entity_id,
+                    serde_operator_id: serde_generator
+                        .get_serde_operator_id(SerdeKey::identity(type_def_id)),
+                });
             }
 
-            out_domains.insert(package_id, domain);
+            builder.add_domain(package_id, domain);
         }
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();
 
-        Env {
-            domains: out_domains,
-            lib: self.codegen_tasks.result_lib,
-            translations: self.codegen_tasks.result_translations,
-            serde_operators_per_def,
-            serde_operators,
-            string_like_types: HashMap::from_iter([(self.defs.uuid(), StringLikeType::Uuid)]),
-            string_patterns: self.patterns.string_patterns,
-        }
+        builder
+            .lib(self.codegen_tasks.result_lib)
+            .translations(self.codegen_tasks.result_translations)
+            .serde_operators(serde_operators, serde_operators_per_def)
+            .string_like_types(HashMap::from_iter([(
+                self.defs.uuid(),
+                StringLikeType::Uuid,
+            )]))
+            .string_patterns(self.patterns.string_patterns)
+            .build()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

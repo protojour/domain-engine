@@ -1,4 +1,4 @@
-use ontol_runtime::{env::Env, property_probe::PropertyProbe, translate::Translator};
+use ontol_runtime::env::Env;
 use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TEST_PKG};
 use serde_json::json;
 use test_log::test;
@@ -25,7 +25,7 @@ fn assert_translate(
         ),
     };
 
-    let mut translator = Translator::new(&env.lib);
+    let mut translator = env.new_translator();
     let value = translator.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(&value);
@@ -217,7 +217,7 @@ fn test_eq_complex_flow() {
 
         // FIXME: Property probe does not make completely sense for this translation:
         let domain = env.find_domain(&TEST_PKG).unwrap();
-        let mut property_probe = PropertyProbe::new(&env.lib);
+        let mut property_probe = env.new_property_probe();
         let property_map = property_probe
             .probe_from_serde_operator(
                 &env,

@@ -86,7 +86,7 @@ fn dependency_dag() {
     ])
     .compile_ok(|env| {
         // four user domains, plus core:
-        assert_eq!(5, env.domains.len());
+        assert_eq!(5, env.domain_count());
 
         let bar = TypeBinding::new(&env, "foobar");
         assert_json_io_matches!(
