@@ -65,9 +65,6 @@ impl juniper::GraphQLType<GqlScalar> for MapInputValue {
     }
 }
 
-// impl juniper::marker::IsInputType<GqlScalar> for InputValue {}
-// impl juniper::marker::IsOutputType<GqlScalar> for InputValue {}
-
 impl juniper::ToInputValue<GqlScalar> for MapInputValue {
     fn to_input_value(&self) -> juniper::InputValue<GqlScalar> {
         let v = juniper::Value::scalar(42);
@@ -78,10 +75,8 @@ impl juniper::ToInputValue<GqlScalar> for MapInputValue {
 impl juniper::FromInputValue<GqlScalar> for MapInputValue {
     type Error = String;
 
-    fn from_input_value(value: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
-        Ok(MapInputValue {
-            input_value: value.clone(),
-        })
+    fn from_input_value(_: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
+        unimplemented!("This is not actually used");
     }
 }
 
