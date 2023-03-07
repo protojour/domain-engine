@@ -118,7 +118,6 @@ async fn test_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-#[ignore = "unions"]
 async fn test_guitar_synth_union_connections() {
     let schema = _GUITAR_SYNTH_UNION.compile_schema();
 

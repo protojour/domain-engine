@@ -6,6 +6,7 @@ use ontol_runtime::{env::Env, PackageId};
 pub mod adapter;
 pub mod gql_scalar;
 
+mod field;
 mod input;
 mod input_value_deserializer;
 mod macros;
@@ -83,5 +84,10 @@ mod test_derivations {
         fn update_input_object(_obj: TestInputObject) -> f64 {
             42.0
         }
+    }
+
+    #[juniper::graphql_union]
+    trait TestUnion {
+        fn as_mutation(&self) -> Option<&TestMutation>;
     }
 }

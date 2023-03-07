@@ -132,7 +132,7 @@ impl Kind for ScalarKind {
 pub struct TypeAdapter<K: Kind> {
     pub domain_data: Arc<DomainData>,
     pub operator_id: SerdeOperatorId,
-    _kind: std::marker::PhantomData<K>,
+    pub _kind: std::marker::PhantomData<K>,
 }
 
 impl<K: Kind> TypeAdapter<K> {
@@ -169,7 +169,7 @@ impl EdgeAdapter {
             .expect("No edge data found")
     }
 
-    pub fn node_adapter(&self) -> TypeAdapter<NodeKind> {
+    pub fn node_adapter(&self) -> TypeAdapter<DynamicKind> {
         TypeAdapter {
             domain_data: self.domain_data.clone(),
             operator_id: self.node_operator_id,
