@@ -4,21 +4,21 @@ use serde::de::IntoDeserializer;
 
 use crate::gql_scalar::GqlScalar;
 
-pub struct InputValueDeserializer<E> {
-    pub value: juniper::InputValue<GqlScalar>,
+pub struct InputValueDeserializer<'v, E> {
+    pub value: &'v juniper::InputValue<GqlScalar>,
     pub error: std::marker::PhantomData<fn() -> E>,
 }
 
-impl<'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<E> {
+impl<'v, 'de, E: de::Error> de::Deserializer<'de> for InputValueDeserializer<'v, E> {
     type Error = E;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match self.value {
             InputValue::Null => visitor.visit_none(),
-            InputValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(value),
-            InputValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(value),
-            InputValue::Scalar(GqlScalar::Bool(value)) => visitor.visit_bool(value),
-            InputValue::Scalar(GqlScalar::String(value)) => visitor.visit_str(&value),
+            InputValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(*value),
+            InputValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
+            InputValue::Scalar(GqlScalar::Bool(value)) => visitor.visit_bool(*value),
+            InputValue::Scalar(GqlScalar::String(value)) => visitor.visit_str(value),
             InputValue::Enum(value) => visitor.visit_str(&value),
             InputValue::Variable(var) => Err(de::Error::invalid_value(
                 de::Unexpected::Str(&var),
@@ -86,10 +86,10 @@ impl<E, I: Iterator> SeqDeserializer<E, I> {
     }
 }
 
-impl<'de, E: de::Error, I> de::SeqAccess<'de> for SeqDeserializer<E, I>
+impl<'v, 'de, E: de::Error, I> de::SeqAccess<'de> for SeqDeserializer<E, I>
 where
     E: de::Error,
-    I: Iterator<Item = Spanning<juniper::InputValue<GqlScalar>>>,
+    I: Iterator<Item = &'v Spanning<juniper::InputValue<GqlScalar>>>,
 {
     type Error = E;
 
@@ -101,7 +101,7 @@ where
             Some(value) => {
                 self.count += 1;
                 seed.deserialize(InputValueDeserializer {
-                    value: value.item,
+                    value: &value.item,
                     error: std::marker::PhantomData,
                 })
                 .map(Some)
@@ -115,21 +115,21 @@ where
     }
 }
 
-struct MapDeserializer<E, I> {
+struct MapDeserializer<'v, E, I> {
     iter: std::iter::Fuse<I>,
-    state: MapState,
+    state: MapState<'v>,
     _count: usize,
     error: std::marker::PhantomData<fn() -> E>,
 }
 
 #[derive(Default)]
-enum MapState {
+enum MapState<'v> {
     #[default]
     NextKey,
-    NextValue(Spanning<juniper::InputValue<GqlScalar>>),
+    NextValue(&'v Spanning<juniper::InputValue<GqlScalar>>),
 }
 
-impl<E, I: Iterator> MapDeserializer<E, I> {
+impl<'v, E, I: Iterator> MapDeserializer<'v, E, I> {
     fn new(iterator: I) -> Self {
         Self {
             iter: iterator.fuse(),
@@ -140,10 +140,10 @@ impl<E, I: Iterator> MapDeserializer<E, I> {
     }
 }
 
-impl<'de, E: de::Error, I> de::MapAccess<'de> for MapDeserializer<E, I>
+impl<'v, 'de, E: de::Error, I> de::MapAccess<'de> for MapDeserializer<'v, E, I>
 where
     E: de::Error,
-    I: Iterator<Item = (Spanning<String>, Spanning<juniper::InputValue<GqlScalar>>)>,
+    I: Iterator<Item = &'v (Spanning<String>, Spanning<juniper::InputValue<GqlScalar>>)>,
 {
     type Error = E;
 
@@ -154,7 +154,8 @@ where
         match (self.iter.next(), &self.state) {
             (Some((key, value)), MapState::NextKey) => {
                 self.state = MapState::NextValue(value);
-                seed.deserialize(key.item.into_deserializer()).map(Some)
+                seed.deserialize(key.item.as_str().into_deserializer())
+                    .map(Some)
             }
             (None, MapState::NextKey) => Ok(None),
             (_, MapState::NextValue(_)) => panic!("should call next_value"),
@@ -167,7 +168,7 @@ where
     {
         match std::mem::take(&mut self.state) {
             MapState::NextValue(value) => seed.deserialize(InputValueDeserializer {
-                value: value.item,
+                value: &value.item,
                 error: std::marker::PhantomData,
             }),
             MapState::NextKey => panic!("should call next_key"),
