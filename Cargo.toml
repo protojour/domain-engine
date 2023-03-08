@@ -9,3 +9,7 @@ members = [
     "ontol-parser",
     "ontol-test-utils"
 ]
+
+# Set the settings for build scripts and proc-macros.
+[profile.release.package.domain-engine-wasm]
+opt-level = "s"
