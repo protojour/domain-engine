@@ -16,7 +16,7 @@ pub fn deserialize_argument(
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let type_info = env.get_type_info(def_id);
     let serde_operator_id = type_info
-        .serde_operator_id
+        .identity_operator_id
         .expect("This type cannot be deserialized");
 
     let value = arguments.get_input_value(name).unwrap();

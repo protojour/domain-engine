@@ -736,6 +736,7 @@ dependencies = [
 name = "ontol-runtime"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "derive-debug-extras",
  "fnv",
  "indexmap",

@@ -48,7 +48,7 @@ pub fn adapt_domain(
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
 
-        if let Some(operator_id) = type_info.serde_operator_id {
+        if let Some(operator_id) = type_info.identity_operator_id {
             debug!("type `{}`", type_info.name);
 
             adapt_type(&env, &mut domain_data, type_info, operator_id);
@@ -140,7 +140,9 @@ fn adapt_node_type(
 
     if let Some(entity_id) = type_info.entity_id {
         let id_type_info = env.get_type_info(entity_id);
-        let id_operator_id = id_type_info.serde_operator_id.expect("No id_operator_id");
+        let id_operator_id = id_type_info
+            .identity_operator_id
+            .expect("No id_operator_id");
 
         fields.insert(
             "_id".into(),

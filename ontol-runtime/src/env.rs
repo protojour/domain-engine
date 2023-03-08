@@ -125,7 +125,7 @@ impl Domain {
                 def_id: DefId(type_info.def_id.0, self.info.len() as u16),
                 name: "".into(),
                 entity_id: None,
-                serde_operator_id: None,
+                identity_operator_id: None,
             });
         }
 
@@ -142,7 +142,7 @@ pub struct TypeInfo {
     /// If this type is an entity, this is the type of its ID
     pub entity_id: Option<DefId>,
 
-    pub serde_operator_id: Option<SerdeOperatorId>,
+    pub identity_operator_id: Option<SerdeOperatorId>,
 }
 
 pub struct EnvBuilder {

@@ -24,7 +24,7 @@ pub fn build_openapi_schemas<'e>(
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
-        if let Some(operator_id) = &type_info.serde_operator_id {
+        if let Some(operator_id) = &type_info.identity_operator_id {
             graph_builder.visit(*operator_id, env);
         }
     }
@@ -43,7 +43,7 @@ pub fn build_standalone_schema<'e>(
     let mut graph_builder = SchemaGraphBuilder::default();
 
     let operator_id = type_info
-        .serde_operator_id
+        .identity_operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 
@@ -214,19 +214,19 @@ impl Display for Key {
         let def_id = variant.id();
         let package = def_id.0;
 
-        write!(
-            f,
-            "{}_{}{}",
-            package.0,
-            def_id.1,
-            match variant.data_variant() {
-                DataVariant::Identity => "",
-                DataVariant::Array => "_array",
-                DataVariant::IdMap => "_id",
-                DataVariant::InherentPropertyMap => "_inherent_props",
-                DataVariant::JoinedPropertyMap => "_props",
-            }
-        )
+        write!(f, "{}_{}", package.0, def_id.1)?;
+
+        if variant.data_variant().contains(DataVariant::ID) {
+            write!(f, "_id")?;
+        }
+        if variant.data_variant().contains(DataVariant::UNION) {
+            write!(f, "_union")?;
+        }
+        if variant.data_variant().contains(DataVariant::ARRAY) {
+            write!(f, "_array")?;
+        }
+
+        Ok(())
     }
 }
 

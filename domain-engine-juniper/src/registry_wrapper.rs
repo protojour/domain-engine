@@ -118,7 +118,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         def_id: DefId,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let type_info = self.domain_data.env.get_type_info(def_id);
-        let operator_id = type_info.serde_operator_id.unwrap();
+        let operator_id = type_info.identity_operator_id.unwrap();
 
         let operator = self.domain_data.env.get_serde_operator(operator_id);
 

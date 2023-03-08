@@ -15,7 +15,7 @@ use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
     serde::SerdeKey,
     string_types::StringLikeType,
-    DefId, PackageId,
+    DataVariant, DefId, PackageId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
@@ -190,8 +190,10 @@ impl<'m> Compiler<'m> {
                     def_id: type_def_id,
                     name: type_name,
                     entity_id,
-                    serde_operator_id: serde_generator
-                        .get_serde_operator_id(SerdeKey::identity(type_def_id)),
+                    identity_operator_id: serde_generator.get_serde_operator_id(SerdeKey::variant(
+                        type_def_id,
+                        DataVariant::ID | DataVariant::PROPS | DataVariant::UNION,
+                    )),
                 });
             }
 

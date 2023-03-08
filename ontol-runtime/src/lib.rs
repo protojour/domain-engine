@@ -42,13 +42,14 @@ impl DefId {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum DataVariant {
-    Identity,
-    Array,
-    JoinedPropertyMap,
-    InherentPropertyMap,
-    IdMap,
+bitflags::bitflags! {
+    pub struct DataVariant: u32 {
+        const IDENTITY = 0b00000000;
+        const ARRAY    = 0b00000001;
+        const ID       = 0b00000010;
+        const UNION    = 0b00000100;
+        const PROPS    = 0b00001000;
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -56,7 +57,7 @@ pub struct DefVariant(pub DefId, pub DataVariant);
 
 impl DefVariant {
     pub const fn identity(def_id: DefId) -> Self {
-        Self(def_id, DataVariant::Identity)
+        Self(def_id, DataVariant::IDENTITY)
     }
 
     pub const fn id(&self) -> DefId {

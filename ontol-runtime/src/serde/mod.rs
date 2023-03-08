@@ -91,7 +91,7 @@ impl SerdeKey {
     }
 
     pub const fn identity(def_id: DefId) -> Self {
-        Self::Variant(DefVariant(def_id, DataVariant::Identity))
+        Self::Variant(DefVariant(def_id, DataVariant::IDENTITY))
     }
 }
 

@@ -18,7 +18,7 @@ use crate::{
     patterns::Patterns,
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
-    types::{DefTypes, Type},
+    types::{DefTypes, Type, TypeRef},
 };
 
 use super::union_builder::UnionBuilder;
@@ -30,6 +30,11 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) patterns: &'c Patterns,
     pub(super) operators_by_id: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorId>,
+}
+
+enum OperatorAllocation {
+    Allocated(SerdeOperatorId, SerdeOperator),
+    Redirect(DefVariant),
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
@@ -47,12 +52,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Some(*id);
         }
 
-        if let Some((operator_id, operator)) = self.create_serde_operator_from_key(key.clone()) {
-            debug!("created operator {operator_id:?} {key:?} {operator:?}");
-            self.operators_by_id[operator_id.0 as usize] = operator;
-            Some(operator_id)
-        } else {
-            None
+        match self.create_serde_operator_from_key(key.clone()) {
+            Some(OperatorAllocation::Allocated(operator_id, operator)) => {
+                debug!("created operator {operator_id:?} {key:?} {operator:?}");
+                self.operators_by_id[operator_id.0 as usize] = operator;
+                Some(operator_id)
+            }
+            Some(OperatorAllocation::Redirect(def_variant)) => {
+                let operator_id = self.get_serde_operator_id(SerdeKey::Variant(def_variant))?;
+                // debug!("key {key:?} redirected to {:?}", def_variant.data_variant());
+                self.operators_by_key.insert(key, operator_id);
+                Some(operator_id)
+            }
+            None => None,
         }
     }
 
@@ -61,69 +73,41 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
         cardinality: Cardinality,
     ) -> (PropertyCardinality, SerdeOperatorId) {
+        // FIXME: The variant of the property depends on what kind of map we are building?
+        let property_variant = DataVariant::ID | DataVariant::PROPS | DataVariant::UNION;
+
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
-                self.get_serde_operator_id(SerdeKey::identity(type_def_id))
+                self.get_serde_operator_id(SerdeKey::variant(type_def_id, property_variant))
                     .expect("no property operator"),
             ),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.get_serde_operator_id(SerdeKey::variant(type_def_id, DataVariant::Array))
-                    .expect("no property operator"),
+                self.get_serde_operator_id(SerdeKey::variant(
+                    type_def_id,
+                    property_variant | DataVariant::ARRAY,
+                ))
+                .expect("no property operator"),
             ),
         }
     }
 
-    fn create_serde_operator_from_key(
-        &mut self,
-        key: SerdeKey,
-    ) -> Option<(SerdeOperatorId, SerdeOperator)> {
+    fn alloc_operator_id(&mut self, def_variant: &DefVariant) -> SerdeOperatorId {
+        self.alloc_operator_id_for_key(&SerdeKey::Variant(*def_variant))
+    }
+
+    fn alloc_operator_id_for_key(&mut self, key: &SerdeKey) -> SerdeOperatorId {
+        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
+        // We just need a temporary placeholder for this operator,
+        // this will be properly overwritten afterwards:
+        self.operators_by_id.push(SerdeOperator::Unit);
+        self.operators_by_key.insert(key.clone(), operator_id);
+        operator_id
+    }
+
+    fn create_serde_operator_from_key(&mut self, key: SerdeKey) -> Option<OperatorAllocation> {
         match &key {
-            SerdeKey::Variant(
-                def_variant @ DefVariant(
-                    _,
-                    DataVariant::Identity
-                    | DataVariant::JoinedPropertyMap
-                    | DataVariant::InherentPropertyMap,
-                ),
-            ) => self.create_item_operator(*def_variant),
-            SerdeKey::Variant(def_variant @ DefVariant(def_id, DataVariant::Array)) => {
-                let item_operator_id = self.get_serde_operator_id(SerdeKey::identity(*def_id))?;
-
-                Some((
-                    self.alloc_operator_id_for_key(&key),
-                    SerdeOperator::RelationSequence(RelationSequenceType {
-                        ranges: [SequenceRange {
-                            operator_id: item_operator_id,
-                            finite_repetition: None,
-                        }],
-                        def_variant: *def_variant,
-                    }),
-                ))
-            }
-            SerdeKey::Variant(DefVariant(def_id, DataVariant::IdMap)) => {
-                match self.get_def_type(*def_id)? {
-                    Type::Domain(_) => {
-                        let id_relation_id = self.relations.properties_by_type.get(def_id)?.id?;
-
-                        let (relationship, _) = self
-                            .get_subject_property_meta(*def_id, id_relation_id)
-                            .expect("Problem getting subject property meta");
-                        let object = relationship.object;
-
-                        let object_operator_id = self
-                            .get_serde_operator_id(SerdeKey::identity(object.0))
-                            .expect("No object operator for _id property");
-
-                        Some((
-                            self.alloc_operator_id_for_key(&key),
-                            SerdeOperator::Id(object_operator_id),
-                        ))
-                    }
-                    _ => None,
-                }
-            }
             SerdeKey::Intersection(keys) => {
                 let operator_id = self.alloc_operator_id_for_key(&key);
                 let mut iterator = keys.iter();
@@ -149,8 +133,55 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                 }
 
-                Some((operator_id, SerdeOperator::MapType(intersected_map)))
+                Some(OperatorAllocation::Allocated(
+                    operator_id,
+                    SerdeOperator::MapType(intersected_map),
+                ))
             }
+            SerdeKey::Variant(DefVariant(def_id, data_variant))
+                if *data_variant == DataVariant::ID =>
+            {
+                match self.get_def_type(*def_id)? {
+                    Type::Domain(_) => {
+                        let id_relation_id = self.relations.properties_by_type.get(def_id)?.id?;
+
+                        let (relationship, _) = self
+                            .get_subject_property_meta(*def_id, id_relation_id)
+                            .expect("Problem getting subject property meta");
+                        let object = relationship.object;
+
+                        let object_operator_id = self
+                            .get_serde_operator_id(SerdeKey::identity(object.0))
+                            .expect("No object operator for _id property");
+
+                        Some(OperatorAllocation::Allocated(
+                            self.alloc_operator_id_for_key(&key),
+                            SerdeOperator::Id(object_operator_id),
+                        ))
+                    }
+                    _ => None,
+                }
+            }
+            SerdeKey::Variant(def_variant @ DefVariant(def_id, data_variant))
+                if data_variant.contains(DataVariant::ARRAY) =>
+            {
+                let item_operator_id = self.get_serde_operator_id(SerdeKey::variant(
+                    *def_id,
+                    data_variant.difference(DataVariant::ARRAY),
+                ))?;
+
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id_for_key(&key),
+                    SerdeOperator::RelationSequence(RelationSequenceType {
+                        ranges: [SequenceRange {
+                            operator_id: item_operator_id,
+                            finite_repetition: None,
+                        }],
+                        def_variant: *def_variant,
+                    }),
+                ))
+            }
+            SerdeKey::Variant(def_variant) => self.create_item_operator(*def_variant),
         }
     }
 
@@ -183,62 +214,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn create_item_operator(
-        &mut self,
-        def_variant: DefVariant,
-    ) -> Option<(SerdeOperatorId, SerdeOperator)> {
+    fn create_item_operator(&mut self, def_variant: DefVariant) -> Option<OperatorAllocation> {
         match self.get_def_type(def_variant.id()) {
-            Some(Type::Unit(_)) => {
-                Some((self.alloc_operator_id(&def_variant), SerdeOperator::Unit))
-            }
-            Some(Type::IntConstant(_)) => todo!(),
-            Some(Type::Int(_)) => Some((
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::Int(def_variant.id()),
-            )),
-            Some(Type::Number(_)) => Some((
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::Number(def_variant.id()),
-            )),
-            Some(Type::String(_)) => Some((
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::String(def_variant.id()),
-            )),
-            Some(Type::StringConstant(def_id)) => {
-                assert_eq!(def_variant.id(), *def_id);
-
-                let literal = self.defs.get_string_representation(*def_id);
-
-                Some((
-                    self.alloc_operator_id(&def_variant),
-                    SerdeOperator::StringConstant(literal.into(), def_variant.id()),
-                ))
-            }
-            Some(Type::Regex(def_id)) => {
-                assert_eq!(def_variant.id(), *def_id);
-                assert!(self
-                    .patterns
-                    .string_patterns
-                    .contains_key(&def_variant.id()));
-
-                Some((
-                    self.alloc_operator_id(&def_variant),
-                    SerdeOperator::StringPattern(*def_id),
-                ))
-            }
-            Some(Type::Uuid(_)) => Some((
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::String(def_variant.id()),
-            )),
-            Some(Type::EmptySequence(_)) => {
-                todo!("not sure if this should be handled here")
-            }
-            Some(Type::Array(_)) => {
-                panic!("Array not handled here")
-            }
-            Some(Type::Option(_)) => {
-                panic!("Option not handled here")
-            }
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
@@ -246,37 +223,92 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     Some(DefKind::DomainType(None)) => "anonymous",
                     _ => "Unknown type",
                 };
-                let operator_id = self.alloc_operator_id(&def_variant);
-                Some((
-                    operator_id,
-                    self.create_domain_type_serde_operator(
-                        DefVariant(*def_id, def_variant.data_variant()),
-                        typename,
-                        properties,
-                    ),
-                ))
+                self.create_domain_type_serde_operator(
+                    DefVariant(*def_id, def_variant.data_variant()),
+                    typename,
+                    properties,
+                )
             }
-            Some(Type::Function { .. }) => None,
-            Some(Type::Anonymous(_)) => None,
-            Some(Type::Package | Type::BuiltinRelation) => None,
-            Some(Type::Tautology | Type::Infer(_) | Type::Error) => {
-                panic!("crap: {:?}", self.get_def_type(def_variant.id()));
-            }
-            None => panic!("No type available"),
+            Some(type_ref) => match def_variant.data_variant() {
+                DataVariant::IDENTITY => {
+                    self.create_core_type_serde_operator(def_variant, type_ref)
+                }
+                _ => Some(OperatorAllocation::Redirect(DefVariant::identity(
+                    def_variant.id(),
+                ))),
+            },
+            None => panic!("no type available"),
         }
     }
 
-    fn alloc_operator_id(&mut self, def_variant: &DefVariant) -> SerdeOperatorId {
-        self.alloc_operator_id_for_key(&SerdeKey::Variant(*def_variant))
-    }
+    fn create_core_type_serde_operator(
+        &mut self,
+        def_variant: DefVariant,
+        type_ref: TypeRef,
+    ) -> Option<OperatorAllocation> {
+        match type_ref {
+            Type::Unit(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::Unit,
+            )),
+            Type::IntConstant(_) => todo!(),
+            Type::Int(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::Int(def_variant.id()),
+            )),
+            Type::Number(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::Number(def_variant.id()),
+            )),
+            Type::String(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::String(def_variant.id()),
+            )),
+            Type::StringConstant(def_id) => {
+                assert_eq!(def_variant.id(), *def_id);
 
-    fn alloc_operator_id_for_key(&mut self, key: &SerdeKey) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
-        // We just need a temporary placeholder for this operator,
-        // this will be properly overwritten afterwards:
-        self.operators_by_id.push(SerdeOperator::Unit);
-        self.operators_by_key.insert(key.clone(), operator_id);
-        operator_id
+                let literal = self.defs.get_string_representation(*def_id);
+
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::StringConstant(literal.into(), def_variant.id()),
+                ))
+            }
+            Type::Regex(def_id) => {
+                assert_eq!(def_variant.id(), *def_id);
+                assert!(self
+                    .patterns
+                    .string_patterns
+                    .contains_key(&def_variant.id()));
+
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::StringPattern(*def_id),
+                ))
+            }
+            Type::Uuid(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::String(def_variant.id()),
+            )),
+            Type::EmptySequence(_) => {
+                todo!("not sure if this should be handled here")
+            }
+            Type::Array(_) => {
+                panic!("Array not handled here")
+            }
+            Type::Option(_) => {
+                panic!("Option not handled here")
+            }
+            Type::Domain(_) => {
+                panic!("Domain not handled here")
+            }
+            Type::Function { .. } => None,
+            Type::Anonymous(_) => None,
+            Type::Package | Type::BuiltinRelation => None,
+            Type::Tautology | Type::Infer(_) | Type::Error => {
+                panic!("crap: {:?}", self.get_def_type(def_variant.id()));
+            }
+        }
     }
 
     fn create_domain_type_serde_operator(
@@ -284,15 +316,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         def_variant: DefVariant,
         typename: &str,
         properties: Option<&Properties>,
-    ) -> SerdeOperator {
+    ) -> Option<OperatorAllocation> {
         let properties = match properties {
             None => {
-                return SerdeOperator::MapType(MapType {
-                    typename: typename.into(),
-                    def_variant,
-                    properties: Default::default(),
-                    n_mandatory_properties: 0,
-                })
+                return Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::MapType(MapType {
+                        typename: typename.into(),
+                        def_variant,
+                        properties: Default::default(),
+                        n_mandatory_properties: 0,
+                    }),
+                ));
             }
             Some(properties) => properties,
         };
@@ -315,20 +350,29 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     panic!("Value properties must be mandatory, fix this during type check");
                 }
 
-                SerdeOperator::ValueType(ValueType {
-                    typename: typename.into(),
-                    def_variant,
-                    inner_operator_id,
-                })
+                let operator_id = self.alloc_operator_id(&def_variant);
+
+                Some(OperatorAllocation::Allocated(
+                    operator_id,
+                    SerdeOperator::ValueType(ValueType {
+                        typename: typename.into(),
+                        def_variant,
+                        inner_operator_id,
+                    }),
+                ))
             }
             Constructor::ValueUnion(_) => {
-                if let DataVariant::InherentPropertyMap = def_variant.data_variant() {
-                    // just the inherent properties are requested.
-                    // Don't build a union
-                    self.create_map_operator(def_variant, typename, properties)
-                } else {
-                    self.create_value_union_operator(def_variant, typename, properties)
-                }
+                let operator_id = self.alloc_operator_id(&def_variant);
+                Some(OperatorAllocation::Allocated(
+                    operator_id,
+                    if def_variant.data_variant().contains(DataVariant::UNION) {
+                        self.create_value_union_operator(def_variant, typename, properties)
+                    } else {
+                        // just the inherent properties are requested.
+                        // Don't build a union
+                        self.create_map_operator(def_variant, typename, properties)
+                    },
+                ))
             }
             Constructor::Sequence(sequence) => {
                 let mut sequence_range_builder = SequenceRangeBuilder::default();
@@ -361,17 +405,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let ranges = sequence_range_builder.build();
                 debug!("sequence ranges: {:#?}", ranges);
 
-                SerdeOperator::ConstructorSequence(ConstructorSequenceType {
-                    ranges,
-                    def_variant,
-                })
+                let operator_id = self.alloc_operator_id(&def_variant);
+                Some(OperatorAllocation::Allocated(
+                    operator_id,
+                    SerdeOperator::ConstructorSequence(ConstructorSequenceType {
+                        ranges,
+                        def_variant,
+                    }),
+                ))
             }
             Constructor::StringPattern(_) => {
                 assert!(self
                     .patterns
                     .string_patterns
                     .contains_key(&def_variant.id()));
-                SerdeOperator::CapturingStringPattern(def_variant.id())
+
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::CapturingStringPattern(def_variant.id()),
+                ))
             }
         }
     }
@@ -381,27 +433,41 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         def_variant: DefVariant,
         typename: &str,
         properties: &Properties,
-    ) -> SerdeOperator {
-        match (def_variant.data_variant(), &properties.id) {
-            (DataVariant::JoinedPropertyMap, _) => {
-                self.create_map_operator(def_variant, typename, properties)
-            }
-            (_, Some(id_relation_id)) => {
-                let (relationship, _) = self
-                    .get_subject_property_meta(def_variant.id(), *id_relation_id)
-                    .expect("Problem getting subject property meta");
+    ) -> Option<OperatorAllocation> {
+        let union_id = DataVariant::UNION | DataVariant::ID;
 
-                let id_def_variant = DefVariant(def_variant.id(), DataVariant::IdMap);
-                let map_def_variant = DefVariant(def_variant.id(), DataVariant::JoinedPropertyMap);
+        if def_variant.data_variant().contains(union_id) {
+            let id_relation_id = match properties.id {
+                Some(id) => id,
+                None => {
+                    return Some(OperatorAllocation::Redirect(DefVariant(
+                        def_variant.id(),
+                        def_variant.data_variant().difference(union_id),
+                    )));
+                }
+            };
+            let (relationship, _) = self
+                .get_subject_property_meta(def_variant.id(), id_relation_id)
+                .expect("Problem getting subject property meta");
 
-                // Create a union between { '_id' } and the map properties itself
-                let id_operator_id = self
-                    .get_serde_operator_id(SerdeKey::Variant(id_def_variant))
-                    .expect("No _id operator");
-                let map_properties_operator_id = self
-                    .get_serde_operator_id(SerdeKey::Variant(map_def_variant))
-                    .expect("No property map operator");
+            let id_def_variant = DefVariant(def_variant.id(), DataVariant::ID);
+            let map_def_variant = DefVariant(
+                def_variant.id(),
+                def_variant.data_variant().difference(DataVariant::UNION),
+            );
 
+            // Create a union between { '_id' } and the map properties itself
+            let id_operator_id = self
+                .get_serde_operator_id(SerdeKey::Variant(id_def_variant))
+                .expect("No _id operator");
+            let map_properties_operator_id = self
+                .get_serde_operator_id(SerdeKey::Variant(map_def_variant))
+                .expect("No property map operator");
+
+            let operator_id = self.alloc_operator_id(&def_variant);
+
+            Some(OperatorAllocation::Allocated(
+                operator_id,
                 SerdeOperator::ValueUnionType(ValueUnionType {
                     typename: typename.into(),
                     union_def_variant: def_variant,
@@ -409,7 +475,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
-                                    *id_relation_id,
+                                    id_relation_id,
                                     "_id".into(),
                                 ),
                                 def_variant: DefVariant::identity(relationship.object.0),
@@ -424,9 +490,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             operator_id: map_properties_operator_id,
                         },
                     ],
-                })
-            }
-            _ => self.create_map_operator(def_variant, typename, properties),
+                }),
+            ))
+        } else {
+            let operator_id = self.alloc_operator_id(&def_variant);
+            Some(OperatorAllocation::Allocated(
+                operator_id,
+                self.create_map_operator(def_variant, typename, properties),
+            ))
         }
     }
 
@@ -456,8 +527,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let discriminators: Vec<_> = if properties.map.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
-            let inherent_properties_key =
-                SerdeKey::variant(def_variant.id(), DataVariant::InherentPropertyMap);
+            let inherent_properties_key = SerdeKey::variant(def_variant.id(), DataVariant::PROPS);
 
             union_builder
                 .build(self, |this, operator_id, result_type| {
