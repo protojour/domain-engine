@@ -7,9 +7,13 @@ use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
 use tracing::{debug, warn};
 
 use crate::{
-    adapter::{data::DomainData, DynamicKind, DynamicRef, TypeAdapter},
+    adapter::{
+        data::{DomainData, Field, FieldKind},
+        DynamicKind, DynamicRef, EdgeAdapter, TypeAdapter,
+    },
     gql_scalar::GqlScalar,
     templates::{
+        connection::{Connection, ConnectionTypeInfo},
         map_input_value::{MapInputValue, MapInputValueTypeInfo},
         node::{Node, NodeTypeInfo},
         union::{Union, UnionTypeInfo},
@@ -21,37 +25,84 @@ use crate::{
 /// one type to enable a nice API
 pub struct RegistryWrapper<'a, 'r> {
     pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
-    pub domain: &'a Arc<DomainData>,
+    pub domain_data: &'a Arc<DomainData>,
 }
 
 impl<'a, 'r> RegistryWrapper<'a, 'r> {
     pub fn new(
         registry: &'a mut juniper::Registry<'r, GqlScalar>,
-        domain: &'a Arc<DomainData>,
+        domain_data: &'a Arc<DomainData>,
     ) -> Self {
-        Self { domain, registry }
+        Self {
+            domain_data,
+            registry,
+        }
     }
 
     pub fn register_domain_field(
         &mut self,
-        field_name: &str,
-        adapter: TypeAdapter<DynamicKind>,
+        name: &str,
+        field: &Field,
     ) -> juniper::meta::Field<'r, GqlScalar> {
-        let domain_data = &adapter.domain_data;
-        match adapter.data() {
-            DynamicRef::Node(node_ref) => self.registry.field_convert::<Node, _, GqlContext>(
-                field_name,
-                &NodeTypeInfo(domain_data.type_adapter(node_ref.type_data.operator_id)),
-            ),
-            DynamicRef::Entity(entity_ref) => self.registry.field_convert::<Node, _, GqlContext>(
-                field_name,
-                &NodeTypeInfo(domain_data.type_adapter(entity_ref.type_data.operator_id)),
-            ),
-            DynamicRef::Union(union_data) => self.registry.field_convert::<Union, _, GqlContext>(
-                field_name,
-                &UnionTypeInfo(domain_data.type_adapter(union_data.operator_id)),
-            ),
-            DynamicRef::Scalar(_) => panic!("Unsupported scalar here"),
+        let domain_data = &self.domain_data;
+        let env = &self.domain_data.env;
+
+        match &field.kind {
+            FieldKind::Scalar(serde_operator_id) => {
+                match env.get_serde_operator(*serde_operator_id) {
+                    SerdeOperator::Unit => {
+                        todo!("unit fields");
+                    }
+                    SerdeOperator::Int(_) => {
+                        self.registry.field_convert::<i32, _, GqlContext>(name, &())
+                    }
+                    SerdeOperator::Number(_) => {
+                        todo!("number fields");
+                    }
+                    SerdeOperator::String(_)
+                    | SerdeOperator::StringConstant(..)
+                    | SerdeOperator::StringPattern(_)
+                    | SerdeOperator::CapturingStringPattern(_) => self
+                        .registry
+                        .field_convert::<std::string::String, _, GqlContext>(name, &()),
+                    _ => {
+                        panic!()
+                    }
+                }
+            }
+            FieldKind::Node(node) => {
+                let adapter = self.domain_data.type_adapter::<DynamicKind>(*node);
+                match adapter.data() {
+                    DynamicRef::Node(_) => self.registry.field_convert::<Node, _, GqlContext>(
+                        name,
+                        &NodeTypeInfo(domain_data.type_adapter(*node)),
+                    ),
+                    DynamicRef::Entity(_) => self.registry.field_convert::<Node, _, GqlContext>(
+                        name,
+                        &NodeTypeInfo(domain_data.type_adapter(*node)),
+                    ),
+                    DynamicRef::Union(union_data) => {
+                        self.registry.field_convert::<Union, _, GqlContext>(
+                            name,
+                            &UnionTypeInfo(domain_data.type_adapter(union_data.operator_id)),
+                        )
+                    }
+                    DynamicRef::Scalar(_) => panic!("Unsupported scalar here"),
+                }
+            }
+            FieldKind::Edge { .. } => {
+                todo!()
+            }
+            FieldKind::EntityRelationship { subject, node, .. } => self
+                .registry
+                .field_convert::<Option<Connection>, _, GqlContext>(
+                    name,
+                    &ConnectionTypeInfo(EdgeAdapter {
+                        domain_data: self.domain_data.clone(),
+                        subject: Some(*subject),
+                        node_operator_id: *node,
+                    }),
+                ),
         }
     }
 
@@ -60,7 +111,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         name: &str,
         operator_id: SerdeOperatorId,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let operator = self.domain.env.get_serde_operator(operator_id);
+        let operator = self.domain_data.env.get_serde_operator(operator_id);
 
         debug!("register argument {name} {operator:?}");
 
@@ -94,7 +145,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 todo!()
             }
             SerdeOperator::MapType(_) => {
-                let type_info = MapInputValueTypeInfo(self.domain.type_adapter(operator_id));
+                let type_info = MapInputValueTypeInfo(self.domain_data.type_adapter(operator_id));
 
                 self.arg::<MapInputValue>(name, &type_info)
             }

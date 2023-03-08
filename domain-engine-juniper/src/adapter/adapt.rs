@@ -209,7 +209,7 @@ fn adapt_node_type(
                     property_name.clone(),
                     Field {
                         cardinality,
-                        kind: FieldKind::Node {
+                        kind: FieldKind::Edge {
                             node: property.value_operator_id,
                             rel: property.rel_params_operator_id,
                         },
@@ -241,6 +241,7 @@ fn adapt_node_type(
                             Field {
                                 cardinality,
                                 kind: FieldKind::EntityRelationship {
+                                    subject: type_info.def_id,
                                     node: entity_operator_id,
                                     rel: property.rel_params_operator_id,
                                 },
@@ -252,7 +253,7 @@ fn adapt_node_type(
                             property_name.clone(),
                             Field {
                                 cardinality,
-                                kind: FieldKind::Node {
+                                kind: FieldKind::Edge {
                                     node: node_operator_id,
                                     rel: property.rel_params_operator_id,
                                 },

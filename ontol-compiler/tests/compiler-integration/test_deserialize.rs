@@ -87,7 +87,7 @@ fn deserialize_object_properties() {
         );
         assert_error_msg!(
             obj.deserialize_data(json!({ "a": "hei", "b": 42, "_edge": { "param": 42 } })),
-            "`_edge` property not accepted here at line 1 column 25"
+            "`_edge` property not accepted here at line 1 column 8"
         );
         assert_error_msg!(
             obj.deserialize_data(json!({})),

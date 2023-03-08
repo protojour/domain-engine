@@ -1,6 +1,12 @@
 use crate::{
-    adapter::EdgeAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
-    registry_wrapper::RegistryWrapper, type_info::GraphqlTypeName,
+    adapter::{
+        data::{Field, FieldCardinality, FieldKind},
+        EdgeAdapter,
+    },
+    gql_scalar::GqlScalar,
+    macros::impl_graphql_value,
+    registry_wrapper::RegistryWrapper,
+    type_info::GraphqlTypeName,
 };
 
 pub struct Edge;
@@ -32,7 +38,13 @@ impl juniper::GraphQLType<GqlScalar> for Edge {
         let fields = [
             // TODO: edge rel params, cursor
             reg.field_convert::<std::string::String, _, Self::Context>("cursor", &()),
-            reg.register_domain_field("node", info.0.node_adapter()),
+            reg.register_domain_field(
+                "node",
+                &Field {
+                    cardinality: FieldCardinality::UnitMandatory,
+                    kind: FieldKind::Node(info.0.node_operator_id),
+                },
+            ),
         ];
 
         registry
