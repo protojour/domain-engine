@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
+use ontol_runtime::{serde::SerdeOperator, DefId};
 use tracing::{debug, warn};
 
 use crate::{
@@ -48,7 +48,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         let env = &self.domain_data.env;
 
         match &field.kind {
-            FieldKind::Scalar(serde_operator_id) => {
+            FieldKind::Scalar(_def_id, serde_operator_id) => {
                 match env.get_serde_operator(*serde_operator_id) {
                     SerdeOperator::Unit => {
                         todo!("unit fields");
@@ -70,7 +70,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                     }
                 }
             }
-            FieldKind::Node(node) => {
+            FieldKind::Node(node, _operator_id) => {
                 let adapter = self.domain_data.type_adapter::<DynamicKind>(*node);
                 match adapter.data() {
                     DynamicRef::Node(_) => self.registry.field_convert::<Node, _, GqlContext>(
@@ -84,7 +84,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                     DynamicRef::Union(union_data) => {
                         self.registry.field_convert::<Union, _, GqlContext>(
                             name,
-                            &UnionTypeInfo(domain_data.type_adapter(union_data.operator_id)),
+                            &UnionTypeInfo(domain_data.type_adapter(union_data.def_id)),
                         )
                     }
                     DynamicRef::Scalar(_) => panic!("Unsupported scalar here"),
@@ -93,14 +93,20 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
             FieldKind::Edge { .. } => {
                 todo!()
             }
-            FieldKind::EntityRelationship { subject, node, .. } => self
+            FieldKind::EntityRelationship {
+                subject,
+                node,
+                node_operator,
+                ..
+            } => self
                 .registry
                 .field_convert::<Option<Connection>, _, GqlContext>(
                     name,
                     &ConnectionTypeInfo(EdgeAdapter {
                         domain_data: self.domain_data.clone(),
                         subject: Some(*subject),
-                        node_operator_id: *node,
+                        node_id: *node,
+                        node_operator_id: *node_operator,
                     }),
                 ),
         }
@@ -109,8 +115,11 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
     pub fn register_domain_argument(
         &mut self,
         name: &str,
-        operator_id: SerdeOperatorId,
+        def_id: DefId,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
+        let type_info = self.domain_data.env.get_type_info(def_id);
+        let operator_id = type_info.serde_operator_id.unwrap();
+
         let operator = self.domain_data.env.get_serde_operator(operator_id);
 
         debug!("register argument {name} {operator:?}");
@@ -136,7 +145,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 // registry.arg::<CustomScalar>(name, &()),
             }
             SerdeOperator::ValueType(value_type) => {
-                self.register_domain_argument(name, value_type.inner_operator_id)
+                self.register_domain_argument(name, value_type.def_variant.id())
             }
             SerdeOperator::ValueUnionType(_) => {
                 todo!()
@@ -145,7 +154,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 todo!()
             }
             SerdeOperator::MapType(_) => {
-                let type_info = MapInputValueTypeInfo(self.domain_data.type_adapter(operator_id));
+                let type_info = MapInputValueTypeInfo(self.domain_data.type_adapter(def_id));
 
                 self.arg::<MapInputValue>(name, &type_info)
             }
@@ -156,14 +165,14 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         let domain_data = &adapter.domain_data;
         match adapter.data() {
             DynamicRef::Node(node_ref) => self.registry.get_type::<Node>(&NodeTypeInfo(
-                domain_data.type_adapter(node_ref.type_data.operator_id),
+                domain_data.type_adapter(node_ref.type_data.def_id),
             )),
             DynamicRef::Entity(entity_ref) => self.registry.get_type::<Node>(&NodeTypeInfo(
-                domain_data.type_adapter(entity_ref.type_data.operator_id),
+                domain_data.type_adapter(entity_ref.type_data.def_id),
             )),
-            DynamicRef::Union(union_data) => self.registry.get_type::<Union>(&UnionTypeInfo(
-                domain_data.type_adapter(union_data.operator_id),
-            )),
+            DynamicRef::Union(union_data) => self
+                .registry
+                .get_type::<Union>(&UnionTypeInfo(domain_data.type_adapter(union_data.def_id))),
             DynamicRef::Scalar(_) => panic!("Unsupported scalar here"),
         }
     }

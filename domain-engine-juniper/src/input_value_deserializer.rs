@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use juniper::{graphql_value, InputValue, Spanning};
-use ontol_runtime::{env::Env, serde::SerdeOperatorId, smart_format};
+use ontol_runtime::{env::Env, smart_format, DefId};
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 use tracing::debug;
 
@@ -11,14 +11,19 @@ use crate::gql_scalar::GqlScalar;
 pub fn deserialize_argument(
     arguments: &juniper::Arguments<GqlScalar>,
     name: &str,
-    operator_id: SerdeOperatorId,
+    def_id: DefId,
     env: &Env,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
+    let type_info = env.get_type_info(def_id);
+    let serde_operator_id = type_info
+        .serde_operator_id
+        .expect("This type cannot be deserialized");
+
     let value = arguments.get_input_value(name).unwrap();
 
     debug!("deserializing {value:?}");
 
-    env.new_serde_processor(operator_id, None)
+    env.new_serde_processor(serde_operator_id, None)
         .deserialize(InputValueDeserializer { value })
         .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
 }

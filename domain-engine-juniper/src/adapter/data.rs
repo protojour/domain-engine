@@ -14,30 +14,29 @@ pub struct DomainData {
     pub unions: FnvHashMap<SerdeOperatorId, UnionData>,
     pub edges: FnvHashMap<(Option<DefId>, SerdeOperatorId), EdgeData>,
 
+    pub types_by_def: FnvHashMap<DefId, TypeData>,
+    pub entities_by_def: FnvHashMap<DefId, EntityData>,
+    pub unions_by_def: FnvHashMap<DefId, UnionData>,
+    pub edges_by_def: FnvHashMap<(Option<DefId>, DefId), EdgeData>,
+
     pub query_type_name: String,
     pub mutation_type_name: String,
 
-    pub queries: IndexMap<String, SerdeOperatorId>,
+    pub queries: IndexMap<String, DefId>,
     pub mutations: IndexMap<String, MutationData>,
 }
 
 pub struct MutationData {
+    pub entity: DefId,
     pub entity_operator_id: SerdeOperatorId,
     pub kind: MutationKind,
 }
 
 #[derive(Clone, Copy)]
 pub enum MutationKind {
-    Create {
-        input: SerdeOperatorId,
-    },
-    Update {
-        id: SerdeOperatorId,
-        input: SerdeOperatorId,
-    },
-    Delete {
-        id: SerdeOperatorId,
-    },
+    Create { input: DefId },
+    Update { id: DefId, input: DefId },
+    Delete { id: DefId },
 }
 
 pub struct EntityData {
@@ -55,8 +54,9 @@ pub struct TypeData {
 
 pub struct UnionData {
     pub type_name: String,
+    pub def_id: DefId,
     pub operator_id: SerdeOperatorId,
-    pub variants: Vec<SerdeOperatorId>,
+    pub variants: Vec<(DefId, SerdeOperatorId)>,
 }
 
 #[derive(Clone)]
@@ -69,11 +69,13 @@ pub struct EdgeData {
     pub connection_type_name: String,
 }
 
+#[derive(Clone)]
 pub struct Field {
     pub cardinality: FieldCardinality,
     pub kind: FieldKind,
 }
 
+#[derive(Clone)]
 pub enum FieldCardinality {
     UnitMandatory,
     UnitOptional,
@@ -81,16 +83,19 @@ pub enum FieldCardinality {
     ManyOptional,
 }
 
+#[derive(Clone)]
 pub enum FieldKind {
-    Scalar(SerdeOperatorId),
+    Scalar(DefId, SerdeOperatorId),
     Edge {
-        node: SerdeOperatorId,
+        node: DefId,
+        node_operator: SerdeOperatorId,
         rel: Option<SerdeOperatorId>,
     },
-    Node(SerdeOperatorId),
+    Node(DefId, SerdeOperatorId),
     EntityRelationship {
         subject: DefId,
-        node: SerdeOperatorId,
+        node: DefId,
+        node_operator: SerdeOperatorId,
         rel: Option<SerdeOperatorId>,
     },
 }

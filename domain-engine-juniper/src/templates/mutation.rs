@@ -44,8 +44,7 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
             .mutations
             .iter()
             .map(|(name, mutation_data)| {
-                let node_type_info =
-                    NodeTypeInfo(info.0.type_adapter(mutation_data.entity_operator_id));
+                let node_type_info = NodeTypeInfo(info.0.type_adapter(mutation_data.entity));
                 let type_name = &node_type_info.0.type_data().type_name;
 
                 match mutation_data.kind {

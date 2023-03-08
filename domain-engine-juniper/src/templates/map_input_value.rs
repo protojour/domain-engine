@@ -35,18 +35,16 @@ impl juniper::GraphQLType<GqlScalar> for MapInputValue {
         GqlScalar: 'r,
     {
         let type_data = &info.0.data().type_data;
+        let env = &info.0.domain_data.env;
         let mut reg = RegistryWrapper::new(registry, &info.0.domain_data);
-        let operator = info
-            .0
-            .domain_data
-            .env
-            .get_serde_operator(type_data.operator_id);
+        let operator = env.get_serde_operator(type_data.operator_id);
 
         let mut arguments = vec![];
 
         if let SerdeOperator::MapType(map_type) = operator {
             for (name, property) in &map_type.properties {
-                arguments.push(reg.register_domain_argument(name, property.value_operator_id));
+                let property_operator = env.get_serde_operator(property.value_operator_id);
+                arguments.push(reg.register_domain_argument(name, property_operator.type_def_id()));
             }
         } else {
             panic!()

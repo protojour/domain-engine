@@ -58,8 +58,8 @@ impl juniper::GraphQLType<GqlScalar> for Union {
             .data()
             .variants
             .iter()
-            .map(|variant_operator_id| {
-                reg.get_domain_type(info.0.domain_data.type_adapter(*variant_operator_id))
+            .map(|(variant_def_id, _)| {
+                reg.get_domain_type(info.0.domain_data.type_adapter(*variant_def_id))
             })
             .collect::<Vec<_>>();
 

@@ -130,6 +130,26 @@ pub enum SerdeOperator {
     MapType(MapType),
 }
 
+impl SerdeOperator {
+    pub fn type_def_id(&self) -> DefId {
+        match self {
+            Self::Unit => DefId::unit(),
+            Self::Int(def_id) => *def_id,
+            Self::Number(def_id) => *def_id,
+            Self::String(def_id) => *def_id,
+            Self::StringConstant(_, def_id) => *def_id,
+            Self::StringPattern(def_id) => *def_id,
+            Self::CapturingStringPattern(def_id) => *def_id,
+            Self::RelationSequence(seq) => seq.def_variant.id(),
+            Self::ConstructorSequence(seq) => seq.def_variant.id(),
+            Self::ValueType(ty) => ty.def_variant.id(),
+            Self::ValueUnionType(ty) => ty.union_def_variant.id(),
+            Self::Id(_) => todo!("Should include DefId of the Id type"),
+            Self::MapType(ty) => ty.def_variant.id(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RelationSequenceType {
     // note: This is constant size array so that it can produce a dynamic slice
