@@ -14,28 +14,10 @@ pub mod data;
 pub type DomainAdapter = Arc<DomainData>;
 
 impl DomainData {
-    pub fn entity_ref(&self, entity_id: SerdeOperatorId) -> EntityRef {
-        let entity_data = &self.entities.get(&entity_id).unwrap();
-        let type_data = &self.types.get(&entity_id).unwrap();
-
-        EntityRef {
-            entity_data,
-            type_data,
-        }
-    }
-
-    pub fn node_adapter(self: &Arc<Self>, operator_id: SerdeOperatorId) -> TypeAdapter<NodeKind> {
+    pub fn type_adapter<K: Kind>(self: &Arc<Self>, operator_id: SerdeOperatorId) -> TypeAdapter<K> {
         TypeAdapter {
             domain_data: self.clone(),
             operator_id,
-            _kind: std::marker::PhantomData,
-        }
-    }
-
-    pub fn entity_adapter(self: &Arc<Self>, entity_ref: &EntityRef) -> TypeAdapter<EntityKind> {
-        TypeAdapter {
-            domain_data: self.clone(),
-            operator_id: entity_ref.type_data.operator_id,
             _kind: std::marker::PhantomData,
         }
     }
@@ -67,6 +49,9 @@ pub struct NodeKind;
 pub struct EntityKind;
 
 #[derive(Clone)]
+pub struct UnionKind;
+
+#[derive(Clone)]
 pub struct ScalarKind;
 
 impl Kind for DynamicKind {
@@ -75,7 +60,7 @@ impl Kind for DynamicKind {
     fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_> {
         debug!("dynamic get_data_ref {operator_id:?}");
         if let Some(union_data) = domain_data.unions.get(&operator_id) {
-            DynamicRef::Union(UnionRef { union_data })
+            DynamicRef::Union(union_data)
         } else {
             let type_data = domain_data
                 .types
@@ -124,6 +109,17 @@ impl Kind for EntityKind {
     }
 }
 
+impl Kind for UnionKind {
+    type DataRef<'d> = &'d UnionData;
+
+    fn get_data_ref(domain_data: &DomainData, operator_id: SerdeOperatorId) -> Self::DataRef<'_> {
+        domain_data
+            .unions
+            .get(&operator_id)
+            .expect("No union data found")
+    }
+}
+
 impl Kind for ScalarKind {
     type DataRef<'d> = ScalarRef<'d>;
 
@@ -136,7 +132,7 @@ impl Kind for ScalarKind {
 pub struct TypeAdapter<K: Kind> {
     pub domain_data: Arc<DomainData>,
     pub operator_id: SerdeOperatorId,
-    pub _kind: std::marker::PhantomData<K>,
+    _kind: std::marker::PhantomData<K>,
 }
 
 impl<K: Kind> TypeAdapter<K> {
@@ -155,21 +151,6 @@ impl<K: Kind> TypeAdapter<K> {
             .types
             .get(&self.operator_id)
             .expect("Type has not been registered")
-    }
-}
-
-#[derive(Clone)]
-pub struct UnionAdapter {
-    pub domain_data: Arc<DomainData>,
-    pub operator_id: SerdeOperatorId,
-}
-
-impl UnionAdapter {
-    pub fn data(&self) -> &UnionData {
-        self.domain_data
-            .unions
-            .get(&self.operator_id)
-            .expect("No union data found")
     }
 }
 
@@ -201,7 +182,7 @@ impl EdgeAdapter {
 pub enum DynamicRef<'d> {
     Node(NodeRef<'d>),
     Entity(EntityRef<'d>),
-    Union(UnionRef<'d>),
+    Union(&'d UnionData),
     Scalar(ScalarRef<'d>),
 }
 
@@ -215,11 +196,6 @@ pub struct NodeRef<'d> {
 pub struct EntityRef<'d> {
     pub entity_data: &'d EntityData,
     pub type_data: &'d TypeData,
-}
-
-#[derive(Copy, Clone)]
-pub struct UnionRef<'d> {
-    pub union_data: &'d UnionData,
 }
 
 #[derive(Copy, Clone)]

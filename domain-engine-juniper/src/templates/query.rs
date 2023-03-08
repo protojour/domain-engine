@@ -1,6 +1,10 @@
 use crate::{
-    adapter::DomainAdapter, gql_scalar::GqlScalar, macros::impl_graphql_value,
-    registry_wrapper::RegistryWrapper, type_info::GraphqlTypeName, GqlContext,
+    adapter::{DomainAdapter, EntityKind},
+    gql_scalar::GqlScalar,
+    macros::impl_graphql_value,
+    registry_wrapper::RegistryWrapper,
+    type_info::GraphqlTypeName,
+    GqlContext,
 };
 
 use super::connection::{Connection, ConnectionTypeInfo};
@@ -37,11 +41,11 @@ impl juniper::GraphQLType<GqlScalar> for Query {
             .queries
             .iter()
             .map(|(name, operator_id)| {
-                let entity_ref = info.0.entity_ref(*operator_id);
+                let entity_adapter = info.0.type_adapter::<EntityKind>(*operator_id);
 
                 reg.field_convert::<Option<Connection>, _, GqlContext>(
                     name,
-                    &ConnectionTypeInfo(info.0.root_edge_adapter(&entity_ref)),
+                    &ConnectionTypeInfo(info.0.root_edge_adapter(&entity_adapter.data())),
                 )
                 // .argument(registry.arg::<Option<i32>>("skip", &()))
                 // .argument(registry.arg::<Option<i32>>("limit", &()))

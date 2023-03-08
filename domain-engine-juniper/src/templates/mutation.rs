@@ -39,31 +39,24 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
     {
         let mut reg = RegistryWrapper::new(registry, &info.0);
 
-        let domain_adapter = &info.0;
-
         let fields: Vec<_> = info
             .0
             .mutations
             .iter()
             .map(|(name, mutation_data)| {
-                let entity_ref = domain_adapter.entity_ref(mutation_data.entity_operator_id);
-                let type_name = &entity_ref.type_data.type_name;
+                let node_type_info =
+                    NodeTypeInfo(info.0.type_adapter(mutation_data.entity_operator_id));
+                let type_name = &node_type_info.0.type_data().type_name;
 
                 match mutation_data.kind {
                     MutationKind::Create { input } => reg
-                        .field_convert::<Node, _, GqlContext>(
-                            name,
-                            &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
-                        )
+                        .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
                             reg.register_domain_argument("input", input)
                                 .description(&format!("Input data for new {type_name}")),
                         ),
                     MutationKind::Update { input, id } => reg
-                        .field_convert::<Node, _, GqlContext>(
-                            name,
-                            &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
-                        )
+                        .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
                             reg.register_domain_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),
@@ -73,10 +66,7 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
                                 .description(&format!("Input data for the {type_name} update")),
                         ),
                     MutationKind::Delete { id } => reg
-                        .field_convert::<Node, _, GqlContext>(
-                            name,
-                            &NodeTypeInfo(info.0.node_adapter(entity_ref.type_data.operator_id)),
-                        )
+                        .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
                             reg.register_domain_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),

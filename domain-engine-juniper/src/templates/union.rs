@@ -1,5 +1,5 @@
 use crate::{
-    adapter::{TypeAdapter, UnionAdapter},
+    adapter::{TypeAdapter, UnionKind},
     gql_scalar::GqlScalar,
     registry_wrapper::RegistryWrapper,
     type_info::GraphqlTypeName,
@@ -9,7 +9,7 @@ use crate::{
 pub struct Union;
 
 #[derive(Clone)]
-pub struct UnionTypeInfo(pub UnionAdapter);
+pub struct UnionTypeInfo(pub TypeAdapter<UnionKind>);
 
 impl GraphqlTypeName for UnionTypeInfo {
     fn graphql_type_name(&self) -> &str {
@@ -59,11 +59,7 @@ impl juniper::GraphQLType<GqlScalar> for Union {
             .variants
             .iter()
             .map(|variant_operator_id| {
-                reg.get_domain_type(TypeAdapter {
-                    domain_data: info.0.domain_data.clone(),
-                    operator_id: *variant_operator_id,
-                    _kind: std::marker::PhantomData,
-                })
+                reg.get_domain_type(info.0.domain_data.type_adapter(*variant_operator_id))
             })
             .collect::<Vec<_>>();
 
