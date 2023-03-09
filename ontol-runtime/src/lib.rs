@@ -43,28 +43,29 @@ impl DefId {
 }
 
 bitflags::bitflags! {
-    pub struct DataVariant: u32 {
+    /// Modifier for (de)serializers.
+    pub struct DataModifier: u32 {
         const IDENTITY = 0b00000000;
         const ARRAY    = 0b00000001;
-        const ID       = 0b00000010;
-        const UNION    = 0b00000100;
+        const UNION    = 0b00000010;
+        const ID       = 0b00000100;
         const PROPS    = 0b00001000;
     }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct DefVariant(pub DefId, pub DataVariant);
+pub struct DefVariant(pub DefId, pub DataModifier);
 
 impl DefVariant {
     pub const fn identity(def_id: DefId) -> Self {
-        Self(def_id, DataVariant::IDENTITY)
+        Self(def_id, DataModifier::IDENTITY)
     }
 
     pub const fn id(&self) -> DefId {
         self.0
     }
 
-    pub const fn data_variant(&self) -> DataVariant {
+    pub const fn modifier(&self) -> DataModifier {
         self.1
     }
 }

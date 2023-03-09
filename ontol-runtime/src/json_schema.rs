@@ -13,7 +13,7 @@ use crate::{
     serde::{SerdeOperator, SerdeOperatorId},
     DefId, PackageId,
 };
-use crate::{smart_format, DataVariant, DefVariant};
+use crate::{smart_format, DataModifier, DefVariant};
 
 pub fn build_openapi_schemas<'e>(
     env: &'e Env,
@@ -216,13 +216,13 @@ impl Display for Key {
 
         write!(f, "{}_{}", package.0, def_id.1)?;
 
-        if variant.data_variant().contains(DataVariant::ID) {
+        if variant.modifier().contains(DataModifier::ID) {
             write!(f, "_id")?;
         }
-        if variant.data_variant().contains(DataVariant::UNION) {
+        if variant.modifier().contains(DataModifier::UNION) {
             write!(f, "_union")?;
         }
-        if variant.data_variant().contains(DataVariant::ARRAY) {
+        if variant.modifier().contains(DataModifier::ARRAY) {
             write!(f, "_array")?;
         }
 

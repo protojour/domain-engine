@@ -3,10 +3,9 @@ use std::collections::BTreeMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
     serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionVariant},
-    smart_format, DefId,
+    smart_format, DataModifier, DefId,
 };
 use smartstring::alias::String;
-use tracing::debug;
 
 use super::serde_generator::SerdeGenerator;
 
@@ -69,9 +68,10 @@ impl UnionBuilder {
         &mut self,
         generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
+        modifier: DataModifier,
     ) -> Result<(), String> {
         let operator_id = match generator
-            .get_serde_operator_id(SerdeKey::identity(discriminator.def_variant.id()))
+            .get_serde_operator_id(SerdeKey::def(discriminator.def_variant.id(), modifier))
         {
             Some(operator_id) => operator_id,
             None => return Ok(()),
@@ -105,8 +105,8 @@ impl UnionBuilder {
                 }
                 Ok(())
             }
-            other => {
-                debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
+            _other => {
+                // debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
                 match discriminator.discriminant {
                     Discriminant::MapFallback => {
                         if let Some(scoping) = scope.last() {

@@ -14,7 +14,7 @@ use crate::{
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     value::PropertyId,
-    DataVariant, DefId, DefVariant,
+    DataModifier, DefId, DefVariant,
 };
 
 mod deserialize;
@@ -81,17 +81,17 @@ pub struct SerdeOperatorId(pub u32);
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SerdeKey {
-    Variant(DefVariant),
+    Def(DefVariant),
     Intersection(Box<BTreeSet<SerdeKey>>),
 }
 
 impl SerdeKey {
-    pub const fn variant(def_id: DefId, variant: DataVariant) -> Self {
-        Self::Variant(DefVariant(def_id, variant))
+    pub const fn def(def_id: DefId, modifier: DataModifier) -> Self {
+        Self::Def(DefVariant(def_id, modifier))
     }
 
     pub const fn identity(def_id: DefId) -> Self {
-        Self::Variant(DefVariant(def_id, DataVariant::IDENTITY))
+        Self::Def(DefVariant(def_id, DataModifier::IDENTITY))
     }
 }
 
