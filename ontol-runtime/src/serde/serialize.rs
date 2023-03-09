@@ -72,7 +72,7 @@ impl<'e> SerdeProcessor<'e> {
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type.variants.iter().find(|discriminator| {
-                    value.type_def_id == discriminator.discriminator.def_variant.id()
+                    value.type_def_id == discriminator.discriminator.def_variant.def_id
                 });
 
                 match discriminator {

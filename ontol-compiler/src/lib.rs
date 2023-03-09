@@ -15,7 +15,7 @@ use ontol_runtime::{
     env::{Domain, Env, TypeInfo},
     serde::SerdeKey,
     string_types::StringLikeType,
-    DataModifier, DefId, PackageId,
+    DataModifier, DefId, DefVariant, PackageId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
@@ -186,13 +186,18 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
+                let modifier = DataModifier::ID | DataModifier::PROPS | DataModifier::UNION;
+
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     name: type_name,
                     entity_id,
-                    identity_operator_id: serde_generator.get_serde_operator_id(SerdeKey::def(
-                        type_def_id,
-                        DataModifier::ID | DataModifier::PROPS | DataModifier::UNION,
+                    identity_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
+                        DefVariant {
+                            def_id: type_def_id,
+                            local_mod: modifier,
+                            global_mod: modifier,
+                        },
                     )),
                 });
             }

@@ -110,7 +110,7 @@ fn adapt_type(
                         operator_id,
                         UnionData {
                             type_name: type_info.name.clone(),
-                            def_id: value_union_type.union_def_variant.id(),
+                            def_id: value_union_type.union_def_variant.def_id,
                             operator_id,
                             variants: union_variants,
                         },
@@ -238,7 +238,7 @@ fn adapt_node_type(
                     Field {
                         cardinality,
                         kind: FieldKind::Edge {
-                            node: map_type.def_variant.id(),
+                            node: map_type.def_variant.def_id,
                             node_operator: property.value_operator_id,
                             rel: property.rel_params_operator_id,
                         },
@@ -354,11 +354,11 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
 
     match operator {
         SerdeOperator::MapType(map_type) => {
-            let type_info = env.get_type_info(map_type.def_variant.id());
+            let type_info = env.get_type_info(map_type.def_variant.def_id);
             if type_info.entity_id.is_some() {
-                TypeClassification::Entity(map_type.def_variant.id(), operator_id)
+                TypeClassification::Entity(map_type.def_variant.def_id, operator_id)
             } else {
-                TypeClassification::Node(map_type.def_variant.id(), operator_id)
+                TypeClassification::Node(map_type.def_variant.def_id, operator_id)
             }
         }
         SerdeOperator::ValueUnionType(union_type) => {
@@ -372,7 +372,7 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
 
             // start with the "highest" classification and downgrade as "lower" variants are found.
             let mut classification =
-                TypeClassification::Entity(union_type.union_def_variant.id(), operator_id);
+                TypeClassification::Entity(union_type.union_def_variant.def_id, operator_id);
 
             for variant in &union_type.variants {
                 let variant_classification = classify_type(env, variant.operator_id);
@@ -381,7 +381,7 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
                         // downgrade
                         debug!("    Downgrade to Node");
                         classification = TypeClassification::Node(
-                            union_type.union_def_variant.id(),
+                            union_type.union_def_variant.def_id,
                             operator_id,
                         );
                     }

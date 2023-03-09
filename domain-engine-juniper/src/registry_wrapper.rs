@@ -145,7 +145,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 // registry.arg::<CustomScalar>(name, &()),
             }
             SerdeOperator::ValueType(value_type) => {
-                self.register_domain_argument(name, value_type.def_variant.id())
+                self.register_domain_argument(name, value_type.def_variant.def_id)
             }
             SerdeOperator::ValueUnionType(_) => {
                 todo!()

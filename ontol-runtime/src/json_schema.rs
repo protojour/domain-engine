@@ -84,7 +84,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
         }
 
         for (def_variant, operator_id) in &self.schema_graph {
-            if def_variant.id().0 != self.package_id {
+            if def_variant.def_id.0 != self.package_id {
                 map.serialize_entry(&ctx.format_key(*def_variant), &ctx.definition(*operator_id))?;
             }
         }
@@ -211,18 +211,17 @@ struct Key(DefVariant);
 impl Display for Key {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let variant = &self.0;
-        let def_id = variant.id();
-        let package = def_id.0;
+        let package = self.0.def_id.0;
 
-        write!(f, "{}_{}", package.0, def_id.1)?;
+        write!(f, "{}_{}", package.0, self.0.def_id.1)?;
 
-        if variant.modifier().contains(DataModifier::ID) {
+        if variant.local_mod.contains(DataModifier::ID) {
             write!(f, "_id")?;
         }
-        if variant.modifier().contains(DataModifier::UNION) {
+        if variant.local_mod.contains(DataModifier::UNION) {
             write!(f, "_union")?;
         }
-        if variant.modifier().contains(DataModifier::ARRAY) {
+        if variant.local_mod.contains(DataModifier::ARRAY) {
             write!(f, "_array")?;
         }
 

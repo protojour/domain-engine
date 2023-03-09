@@ -54,19 +54,43 @@ bitflags::bitflags! {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct DefVariant(pub DefId, pub DataModifier);
+pub struct DefVariant {
+    pub def_id: DefId,
+    pub local_mod: DataModifier,
+    pub global_mod: DataModifier,
+}
 
 impl DefVariant {
     pub const fn identity(def_id: DefId) -> Self {
-        Self(def_id, DataModifier::IDENTITY)
+        Self {
+            def_id: def_id,
+            local_mod: DataModifier::IDENTITY,
+            global_mod: DataModifier::IDENTITY,
+        }
     }
 
-    pub const fn id(&self) -> DefId {
-        self.0
+    pub fn new_def(self, def_id: DefId) -> Self {
+        Self {
+            def_id,
+            local_mod: self.local_mod,
+            global_mod: self.global_mod,
+        }
     }
 
-    pub const fn modifier(&self) -> DataModifier {
-        self.1
+    pub fn new_local_mod(self, local_mod: DataModifier) -> Self {
+        Self {
+            def_id: self.def_id,
+            local_mod,
+            global_mod: self.global_mod,
+        }
+    }
+
+    pub fn local_mod_difference(self, local_mod: DataModifier) -> Self {
+        Self {
+            def_id: self.def_id,
+            local_mod: self.local_mod.difference(local_mod),
+            global_mod: self.global_mod,
+        }
     }
 }
 
@@ -75,7 +99,7 @@ impl Debug for DefVariant {
         write!(
             f,
             "DefVariant({}, {}, {:?})",
-            self.0 .0 .0, self.0 .1, self.1,
+            self.def_id.0 .0, self.def_id.1, self.local_mod,
         )
     }
 }

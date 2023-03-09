@@ -14,7 +14,7 @@ use crate::{
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     value::PropertyId,
-    DataModifier, DefId, DefVariant,
+    DefId, DefVariant,
 };
 
 mod deserialize;
@@ -86,12 +86,8 @@ pub enum SerdeKey {
 }
 
 impl SerdeKey {
-    pub const fn def(def_id: DefId, modifier: DataModifier) -> Self {
-        Self::Def(DefVariant(def_id, modifier))
-    }
-
     pub const fn identity(def_id: DefId) -> Self {
-        Self::Def(DefVariant(def_id, DataModifier::IDENTITY))
+        Self::Def(DefVariant::identity(def_id))
     }
 }
 
@@ -140,12 +136,12 @@ impl SerdeOperator {
             Self::StringConstant(_, def_id) => *def_id,
             Self::StringPattern(def_id) => *def_id,
             Self::CapturingStringPattern(def_id) => *def_id,
-            Self::RelationSequence(seq) => seq.def_variant.id(),
-            Self::ConstructorSequence(seq) => seq.def_variant.id(),
-            Self::ValueType(ty) => ty.def_variant.id(),
-            Self::ValueUnionType(ty) => ty.union_def_variant.id(),
+            Self::RelationSequence(seq) => seq.def_variant.def_id,
+            Self::ConstructorSequence(seq) => seq.def_variant.def_id,
+            Self::ValueType(ty) => ty.def_variant.def_id,
+            Self::ValueUnionType(ty) => ty.union_def_variant.def_id,
             Self::Id(_) => todo!("Should include DefId of the Id type"),
-            Self::MapType(ty) => ty.def_variant.id(),
+            Self::MapType(ty) => ty.def_variant.def_id,
         }
     }
 }

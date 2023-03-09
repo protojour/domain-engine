@@ -321,7 +321,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
                         self.env,
-                        variant.discriminator.def_variant.id(),
+                        variant.discriminator.def_variant.def_id,
                         str,
                     )
                     .map_err(|_| ())
@@ -329,13 +329,13 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsStringLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.env,
-                        variant.discriminator.def_variant.id(),
+                        variant.discriminator.def_variant.def_id,
                         str,
                     )
                     .map_err(|_| ())
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
-                    let result_type = variant.discriminator.def_variant.id();
+                    let result_type = variant.discriminator.def_variant.def_id;
                     let pattern = self.env.string_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str) {
@@ -358,14 +358,14 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     SerdeOperator::RelationSequence(sequence_type) => {
                         return Ok(SequenceMatcher::new(
                             &sequence_type.ranges,
-                            sequence_type.def_variant.id(),
+                            sequence_type.def_variant.def_id,
                             self.rel_params_operator_id,
                         ))
                     }
                     SerdeOperator::ConstructorSequence(sequence_type) => {
                         return Ok(SequenceMatcher::new(
                             &sequence_type.ranges,
-                            sequence_type.def_variant.id(),
+                            sequence_type.def_variant.def_id,
                             self.rel_params_operator_id,
                         ))
                     }
@@ -403,7 +403,7 @@ impl<'e> UnionMatcher<'e> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
         for variant in &self.value_union_type.variants {
             if variant.discriminator.discriminant == discriminant {
-                return Ok(variant.discriminator.def_variant.id());
+                return Ok(variant.discriminator.def_variant.def_id);
             }
         }
 

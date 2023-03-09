@@ -3,15 +3,24 @@ use std::collections::BTreeMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
     serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionVariant},
-    smart_format, DataModifier, DefId,
+    smart_format, DefId, DefVariant,
 };
 use smartstring::alias::String;
 
 use super::serde_generator::SerdeGenerator;
 
-#[derive(Default)]
 pub struct UnionBuilder {
     discriminator_candidates: Vec<ValueUnionVariant>,
+    def_variant: DefVariant,
+}
+
+impl UnionBuilder {
+    pub fn new(def_variant: DefVariant) -> Self {
+        Self {
+            discriminator_candidates: vec![],
+            def_variant,
+        }
+    }
 }
 
 impl UnionBuilder {
@@ -24,7 +33,7 @@ impl UnionBuilder {
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
         for candidate in &mut self.discriminator_candidates {
-            let result_type = candidate.discriminator.def_variant.id();
+            let result_type = candidate.discriminator.def_variant.def_id;
 
             candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
 
@@ -68,11 +77,10 @@ impl UnionBuilder {
         &mut self,
         generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
-        modifier: DataModifier,
     ) -> Result<(), String> {
-        let operator_id = match generator
-            .get_serde_operator_id(SerdeKey::def(discriminator.def_variant.id(), modifier))
-        {
+        let operator_id = match generator.get_serde_operator_id(SerdeKey::Def(
+            self.def_variant.new_def(discriminator.def_variant.def_id),
+        )) {
             Some(operator_id) => operator_id,
             None => return Ok(()),
         };
