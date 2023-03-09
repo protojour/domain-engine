@@ -3,7 +3,7 @@ use tracing::debug;
 use crate::{
     adapter::{data::MutationKind, DomainAdapter},
     gql_scalar::GqlScalar,
-    input_value_deserializer::deserialize_argument,
+    input_value_deserializer::{deserialize_def_argument, deserialize_operator_argument},
     macros::impl_graphql_value,
     registry_wrapper::RegistryWrapper,
     type_info::GraphqlTypeName,
@@ -51,23 +51,23 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
                     MutationKind::Create { input } => reg
                         .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
-                            reg.register_domain_argument("input", input)
+                            reg.register_def_argument("input", input)
                                 .description(&format!("Input data for new {type_name}")),
                         ),
                     MutationKind::Update { input, id } => reg
                         .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
-                            reg.register_domain_argument("_id", id)
+                            reg.register_operator_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),
                         )
                         .argument(
-                            reg.register_domain_argument("input", input)
+                            reg.register_def_argument("input", input)
                                 .description(&format!("Input data for the {type_name} update")),
                         ),
                     MutationKind::Delete { id } => reg
                         .field_convert::<Node, _, GqlContext>(name, &node_type_info)
                         .argument(
-                            reg.register_domain_argument("_id", id)
+                            reg.register_operator_argument("_id", id)
                                 .description(&format!("Identifier for the {type_name} object")),
                         ),
                 }
@@ -94,18 +94,18 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
 
             match mutation_data.kind {
                 MutationKind::Create { input } => {
-                    let input_value = deserialize_argument(arguments, "input", input, env)?;
+                    let input_value = deserialize_def_argument(arguments, "input", input, env)?;
 
                     debug!("CREATE {input_value:?}");
                 }
                 MutationKind::Update { id, input } => {
-                    let id_value = deserialize_argument(arguments, "_id", id, env)?;
-                    let input_value = deserialize_argument(arguments, "input", input, env)?;
+                    let id_value = deserialize_operator_argument(arguments, "_id", id, env)?;
+                    let input_value = deserialize_def_argument(arguments, "input", input, env)?;
 
                     debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
                 MutationKind::Delete { id } => {
-                    let id_value = deserialize_argument(arguments, "_id", id, env)?;
+                    let id_value = deserialize_operator_argument(arguments, "_id", id, env)?;
                     debug!("DELETE {id_value:?}");
                 }
             };

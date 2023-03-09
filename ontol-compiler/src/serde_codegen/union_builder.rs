@@ -79,7 +79,7 @@ impl UnionBuilder {
         discriminator: &VariantDiscriminator,
     ) -> Result<(), String> {
         let operator_id = match generator.get_serde_operator_id(SerdeKey::Def(
-            self.def_variant.new_def(discriminator.def_variant.def_id),
+            self.def_variant.with_def(discriminator.def_variant.def_id),
         )) {
             Some(operator_id) => operator_id,
             None => return Ok(()),

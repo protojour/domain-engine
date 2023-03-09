@@ -35,8 +35,8 @@ pub struct MutationData {
 #[derive(Clone, Copy)]
 pub enum MutationKind {
     Create { input: DefId },
-    Update { id: DefId, input: DefId },
-    Delete { id: DefId },
+    Update { id: SerdeOperatorId, input: DefId },
+    Delete { id: SerdeOperatorId },
 }
 
 pub struct EntityData {
@@ -85,7 +85,7 @@ pub enum FieldCardinality {
 
 #[derive(Clone)]
 pub enum FieldKind {
-    Scalar(DefId, SerdeOperatorId),
+    Scalar(SerdeOperatorId),
     Edge {
         node: DefId,
         node_operator: SerdeOperatorId,

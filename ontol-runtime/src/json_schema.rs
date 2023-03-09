@@ -24,7 +24,7 @@ pub fn build_openapi_schemas<'e>(
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
-        if let Some(operator_id) = &type_info.identity_operator_id {
+        if let Some(operator_id) = &type_info.rest_operator_id {
             graph_builder.visit(*operator_id, env);
         }
     }
@@ -43,7 +43,7 @@ pub fn build_standalone_schema<'e>(
     let mut graph_builder = SchemaGraphBuilder::default();
 
     let operator_id = type_info
-        .identity_operator_id
+        .rest_operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 
@@ -77,8 +77,8 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
         // serialize schema definitions belonging to the domain package first
         for (def_id, operator_id) in self.schema_graph.range(
-            DefVariant::identity(DefId(package_id, 0))
-                ..DefVariant::identity(DefId(next_package_id, 0)),
+            DefVariant::new(DefId(package_id, 0), DataModifier::IDENTITY)
+                ..DefVariant::new(DefId(next_package_id, 0), DataModifier::IDENTITY),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
         }

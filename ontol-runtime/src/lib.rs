@@ -61,15 +61,15 @@ pub struct DefVariant {
 }
 
 impl DefVariant {
-    pub const fn identity(def_id: DefId) -> Self {
+    pub const fn new(def_id: DefId, modifier: DataModifier) -> Self {
         Self {
-            def_id: def_id,
-            local_mod: DataModifier::IDENTITY,
-            global_mod: DataModifier::IDENTITY,
+            def_id,
+            local_mod: modifier,
+            global_mod: modifier,
         }
     }
 
-    pub fn new_def(self, def_id: DefId) -> Self {
+    pub fn with_def(self, def_id: DefId) -> Self {
         Self {
             def_id,
             local_mod: self.local_mod,
@@ -77,7 +77,7 @@ impl DefVariant {
         }
     }
 
-    pub fn new_local_mod(self, local_mod: DataModifier) -> Self {
+    pub fn with_local_mod(self, local_mod: DataModifier) -> Self {
         Self {
             def_id: self.def_id,
             local_mod,
@@ -85,10 +85,10 @@ impl DefVariant {
         }
     }
 
-    pub fn local_mod_difference(self, local_mod: DataModifier) -> Self {
+    pub fn minus_local_mod(self, diff: DataModifier) -> Self {
         Self {
             def_id: self.def_id,
-            local_mod: self.local_mod.difference(local_mod),
+            local_mod: self.local_mod.difference(diff),
             global_mod: self.global_mod,
         }
     }

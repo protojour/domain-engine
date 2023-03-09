@@ -3,7 +3,10 @@ use std::{
     sync::Arc,
 };
 
-use ontol_runtime::{serde::SerdeOperator, DefId};
+use ontol_runtime::{
+    serde::{SerdeOperator, SerdeOperatorId},
+    DefId,
+};
 use tracing::{debug, warn};
 
 use crate::{
@@ -48,7 +51,7 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         let env = &self.domain_data.env;
 
         match &field.kind {
-            FieldKind::Scalar(_def_id, serde_operator_id) => {
+            FieldKind::Scalar(serde_operator_id) => {
                 match env.get_serde_operator(*serde_operator_id) {
                     SerdeOperator::Unit => {
                         todo!("unit fields");
@@ -112,14 +115,11 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
         }
     }
 
-    pub fn register_domain_argument(
+    pub fn register_operator_argument(
         &mut self,
         name: &str,
-        def_id: DefId,
+        operator_id: SerdeOperatorId,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let type_info = self.domain_data.env.get_type_info(def_id);
-        let operator_id = type_info.identity_operator_id.unwrap();
-
         let operator = self.domain_data.env.get_serde_operator(operator_id);
 
         debug!("register argument {name} {operator:?}");
@@ -145,18 +145,37 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 // registry.arg::<CustomScalar>(name, &()),
             }
             SerdeOperator::ValueType(value_type) => {
-                self.register_domain_argument(name, value_type.def_variant.def_id)
+                self.register_operator_argument(name, value_type.inner_operator_id)
             }
-            SerdeOperator::ValueUnionType(_) => {
-                todo!()
+            SerdeOperator::ValueUnionType(union_type) => {
+                self.register_def_argument(name, union_type.union_def_variant.def_id)
             }
             SerdeOperator::Id(_) => {
                 todo!()
             }
-            SerdeOperator::MapType(_) => {
-                let type_info = MapInputValueTypeInfo(self.domain_data.type_adapter(def_id));
+            SerdeOperator::MapType(map_type) => {
+                self.register_def_argument(name, map_type.def_variant.def_id)
+            }
+        }
+    }
 
+    pub fn register_def_argument(
+        &mut self,
+        name: &str,
+        def_id: DefId,
+    ) -> juniper::meta::Argument<'r, GqlScalar> {
+        let type_adapter = self.domain_data.type_adapter::<DynamicKind>(def_id);
+
+        match type_adapter.data() {
+            DynamicRef::Node(_) | DynamicRef::Entity(_) => {
+                let type_info = MapInputValueTypeInfo(self.domain_data.type_adapter(def_id));
                 self.arg::<MapInputValue>(name, &type_info)
+            }
+            DynamicRef::Union(_) => {
+                todo!()
+            }
+            DynamicRef::Scalar(_) => {
+                panic!()
             }
         }
     }

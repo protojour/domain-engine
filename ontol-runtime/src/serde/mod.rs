@@ -14,7 +14,7 @@ use crate::{
     env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     value::PropertyId,
-    DefId, DefVariant,
+    DataModifier, DefId, DefVariant,
 };
 
 mod deserialize;
@@ -87,7 +87,7 @@ pub enum SerdeKey {
 
 impl SerdeKey {
     pub const fn identity(def_id: DefId) -> Self {
-        Self::Def(DefVariant::identity(def_id))
+        Self::Def(DefVariant::new(def_id, DataModifier::IDENTITY))
     }
 }
 

@@ -43,8 +43,7 @@ impl juniper::GraphQLType<GqlScalar> for MapInputValue {
 
         if let SerdeOperator::MapType(map_type) = operator {
             for (name, property) in &map_type.properties {
-                let property_operator = env.get_serde_operator(property.value_operator_id);
-                arguments.push(reg.register_domain_argument(name, property_operator.type_def_id()));
+                arguments.push(reg.register_operator_argument(name, property.value_operator_id));
             }
         } else {
             panic!()
