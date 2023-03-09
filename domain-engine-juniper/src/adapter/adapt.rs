@@ -5,20 +5,20 @@ use ontol_runtime::{
     discriminator::Discriminant,
     env::{Env, TypeInfo},
     serde::{MapType, SerdeOperator, SerdeOperatorId},
-    smart_format, DefId, PackageId,
+    DefId, PackageId,
 };
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     adapter::data::{
-        DomainData, EdgeData, EntityData, Field, FieldCardinality, FieldKind, MutationData,
-        MutationKind, TypeData, UnionData,
+        DomainData, EntityData, Field, FieldCardinality, FieldKind, MutationData, MutationKind,
+        TypeData, UnionData,
     },
     SchemaBuildError,
 };
 
-use super::DomainAdapter;
+use super::{names::Names, DomainAdapter};
 
 pub fn adapt_domain(
     env: Arc<Env>,
@@ -28,6 +28,8 @@ pub fn adapt_domain(
         .find_domain(&package_id)
         .ok_or(SchemaBuildError::UnknownPackage)?;
 
+    let mut names = Names::new();
+
     let mut domain_data = DomainData {
         env: env.clone(),
         package_id,
@@ -35,10 +37,6 @@ pub fn adapt_domain(
         entities: Default::default(),
         unions: Default::default(),
         edges: Default::default(),
-        types_by_def: Default::default(),
-        entities_by_def: Default::default(),
-        unions_by_def: Default::default(),
-        edges_by_def: Default::default(),
         query_type_name: "Query".into(),
         mutation_type_name: "Mutation".into(),
         queries: Default::default(),
@@ -51,7 +49,7 @@ pub fn adapt_domain(
         if let Some(operator_id) = type_info.graphql_operator_id {
             debug!("adapt type `{}` {:?}", type_info.name, operator_id);
 
-            adapt_type(&env, &mut domain_data, type_info, operator_id);
+            adapt_type(&env, &mut domain_data, &mut names, type_info, operator_id);
         }
     }
 
@@ -61,12 +59,13 @@ pub fn adapt_domain(
 fn adapt_type(
     env: &Env,
     domain_data: &mut DomainData,
+    names: &mut Names,
     type_info: &TypeInfo,
     operator_id: SerdeOperatorId,
 ) {
     match env.get_serde_operator(operator_id) {
         SerdeOperator::MapType(map_type) => {
-            adapt_node_type(env, domain_data, type_info, operator_id, map_type);
+            adapt_node_type(env, domain_data, names, type_info, operator_id, map_type);
         }
         SerdeOperator::ValueUnionType(value_union_type) => {
             let mut found_id = None;
@@ -86,7 +85,7 @@ fn adapt_type(
             match (found_id, found_map_fallback) {
                 (Some(_id), Some(map_fallback)) => {
                     debug!("found _id and map fallback");
-                    adapt_type(env, domain_data, type_info, map_fallback.operator_id)
+                    adapt_type(env, domain_data, names, type_info, map_fallback.operator_id)
                 }
                 _ => {
                     let mut union_variants = vec![];
@@ -107,7 +106,7 @@ fn adapt_type(
                     debug!("created a union for `{type_name}`: {operator_id:?} variants={union_variants:?}", type_name = type_info.name);
 
                     domain_data.unions.insert(
-                        operator_id,
+                        type_info.def_id,
                         UnionData {
                             type_name: type_info.name.clone(),
                             def_id: value_union_type.union_def_variant.def_id,
@@ -127,6 +126,7 @@ fn adapt_type(
 fn adapt_node_type(
     _env: &Env,
     domain_data: &mut DomainData,
+    names: &mut Names,
     type_info: &TypeInfo,
     serde_operator_id: SerdeOperatorId,
     map_type: &MapType,
@@ -152,10 +152,10 @@ fn adapt_node_type(
 
         domain_data
             .queries
-            .insert(smart_format!("{type_name}List"), type_info.def_id);
+            .insert(names.list(type_name), type_info.def_id);
 
         domain_data.mutations.insert(
-            smart_format!("create{type_name}"),
+            names.create(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
@@ -165,7 +165,7 @@ fn adapt_node_type(
             },
         );
         domain_data.mutations.insert(
-            smart_format!("update{type_name}"),
+            names.update(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
@@ -176,42 +176,23 @@ fn adapt_node_type(
             },
         );
         domain_data.mutations.insert(
-            smart_format!("delete{type_name}"),
+            names.delete(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
                 kind: MutationKind::Delete { id: id_operator_id },
             },
         );
-
         domain_data.entities.insert(
-            serde_operator_id,
-            EntityData {
-                def_id: type_info.def_id,
-                id_operator_id,
-            },
-        );
-        domain_data.entities_by_def.insert(
             type_info.def_id,
             EntityData {
                 def_id: type_info.def_id,
                 id_operator_id,
             },
         );
-        domain_data.edges.insert(
-            (None, serde_operator_id),
-            EdgeData {
-                edge_type_name: smart_format!("{type_name}ConnectionEdge"),
-                connection_type_name: smart_format!("{type_name}Connection"),
-            },
-        );
-        domain_data.edges_by_def.insert(
-            (None, type_info.def_id),
-            EdgeData {
-                edge_type_name: smart_format!("{type_name}ConnectionEdge"),
-                connection_type_name: smart_format!("{type_name}Connection"),
-            },
-        );
+        domain_data
+            .edges
+            .insert((None, type_info.def_id), names.root_edge_data(type_name));
     }
 
     for (property_name, property) in &map_type.properties {
@@ -234,6 +215,7 @@ fn adapt_node_type(
                     Field {
                         cardinality,
                         kind: FieldKind::Edge {
+                            subject: type_info.def_id,
                             node: map_type.def_variant.def_id,
                             node_operator: property.value_operator_id,
                             rel: property.rel_params_operator_id,
@@ -251,15 +233,8 @@ fn adapt_node_type(
                 match classify_type(env, sequence_type.ranges[0].operator_id) {
                     TypeClassification::Entity(entity_def_id, entity_operator_id) => {
                         domain_data.edges.insert(
-                            (Some(type_info.def_id), entity_operator_id),
-                            EdgeData {
-                                edge_type_name: smart_format!(
-                                    "{type_name}{property_name}ConnectionEdge"
-                                ),
-                                connection_type_name: smart_format!(
-                                    "{type_name}{property_name}Connection"
-                                ),
-                            },
+                            (Some(type_info.def_id), entity_def_id),
+                            names.edge_data(type_name, property_name),
                         );
                         fields.insert(
                             property_name.clone(),
@@ -275,11 +250,16 @@ fn adapt_node_type(
                         );
                     }
                     TypeClassification::Node(node_def_id, node_operator_id) => {
+                        domain_data.edges.insert(
+                            (Some(type_info.def_id), node_def_id),
+                            names.edge_data(type_name, property_name),
+                        );
                         fields.insert(
                             property_name.clone(),
                             Field {
                                 cardinality,
                                 kind: FieldKind::Edge {
+                                    subject: type_info.def_id,
                                     node: node_def_id,
                                     node_operator: node_operator_id,
                                     rel: property.rel_params_operator_id,
@@ -315,22 +295,11 @@ fn adapt_node_type(
     }
 
     domain_data.types.insert(
-        serde_operator_id,
-        TypeData {
-            type_name: type_name.clone(),
-            def_id: type_info.def_id,
-            input_type_name: smart_format!("{type_name}Input"),
-            operator_id: serde_operator_id,
-            fields: fields.clone(),
-        },
-    );
-
-    domain_data.types_by_def.insert(
         type_info.def_id,
         TypeData {
             type_name: type_name.clone(),
             def_id: type_info.def_id,
-            input_type_name: smart_format!("{type_name}Input"),
+            input_type_name: names.input(type_name),
             operator_id: serde_operator_id,
             fields,
         },
@@ -358,19 +327,15 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
             }
         }
         SerdeOperator::ValueUnionType(union_type) => {
-            for variant in &union_type.variants {
-                if variant.discriminator.discriminant == Discriminant::MapFallback {
-                    return classify_type(env, variant.operator_id);
-                }
-            }
-
-            debug!("   no MapFallback");
-
             // start with the "highest" classification and downgrade as "lower" variants are found.
             let mut classification =
                 TypeClassification::Entity(union_type.union_def_variant.def_id, operator_id);
 
             for variant in &union_type.variants {
+                if variant.discriminator.discriminant == Discriminant::MapFallback {
+                    panic!("BUG: Don't want to see this in a GraphQL operator");
+                }
+
                 let variant_classification = classify_type(env, variant.operator_id);
                 match (&classification, variant_classification) {
                     (TypeClassification::Entity(..), TypeClassification::Node(..)) => {

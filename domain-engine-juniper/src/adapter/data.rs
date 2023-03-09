@@ -9,15 +9,10 @@ pub struct DomainData {
     pub env: Arc<Env>,
     pub package_id: PackageId,
 
-    pub types: FnvHashMap<SerdeOperatorId, TypeData>,
-    pub entities: FnvHashMap<SerdeOperatorId, EntityData>,
-    pub unions: FnvHashMap<SerdeOperatorId, UnionData>,
-    pub edges: FnvHashMap<(Option<DefId>, SerdeOperatorId), EdgeData>,
-
-    pub types_by_def: FnvHashMap<DefId, TypeData>,
-    pub entities_by_def: FnvHashMap<DefId, EntityData>,
-    pub unions_by_def: FnvHashMap<DefId, UnionData>,
-    pub edges_by_def: FnvHashMap<(Option<DefId>, DefId), EdgeData>,
+    pub types: FnvHashMap<DefId, TypeData>,
+    pub entities: FnvHashMap<DefId, EntityData>,
+    pub unions: FnvHashMap<DefId, UnionData>,
+    pub edges: FnvHashMap<(Option<DefId>, DefId), EdgeData>,
 
     pub query_type_name: String,
     pub mutation_type_name: String,
@@ -87,6 +82,7 @@ pub enum FieldCardinality {
 pub enum FieldKind {
     Scalar(SerdeOperatorId),
     Edge {
+        subject: DefId,
         node: DefId,
         node_operator: SerdeOperatorId,
         rel: Option<SerdeOperatorId>,

@@ -11,12 +11,13 @@ use tracing::{debug, warn};
 
 use crate::{
     adapter::{
-        data::{DomainData, Field, FieldKind},
+        data::{DomainData, Field, FieldCardinality, FieldKind},
         DynamicKind, DynamicRef, EdgeAdapter, TypeAdapter,
     },
     gql_scalar::GqlScalar,
     templates::{
         connection::{Connection, ConnectionTypeInfo},
+        edge::{Edge, EdgeTypeInfo},
         map_input_value::{MapInputValue, MapInputValueTypeInfo},
         node::{Node, NodeTypeInfo},
         union::{Union, UnionTypeInfo},
@@ -93,25 +94,60 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                     DynamicRef::Scalar(_) => panic!("Unsupported scalar here"),
                 }
             }
-            FieldKind::Edge { .. } => {
-                todo!()
+            FieldKind::Edge {
+                subject,
+                node,
+                node_operator,
+                ..
+            } => {
+                let edge_adapter = EdgeAdapter {
+                    domain_data: self.domain_data.clone(),
+                    subject: Some(*subject),
+                    node_id: *node,
+                    node_operator_id: *node_operator,
+                };
+                match field.cardinality {
+                    FieldCardinality::UnitMandatory | FieldCardinality::UnitOptional => {
+                        self.registry.field_convert::<Option<Edge>, _, GqlContext>(
+                            name,
+                            &EdgeTypeInfo(edge_adapter),
+                        )
+                    }
+                    FieldCardinality::ManyMandatory | FieldCardinality::ManyOptional => {
+                        self.registry.field_convert::<Vec<Edge>, _, GqlContext>(
+                            name,
+                            &EdgeTypeInfo(edge_adapter),
+                        )
+                    }
+                }
             }
             FieldKind::EntityRelationship {
                 subject,
                 node,
                 node_operator,
                 ..
-            } => self
-                .registry
-                .field_convert::<Option<Connection>, _, GqlContext>(
-                    name,
-                    &ConnectionTypeInfo(EdgeAdapter {
-                        domain_data: self.domain_data.clone(),
-                        subject: Some(*subject),
-                        node_id: *node,
-                        node_operator_id: *node_operator,
-                    }),
-                ),
+            } => {
+                let edge_adapter = EdgeAdapter {
+                    domain_data: self.domain_data.clone(),
+                    subject: Some(*subject),
+                    node_id: *node,
+                    node_operator_id: *node_operator,
+                };
+                match field.cardinality {
+                    FieldCardinality::UnitMandatory | FieldCardinality::UnitOptional => {
+                        self.registry.field_convert::<Option<Edge>, _, GqlContext>(
+                            name,
+                            &EdgeTypeInfo(edge_adapter),
+                        )
+                    }
+                    FieldCardinality::ManyMandatory | FieldCardinality::ManyOptional => self
+                        .registry
+                        .field_convert::<Option<Connection>, _, GqlContext>(
+                            name,
+                            &ConnectionTypeInfo(edge_adapter),
+                        ),
+                }
+            }
         }
     }
 

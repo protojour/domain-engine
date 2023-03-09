@@ -11,6 +11,8 @@ use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionDa
 pub mod adapt;
 pub mod data;
 
+mod names;
+
 pub type DomainAdapter = Arc<DomainData>;
 
 impl DomainData {
@@ -60,15 +62,15 @@ impl Kind for DynamicKind {
 
     fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
         debug!("dynamic get_data_ref {def_id:?}");
-        if let Some(union_data) = domain_data.unions_by_def.get(&def_id) {
+        if let Some(union_data) = domain_data.unions.get(&def_id) {
             DynamicRef::Union(union_data)
         } else {
             let type_data = domain_data
-                .types_by_def
+                .types
                 .get(&def_id)
                 .expect("BUG: Type data for non-union not found");
 
-            if let Some(entity_data) = domain_data.entities_by_def.get(&def_id) {
+            if let Some(entity_data) = domain_data.entities.get(&def_id) {
                 DynamicRef::Entity(EntityRef {
                     entity_data,
                     type_data,
@@ -87,10 +89,10 @@ impl Kind for NodeKind {
     type DataRef<'d> = NodeRef<'d>;
 
     fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
-        let type_data = domain_data.types_by_def.get(&def_id).unwrap();
+        let type_data = domain_data.types.get(&def_id).unwrap();
 
         NodeRef {
-            entity_data: domain_data.entities_by_def.get(&def_id),
+            entity_data: domain_data.entities.get(&def_id),
             type_data,
         }
     }
@@ -100,8 +102,8 @@ impl Kind for EntityKind {
     type DataRef<'d> = EntityRef<'d>;
 
     fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
-        let entity_data = domain_data.entities_by_def.get(&def_id).unwrap();
-        let type_data = domain_data.types_by_def.get(&def_id).unwrap();
+        let entity_data = domain_data.entities.get(&def_id).unwrap();
+        let type_data = domain_data.types.get(&def_id).unwrap();
 
         EntityRef {
             entity_data,
@@ -115,7 +117,7 @@ impl Kind for UnionKind {
 
     fn get_data_ref(domain_data: &DomainData, def_id: DefId) -> Self::DataRef<'_> {
         domain_data
-            .unions_by_def
+            .unions
             .get(&def_id)
             .expect("No union data found")
     }
@@ -149,7 +151,7 @@ impl<K: Kind> TypeAdapter<K> {
 
     pub fn type_data(&self) -> &TypeData {
         self.domain_data
-            .types_by_def
+            .types
             .get(&self.def_id)
             .expect("Type has not been registered")
     }
@@ -167,7 +169,7 @@ impl EdgeAdapter {
     pub fn data(&self) -> &EdgeData {
         self.domain_data
             .edges
-            .get(&(self.subject, self.node_operator_id))
+            .get(&(self.subject, self.node_id))
             .expect("No edge data found")
     }
 

@@ -118,7 +118,6 @@ async fn test_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-#[ignore = "BUG: Unions do not yet work because of the intersection between the identity type and the union's inherent properties"]
 async fn test_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION.compile_schema();
 
