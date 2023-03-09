@@ -68,54 +68,35 @@ fn adapt_type(
             adapt_node_type(env, domain_data, names, type_info, operator_id, map_type);
         }
         SerdeOperator::ValueUnionType(value_union_type) => {
-            let mut found_id = None;
-            let mut found_map_fallback = None;
+            let mut union_variants = vec![];
+
             for variant in &value_union_type.variants {
-                match &variant.discriminator.discriminant {
-                    Discriminant::IsSingletonProperty(_, prop) if prop == "_id" => {
-                        found_id = Some(variant);
+                match classify_type(env, variant.operator_id) {
+                    TypeClassification::Entity(def_id, operator_id)
+                    | TypeClassification::Node(def_id, operator_id) => {
+                        union_variants.push((def_id, operator_id));
                     }
-                    Discriminant::MapFallback => {
-                        found_map_fallback = Some(variant);
+                    TypeClassification::Id => {}
+                    TypeClassification::Scalar => {
+                        panic!("BUG: Scalar in union");
                     }
-                    _ => {}
                 }
             }
 
-            match (found_id, found_map_fallback) {
-                (Some(_id), Some(map_fallback)) => {
-                    debug!("found _id and map fallback");
-                    adapt_type(env, domain_data, names, type_info, map_fallback.operator_id)
-                }
-                _ => {
-                    let mut union_variants = vec![];
+            debug!(
+                "created a union for `{type_name}`: {operator_id:?} variants={union_variants:?}",
+                type_name = type_info.name
+            );
 
-                    for variant in &value_union_type.variants {
-                        match classify_type(env, variant.operator_id) {
-                            TypeClassification::Entity(def_id, operator_id)
-                            | TypeClassification::Node(def_id, operator_id) => {
-                                union_variants.push((def_id, operator_id));
-                            }
-                            TypeClassification::Id => {}
-                            TypeClassification::Scalar => {
-                                panic!("BUG: Scalar in union");
-                            }
-                        }
-                    }
-
-                    debug!("created a union for `{type_name}`: {operator_id:?} variants={union_variants:?}", type_name = type_info.name);
-
-                    domain_data.unions.insert(
-                        type_info.def_id,
-                        UnionData {
-                            type_name: type_info.name.clone(),
-                            def_id: value_union_type.union_def_variant.def_id,
-                            operator_id,
-                            variants: union_variants,
-                        },
-                    );
-                }
-            }
+            domain_data.unions.insert(
+                type_info.def_id,
+                UnionData {
+                    type_name: type_info.name.clone(),
+                    def_id: value_union_type.union_def_variant.def_id,
+                    operator_id,
+                    variants: union_variants,
+                },
+            );
         }
         _other => {
             // panic!("other operator: {other:?}");
@@ -215,10 +196,9 @@ fn adapt_node_type(
                     Field {
                         cardinality,
                         kind: FieldKind::Edge {
-                            subject: type_info.def_id,
-                            node: map_type.def_variant.def_id,
-                            node_operator: property.value_operator_id,
-                            rel: property.rel_params_operator_id,
+                            subject_id: type_info.def_id,
+                            node_id: map_type.def_variant.def_id,
+                            rel_id: property.rel_params_operator_id,
                         },
                     },
                 );
@@ -231,7 +211,7 @@ fn adapt_node_type(
                 };
 
                 match classify_type(env, sequence_type.ranges[0].operator_id) {
-                    TypeClassification::Entity(entity_def_id, entity_operator_id) => {
+                    TypeClassification::Entity(entity_def_id, _) => {
                         domain_data.edges.insert(
                             (Some(type_info.def_id), entity_def_id),
                             names.edge_data(type_name, property_name),
@@ -241,17 +221,16 @@ fn adapt_node_type(
                             Field {
                                 cardinality,
                                 kind: FieldKind::EntityRelationship {
-                                    subject: type_info.def_id,
-                                    node: entity_def_id,
-                                    node_operator: entity_operator_id,
-                                    rel: property.rel_params_operator_id,
+                                    subject_id: Some(type_info.def_id),
+                                    node_id: entity_def_id,
+                                    rel_id: property.rel_params_operator_id,
                                 },
                             },
                         );
                     }
-                    TypeClassification::Node(node_def_id, node_operator_id) => {
+                    TypeClassification::Node(node_id, _) => {
                         domain_data.edges.insert(
-                            (Some(type_info.def_id), node_def_id),
+                            (Some(type_info.def_id), node_id),
                             names.edge_data(type_name, property_name),
                         );
                         fields.insert(
@@ -259,10 +238,9 @@ fn adapt_node_type(
                             Field {
                                 cardinality,
                                 kind: FieldKind::Edge {
-                                    subject: type_info.def_id,
-                                    node: node_def_id,
-                                    node_operator: node_operator_id,
-                                    rel: property.rel_params_operator_id,
+                                    subject_id: type_info.def_id,
+                                    node_id,
+                                    rel_id: property.rel_params_operator_id,
                                 },
                             },
                         );

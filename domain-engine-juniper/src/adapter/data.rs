@@ -82,16 +82,14 @@ pub enum FieldCardinality {
 pub enum FieldKind {
     Scalar(SerdeOperatorId),
     Edge {
-        subject: DefId,
-        node: DefId,
-        node_operator: SerdeOperatorId,
-        rel: Option<SerdeOperatorId>,
+        subject_id: DefId,
+        node_id: DefId,
+        rel_id: Option<SerdeOperatorId>,
     },
-    Node(DefId, SerdeOperatorId),
+    Node(DefId),
     EntityRelationship {
-        subject: DefId,
-        node: DefId,
-        node_operator: SerdeOperatorId,
-        rel: Option<SerdeOperatorId>,
+        subject_id: Option<DefId>,
+        node_id: DefId,
+        rel_id: Option<SerdeOperatorId>,
     },
 }

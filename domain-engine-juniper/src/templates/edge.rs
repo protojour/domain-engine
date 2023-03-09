@@ -42,7 +42,7 @@ impl juniper::GraphQLType<GqlScalar> for Edge {
                 "node",
                 &Field {
                     cardinality: FieldCardinality::UnitMandatory,
-                    kind: FieldKind::Node(info.0.node_id, info.0.node_operator_id),
+                    kind: FieldKind::Node(info.0.node_id),
                 },
             ),
         ];

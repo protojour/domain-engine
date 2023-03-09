@@ -74,16 +74,16 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                     }
                 }
             }
-            FieldKind::Node(node, _operator_id) => {
-                let adapter = self.domain_data.type_adapter::<DynamicKind>(*node);
+            FieldKind::Node(node_id) => {
+                let adapter = self.domain_data.type_adapter::<DynamicKind>(*node_id);
                 match adapter.data() {
                     DynamicRef::Node(_) => self.registry.field_convert::<Node, _, GqlContext>(
                         name,
-                        &NodeTypeInfo(domain_data.type_adapter(*node)),
+                        &NodeTypeInfo(domain_data.type_adapter(*node_id)),
                     ),
                     DynamicRef::Entity(_) => self.registry.field_convert::<Node, _, GqlContext>(
                         name,
-                        &NodeTypeInfo(domain_data.type_adapter(*node)),
+                        &NodeTypeInfo(domain_data.type_adapter(*node_id)),
                     ),
                     DynamicRef::Union(union_data) => {
                         self.registry.field_convert::<Union, _, GqlContext>(
@@ -95,16 +95,14 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 }
             }
             FieldKind::Edge {
-                subject,
-                node,
-                node_operator,
+                subject_id,
+                node_id,
                 ..
             } => {
                 let edge_adapter = EdgeAdapter {
                     domain_data: self.domain_data.clone(),
-                    subject: Some(*subject),
-                    node_id: *node,
-                    node_operator_id: *node_operator,
+                    subject_id: Some(*subject_id),
+                    node_id: *node_id,
                 };
                 match field.cardinality {
                     FieldCardinality::UnitMandatory | FieldCardinality::UnitOptional => {
@@ -122,16 +120,14 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                 }
             }
             FieldKind::EntityRelationship {
-                subject,
-                node,
-                node_operator,
+                subject_id,
+                node_id,
                 ..
             } => {
                 let edge_adapter = EdgeAdapter {
                     domain_data: self.domain_data.clone(),
-                    subject: Some(*subject),
-                    node_id: *node,
-                    node_operator_id: *node_operator,
+                    subject_id: *subject_id,
+                    node_id: *node_id,
                 };
                 match field.cardinality {
                     FieldCardinality::UnitMandatory | FieldCardinality::UnitOptional => {
@@ -145,7 +141,11 @@ impl<'a, 'r> RegistryWrapper<'a, 'r> {
                         .field_convert::<Option<Connection>, _, GqlContext>(
                             name,
                             &ConnectionTypeInfo(edge_adapter),
-                        ),
+                        ), // .argument(registry.arg::<Option<i32>>("skip", &()))
+                           // .argument(registry.arg::<Option<i32>>("limit", &()))
+                           // .argument(registry.arg::<Option<String>>("sort", &()))
+                           // .argument(registry.arg::<Option<Vec<String>>>("filter", &()))
+                           // .argument(registry.arg::<Option<String>>("search", &()))
                 }
             }
         }

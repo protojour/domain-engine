@@ -186,8 +186,8 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
-                let rest_modifier = DataModifier::ID | DataModifier::PROPS | DataModifier::UNION;
-                let graphql_modifier = DataModifier::PROPS;
+                let rest_modifier = DataModifier::UNION | DataModifier::ID | DataModifier::PROPS;
+                let graphql_modifier = DataModifier::UNION | DataModifier::PROPS;
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,

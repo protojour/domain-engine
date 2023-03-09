@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use ontol_runtime::{
-    serde::{SerdeOperator, SerdeOperatorId},
-    DefId,
-};
+use ontol_runtime::{serde::SerdeOperator, DefId};
 use tracing::debug;
 
 use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionData};
@@ -27,9 +24,8 @@ impl DomainData {
     pub fn root_edge_adapter(self: &Arc<Self>, entity_ref: &EntityRef) -> EdgeAdapter {
         EdgeAdapter {
             domain_data: self.clone(),
-            subject: None,
+            subject_id: None,
             node_id: entity_ref.type_data.def_id,
-            node_operator_id: entity_ref.type_data.operator_id,
         }
     }
 }
@@ -160,16 +156,15 @@ impl<K: Kind> TypeAdapter<K> {
 #[derive(Clone)]
 pub struct EdgeAdapter {
     pub domain_data: Arc<DomainData>,
-    pub subject: Option<DefId>,
+    pub subject_id: Option<DefId>,
     pub node_id: DefId,
-    pub node_operator_id: SerdeOperatorId,
 }
 
 impl EdgeAdapter {
     pub fn data(&self) -> &EdgeData {
         self.domain_data
             .edges
-            .get(&(self.subject, self.node_id))
+            .get(&(self.subject_id, self.node_id))
             .expect("No edge data found")
     }
 

@@ -1,13 +1,13 @@
 use crate::{
-    adapter::{DomainAdapter, EntityKind},
+    adapter::{
+        data::{Field, FieldCardinality, FieldKind},
+        DomainAdapter,
+    },
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     registry_wrapper::RegistryWrapper,
     type_info::GraphqlTypeName,
-    GqlContext,
 };
-
-use super::connection::{Connection, ConnectionTypeInfo};
 
 pub struct Query;
 
@@ -40,18 +40,18 @@ impl juniper::GraphQLType<GqlScalar> for Query {
             .0
             .queries
             .iter()
-            .map(|(name, operator_id)| {
-                let entity_adapter = info.0.type_adapter::<EntityKind>(*operator_id);
-
-                reg.field_convert::<Option<Connection>, _, GqlContext>(
+            .map(|(name, def_id)| {
+                reg.register_domain_field(
                     name,
-                    &ConnectionTypeInfo(info.0.root_edge_adapter(&entity_adapter.data())),
+                    &Field {
+                        cardinality: FieldCardinality::ManyMandatory,
+                        kind: FieldKind::EntityRelationship {
+                            subject_id: None,
+                            node_id: *def_id,
+                            rel_id: None,
+                        },
+                    },
                 )
-                // .argument(registry.arg::<Option<i32>>("skip", &()))
-                // .argument(registry.arg::<Option<i32>>("limit", &()))
-                // .argument(registry.arg::<Option<String>>("sort", &()))
-                // .argument(registry.arg::<Option<Vec<String>>>("filter", &()))
-                // .argument(registry.arg::<Option<String>>("search", &()))
             })
             .collect();
 

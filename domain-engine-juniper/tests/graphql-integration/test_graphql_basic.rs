@@ -1,6 +1,6 @@
 use domain_engine_juniper::create_graphql_schema;
 use juniper::graphql_value;
-use ontol_test_utils::{assert_error_msg, TestCompile, TEST_PKG};
+use ontol_test_utils::{TestCompile, TEST_PKG};
 use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
@@ -118,11 +118,11 @@ async fn test_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-async fn test_guitar_synth_union_smoke_test() {
+async fn test_graphql_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION.compile_schema();
 
     // `instrument` is a union so fields cannot be queries directly
-    assert_error_msg!(
+    assert_eq!(
         "{
             artistList {
                 edges {
@@ -130,7 +130,13 @@ async fn test_guitar_synth_union_smoke_test() {
                         plays {
                             edges {
                                 node {
-                                    name
+                                    __typename
+                                    ... on guitar {
+                                        string_count
+                                    }
+                                    ... on synth {
+                                        polyphony
+                                    }
                                 }
                             }
                         }
@@ -139,7 +145,10 @@ async fn test_guitar_synth_union_smoke_test() {
             }
         }"
         .exec(&schema)
-        .await,
-        r#"GraphQL: Unknown field "name" on type "instrument". At 7:36"#
+        .await
+        .unwrap(),
+        graphql_value!({
+            "artistList": None,
+        }),
     );
 }
