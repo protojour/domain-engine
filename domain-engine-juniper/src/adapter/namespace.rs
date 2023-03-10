@@ -2,11 +2,11 @@ use convert_case::{Case, Casing};
 use ontol_runtime::smart_format;
 use smartstring::alias::String;
 
-use super::data::EdgeData;
+use super::data::EdgeNames;
 
-pub struct Names;
+pub struct Namespace;
 
-impl Names {
+impl Namespace {
     pub fn new() -> Self {
         Self
     }
@@ -31,19 +31,20 @@ impl Names {
         smart_format!("{type_name}Input")
     }
 
-    pub fn root_edge_data(&mut self, type_name: &str) -> EdgeData {
-        EdgeData {
-            edge_type_name: smart_format!("{type_name}ConnectionEdge"),
-            connection_type_name: smart_format!("{type_name}Connection"),
-        }
-    }
+    pub fn edge_names(&mut self, type_name: &str, property_name: Option<&str>) -> EdgeNames {
+        match property_name {
+            Some(property_name) => {
+                let property = property_name.to_case(Case::Pascal);
 
-    pub fn edge_data(&mut self, type_name: &str, property_name: &str) -> EdgeData {
-        let property = property_name.to_case(Case::Pascal);
-
-        EdgeData {
-            edge_type_name: smart_format!("{type_name}{property}ConnectionEdge"),
-            connection_type_name: smart_format!("{type_name}{property}Connection"),
+                EdgeNames {
+                    edge: smart_format!("{type_name}{property}ConnectionEdge"),
+                    connection: smart_format!("{type_name}{property}Connection"),
+                }
+            }
+            None => EdgeNames {
+                edge: smart_format!("{type_name}ConnectionEdge"),
+                connection: smart_format!("{type_name}Connection"),
+            },
         }
     }
 }

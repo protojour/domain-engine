@@ -12,7 +12,7 @@ pub struct ConnectionTypeInfo(pub EdgeAdapter);
 
 impl GraphqlTypeName for ConnectionTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.data().connection_type_name
+        &self.0.data().names.connection
     }
 }
 

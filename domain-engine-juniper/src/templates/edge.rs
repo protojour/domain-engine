@@ -16,7 +16,7 @@ pub struct EdgeTypeInfo(pub EdgeAdapter);
 
 impl GraphqlTypeName for EdgeTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.0.data().edge_type_name
+        &self.0.data().names.edge
     }
 }
 

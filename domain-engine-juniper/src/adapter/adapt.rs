@@ -18,7 +18,7 @@ use crate::{
     SchemaBuildError,
 };
 
-use super::{names::Names, DomainAdapter};
+use super::{data::EdgeData, namespace::Namespace, DomainAdapter};
 
 pub fn adapt_domain(
     env: Arc<Env>,
@@ -28,7 +28,7 @@ pub fn adapt_domain(
         .find_domain(&package_id)
         .ok_or(SchemaBuildError::UnknownPackage)?;
 
-    let mut names = Names::new();
+    let mut namespace = Namespace::new();
 
     let mut domain_data = DomainData {
         env: env.clone(),
@@ -49,7 +49,13 @@ pub fn adapt_domain(
         if let Some(operator_id) = type_info.graphql_operator_id {
             debug!("adapt type `{}` {:?}", type_info.name, operator_id);
 
-            adapt_type(&env, &mut domain_data, &mut names, type_info, operator_id);
+            adapt_type(
+                &env,
+                &mut domain_data,
+                &mut namespace,
+                type_info,
+                operator_id,
+            );
         }
     }
 
@@ -59,21 +65,27 @@ pub fn adapt_domain(
 fn adapt_type(
     env: &Env,
     domain_data: &mut DomainData,
-    names: &mut Names,
+    namespace: &mut Namespace,
     type_info: &TypeInfo,
     operator_id: SerdeOperatorId,
 ) {
     match env.get_serde_operator(operator_id) {
         SerdeOperator::MapType(map_type) => {
-            adapt_node_type(env, domain_data, names, type_info, operator_id, map_type);
+            adapt_node_type(
+                env,
+                domain_data,
+                namespace,
+                type_info,
+                operator_id,
+                map_type,
+            );
         }
         SerdeOperator::ValueUnionType(value_union_type) => {
             let mut union_variants = vec![];
 
             for variant in &value_union_type.variants {
                 match classify_type(env, variant.operator_id) {
-                    TypeClassification::Entity(def_id, operator_id)
-                    | TypeClassification::Node(def_id, operator_id) => {
+                    TypeClassification::Type(_, def_id, operator_id) => {
                         union_variants.push((def_id, operator_id));
                     }
                     TypeClassification::Id => {}
@@ -107,7 +119,7 @@ fn adapt_type(
 fn adapt_node_type(
     _env: &Env,
     domain_data: &mut DomainData,
-    names: &mut Names,
+    namespace: &mut Namespace,
     type_info: &TypeInfo,
     serde_operator_id: SerdeOperatorId,
     map_type: &MapType,
@@ -133,10 +145,10 @@ fn adapt_node_type(
 
         domain_data
             .queries
-            .insert(names.list(type_name), type_info.def_id);
+            .insert(namespace.list(type_name), type_info.def_id);
 
         domain_data.mutations.insert(
-            names.create(type_name),
+            namespace.create(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
@@ -146,7 +158,7 @@ fn adapt_node_type(
             },
         );
         domain_data.mutations.insert(
-            names.update(type_name),
+            namespace.update(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
@@ -157,7 +169,7 @@ fn adapt_node_type(
             },
         );
         domain_data.mutations.insert(
-            names.delete(type_name),
+            namespace.delete(type_name),
             MutationData {
                 entity: type_info.def_id,
                 entity_operator_id: serde_operator_id,
@@ -171,9 +183,18 @@ fn adapt_node_type(
                 id_operator_id,
             },
         );
-        domain_data
-            .edges
-            .insert((None, type_info.def_id), names.root_edge_data(type_name));
+        domain_data.edges.insert(
+            (None, type_info.def_id),
+            adapt_edge(
+                env,
+                namespace,
+                EdgeInfo {
+                    type_name,
+                    property_name: None,
+                    rel_params_operator_id: None,
+                },
+            ),
+        );
     }
 
     for (property_name, property) in &map_type.properties {
@@ -211,36 +232,34 @@ fn adapt_node_type(
                 };
 
                 match classify_type(env, sequence_type.ranges[0].operator_id) {
-                    TypeClassification::Entity(entity_def_id, _) => {
-                        domain_data.edges.insert(
-                            (Some(type_info.def_id), entity_def_id),
-                            names.edge_data(type_name, property_name),
-                        );
-                        fields.insert(
-                            property_name.clone(),
-                            Field {
-                                cardinality,
-                                kind: FieldKind::EntityRelationship {
-                                    subject_id: Some(type_info.def_id),
-                                    node_id: entity_def_id,
-                                    rel_id: property.rel_params_operator_id,
-                                },
-                            },
-                        );
-                    }
-                    TypeClassification::Node(node_id, _) => {
+                    TypeClassification::Type(node_classification, node_id, _) => {
                         domain_data.edges.insert(
                             (Some(type_info.def_id), node_id),
-                            names.edge_data(type_name, property_name),
+                            adapt_edge(
+                                env,
+                                namespace,
+                                EdgeInfo {
+                                    type_name,
+                                    property_name: Some(property_name),
+                                    rel_params_operator_id: property.rel_params_operator_id,
+                                },
+                            ),
                         );
                         fields.insert(
                             property_name.clone(),
                             Field {
                                 cardinality,
-                                kind: FieldKind::Edge {
-                                    subject_id: type_info.def_id,
-                                    node_id,
-                                    rel_id: property.rel_params_operator_id,
+                                kind: match node_classification {
+                                    NodeClassification::Node => FieldKind::Edge {
+                                        subject_id: type_info.def_id,
+                                        node_id,
+                                        rel_id: property.rel_params_operator_id,
+                                    },
+                                    NodeClassification::Entity => FieldKind::EntityRelationship {
+                                        subject_id: Some(type_info.def_id),
+                                        node_id,
+                                        rel_id: property.rel_params_operator_id,
+                                    },
                                 },
                             },
                         );
@@ -277,18 +296,39 @@ fn adapt_node_type(
         TypeData {
             type_name: type_name.clone(),
             def_id: type_info.def_id,
-            input_type_name: names.input(type_name),
+            input_type_name: namespace.input(type_name),
             operator_id: serde_operator_id,
             fields,
         },
     );
 }
 
+struct EdgeInfo<'a> {
+    type_name: &'a str,
+    property_name: Option<&'a str>,
+    rel_params_operator_id: Option<SerdeOperatorId>,
+}
+
+fn adapt_edge(_env: &Env, namespace: &mut Namespace, edge_info: EdgeInfo) -> EdgeData {
+    let mut fields: IndexMap<String, Field> = Default::default();
+
+    if let Some(_rel_params_operator_id) = edge_info.rel_params_operator_id {}
+
+    EdgeData {
+        names: namespace.edge_names(edge_info.type_name, edge_info.property_name),
+        fields: Default::default(),
+    }
+}
+
 enum TypeClassification {
-    Entity(DefId, SerdeOperatorId),
-    Node(DefId, SerdeOperatorId),
+    Type(NodeClassification, DefId, SerdeOperatorId),
     Id,
     Scalar,
+}
+
+enum NodeClassification {
+    Node,
+    Entity,
 }
 
 fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
@@ -298,16 +338,24 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
     match operator {
         SerdeOperator::MapType(map_type) => {
             let type_info = env.get_type_info(map_type.def_variant.def_id);
-            if type_info.entity_id.is_some() {
-                TypeClassification::Entity(map_type.def_variant.def_id, operator_id)
+            let node_classification = if type_info.entity_id.is_some() {
+                NodeClassification::Entity
             } else {
-                TypeClassification::Node(map_type.def_variant.def_id, operator_id)
-            }
+                NodeClassification::Node
+            };
+            TypeClassification::Type(
+                node_classification,
+                map_type.def_variant.def_id,
+                operator_id,
+            )
         }
         SerdeOperator::ValueUnionType(union_type) => {
             // start with the "highest" classification and downgrade as "lower" variants are found.
-            let mut classification =
-                TypeClassification::Entity(union_type.union_def_variant.def_id, operator_id);
+            let mut classification = TypeClassification::Type(
+                NodeClassification::Entity,
+                union_type.union_def_variant.def_id,
+                operator_id,
+            );
 
             for variant in &union_type.variants {
                 if variant.discriminator.discriminant == Discriminant::MapFallback {
@@ -316,10 +364,14 @@ fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification 
 
                 let variant_classification = classify_type(env, variant.operator_id);
                 match (&classification, variant_classification) {
-                    (TypeClassification::Entity(..), TypeClassification::Node(..)) => {
+                    (
+                        TypeClassification::Type(..),
+                        TypeClassification::Type(NodeClassification::Node, ..),
+                    ) => {
                         // downgrade
                         debug!("    Downgrade to Node");
-                        classification = TypeClassification::Node(
+                        classification = TypeClassification::Type(
+                            NodeClassification::Node,
                             union_type.union_def_variant.def_id,
                             operator_id,
                         );

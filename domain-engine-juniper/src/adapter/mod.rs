@@ -8,7 +8,7 @@ use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionDa
 pub mod adapt;
 pub mod data;
 
-mod names;
+mod namespace;
 
 pub type DomainAdapter = Arc<DomainData>;
 

@@ -60,8 +60,13 @@ pub struct ScalarData {
 }
 
 pub struct EdgeData {
-    pub edge_type_name: String,
-    pub connection_type_name: String,
+    pub names: EdgeNames,
+    pub fields: IndexMap<String, Field>,
+}
+
+pub struct EdgeNames {
+    pub edge: String,
+    pub connection: String,
 }
 
 #[derive(Clone)]
