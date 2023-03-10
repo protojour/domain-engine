@@ -33,7 +33,9 @@ pub fn create_graphql_schema(
     env: Arc<Env>,
     package_id: PackageId,
 ) -> Result<Schema, SchemaBuildError> {
-    let adapter = adapter::adapt::adapt_domain(env, package_id)?;
+    let adapter = adapter::adapt::adapt_domain(env.clone(), package_id)?;
+
+    let _ = adapter::build::build_domain_data(env, package_id).expect("BUG");
 
     Ok(Schema::new_with_info(
         templates::query::Query,

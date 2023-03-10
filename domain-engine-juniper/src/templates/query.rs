@@ -71,7 +71,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let _operator_id = info
+            let _def_id = info
                 .0
                 .queries
                 .get(field_name)

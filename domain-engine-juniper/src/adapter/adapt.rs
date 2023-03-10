@@ -310,28 +310,28 @@ struct EdgeInfo<'a> {
 }
 
 fn adapt_edge(_env: &Env, namespace: &mut Namespace, edge_info: EdgeInfo) -> EdgeData {
-    let mut fields: IndexMap<String, Field> = Default::default();
+    let fields: IndexMap<String, Field> = Default::default();
 
     if let Some(_rel_params_operator_id) = edge_info.rel_params_operator_id {}
 
     EdgeData {
         names: namespace.edge_names(edge_info.type_name, edge_info.property_name),
-        fields: Default::default(),
+        fields,
     }
 }
 
-enum TypeClassification {
+pub enum TypeClassification {
     Type(NodeClassification, DefId, SerdeOperatorId),
     Id,
     Scalar,
 }
 
-enum NodeClassification {
+pub enum NodeClassification {
     Node,
     Entity,
 }
 
-fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
+pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
     let operator = env.get_serde_operator(operator_id);
     // debug!("    classify operator: {operator:?}");
 

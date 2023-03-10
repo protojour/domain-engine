@@ -6,7 +6,9 @@ use tracing::debug;
 use self::data::{DomainData, EdgeData, EntityData, ScalarData, TypeData, UnionData};
 
 pub mod adapt;
+pub mod build;
 pub mod data;
+pub mod data2;
 
 mod namespace;
 
