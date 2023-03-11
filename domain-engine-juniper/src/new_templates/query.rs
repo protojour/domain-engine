@@ -1,3 +1,6 @@
+use juniper::graphql_value;
+use tracing::debug;
+
 use crate::{
     gql_scalar::GqlScalar, macros::impl_graphql_value, type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry, virtual_schema::VirtualIndexedTypeInfo,
@@ -40,7 +43,9 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         Box::pin(async move {
             let _query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            Ok(juniper::Value::Null)
+            debug!("Executing query {field_name}");
+
+            Ok(graphql_value!({ "edges": None }))
         })
     }
 }

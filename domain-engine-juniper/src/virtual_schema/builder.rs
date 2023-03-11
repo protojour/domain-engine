@@ -159,7 +159,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             fields: [(
                                 smart_format!("edges"),
                                 FieldData::no_args(
-                                    TypeRef::mandatory(edge_ref).to_mandatory_array(),
+                                    TypeRef::mandatory(edge_ref).to_array(Optionality::Optional),
                                 ),
                             )]
                             .into(),

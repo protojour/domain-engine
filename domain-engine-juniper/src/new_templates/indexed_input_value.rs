@@ -43,25 +43,28 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
     where
         GqlScalar: 'r,
     {
-        let reg = VirtualRegistry::new(&info.0.virtual_schema, registry);
+        let mut reg = VirtualRegistry::new(&info.0.virtual_schema, registry);
         match &info.0.type_data().kind {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(node_data),
                 ..
             }) => {
-                let fields = vec![];
                 let serde_operator = reg
                     .virtual_schema
                     .env()
                     .get_serde_operator(node_data.operator_id);
+                let mut arguments = vec![];
 
-                if let SerdeOperator::MapType(_map_type) = serde_operator {
+                if let SerdeOperator::MapType(map_type) = serde_operator {
+                    for (name, property) in &map_type.properties {
+                        arguments.push(reg.get_operator_argument(name, property.value_operator_id))
+                    }
                 } else {
                     panic!();
                 }
 
                 registry
-                    .build_object_type::<Self>(info, &fields)
+                    .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
             }
             TypeKind::Union(_union_data) => {

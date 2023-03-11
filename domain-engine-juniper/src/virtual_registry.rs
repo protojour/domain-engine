@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use juniper::GraphQLValue;
+use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
+use tracing::{debug, warn};
 
 use crate::{
     gql_scalar::GqlScalar,
@@ -116,6 +118,52 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         }
     }
 
+    pub fn get_operator_argument(
+        &mut self,
+        name: &str,
+        operator_id: SerdeOperatorId,
+    ) -> juniper::meta::Argument<'r, GqlScalar> {
+        let operator = self.virtual_schema.env().get_serde_operator(operator_id);
+
+        debug!("register argument {name} {operator:?}");
+
+        match operator {
+            SerdeOperator::Unit => {
+                todo!("unit argument")
+            }
+            SerdeOperator::Int(_) => self.registry.arg::<i32>(name, &()),
+            SerdeOperator::Number(_) => self.registry.arg::<f64>(name, &()),
+            SerdeOperator::String(_) => self.registry.arg::<String>(name, &()),
+            SerdeOperator::StringConstant(_, _) => self.registry.arg::<String>(name, &()),
+            SerdeOperator::StringPattern(_) => self.registry.arg::<String>(name, &()),
+            SerdeOperator::CapturingStringPattern(_) => self.registry.arg::<String>(name, &()),
+            SerdeOperator::RelationSequence(_) => {
+                warn!("Skipping relation sequence for now");
+                self.registry.arg::<String>(name, &())
+                // registry.arg::<CustomScalar>(name, &()),
+            }
+            SerdeOperator::ConstructorSequence(_) => {
+                warn!("Skipping constructor sequence for now");
+                self.registry.arg::<String>(name, &())
+                // registry.arg::<CustomScalar>(name, &()),
+            }
+            SerdeOperator::ValueType(value_type) => {
+                self.get_operator_argument(name, value_type.inner_operator_id)
+            }
+            SerdeOperator::ValueUnionType(_union_type) => {
+                // self.register_def_argument(name, union_type.union_def_variant.def_id)
+                todo!()
+            }
+            SerdeOperator::Id(_) => {
+                panic!()
+            }
+            SerdeOperator::MapType(_map_type) => {
+                // self.register_def_argument(name, map_type.def_variant.def_id)
+                todo!()
+            }
+        }
+    }
+
     fn get_field_arguments(
         &mut self,
         arguments: &ArgumentsKind,
@@ -141,7 +189,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 argument.name(),
                 &IndexedInputValueTypeInfo(self.virtual_schema.indexed_type_info(*type_index)),
             ),
-            Argument::Id(_) => self.registry.arg::<i32>(argument.name(), &()),
+            Argument::Id(operator_id) => self.get_operator_argument(argument.name(), *operator_id),
         }
     }
 }

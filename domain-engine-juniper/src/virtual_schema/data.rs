@@ -84,10 +84,6 @@ impl TypeRef {
             unit: self.unit,
         }
     }
-
-    pub fn to_mandatory_array(self) -> Self {
-        self.to_array(Optionality::Mandatory)
-    }
 }
 
 pub struct TypeData {

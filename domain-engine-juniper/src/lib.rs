@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
+use tracing::debug;
 
 pub mod adapter;
 pub mod gql_scalar;
@@ -64,14 +65,18 @@ pub fn create_graphql_schema_v2(
 ) -> Result<SchemaV2, SchemaBuildError> {
     let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(env, package_id)?);
 
-    Ok(SchemaV2::new_with_info(
+    let schema = SchemaV2::new_with_info(
         new_templates::query::Query,
         new_templates::mutation::Mutation,
         juniper::EmptySubscription::new(),
         virtual_schema.query_type_info(),
         virtual_schema.mutation_type_info(),
         (),
-    ))
+    );
+
+    debug!("Created schema \n{}", schema.as_schema_language());
+
+    Ok(schema)
 }
 
 /// Just some test code to be able to look at some macro expansions
