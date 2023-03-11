@@ -15,9 +15,9 @@ use crate::adapter::{
 
 use super::{
     data::{
-        ArgumentsKind, EdgeData, FieldData, NativeScalarRef, NodeData, ObjectData, ObjectKind,
-        Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData,
-        UnitTypeRef,
+        ArgumentsKind, ConnectionData, EdgeData, FieldData, NativeScalarRef, NodeData, ObjectData,
+        ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef,
+        UnionData, UnitTypeRef,
     },
     VirtualSchema,
 };
@@ -163,7 +163,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 ),
                             )]
                             .into(),
-                            kind: ObjectKind::Edge(EdgeData {}),
+                            kind: ObjectKind::Connection(ConnectionData {}),
                         }),
                     },
                 )
@@ -417,7 +417,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.delete(&typename),
                 FieldData {
-                    arguments: ArgumentsKind::UpdateMutation,
+                    arguments: ArgumentsKind::DeleteMutation,
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
                         NativeScalarRef::Bool,
                     )),

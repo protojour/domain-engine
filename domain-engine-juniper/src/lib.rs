@@ -5,13 +5,15 @@ use ontol_runtime::{env::Env, PackageId};
 
 pub mod adapter;
 pub mod gql_scalar;
-pub mod virtual_schema;
+mod virtual_schema;
 
 mod input_value_deserializer;
 mod macros;
+mod new_templates;
 mod registry_wrapper;
 mod templates;
 mod type_info;
+mod virtual_registry;
 
 pub struct GqlContext;
 
@@ -85,6 +87,10 @@ mod test_derivations {
     impl TestMutation {
         fn update_input_object(_obj: TestInputObject) -> f64 {
             42.0
+        }
+
+        fn option_ret(_obj: TestInputObject) -> Option<f64> {
+            Some(42.0)
         }
     }
 

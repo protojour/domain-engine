@@ -4,7 +4,10 @@ use fnv::FnvHashMap;
 use ontol_runtime::{env::Env, DefId, PackageId};
 use tracing::debug;
 
-use crate::{adapter::namespace::Namespace, virtual_schema::builder::QueryLevel, SchemaBuildError};
+use crate::{
+    adapter::namespace::Namespace, type_info::GraphqlTypeName, virtual_schema::builder::QueryLevel,
+    SchemaBuildError,
+};
 
 use self::{
     builder::VirtualSchemaBuilder,
@@ -15,17 +18,35 @@ pub mod data;
 
 mod builder;
 
+#[derive(Clone)]
+pub struct VirtualIndexedTypeInfo {
+    pub virtual_schema: Arc<VirtualSchema>,
+    pub type_index: TypeIndex,
+}
+
+impl VirtualIndexedTypeInfo {
+    pub fn type_data(&self) -> &TypeData {
+        &self.virtual_schema.type_data(self.type_index)
+    }
+}
+
+impl GraphqlTypeName for VirtualIndexedTypeInfo {
+    fn graphql_type_name(&self) -> &str {
+        &self.type_data().typename
+    }
+}
+
 /// The virtual schema is a schema representation
 /// held as a "shadow" schema behind juniper's user-facing schema.
 ///
 /// This comes in handy when performing lookahead on selection sets,
 /// parsing field arguments, etc.
 pub struct VirtualSchema {
-    pub env: Arc<Env>,
-    pub package_id: PackageId,
-    pub query: TypeIndex,
-    pub mutation: TypeIndex,
-    pub types: Vec<TypeData>,
+    env: Arc<Env>,
+    package_id: PackageId,
+    query: TypeIndex,
+    mutation: TypeIndex,
+    types: Vec<TypeData>,
 }
 
 impl VirtualSchema {
@@ -40,7 +61,7 @@ impl VirtualSchema {
             package_id,
             query: TypeIndex(0),
             mutation: TypeIndex(0),
-            types: vec![],
+            types: Vec::with_capacity(domain.type_names.len()),
         };
         let mut namespace = Namespace::default();
         let mut builder = VirtualSchemaBuilder {
@@ -70,11 +91,25 @@ impl VirtualSchema {
         Ok(schema)
     }
 
+    pub fn _query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+        VirtualIndexedTypeInfo {
+            virtual_schema: self.clone(),
+            type_index: self.query,
+        }
+    }
+
+    pub fn _mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+        VirtualIndexedTypeInfo {
+            virtual_schema: self.clone(),
+            type_index: self.mutation,
+        }
+    }
+
     pub fn type_data(&self, index: TypeIndex) -> &TypeData {
         &self.types[index.0 as usize]
     }
 
-    pub fn object_data_mut(&mut self, index: TypeIndex) -> &mut ObjectData {
+    fn object_data_mut(&mut self, index: TypeIndex) -> &mut ObjectData {
         let type_data = self.types.get_mut(index.0 as usize).unwrap();
         match &mut type_data.kind {
             TypeKind::Object(object_data) => object_data,
@@ -82,7 +117,7 @@ impl VirtualSchema {
         }
     }
 
-    pub fn entity_check(&self, type_ref: UnitTypeRef) -> Option<(TypeIndex, DefId)> {
+    fn entity_check(&self, type_ref: UnitTypeRef) -> Option<(TypeIndex, DefId)> {
         if let UnitTypeRef::Indexed(type_index) = type_ref {
             if let TypeKind::Object(obj) = &self.type_data(type_index).kind {
                 if let ObjectKind::Node(node) = &obj.kind {

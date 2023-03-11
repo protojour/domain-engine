@@ -51,9 +51,9 @@ pub enum UnitTypeRef {
 #[derive(Clone, Copy)]
 pub enum NativeScalarRef {
     Unit,
+    Bool,
     Int(DefId),
     Number(DefId),
-    Bool,
     String(SerdeOperatorId),
 }
 
@@ -71,7 +71,7 @@ impl TypeRef {
         }
     }
 
-    pub fn optional(unit: UnitTypeRef) -> Self {
+    pub fn _optional(unit: UnitTypeRef) -> Self {
         Self {
             modifier: TypeModifier::Unit(Optionality::Mandatory),
             unit,
