@@ -28,7 +28,7 @@ pub fn adapt_domain(
         .find_domain(&package_id)
         .ok_or(SchemaBuildError::UnknownPackage)?;
 
-    let mut namespace = Namespace::new();
+    let mut namespace = Namespace::default();
 
     let mut domain_data = DomainData {
         env: env.clone(),

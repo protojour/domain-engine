@@ -5,6 +5,7 @@ use ontol_runtime::{env::Env, PackageId};
 
 pub mod adapter;
 pub mod gql_scalar;
+pub mod virtual_schema;
 
 mod input_value_deserializer;
 mod macros;
@@ -35,7 +36,7 @@ pub fn create_graphql_schema(
 ) -> Result<Schema, SchemaBuildError> {
     let adapter = adapter::adapt::adapt_domain(env.clone(), package_id)?;
 
-    let _ = adapter::build::build_domain_data(env, package_id).expect("BUG");
+    let _ = virtual_schema::VirtualSchema::build(env, package_id).expect("BUG");
 
     Ok(Schema::new_with_info(
         templates::query::Query,

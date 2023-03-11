@@ -4,13 +4,10 @@ use smartstring::alias::String;
 
 use super::data::EdgeNames;
 
+#[derive(Default)]
 pub struct Namespace;
 
 impl Namespace {
-    pub fn new() -> Self {
-        Self
-    }
-
     pub fn list(&mut self, type_name: &str) -> String {
         smart_format!("{type_name}List")
     }

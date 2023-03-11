@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use indexmap::IndexMap;
-use ontol_runtime::{env::Env, serde::SerdeOperatorId, DefId, PackageId};
+use ontol_runtime::{serde::SerdeOperatorId, DefId};
 use smartstring::alias::String;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -14,6 +12,16 @@ pub enum Optionality {
     Optional,
 }
 
+impl Optionality {
+    pub fn from_optional(optional: bool) -> Self {
+        if optional {
+            Self::Optional
+        } else {
+            Self::Mandatory
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum TypeModifier {
     Unit(Optionality),
@@ -21,7 +29,11 @@ pub enum TypeModifier {
 }
 
 impl TypeModifier {
-    fn unit_optionality(&self) -> Optionality {
+    pub fn new_unit(optionality: Optionality) -> Self {
+        TypeModifier::Unit(optionality)
+    }
+
+    pub fn unit_optionality(&self) -> Optionality {
         match self {
             Self::Unit(unit) => *unit,
             Self::Array(_, unit) => *unit,
@@ -66,53 +78,15 @@ impl TypeRef {
         }
     }
 
-    pub fn to_mandatory_array(self) -> Self {
+    pub fn to_array(self, array_optionality: Optionality) -> Self {
         Self {
-            modifier: TypeModifier::Array(Optionality::Mandatory, self.modifier.unit_optionality()),
+            modifier: TypeModifier::Array(array_optionality, self.modifier.unit_optionality()),
             unit: self.unit,
         }
     }
-}
 
-pub struct DomainData {
-    pub env: Arc<Env>,
-    pub package_id: PackageId,
-    pub query: TypeIndex,
-    pub mutation: TypeIndex,
-    pub types: Vec<TypeData>,
-}
-
-impl DomainData {
-    pub fn type_data(&self, index: TypeIndex) -> &TypeData {
-        &self.types[index.0 as usize]
-    }
-
-    pub fn object_data_mut(&mut self, index: TypeIndex) -> &mut ObjectData {
-        let type_data = self.types.get_mut(index.0 as usize).unwrap();
-        match &mut type_data.kind {
-            TypeKind::Object(object_data) => object_data,
-            _ => panic!("{index:?} is not an object"),
-        }
-    }
-
-    pub fn entity_check(&self, type_ref: UnitTypeRef) -> Option<(TypeIndex, DefId)> {
-        if let UnitTypeRef::Indexed(type_index) = type_ref {
-            if let TypeKind::Object(obj) = &self.type_data(type_index).kind {
-                if let ObjectKind::Node(node) = &obj.kind {
-                    if node.entity_id.is_some() {
-                        Some((type_index, node.def_id))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    pub fn to_mandatory_array(self) -> Self {
+        self.to_array(Optionality::Mandatory)
     }
 }
 
@@ -161,6 +135,22 @@ pub struct ScalarData {
 pub struct FieldData {
     pub arguments: ArgumentsKind,
     pub field_type: TypeRef,
+}
+
+impl FieldData {
+    pub fn no_args(field_type: TypeRef) -> Self {
+        Self {
+            arguments: ArgumentsKind::Empty,
+            field_type,
+        }
+    }
+
+    pub fn connection(unit_type_ref: UnitTypeRef) -> Self {
+        Self {
+            arguments: ArgumentsKind::ConnectionQuery,
+            field_type: TypeRef::mandatory(unit_type_ref),
+        }
+    }
 }
 
 pub enum ArgumentsKind {
