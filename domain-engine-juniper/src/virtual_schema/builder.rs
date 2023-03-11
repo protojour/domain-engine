@@ -19,7 +19,7 @@ use super::{
         ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef,
         UnionData, UnitTypeRef,
     },
-    VirtualSchema,
+    EntityInfo, VirtualSchema,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -100,7 +100,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         // note: this will be overwritten later
         self.schema.types.push(TypeData {
             typename: String::new(),
-            kind: TypeKind::Scalar(ScalarData {
+            kind: TypeKind::CustomScalar(ScalarData {
                 serde_operator_id: SerdeOperatorId(0),
             }),
         });
@@ -380,13 +380,18 @@ impl<'a> VirtualSchemaBuilder<'a> {
         })
     }
 
-    pub fn add_entity_queries_and_mutations(&mut self, type_index: TypeIndex, def_id: DefId) {
-        let type_data = self.schema.type_data(type_index);
+    pub fn add_entity_queries_and_mutations(&mut self, entity_info: EntityInfo) {
+        let type_data = self.schema.type_data(entity_info.type_index);
         let typename = type_data.typename.clone();
 
-        let node_ref = UnitTypeRef::Indexed(type_index);
-        let connection_ref =
-            self.get_def_type_ref(def_id, QueryLevel::Connection { rel_params: None });
+        let node_ref = UnitTypeRef::Indexed(entity_info.type_index);
+        let connection_ref = self.get_def_type_ref(
+            entity_info.node_def_id,
+            QueryLevel::Connection { rel_params: None },
+        );
+
+        let id_type_info = self.env.get_type_info(entity_info.id_def_id);
+        let id_operator_id = id_type_info.rest_operator_id.expect("No id_operator_id");
 
         {
             let query = self.schema.object_data_mut(self.schema.query);
@@ -401,7 +406,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.create(&typename),
                 FieldData {
-                    arguments: ArgumentsKind::CreateMutation,
+                    arguments: ArgumentsKind::CreateMutation {
+                        input: entity_info.node_def_id,
+                    },
                     field_type: TypeRef::mandatory(node_ref),
                 },
             );
@@ -409,7 +416,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.update(&typename),
                 FieldData {
-                    arguments: ArgumentsKind::UpdateMutation,
+                    arguments: ArgumentsKind::UpdateMutation {
+                        input: entity_info.node_def_id,
+                        id: id_operator_id,
+                    },
                     field_type: TypeRef::mandatory(node_ref),
                 },
             );
@@ -417,7 +427,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.delete(&typename),
                 FieldData {
-                    arguments: ArgumentsKind::DeleteMutation,
+                    arguments: ArgumentsKind::DeleteMutation { id: id_operator_id },
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
                         NativeScalarRef::Bool,
                     )),

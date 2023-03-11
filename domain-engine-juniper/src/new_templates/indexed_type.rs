@@ -46,7 +46,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedType {
 
                 registry.build_union_type::<Self>(info, &types).into_meta()
             }
-            TypeKind::Scalar(_) => panic!("Should not make scalar here?"),
+            TypeKind::CustomScalar(_) => todo!(),
         }
     }
 }

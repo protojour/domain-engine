@@ -95,10 +95,19 @@ pub struct TypeData {
     pub kind: TypeKind,
 }
 
+impl TypeData {
+    pub fn fields(&self) -> Option<&IndexMap<String, FieldData>> {
+        match &self.kind {
+            TypeKind::Object(obj) => Some(&obj.fields),
+            _ => None,
+        }
+    }
+}
+
 pub enum TypeKind {
     Object(ObjectData),
     Union(UnionData),
-    Scalar(ScalarData),
+    CustomScalar(ScalarData),
 }
 
 pub struct ObjectData {
@@ -156,7 +165,7 @@ impl FieldData {
 pub enum ArgumentsKind {
     Empty,
     ConnectionQuery,
-    CreateMutation,
-    UpdateMutation,
-    DeleteMutation,
+    CreateMutation { input: DefId },
+    UpdateMutation { id: SerdeOperatorId, input: DefId },
+    DeleteMutation { id: SerdeOperatorId },
 }

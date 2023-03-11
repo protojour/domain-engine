@@ -25,6 +25,10 @@ pub struct VirtualIndexedTypeInfo {
 }
 
 impl VirtualIndexedTypeInfo {
+    pub fn env(&self) -> &Env {
+        &self.virtual_schema.env
+    }
+
     pub fn type_data(&self) -> &TypeData {
         &self.virtual_schema.type_data(self.type_index)
     }
@@ -43,7 +47,7 @@ impl GraphqlTypeName for VirtualIndexedTypeInfo {
 /// parsing field arguments, etc.
 pub struct VirtualSchema {
     env: Arc<Env>,
-    package_id: PackageId,
+    _package_id: PackageId,
     query: TypeIndex,
     mutation: TypeIndex,
     types: Vec<TypeData>,
@@ -58,7 +62,7 @@ impl VirtualSchema {
 
         let mut schema = Self {
             env: env.clone(),
-            package_id,
+            _package_id: package_id,
             query: TypeIndex(0),
             mutation: TypeIndex(0),
             types: Vec::with_capacity(domain.type_names.len()),
@@ -82,8 +86,8 @@ impl VirtualSchema {
 
                 let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
 
-                if let Some((type_index, def_id)) = builder.schema.entity_check(type_ref) {
-                    builder.add_entity_queries_and_mutations(type_index, def_id);
+                if let Some(entity_info) = builder.schema.entity_check(type_ref) {
+                    builder.add_entity_queries_and_mutations(entity_info);
                 }
             }
         }
@@ -91,14 +95,18 @@ impl VirtualSchema {
         Ok(schema)
     }
 
-    pub fn _query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+    pub fn env(&self) -> &Env {
+        &self.env
+    }
+
+    pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
         VirtualIndexedTypeInfo {
             virtual_schema: self.clone(),
             type_index: self.query,
         }
     }
 
-    pub fn _mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+    pub fn mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
         VirtualIndexedTypeInfo {
             virtual_schema: self.clone(),
             type_index: self.mutation,
@@ -117,12 +125,16 @@ impl VirtualSchema {
         }
     }
 
-    fn entity_check(&self, type_ref: UnitTypeRef) -> Option<(TypeIndex, DefId)> {
+    fn entity_check(&self, type_ref: UnitTypeRef) -> Option<EntityInfo> {
         if let UnitTypeRef::Indexed(type_index) = type_ref {
             if let TypeKind::Object(obj) = &self.type_data(type_index).kind {
                 if let ObjectKind::Node(node) = &obj.kind {
-                    if node.entity_id.is_some() {
-                        Some((type_index, node.def_id))
+                    if let Some(id_def_id) = node.entity_id {
+                        Some(EntityInfo {
+                            type_index,
+                            node_def_id: node.def_id,
+                            id_def_id,
+                        })
                     } else {
                         None
                     }
@@ -136,4 +148,10 @@ impl VirtualSchema {
             None
         }
     }
+}
+
+struct EntityInfo {
+    type_index: TypeIndex,
+    node_def_id: DefId,
+    id_def_id: DefId,
 }

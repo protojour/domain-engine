@@ -32,11 +32,15 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
     /// TODO: Might implement resolve_async instead, so we can have just one query
     fn resolve_field_async<'a>(
         &'a self,
-        _info: &'a Self::TypeInfo,
-        _field_name: &'a str,
+        info: &'a Self::TypeInfo,
+        field_name: &'a str,
         _arguments: &'a juniper::Arguments<GqlScalar>,
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
-        Box::pin(async move { Ok(juniper::Value::Null) })
+        Box::pin(async move {
+            let _query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
+
+            Ok(juniper::Value::Null)
+        })
     }
 }

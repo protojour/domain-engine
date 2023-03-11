@@ -27,6 +27,14 @@ pub type Schema = juniper::RootNode<
     GqlScalar,
 >;
 
+pub type SchemaV2 = juniper::RootNode<
+    'static,
+    new_templates::query::Query,
+    new_templates::mutation::Mutation,
+    juniper::EmptySubscription<GqlContext>,
+    GqlScalar,
+>;
+
 #[derive(Debug)]
 pub enum SchemaBuildError {
     UnknownPackage,
@@ -38,7 +46,7 @@ pub fn create_graphql_schema(
 ) -> Result<Schema, SchemaBuildError> {
     let adapter = adapter::adapt::adapt_domain(env.clone(), package_id)?;
 
-    let _ = virtual_schema::VirtualSchema::build(env, package_id).expect("BUG");
+    let _ = create_graphql_schema_v2(env, package_id).expect("BUG");
 
     Ok(Schema::new_with_info(
         templates::query::Query,
@@ -46,6 +54,22 @@ pub fn create_graphql_schema(
         juniper::EmptySubscription::new(),
         templates::query::QueryTypeInfo(adapter.clone()),
         templates::mutation::MutationTypeInfo(adapter),
+        (),
+    ))
+}
+
+pub fn create_graphql_schema_v2(
+    env: Arc<Env>,
+    package_id: PackageId,
+) -> Result<SchemaV2, SchemaBuildError> {
+    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(env, package_id)?);
+
+    Ok(SchemaV2::new_with_info(
+        new_templates::query::Query,
+        new_templates::mutation::Mutation,
+        juniper::EmptySubscription::new(),
+        virtual_schema.query_type_info(),
+        virtual_schema.mutation_type_info(),
         (),
     ))
 }
