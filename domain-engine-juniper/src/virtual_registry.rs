@@ -4,10 +4,14 @@ use juniper::GraphQLValue;
 
 use crate::{
     gql_scalar::GqlScalar,
-    new_templates::indexed_type::IndexedType,
+    new_templates::{
+        indexed_input_value::{IndexedInputValue, IndexedInputValueTypeInfo},
+        indexed_type::IndexedType,
+    },
     virtual_schema::{
         data::{
-            NativeScalarRef, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef, UnitTypeRef,
+            Argument, ArgumentsKind, NativeScalarRef, Optionality, TypeIndex, TypeKind,
+            TypeModifier, TypeRef, UnitTypeRef,
         },
         VirtualIndexedTypeInfo, VirtualSchema,
     },
@@ -43,7 +47,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 .map(|(name, field_data)| juniper::meta::Field {
                     name: name.clone(),
                     description: None,
-                    arguments: None,
+                    arguments: self.get_field_arguments(&field_data.arguments),
                     field_type: self.get_type(field_data.field_type),
                     deprecation_status: juniper::meta::DeprecationStatus::Current,
                 })
@@ -109,6 +113,35 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
                 self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
             }
+        }
+    }
+
+    fn get_field_arguments(
+        &mut self,
+        arguments: &ArgumentsKind,
+    ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
+        match arguments {
+            ArgumentsKind::Empty => None,
+            ArgumentsKind::ConnectionQuery => None,
+            ArgumentsKind::CreateMutation { input } => Some(vec![self.get_field_argument(input)]),
+            ArgumentsKind::UpdateMutation { id, input } => Some(vec![
+                self.get_field_argument(id),
+                self.get_field_argument(input),
+            ]),
+            ArgumentsKind::DeleteMutation { id } => Some(vec![self.get_field_argument(id)]),
+        }
+    }
+
+    fn get_field_argument(
+        &mut self,
+        argument: &Argument,
+    ) -> juniper::meta::Argument<'r, GqlScalar> {
+        match argument {
+            Argument::Input(type_index, _) => self.registry.arg::<IndexedInputValue>(
+                argument.name(),
+                &IndexedInputValueTypeInfo(self.virtual_schema.indexed_type_info(*type_index)),
+            ),
+            Argument::Id(_) => self.registry.arg::<i32>(argument.name(), &()),
         }
     }
 }

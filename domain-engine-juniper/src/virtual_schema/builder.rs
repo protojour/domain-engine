@@ -15,9 +15,9 @@ use crate::adapter::{
 
 use super::{
     data::{
-        ArgumentsKind, ConnectionData, EdgeData, FieldData, NativeScalarRef, NodeData, ObjectData,
-        ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef,
-        UnionData, UnitTypeRef,
+        Argument, ArgumentsKind, ConnectionData, EdgeData, FieldData, NativeScalarRef, NodeData,
+        ObjectData, ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind,
+        TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     EntityInfo, VirtualSchema,
 };
@@ -254,6 +254,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapType) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
+        let operator_id = type_info.graphql_operator_id.unwrap();
 
         let mut fields = IndexMap::default();
 
@@ -281,6 +282,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info.entity_id,
+                        operator_id,
+                        input_type_name: smart_format!("{typename}Input"),
                     }),
                 }),
             },
@@ -407,7 +410,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.create(&typename),
                 FieldData {
                     arguments: ArgumentsKind::CreateMutation {
-                        input: entity_info.node_def_id,
+                        input: Argument::Input(entity_info.type_index, entity_info.node_def_id),
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -417,8 +420,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.update(&typename),
                 FieldData {
                     arguments: ArgumentsKind::UpdateMutation {
-                        input: entity_info.node_def_id,
-                        id: id_operator_id,
+                        input: Argument::Input(entity_info.type_index, entity_info.node_def_id),
+                        id: Argument::Id(id_operator_id),
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -427,7 +430,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.delete(&typename),
                 FieldData {
-                    arguments: ArgumentsKind::DeleteMutation { id: id_operator_id },
+                    arguments: ArgumentsKind::DeleteMutation {
+                        id: Argument::Id(id_operator_id),
+                    },
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
                         NativeScalarRef::Bool,
                     )),

@@ -11,7 +11,7 @@ use crate::{
 
 use self::{
     builder::VirtualSchemaBuilder,
-    data::{ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, UnitTypeRef},
+    data::{NodeData, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, UnitTypeRef},
 };
 
 pub mod data;
@@ -30,7 +30,7 @@ impl VirtualIndexedTypeInfo {
     }
 
     pub fn type_data(&self) -> &TypeData {
-        &self.virtual_schema.type_data(self.type_index)
+        self.virtual_schema.type_data(self.type_index)
     }
 }
 
@@ -99,18 +99,19 @@ impl VirtualSchema {
         &self.env
     }
 
-    pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+    pub fn indexed_type_info(self: &Arc<Self>, type_index: TypeIndex) -> VirtualIndexedTypeInfo {
         VirtualIndexedTypeInfo {
             virtual_schema: self.clone(),
-            type_index: self.query,
+            type_index,
         }
     }
 
+    pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
+        self.indexed_type_info(self.query)
+    }
+
     pub fn mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
-        VirtualIndexedTypeInfo {
-            virtual_schema: self.clone(),
-            type_index: self.mutation,
-        }
+        self.indexed_type_info(self.mutation)
     }
 
     pub fn type_data(&self, index: TypeIndex) -> &TypeData {
@@ -127,20 +128,27 @@ impl VirtualSchema {
 
     fn entity_check(&self, type_ref: UnitTypeRef) -> Option<EntityInfo> {
         if let UnitTypeRef::Indexed(type_index) = type_ref {
-            if let TypeKind::Object(obj) = &self.type_data(type_index).kind {
-                if let ObjectKind::Node(node) = &obj.kind {
-                    if let Some(id_def_id) = node.entity_id {
-                        Some(EntityInfo {
-                            type_index,
-                            node_def_id: node.def_id,
-                            id_def_id,
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+            let type_data = &self.type_data(type_index);
+
+            if let TypeData {
+                kind:
+                    TypeKind::Object(ObjectData {
+                        kind:
+                            ObjectKind::Node(NodeData {
+                                def_id: node_def_id,
+                                entity_id: Some(id_def_id),
+                                ..
+                            }),
+                        ..
+                    }),
+                ..
+            } = type_data
+            {
+                Some(EntityInfo {
+                    type_index,
+                    node_def_id: *node_def_id,
+                    id_def_id: *id_def_id,
+                })
             } else {
                 None
             }

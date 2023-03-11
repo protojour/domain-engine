@@ -5,7 +5,21 @@ use ontol_runtime::{env::Env, serde::SerdeOperatorId, smart_format, DefId};
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 use tracing::debug;
 
-use crate::gql_scalar::GqlScalar;
+use crate::{gql_scalar::GqlScalar, virtual_schema::data::Argument};
+
+pub fn deserialize_argument(
+    argument: &Argument,
+    arguments: &juniper::Arguments<GqlScalar>,
+    env: &Env,
+) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
+    let name = argument.name();
+    match argument {
+        Argument::Input(_, def_id) => deserialize_def_argument(arguments, name, *def_id, env),
+        Argument::Id(operator_id) => {
+            deserialize_operator_argument(arguments, name, *operator_id, env)
+        }
+    }
+}
 
 /// Deserialize some named juniper input argument using the given SerdeOperatorId.
 pub fn deserialize_def_argument(

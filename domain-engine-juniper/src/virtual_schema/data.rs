@@ -126,6 +126,8 @@ pub enum ObjectKind {
 pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
+    pub operator_id: SerdeOperatorId,
+    pub input_type_name: String,
 }
 
 pub struct UnionData {
@@ -165,7 +167,21 @@ impl FieldData {
 pub enum ArgumentsKind {
     Empty,
     ConnectionQuery,
-    CreateMutation { input: DefId },
-    UpdateMutation { id: SerdeOperatorId, input: DefId },
-    DeleteMutation { id: SerdeOperatorId },
+    CreateMutation { input: Argument },
+    UpdateMutation { id: Argument, input: Argument },
+    DeleteMutation { id: Argument },
+}
+
+pub enum Argument {
+    Input(TypeIndex, DefId),
+    Id(SerdeOperatorId),
+}
+
+impl Argument {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Input(..) => "input",
+            Self::Id(_) => "id",
+        }
+    }
 }

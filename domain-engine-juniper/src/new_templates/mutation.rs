@@ -2,7 +2,7 @@ use tracing::debug;
 
 use crate::{
     gql_scalar::GqlScalar,
-    input_value_deserializer::{deserialize_def_argument, deserialize_operator_argument},
+    input_value_deserializer::deserialize_argument,
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
@@ -47,22 +47,18 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
             let mutation_field = info.type_data().fields().unwrap().get(field_name).unwrap();
             match &mutation_field.arguments {
                 ArgumentsKind::CreateMutation { input } => {
-                    let input_value =
-                        deserialize_def_argument(arguments, "input", *input, info.env())?;
+                    let input_value = deserialize_argument(input, arguments, info.env())?;
 
                     debug!("CREATE {input_value:?}");
                 }
                 ArgumentsKind::UpdateMutation { id, input } => {
-                    let id_value =
-                        deserialize_operator_argument(arguments, "_id", *id, info.env())?;
-                    let input_value =
-                        deserialize_def_argument(arguments, "input", *input, info.env())?;
+                    let id_value = deserialize_argument(id, arguments, info.env())?;
+                    let input_value = deserialize_argument(input, arguments, info.env())?;
 
                     debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
                 ArgumentsKind::DeleteMutation { id } => {
-                    let id_value =
-                        deserialize_operator_argument(arguments, "_id", *id, info.env())?;
+                    let id_value = deserialize_argument(id, arguments, info.env())?;
 
                     debug!("DELETE {id_value:?}");
                 }
