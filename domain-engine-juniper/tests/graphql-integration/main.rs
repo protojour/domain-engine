@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use domain_engine_juniper::{
-    create_graphql_schema_v2, gql_scalar::GqlScalar, GqlContext, SchemaV2,
-};
+use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_test_utils::{TestCompile, TEST_PKG};
 
 mod test_graphql_basic;
@@ -16,7 +14,7 @@ impl<T: TestCompile> TestCompileSchema for T {
     fn compile_schema(self) -> TestSchema {
         let env = self.compile_ok(|_| {});
         TestSchema {
-            schema: create_graphql_schema_v2(env, TEST_PKG).unwrap(),
+            schema: create_graphql_schema(env, TEST_PKG).unwrap(),
         }
     }
 }
@@ -56,7 +54,7 @@ impl Display for TestError {
 }
 
 struct TestSchema {
-    schema: SchemaV2,
+    schema: Schema,
 }
 
 #[async_trait::async_trait]

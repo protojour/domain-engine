@@ -1,8 +1,4 @@
-pub mod connection;
-pub mod custom_scalar;
-pub mod edge;
-pub mod map_input_value;
+pub mod indexed_input_value;
+pub mod indexed_type;
 pub mod mutation;
-pub mod node;
 pub mod query;
-pub mod union;

@@ -8,10 +8,7 @@ use ontol_runtime::{
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::adapter::{
-    adapt::{classify_type, NodeClassification, TypeClassification},
-    namespace::Namespace,
-};
+use crate::virtual_schema::{classify_type, TypeClassification};
 
 use super::{
     data::{
@@ -19,7 +16,8 @@ use super::{
         ObjectData, ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind,
         TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
-    EntityInfo, VirtualSchema,
+    namespace::Namespace,
+    EntityInfo, NodeClassification, VirtualSchema,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -283,7 +281,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         def_id: type_info.def_id,
                         entity_id: type_info.entity_id,
                         operator_id,
-                        input_type_name: smart_format!("{typename}Input"),
+                        input_type_name: self.namespace.input(typename),
                     }),
                 }),
             },

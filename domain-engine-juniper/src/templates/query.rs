@@ -1,26 +1,14 @@
+use juniper::graphql_value;
+use tracing::debug;
+
 use crate::{
-    adapter::{
-        data::{Field, FieldCardinality, FieldKind},
-        DomainAdapter,
-    },
-    gql_scalar::GqlScalar,
-    macros::impl_graphql_value,
-    registry_wrapper::RegistryWrapper,
-    type_info::GraphqlTypeName,
+    gql_scalar::GqlScalar, macros::impl_graphql_value, type_info::GraphqlTypeName,
+    virtual_registry::VirtualRegistry, virtual_schema::VirtualIndexedTypeInfo,
 };
 
 pub struct Query;
 
-#[derive(Clone)]
-pub struct QueryTypeInfo(pub DomainAdapter);
-
-impl GraphqlTypeName for QueryTypeInfo {
-    fn graphql_type_name(&self) -> &str {
-        &self.0.query_type_name
-    }
-}
-
-impl_graphql_value!(Query, TypeInfo = QueryTypeInfo);
+impl_graphql_value!(Query, TypeInfo = VirtualIndexedTypeInfo);
 
 impl juniper::GraphQLType<GqlScalar> for Query {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
@@ -34,26 +22,8 @@ impl juniper::GraphQLType<GqlScalar> for Query {
     where
         GqlScalar: 'r,
     {
-        let mut reg = RegistryWrapper::new(registry, &info.0);
-
-        let fields: Vec<_> = info
-            .0
-            .queries
-            .iter()
-            .map(|(name, def_id)| {
-                reg.register_domain_field(
-                    name,
-                    &Field {
-                        cardinality: FieldCardinality::ManyMandatory,
-                        kind: FieldKind::EntityRelationship {
-                            subject_id: None,
-                            node_id: *def_id,
-                            rel_id: None,
-                        },
-                    },
-                )
-            })
-            .collect();
+        let mut reg = VirtualRegistry::new(&info.virtual_schema, registry);
+        let fields = reg.get_fields(info.type_index);
 
         registry
             .build_object_type::<Self>(info, &fields)
@@ -71,13 +41,11 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let _def_id = info
-                .0
-                .queries
-                .get(field_name)
-                .expect("BUG: Query not found");
+            let _query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            Ok(juniper::Value::Null)
+            debug!("Executing query {field_name}");
+
+            Ok(graphql_value!({ "edges": None }))
         })
     }
 }

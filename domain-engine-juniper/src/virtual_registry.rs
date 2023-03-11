@@ -6,7 +6,7 @@ use tracing::{debug, warn};
 
 use crate::{
     gql_scalar::GqlScalar,
-    new_templates::{
+    templates::{
         indexed_input_value::{IndexedInputValue, IndexedInputValueTypeInfo},
         indexed_type::IndexedType,
     },
