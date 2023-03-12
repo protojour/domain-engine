@@ -199,9 +199,6 @@ impl<'m> Compiler<'m> {
                     create_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, full_modifier).with_local_mod(no_id_modifier),
                     )),
-                    selection_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, no_id_modifier),
-                    )),
                 });
             }
 

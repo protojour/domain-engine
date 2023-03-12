@@ -135,7 +135,6 @@ impl Domain {
                 entity_id: None,
                 generic_operator_id: None,
                 create_operator_id: None,
-                selection_operator_id: None,
             });
         }
 
@@ -155,8 +154,6 @@ pub struct TypeInfo {
     pub generic_operator_id: Option<SerdeOperatorId>,
 
     pub create_operator_id: Option<SerdeOperatorId>,
-
-    pub selection_operator_id: Option<SerdeOperatorId>,
 }
 
 pub struct EnvBuilder {

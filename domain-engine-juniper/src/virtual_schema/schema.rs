@@ -4,7 +4,10 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     discriminator::Discriminant,
     env::Env,
-    serde::operator::{SerdeOperator, SerdeOperatorId},
+    serde::{
+        operator::{FilteredVariants, SerdeOperator, SerdeOperatorId},
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     DefId, PackageId,
 };
 use tracing::debug;
@@ -59,12 +62,13 @@ impl VirtualSchema {
         for (_, def_id) in &domain.type_names {
             let type_info = domain.type_info(*def_id);
 
-            if let (Some(select), Some(create)) = (
-                type_info.selection_operator_id,
+            if let (Some(generic), Some(select), Some(create)) = (
+                type_info.generic_operator_id,
+                type_info.generic_operator_id,
                 type_info.create_operator_id,
             ) {
                 debug!(
-                    "adapt type `{name}` {select:?} {create:?}",
+                    "adapt type `{name}` {generic:?} {select:?} {create:?}",
                     name = type_info.name,
                 );
 
@@ -168,42 +172,47 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
             TypeClassification::Type(node_classification, map_op.def_variant.def_id, operator_id)
         }
         SerdeOperator::Union(union_op) => {
-            // start with the "highest" classification and downgrade as "lower" variants are found.
-            let mut classification = TypeClassification::Type(
-                NodeClassification::Entity,
-                union_op.union_def_variant().def_id,
-                operator_id,
-            );
+            match union_op.variants(ProcessorMode::Select, ProcessorLevel::Child) {
+                FilteredVariants::Single(operator_id) => classify_type(env, operator_id),
+                FilteredVariants::Multi(variants) => {
+                    // start with the "highest" classification and downgrade as "lower" variants are found.
+                    let mut classification = TypeClassification::Type(
+                        NodeClassification::Entity,
+                        union_op.union_def_variant().def_id,
+                        operator_id,
+                    );
 
-            for variant in union_op.unfiltered_variants() {
-                if variant.discriminator.discriminant == Discriminant::MapFallback {
-                    panic!("BUG: Don't want to see this in a GraphQL operator");
-                }
+                    for variant in variants {
+                        if variant.discriminator.discriminant == Discriminant::MapFallback {
+                            panic!("BUG: Don't want to see this variant in ProcessorMode::Select");
+                        }
 
-                let variant_classification = classify_type(env, variant.operator_id);
-                match (&classification, variant_classification) {
-                    (
-                        TypeClassification::Type(..),
-                        TypeClassification::Type(NodeClassification::Node, ..),
-                    ) => {
-                        // downgrade
-                        debug!("    Downgrade to Node");
-                        classification = TypeClassification::Type(
-                            NodeClassification::Node,
-                            union_op.union_def_variant().def_id,
-                            operator_id,
-                        );
+                        let variant_classification = classify_type(env, variant.operator_id);
+                        match (&classification, variant_classification) {
+                            (
+                                TypeClassification::Type(..),
+                                TypeClassification::Type(NodeClassification::Node, ..),
+                            ) => {
+                                // downgrade
+                                debug!("    Downgrade to Node");
+                                classification = TypeClassification::Type(
+                                    NodeClassification::Node,
+                                    union_op.union_def_variant().def_id,
+                                    operator_id,
+                                );
+                            }
+                            (_, TypeClassification::Scalar) => {
+                                // downgrade
+                                debug!("    Downgrade to Scalar");
+                                classification = TypeClassification::Scalar;
+                            }
+                            _ => {}
+                        }
                     }
-                    (_, TypeClassification::Scalar) => {
-                        // downgrade
-                        debug!("    Downgrade to Scalar");
-                        classification = TypeClassification::Scalar;
-                    }
-                    _ => {}
+
+                    classification
                 }
             }
-
-            classification
         }
         SerdeOperator::Id(_) => TypeClassification::Id,
         operator => {
