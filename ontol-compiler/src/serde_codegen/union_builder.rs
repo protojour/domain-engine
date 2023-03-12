@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    discriminator::{Discriminant, VariantDiscriminator},
+    discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueUnionVariant},
         SerdeKey,
@@ -13,14 +13,15 @@ use smartstring::alias::String;
 use super::serde_generator::SerdeGenerator;
 
 pub struct UnionBuilder {
-    discriminator_candidates: Vec<ValueUnionVariant>,
+    // variants _sorted_ by purpose
+    variant_candidates_by_purpose: BTreeMap<VariantPurpose, Vec<ValueUnionVariant>>,
     def_variant: DefVariant,
 }
 
 impl UnionBuilder {
     pub fn new(def_variant: DefVariant) -> Self {
         Self {
-            discriminator_candidates: vec![],
+            variant_candidates_by_purpose: Default::default(),
             def_variant,
         }
     }
@@ -28,14 +29,20 @@ impl UnionBuilder {
 
 impl UnionBuilder {
     pub fn build(
-        mut self,
+        self,
         generator: &mut SerdeGenerator,
         mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
     ) -> Result<Vec<ValueUnionVariant>, String> {
         // sanity check
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
-        for candidate in &mut self.discriminator_candidates {
+        let mut variant_candidates: Vec<_> = self
+            .variant_candidates_by_purpose
+            .into_iter()
+            .flat_map(|(_, variants)| variants)
+            .collect();
+
+        for candidate in &mut variant_candidates {
             let result_type = candidate.discriminator.def_variant.def_id;
 
             candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
@@ -73,7 +80,7 @@ impl UnionBuilder {
             }
         }
 
-        Ok(self.discriminator_candidates)
+        Ok(variant_candidates)
     }
 
     pub fn add_root_discriminator(
@@ -121,20 +128,27 @@ impl UnionBuilder {
                 match discriminator.discriminant {
                     Discriminant::MapFallback => {
                         if let Some(scoping) = scope.last() {
-                            self.discriminator_candidates.push(ValueUnionVariant {
-                                discriminator: (*scoping).clone(),
-                                operator_id,
-                            });
+                            self.variant_candidates_by_purpose
+                                .entry(scoping.purpose)
+                                .or_default()
+                                .push(ValueUnionVariant {
+                                    discriminator: (*scoping).clone(),
+                                    operator_id,
+                                });
+
                             Ok(())
                         } else {
                             Err(smart_format!("MapFallback without scoping"))
                         }
                     }
                     _ => {
-                        self.discriminator_candidates.push(ValueUnionVariant {
-                            discriminator: discriminator.clone(),
-                            operator_id,
-                        });
+                        self.variant_candidates_by_purpose
+                            .entry(discriminator.purpose)
+                            .or_default()
+                            .push(ValueUnionVariant {
+                                discriminator: discriminator.clone(),
+                                operator_id,
+                            });
                         Ok(())
                     }
                 }

@@ -5,7 +5,11 @@ use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
-use crate::{discriminator::VariantDiscriminator, value::PropertyId, DefId, DefVariant};
+use crate::{
+    discriminator::{VariantDiscriminator, VariantPurpose},
+    value::PropertyId,
+    DefId, DefVariant,
+};
 
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
@@ -105,11 +109,21 @@ pub struct UnionOperator {
 }
 
 impl UnionOperator {
+    /// Note: variants must be sorted according to its purpose (VariantPurpose)
     pub fn new(
         typename: String,
         union_def_variant: DefVariant,
         variants: Vec<ValueUnionVariant>,
     ) -> Self {
+        variants
+            .iter()
+            .fold(VariantPurpose::Identification, |last_purpose, variant| {
+                if variant.discriminator.purpose < last_purpose {
+                    panic!("variants are not sorted: {variants:#?}");
+                }
+                variant.discriminator.purpose
+            });
+
         Self {
             typename,
             union_def_variant,

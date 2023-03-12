@@ -14,10 +14,10 @@ pub struct VariantDiscriminator {
     pub def_variant: DefVariant,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum VariantPurpose {
-    Data,
     Identification,
+    Data,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
