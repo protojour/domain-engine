@@ -1,6 +1,7 @@
 use domain_engine_juniper::create_graphql_schema;
 use juniper::graphql_value;
-use ontol_test_utils::{TestCompile, TEST_PKG};
+use ontol_test_utils::{assert_error_msg, TestCompile, TEST_PKG};
+use pretty_assertions::assert_eq;
 use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
@@ -36,13 +37,12 @@ async fn test_graphql_basic_schema() {
             }    
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
+        .await,
+        Ok(graphql_value!({
             "fooList": {
                 "edges": None,
             },
-        }),
+        })),
     );
 
     assert_eq!(
@@ -56,14 +56,13 @@ async fn test_graphql_basic_schema() {
             }
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!(None),
+        .await,
+        Ok(graphql_value!(None)),
     );
 }
 
 #[test(tokio::test)]
-async fn test_artist_and_instrument_connections() {
+async fn test_graphql_artist_and_instrument_connections() {
     let schema = ARTIST_AND_INSTRUMENT.compile_schema();
 
     assert_eq!(
@@ -85,13 +84,12 @@ async fn test_artist_and_instrument_connections() {
             }
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
+        .await,
+        Ok(graphql_value!({
             "artistList": {
                 "edges": None,
             },
-        }),
+        })),
     );
 
     assert_eq!(
@@ -113,13 +111,29 @@ async fn test_artist_and_instrument_connections() {
             }
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
+        .await,
+        Ok(graphql_value!({
             "instrumentList": {
                 "edges": None
             },
-        }),
+        })),
+    );
+
+    // BUG:
+    assert_error_msg!(
+        r#"
+mutation {
+    createartist(input: {
+        name: "Someone",
+        plays: "invalid"
+    }) {
+        _id
+    }
+}
+        "#
+        .exec(&schema)
+        .await,
+        r#"Execution: invalid type: string "invalid", expected sequence with minimum length 0 in input at line 4 column 15 (field at line 2 column 4)"#
     );
 }
 
@@ -151,12 +165,11 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
             }
         }"
         .exec(&schema)
-        .await
-        .unwrap(),
-        graphql_value!({
+        .await,
+        Ok(graphql_value!({
             "artistList": {
                 "edges": None
             },
-        }),
+        })),
     );
 }

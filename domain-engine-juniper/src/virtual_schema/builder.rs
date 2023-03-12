@@ -353,10 +353,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         self.get_operator_scalar_type_ref(property.value_operator_id, operator);
                     fields.insert(
                         property_name.clone(),
-                        FieldData::no_args(
-                            TypeRef::mandatory(scalar_ref)
-                                .to_array(Optionality::from_optional(property.optional)),
-                        ),
+                        FieldData::no_args(TypeRef {
+                            modifier: TypeModifier::new_unit(Optionality::from_optional(
+                                property.optional,
+                            )),
+                            unit: scalar_ref,
+                        }),
                     );
                 }
             }

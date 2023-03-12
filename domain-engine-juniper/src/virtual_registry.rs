@@ -19,8 +19,8 @@ use crate::{
     },
 };
 
-/// Juniper registry and domain adapter combined into
-/// one type to enable a nice API
+/// Juniper registry and virtual schema combined into
+/// one type to enable a nice unified API
 pub struct VirtualRegistry<'a, 'r> {
     pub virtual_schema: &'a Arc<VirtualSchema>,
     pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
@@ -138,7 +138,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::StringPattern(_) => self.registry.arg::<String>(name, &()),
             SerdeOperator::CapturingStringPattern(_) => self.registry.arg::<String>(name, &()),
             SerdeOperator::RelationSequence(_) => {
-                warn!("Skipping relation sequence for now");
+                warn!("Skipping relation sequence for now: {name}");
                 self.registry.arg::<String>(name, &())
                 // registry.arg::<CustomScalar>(name, &()),
             }

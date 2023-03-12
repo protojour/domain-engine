@@ -19,7 +19,7 @@ impl<T: TestCompile> TestCompileSchema for T {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum TestError {
     GraphQL(juniper::GraphQLError),
     Execution(Vec<juniper::ExecutionError<GqlScalar>>),
