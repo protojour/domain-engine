@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
-    discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator},
+    discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
     smart_format,
     value::PropertyId,
     DataModifier, DefId, DefVariant, RelationId,
@@ -424,6 +424,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(def_id) = builder.unit {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsUnit,
+                purpose: VariantPurpose::Data,
                 def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
             })
         }
@@ -431,6 +432,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(number) = builder.number {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsInt,
+                purpose: VariantPurpose::Data,
                 def_variant: DefVariant::new(number.0, DataModifier::IDENTITY),
             })
         }
@@ -439,6 +441,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (variant_def_id, _) in builder.pattern_candidates {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::MatchesCapturingStringPattern(variant_def_id),
+                purpose: VariantPurpose::Data,
                 def_variant: DefVariant::new(variant_def_id, DataModifier::IDENTITY),
             });
         }
@@ -448,6 +451,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             StringDiscriminator::Any(def_id) => {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: Discriminant::IsString,
+                    purpose: VariantPurpose::Data,
                     def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
                 });
             }
@@ -455,6 +459,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 for (literal, def_id) in literals {
                     union_discriminator.variants.push(VariantDiscriminator {
                         discriminant: Discriminant::IsStringLiteral(literal),
+                        purpose: VariantPurpose::Data,
                         def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
                     });
                 }
@@ -464,6 +469,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(sequence_def_id) = builder.sequence {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsSequence,
+                purpose: VariantPurpose::Data,
                 def_variant: DefVariant::new(sequence_def_id, DataModifier::IDENTITY),
             });
         }
@@ -472,6 +478,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             for candidate in map_discriminator.property_candidates {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: candidate.discriminant,
+                    purpose: VariantPurpose::Data,
                     def_variant: DefVariant::new(
                         map_discriminator.result_type,
                         DataModifier::IDENTITY,

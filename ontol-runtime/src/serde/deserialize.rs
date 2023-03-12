@@ -9,7 +9,6 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    env::Env,
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
@@ -38,15 +37,15 @@ struct DeserializedMap {
 }
 
 pub(super) struct MatcherVisitor<'e, M> {
+    processor: SerdeProcessor<'e>,
     matcher: M,
-    env: &'e Env,
 }
 
 struct MapTypeVisitor<'e> {
+    processor: SerdeProcessor<'e>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     map_type: &'e MapType,
     rel_params_operator_id: Option<SerdeOperatorId>,
-    env: &'e Env,
 }
 
 #[derive(Clone, Copy)]
@@ -86,8 +85,8 @@ impl<'e> SerdeProcessor<'e> {
 trait IntoVisitor: ValueMatcher + Sized {
     fn into_visitor(self, processor: SerdeProcessor) -> MatcherVisitor<Self> {
         MatcherVisitor {
+            processor,
             matcher: self,
-            env: processor.env,
         }
     }
 
@@ -168,8 +167,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             ),
             SerdeOperator::ValueType(value_type) => {
                 let typed_value = self
-                    .env
-                    .new_serde_processor(value_type.inner_operator_id, None)
+                    .narrow(value_type.inner_operator_id)
                     .deserialize(deserializer)?;
 
                 Ok(typed_value)
@@ -187,10 +185,10 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 todo!()
             }
             SerdeOperator::MapType(map_type) => deserializer.deserialize_map(MapTypeVisitor {
+                processor: self,
                 buffered_attrs: Default::default(),
                 map_type,
                 rel_params_operator_id: self.rel_params_operator_id,
-                env: self.env,
             }),
         }
     }
@@ -258,7 +256,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
-                Some(element_match) => self.env.new_serde_processor(
+                Some(element_match) => self.processor.narrow_with_rel(
                     element_match.element_operator_id,
                     element_match.rel_params_operator_id,
                 ),
@@ -336,14 +334,15 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
         // delegate to the real map visitor
         match map_match.kind {
             MapMatchKind::MapType(map_type) => MapTypeVisitor {
+                processor: self.processor,
                 buffered_attrs,
                 map_type,
                 rel_params_operator_id: map_match.rel_params_operator_id,
-                env: self.env,
             }
             .visit_map(map),
             MapMatchKind::IdType(serde_operator_id) => {
                 let deserialized_map = deserialize_map(
+                    self.processor,
                     map,
                     buffered_attrs,
                     &IndexMap::default(),
@@ -352,7 +351,6 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                         rel_params: map_match.rel_params_operator_id,
                         id: Some(serde_operator_id),
                     },
-                    self.env,
                 )?;
                 let id = deserialized_map
                     .id
@@ -377,6 +375,7 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.map_type.def_variant.def_id;
         let deserialized_map = deserialize_map(
+            self.processor,
             map,
             self.buffered_attrs,
             &self.map_type.properties,
@@ -385,7 +384,6 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
                 rel_params: self.rel_params_operator_id,
                 id: None,
             },
-            self.env,
         )?;
         Ok(Attribute {
             value: Value {
@@ -397,13 +395,13 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
     }
 }
 
-fn deserialize_map<'de, A: MapAccess<'de>>(
+fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
+    processor: SerdeProcessor<'e>,
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
     expected_mandatory_properties: usize,
     special_operator_ids: SpecialOperatorIds,
-    env: &Env,
 ) -> Result<DeserializedMap, A::Error> {
     let mut attributes = BTreeMap::new();
     let mut rel_params = Value::unit();
@@ -415,21 +413,21 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
     for (serde_key, serde_value) in buffered_attrs {
         match PropertySet::new(properties, special_operator_ids).visit_str(&serde_key)? {
             MapKey::RelParams(operator_id) => {
-                let Attribute { value, .. } = env
-                    .new_serde_processor(operator_id, None)
+                let Attribute { value, .. } = processor
+                    .new_child(operator_id)
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
-                let Attribute { value, .. } = env
-                    .new_serde_processor(operator_id, None)
+                let Attribute { value, .. } = processor
+                    .new_child(operator_id)
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
-                let Attribute { rel_params, value } = env
-                    .new_serde_processor(
+                let Attribute { rel_params, value } = processor
+                    .new_child_with_rel(
                         serde_property.value_operator_id,
                         serde_property.rel_params_operator_id,
                     )
@@ -451,18 +449,18 @@ fn deserialize_map<'de, A: MapAccess<'de>>(
         match map_key {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } =
-                    map.next_value_seed(env.new_serde_processor(operator_id, None))?;
+                    map.next_value_seed(processor.new_child(operator_id))?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
                 let Attribute { value, .. } =
-                    map.next_value_seed(env.new_serde_processor(operator_id, None))?;
+                    map.next_value_seed(processor.new_child(operator_id))?;
 
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
-                let attribute = map.next_value_seed(env.new_serde_processor(
+                let attribute = map.next_value_seed(processor.new_child_with_rel(
                     serde_property.value_operator_id,
                     serde_property.rel_params_operator_id,
                 ))?;

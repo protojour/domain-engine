@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    discriminator::{Discriminant, VariantDiscriminator},
+    discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     serde::{
         ConstructorSequenceType, MapType, RelationSequenceType, SequenceRange, SerdeKey,
         SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType,
@@ -487,6 +487,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                     id_relation_id,
                                     "_id".into(),
                                 ),
+                                purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
                                     relationship.object.0,
                                     DataModifier::IDENTITY,
@@ -497,6 +498,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::MapFallback,
+                                purpose: VariantPurpose::Data,
                                 def_variant: map_def_variant,
                             },
                             operator_id: map_properties_operator_id,

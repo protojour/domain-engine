@@ -67,8 +67,7 @@ impl<'e> SerdeProcessor<'e> {
                 serializer,
             ),
             SerdeOperator::ValueType(value_type) => self
-                .env
-                .new_serde_processor(value_type.inner_operator_id, self.rel_params_operator_id)
+                .narrow(value_type.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
                 let discriminator = value_union_type.variants.iter().find(|discriminator| {
@@ -77,10 +76,7 @@ impl<'e> SerdeProcessor<'e> {
 
                 match discriminator {
                     Some(discriminator) => {
-                        let processor = self.env.new_serde_processor(
-                            discriminator.operator_id,
-                            self.rel_params_operator_id,
-                        );
+                        let processor = self.narrow(discriminator.operator_id);
                         debug!(
                             "serializing union variant with {:?} {processor:}",
                             discriminator.operator_id
@@ -100,7 +96,7 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value,
                         rel_params: None,
-                        processor: self.env.new_serde_processor(*inner_operator_id, None),
+                        processor: self.new_child(*inner_operator_id),
                     },
                 )?;
                 self.serialize_rel_params::<S>(rel_params, &mut map)?;
@@ -141,9 +137,7 @@ impl<'e> SerdeProcessor<'e> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self
-                            .env
-                            .new_serde_processor(range.operator_id, self.rel_params_operator_id),
+                        processor: self.narrow(range.operator_id),
                     })?;
                 }
             } else {
@@ -151,9 +145,7 @@ impl<'e> SerdeProcessor<'e> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self
-                            .env
-                            .new_serde_processor(range.operator_id, self.rel_params_operator_id),
+                        processor: self.narrow(range.operator_id),
                     })?;
                 }
             }
@@ -196,7 +188,7 @@ impl<'e> SerdeProcessor<'e> {
                 &Proxy {
                     value: &attribute.value,
                     rel_params: attribute.rel_params.filter_non_unit(),
-                    processor: self.env.new_serde_processor(
+                    processor: self.new_child_with_rel(
                         serde_prop.value_operator_id,
                         serde_prop.rel_params_operator_id,
                     ),
@@ -222,7 +214,7 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value: rel_params,
                         rel_params: None,
-                        processor: self.env.new_serde_processor(operator_id, None),
+                        processor: self.new_child(operator_id),
                     },
                 )?;
             }

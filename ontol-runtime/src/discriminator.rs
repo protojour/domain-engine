@@ -10,7 +10,14 @@ pub struct UnionDiscriminator {
 #[derive(Clone, Debug)]
 pub struct VariantDiscriminator {
     pub discriminant: Discriminant,
+    pub purpose: VariantPurpose,
     pub def_variant: DefVariant,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum VariantPurpose {
+    Data,
+    Identification,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]

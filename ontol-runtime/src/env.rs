@@ -7,7 +7,7 @@ use smartstring::alias::String;
 use crate::{
     proc::{Lib, Procedure},
     property_probe::PropertyProbe,
-    serde::{SerdeKey, SerdeOperator, SerdeOperatorId, SerdeProcessor},
+    serde::{ProcessorLevel, SerdeKey, SerdeOperator, SerdeOperatorId, SerdeProcessor},
     string_pattern::StringPattern,
     string_types::StringLikeType,
     translate::Translator,
@@ -82,10 +82,12 @@ impl Env {
         &self,
         value_operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,
+        level: ProcessorLevel,
     ) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
             rel_params_operator_id,
+            level,
             env: self,
         }
     }
