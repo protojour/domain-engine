@@ -2,7 +2,10 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Env, TypeInfo},
-    serde::operator::{MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
+    serde::{
+        operator::{MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     smart_format, DefId,
 };
 use smartstring::alias::String;
@@ -184,7 +187,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                 let mut variants = vec![];
 
-                for variant in union_op.variants() {
+                for variant in union_op.variants(ProcessorMode::Select, ProcessorLevel::Child) {
                     match classify_type(self.env, variant.operator_id) {
                         TypeClassification::Type(_, def_id, _operator_id) => {
                             match self.get_def_type_ref(def_id, QueryLevel::Node) {

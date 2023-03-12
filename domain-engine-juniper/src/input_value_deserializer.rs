@@ -3,7 +3,10 @@ use std::fmt::Display;
 use juniper::{graphql_value, InputValue, Spanning};
 use ontol_runtime::{
     env::Env,
-    serde::{operator::SerdeOperatorId, processor::ProcessorLevel},
+    serde::{
+        operator::SerdeOperatorId,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     smart_format, DefId,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
@@ -53,9 +56,14 @@ pub fn deserialize_operator_argument(
 
     debug!("deserializing {value:?}");
 
-    env.new_serde_processor(operator_id, None, ProcessorLevel::Root)
-        .deserialize(InputValueDeserializer { value })
-        .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+    env.new_serde_processor(
+        operator_id,
+        None,
+        ProcessorMode::Create,
+        ProcessorLevel::Root,
+    )
+    .deserialize(InputValueDeserializer { value })
+    .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
 }
 
 #[derive(Debug)]

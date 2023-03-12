@@ -86,6 +86,7 @@ impl Env {
         &self,
         value_operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,
+        mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> SerdeProcessor {
         SerdeProcessor {
@@ -93,18 +94,8 @@ impl Env {
             rel_params_operator_id,
             level,
             env: self,
+            mode,
         }
-    }
-
-    pub fn new_serde_processor_mode(
-        &self,
-        value_operator_id: SerdeOperatorId,
-        rel_params_operator_id: Option<SerdeOperatorId>,
-        level: ProcessorLevel,
-        _mode: ProcessorMode,
-    ) -> SerdeProcessor {
-        // TODO
-        self.new_serde_processor(value_operator_id, rel_params_operator_id, level)
     }
 
     pub fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {

@@ -5,7 +5,7 @@ use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
     serde::operator::SerdeOperatorId,
-    serde::processor::ProcessorLevel,
+    serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -41,7 +41,12 @@ impl<'e> TypeBinding<'e> {
             operator_id = type_info.create_operator_id,
             processor = type_info
                 .create_operator_id
-                .map(|id| env.new_serde_processor(id, None, ProcessorLevel::Root))
+                .map(|id| env.new_serde_processor(
+                    id,
+                    None,
+                    ProcessorMode::Create,
+                    ProcessorLevel::Root
+                ))
         );
 
         let json_schema = compile_json_schema(env, &type_info);
@@ -65,7 +70,12 @@ impl<'e> TypeBinding<'e> {
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
         self.env
-            .new_serde_processor(self.serde_operator_id(), None, ProcessorLevel::Root)
+            .new_serde_processor(
+                self.serde_operator_id(),
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
             .find_property(prop)
     }
 
@@ -104,7 +114,12 @@ impl<'e> TypeBinding<'e> {
 
         let attribute_result = self
             .env
-            .new_serde_processor(self.serde_operator_id(), None, ProcessorLevel::Root)
+            .new_serde_processor(
+                self.serde_operator_id(),
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
         if TEST_JSON_SCHEMA_VALIDATION {
@@ -145,7 +160,12 @@ impl<'e> TypeBinding<'e> {
     pub fn serialize_json(&self, value: &Value) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.env
-            .new_serde_processor(self.serde_operator_id(), None, ProcessorLevel::Root)
+            .new_serde_processor(
+                self.serde_operator_id(),
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
             .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
@@ -153,7 +173,7 @@ impl<'e> TypeBinding<'e> {
 }
 
 fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
-    let standalone_schema = build_standalone_schema(env, type_info).unwrap();
+    let standalone_schema = build_standalone_schema(env, type_info, ProcessorMode::Create).unwrap();
 
     debug!(
         "outputted json schema: {}",

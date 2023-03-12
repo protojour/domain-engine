@@ -37,17 +37,22 @@ pub struct SerdeProcessor<'e> {
     /// The edge data would be injected in the child map as the `_edge` property.
     pub(crate) rel_params_operator_id: Option<SerdeOperatorId>,
 
-    pub(crate) level: ProcessorLevel,
-
     /// The environment, via which new SerdeOperators can be created.
     pub(crate) env: &'e Env,
+
+    pub(crate) mode: ProcessorMode,
+    pub(crate) level: ProcessorLevel,
 }
 
 impl<'e> SerdeProcessor<'e> {
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
-        self.env
-            .new_serde_processor(operator_id, self.rel_params_operator_id, self.level)
+        self.env.new_serde_processor(
+            operator_id,
+            self.rel_params_operator_id,
+            self.mode,
+            self.level,
+        )
     }
 
     pub fn narrow_with_rel(
@@ -56,13 +61,13 @@ impl<'e> SerdeProcessor<'e> {
         rel_params_operator_id: Option<SerdeOperatorId>,
     ) -> Self {
         self.env
-            .new_serde_processor(operator_id, rel_params_operator_id, self.level)
+            .new_serde_processor(operator_id, rel_params_operator_id, self.mode, self.level)
     }
 
     /// Return a processor that processes a new value that is a child of value of this processor.
     pub fn new_child(&self, operator_id: SerdeOperatorId) -> Self {
         self.env
-            .new_serde_processor(operator_id, None, ProcessorLevel::Child)
+            .new_serde_processor(operator_id, None, self.mode, ProcessorLevel::Child)
     }
 
     pub fn new_child_with_rel(
@@ -70,8 +75,12 @@ impl<'e> SerdeProcessor<'e> {
         operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,
     ) -> Self {
-        self.env
-            .new_serde_processor(operator_id, rel_params_operator_id, ProcessorLevel::Child)
+        self.env.new_serde_processor(
+            operator_id,
+            rel_params_operator_id,
+            self.mode,
+            ProcessorLevel::Child,
+        )
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
@@ -81,7 +90,7 @@ impl<'e> SerdeProcessor<'e> {
     fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
         match operator {
             SerdeOperator::Union(union_op) => {
-                for discriminator in union_op.variants() {
+                for discriminator in union_op.variants(self.mode, self.level) {
                     let next_operator = self.narrow(discriminator.operator_id);
                     if let Some(property_id) =
                         self.search_property(prop, next_operator.value_operator)

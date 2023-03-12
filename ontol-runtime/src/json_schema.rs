@@ -10,6 +10,7 @@ use crate::env::TypeInfo;
 use crate::serde::operator::{
     MapOperator, SequenceRange, SerdeOperator, SerdeOperatorId, UnionOperator,
 };
+use crate::serde::processor::ProcessorMode;
 use crate::{
     env::{Domain, Env},
     DefId, PackageId,
@@ -40,6 +41,7 @@ pub fn build_openapi_schemas<'e>(
 pub fn build_standalone_schema<'e>(
     env: &'e Env,
     type_info: &TypeInfo,
+    mode: ProcessorMode,
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
@@ -52,6 +54,7 @@ pub fn build_standalone_schema<'e>(
         operator_id,
         defs: graph_builder.graph,
         env,
+        mode,
     })
 }
 
@@ -74,6 +77,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
             link_anchor: LinkAnchor::ComponentsSchemas,
             env: self.env,
             rel_params_operator_id: None,
+            mode: ProcessorMode::Create,
         };
 
         // serialize schema definitions belonging to the domain package first
@@ -99,6 +103,7 @@ pub struct StandaloneJsonSchema<'e> {
     operator_id: SerdeOperatorId,
     defs: BTreeMap<DefVariant, SerdeOperatorId>,
     env: &'e Env,
+    mode: ProcessorMode,
 }
 
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
@@ -107,6 +112,7 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
             link_anchor: LinkAnchor::Defs,
             env: self.env,
             rel_params_operator_id: None,
+            mode: self.mode,
         };
 
         SchemaReference {
@@ -127,6 +133,7 @@ struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
     env: &'e Env,
     rel_params_operator_id: Option<SerdeOperatorId>,
+    mode: ProcessorMode,
 }
 
 impl<'e> SchemaCtx<'e> {
@@ -174,6 +181,7 @@ impl<'e> SchemaCtx<'e> {
             link_anchor: self.link_anchor,
             env: self.env,
             rel_params_operator_id,
+            mode: self.mode,
         }
     }
 
@@ -495,7 +503,11 @@ impl<'e> Serialize for UnionRefLinks<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
 
-        for discriminator in self.union_op.variants() {
+        for discriminator in self
+            .union_op
+            // BUG: Must filter variants
+            .unfiltered_variants()
+        {
             seq.serialize_element(&self.ctx.reference(discriminator.operator_id))?;
         }
 
@@ -674,7 +686,7 @@ impl SchemaGraphBuilder {
             SerdeOperator::Union(union_op) => {
                 self.add_to_graph(union_op.union_def_variant(), operator_id);
 
-                for discriminator in union_op.variants() {
+                for discriminator in union_op.unfiltered_variants() {
                     self.visit(discriminator.operator_id, env);
                 }
             }

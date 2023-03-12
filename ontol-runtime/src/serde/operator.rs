@@ -11,6 +11,8 @@ use crate::{
     DefId, DefVariant,
 };
 
+use super::processor::{ProcessorLevel, ProcessorMode};
+
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
 #[debug_single_tuple_inline]
@@ -139,7 +141,11 @@ impl UnionOperator {
         self.union_def_variant
     }
 
-    pub fn variants(&self) -> &[ValueUnionVariant] {
+    pub fn variants(&self, _mode: ProcessorMode, _level: ProcessorLevel) -> &[ValueUnionVariant] {
+        &self.variants
+    }
+
+    pub fn unfiltered_variants(&self) -> &[ValueUnionVariant] {
         &self.variants
     }
 }

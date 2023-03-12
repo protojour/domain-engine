@@ -177,9 +177,11 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Union(union_op) => deserializer.deserialize_any(
                 UnionMatcher {
                     typename: union_op.typename(),
-                    variants: union_op.variants(),
+                    variants: union_op.variants(self.mode, self.level),
                     rel_params_operator_id: self.rel_params_operator_id,
                     env: self.env,
+                    mode: self.mode,
+                    level: self.level,
                 }
                 .into_visitor(self),
             ),

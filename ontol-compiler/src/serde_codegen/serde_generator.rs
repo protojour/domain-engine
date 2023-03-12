@@ -201,7 +201,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let mut map_count = 0;
                 let mut result = Err(operator);
 
-                for discriminator in union_op.variants() {
+                for discriminator in union_op.unfiltered_variants() {
                     if let Ok(map_type) =
                         self.find_unambiguous_map_operator(discriminator.operator_id)
                     {

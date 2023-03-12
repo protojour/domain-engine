@@ -175,7 +175,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                 operator_id,
             );
 
-            for variant in union_op.variants() {
+            for variant in union_op.unfiltered_variants() {
                 if variant.discriminator.discriminant == Discriminant::MapFallback {
                     panic!("BUG: Don't want to see this in a GraphQL operator");
                 }

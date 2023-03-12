@@ -70,9 +70,13 @@ impl<'e> SerdeProcessor<'e> {
                 .narrow(value_op.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::Union(union_op) => {
-                let discriminator = union_op.variants().iter().find(|discriminator| {
-                    value.type_def_id == discriminator.discriminator.def_variant.def_id
-                });
+                let discriminator =
+                    union_op
+                        .variants(self.mode, self.level)
+                        .iter()
+                        .find(|discriminator| {
+                            value.type_def_id == discriminator.discriminator.def_variant.def_id
+                        });
 
                 match discriminator {
                     Some(discriminator) => {

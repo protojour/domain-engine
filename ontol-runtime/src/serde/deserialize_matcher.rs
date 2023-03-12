@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     operator::{SequenceRange, SerdeOperator, ValueUnionVariant},
-    processor::ProcessorLevel,
+    processor::{ProcessorLevel, ProcessorMode},
     MapOperator, SerdeOperatorId,
 };
 
@@ -285,6 +285,8 @@ pub struct UnionMatcher<'e> {
     pub variants: &'e [ValueUnionVariant],
     pub rel_params_operator_id: Option<SerdeOperatorId>,
     pub env: &'e Env,
+    pub mode: ProcessorMode,
+    pub level: ProcessorLevel,
 }
 
 impl<'e> ValueMatcher for UnionMatcher<'e> {
@@ -300,6 +302,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     .map(|discriminator| self.env.new_serde_processor(
                         discriminator.operator_id,
                         None,
+                        self.mode,
                         ProcessorLevel::Root
                     ))
                     .collect(),
@@ -399,6 +402,8 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             variants: self.variants,
             rel_params_operator_id: self.rel_params_operator_id,
             env: self.env,
+            mode: self.mode,
+            level: self.level,
         })
     }
 }
@@ -420,6 +425,8 @@ pub struct MapMatcher<'e> {
     variants: &'e [ValueUnionVariant],
     pub rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
+    mode: ProcessorMode,
+    level: ProcessorLevel,
 }
 
 pub enum MapMatchResult<'e> {
@@ -478,9 +485,11 @@ impl<'e> MapMatcher<'e> {
                         MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
                     }
                     SerdeOperator::Union(union_op) => MapMatcher {
-                        variants: union_op.variants(),
+                        variants: union_op.variants(self.mode, self.level),
                         rel_params_operator_id: self.rel_params_operator_id,
                         env: self.env,
+                        mode: self.mode,
+                        level: self.level,
                     }
                     .match_attribute(property, value),
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
