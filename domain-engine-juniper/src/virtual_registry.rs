@@ -9,10 +9,7 @@ use tracing::{debug, warn};
 
 use crate::{
     gql_scalar::GqlScalar,
-    templates::{
-        indexed_input_value::{IndexedInputValue, IndexedInputValueTypeInfo},
-        indexed_type::IndexedType,
-    },
+    templates::{indexed_input_value::IndexedInputValue, indexed_type::IndexedType},
     virtual_schema::{
         data::{
             Argument, ArgumentsKind, NativeScalarRef, Optionality, TypeIndex, TypeKind,
@@ -221,11 +218,9 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         match argument {
             Argument::Input(type_index, _, mode) => self.registry.arg::<IndexedInputValue>(
                 argument.name(),
-                &IndexedInputValueTypeInfo(self.virtual_schema.indexed_type_info(
-                    *type_index,
-                    *mode,
-                    ProcessorLevel::Root,
-                )),
+                &self
+                    .virtual_schema
+                    .indexed_type_info(*type_index, *mode, ProcessorLevel::Root),
             ),
             Argument::Id(operator_id, _) => {
                 self.get_operator_argument(argument.name(), *operator_id)

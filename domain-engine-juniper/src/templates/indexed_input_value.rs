@@ -13,24 +13,10 @@ pub struct IndexedInputValue {
     pub input_value: juniper::InputValue<GqlScalar>,
 }
 
-pub struct IndexedInputValueTypeInfo(pub VirtualIndexedTypeInfo);
-
-impl GraphqlTypeName for IndexedInputValueTypeInfo {
-    fn graphql_type_name(&self) -> &str {
-        match &self.0.type_data().kind {
-            TypeKind::Object(obj) => match &obj.kind {
-                ObjectKind::Node(node) => &node.input_type_name,
-                _ => panic!(),
-            },
-            _ => panic!(),
-        }
-    }
-}
-
-impl_graphql_value!(IndexedInputValue, TypeInfo = IndexedInputValueTypeInfo);
+impl_graphql_value!(IndexedInputValue, TypeInfo = VirtualIndexedTypeInfo);
 
 impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
-    fn name(info: &IndexedInputValueTypeInfo) -> Option<&str> {
+    fn name(info: &VirtualIndexedTypeInfo) -> Option<&str> {
         Some(info.graphql_type_name())
     }
 
@@ -41,8 +27,8 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
     where
         GqlScalar: 'r,
     {
-        let mut reg = VirtualRegistry::new(&info.0.virtual_schema, registry);
-        match &info.0.type_data().kind {
+        let mut reg = VirtualRegistry::new(&info.virtual_schema, registry);
+        match &info.type_data().kind {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(node_data),
                 ..
@@ -51,15 +37,15 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                 reg.collect_operator_arguments(
                     node_data.generic_operator_id,
                     &mut arguments,
-                    info.0.mode,
-                    info.0.level,
+                    info.mode,
+                    info.level,
                 );
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
             }
             TypeKind::Union(_union_data) => {
-                todo!()
+                panic!("Unions can't be part of input values")
             }
             TypeKind::CustomScalar(_) => todo!(),
             TypeKind::Object(_) => panic!("Invalid Object input data"),

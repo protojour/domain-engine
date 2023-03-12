@@ -8,7 +8,7 @@ use ontol_runtime::{
 
 use crate::type_info::GraphqlTypeName;
 
-use self::data::{TypeData, TypeIndex};
+use self::data::{ObjectData, ObjectKind, TypeData, TypeIndex};
 
 pub mod data;
 
@@ -38,7 +38,20 @@ impl VirtualIndexedTypeInfo {
 
 impl GraphqlTypeName for VirtualIndexedTypeInfo {
     fn graphql_type_name(&self) -> &str {
-        &self.type_data().typename
+        let type_data = &self.type_data();
+        match self.mode {
+            ProcessorMode::Select => &type_data.typename,
+            _ => match &type_data.kind {
+                data::TypeKind::Object(ObjectData {
+                    kind: ObjectKind::Node(node),
+                    ..
+                }) => &node.input_type_name,
+                _ => panic!(
+                    "No {mode:?} typename available for this type_data",
+                    mode = self.mode
+                ),
+            },
+        }
     }
 }
 
