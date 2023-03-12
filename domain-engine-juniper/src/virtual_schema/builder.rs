@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Env, TypeInfo},
-    serde::operator::{MapType, SerdeOperator, SerdeOperatorId, SerdeProperty},
+    serde::operator::{MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
     smart_format, DefId,
 };
 use smartstring::alias::String;
@@ -126,8 +126,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                 if let Some(rel_params) = rel_params {
                     match self.env.get_serde_operator(rel_params) {
-                        SerdeOperator::MapType(map_type) => {
-                            self.register_fields(map_type, &mut fields);
+                        SerdeOperator::Map(map_op) => {
+                            self.register_fields(map_op, &mut fields);
                         }
                         other => {
                             panic!("Tried to register edge rel_params for {other:?}");
@@ -179,12 +179,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
             SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::ValueType(_) => todo!("value type"),
-            SerdeOperator::ValueUnionType(value_union_type) => {
+            SerdeOperator::Union(union_op) => {
                 let node_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
 
                 let mut variants = vec![];
 
-                for variant in value_union_type.variants() {
+                for variant in union_op.variants() {
                     match classify_type(self.env, variant.operator_id) {
                         TypeClassification::Type(_, def_id, _operator_id) => {
                             match self.get_def_type_ref(def_id, QueryLevel::Node) {
@@ -219,7 +219,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     },
                 )
             }
-            SerdeOperator::MapType(map_type) => self.make_map_type(type_info, map_type),
+            SerdeOperator::Map(map_op) => self.make_map_type(type_info, map_op),
             operator => self.make_new_scalar(selection_operator_id, operator),
         }
     }
@@ -244,13 +244,13 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::Id(_) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
-            | SerdeOperator::ValueUnionType(_)
-            | SerdeOperator::MapType(_)
+            | SerdeOperator::Union(_)
+            | SerdeOperator::Map(_)
             | SerdeOperator::RelationSequence(_) => panic!("not a scalar"),
         }
     }
 
-    fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapType) -> NewType {
+    fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
         let selection_operator_id = type_info.selection_operator_id.unwrap();
@@ -291,26 +291,23 @@ impl<'a> VirtualSchemaBuilder<'a> {
         )
     }
 
-    fn register_fields(&mut self, map_type: &MapType, fields: &mut IndexMap<String, FieldData>) {
-        for (property_name, property) in &map_type.properties {
+    fn register_fields(&mut self, map_op: &MapOperator, fields: &mut IndexMap<String, FieldData>) {
+        for (property_name, property) in &map_op.properties {
             match self.env.get_serde_operator(property.value_operator_id) {
-                SerdeOperator::MapType(property_map_type) => {
+                SerdeOperator::Map(property_map_op) => {
                     fields.insert(
                         property_name.clone(),
-                        self.unit_def_field_data(property, property_map_type.def_variant.def_id),
+                        self.unit_def_field_data(property, property_map_op.def_variant.def_id),
                     );
                 }
-                SerdeOperator::ValueUnionType(value_union_type) => {
+                SerdeOperator::Union(union_op) => {
                     fields.insert(
                         property_name.clone(),
-                        self.unit_def_field_data(
-                            property,
-                            value_union_type.union_def_variant().def_id,
-                        ),
+                        self.unit_def_field_data(property, union_op.union_def_variant().def_id),
                     );
                 }
-                SerdeOperator::RelationSequence(sequence_type) => {
-                    match classify_type(self.env, sequence_type.ranges[0].operator_id) {
+                SerdeOperator::RelationSequence(seq_op) => {
+                    match classify_type(self.env, seq_op.ranges[0].operator_id) {
                         TypeClassification::Type(NodeClassification::Entity, node_id, _) => {
                             let connection_ref = self.get_def_type_ref(
                                 node_id,
@@ -345,8 +342,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         TypeClassification::Scalar => {
                             panic!(
                                 "Unhandled scalar: {:?}",
-                                self.env
-                                    .get_serde_operator(sequence_type.ranges[0].operator_id)
+                                self.env.get_serde_operator(seq_op.ranges[0].operator_id)
                             )
                         }
                     }

@@ -23,7 +23,7 @@ use super::{
     },
     operator::{SerdeOperator, SerdeProperty},
     processor::SerdeProcessor,
-    MapType, SerdeOperatorId, ID_PROPERTY,
+    MapOperator, SerdeOperatorId, ID_PROPERTY,
 };
 
 enum MapKey {
@@ -46,7 +46,7 @@ pub(super) struct MatcherVisitor<'e, M> {
 struct MapTypeVisitor<'e> {
     processor: SerdeProcessor<'e>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
-    map_type: &'e MapType,
+    map_op: &'e MapOperator,
     rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
@@ -151,33 +151,33 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::RelationSequence(sequence_type) => deserializer.deserialize_seq(
+            SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
                 SequenceMatcher::new(
-                    &sequence_type.ranges,
-                    sequence_type.def_variant.def_id,
+                    &seq_op.ranges,
+                    seq_op.def_variant.def_id,
                     self.rel_params_operator_id,
                 )
                 .into_visitor(self),
             ),
-            SerdeOperator::ConstructorSequence(sequence_type) => deserializer.deserialize_seq(
+            SerdeOperator::ConstructorSequence(seq_op) => deserializer.deserialize_seq(
                 SequenceMatcher::new(
-                    &sequence_type.ranges,
-                    sequence_type.def_variant.def_id,
+                    &seq_op.ranges,
+                    seq_op.def_variant.def_id,
                     self.rel_params_operator_id,
                 )
                 .into_visitor(self),
             ),
-            SerdeOperator::ValueType(value_type) => {
+            SerdeOperator::ValueType(value_op) => {
                 let typed_value = self
-                    .narrow(value_type.inner_operator_id)
+                    .narrow(value_op.inner_operator_id)
                     .deserialize(deserializer)?;
 
                 Ok(typed_value)
             }
-            SerdeOperator::ValueUnionType(value_union_type) => deserializer.deserialize_any(
+            SerdeOperator::Union(union_op) => deserializer.deserialize_any(
                 UnionMatcher {
-                    typename: value_union_type.typename(),
-                    variants: value_union_type.variants(),
+                    typename: union_op.typename(),
+                    variants: union_op.variants(),
                     rel_params_operator_id: self.rel_params_operator_id,
                     env: self.env,
                 }
@@ -187,10 +187,10 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 //deserializer.deserialize_map()
                 todo!()
             }
-            SerdeOperator::MapType(map_type) => deserializer.deserialize_map(MapTypeVisitor {
+            SerdeOperator::Map(map_op) => deserializer.deserialize_map(MapTypeVisitor {
                 processor: self,
                 buffered_attrs: Default::default(),
-                map_type,
+                map_op,
                 rel_params_operator_id: self.rel_params_operator_id,
             }),
         }
@@ -336,10 +336,10 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         // delegate to the real map visitor
         match map_match.kind {
-            MapMatchKind::MapType(map_type) => MapTypeVisitor {
+            MapMatchKind::MapType(map_op) => MapTypeVisitor {
                 processor: self.processor,
                 buffered_attrs,
-                map_type,
+                map_op,
                 rel_params_operator_id: map_match.rel_params_operator_id,
             }
             .visit_map(map),
@@ -372,17 +372,17 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "type `{}`", self.map_type.typename)
+        write!(f, "type `{}`", self.map_op.typename)
     }
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-        let type_def_id = self.map_type.def_variant.def_id;
+        let type_def_id = self.map_op.def_variant.def_id;
         let deserialized_map = deserialize_map(
             self.processor,
             map,
             self.buffered_attrs,
-            &self.map_type.properties,
-            self.map_type.n_mandatory_properties,
+            &self.map_op.properties,
+            self.map_op.n_mandatory_properties,
             SpecialOperatorIds {
                 rel_params: self.rel_params_operator_id,
                 id: None,

@@ -80,8 +80,8 @@ impl<'e> SerdeProcessor<'e> {
 
     fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
         match operator {
-            SerdeOperator::ValueUnionType(union_type) => {
-                for discriminator in union_type.variants() {
+            SerdeOperator::Union(union_op) => {
+                for discriminator in union_op.variants() {
                     let next_operator = self.narrow(discriminator.operator_id);
                     if let Some(property_id) =
                         self.search_property(prop, next_operator.value_operator)
@@ -92,7 +92,7 @@ impl<'e> SerdeProcessor<'e> {
 
                 None
             }
-            SerdeOperator::MapType(map_type) => map_type
+            SerdeOperator::Map(map_op) => map_op
                 .properties
                 .get(prop)
                 .map(|serde_property| serde_property.property_id),
@@ -123,17 +123,13 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
                 write!(f, "`string_pattern`")
             }
-            SerdeOperator::RelationSequence(sequence_type) => {
-                write!(
-                    f,
-                    "[{}..]",
-                    self.narrow(sequence_type.ranges[0].operator_id)
-                )
+            SerdeOperator::RelationSequence(seq_op) => {
+                write!(f, "[{}..]", self.narrow(seq_op.ranges[0].operator_id))
             }
-            SerdeOperator::ConstructorSequence(sequence_type) => {
+            SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut processors = vec![];
                 let mut finite = true;
-                for range in &sequence_type.ranges {
+                for range in &seq_op.ranges {
                     if let Some(finite_repetition) = range.finite_repetition {
                         for _ in 0..finite_repetition {
                             processors.push(self.narrow(range.operator_id));
@@ -153,10 +149,10 @@ impl<'e> Display for SerdeProcessor<'e> {
                     processors = CommaSeparated(&processors)
                 )
             }
-            SerdeOperator::ValueType(value_type) => Backticks(&value_type.typename).fmt(f),
-            SerdeOperator::ValueUnionType(_) => write!(f, "union"),
+            SerdeOperator::ValueType(value_op) => Backticks(&value_op.typename).fmt(f),
+            SerdeOperator::Union(_) => write!(f, "union"),
             SerdeOperator::Id(_) => write!(f, "id"),
-            SerdeOperator::MapType(map_type) => Backticks(&map_type.typename).fmt(f),
+            SerdeOperator::Map(map_op) => Backticks(&map_op.typename).fmt(f),
         }
     }
 }

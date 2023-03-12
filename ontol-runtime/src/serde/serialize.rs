@@ -15,7 +15,7 @@ use crate::{
 use super::{
     operator::{SequenceRange, SerdeOperator},
     processor::SerdeProcessor,
-    MapType, EDGE_PROPERTY,
+    MapOperator, EDGE_PROPERTY,
 };
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
@@ -60,21 +60,17 @@ impl<'e> SerdeProcessor<'e> {
                 .unwrap();
                 serializer.serialize_str(&buf)
             }
-            SerdeOperator::RelationSequence(sequence_type) => self.serialize_sequence(
-                cast_ref::<Vec<_>>(value),
-                &sequence_type.ranges,
-                serializer,
-            ),
-            SerdeOperator::ConstructorSequence(sequence_type) => self.serialize_sequence(
-                cast_ref::<Vec<_>>(value),
-                &sequence_type.ranges,
-                serializer,
-            ),
-            SerdeOperator::ValueType(value_type) => self
-                .narrow(value_type.inner_operator_id)
+            SerdeOperator::RelationSequence(seq_op) => {
+                self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
+            }
+            SerdeOperator::ConstructorSequence(seq_op) => {
+                self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
+            }
+            SerdeOperator::ValueType(value_op) => self
+                .narrow(value_op.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
-            SerdeOperator::ValueUnionType(value_union_type) => {
-                let discriminator = value_union_type.variants().iter().find(|discriminator| {
+            SerdeOperator::Union(union_op) => {
+                let discriminator = union_op.variants().iter().find(|discriminator| {
                     value.type_def_id == discriminator.discriminator.def_variant.def_id
                 });
 
@@ -107,9 +103,7 @@ impl<'e> SerdeProcessor<'e> {
 
                 map.end()
             }
-            SerdeOperator::MapType(map_type) => {
-                self.serialize_map(map_type, rel_params, value, serializer)
-            }
+            SerdeOperator::Map(map_op) => self.serialize_map(map_op, rel_params, value, serializer),
         }
     }
 }
@@ -160,7 +154,7 @@ impl<'e> SerdeProcessor<'e> {
 
     fn serialize_map<S: Serializer>(
         &self,
-        map_type: &MapType,
+        map_op: &MapOperator,
         rel_params: Option<&Value>,
         value: &Value,
         serializer: S,
@@ -172,7 +166,7 @@ impl<'e> SerdeProcessor<'e> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
-        for (name, serde_prop) in &map_type.properties {
+        for (name, serde_prop) in &map_op.properties {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
@@ -181,7 +175,7 @@ impl<'e> SerdeProcessor<'e> {
                     } else {
                         panic!(
                             "While serializing value {:?} with `{}`, property `{}` was not found",
-                            value, map_type.typename, name
+                            value, map_op.typename, name
                         )
                     }
                 }

@@ -57,13 +57,13 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                 let mut arguments = vec![];
 
                 match serde_operator {
-                    SerdeOperator::MapType(map_type) => {
-                        for (name, property) in &map_type.properties {
+                    SerdeOperator::Map(map_op) => {
+                        for (name, property) in &map_op.properties {
                             arguments
                                 .push(reg.get_operator_argument(name, property.value_operator_id))
                         }
                     }
-                    SerdeOperator::ValueUnionType(union_type) => {
+                    SerdeOperator::Union(union_type) => {
                         warn!("value union: {union_type:?}");
                     }
                     other => {

@@ -28,39 +28,39 @@ pub enum SerdeOperator {
 
     /// A sequence representing a relationship between one subject and many objects.
     /// This is simple and does not support any tuples.
-    RelationSequence(RelationSequenceType),
+    RelationSequence(RelationSequenceOperator),
 
     /// A sequence for constructing a value.
     /// This may include tuple-like sequences.
-    ConstructorSequence(ConstructorSequenceType),
+    ConstructorSequence(ConstructorSequenceOperator),
 
     /// A type with just one anonymous property
-    ValueType(ValueType),
+    ValueType(ValueOperator),
 
     /// A type with multiple anonymous properties, equivalent to a union of types
-    ValueUnionType(ValueUnionType),
+    Union(UnionOperator),
 
     /// A map with one property, "_id"
     Id(SerdeOperatorId),
 
     /// A type with many properties
-    MapType(MapType),
+    Map(MapOperator),
 }
 
 #[derive(Debug)]
-pub struct RelationSequenceType {
+pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
     pub def_variant: DefVariant,
 }
 
 #[derive(Debug)]
-pub struct ConstructorSequenceType {
+pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def_variant: DefVariant,
 }
 
-impl ConstructorSequenceType {
+impl ConstructorSequenceOperator {
     pub fn length_range(&self) -> Range<Option<u16>> {
         let mut count = 0;
         let mut finite = true;
@@ -91,20 +91,20 @@ pub struct SequenceRange {
 }
 
 #[derive(Debug)]
-pub struct ValueType {
+pub struct ValueOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub inner_operator_id: SerdeOperatorId,
 }
 
 #[derive(Debug)]
-pub struct ValueUnionType {
+pub struct UnionOperator {
     typename: String,
     union_def_variant: DefVariant,
     variants: Vec<ValueUnionVariant>,
 }
 
-impl ValueUnionType {
+impl UnionOperator {
     pub fn new(
         typename: String,
         union_def_variant: DefVariant,
@@ -137,7 +137,7 @@ pub struct ValueUnionVariant {
 }
 
 #[derive(Clone, Debug)]
-pub struct MapType {
+pub struct MapOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,

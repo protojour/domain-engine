@@ -13,7 +13,7 @@ use crate::{
 use super::{
     operator::{SequenceRange, SerdeOperator, ValueUnionVariant},
     processor::ProcessorLevel,
-    MapType, SerdeOperatorId,
+    MapOperator, SerdeOperatorId,
 };
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
@@ -359,17 +359,17 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         for variant in self.variants {
             if variant.discriminator.discriminant == Discriminant::IsSequence {
                 match self.env.get_serde_operator(variant.operator_id) {
-                    SerdeOperator::RelationSequence(sequence_type) => {
+                    SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
-                            &sequence_type.ranges,
-                            sequence_type.def_variant.def_id,
+                            &seq_op.ranges,
+                            seq_op.def_variant.def_id,
                             self.rel_params_operator_id,
                         ))
                     }
-                    SerdeOperator::ConstructorSequence(sequence_type) => {
+                    SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
-                            &sequence_type.ranges,
-                            sequence_type.def_variant.def_id,
+                            &seq_op.ranges,
+                            seq_op.def_variant.def_id,
                             self.rel_params_operator_id,
                         ))
                     }
@@ -435,13 +435,13 @@ pub struct MapMatch<'e> {
 
 #[derive(Debug)]
 pub enum MapMatchKind<'e> {
-    MapType(&'e MapType),
+    MapType(&'e MapOperator),
     IdType(SerdeOperatorId),
 }
 
 impl<'e> MapMatcher<'e> {
     pub fn match_attribute(self, property: &str, value: &serde_value::Value) -> MapMatchResult<'e> {
-        // debug!("match_attribute '{property}': {:#?}", self.value_union_type);
+        // debug!("match_attribute '{property}': {:#?}", self.union_op);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
@@ -471,14 +471,14 @@ impl<'e> MapMatcher<'e> {
             .find(|variant| match_fn(&variant.discriminator.discriminant))
             .map(
                 |variant| match self.env.get_serde_operator(variant.operator_id) {
-                    SerdeOperator::MapType(map_type) => {
-                        MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_type)))
+                    SerdeOperator::Map(map_op) => {
+                        MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
                     SerdeOperator::Id(operator_id) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
                     }
-                    SerdeOperator::ValueUnionType(value_union_type) => MapMatcher {
-                        variants: value_union_type.variants(),
+                    SerdeOperator::Union(union_op) => MapMatcher {
+                        variants: union_op.variants(),
                         rel_params_operator_id: self.rel_params_operator_id,
                         env: self.env,
                     }
@@ -502,10 +502,8 @@ impl<'e> MapMatcher<'e> {
                 Discriminant::MapFallback
             ) {
                 match self.env.get_serde_operator(variant.operator_id) {
-                    SerdeOperator::MapType(map_type) => {
-                        return MapMatchResult::Match(
-                            self.new_match(MapMatchKind::MapType(map_type)),
-                        )
+                    SerdeOperator::Map(map_op) => {
+                        return MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
                     SerdeOperator::Id(operator_id) => {
                         return MapMatchResult::Match(

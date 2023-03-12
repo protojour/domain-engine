@@ -147,17 +147,17 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 self.registry.arg::<String>(name, &())
                 // registry.arg::<CustomScalar>(name, &()),
             }
-            SerdeOperator::ValueType(value_type) => {
-                self.get_operator_argument(name, value_type.inner_operator_id)
+            SerdeOperator::ValueType(value_op) => {
+                self.get_operator_argument(name, value_op.inner_operator_id)
             }
-            SerdeOperator::ValueUnionType(_union_type) => {
+            SerdeOperator::Union(_union_op) => {
                 // self.register_def_argument(name, union_type.union_def_variant.def_id)
                 todo!()
             }
             SerdeOperator::Id(_) => {
                 panic!()
             }
-            SerdeOperator::MapType(_map_type) => {
+            SerdeOperator::Map(_map_op) => {
                 // self.register_def_argument(name, map_type.def_variant.def_id)
                 todo!()
             }

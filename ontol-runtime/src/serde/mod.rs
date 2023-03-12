@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::{DataModifier, DefId, DefVariant};
 
-use self::operator::{MapType, SerdeOperatorId};
+use self::operator::{MapOperator, SerdeOperatorId};
 
 mod deserialize;
 mod deserialize_matcher;

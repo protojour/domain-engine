@@ -36,8 +36,8 @@ impl<'l> PropertyProbe<'l> {
         let translation_proc = env.translations.get(&(destination.def_id, origin.def_id))?;
 
         match serde_operator {
-            SerdeOperator::MapType(map_type) => {
-                let start_map = map_type
+            SerdeOperator::Map(map_op) => {
+                let start_map = map_op
                     .properties
                     .iter()
                     .map(|(_, serde_property)| {

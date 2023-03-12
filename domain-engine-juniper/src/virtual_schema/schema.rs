@@ -158,28 +158,24 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
     // debug!("    classify operator: {operator:?}");
 
     match operator {
-        SerdeOperator::MapType(map_type) => {
-            let type_info = env.get_type_info(map_type.def_variant.def_id);
+        SerdeOperator::Map(map_op) => {
+            let type_info = env.get_type_info(map_op.def_variant.def_id);
             let node_classification = if type_info.entity_id.is_some() {
                 NodeClassification::Entity
             } else {
                 NodeClassification::Node
             };
-            TypeClassification::Type(
-                node_classification,
-                map_type.def_variant.def_id,
-                operator_id,
-            )
+            TypeClassification::Type(node_classification, map_op.def_variant.def_id, operator_id)
         }
-        SerdeOperator::ValueUnionType(union_type) => {
+        SerdeOperator::Union(union_op) => {
             // start with the "highest" classification and downgrade as "lower" variants are found.
             let mut classification = TypeClassification::Type(
                 NodeClassification::Entity,
-                union_type.union_def_variant().def_id,
+                union_op.union_def_variant().def_id,
                 operator_id,
             );
 
-            for variant in union_type.variants() {
+            for variant in union_op.variants() {
                 if variant.discriminator.discriminant == Discriminant::MapFallback {
                     panic!("BUG: Don't want to see this in a GraphQL operator");
                 }
@@ -194,7 +190,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                         debug!("    Downgrade to Node");
                         classification = TypeClassification::Type(
                             NodeClassification::Node,
-                            union_type.union_def_variant().def_id,
+                            union_op.union_def_variant().def_id,
                             operator_id,
                         );
                     }

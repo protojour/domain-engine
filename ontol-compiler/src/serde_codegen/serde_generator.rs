@@ -4,8 +4,9 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     serde::operator::{
-        ConstructorSequenceType, MapType, RelationSequenceType, SequenceRange, SerdeOperator,
-        SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType, ValueUnionVariant,
+        ConstructorSequenceOperator, MapOperator, RelationSequenceOperator, SequenceRange,
+        SerdeOperator, SerdeOperatorId, SerdeProperty, UnionOperator, ValueOperator,
+        ValueUnionVariant,
     },
     serde::SerdeKey,
     DataModifier, DefId, DefVariant, Role,
@@ -122,7 +123,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let first_id = self.get_serde_operator_id(iterator.next()?.clone())?;
 
                 let mut intersected_map = self
-                    .find_unambiguous_map_type(first_id)
+                    .find_unambiguous_map_operator(first_id)
                     .unwrap_or_else(|operator| {
                         panic!("Initial map not found for intersection: {operator:?}")
                     })
@@ -131,7 +132,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 for next_key in iterator {
                     let next_id = self.get_serde_operator_id(next_key.clone()).unwrap();
 
-                    if let Ok(next_map_type) = self.find_unambiguous_map_type(next_id) {
+                    if let Ok(next_map_type) = self.find_unambiguous_map_operator(next_id) {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
@@ -140,7 +141,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    SerdeOperator::MapType(intersected_map),
+                    SerdeOperator::Map(intersected_map),
                 ))
             }
             SerdeKey::Def(def_variant) if def_variant.local_mod == DataModifier::ID => {
@@ -176,7 +177,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id_for_key(&key),
-                    SerdeOperator::RelationSequence(RelationSequenceType {
+                    SerdeOperator::RelationSequence(RelationSequenceOperator {
                         ranges: [SequenceRange {
                             operator_id: item_operator_id,
                             finite_repetition: None,
@@ -189,16 +190,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn find_unambiguous_map_type(&self, id: SerdeOperatorId) -> Result<&MapType, &SerdeOperator> {
+    fn find_unambiguous_map_operator(
+        &self,
+        id: SerdeOperatorId,
+    ) -> Result<&MapOperator, &SerdeOperator> {
         let operator = &self.operators_by_id[id.0 as usize];
         match operator {
-            SerdeOperator::MapType(map_type) => Ok(map_type),
-            SerdeOperator::ValueUnionType(union_type) => {
+            SerdeOperator::Map(map_op) => Ok(map_op),
+            SerdeOperator::Union(union_op) => {
                 let mut map_count = 0;
                 let mut result = Err(operator);
 
-                for discriminator in union_type.variants() {
-                    if let Ok(map_type) = self.find_unambiguous_map_type(discriminator.operator_id)
+                for discriminator in union_op.variants() {
+                    if let Ok(map_type) =
+                        self.find_unambiguous_map_operator(discriminator.operator_id)
                     {
                         result = Ok(map_type);
                         map_count += 1;
@@ -326,7 +331,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (None, DataModifier::IDENTITY) => {
                 return Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::MapType(MapType {
+                    SerdeOperator::Map(MapOperator {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
@@ -365,7 +370,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    SerdeOperator::ValueType(ValueType {
+                    SerdeOperator::ValueType(ValueOperator {
                         typename: typename.into(),
                         def_variant,
                         inner_operator_id,
@@ -377,7 +382,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(OperatorAllocation::Allocated(
                     operator_id,
                     if def_variant.local_mod.contains(DataModifier::UNION) {
-                        self.create_value_union_operator(def_variant, typename, properties)
+                        self.create_union_operator(def_variant, typename, properties)
                     } else {
                         // just the inherent properties are requested.
                         // Don't build a union
@@ -421,7 +426,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    SerdeOperator::ConstructorSequence(ConstructorSequenceType {
+                    SerdeOperator::ConstructorSequence(ConstructorSequenceOperator {
                         ranges,
                         def_variant,
                     }),
@@ -477,7 +482,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             Some(OperatorAllocation::Allocated(
                 operator_id,
-                SerdeOperator::ValueUnionType(ValueUnionType::new(
+                SerdeOperator::Union(UnionOperator::new(
                     typename.into(),
                     def_variant,
                     vec![
@@ -515,7 +520,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn create_value_union_operator(
+    fn create_union_operator(
         &mut self,
         def_variant: DefVariant,
         typename: &str,
@@ -567,7 +572,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .unwrap()
         };
 
-        SerdeOperator::ValueUnionType(ValueUnionType::new(typename.into(), def_variant, variants))
+        SerdeOperator::Union(UnionOperator::new(typename.into(), def_variant, variants))
     }
 
     fn create_map_operator(
@@ -635,7 +640,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         };
 
-        SerdeOperator::MapType(MapType {
+        SerdeOperator::Map(MapOperator {
             typename: typename.into(),
             def_variant,
             properties: serde_properties,

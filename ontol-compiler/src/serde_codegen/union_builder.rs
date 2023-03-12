@@ -101,8 +101,8 @@ impl UnionBuilder {
     ) -> Result<(), String> {
         let operator = &generator.operators_by_id[operator_id.0 as usize];
         match operator {
-            SerdeOperator::ValueUnionType(value_union) => {
-                for inner_discriminator in value_union.variants() {
+            SerdeOperator::Union(union_op) => {
+                for inner_discriminator in union_op.variants() {
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
                     child_scope.push(discriminator);

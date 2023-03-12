@@ -101,35 +101,10 @@ impl Env {
         value_operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,
         level: ProcessorLevel,
-        mode: ProcessorMode,
+        _mode: ProcessorMode,
     ) -> SerdeProcessor {
-        match (self.get_serde_operator(value_operator_id), mode) {
-            /*
-            (operator @ SerdeOperator::ValueUnionType(union_type), ProcessorMode::Select) => {
-                let id_variant_count = 0;
-                for variant in &union_type.variants {
-                    match variant.discriminator.purpose {
-                        VariantPurpose::Identification => id_variant_count += 1,
-                        VariantPurpose::Data => {
-
-                        }
-                    }
-                }
-                SerdeProcessor {
-                    value_operator: operator,
-                    rel_params_operator_id,
-                    level,
-                    env: self,
-                }
-            }
-            */
-            (value_operator, _) => SerdeProcessor {
-                value_operator,
-                rel_params_operator_id,
-                level,
-                env: self,
-            },
-        }
+        // TODO
+        self.new_serde_processor(value_operator_id, rel_params_operator_id, level)
     }
 
     pub fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
