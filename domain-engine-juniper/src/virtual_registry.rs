@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use juniper::GraphQLValue;
-use ontol_runtime::serde::{SerdeOperator, SerdeOperatorId};
+use ontol_runtime::serde::operator::{SerdeOperator, SerdeOperatorId};
 use tracing::{debug, warn};
 
 use crate::{

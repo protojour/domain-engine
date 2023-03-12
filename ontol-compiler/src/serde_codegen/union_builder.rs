@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator},
-    serde::{SerdeKey, SerdeOperator, SerdeOperatorId, ValueUnionVariant},
+    serde::{
+        operator::{SerdeOperator, SerdeOperatorId, ValueUnionVariant},
+        SerdeKey,
+    },
     smart_format, DefId, DefVariant,
 };
 use smartstring::alias::String;
@@ -99,7 +102,7 @@ impl UnionBuilder {
         let operator = &generator.operators_by_id[operator_id.0 as usize];
         match operator {
             SerdeOperator::ValueUnionType(value_union) => {
-                for inner_discriminator in &value_union.variants {
+                for inner_discriminator in value_union.variants() {
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
                     child_scope.push(discriminator);

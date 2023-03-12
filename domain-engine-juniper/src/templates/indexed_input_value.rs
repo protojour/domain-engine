@@ -1,4 +1,4 @@
-use ontol_runtime::serde::SerdeOperator;
+use ontol_runtime::serde::operator::SerdeOperator;
 use tracing::warn;
 
 use crate::{

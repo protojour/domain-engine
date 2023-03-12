@@ -5,7 +5,7 @@ use tracing::debug;
 use crate::{
     env::{Env, TypeInfo},
     proc::{BuiltinProc, Lib, Local},
-    serde::SerdeOperator,
+    serde::operator::SerdeOperator,
     value::PropertyId,
     vm::{AbstractVm, Stack, VmDebug},
     DefId,

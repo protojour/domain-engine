@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{serde::SerdeOperatorId, DefId};
+use ontol_runtime::{serde::operator::SerdeOperatorId, DefId};
 use smartstring::alias::String;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]

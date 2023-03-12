@@ -11,7 +11,9 @@ use crate::{
 };
 
 use super::{
-    MapType, ProcessorLevel, SequenceRange, SerdeOperator, SerdeOperatorId, ValueUnionType,
+    operator::{SequenceRange, SerdeOperator, ValueUnionVariant},
+    processor::ProcessorLevel,
+    MapType, SerdeOperatorId,
 };
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
@@ -279,7 +281,8 @@ impl<'e> SequenceMatcher<'e> {
 }
 
 pub struct UnionMatcher<'e> {
-    pub value_union_type: &'e ValueUnionType,
+    pub typename: &'e str,
+    pub variants: &'e [ValueUnionVariant],
     pub rel_params_operator_id: Option<SerdeOperatorId>,
     pub env: &'e Env,
 }
@@ -289,10 +292,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         write!(
             f,
             "{} ({})",
-            Backticks(&self.value_union_type.typename),
+            Backticks(self.typename),
             Missing {
                 items: self
-                    .value_union_type
                     .variants
                     .iter()
                     .map(|discriminator| self.env.new_serde_processor(
@@ -320,7 +322,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        for variant in &self.value_union_type.variants {
+        for variant in self.variants {
             match &variant.discriminator.discriminant {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
@@ -354,7 +356,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
-        for variant in &self.value_union_type.variants {
+        for variant in self.variants {
             if variant.discriminator.discriminant == Discriminant::IsSequence {
                 match self.env.get_serde_operator(variant.operator_id) {
                     SerdeOperator::RelationSequence(sequence_type) => {
@@ -380,7 +382,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 
     fn match_map(&self) -> Result<MapMatcher, ()> {
-        if !self.value_union_type.variants.iter().any(|variant| {
+        if !self.variants.iter().any(|variant| {
             matches!(
                 &variant.discriminator.discriminant,
                 Discriminant::MapFallback
@@ -394,7 +396,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         }
 
         Ok(MapMatcher {
-            value_union_type: self.value_union_type,
+            variants: self.variants,
             rel_params_operator_id: self.rel_params_operator_id,
             env: self.env,
         })
@@ -403,7 +405,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
 impl<'e> UnionMatcher<'e> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
-        for variant in &self.value_union_type.variants {
+        for variant in self.variants {
             if variant.discriminator.discriminant == discriminant {
                 return Ok(variant.discriminator.def_variant.def_id);
             }
@@ -415,7 +417,7 @@ impl<'e> UnionMatcher<'e> {
 
 #[derive(Clone)]
 pub struct MapMatcher<'e> {
-    value_union_type: &'e ValueUnionType,
+    variants: &'e [ValueUnionVariant],
     pub rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
 }
@@ -464,7 +466,6 @@ impl<'e> MapMatcher<'e> {
         };
 
         let result = self
-            .value_union_type
             .variants
             .iter()
             .find(|variant| match_fn(&variant.discriminator.discriminant))
@@ -477,7 +478,7 @@ impl<'e> MapMatcher<'e> {
                         MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
                     }
                     SerdeOperator::ValueUnionType(value_union_type) => MapMatcher {
-                        value_union_type,
+                        variants: value_union_type.variants(),
                         rel_params_operator_id: self.rel_params_operator_id,
                         env: self.env,
                     }
@@ -495,7 +496,7 @@ impl<'e> MapMatcher<'e> {
     pub fn match_fallback(self) -> MapMatchResult<'e> {
         // debug!("match_fallback");
 
-        for variant in &self.value_union_type.variants {
+        for variant in self.variants {
             if matches!(
                 variant.discriminator.discriminant,
                 Discriminant::MapFallback

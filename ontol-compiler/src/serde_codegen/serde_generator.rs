@@ -3,11 +3,11 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    serde::{
-        ConstructorSequenceType, MapType, RelationSequenceType, SequenceRange, SerdeKey,
-        SerdeOperator, SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType,
-        ValueUnionVariant,
+    serde::operator::{
+        ConstructorSequenceType, MapType, RelationSequenceType, SequenceRange, SerdeOperator,
+        SerdeOperatorId, SerdeProperty, ValueType, ValueUnionType, ValueUnionVariant,
     },
+    serde::SerdeKey,
     DataModifier, DefId, DefVariant, Role,
 };
 use tracing::debug;
@@ -197,7 +197,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let mut map_count = 0;
                 let mut result = Err(operator);
 
-                for discriminator in &union_type.variants {
+                for discriminator in union_type.variants() {
                     if let Ok(map_type) = self.find_unambiguous_map_type(discriminator.operator_id)
                     {
                         result = Ok(map_type);
@@ -477,10 +477,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             Some(OperatorAllocation::Allocated(
                 operator_id,
-                SerdeOperator::ValueUnionType(ValueUnionType {
-                    typename: typename.into(),
-                    union_def_variant: def_variant,
-                    variants: vec![
+                SerdeOperator::ValueUnionType(ValueUnionType::new(
+                    typename.into(),
+                    def_variant,
+                    vec![
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
@@ -504,7 +504,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             operator_id: map_properties_operator_id,
                         },
                     ],
-                }),
+                )),
             ))
         } else {
             let operator_id = self.alloc_operator_id(&def_variant);
@@ -538,7 +538,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             root_types.insert(root_discriminator.def_variant.def_id);
         }
 
-        let discriminators: Vec<_> = if properties.map.is_some() {
+        let variants: Vec<_> = if properties.map.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_key =
@@ -567,11 +567,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .unwrap()
         };
 
-        SerdeOperator::ValueUnionType(ValueUnionType {
-            typename: typename.into(),
-            union_def_variant: def_variant,
-            variants: discriminators,
-        })
+        SerdeOperator::ValueUnionType(ValueUnionType::new(typename.into(), def_variant, variants))
     }
 
     fn create_map_operator(

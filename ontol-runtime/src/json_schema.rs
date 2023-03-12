@@ -7,10 +7,11 @@ use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
 
 use crate::env::TypeInfo;
-use crate::serde::{MapType, SequenceRange, ValueUnionType};
+use crate::serde::operator::{
+    MapType, SequenceRange, SerdeOperator, SerdeOperatorId, ValueUnionType,
+};
 use crate::{
     env::{Domain, Env},
-    serde::{SerdeOperator, SerdeOperatorId},
     DefId, PackageId,
 };
 use crate::{smart_format, DataModifier, DefVariant};
@@ -401,7 +402,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
                 .compose(self.ctx.ref_link(value_type.def_variant))
                 .serialize(serializer),
             SerdeOperator::ValueUnionType(value_union_type) => self
-                .compose(self.ctx.ref_link(value_union_type.union_def_variant))
+                .compose(self.ctx.ref_link(value_union_type.union_def_variant()))
                 .serialize(serializer),
             SerdeOperator::Id(id_operator_id) => self
                 .compose(self.ctx.singleton_object("_id", *id_operator_id))
@@ -494,7 +495,7 @@ impl<'e> Serialize for UnionRefLinks<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
 
-        for discriminator in &self.value_union_type.variants {
+        for discriminator in self.value_union_type.variants() {
             seq.serialize_element(&self.ctx.reference(discriminator.operator_id))?;
         }
 
@@ -671,9 +672,9 @@ impl SchemaGraphBuilder {
                 self.visit(value_type.inner_operator_id, env);
             }
             SerdeOperator::ValueUnionType(value_union_type) => {
-                self.add_to_graph(value_union_type.union_def_variant, operator_id);
+                self.add_to_graph(value_union_type.union_def_variant(), operator_id);
 
-                for discriminator in &value_union_type.variants {
+                for discriminator in value_union_type.variants() {
                     self.visit(discriminator.operator_id, env);
                 }
             }

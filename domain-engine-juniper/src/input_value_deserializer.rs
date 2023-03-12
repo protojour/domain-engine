@@ -3,7 +3,7 @@ use std::fmt::Display;
 use juniper::{graphql_value, InputValue, Spanning};
 use ontol_runtime::{
     env::Env,
-    serde::{ProcessorLevel, SerdeOperatorId},
+    serde::{operator::SerdeOperatorId, processor::ProcessorLevel},
     smart_format, DefId,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};

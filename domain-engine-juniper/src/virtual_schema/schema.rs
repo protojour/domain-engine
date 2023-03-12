@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     discriminator::Discriminant,
     env::Env,
-    serde::{SerdeOperator, SerdeOperatorId},
+    serde::operator::{SerdeOperator, SerdeOperatorId},
     DefId, PackageId,
 };
 use tracing::debug;
@@ -175,11 +175,11 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
             // start with the "highest" classification and downgrade as "lower" variants are found.
             let mut classification = TypeClassification::Type(
                 NodeClassification::Entity,
-                union_type.union_def_variant.def_id,
+                union_type.union_def_variant().def_id,
                 operator_id,
             );
 
-            for variant in &union_type.variants {
+            for variant in union_type.variants() {
                 if variant.discriminator.discriminant == Discriminant::MapFallback {
                     panic!("BUG: Don't want to see this in a GraphQL operator");
                 }
@@ -194,7 +194,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                         debug!("    Downgrade to Node");
                         classification = TypeClassification::Type(
                             NodeClassification::Node,
-                            union_type.union_def_variant.def_id,
+                            union_type.union_def_variant().def_id,
                             operator_id,
                         );
                     }

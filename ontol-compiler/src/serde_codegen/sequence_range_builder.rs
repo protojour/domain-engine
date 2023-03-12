@@ -1,4 +1,4 @@
-use ontol_runtime::serde::{SequenceRange, SerdeOperatorId};
+use ontol_runtime::serde::operator::{SequenceRange, SerdeOperatorId};
 use smallvec::SmallVec;
 
 #[derive(Default)]

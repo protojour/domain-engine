@@ -4,7 +4,8 @@ use jsonschema::JSONSchema;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
-    serde::{ProcessorLevel, SerdeOperatorId},
+    serde::operator::SerdeOperatorId,
+    serde::processor::ProcessorLevel,
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };

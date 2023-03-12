@@ -12,7 +12,11 @@ use crate::{
     value::{Attribute, Data, FormatStringData, Value},
 };
 
-use super::{MapType, SequenceRange, SerdeOperator, SerdeProcessor, EDGE_PROPERTY};
+use super::{
+    operator::{SequenceRange, SerdeOperator},
+    processor::SerdeProcessor,
+    MapType, EDGE_PROPERTY,
+};
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
@@ -70,7 +74,7 @@ impl<'e> SerdeProcessor<'e> {
                 .narrow(value_type.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::ValueUnionType(value_union_type) => {
-                let discriminator = value_union_type.variants.iter().find(|discriminator| {
+                let discriminator = value_union_type.variants().iter().find(|discriminator| {
                     value.type_def_id == discriminator.discriminator.def_variant.def_id
                 });
 

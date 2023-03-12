@@ -7,7 +7,11 @@ use smartstring::alias::String;
 use crate::{
     proc::{Lib, Procedure},
     property_probe::PropertyProbe,
-    serde::{ProcessorLevel, SerdeKey, SerdeOperator, SerdeOperatorId, SerdeProcessor},
+    serde::{
+        operator::{SerdeOperator, SerdeOperatorId},
+        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
+        SerdeKey,
+    },
     string_pattern::StringPattern,
     string_types::StringLikeType,
     translate::Translator,
@@ -89,6 +93,42 @@ impl Env {
             rel_params_operator_id,
             level,
             env: self,
+        }
+    }
+
+    pub fn new_serde_processor_mode(
+        &self,
+        value_operator_id: SerdeOperatorId,
+        rel_params_operator_id: Option<SerdeOperatorId>,
+        level: ProcessorLevel,
+        mode: ProcessorMode,
+    ) -> SerdeProcessor {
+        match (self.get_serde_operator(value_operator_id), mode) {
+            /*
+            (operator @ SerdeOperator::ValueUnionType(union_type), ProcessorMode::Select) => {
+                let id_variant_count = 0;
+                for variant in &union_type.variants {
+                    match variant.discriminator.purpose {
+                        VariantPurpose::Identification => id_variant_count += 1,
+                        VariantPurpose::Data => {
+
+                        }
+                    }
+                }
+                SerdeProcessor {
+                    value_operator: operator,
+                    rel_params_operator_id,
+                    level,
+                    env: self,
+                }
+            }
+            */
+            (value_operator, _) => SerdeProcessor {
+                value_operator,
+                rel_params_operator_id,
+                level,
+                env: self,
+            },
         }
     }
 

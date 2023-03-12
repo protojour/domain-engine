@@ -21,7 +21,9 @@ use super::{
         MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher,
         UnitMatcher, ValueMatcher,
     },
-    MapType, SerdeOperator, SerdeOperatorId, SerdeProcessor, SerdeProperty, ID_PROPERTY,
+    operator::{SerdeOperator, SerdeProperty},
+    processor::SerdeProcessor,
+    MapType, SerdeOperatorId, ID_PROPERTY,
 };
 
 enum MapKey {
@@ -174,7 +176,8 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             }
             SerdeOperator::ValueUnionType(value_union_type) => deserializer.deserialize_any(
                 UnionMatcher {
-                    value_union_type,
+                    typename: value_union_type.typename(),
+                    variants: value_union_type.variants(),
                     rel_params_operator_id: self.rel_params_operator_id,
                     env: self.env,
                 }
