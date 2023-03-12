@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    operator::{SequenceRange, SerdeOperator},
+    operator::{FilteredVariants, SequenceRange, SerdeOperator},
     processor::SerdeProcessor,
     MapOperator, EDGE_PROPERTY,
 };
@@ -69,30 +69,28 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_op) => self
                 .narrow(value_op.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
-            SerdeOperator::Union(union_op) => {
-                let discriminator =
-                    union_op
-                        .variants(self.mode, self.level)
-                        .iter()
-                        .find(|discriminator| {
-                            value.type_def_id == discriminator.discriminator.def_variant.def_id
-                        });
+            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
+                FilteredVariants::Single(id) => self
+                    .narrow(id)
+                    .serialize_value(value, rel_params, serializer),
+                FilteredVariants::Multi(variants) => {
+                    let variant = variants.iter().find(|discriminator| {
+                        value.type_def_id == discriminator.discriminator.def_variant.def_id
+                    });
 
-                match discriminator {
-                    Some(discriminator) => {
-                        let processor = self.narrow(discriminator.operator_id);
+                    if let Some(variant) = variant {
+                        let processor = self.narrow(variant.operator_id);
                         debug!(
                             "serializing union variant with {:?} {processor:}",
-                            discriminator.operator_id
+                            variant.operator_id
                         );
 
                         processor.serialize_value(value, rel_params, serializer)
-                    }
-                    None => {
+                    } else {
                         panic!("Discriminator not found while serializing union type");
                     }
                 }
-            }
+            },
             SerdeOperator::Id(inner_operator_id) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(

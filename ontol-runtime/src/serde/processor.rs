@@ -6,7 +6,7 @@ use crate::{
     value::PropertyId,
 };
 
-use super::operator::{SerdeOperator, SerdeOperatorId};
+use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ProcessorLevel {
@@ -89,18 +89,21 @@ impl<'e> SerdeProcessor<'e> {
 
     fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
         match operator {
-            SerdeOperator::Union(union_op) => {
-                for discriminator in union_op.variants(self.mode, self.level) {
-                    let next_operator = self.narrow(discriminator.operator_id);
-                    if let Some(property_id) =
-                        self.search_property(prop, next_operator.value_operator)
-                    {
-                        return Some(property_id);
+            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
+                FilteredVariants::Single(id) => self.narrow(id).search_property(prop, operator),
+                FilteredVariants::Multi(variants) => {
+                    for variant in variants {
+                        let next_operator = self.narrow(variant.operator_id);
+                        if let Some(property_id) =
+                            self.search_property(prop, next_operator.value_operator)
+                        {
+                            return Some(property_id);
+                        }
                     }
-                }
 
-                None
-            }
+                    None
+                }
+            },
             SerdeOperator::Map(map_op) => map_op
                 .properties
                 .get(prop)

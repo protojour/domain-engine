@@ -141,13 +141,39 @@ impl UnionOperator {
         self.union_def_variant
     }
 
-    pub fn variants(&self, _mode: ProcessorMode, _level: ProcessorLevel) -> &[ValueUnionVariant] {
-        &self.variants
+    pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
+        match (mode, level) {
+            (ProcessorMode::Select, _) => {
+                let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
+                    variant.discriminator.purpose > VariantPurpose::Identification
+                });
+
+                if let Some((skip_index, _)) = skip_id {
+                    Self::filtered_variants(&self.variants[skip_index..])
+                } else {
+                    Self::filtered_variants(&self.variants)
+                }
+            }
+            _ => Self::filtered_variants(&self.variants),
+        }
+    }
+
+    fn filtered_variants(variants: &[ValueUnionVariant]) -> FilteredVariants<'_> {
+        if variants.len() == 1 {
+            FilteredVariants::Single(variants[0].operator_id)
+        } else {
+            FilteredVariants::Multi(variants)
+        }
     }
 
     pub fn unfiltered_variants(&self) -> &[ValueUnionVariant] {
         &self.variants
     }
+}
+
+pub enum FilteredVariants<'e> {
+    Single(SerdeOperatorId),
+    Multi(&'e [ValueUnionVariant]),
 }
 
 #[derive(Clone, Debug)]

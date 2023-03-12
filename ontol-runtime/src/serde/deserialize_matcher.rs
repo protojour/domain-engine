@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::{
-    operator::{SequenceRange, SerdeOperator, ValueUnionVariant},
+    operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
     processor::{ProcessorLevel, ProcessorMode},
     MapOperator, SerdeOperatorId,
 };
@@ -484,14 +484,19 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Id(operator_id) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
                     }
-                    SerdeOperator::Union(union_op) => MapMatcher {
-                        variants: union_op.variants(self.mode, self.level),
-                        rel_params_operator_id: self.rel_params_operator_id,
-                        env: self.env,
-                        mode: self.mode,
-                        level: self.level,
+                    SerdeOperator::Union(union_op) => {
+                        match union_op.variants(self.mode, self.level) {
+                            FilteredVariants::Single(_) => todo!(),
+                            FilteredVariants::Multi(variants) => MapMatcher {
+                                variants,
+                                rel_params_operator_id: self.rel_params_operator_id,
+                                env: self.env,
+                                mode: self.mode,
+                                level: self.level,
+                            }
+                            .match_attribute(property, value),
+                        }
                     }
-                    .match_attribute(property, value),
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 },
             );

@@ -21,7 +21,7 @@ use super::{
         MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher,
         UnitMatcher, ValueMatcher,
     },
-    operator::{SerdeOperator, SerdeProperty},
+    operator::{FilteredVariants, SerdeOperator, SerdeProperty},
     processor::SerdeProcessor,
     MapOperator, SerdeOperatorId, ID_PROPERTY,
 };
@@ -174,17 +174,23 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
 
                 Ok(typed_value)
             }
-            SerdeOperator::Union(union_op) => deserializer.deserialize_any(
-                UnionMatcher {
-                    typename: union_op.typename(),
-                    variants: union_op.variants(self.mode, self.level),
-                    rel_params_operator_id: self.rel_params_operator_id,
-                    env: self.env,
-                    mode: self.mode,
-                    level: self.level,
+            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
+                FilteredVariants::Single(operator_id) => {
+                    self.narrow(operator_id).deserialize(deserializer)
                 }
-                .into_visitor(self),
-            ),
+                FilteredVariants::Multi(variants) => deserializer.deserialize_any(
+                    UnionMatcher {
+                        typename: union_op.typename(),
+                        variants,
+                        rel_params_operator_id: self.rel_params_operator_id,
+                        env: self.env,
+                        mode: self.mode,
+                        level: self.level,
+                    }
+                    .into_visitor(self),
+                ),
+            },
+
             SerdeOperator::Id(_inner_operator_id) => {
                 //deserializer.deserialize_map()
                 todo!()

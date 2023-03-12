@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     serde::{
-        operator::{MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
+        operator::{FilteredVariants, MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     smart_format, DefId,
@@ -178,52 +178,67 @@ impl<'a> VirtualSchemaBuilder<'a> {
             .selection_operator_id
             .expect("No selection operator id");
 
-        match self.env.get_serde_operator(selection_operator_id) {
+        self.make_node_type_inner(type_info, selection_operator_id)
+    }
+
+    fn make_node_type_inner(
+        &mut self,
+        type_info: &TypeInfo,
+        operator_id: SerdeOperatorId,
+    ) -> NewType {
+        match self.env.get_serde_operator(operator_id) {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
             SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::ValueType(_) => todo!("value type"),
             SerdeOperator::Union(union_op) => {
-                let node_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
+                match union_op.variants(ProcessorMode::Select, ProcessorLevel::Root) {
+                    FilteredVariants::Single(operator_id) => {
+                        self.make_node_type_inner(type_info, operator_id)
+                    }
+                    FilteredVariants::Multi(variants) => {
+                        let node_index =
+                            self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
+                        let mut type_variants = vec![];
 
-                let mut variants = vec![];
-
-                for variant in union_op.variants(ProcessorMode::Select, ProcessorLevel::Child) {
-                    match classify_type(self.env, variant.operator_id) {
-                        TypeClassification::Type(_, def_id, _operator_id) => {
-                            match self.get_def_type_ref(def_id, QueryLevel::Node) {
-                                UnitTypeRef::Indexed(type_index) => {
-                                    variants.push(type_index);
+                        for variant in variants {
+                            match classify_type(self.env, variant.operator_id) {
+                                TypeClassification::Type(_, def_id, _operator_id) => {
+                                    match self.get_def_type_ref(def_id, QueryLevel::Node) {
+                                        UnitTypeRef::Indexed(type_index) => {
+                                            type_variants.push(type_index);
+                                        }
+                                        _ => {
+                                            panic!("Unexpected type in union");
+                                        }
+                                    }
                                 }
-                                _ => {
-                                    panic!("Unexpected type in union");
+                                TypeClassification::Id => {}
+                                TypeClassification::Scalar => {
+                                    panic!("BUG: Scalar in union");
                                 }
                             }
                         }
-                        TypeClassification::Id => {}
-                        TypeClassification::Scalar => {
-                            panic!("BUG: Scalar in union");
-                        }
+
+                        debug!(
+                            "created a union for `{type_name}`: {operator_id:?} variants={variants:?}",
+                            type_name = type_info.name
+                        );
+
+                        NewType::Indexed(
+                            node_index,
+                            TypeData {
+                                typename: type_info.name.clone(),
+                                kind: TypeKind::Union(UnionData {
+                                    union_def_id: type_info.def_id,
+                                    variants: type_variants,
+                                }),
+                            },
+                        )
                     }
                 }
-
-                debug!(
-                    "created a union for `{type_name}`: {selection_operator_id:?} variants={variants:?}",
-                    type_name = type_info.name
-                );
-
-                NewType::Indexed(
-                    node_index,
-                    TypeData {
-                        typename: type_info.name.clone(),
-                        kind: TypeKind::Union(UnionData {
-                            union_def_id: type_info.def_id,
-                            variants,
-                        }),
-                    },
-                )
             }
             SerdeOperator::Map(map_op) => self.make_map_type(type_info, map_op),
-            operator => self.make_new_scalar(selection_operator_id, operator),
+            operator => self.make_new_scalar(operator_id, operator),
         }
     }
 

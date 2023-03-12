@@ -133,6 +133,7 @@ impl Domain {
                 def_id: DefId(type_info.def_id.0, self.info.len() as u16),
                 name: "".into(),
                 entity_id: None,
+                generic_operator_id: None,
                 create_operator_id: None,
                 selection_operator_id: None,
             });
@@ -150,6 +151,8 @@ pub struct TypeInfo {
 
     /// If this type is an entity, this is the type of its ID
     pub entity_id: Option<DefId>,
+
+    pub generic_operator_id: Option<SerdeOperatorId>,
 
     pub create_operator_id: Option<SerdeOperatorId>,
 
