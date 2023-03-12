@@ -59,7 +59,7 @@ fn artist_and_instrument_error_artist() {
                 "name": "Herbie Hancock",
                 "plays": [{ "name": "piano" }]
             })),
-            r#"missing properties, expected "_edge" at line 1 column 52"#
+            r#"missing properties, expected "_edge" at line 1 column 50"#
         );
     });
 }
@@ -121,14 +121,14 @@ fn artist_and_instrument_id_as_relation_object() {
                     }
                 ]
             })),
-            r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 43"#
+            r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 41"#
         );
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Robert Fripp",
                 "plays": [{ "_id": example_id }]
             })),
-            r#"missing properties, expected "_edge" at line 1 column 91"#
+            r#"missing properties, expected "_edge" at line 1 column 89"#
         );
 
         // The following tests show that { "_id" } and the property map is a type union:
@@ -137,14 +137,14 @@ fn artist_and_instrument_id_as_relation_object() {
                 "name": "Tony Levin",
                 "plays": [{ "_id": example_id, "name": "Chapman stick" }]
             })),
-            r#"unknown property `name` at line 1 column 112"#
+            r#"unknown property `name` at line 1 column 93"#
         );
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Allan Holdsworth",
                 "plays": [{ "name": "Synthaxe", "_id": example_id }]
             })),
-            r#"unknown property `name` at line 1 column 113"#
+            r#"unknown property `name` at line 1 column 99"#
         );
     });
 }

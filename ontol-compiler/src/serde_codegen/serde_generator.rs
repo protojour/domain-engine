@@ -115,6 +115,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn create_serde_operator_from_key(&mut self, key: SerdeKey) -> Option<OperatorAllocation> {
         match &key {
             SerdeKey::Intersection(keys) => {
+                debug!("create intersection: {keys:?}");
+
                 let operator_id = self.alloc_operator_id_for_key(&key);
                 let mut iterator = keys.iter();
                 let first_id = self.get_serde_operator_id(iterator.next()?.clone())?;
@@ -129,13 +131,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 for next_key in iterator {
                     let next_id = self.get_serde_operator_id(next_key.clone()).unwrap();
 
-                    let next_map_type =
-                        self.find_unambiguous_map_type(next_id)
-                            .unwrap_or_else(|operator| {
-                                panic!("Map not found for intersection: {operator:?}")
-                            });
-                    for (key, value) in &next_map_type.properties {
-                        intersected_map.properties.insert(key.clone(), *value);
+                    if let Ok(next_map_type) = self.find_unambiguous_map_type(next_id) {
+                        for (key, value) in &next_map_type.properties {
+                            intersected_map.properties.insert(key.clone(), *value);
+                        }
                     }
                 }
 

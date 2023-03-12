@@ -33,7 +33,7 @@ pub fn deserialize_def_argument(
         arguments,
         name,
         type_info
-            .graphql_selection_operator_id
+            .create_operator_id
             .expect("This type cannot be deserialized"),
         env,
     )

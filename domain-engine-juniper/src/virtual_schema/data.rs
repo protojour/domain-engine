@@ -122,7 +122,8 @@ pub enum ObjectKind {
 pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
-    pub operator_id: SerdeOperatorId,
+    pub selection_operator_id: SerdeOperatorId,
+    pub create_operator_id: SerdeOperatorId,
     pub input_type_name: String,
 }
 

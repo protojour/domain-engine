@@ -171,11 +171,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     fn make_node_type(&mut self, type_info: &TypeInfo) -> NewType {
-        let operator_id = type_info
-            .graphql_selection_operator_id
-            .expect("No GraphQL operator id");
+        let selection_operator_id = type_info
+            .selection_operator_id
+            .expect("No selection operator id");
 
-        match self.env.get_serde_operator(operator_id) {
+        match self.env.get_serde_operator(selection_operator_id) {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
             SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::ValueType(_) => todo!("value type"),
@@ -204,7 +204,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 }
 
                 debug!(
-                    "created a union for `{type_name}`: {operator_id:?} variants={variants:?}",
+                    "created a union for `{type_name}`: {selection_operator_id:?} variants={variants:?}",
                     type_name = type_info.name
                 );
 
@@ -220,7 +220,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 )
             }
             SerdeOperator::MapType(map_type) => self.make_map_type(type_info, map_type),
-            operator => self.make_new_scalar(operator_id, operator),
+            operator => self.make_new_scalar(selection_operator_id, operator),
         }
     }
 
@@ -253,7 +253,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapType) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
-        let operator_id = type_info.graphql_selection_operator_id.unwrap();
+        let selection_operator_id = type_info.selection_operator_id.unwrap();
+        let create_operator_id = type_info.create_operator_id.expect("No create operator id");
 
         let mut fields = IndexMap::default();
 
@@ -281,7 +282,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info.entity_id,
-                        operator_id,
+                        selection_operator_id,
+                        create_operator_id,
                         input_type_name: self.namespace.input(typename),
                     }),
                 }),

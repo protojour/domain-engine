@@ -59,8 +59,14 @@ impl VirtualSchema {
         for (_, def_id) in &domain.type_names {
             let type_info = domain.type_info(*def_id);
 
-            if let Some(operator_id) = type_info.graphql_selection_operator_id {
-                debug!("adapt type `{}` {:?}", type_info.name, operator_id);
+            if let (Some(select), Some(create)) = (
+                type_info.selection_operator_id,
+                type_info.create_operator_id,
+            ) {
+                debug!(
+                    "adapt type `{name}` {select:?} {create:?}",
+                    name = type_info.name,
+                );
 
                 let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
 

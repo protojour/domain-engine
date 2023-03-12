@@ -126,7 +126,7 @@ impl Domain {
                 name: "".into(),
                 entity_id: None,
                 create_operator_id: None,
-                graphql_selection_operator_id: None,
+                selection_operator_id: None,
             });
         }
 
@@ -145,7 +145,7 @@ pub struct TypeInfo {
 
     pub create_operator_id: Option<SerdeOperatorId>,
 
-    pub graphql_selection_operator_id: Option<SerdeOperatorId>,
+    pub selection_operator_id: Option<SerdeOperatorId>,
 }
 
 pub struct EnvBuilder {

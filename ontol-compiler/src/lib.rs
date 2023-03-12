@@ -186,19 +186,19 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
-                let rest_modifier = DataModifier::UNION | DataModifier::ID | DataModifier::PROPS;
-                let graphql_modifier = DataModifier::UNION | DataModifier::PROPS;
+                let full_modifier = DataModifier::UNION | DataModifier::ID | DataModifier::PROPS;
+                let no_id_modifier = DataModifier::UNION | DataModifier::PROPS;
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     name: type_name,
                     entity_id,
                     create_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, rest_modifier),
+                        DefVariant::new(type_def_id, full_modifier).with_local_mod(no_id_modifier),
                     )),
-                    graphql_selection_operator_id: serde_generator.get_serde_operator_id(
-                        SerdeKey::Def(DefVariant::new(type_def_id, graphql_modifier)),
-                    ),
+                    selection_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
+                        DefVariant::new(type_def_id, no_id_modifier),
+                    )),
                 });
             }
 
