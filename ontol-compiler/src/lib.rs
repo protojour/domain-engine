@@ -196,7 +196,7 @@ impl<'m> Compiler<'m> {
                     generic_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, full_modifier),
                     )),
-                    create_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
+                    deprecated_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, full_modifier).with_local_mod(no_id_modifier),
                     )),
                 });

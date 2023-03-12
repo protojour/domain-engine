@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use juniper::GraphQLValue;
-use ontol_runtime::serde::operator::{SerdeOperator, SerdeOperatorId};
+use ontol_runtime::serde::{
+    operator::{FilteredVariants, SerdeOperator, SerdeOperatorId},
+    processor::{ProcessorLevel, ProcessorMode},
+};
 use tracing::{debug, warn};
 
 use crate::{
@@ -65,6 +68,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 &VirtualIndexedTypeInfo {
                     virtual_schema: self.virtual_schema.clone(),
                     type_index,
+                    mode: ProcessorMode::Select,
+                    level: ProcessorLevel::Root,
                 },
                 type_ref.modifier,
             ),
@@ -114,6 +119,35 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             }
             TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
                 self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
+            }
+        }
+    }
+
+    pub fn collect_operator_arguments(
+        &mut self,
+        operator_id: SerdeOperatorId,
+        output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) {
+        let serde_operator = self.virtual_schema.env().get_serde_operator(operator_id);
+
+        match serde_operator {
+            SerdeOperator::Map(map_op) => {
+                for (name, property) in &map_op.properties {
+                    output.push(self.get_operator_argument(name, property.value_operator_id))
+                }
+            }
+            SerdeOperator::Union(union_op) => match union_op.variants(mode, level) {
+                FilteredVariants::Single(operator_id) => {
+                    self.collect_operator_arguments(operator_id, output, mode, level);
+                }
+                FilteredVariants::Multi(variants) => {
+                    warn!("Multiple variants in union: {variants:#?}");
+                }
+            },
+            other => {
+                panic!("{other:?}");
             }
         }
     }
@@ -185,11 +219,17 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         argument: &Argument,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         match argument {
-            Argument::Input(type_index, _) => self.registry.arg::<IndexedInputValue>(
+            Argument::Input(type_index, _, mode) => self.registry.arg::<IndexedInputValue>(
                 argument.name(),
-                &IndexedInputValueTypeInfo(self.virtual_schema.indexed_type_info(*type_index)),
+                &IndexedInputValueTypeInfo(self.virtual_schema.indexed_type_info(
+                    *type_index,
+                    *mode,
+                    ProcessorLevel::Root,
+                )),
             ),
-            Argument::Id(operator_id) => self.get_operator_argument(argument.name(), *operator_id),
+            Argument::Id(operator_id, _) => {
+                self.get_operator_argument(argument.name(), *operator_id)
+            }
         }
     }
 }

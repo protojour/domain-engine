@@ -1,6 +1,3 @@
-use ontol_runtime::serde::operator::SerdeOperator;
-use tracing::warn;
-
 use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
@@ -50,27 +47,13 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                 kind: ObjectKind::Node(node_data),
                 ..
             }) => {
-                let serde_operator = reg
-                    .virtual_schema
-                    .env()
-                    .get_serde_operator(node_data.create_operator_id);
                 let mut arguments = vec![];
-
-                match serde_operator {
-                    SerdeOperator::Map(map_op) => {
-                        for (name, property) in &map_op.properties {
-                            arguments
-                                .push(reg.get_operator_argument(name, property.value_operator_id))
-                        }
-                    }
-                    SerdeOperator::Union(union_type) => {
-                        warn!("value union: {union_type:?}");
-                    }
-                    other => {
-                        panic!("{other:?}");
-                    }
-                }
-
+                reg.collect_operator_arguments(
+                    node_data.generic_operator_id,
+                    &mut arguments,
+                    info.0.mode,
+                    info.0.level,
+                );
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()

@@ -1,5 +1,8 @@
 use indexmap::IndexMap;
-use ontol_runtime::{serde::operator::SerdeOperatorId, DefId};
+use ontol_runtime::{
+    serde::{operator::SerdeOperatorId, processor::ProcessorMode},
+    DefId,
+};
 use smartstring::alias::String;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -123,7 +126,6 @@ pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
     pub generic_operator_id: SerdeOperatorId,
-    pub create_operator_id: SerdeOperatorId,
     pub input_type_name: String,
 }
 
@@ -170,15 +172,15 @@ pub enum ArgumentsKind {
 }
 
 pub enum Argument {
-    Input(TypeIndex, DefId),
-    Id(SerdeOperatorId),
+    Input(TypeIndex, DefId, ProcessorMode),
+    Id(SerdeOperatorId, ProcessorMode),
 }
 
 impl Argument {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Input(..) => "input",
-            Self::Id(_) => "id",
+            Self::Id(..) => "id",
         }
     }
 }

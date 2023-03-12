@@ -90,12 +90,13 @@ impl<'e> SerdeProcessor<'e> {
     fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
         match operator {
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(id) => self.narrow(id).search_property(prop, operator),
+                FilteredVariants::Single(operator_id) => {
+                    self.narrow(operator_id).find_property(prop)
+                }
                 FilteredVariants::Multi(variants) => {
                     for variant in variants {
-                        let next_operator = self.narrow(variant.operator_id);
                         if let Some(property_id) =
-                            self.search_property(prop, next_operator.value_operator)
+                            self.narrow(variant.operator_id).find_property(prop)
                         {
                             return Some(property_id);
                         }

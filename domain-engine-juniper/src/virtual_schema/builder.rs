@@ -272,13 +272,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
         let generic_operator_id = type_info.generic_operator_id.unwrap();
-        let create_operator_id = type_info.create_operator_id.expect("No create operator id");
 
         let mut fields = IndexMap::default();
 
         if let Some(entity_id) = type_info.entity_id {
             let id_type_info = self.env.get_type_info(entity_id);
-            let id_operator_id = id_type_info.create_operator_id.expect("No id_operator_id");
+            let id_operator_id = id_type_info.generic_operator_id.expect("No id_operator_id");
 
             fields.insert(
                 "_id".into(),
@@ -301,7 +300,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         def_id: type_info.def_id,
                         entity_id: type_info.entity_id,
                         generic_operator_id,
-                        create_operator_id,
                         input_type_name: self.namespace.input(typename),
                     }),
                 }),
@@ -411,7 +409,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         );
 
         let id_type_info = self.env.get_type_info(entity_info.id_def_id);
-        let id_operator_id = id_type_info.create_operator_id.expect("No id_operator_id");
+        let id_operator_id = id_type_info.generic_operator_id.expect("No id_operator_id");
 
         {
             let query = self.schema.object_data_mut(self.schema.query);
@@ -427,7 +425,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.create(&typename),
                 FieldData {
                     arguments: ArgumentsKind::CreateMutation {
-                        input: Argument::Input(entity_info.type_index, entity_info.node_def_id),
+                        input: Argument::Input(
+                            entity_info.type_index,
+                            entity_info.node_def_id,
+                            ProcessorMode::Create,
+                        ),
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -437,8 +439,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.update(&typename),
                 FieldData {
                     arguments: ArgumentsKind::UpdateMutation {
-                        input: Argument::Input(entity_info.type_index, entity_info.node_def_id),
-                        id: Argument::Id(id_operator_id),
+                        input: Argument::Input(
+                            entity_info.type_index,
+                            entity_info.node_def_id,
+                            ProcessorMode::Update,
+                        ),
+                        id: Argument::Id(id_operator_id, ProcessorMode::Select),
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -448,7 +454,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.delete(&typename),
                 FieldData {
                     arguments: ArgumentsKind::DeleteMutation {
-                        id: Argument::Id(id_operator_id),
+                        id: Argument::Id(id_operator_id, ProcessorMode::Select),
                     },
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
                         NativeScalarRef::Bool,

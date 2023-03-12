@@ -21,9 +21,11 @@ pub fn deserialize_argument(
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let name = argument.name();
     match argument {
-        Argument::Input(_, def_id) => deserialize_def_argument(arguments, name, *def_id, env),
-        Argument::Id(operator_id) => {
-            deserialize_operator_argument(arguments, name, *operator_id, env)
+        Argument::Input(_, def_id, mode) => {
+            deserialize_def_argument(arguments, name, *def_id, env, *mode)
+        }
+        Argument::Id(operator_id, mode) => {
+            deserialize_operator_argument(arguments, name, *operator_id, env, *mode)
         }
     }
 }
@@ -34,15 +36,17 @@ pub fn deserialize_def_argument(
     name: &str,
     def_id: DefId,
     env: &Env,
+    mode: ProcessorMode,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let type_info = env.get_type_info(def_id);
     deserialize_operator_argument(
         arguments,
         name,
         type_info
-            .create_operator_id
+            .generic_operator_id
             .expect("This type cannot be deserialized"),
         env,
+        mode,
     )
 }
 
@@ -51,19 +55,15 @@ pub fn deserialize_operator_argument(
     name: &str,
     operator_id: SerdeOperatorId,
     env: &Env,
+    mode: ProcessorMode,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let value = arguments.get_input_value(name).unwrap();
 
     debug!("deserializing {value:?}");
 
-    env.new_serde_processor(
-        operator_id,
-        None,
-        ProcessorMode::Create,
-        ProcessorLevel::Root,
-    )
-    .deserialize(InputValueDeserializer { value })
-    .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+    env.new_serde_processor(operator_id, None, mode, ProcessorLevel::Root)
+        .deserialize(InputValueDeserializer { value })
+        .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
 }
 
 #[derive(Debug)]

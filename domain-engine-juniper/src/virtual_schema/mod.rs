@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use ontol_runtime::{env::Env, DefId};
+use ontol_runtime::{
+    env::Env,
+    serde::processor::{ProcessorLevel, ProcessorMode},
+    DefId,
+};
 
 use crate::type_info::GraphqlTypeName;
 
@@ -18,6 +22,8 @@ pub use schema::VirtualSchema;
 pub struct VirtualIndexedTypeInfo {
     pub virtual_schema: Arc<VirtualSchema>,
     pub type_index: TypeIndex,
+    pub mode: ProcessorMode,
+    pub level: ProcessorLevel,
 }
 
 impl VirtualIndexedTypeInfo {

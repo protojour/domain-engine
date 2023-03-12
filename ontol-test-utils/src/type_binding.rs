@@ -37,10 +37,10 @@ impl<'e> TypeBinding<'e> {
         let type_info = domain.type_info(*def_id).clone();
 
         debug!(
-            "TypeBinding::new `{type_name}` with {operator_id:?} {processor:?}",
-            operator_id = type_info.create_operator_id,
+            "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
+            operator_id = type_info.generic_operator_id,
             processor = type_info
-                .create_operator_id
+                .generic_operator_id
                 .map(|id| env.new_serde_processor(
                     id,
                     None,
@@ -64,7 +64,7 @@ impl<'e> TypeBinding<'e> {
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
         self.type_info
-            .create_operator_id
+            .generic_operator_id
             .expect("No serde operator id")
     }
 

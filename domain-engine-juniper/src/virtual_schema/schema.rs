@@ -62,15 +62,8 @@ impl VirtualSchema {
         for (_, def_id) in &domain.type_names {
             let type_info = domain.type_info(*def_id);
 
-            if let (Some(generic), Some(select), Some(create)) = (
-                type_info.generic_operator_id,
-                type_info.generic_operator_id,
-                type_info.create_operator_id,
-            ) {
-                debug!(
-                    "adapt type `{name}` {generic:?} {select:?} {create:?}",
-                    name = type_info.name,
-                );
+            if let Some(operator_id) = type_info.generic_operator_id {
+                debug!("adapt type `{name}` {operator_id:?}", name = type_info.name,);
 
                 let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
 
@@ -87,19 +80,26 @@ impl VirtualSchema {
         &self.env
     }
 
-    pub fn indexed_type_info(self: &Arc<Self>, type_index: TypeIndex) -> VirtualIndexedTypeInfo {
+    pub fn indexed_type_info(
+        self: &Arc<Self>,
+        type_index: TypeIndex,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> VirtualIndexedTypeInfo {
         VirtualIndexedTypeInfo {
             virtual_schema: self.clone(),
             type_index,
+            mode,
+            level,
         }
     }
 
     pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
-        self.indexed_type_info(self.query)
+        self.indexed_type_info(self.query, ProcessorMode::Select, ProcessorLevel::Root)
     }
 
     pub fn mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
-        self.indexed_type_info(self.mutation)
+        self.indexed_type_info(self.mutation, ProcessorMode::Select, ProcessorLevel::Root)
     }
 
     pub fn type_data(&self, index: TypeIndex) -> &TypeData {

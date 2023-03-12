@@ -1,3 +1,5 @@
+use ontol_runtime::serde::processor::ProcessorMode;
+
 use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
@@ -40,6 +42,8 @@ impl juniper::GraphQLType<GqlScalar> for IndexedType {
                             .get_type::<IndexedType>(&VirtualIndexedTypeInfo {
                                 virtual_schema: info.virtual_schema.clone(),
                                 type_index: *type_index,
+                                mode: ProcessorMode::Select,
+                                level: info.level,
                             })
                     })
                     .collect();
