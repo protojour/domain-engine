@@ -37,9 +37,9 @@ impl<'e> TypeBinding<'e> {
 
         debug!(
             "TypeBinding::new `{type_name}` with {operator_id:?} {processor:?}",
-            operator_id = type_info.rest_operator_id,
+            operator_id = type_info.create_operator_id,
             processor = type_info
-                .rest_operator_id
+                .create_operator_id
                 .map(|id| env.new_serde_processor(id, None))
         );
 
@@ -58,7 +58,7 @@ impl<'e> TypeBinding<'e> {
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
         self.type_info
-            .rest_operator_id
+            .create_operator_id
             .expect("No serde operator id")
     }
 

@@ -193,12 +193,12 @@ impl<'m> Compiler<'m> {
                     def_id: type_def_id,
                     name: type_name,
                     entity_id,
-                    rest_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
+                    create_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, rest_modifier),
                     )),
-                    graphql_operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, graphql_modifier),
-                    )),
+                    graphql_selection_operator_id: serde_generator.get_serde_operator_id(
+                        SerdeKey::Def(DefVariant::new(type_def_id, graphql_modifier)),
+                    ),
                 });
             }
 

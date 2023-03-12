@@ -8,7 +8,7 @@ use ontol_runtime::{
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::virtual_schema::{classify_type, TypeClassification};
+use crate::virtual_schema::schema::{classify_type, TypeClassification};
 
 use super::{
     data::{
@@ -17,7 +17,8 @@ use super::{
         TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
-    EntityInfo, NodeClassification, VirtualSchema,
+    schema::NodeClassification,
+    EntityInfo, VirtualSchema,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -171,7 +172,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
     fn make_node_type(&mut self, type_info: &TypeInfo) -> NewType {
         let operator_id = type_info
-            .graphql_operator_id
+            .graphql_selection_operator_id
             .expect("No GraphQL operator id");
 
         match self.env.get_serde_operator(operator_id) {
@@ -252,13 +253,13 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapType) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
-        let operator_id = type_info.graphql_operator_id.unwrap();
+        let operator_id = type_info.graphql_selection_operator_id.unwrap();
 
         let mut fields = IndexMap::default();
 
         if let Some(entity_id) = type_info.entity_id {
             let id_type_info = self.env.get_type_info(entity_id);
-            let id_operator_id = id_type_info.rest_operator_id.expect("No id_operator_id");
+            let id_operator_id = id_type_info.create_operator_id.expect("No id_operator_id");
 
             fields.insert(
                 "_id".into(),
@@ -394,7 +395,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         );
 
         let id_type_info = self.env.get_type_info(entity_info.id_def_id);
-        let id_operator_id = id_type_info.rest_operator_id.expect("No id_operator_id");
+        let id_operator_id = id_type_info.create_operator_id.expect("No id_operator_id");
 
         {
             let query = self.schema.object_data_mut(self.schema.query);
