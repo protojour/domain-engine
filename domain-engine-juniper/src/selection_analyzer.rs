@@ -11,8 +11,12 @@ use crate::{
     },
 };
 
+pub struct SelectionProperty {
+    pub property_id: PropertyId,
+    pub selection: NaiveSelection,
+}
+
 /// TODO: An "official" selection data type for domain-engine
-/// TODO: Must index by PropertyId, not string
 #[derive(Clone, Debug)]
 pub enum NaiveSelection {
     Node(FnvHashMap<PropertyId, NaiveSelection>),
@@ -25,13 +29,13 @@ pub fn analyze(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     field_data: &FieldData,
     virtual_schema: &VirtualSchema,
-) -> (PropertyId, NaiveSelection) {
+) -> SelectionProperty {
     match (
         &field_data.kind,
         virtual_schema.lookup_type_data(field_data.field_type.unit),
     ) {
         (
-            FieldKind::ConnectionQuery(_arguments),
+            FieldKind::Connection(connection_field),
             Ok(TypeData {
                 kind: TypeKind::Object(object_data),
                 ..
@@ -44,11 +48,15 @@ pub fn analyze(
                 let field_data = object_data.fields.get(field_name).unwrap();
 
                 if let FieldKind::Edges = &field_data.kind {
-                    selection = Some(analyze(field_look_ahead, field_data, virtual_schema));
+                    selection =
+                        Some(analyze(field_look_ahead, field_data, virtual_schema).selection);
                 }
             }
 
-            selection.unwrap_or_else(|| (unit_property(), NaiveSelection::Node(Default::default())))
+            SelectionProperty {
+                property_id: connection_field.property_id.unwrap_or(unit_property()),
+                selection: selection.unwrap_or(NaiveSelection::Node(Default::default())),
+            }
         }
         (
             FieldKind::Edges,
@@ -68,22 +76,27 @@ pub fn analyze(
                 }
             }
 
-            selection.unwrap_or_else(|| (unit_property(), NaiveSelection::Node(Default::default())))
+            selection.unwrap_or_else(|| SelectionProperty {
+                property_id: unit_property(),
+                selection: NaiveSelection::Node(Default::default()),
+            })
         }
-        (FieldKind::Node, Ok(type_data)) => (
-            unit_property(),
-            analyze_data(look_ahead, type_data, virtual_schema),
-        ),
-        (FieldKind::Property(property_id), Ok(type_data)) => (
-            *property_id,
-            analyze_data(look_ahead, type_data, virtual_schema),
-        ),
-        (FieldKind::Property(property_id), Err(_scalar_ref)) => {
-            (*property_id, NaiveSelection::Scalar)
-        }
-        (FieldKind::Id(relation_id), Err(_scalar_ref)) => {
-            (PropertyId::subject(*relation_id), NaiveSelection::IdScalar)
-        }
+        (FieldKind::Node, Ok(type_data)) => SelectionProperty {
+            property_id: unit_property(),
+            selection: analyze_data(look_ahead, type_data, virtual_schema),
+        },
+        (FieldKind::Property(property_id), Ok(type_data)) => SelectionProperty {
+            property_id: *property_id,
+            selection: analyze_data(look_ahead, type_data, virtual_schema),
+        },
+        (FieldKind::Property(property_id), Err(_scalar_ref)) => SelectionProperty {
+            property_id: *property_id,
+            selection: NaiveSelection::Scalar,
+        },
+        (FieldKind::Id(relation_id), Err(_scalar_ref)) => SelectionProperty {
+            property_id: PropertyId::subject(*relation_id),
+            selection: NaiveSelection::IdScalar,
+        },
         (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
     }
 }
@@ -102,10 +115,12 @@ pub fn analyze_data(
                     let field_name = field_look_ahead.field_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    let (property, selection) =
-                        analyze(field_look_ahead, field_data, virtual_schema);
+                    let SelectionProperty {
+                        property_id,
+                        selection,
+                    } = analyze(field_look_ahead, field_data, virtual_schema);
 
-                    map.insert(property, selection);
+                    map.insert(property_id, selection);
                 }
 
                 NaiveSelection::Node(map)
@@ -113,7 +128,7 @@ pub fn analyze_data(
             ObjectKind::Edge(_) => {
                 panic!()
             }
-            ObjectKind::Connection(_) => {
+            ObjectKind::Connection => {
                 panic!()
             }
             ObjectKind::Query | ObjectKind::Mutation => panic!("Bug in virtual schema"),
@@ -157,10 +172,12 @@ pub fn analyze_data(
                     let variant_map = union_map.entry(def_id).or_default();
                     let field_data = fields.get(field_name).unwrap();
 
-                    let (property, selection) =
-                        analyze(field_look_ahead, field_data, virtual_schema);
+                    let SelectionProperty {
+                        property_id,
+                        selection,
+                    } = analyze(field_look_ahead, field_data, virtual_schema);
 
-                    variant_map.insert(property, selection);
+                    variant_map.insert(property_id, selection);
                 }
             }
 

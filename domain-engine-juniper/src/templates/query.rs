@@ -44,11 +44,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         Box::pin(async move {
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let (_, selection) = selection_analyzer::analyze(
+            let selection = selection_analyzer::analyze(
                 &executor.look_ahead(),
                 query_field,
                 &info.virtual_schema,
-            );
+            )
+            .selection;
 
             debug!("Executing query {field_name} selection: {selection:?}");
 

@@ -13,10 +13,11 @@ use tracing::debug;
 use crate::virtual_schema::schema::{classify_type, TypeClassification};
 
 use super::{
+    argument::FieldArgument,
     data::{
-        ConnectionData, EdgeData, FieldArgument, FieldData, FieldKind, NativeScalarRef, NodeData,
-        ObjectData, ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind,
-        TypeModifier, TypeRef, UnionData, UnitTypeRef,
+        ConnectionFieldKind, EdgeData, FieldData, FieldKind, NativeScalarRef, NodeData, ObjectData,
+        ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef,
+        UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -196,7 +197,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 },
                             )]
                             .into(),
-                            kind: ObjectKind::Connection(ConnectionData {}),
+                            kind: ObjectKind::Connection,
                         }),
                     },
                 )
@@ -374,7 +375,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                             fields.insert(
                                 property_name.clone(),
-                                FieldData::connection(connection_ref),
+                                FieldData::connection(
+                                    ConnectionFieldKind {
+                                        property_id: Some(property.property_id),
+                                    },
+                                    connection_ref,
+                                ),
                             );
                         }
                         TypeClassification::Type(NodeClassification::Node, node_id, _) => {
@@ -461,7 +467,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             let query = self.schema.object_data_mut(self.schema.query);
             query.fields.insert(
                 self.namespace.list(&typename),
-                FieldData::connection(connection_ref),
+                FieldData::connection(ConnectionFieldKind { property_id: None }, connection_ref),
             );
         }
 

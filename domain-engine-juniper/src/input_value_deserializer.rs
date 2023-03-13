@@ -6,7 +6,7 @@ use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
 use crate::{
     gql_scalar::GqlScalar,
-    virtual_schema::{data::FieldArgument, TypingPurpose},
+    virtual_schema::{argument::FieldArgument, TypingPurpose},
 };
 
 pub fn deserialize_argument(

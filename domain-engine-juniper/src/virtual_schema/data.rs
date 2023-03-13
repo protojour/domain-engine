@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationId};
 use smartstring::alias::String;
 
-use super::TypingPurpose;
+use super::argument::FieldArgument;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct TypeIndex(pub u32);
@@ -118,7 +118,7 @@ pub struct ObjectData {
 pub enum ObjectKind {
     Node(NodeData),
     Edge(EdgeData),
-    Connection(ConnectionData),
+    Connection,
     Query,
     Mutation,
 }
@@ -133,8 +133,6 @@ pub struct UnionData {
     pub union_def_id: DefId,
     pub variants: Vec<TypeIndex>,
 }
-
-pub struct ConnectionData {}
 
 pub struct EdgeData {
     pub node_operator_id: SerdeOperatorId,
@@ -152,9 +150,9 @@ pub struct FieldData {
 }
 
 impl FieldData {
-    pub fn connection(unit_type_ref: UnitTypeRef) -> Self {
+    pub fn connection(kind: ConnectionFieldKind, unit_type_ref: UnitTypeRef) -> Self {
         Self {
-            kind: FieldKind::ConnectionQuery(ConnectionArguments {}),
+            kind: FieldKind::Connection(kind),
             field_type: TypeRef::mandatory(unit_type_ref),
         }
     }
@@ -166,7 +164,7 @@ pub enum FieldKind {
     Id(RelationId),
     Node,
     Edges,
-    ConnectionQuery(ConnectionArguments),
+    Connection(ConnectionFieldKind),
     CreateMutation {
         input: FieldArgument,
     },
@@ -180,19 +178,6 @@ pub enum FieldKind {
 }
 
 #[derive(Debug)]
-pub struct ConnectionArguments {}
-
-#[derive(Debug)]
-pub enum FieldArgument {
-    Input(TypeIndex, DefId, TypingPurpose),
-    Id(SerdeOperatorId, TypingPurpose),
-}
-
-impl FieldArgument {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Input(..) => "input",
-            Self::Id(..) => "id",
-        }
-    }
+pub struct ConnectionFieldKind {
+    pub property_id: Option<PropertyId>,
 }

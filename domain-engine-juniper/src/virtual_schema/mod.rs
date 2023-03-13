@@ -13,6 +13,7 @@ use crate::type_info::GraphqlTypeName;
 
 use self::data::{TypeData, TypeIndex};
 
+pub mod argument;
 pub mod data;
 
 mod builder;
