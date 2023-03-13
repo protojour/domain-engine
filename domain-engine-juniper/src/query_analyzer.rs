@@ -1,6 +1,10 @@
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
-use ontol_runtime::{value::PropertyId, DefId, RelationId};
+use ontol_runtime::{
+    query::{EntityQuery, EntityQuerySource, ObjectSource, PropertySelection},
+    value::PropertyId,
+    DefId, RelationId,
+};
 use tracing::debug;
 
 use crate::{
@@ -11,25 +15,16 @@ use crate::{
     },
 };
 
-pub struct SelectionProperty {
-    pub property_id: PropertyId,
-    pub selection: NaiveSelection,
-}
-
-/// TODO: An "official" selection data type for domain-engine
-#[derive(Clone, Debug)]
-pub enum NaiveSelection {
-    Node(FnvHashMap<PropertyId, NaiveSelection>),
-    Union(FnvHashMap<DefId, FnvHashMap<PropertyId, NaiveSelection>>),
-    Scalar,
-    IdScalar,
+pub struct KeyedPropertySelection {
+    pub key: PropertyId,
+    pub selection: PropertySelection,
 }
 
 pub fn analyze(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     field_data: &FieldData,
     virtual_schema: &VirtualSchema,
-) -> SelectionProperty {
+) -> KeyedPropertySelection {
     match (
         &field_data.kind,
         virtual_schema.lookup_type_data(field_data.field_type.unit),
@@ -53,9 +48,29 @@ pub fn analyze(
                 }
             }
 
-            SelectionProperty {
-                property_id: property_id.unwrap_or(unit_property()),
-                selection: selection.unwrap_or(NaiveSelection::Node(Default::default())),
+            let limit = 42;
+            let cursor = None;
+
+            KeyedPropertySelection {
+                key: property_id.unwrap_or(unit_property()),
+                selection: match selection {
+                    Some(PropertySelection::Object(object)) => {
+                        PropertySelection::EntityQuery(EntityQuery {
+                            source: EntityQuerySource::Entity(object),
+                            limit,
+                            cursor,
+                        })
+                    }
+                    Some(PropertySelection::ObjectUnion(objects)) => {
+                        PropertySelection::EntityQuery(EntityQuery {
+                            source: EntityQuerySource::EntityUnion(objects),
+                            limit,
+                            cursor,
+                        })
+                    }
+                    Some(PropertySelection::EntityQuery(_)) => panic!("Query in query"),
+                    Some(PropertySelection::Leaf) | None => PropertySelection::Leaf,
+                },
             }
         }
         (
@@ -76,26 +91,26 @@ pub fn analyze(
                 }
             }
 
-            selection.unwrap_or_else(|| SelectionProperty {
-                property_id: unit_property(),
-                selection: NaiveSelection::Node(Default::default()),
+            selection.unwrap_or_else(|| KeyedPropertySelection {
+                key: unit_property(),
+                selection: PropertySelection::Leaf,
             })
         }
-        (FieldKind::Node, Ok(type_data)) => SelectionProperty {
-            property_id: unit_property(),
+        (FieldKind::Node, Ok(type_data)) => KeyedPropertySelection {
+            key: unit_property(),
             selection: analyze_data(look_ahead, type_data, virtual_schema),
         },
-        (FieldKind::Property(property_id), Ok(type_data)) => SelectionProperty {
-            property_id: *property_id,
+        (FieldKind::Property(property_id), Ok(type_data)) => KeyedPropertySelection {
+            key: *property_id,
             selection: analyze_data(look_ahead, type_data, virtual_schema),
         },
-        (FieldKind::Property(property_id), Err(_scalar_ref)) => SelectionProperty {
-            property_id: *property_id,
-            selection: NaiveSelection::Scalar,
+        (FieldKind::Property(property_id), Err(_scalar_ref)) => KeyedPropertySelection {
+            key: *property_id,
+            selection: PropertySelection::Leaf,
         },
-        (FieldKind::Id(relation_id), Err(_scalar_ref)) => SelectionProperty {
-            property_id: PropertyId::subject(*relation_id),
-            selection: NaiveSelection::IdScalar,
+        (FieldKind::Id(relation_id), Err(_scalar_ref)) => KeyedPropertySelection {
+            key: PropertyId::subject(*relation_id),
+            selection: PropertySelection::Leaf,
         },
         (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
     }
@@ -105,36 +120,37 @@ pub fn analyze_data(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     type_data: &TypeData,
     virtual_schema: &VirtualSchema,
-) -> NaiveSelection {
+) -> PropertySelection {
     match &type_data.kind {
         TypeKind::Object(object_data) => match &object_data.kind {
-            ObjectKind::Node(_) => {
-                let mut map: FnvHashMap<PropertyId, NaiveSelection> = FnvHashMap::default();
+            ObjectKind::Node(node_data) => {
+                let mut properties: FnvHashMap<PropertyId, PropertySelection> =
+                    FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    let SelectionProperty {
-                        property_id,
+                    let KeyedPropertySelection {
+                        key: property_id,
                         selection,
                     } = analyze(field_look_ahead, field_data, virtual_schema);
 
-                    map.insert(property_id, selection);
+                    properties.insert(property_id, selection);
                 }
 
-                NaiveSelection::Node(map)
+                PropertySelection::Object(ObjectSource {
+                    def_id: node_data.def_id,
+                    properties,
+                })
             }
-            ObjectKind::Edge(_) => {
-                panic!()
-            }
-            ObjectKind::Connection => {
-                panic!()
-            }
-            ObjectKind::Query | ObjectKind::Mutation => panic!("Bug in virtual schema"),
+            ObjectKind::Edge(_)
+            | ObjectKind::Connection
+            | ObjectKind::Query
+            | ObjectKind::Mutation => panic!("Bug in virtual schema"),
         },
         TypeKind::Union(union_data) => {
-            let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, NaiveSelection>> =
+            let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, PropertySelection>> =
                 FnvHashMap::default();
 
             for field_look_ahead in look_ahead.children() {
@@ -172,8 +188,8 @@ pub fn analyze_data(
                     let variant_map = union_map.entry(def_id).or_default();
                     let field_data = fields.get(field_name).unwrap();
 
-                    let SelectionProperty {
-                        property_id,
+                    let KeyedPropertySelection {
+                        key: property_id,
                         selection,
                     } = analyze(field_look_ahead, field_data, virtual_schema);
 
@@ -181,11 +197,16 @@ pub fn analyze_data(
                 }
             }
 
-            NaiveSelection::Union(union_map)
+            PropertySelection::ObjectUnion(
+                union_map
+                    .into_iter()
+                    .map(|(def_id, properties)| ObjectSource { def_id, properties })
+                    .collect(),
+            )
         }
         TypeKind::CustomScalar(_) => {
             assert!(look_ahead.children().is_empty());
-            NaiveSelection::Scalar
+            PropertySelection::Leaf
         }
     }
 }

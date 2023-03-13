@@ -3,23 +3,29 @@ use smartstring::alias::String;
 
 use crate::{value::PropertyId, DefId};
 
-pub struct Query {
-    pub source: Source,
+#[derive(Debug)]
+pub struct EntityQuery {
+    pub source: EntityQuerySource,
     pub limit: u32,
     pub cursor: Option<String>,
 }
 
-pub enum PropertySelection {
-    Leaf,
-    Query(Query),
+#[derive(Debug)]
+pub enum EntityQuerySource {
+    Entity(ObjectSource),
+    EntityUnion(Vec<ObjectSource>),
 }
 
-pub enum Source {
-    Entity(EntitySource),
-    EntityUnion(Vec<EntitySource>),
-}
-
-pub struct EntitySource {
+#[derive(Debug)]
+pub struct ObjectSource {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, PropertySelection>,
+}
+
+#[derive(Debug)]
+pub enum PropertySelection {
+    Leaf,
+    Object(ObjectSource),
+    ObjectUnion(Vec<ObjectSource>),
+    EntityQuery(EntityQuery),
 }

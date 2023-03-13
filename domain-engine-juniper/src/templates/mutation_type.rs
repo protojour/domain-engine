@@ -9,11 +9,11 @@ use crate::{
     virtual_schema::{data::FieldKind, VirtualIndexedTypeInfo},
 };
 
-pub struct Mutation;
+pub struct MutationType;
 
-impl_graphql_value!(Mutation, TypeInfo = VirtualIndexedTypeInfo);
+impl_graphql_value!(MutationType, TypeInfo = VirtualIndexedTypeInfo);
 
-impl juniper::GraphQLType<GqlScalar> for Mutation {
+impl juniper::GraphQLType<GqlScalar> for MutationType {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
         Some(info.graphql_type_name())
     }
@@ -34,7 +34,7 @@ impl juniper::GraphQLType<GqlScalar> for Mutation {
     }
 }
 
-impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
+impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
     /// TODO: Might implement resolve_async instead, so we can have just one query
     fn resolve_field_async<'a>(
         &'a self,

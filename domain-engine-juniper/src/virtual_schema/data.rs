@@ -152,7 +152,7 @@ pub struct FieldData {
 impl FieldData {
     pub fn mandatory(kind: FieldKind, unit_type_ref: UnitTypeRef) -> Self {
         Self {
-            kind: kind,
+            kind,
             field_type: TypeRef::mandatory(unit_type_ref),
         }
     }

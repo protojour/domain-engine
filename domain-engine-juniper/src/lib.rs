@@ -20,8 +20,8 @@ impl juniper::Context for GqlContext {}
 
 pub type Schema = juniper::RootNode<
     'static,
-    templates::query::Query,
-    templates::mutation::Mutation,
+    templates::query_type::QueryType,
+    templates::mutation_type::MutationType,
     juniper::EmptySubscription<GqlContext>,
     GqlScalar,
 >;
@@ -38,8 +38,8 @@ pub fn create_graphql_schema(
     let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(env, package_id)?);
 
     let schema = Schema::new_with_info(
-        templates::query::Query,
-        templates::mutation::Mutation,
+        templates::query_type::QueryType,
+        templates::mutation_type::MutationType,
         juniper::EmptySubscription::new(),
         virtual_schema.query_type_info(),
         virtual_schema.mutation_type_info(),

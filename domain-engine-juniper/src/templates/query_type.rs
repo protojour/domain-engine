@@ -1,4 +1,5 @@
 use juniper::graphql_value;
+use ontol_runtime::query::PropertySelection;
 use tracing::debug;
 
 use crate::{
@@ -6,11 +7,11 @@ use crate::{
     virtual_registry::VirtualRegistry, virtual_schema::VirtualIndexedTypeInfo,
 };
 
-pub struct Query;
+pub struct QueryType;
 
-impl_graphql_value!(Query, TypeInfo = VirtualIndexedTypeInfo);
+impl_graphql_value!(QueryType, TypeInfo = VirtualIndexedTypeInfo);
 
-impl juniper::GraphQLType<GqlScalar> for Query {
+impl juniper::GraphQLType<GqlScalar> for QueryType {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
         Some(info.graphql_type_name())
     }
@@ -31,7 +32,7 @@ impl juniper::GraphQLType<GqlScalar> for Query {
     }
 }
 
-impl juniper::GraphQLValueAsync<GqlScalar> for Query {
+impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
     /// TODO: Might implement resolve_async instead, so we can have just one query
     fn resolve_field_async<'a>(
         &'a self,
@@ -47,7 +48,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
                 query_analyzer::analyze(&executor.look_ahead(), query_field, &info.virtual_schema)
                     .selection;
 
-            debug!("Executing query {field_name} selection: {selection:?}");
+            let entity_query = match selection {
+                PropertySelection::EntityQuery(query) => query,
+                other => panic!("Not an entity query: {other:?}"),
+            };
+
+            debug!("Executing query {field_name}: {entity_query:#?}");
 
             Ok(graphql_value!({ "edges": None }))
         })
