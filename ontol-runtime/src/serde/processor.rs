@@ -9,16 +9,16 @@ use crate::{
 use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
 
 #[derive(Copy, Clone, Debug)]
-pub enum ProcessorLevel {
-    Root,
-    Child,
+pub enum ProcessorMode {
+    Create,
+    Update,
+    Select,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum ProcessorMode {
-    Select,
-    Create,
-    Update,
+pub enum ProcessorLevel {
+    Root,
+    Child,
 }
 
 /// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.

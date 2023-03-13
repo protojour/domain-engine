@@ -24,4 +24,8 @@ impl Namespace {
     pub fn input(&mut self, type_name: &str) -> String {
         smart_format!("{type_name}Input")
     }
+
+    pub fn partial_input(&mut self, type_name: &str) -> String {
+        smart_format!("{type_name}PartialInput")
+    }
 }

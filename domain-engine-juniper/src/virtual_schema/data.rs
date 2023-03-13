@@ -1,9 +1,8 @@
 use indexmap::IndexMap;
-use ontol_runtime::{
-    serde::{operator::SerdeOperatorId, processor::ProcessorMode},
-    DefId,
-};
+use ontol_runtime::{serde::operator::SerdeOperatorId, DefId};
 use smartstring::alias::String;
+
+use super::TypingPurpose;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct TypeIndex(pub u32);
@@ -91,6 +90,8 @@ impl TypeRef {
 
 pub struct TypeData {
     pub typename: String,
+    pub input_typename: Option<String>,
+    pub partial_input_typename: Option<String>,
     pub kind: TypeKind,
 }
 
@@ -126,7 +127,6 @@ pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
     pub generic_operator_id: SerdeOperatorId,
-    pub input_type_name: String,
 }
 
 pub struct UnionData {
@@ -143,40 +143,47 @@ pub struct ScalarData {
 }
 
 pub struct FieldData {
-    pub arguments: ArgumentsKind,
+    pub arguments: FieldArguments,
     pub field_type: TypeRef,
 }
 
 impl FieldData {
     pub fn no_args(field_type: TypeRef) -> Self {
         Self {
-            arguments: ArgumentsKind::Empty,
+            arguments: FieldArguments::Empty,
             field_type,
         }
     }
 
     pub fn connection(unit_type_ref: UnitTypeRef) -> Self {
         Self {
-            arguments: ArgumentsKind::ConnectionQuery,
+            arguments: FieldArguments::ConnectionQuery,
             field_type: TypeRef::mandatory(unit_type_ref),
         }
     }
 }
 
-pub enum ArgumentsKind {
+pub enum FieldArguments {
     Empty,
     ConnectionQuery,
-    CreateMutation { input: Argument },
-    UpdateMutation { id: Argument, input: Argument },
-    DeleteMutation { id: Argument },
+    CreateMutation {
+        input: FieldArgument,
+    },
+    UpdateMutation {
+        id: FieldArgument,
+        input: FieldArgument,
+    },
+    DeleteMutation {
+        id: FieldArgument,
+    },
 }
 
-pub enum Argument {
-    Input(TypeIndex, DefId, ProcessorMode),
-    Id(SerdeOperatorId, ProcessorMode),
+pub enum FieldArgument {
+    Input(TypeIndex, DefId, TypingPurpose),
+    Id(SerdeOperatorId, TypingPurpose),
 }
 
-impl Argument {
+impl FieldArgument {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Input(..) => "input",

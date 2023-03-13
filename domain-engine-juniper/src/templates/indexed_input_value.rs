@@ -1,3 +1,5 @@
+use tracing::{debug, warn};
+
 use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
@@ -9,9 +11,7 @@ use crate::{
     },
 };
 
-pub struct IndexedInputValue {
-    pub input_value: juniper::InputValue<GqlScalar>,
-}
+pub struct IndexedInputValue;
 
 impl_graphql_value!(IndexedInputValue, TypeInfo = VirtualIndexedTypeInfo);
 
@@ -37,15 +37,26 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                 reg.collect_operator_arguments(
                     node_data.generic_operator_id,
                     &mut arguments,
-                    info.mode,
-                    info.level,
+                    info.typing_purpose,
                 );
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
             }
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Edge(_edge_data),
+                fields,
+            }) => {
+                let arguments = reg.convert_fields_to_arguments(fields, info.typing_purpose);
+                registry
+                    .build_input_object_type::<Self>(info, &arguments)
+                    .into_meta()
+            }
             TypeKind::Union(_union_data) => {
-                panic!("Unions can't be part of input values")
+                warn!("No support for unions as input values yet");
+                registry
+                    .build_input_object_type::<Self>(info, &[])
+                    .into_meta()
             }
             TypeKind::CustomScalar(_) => todo!(),
             TypeKind::Object(_) => panic!("Invalid Object input data"),
@@ -64,7 +75,8 @@ impl juniper::FromInputValue<GqlScalar> for IndexedInputValue {
     type Error = String;
 
     fn from_input_value(_: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
-        unimplemented!("This is not actually used");
+        debug!("No way to validate this here without TypeInfo/SerdeOperatorId");
+        Ok(Self)
     }
 }
 

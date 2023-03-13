@@ -1,31 +1,27 @@
 use std::fmt::Display;
 
 use juniper::{graphql_value, InputValue, Spanning};
-use ontol_runtime::{
-    env::Env,
-    serde::{
-        operator::SerdeOperatorId,
-        processor::{ProcessorLevel, ProcessorMode},
-    },
-    smart_format, DefId,
-};
+use ontol_runtime::{env::Env, serde::operator::SerdeOperatorId, smart_format, DefId};
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 use tracing::debug;
 
-use crate::{gql_scalar::GqlScalar, virtual_schema::data::Argument};
+use crate::{
+    gql_scalar::GqlScalar,
+    virtual_schema::{data::FieldArgument, TypingPurpose},
+};
 
 pub fn deserialize_argument(
-    argument: &Argument,
+    argument: &FieldArgument,
     arguments: &juniper::Arguments<GqlScalar>,
     env: &Env,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let name = argument.name();
     match argument {
-        Argument::Input(_, def_id, mode) => {
-            deserialize_def_argument(arguments, name, *def_id, env, *mode)
+        FieldArgument::Input(_, def_id, typing_purpose) => {
+            deserialize_def_argument(arguments, name, *def_id, env, *typing_purpose)
         }
-        Argument::Id(operator_id, mode) => {
-            deserialize_operator_argument(arguments, name, *operator_id, env, *mode)
+        FieldArgument::Id(operator_id, typing_purpose) => {
+            deserialize_operator_argument(arguments, name, *operator_id, env, *typing_purpose)
         }
     }
 }
@@ -36,7 +32,7 @@ pub fn deserialize_def_argument(
     name: &str,
     def_id: DefId,
     env: &Env,
-    mode: ProcessorMode,
+    typing_purpose: TypingPurpose,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let type_info = env.get_type_info(def_id);
     deserialize_operator_argument(
@@ -46,7 +42,7 @@ pub fn deserialize_def_argument(
             .generic_operator_id
             .expect("This type cannot be deserialized"),
         env,
-        mode,
+        typing_purpose,
     )
 }
 
@@ -55,13 +51,15 @@ pub fn deserialize_operator_argument(
     name: &str,
     operator_id: SerdeOperatorId,
     env: &Env,
-    mode: ProcessorMode,
+    typing_purpose: TypingPurpose,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let value = arguments.get_input_value(name).unwrap();
 
     debug!("deserializing {value:?}");
 
-    env.new_serde_processor(operator_id, None, mode, ProcessorLevel::Root)
+    let (mode, level) = typing_purpose.mode_and_level();
+
+    env.new_serde_processor(operator_id, None, mode, level)
         .deserialize(InputValueDeserializer { value })
         .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
 }

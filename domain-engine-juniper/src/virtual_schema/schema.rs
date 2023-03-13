@@ -12,13 +12,13 @@ use ontol_runtime::{
 };
 use tracing::debug;
 
-use crate::{virtual_schema::builder::QueryLevel, SchemaBuildError};
+use crate::SchemaBuildError;
 
 use super::{
     builder::VirtualSchemaBuilder,
     data::{NodeData, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, UnitTypeRef},
     namespace::Namespace,
-    EntityInfo, VirtualIndexedTypeInfo,
+    EntityInfo, QueryLevel, TypingPurpose, VirtualIndexedTypeInfo,
 };
 
 /// The virtual schema is a schema representation
@@ -32,6 +32,7 @@ pub struct VirtualSchema {
     pub(super) query: TypeIndex,
     pub(super) mutation: TypeIndex,
     pub(super) types: Vec<TypeData>,
+    pub(super) type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
 }
 
 impl VirtualSchema {
@@ -47,13 +48,16 @@ impl VirtualSchema {
             query: TypeIndex(0),
             mutation: TypeIndex(0),
             types: Vec::with_capacity(domain.type_names.len()),
+            type_index_by_def: FnvHashMap::with_capacity_and_hasher(
+                domain.type_names.len(),
+                Default::default(),
+            ),
         };
         let mut namespace = Namespace::default();
         let mut builder = VirtualSchemaBuilder {
             env: env.as_ref(),
             schema: &mut schema,
             namespace: &mut namespace,
-            type_index_by_def: FnvHashMap::default(),
         };
 
         builder.register_query();
@@ -83,27 +87,29 @@ impl VirtualSchema {
     pub fn indexed_type_info(
         self: &Arc<Self>,
         type_index: TypeIndex,
-        mode: ProcessorMode,
-        level: ProcessorLevel,
+        typing_purpose: TypingPurpose,
     ) -> VirtualIndexedTypeInfo {
         VirtualIndexedTypeInfo {
             virtual_schema: self.clone(),
             type_index,
-            mode,
-            level,
+            typing_purpose,
         }
     }
 
     pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
-        self.indexed_type_info(self.query, ProcessorMode::Select, ProcessorLevel::Root)
+        self.indexed_type_info(self.query, TypingPurpose::Selection)
     }
 
     pub fn mutation_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
-        self.indexed_type_info(self.mutation, ProcessorMode::Select, ProcessorLevel::Root)
+        self.indexed_type_info(self.mutation, TypingPurpose::Selection)
     }
 
     pub fn type_data(&self, index: TypeIndex) -> &TypeData {
         &self.types[index.0 as usize]
+    }
+
+    pub fn type_index_by_def(&self, def_id: DefId, query_level: QueryLevel) -> Option<TypeIndex> {
+        self.type_index_by_def.get(&(def_id, query_level)).cloned()
     }
 
     pub(super) fn object_data_mut(&mut self, index: TypeIndex) -> &mut ObjectData {

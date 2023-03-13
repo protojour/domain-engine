@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 use ontol_runtime::{
     env::Env,
-    serde::processor::{ProcessorLevel, ProcessorMode},
+    serde::{
+        operator::SerdeOperatorId,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     DefId,
 };
 
 use crate::type_info::GraphqlTypeName;
 
-use self::data::{ObjectData, ObjectKind, TypeData, TypeIndex};
+use self::data::{TypeData, TypeIndex};
 
 pub mod data;
 
@@ -18,12 +21,39 @@ mod schema;
 
 pub use schema::VirtualSchema;
 
+#[derive(Copy, Clone, Debug)]
+pub enum TypingPurpose {
+    Selection,
+    Input,
+    PartialInput,
+    ReferenceInput,
+}
+
+impl TypingPurpose {
+    pub fn child(self) -> Self {
+        match self {
+            Self::Selection => Self::Selection,
+            Self::Input => Self::Input,
+            Self::PartialInput => Self::Input,
+            Self::ReferenceInput => Self::Input,
+        }
+    }
+
+    pub const fn mode_and_level(self) -> (ProcessorMode, ProcessorLevel) {
+        match self {
+            TypingPurpose::Selection => (ProcessorMode::Select, ProcessorLevel::Root),
+            TypingPurpose::Input => (ProcessorMode::Create, ProcessorLevel::Root),
+            TypingPurpose::PartialInput => (ProcessorMode::Update, ProcessorLevel::Root),
+            TypingPurpose::ReferenceInput => (ProcessorMode::Create, ProcessorLevel::Child),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct VirtualIndexedTypeInfo {
     pub virtual_schema: Arc<VirtualSchema>,
     pub type_index: TypeIndex,
-    pub mode: ProcessorMode,
-    pub level: ProcessorLevel,
+    pub typing_purpose: TypingPurpose,
 }
 
 impl VirtualIndexedTypeInfo {
@@ -39,20 +69,25 @@ impl VirtualIndexedTypeInfo {
 impl GraphqlTypeName for VirtualIndexedTypeInfo {
     fn graphql_type_name(&self) -> &str {
         let type_data = &self.type_data();
-        match self.mode {
-            ProcessorMode::Select => &type_data.typename,
-            _ => match &type_data.kind {
-                data::TypeKind::Object(ObjectData {
-                    kind: ObjectKind::Node(node),
-                    ..
-                }) => &node.input_type_name,
-                _ => panic!(
-                    "No {mode:?} typename available for this type_data",
-                    mode = self.mode
-                ),
-            },
+        match self.typing_purpose {
+            TypingPurpose::Selection => &type_data.typename,
+            TypingPurpose::Input | TypingPurpose::ReferenceInput => type_data
+                .input_typename
+                .as_deref()
+                .expect("No input typename available"),
+            TypingPurpose::PartialInput => type_data
+                .partial_input_typename
+                .as_deref()
+                .expect("No partial input typename available"),
         }
     }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub enum QueryLevel {
+    Node,
+    Edge { rel_params: Option<SerdeOperatorId> },
+    Connection { rel_params: Option<SerdeOperatorId> },
 }
 
 struct EntityInfo {
