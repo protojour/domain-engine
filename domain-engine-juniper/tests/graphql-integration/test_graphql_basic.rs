@@ -154,7 +154,6 @@ async fn test_graphql_artist_and_instrument_connections() {
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION.compile_schema();
 
-    // `instrument` is a union so fields cannot be queries directly
     assert_eq!(
         "{
             artistList {

@@ -104,8 +104,8 @@ impl VirtualSchema {
         self.indexed_type_info(self.mutation, TypingPurpose::Selection)
     }
 
-    pub fn type_data(&self, index: TypeIndex) -> &TypeData {
-        &self.types[index.0 as usize]
+    pub fn type_data(&self, type_index: TypeIndex) -> &TypeData {
+        &self.types[type_index.0 as usize]
     }
 
     pub fn type_index_by_def(&self, def_id: DefId, query_level: QueryLevel) -> Option<TypeIndex> {

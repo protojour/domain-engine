@@ -9,6 +9,7 @@ mod virtual_schema;
 
 mod input_value_deserializer;
 mod macros;
+mod selection_analyzer;
 mod templates;
 mod type_info;
 mod virtual_registry;
