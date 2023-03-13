@@ -2,12 +2,9 @@ use juniper::graphql_value;
 use tracing::debug;
 
 use crate::{
-    gql_scalar::GqlScalar,
-    macros::impl_graphql_value,
-    selection_analyzer::analyze_selection,
-    type_info::GraphqlTypeName,
-    virtual_registry::VirtualRegistry,
-    virtual_schema::{data::UnitTypeRef, VirtualIndexedTypeInfo},
+    gql_scalar::GqlScalar, macros::impl_graphql_value, selection_analyzer,
+    type_info::GraphqlTypeName, virtual_registry::VirtualRegistry,
+    virtual_schema::VirtualIndexedTypeInfo,
 };
 
 pub struct Query;
@@ -47,20 +44,11 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         Box::pin(async move {
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let connection_type_data = match query_field.field_type.unit {
-                UnitTypeRef::Indexed(type_index) => info.virtual_schema.type_data(type_index),
-                _ => panic!("Invalid connection"),
-            };
-
-            let naive_selection = analyze_selection(
+            let naive_selection = selection_analyzer::analyze(
                 &executor.look_ahead(),
-                connection_type_data,
+                query_field,
                 &info.virtual_schema,
             );
-
-            // info.virtual_schema.indexed_type_info(type_index, typing_purpose);
-
-            // query_field.field_type
 
             debug!("Executing query {field_name} selection: {naive_selection:?}");
 

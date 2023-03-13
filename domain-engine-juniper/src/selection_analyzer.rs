@@ -8,7 +8,7 @@ use tracing::debug;
 use crate::{
     gql_scalar::GqlScalar,
     virtual_schema::{
-        data::{FieldData, NodeData, ObjectData, ObjectKind, TypeData, TypeKind, UnitTypeRef},
+        data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
         VirtualSchema,
     },
 };
@@ -22,26 +22,93 @@ pub enum NaiveSelection {
     Scalar,
 }
 
-pub fn analyze_selection(
+pub fn analyze(
+    look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+    field_data: &FieldData,
+    virtual_schema: &VirtualSchema,
+) -> NaiveSelection {
+    match (
+        &field_data.kind,
+        virtual_schema.lookup_type_data(field_data.field_type.unit),
+    ) {
+        (
+            FieldKind::ConnectionQuery(_arguments),
+            Ok(TypeData {
+                kind: TypeKind::Object(object_data),
+                ..
+            }),
+        ) => {
+            let mut selection = None;
+
+            for field_look_ahead in look_ahead.children() {
+                let field_name = field_look_ahead.field_name();
+                let field_data = object_data.fields.get(field_name).unwrap();
+
+                if let FieldKind::Edges = &field_data.kind {
+                    selection = Some(analyze(field_look_ahead, field_data, virtual_schema));
+                }
+            }
+
+            selection.unwrap_or_else(|| NaiveSelection::Node(Default::default()))
+        }
+        (
+            FieldKind::Edges,
+            Ok(TypeData {
+                kind: TypeKind::Object(object_data),
+                ..
+            }),
+        ) => {
+            let mut selection = None;
+
+            for field_look_ahead in look_ahead.children() {
+                let field_name = field_look_ahead.field_name();
+                let field_data = object_data.fields.get(field_name).unwrap();
+
+                if let FieldKind::Node = &field_data.kind {
+                    selection = Some(analyze(field_look_ahead, field_data, virtual_schema));
+                }
+            }
+
+            selection.unwrap_or_else(|| NaiveSelection::Node(Default::default()))
+        }
+        (FieldKind::Node | FieldKind::Data, Ok(type_data)) => {
+            analyze_data(look_ahead, type_data, virtual_schema)
+        }
+        (FieldKind::Data | FieldKind::Id, Err(_scalar_ref)) => NaiveSelection::Scalar,
+        (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
+    }
+}
+
+pub fn analyze_data(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     type_data: &TypeData,
     virtual_schema: &VirtualSchema,
 ) -> NaiveSelection {
     match &type_data.kind {
-        TypeKind::Object(object_data) => {
-            let mut map: IndexMap<String, NaiveSelection> = IndexMap::new();
+        TypeKind::Object(object_data) => match &object_data.kind {
+            ObjectKind::Node(_) => {
+                let mut map: IndexMap<String, NaiveSelection> = IndexMap::new();
 
-            for field_look_ahead in look_ahead.children() {
-                let field_name = field_look_ahead.field_name();
+                for field_look_ahead in look_ahead.children() {
+                    let field_name = field_look_ahead.field_name();
+                    let field_data = object_data.fields.get(field_name).unwrap();
 
-                map.insert(
-                    field_name.into(),
-                    analyze_field(field_look_ahead, &object_data.fields, virtual_schema),
-                );
+                    map.insert(
+                        field_name.into(),
+                        analyze(field_look_ahead, field_data, virtual_schema),
+                    );
+                }
+
+                NaiveSelection::Node(map)
             }
-
-            NaiveSelection::Node(map)
-        }
+            ObjectKind::Edge(_) => {
+                panic!()
+            }
+            ObjectKind::Connection(_) => {
+                panic!()
+            }
+            ObjectKind::Query | ObjectKind::Mutation => panic!("Bug in virtual schema"),
+        },
         TypeKind::Union(union_data) => {
             let mut union_map: FnvHashMap<DefId, IndexMap<String, NaiveSelection>> =
                 FnvHashMap::default();
@@ -79,9 +146,11 @@ pub fn analyze_selection(
                     };
 
                     let variant_map = union_map.entry(def_id).or_default();
+                    let field_data = fields.get(field_name).unwrap();
+
                     variant_map.insert(
                         field_name.into(),
-                        analyze_field(field_look_ahead, fields, virtual_schema),
+                        analyze(field_look_ahead, field_data, virtual_schema),
                     );
                 }
             }
@@ -92,30 +161,5 @@ pub fn analyze_selection(
             assert!(look_ahead.children().is_empty());
             NaiveSelection::Scalar
         }
-    }
-}
-
-fn analyze_field(
-    field_look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
-    field_map: &IndexMap<String, FieldData>,
-    virtual_schema: &VirtualSchema,
-) -> NaiveSelection {
-    let field_name = field_look_ahead.field_name();
-    let field_data = field_map.get(field_name).expect("Field not found");
-
-    match field_data.field_type.unit {
-        UnitTypeRef::Indexed(type_index) => {
-            let selection = analyze_selection(
-                field_look_ahead,
-                virtual_schema.type_data(type_index),
-                virtual_schema,
-            );
-
-            debug!("{field_name} selection: {selection:?}");
-
-            selection
-        }
-        UnitTypeRef::ID(_) => NaiveSelection::Scalar,
-        UnitTypeRef::NativeScalar(_) => NaiveSelection::Scalar,
     }
 }

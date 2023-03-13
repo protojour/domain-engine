@@ -46,8 +46,7 @@ impl TypeModifier {
 #[derive(Clone, Copy, Debug)]
 pub enum UnitTypeRef {
     Indexed(TypeIndex),
-    ID(SerdeOperatorId),
-    NativeScalar(NativeScalarRef),
+    Scalar(NativeScalarRef),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,6 +56,7 @@ pub enum NativeScalarRef {
     Int(DefId),
     Number(DefId),
     String(SerdeOperatorId),
+    ID(SerdeOperatorId),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -147,30 +147,26 @@ pub struct ScalarData {
 
 #[derive(Debug)]
 pub struct FieldData {
-    pub arguments: FieldArguments,
+    pub kind: FieldKind,
     pub field_type: TypeRef,
 }
 
 impl FieldData {
-    pub fn no_args(field_type: TypeRef) -> Self {
-        Self {
-            arguments: FieldArguments::Empty,
-            field_type,
-        }
-    }
-
     pub fn connection(unit_type_ref: UnitTypeRef) -> Self {
         Self {
-            arguments: FieldArguments::ConnectionQuery,
+            kind: FieldKind::ConnectionQuery(ConnectionArguments {}),
             field_type: TypeRef::mandatory(unit_type_ref),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum FieldArguments {
-    Empty,
-    ConnectionQuery,
+pub enum FieldKind {
+    Data,
+    Id,
+    Node,
+    Edges,
+    ConnectionQuery(ConnectionArguments),
     CreateMutation {
         input: FieldArgument,
     },
@@ -182,6 +178,9 @@ pub enum FieldArguments {
         id: FieldArgument,
     },
 }
+
+#[derive(Debug)]
+pub struct ConnectionArguments {}
 
 #[derive(Debug)]
 pub enum FieldArgument {

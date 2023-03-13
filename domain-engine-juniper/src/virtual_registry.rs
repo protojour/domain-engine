@@ -11,8 +11,8 @@ use crate::{
     templates::{indexed_input_value::IndexedInputValue, indexed_type::IndexedType},
     virtual_schema::{
         data::{
-            FieldArgument, FieldArguments, FieldData, NativeScalarRef, Optionality, TypeIndex,
-            TypeKind, TypeModifier, TypeRef, UnitTypeRef,
+            FieldArgument, FieldData, FieldKind, NativeScalarRef, Optionality, TypeIndex, TypeKind,
+            TypeModifier, TypeRef, UnitTypeRef,
         },
         QueryLevel, TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
     },
@@ -48,7 +48,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 .map(|(name, field_data)| juniper::meta::Field {
                     name: name.clone(),
                     description: None,
-                    arguments: self.get_arguments_for_field(&field_data.arguments),
+                    arguments: self.get_arguments_for_field(&field_data.kind),
                     field_type: self
                         .get_type::<IndexedType>(field_data.field_type, TypingPurpose::Selection),
                     deprecation_status: juniper::meta::DeprecationStatus::Current,
@@ -206,19 +206,17 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
 
     fn get_arguments_for_field(
         &mut self,
-        arguments: &FieldArguments,
+        field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
-        match arguments {
-            FieldArguments::Empty => None,
-            FieldArguments::ConnectionQuery => None,
-            FieldArguments::CreateMutation { input } => {
-                Some(vec![self.get_argument_for_field(input)])
-            }
-            FieldArguments::UpdateMutation { id, input } => Some(vec![
+        match field_kind {
+            FieldKind::Data | FieldKind::Id | FieldKind::Edges | FieldKind::Node => None,
+            FieldKind::ConnectionQuery(_) => None,
+            FieldKind::CreateMutation { input } => Some(vec![self.get_argument_for_field(input)]),
+            FieldKind::UpdateMutation { id, input } => Some(vec![
                 self.get_argument_for_field(id),
                 self.get_argument_for_field(input),
             ]),
-            FieldArguments::DeleteMutation { id } => Some(vec![self.get_argument_for_field(id)]),
+            FieldKind::DeleteMutation { id } => Some(vec![self.get_argument_for_field(id)]),
         }
     }
 
@@ -263,23 +261,23 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 },
                 type_ref.modifier,
             ),
-            UnitTypeRef::ID(_operator_id) => {
-                self.get_modified_type::<juniper::ID>(&(), type_ref.modifier)
-            }
-            UnitTypeRef::NativeScalar(NativeScalarRef::Unit) => {
+            UnitTypeRef::Scalar(NativeScalarRef::Unit) => {
                 todo!("Unit type")
             }
-            UnitTypeRef::NativeScalar(NativeScalarRef::Bool) => {
+            UnitTypeRef::Scalar(NativeScalarRef::Bool) => {
                 self.get_modified_type::<bool>(&(), type_ref.modifier)
             }
-            UnitTypeRef::NativeScalar(NativeScalarRef::Int(_)) => {
+            UnitTypeRef::Scalar(NativeScalarRef::Int(_)) => {
                 self.get_modified_type::<i32>(&(), type_ref.modifier)
             }
-            UnitTypeRef::NativeScalar(NativeScalarRef::Number(_)) => {
+            UnitTypeRef::Scalar(NativeScalarRef::Number(_)) => {
                 self.get_modified_type::<f64>(&(), type_ref.modifier)
             }
-            UnitTypeRef::NativeScalar(NativeScalarRef::String(_)) => {
+            UnitTypeRef::Scalar(NativeScalarRef::String(_)) => {
                 self.get_modified_type::<std::string::String>(&(), type_ref.modifier)
+            }
+            UnitTypeRef::Scalar(NativeScalarRef::ID(_operator_id)) => {
+                self.get_modified_type::<juniper::ID>(&(), type_ref.modifier)
             }
         }
     }

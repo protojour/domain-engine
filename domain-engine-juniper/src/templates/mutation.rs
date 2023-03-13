@@ -6,7 +6,7 @@ use crate::{
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
-    virtual_schema::{data::FieldArguments, VirtualIndexedTypeInfo},
+    virtual_schema::{data::FieldKind, VirtualIndexedTypeInfo},
 };
 
 pub struct Mutation;
@@ -45,19 +45,19 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Mutation {
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
             let mutation_field = info.type_data().fields().unwrap().get(field_name).unwrap();
-            match &mutation_field.arguments {
-                FieldArguments::CreateMutation { input } => {
+            match &mutation_field.kind {
+                FieldKind::CreateMutation { input } => {
                     let input_value = deserialize_argument(input, arguments, info.env())?;
 
                     debug!("CREATE {input_value:?}");
                 }
-                FieldArguments::UpdateMutation { id, input } => {
+                FieldKind::UpdateMutation { id, input } => {
                     let id_value = deserialize_argument(id, arguments, info.env())?;
                     let input_value = deserialize_argument(input, arguments, info.env())?;
 
                     debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
-                FieldArguments::DeleteMutation { id } => {
+                FieldKind::DeleteMutation { id } => {
                     let id_value = deserialize_argument(id, arguments, info.env())?;
 
                     debug!("DELETE {id_value:?}");

@@ -14,8 +14,8 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 
 use super::{
     data::{
-        ConnectionData, EdgeData, FieldArgument, FieldArguments, FieldData, NativeScalarRef,
-        NodeData, ObjectData, ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind,
+        ConnectionData, EdgeData, FieldArgument, FieldData, FieldKind, NativeScalarRef, NodeData,
+        ObjectData, ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind,
         TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
@@ -73,7 +73,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.schema.types[type_index.0 as usize] = type_data;
                 UnitTypeRef::Indexed(type_index)
             }
-            NewType::NativeScalar(scalar_ref) => UnitTypeRef::NativeScalar(scalar_ref),
+            NewType::NativeScalar(scalar_ref) => UnitTypeRef::Scalar(scalar_ref),
         }
     }
 
@@ -84,7 +84,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     ) -> UnitTypeRef {
         match self.make_new_scalar(operator_id, serde_operator) {
             NewType::Indexed(..) => panic!("BUG: Scalars should not be indexed"),
-            NewType::NativeScalar(native_scalar) => UnitTypeRef::NativeScalar(native_scalar),
+            NewType::NativeScalar(native_scalar) => UnitTypeRef::Scalar(native_scalar),
         }
     }
 
@@ -120,7 +120,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 // FIXME: what if some of the relation data's fields are called "node"
                 let fields: IndexMap<String, FieldData> = [(
                     smart_format!("node"),
-                    FieldData::no_args(TypeRef::mandatory(node_ref)),
+                    FieldData {
+                        kind: FieldKind::Node,
+                        field_type: TypeRef::mandatory(node_ref),
+                    },
                 )]
                 .into();
 
@@ -186,9 +189,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         kind: TypeKind::Object(ObjectData {
                             fields: [(
                                 smart_format!("edges"),
-                                FieldData::no_args(
-                                    TypeRef::mandatory(edge_ref).to_array(Optionality::Optional),
-                                ),
+                                FieldData {
+                                    kind: FieldKind::Edges,
+                                    field_type: TypeRef::mandatory(edge_ref)
+                                        .to_array(Optionality::Optional),
+                                },
                             )]
                             .into(),
                             kind: ObjectKind::Connection(ConnectionData {}),
@@ -311,8 +316,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
             fields.insert(
                 "_id".into(),
                 FieldData {
-                    arguments: FieldArguments::Empty,
-                    field_type: TypeRef::mandatory(UnitTypeRef::ID(id_operator_id)),
+                    kind: FieldKind::Id,
+                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::ID(
+                        id_operator_id,
+                    ))),
                 },
             );
         }
@@ -376,10 +383,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             );
                             fields.insert(
                                 property_name.clone(),
-                                FieldData::no_args(
-                                    TypeRef::mandatory(edge_ref)
+                                FieldData {
+                                    kind: FieldKind::Data,
+                                    field_type: TypeRef::mandatory(edge_ref)
                                         .to_array(Optionality::from_optional(property.optional)),
-                                ),
+                                },
                             );
                         }
                         TypeClassification::Id => {
@@ -398,12 +406,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         self.get_operator_scalar_type_ref(property.value_operator_id, operator);
                     fields.insert(
                         property_name.clone(),
-                        FieldData::no_args(TypeRef {
-                            modifier: TypeModifier::new_unit(Optionality::from_optional(
-                                property.optional,
-                            )),
-                            unit: scalar_ref,
-                        }),
+                        FieldData {
+                            kind: FieldKind::Data,
+                            field_type: TypeRef {
+                                modifier: TypeModifier::new_unit(Optionality::from_optional(
+                                    property.optional,
+                                )),
+                                unit: scalar_ref,
+                            },
+                        },
                     );
                 }
             }
@@ -421,11 +432,13 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 QueryLevel::Node
             },
         );
-
-        FieldData::no_args(TypeRef {
-            modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
-            unit: unit_ref,
-        })
+        FieldData {
+            kind: FieldKind::Data,
+            field_type: TypeRef {
+                modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
+                unit: unit_ref,
+            },
+        }
     }
 
     pub fn add_entity_queries_and_mutations(&mut self, entity_info: EntityInfo) {
@@ -454,7 +467,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.create(&typename),
                 FieldData {
-                    arguments: FieldArguments::CreateMutation {
+                    kind: FieldKind::CreateMutation {
                         input: FieldArgument::Input(
                             entity_info.type_index,
                             entity_info.node_def_id,
@@ -468,7 +481,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.update(&typename),
                 FieldData {
-                    arguments: FieldArguments::UpdateMutation {
+                    kind: FieldKind::UpdateMutation {
                         input: FieldArgument::Input(
                             entity_info.type_index,
                             entity_info.node_def_id,
@@ -483,12 +496,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
             mutation.fields.insert(
                 self.namespace.delete(&typename),
                 FieldData {
-                    arguments: FieldArguments::DeleteMutation {
+                    kind: FieldKind::DeleteMutation {
                         id: FieldArgument::Id(id_operator_id, TypingPurpose::Input),
                     },
-                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
-                        NativeScalarRef::Bool,
-                    )),
+                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::Bool)),
                 },
             );
         }
