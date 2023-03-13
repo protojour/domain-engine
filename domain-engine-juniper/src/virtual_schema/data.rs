@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationId};
 use smartstring::alias::String;
 
-use super::argument::FieldArgument;
+use super::argument::{self};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct TypeIndex(pub u32);
@@ -150,9 +150,9 @@ pub struct FieldData {
 }
 
 impl FieldData {
-    pub fn connection(kind: ConnectionFieldKind, unit_type_ref: UnitTypeRef) -> Self {
+    pub fn mandatory(kind: FieldKind, unit_type_ref: UnitTypeRef) -> Self {
         Self {
-            kind: FieldKind::Connection(kind),
+            kind: kind,
             field_type: TypeRef::mandatory(unit_type_ref),
         }
     }
@@ -164,20 +164,19 @@ pub enum FieldKind {
     Id(RelationId),
     Node,
     Edges,
-    Connection(ConnectionFieldKind),
+    Connection {
+        property_id: Option<PropertyId>,
+        first: argument::First,
+        after: argument::After,
+    },
     CreateMutation {
-        input: FieldArgument,
+        input: argument::Input,
     },
     UpdateMutation {
-        id: FieldArgument,
-        input: FieldArgument,
+        id: argument::Id,
+        input: argument::Input,
     },
     DeleteMutation {
-        id: FieldArgument,
+        id: argument::Id,
     },
-}
-
-#[derive(Debug)]
-pub struct ConnectionFieldKind {
-    pub property_id: Option<PropertyId>,
 }

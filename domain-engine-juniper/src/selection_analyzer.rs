@@ -35,7 +35,7 @@ pub fn analyze(
         virtual_schema.lookup_type_data(field_data.field_type.unit),
     ) {
         (
-            FieldKind::Connection(connection_field),
+            FieldKind::Connection { property_id, .. },
             Ok(TypeData {
                 kind: TypeKind::Object(object_data),
                 ..
@@ -54,7 +54,7 @@ pub fn analyze(
             }
 
             SelectionProperty {
-                property_id: connection_field.property_id.unwrap_or(unit_property()),
+                property_id: property_id.unwrap_or(unit_property()),
                 selection: selection.unwrap_or(NaiveSelection::Node(Default::default())),
             }
         }

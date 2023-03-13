@@ -13,11 +13,11 @@ use tracing::debug;
 use crate::virtual_schema::schema::{classify_type, TypeClassification};
 
 use super::{
-    argument::FieldArgument,
+    argument,
     data::{
-        ConnectionFieldKind, EdgeData, FieldData, FieldKind, NativeScalarRef, NodeData, ObjectData,
-        ObjectKind, Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef,
-        UnionData, UnitTypeRef,
+        EdgeData, FieldData, FieldKind, NativeScalarRef, NodeData, ObjectData, ObjectKind,
+        Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData,
+        UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -375,9 +375,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                             fields.insert(
                                 property_name.clone(),
-                                FieldData::connection(
-                                    ConnectionFieldKind {
+                                FieldData::mandatory(
+                                    FieldKind::Connection {
                                         property_id: Some(property.property_id),
+                                        first: argument::First,
+                                        after: argument::After,
                                     },
                                     connection_ref,
                                 ),
@@ -467,7 +469,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
             let query = self.schema.object_data_mut(self.schema.query);
             query.fields.insert(
                 self.namespace.list(&typename),
-                FieldData::connection(ConnectionFieldKind { property_id: None }, connection_ref),
+                FieldData::mandatory(
+                    FieldKind::Connection {
+                        property_id: None,
+                        first: argument::First,
+                        after: argument::After,
+                    },
+                    connection_ref,
+                ),
             );
         }
 
@@ -477,7 +486,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.create(&typename),
                 FieldData {
                     kind: FieldKind::CreateMutation {
-                        input: FieldArgument::Input(
+                        input: argument::Input(
                             entity_info.type_index,
                             entity_info.node_def_id,
                             TypingPurpose::Input,
@@ -491,12 +500,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.update(&typename),
                 FieldData {
                     kind: FieldKind::UpdateMutation {
-                        input: FieldArgument::Input(
+                        input: argument::Input(
                             entity_info.type_index,
                             entity_info.node_def_id,
                             TypingPurpose::PartialInput,
                         ),
-                        id: FieldArgument::Id(id_operator_id, TypingPurpose::Input),
+                        id: argument::Id(id_operator_id),
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -506,7 +515,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.namespace.delete(&typename),
                 FieldData {
                     kind: FieldKind::DeleteMutation {
-                        id: FieldArgument::Id(id_operator_id, TypingPurpose::Input),
+                        id: argument::Id(id_operator_id),
                     },
                     field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::Bool)),
                 },

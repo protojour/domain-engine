@@ -6,22 +6,29 @@ use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
 use crate::{
     gql_scalar::GqlScalar,
-    virtual_schema::{argument::FieldArgument, TypingPurpose},
+    virtual_schema::{
+        argument::{ArgKind, DomainFieldArg},
+        TypingPurpose,
+    },
 };
 
 pub fn deserialize_argument(
-    argument: &FieldArgument,
+    argument: &dyn DomainFieldArg,
     arguments: &juniper::Arguments<GqlScalar>,
     env: &Env,
 ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
     let name = argument.name();
-    match argument {
-        FieldArgument::Input(_, def_id, typing_purpose) => {
-            deserialize_def_argument(arguments, name, *def_id, env, *typing_purpose)
+    match argument.kind() {
+        ArgKind::Def(_, def_id) => {
+            deserialize_def_argument(arguments, name, def_id, env, argument.typing_purpose())
         }
-        FieldArgument::Id(operator_id, typing_purpose) => {
-            deserialize_operator_argument(arguments, name, *operator_id, env, *typing_purpose)
-        }
+        ArgKind::Operator(operator_id) => deserialize_operator_argument(
+            arguments,
+            name,
+            operator_id,
+            env,
+            argument.typing_purpose(),
+        ),
     }
 }
 

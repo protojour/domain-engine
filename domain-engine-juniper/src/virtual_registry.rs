@@ -10,7 +10,7 @@ use crate::{
     gql_scalar::GqlScalar,
     templates::{indexed_input_value::IndexedInputValue, indexed_type::IndexedType},
     virtual_schema::{
-        argument::FieldArgument,
+        argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
             FieldData, FieldKind, NativeScalarRef, Optionality, TypeIndex, TypeKind, TypeModifier,
             TypeRef, UnitTypeRef,
@@ -210,33 +210,33 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
         match field_kind {
-            FieldKind::Property(_) | FieldKind::Id(_) | FieldKind::Edges | FieldKind::Node => None,
-            FieldKind::Connection(_) => None,
-            FieldKind::CreateMutation { input } => Some(vec![self.get_argument_for_field(input)]),
-            FieldKind::UpdateMutation { id, input } => Some(vec![
-                self.get_argument_for_field(id),
-                self.get_argument_for_field(input),
+            FieldKind::Connection { first, after, .. } => Some(vec![
+                self.registry.arg::<Option<i32>>(first.name(), &()),
+                self.registry.arg::<Option<i32>>(after.name(), &()),
             ]),
-            FieldKind::DeleteMutation { id } => Some(vec![self.get_argument_for_field(id)]),
+            FieldKind::CreateMutation { input } => Some(vec![self.get_domain_arg(input)]),
+            FieldKind::UpdateMutation { id, input } => {
+                Some(vec![self.get_domain_arg(id), self.get_domain_arg(input)])
+            }
+            FieldKind::DeleteMutation { id } => Some(vec![self.get_domain_arg(id)]),
+            FieldKind::Property(_) | FieldKind::Id(_) | FieldKind::Edges | FieldKind::Node => None,
         }
     }
 
-    fn get_argument_for_field(
+    fn get_domain_arg(
         &mut self,
-        argument: &FieldArgument,
+        argument: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        match argument {
-            FieldArgument::Input(type_index, _, typing_purpose) => {
-                self.registry.arg::<IndexedInputValue>(
-                    argument.name(),
-                    &self
-                        .virtual_schema
-                        .indexed_type_info(*type_index, *typing_purpose),
-                )
-            }
-            FieldArgument::Id(operator_id, _typing_purpose) => self.get_operator_argument(
+        match argument.kind() {
+            ArgKind::Def(type_index, _) => self.registry.arg::<IndexedInputValue>(
                 argument.name(),
-                *operator_id,
+                &self
+                    .virtual_schema
+                    .indexed_type_info(type_index, argument.typing_purpose()),
+            ),
+            ArgKind::Operator(operator_id) => self.get_operator_argument(
+                argument.name(),
+                operator_id,
                 None,
                 Optionality::Mandatory,
             ),
