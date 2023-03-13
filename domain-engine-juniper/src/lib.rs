@@ -32,10 +32,13 @@ pub enum SchemaBuildError {
 }
 
 pub fn create_graphql_schema(
-    env: Arc<Env>,
     package_id: PackageId,
+    env: Arc<Env>,
+    config: Arc<domain_engine_core::Config>,
 ) -> Result<Schema, SchemaBuildError> {
-    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(env, package_id)?);
+    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(
+        package_id, env, config,
+    )?);
 
     let schema = Schema::new_with_info(
         templates::query_type::QueryType,

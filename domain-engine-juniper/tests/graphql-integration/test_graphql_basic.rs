@@ -1,6 +1,4 @@
-use domain_engine_juniper::create_graphql_schema;
 use juniper::graphql_value;
-use ontol_test_utils::{TestCompile, TEST_PKG};
 use pretty_assertions::assert_eq;
 use test_log::test;
 
@@ -11,9 +9,7 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".compile_ok(|env| {
-        create_graphql_schema(env, TEST_PKG).unwrap();
-    });
+    "".compile_schema();
 }
 
 #[test(tokio::test)]

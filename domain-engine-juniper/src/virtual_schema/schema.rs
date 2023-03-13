@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use domain_engine_core::Config;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     discriminator::Discriminant,
@@ -31,6 +32,7 @@ use super::{
 /// parsing field arguments, etc.
 pub struct VirtualSchema {
     pub(super) env: Arc<Env>,
+    pub(super) config: Arc<Config>,
     pub(super) _package_id: PackageId,
     pub(super) query: TypeIndex,
     pub(super) mutation: TypeIndex,
@@ -40,13 +42,18 @@ pub struct VirtualSchema {
 
 impl VirtualSchema {
     /// Builds a "shadow schema" before handing that over to juniper
-    pub fn build(env: Arc<Env>, package_id: PackageId) -> Result<Self, SchemaBuildError> {
+    pub fn build(
+        package_id: PackageId,
+        env: Arc<Env>,
+        config: Arc<Config>,
+    ) -> Result<Self, SchemaBuildError> {
         let domain = env
             .find_domain(&package_id)
             .ok_or(SchemaBuildError::UnknownPackage)?;
 
         let mut schema = Self {
             env: env.clone(),
+            config,
             _package_id: package_id,
             query: TypeIndex(0),
             mutation: TypeIndex(0),
@@ -85,6 +92,10 @@ impl VirtualSchema {
 
     pub fn env(&self) -> &Env {
         &self.env
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     pub fn indexed_type_info(

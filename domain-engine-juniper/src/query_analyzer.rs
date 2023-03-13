@@ -48,7 +48,7 @@ pub fn analyze(
                 }
             }
 
-            let limit = 42;
+            let limit = virtual_schema.config().default_limit;
             let cursor = None;
 
             KeyedPropertySelection {

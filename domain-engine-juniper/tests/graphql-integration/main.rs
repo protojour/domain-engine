@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_test_utils::{TestCompile, TEST_PKG};
@@ -14,7 +14,12 @@ impl<T: TestCompile> TestCompileSchema for T {
     fn compile_schema(self) -> TestSchema {
         let env = self.compile_ok(|_| {});
         TestSchema {
-            schema: create_graphql_schema(env, TEST_PKG).unwrap(),
+            schema: create_graphql_schema(
+                TEST_PKG,
+                env,
+                Arc::new(domain_engine_core::Config::default()),
+            )
+            .unwrap(),
         }
     }
 }
