@@ -2,9 +2,8 @@ use juniper::graphql_value;
 use tracing::debug;
 
 use crate::{
-    gql_scalar::GqlScalar, macros::impl_graphql_value, selection_analyzer,
-    type_info::GraphqlTypeName, virtual_registry::VirtualRegistry,
-    virtual_schema::VirtualIndexedTypeInfo,
+    gql_scalar::GqlScalar, macros::impl_graphql_value, query_analyzer, type_info::GraphqlTypeName,
+    virtual_registry::VirtualRegistry, virtual_schema::VirtualIndexedTypeInfo,
 };
 
 pub struct Query;
@@ -44,12 +43,9 @@ impl juniper::GraphQLValueAsync<GqlScalar> for Query {
         Box::pin(async move {
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let selection = selection_analyzer::analyze(
-                &executor.look_ahead(),
-                query_field,
-                &info.virtual_schema,
-            )
-            .selection;
+            let selection =
+                query_analyzer::analyze(&executor.look_ahead(), query_field, &info.virtual_schema)
+                    .selection;
 
             debug!("Executing query {field_name} selection: {selection:?}");
 

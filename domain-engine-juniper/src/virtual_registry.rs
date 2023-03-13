@@ -212,7 +212,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         match field_kind {
             FieldKind::Connection { first, after, .. } => Some(vec![
                 self.registry.arg::<Option<i32>>(first.name(), &()),
-                self.registry.arg::<Option<i32>>(after.name(), &()),
+                self.registry
+                    .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
             FieldKind::CreateMutation { input } => Some(vec![self.get_domain_arg(input)]),
             FieldKind::UpdateMutation { id, input } => {
