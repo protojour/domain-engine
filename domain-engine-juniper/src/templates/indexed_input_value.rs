@@ -6,7 +6,7 @@ use crate::{
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
-        data::{ObjectData, ObjectKind, TypeKind},
+        data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
         VirtualIndexedTypeInfo,
     },
 };
@@ -44,10 +44,33 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     .into_meta()
             }
             TypeKind::Object(ObjectData {
-                kind: ObjectKind::Edge(_edge_data),
-                fields,
+                kind:
+                    ObjectKind::Edge(EdgeData {
+                        node_operator_id,
+                        rel_edge_ref: rel_ref,
+                    }),
+                ..
             }) => {
-                let arguments = reg.convert_fields_to_arguments(fields, info.typing_purpose);
+                debug!("collect edge arguments");
+
+                let mut arguments = vec![];
+                reg.collect_operator_arguments(
+                    *node_operator_id,
+                    &mut arguments,
+                    info.typing_purpose,
+                );
+
+                if let Some(rel_ref) = rel_ref {
+                    arguments.push(juniper::meta::Argument::new(
+                        "_edge",
+                        reg.get_type::<IndexedInputValue>(
+                            TypeRef::mandatory(*rel_ref),
+                            info.typing_purpose,
+                        ),
+                    ));
+                }
+
+                // let arguments = reg.convert_fields_to_arguments(fields, info.typing_purpose);
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()

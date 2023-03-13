@@ -136,7 +136,10 @@ pub struct UnionData {
 
 pub struct ConnectionData {}
 
-pub struct EdgeData {}
+pub struct EdgeData {
+    pub node_operator_id: SerdeOperatorId,
+    pub rel_edge_ref: Option<UnitTypeRef>,
+}
 
 pub struct ScalarData {
     pub serde_operator_id: SerdeOperatorId,

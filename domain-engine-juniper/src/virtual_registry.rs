@@ -59,7 +59,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
     }
 
     /// Convert fields to input arguments
-    pub fn convert_fields_to_arguments(
+    pub fn _convert_fields_to_arguments(
         &mut self,
         fields: &IndexMap<String, FieldData>,
         typing_purpose: TypingPurpose,
@@ -95,7 +95,6 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                         property.value_operator_id,
                         property.rel_params_operator_id,
                         opt,
-                        typing_purpose.child(),
                     ))
                 }
             }
@@ -107,9 +106,22 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     }
                     FilteredVariants::Multi(variants) => {
                         warn!("Multiple variants in union: {variants:#?}");
+                        for variant in variants {
+                            self.collect_operator_arguments(
+                                variant.operator_id,
+                                output,
+                                TypingPurpose::PartialInput,
+                            );
+                        }
                     }
                 }
             }
+            SerdeOperator::Id(id_operator_id) => output.push(self.get_operator_argument(
+                "_id",
+                *id_operator_id,
+                None,
+                Optionality::Optional,
+            )),
             other => {
                 panic!("{other:?}");
             }
@@ -122,7 +134,6 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         operator_id: SerdeOperatorId,
         rel_params: Option<SerdeOperatorId>,
         opt: Optionality,
-        child_typing_purpose: TypingPurpose,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.virtual_schema.env().get_serde_operator(operator_id);
 
@@ -160,13 +171,9 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 self.registry.arg::<bool>(name, &())
                 // registry.arg::<CustomScalar>(name, &()),
             }
-            SerdeOperator::ValueType(value_op) => self.get_operator_argument(
-                name,
-                value_op.inner_operator_id,
-                rel_params,
-                opt,
-                child_typing_purpose,
-            ),
+            SerdeOperator::ValueType(value_op) => {
+                self.get_operator_argument(name, value_op.inner_operator_id, rel_params, opt)
+            }
             SerdeOperator::Union(_union_op) => {
                 // self.register_def_argument(name, union_type.union_def_variant.def_id)
                 todo!()
@@ -228,18 +235,21 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                         .indexed_type_info(*type_index, *typing_purpose),
                 )
             }
-            FieldArgument::Id(operator_id, typing_purpose) => self.get_operator_argument(
+            FieldArgument::Id(operator_id, _typing_purpose) => self.get_operator_argument(
                 argument.name(),
                 *operator_id,
                 None,
                 Optionality::Mandatory,
-                typing_purpose.child(),
             ),
         }
     }
 
     #[inline]
-    fn get_type<I>(&mut self, type_ref: TypeRef, typing_purpose: TypingPurpose) -> juniper::Type<'r>
+    pub fn get_type<I>(
+        &mut self,
+        type_ref: TypeRef,
+        typing_purpose: TypingPurpose,
+    ) -> juniper::Type<'r>
     where
         I: juniper::GraphQLType<GqlScalar>
             + juniper::GraphQLType<GqlScalar, TypeInfo = VirtualIndexedTypeInfo>,

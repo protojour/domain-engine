@@ -1,6 +1,6 @@
 use domain_engine_juniper::create_graphql_schema;
 use juniper::graphql_value;
-use ontol_test_utils::{assert_error_msg, TestCompile, TEST_PKG};
+use ontol_test_utils::{TestCompile, TEST_PKG};
 use pretty_assertions::assert_eq;
 use test_log::test;
 
@@ -119,21 +119,34 @@ async fn test_graphql_artist_and_instrument_connections() {
         })),
     );
 
-    // BUG:
-    assert_error_msg!(
+    assert_eq!(
         r#"
-mutation {
-    createartist(input: {
-        name: "Someone",
-        plays: "invalid"
-    }) {
-        _id
-    }
-}
+        mutation {
+            createartist(input: {
+                name: "Someone",
+                plays: [
+                    {
+                        name: "Instrument",
+                        _edge: {
+                            how_much: "A lot"
+                        }
+                    },
+                    {
+                        _id: "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                        _edge: {
+                            how_much: "A little bit less"
+                        }
+                    }
+                ]
+            }) {
+                _id
+                name
+            }
+        }
         "#
         .exec(&schema)
         .await,
-        r#"Execution: invalid type: string "invalid", expected sequence with minimum length 0 in input at line 4 column 15 (field at line 2 column 4)"#
+        Ok(graphql_value!(None))
     );
 }
 

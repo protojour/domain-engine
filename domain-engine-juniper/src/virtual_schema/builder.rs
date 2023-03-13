@@ -118,7 +118,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 let node_ref = self.get_def_type_ref(def_id, QueryLevel::Node);
 
                 // FIXME: what if some of the relation data's fields are called "node"
-                let mut fields: IndexMap<String, FieldData> = [(
+                let fields: IndexMap<String, FieldData> = [(
                     smart_format!("node"),
                     FieldData::no_args(TypeRef::mandatory(node_ref)),
                 )]
@@ -127,26 +127,51 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 if let Some(rel_params) = rel_params {
                     match self.env.get_serde_operator(rel_params) {
                         SerdeOperator::Map(map_op) => {
-                            self.register_fields(map_op, &mut fields);
+                            let rel_edge_ref =
+                                self.get_def_type_ref(map_op.def_variant.def_id, QueryLevel::Node);
+
+                            let rel_type_info = self.env.get_type_info(map_op.def_variant.def_id);
+                            let rel_typename = &rel_type_info.name;
+
+                            NewType::Indexed(
+                                edge_index,
+                                TypeData {
+                                    typename: smart_format!("{rel_typename}{typename}Edge"),
+                                    input_typename: Some(smart_format!(
+                                        "{rel_typename}{typename}EdgeInput"
+                                    )),
+                                    partial_input_typename: None,
+                                    kind: TypeKind::Object(ObjectData {
+                                        fields,
+                                        kind: ObjectKind::Edge(EdgeData {
+                                            node_operator_id: type_info.operator_id.unwrap(),
+                                            rel_edge_ref: Some(rel_edge_ref),
+                                        }),
+                                    }),
+                                },
+                            )
                         }
                         other => {
                             panic!("Tried to register edge rel_params for {other:?}");
                         }
                     }
+                } else {
+                    NewType::Indexed(
+                        edge_index,
+                        TypeData {
+                            typename: smart_format!("{typename}Edge"),
+                            input_typename: Some(smart_format!("{typename}EdgeInput")),
+                            partial_input_typename: None,
+                            kind: TypeKind::Object(ObjectData {
+                                fields,
+                                kind: ObjectKind::Edge(EdgeData {
+                                    node_operator_id: type_info.operator_id.unwrap(),
+                                    rel_edge_ref: None,
+                                }),
+                            }),
+                        },
+                    )
                 }
-
-                NewType::Indexed(
-                    edge_index,
-                    TypeData {
-                        typename: smart_format!("{typename}Edge"),
-                        input_typename: Some(smart_format!("{typename}EdgeInput")),
-                        partial_input_typename: None,
-                        kind: TypeKind::Object(ObjectData {
-                            fields,
-                            kind: ObjectKind::Edge(EdgeData {}),
-                        }),
-                    },
-                )
             }
             QueryLevel::Connection { rel_params } => {
                 let connection_index = self.alloc_def_type_index(def_id, level);
