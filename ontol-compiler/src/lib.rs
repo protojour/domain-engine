@@ -12,7 +12,7 @@ use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
-    env::{Domain, Env, TypeInfo},
+    env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
     string_types::StringLikeType,
     DataModifier, DefId, DefVariant, PackageId,
@@ -171,14 +171,17 @@ impl<'m> Compiler<'m> {
             let type_namespace = namespaces.remove(&package_id).unwrap().types;
 
             for (type_name, type_def_id) in type_namespace {
-                let entity_id =
+                let entity_info =
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
                         if let Some(id_relation_id) = &properties.id {
                             let (relationship, _) = self
                                 .get_subject_property_meta(type_def_id, *id_relation_id)
                                 .expect("BUG: problem getting property meta");
 
-                            Some(relationship.object.0)
+                            Some(EntityInfo {
+                                id_relation_id: *id_relation_id,
+                                id_value_def_id: relationship.object.0,
+                            })
                         } else {
                             None
                         }
@@ -191,7 +194,7 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     name: type_name,
-                    entity_id,
+                    entity_info,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, full_modifier),
                     )),

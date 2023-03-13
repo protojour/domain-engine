@@ -309,14 +309,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
         let mut fields = IndexMap::default();
 
-        if let Some(entity_id) = type_info.entity_id {
-            let id_type_info = self.env.get_type_info(entity_id);
+        if let Some(entity_info) = &type_info.entity_info {
+            let id_type_info = self.env.get_type_info(entity_info.id_value_def_id);
             let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
             fields.insert(
                 "_id".into(),
                 FieldData {
-                    kind: FieldKind::Id,
+                    kind: FieldKind::Id(entity_info.id_relation_id),
                     field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::ID(
                         id_operator_id,
                     ))),
@@ -336,7 +336,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     fields,
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
-                        entity_id: type_info.entity_id,
+                        entity_id: type_info
+                            .entity_info
+                            .as_ref()
+                            .map(|entity_info| entity_info.id_value_def_id),
                         operator_id,
                     }),
                 }),
@@ -384,7 +387,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             fields.insert(
                                 property_name.clone(),
                                 FieldData {
-                                    kind: FieldKind::Data,
+                                    kind: FieldKind::Property(property.property_id),
                                     field_type: TypeRef::mandatory(edge_ref)
                                         .to_array(Optionality::from_optional(property.optional)),
                                 },
@@ -407,7 +410,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     fields.insert(
                         property_name.clone(),
                         FieldData {
-                            kind: FieldKind::Data,
+                            kind: FieldKind::Property(property.property_id),
                             field_type: TypeRef {
                                 modifier: TypeModifier::new_unit(Optionality::from_optional(
                                     property.optional,
@@ -433,7 +436,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             },
         );
         FieldData {
-            kind: FieldKind::Data,
+            kind: FieldKind::Property(property.property_id),
             field_type: TypeRef {
                 modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
                 unit: unit_ref,

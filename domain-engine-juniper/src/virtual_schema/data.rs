@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{serde::operator::SerdeOperatorId, DefId};
+use ontol_runtime::{serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationId};
 use smartstring::alias::String;
 
 use super::TypingPurpose;
@@ -162,8 +162,8 @@ impl FieldData {
 
 #[derive(Debug)]
 pub enum FieldKind {
-    Data,
-    Id,
+    Property(PropertyId),
+    Id(RelationId),
     Node,
     Edges,
     ConnectionQuery(ConnectionArguments),

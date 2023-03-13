@@ -16,7 +16,7 @@ use crate::{
     string_types::StringLikeType,
     translate::Translator,
     value::{Data, Value},
-    DefId, PackageId,
+    DefId, PackageId, RelationId,
 };
 
 /// Runtime environment
@@ -132,7 +132,7 @@ impl Domain {
             self.info.push(TypeInfo {
                 def_id: DefId(type_info.def_id.0, self.info.len() as u16),
                 name: "".into(),
-                entity_id: None,
+                entity_info: None,
                 operator_id: None,
             });
         }
@@ -147,10 +147,16 @@ pub struct TypeInfo {
 
     pub name: String,
 
-    /// If this type is an entity, this is the type of its ID
-    pub entity_id: Option<DefId>,
+    /// Some if this type is an entity
+    pub entity_info: Option<EntityInfo>,
 
     pub operator_id: Option<SerdeOperatorId>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EntityInfo {
+    pub id_relation_id: RelationId,
+    pub id_value_def_id: DefId,
 }
 
 pub struct EnvBuilder {

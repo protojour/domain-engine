@@ -1,8 +1,6 @@
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use juniper::LookAheadMethods;
-use ontol_runtime::DefId;
-use smartstring::alias::String;
+use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
@@ -15,18 +13,19 @@ use crate::{
 
 /// TODO: An "official" selection data type for domain-engine
 /// TODO: Must index by PropertyId, not string
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum NaiveSelection {
-    Node(IndexMap<String, NaiveSelection>),
-    Union(FnvHashMap<DefId, IndexMap<String, NaiveSelection>>),
+    Node(FnvHashMap<PropertyId, NaiveSelection>),
+    Union(FnvHashMap<DefId, FnvHashMap<PropertyId, NaiveSelection>>),
     Scalar,
+    IdScalar,
 }
 
 pub fn analyze(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     field_data: &FieldData,
     virtual_schema: &VirtualSchema,
-) -> NaiveSelection {
+) -> (PropertyId, NaiveSelection) {
     match (
         &field_data.kind,
         virtual_schema.lookup_type_data(field_data.field_type.unit),
@@ -49,7 +48,7 @@ pub fn analyze(
                 }
             }
 
-            selection.unwrap_or_else(|| NaiveSelection::Node(Default::default()))
+            selection.unwrap_or_else(|| (unit_property(), NaiveSelection::Node(Default::default())))
         }
         (
             FieldKind::Edges,
@@ -69,12 +68,22 @@ pub fn analyze(
                 }
             }
 
-            selection.unwrap_or_else(|| NaiveSelection::Node(Default::default()))
+            selection.unwrap_or_else(|| (unit_property(), NaiveSelection::Node(Default::default())))
         }
-        (FieldKind::Node | FieldKind::Data, Ok(type_data)) => {
-            analyze_data(look_ahead, type_data, virtual_schema)
+        (FieldKind::Node, Ok(type_data)) => (
+            unit_property(),
+            analyze_data(look_ahead, type_data, virtual_schema),
+        ),
+        (FieldKind::Property(property_id), Ok(type_data)) => (
+            *property_id,
+            analyze_data(look_ahead, type_data, virtual_schema),
+        ),
+        (FieldKind::Property(property_id), Err(_scalar_ref)) => {
+            (*property_id, NaiveSelection::Scalar)
         }
-        (FieldKind::Data | FieldKind::Id, Err(_scalar_ref)) => NaiveSelection::Scalar,
+        (FieldKind::Id(relation_id), Err(_scalar_ref)) => {
+            (PropertyId::subject(*relation_id), NaiveSelection::IdScalar)
+        }
         (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
     }
 }
@@ -87,16 +96,16 @@ pub fn analyze_data(
     match &type_data.kind {
         TypeKind::Object(object_data) => match &object_data.kind {
             ObjectKind::Node(_) => {
-                let mut map: IndexMap<String, NaiveSelection> = IndexMap::new();
+                let mut map: FnvHashMap<PropertyId, NaiveSelection> = FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    map.insert(
-                        field_name.into(),
-                        analyze(field_look_ahead, field_data, virtual_schema),
-                    );
+                    let (property, selection) =
+                        analyze(field_look_ahead, field_data, virtual_schema);
+
+                    map.insert(property, selection);
                 }
 
                 NaiveSelection::Node(map)
@@ -110,7 +119,7 @@ pub fn analyze_data(
             ObjectKind::Query | ObjectKind::Mutation => panic!("Bug in virtual schema"),
         },
         TypeKind::Union(union_data) => {
-            let mut union_map: FnvHashMap<DefId, IndexMap<String, NaiveSelection>> =
+            let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, NaiveSelection>> =
                 FnvHashMap::default();
 
             for field_look_ahead in look_ahead.children() {
@@ -148,10 +157,10 @@ pub fn analyze_data(
                     let variant_map = union_map.entry(def_id).or_default();
                     let field_data = fields.get(field_name).unwrap();
 
-                    variant_map.insert(
-                        field_name.into(),
-                        analyze(field_look_ahead, field_data, virtual_schema),
-                    );
+                    let (property, selection) =
+                        analyze(field_look_ahead, field_data, virtual_schema);
+
+                    variant_map.insert(property, selection);
                 }
             }
 
@@ -162,4 +171,8 @@ pub fn analyze_data(
             NaiveSelection::Scalar
         }
     }
+}
+
+const fn unit_property() -> PropertyId {
+    PropertyId::subject(RelationId(DefId::unit()))
 }

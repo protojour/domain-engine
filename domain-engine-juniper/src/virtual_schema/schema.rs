@@ -180,7 +180,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
     match operator {
         SerdeOperator::Map(map_op) => {
             let type_info = env.get_type_info(map_op.def_variant.def_id);
-            let node_classification = if type_info.entity_id.is_some() {
+            let node_classification = if type_info.entity_info.is_some() {
                 NodeClassification::Entity
             } else {
                 NodeClassification::Node

@@ -256,12 +256,12 @@ fn entity_union_in_relation_with_ids() {
         let artist = TypeBinding::new(&env, "artist");
         let plays = artist.find_property("plays").unwrap();
 
-        assert!(artist.type_info.entity_id.is_some());
+        assert!(artist.type_info.entity_info.is_some());
 
         let guitar_id = TypeBinding::new(&env, "guitar_id");
         let synth_id = TypeBinding::new(&env, "synth_id");
 
-        assert!(guitar_id.type_info.entity_id.is_none());
+        assert!(guitar_id.type_info.entity_info.is_none());
 
         let json = json!({
             "name": "Someone",

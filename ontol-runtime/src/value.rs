@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+};
 
 use smartstring::alias::String;
 
@@ -93,21 +96,30 @@ impl<'d> Display for FormatStringData<'d> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PropertyId {
     pub role: Role,
     pub relation_id: RelationId,
 }
 
+impl Debug for PropertyId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("PropertyId")
+            .field(&self.role)
+            .field(&self.relation_id.0)
+            .finish()
+    }
+}
+
 impl PropertyId {
-    pub fn subject(relation_id: RelationId) -> Self {
+    pub const fn subject(relation_id: RelationId) -> Self {
         Self {
             role: Role::Subject,
             relation_id,
         }
     }
 
-    pub fn object(relation_id: RelationId) -> Self {
+    pub const fn object(relation_id: RelationId) -> Self {
         Self {
             role: Role::Object,
             relation_id,

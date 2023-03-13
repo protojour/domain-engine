@@ -209,7 +209,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
         match field_kind {
-            FieldKind::Data | FieldKind::Id | FieldKind::Edges | FieldKind::Node => None,
+            FieldKind::Property(_) | FieldKind::Id(_) | FieldKind::Edges | FieldKind::Node => None,
             FieldKind::ConnectionQuery(_) => None,
             FieldKind::CreateMutation { input } => Some(vec![self.get_argument_for_field(input)]),
             FieldKind::UpdateMutation { id, input } => Some(vec![
