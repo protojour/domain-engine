@@ -35,7 +35,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
             }) => {
                 let mut arguments = vec![];
                 reg.collect_operator_arguments(
-                    node_data.generic_operator_id,
+                    node_data.operator_id,
                     &mut arguments,
                     info.typing_purpose,
                 );

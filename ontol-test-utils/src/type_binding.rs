@@ -38,15 +38,13 @@ impl<'e> TypeBinding<'e> {
 
         debug!(
             "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
-            operator_id = type_info.generic_operator_id,
-            processor = type_info
-                .generic_operator_id
-                .map(|id| env.new_serde_processor(
-                    id,
-                    None,
-                    ProcessorMode::Create,
-                    ProcessorLevel::Root
-                ))
+            operator_id = type_info.operator_id,
+            processor = type_info.operator_id.map(|id| env.new_serde_processor(
+                id,
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root
+            ))
         );
 
         let json_schema = compile_json_schema(env, &type_info);
@@ -63,9 +61,7 @@ impl<'e> TypeBinding<'e> {
     }
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
-        self.type_info
-            .generic_operator_id
-            .expect("No serde operator id")
+        self.type_info.operator_id.expect("No serde operator id")
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {

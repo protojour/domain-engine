@@ -126,7 +126,7 @@ pub enum ObjectKind {
 pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
-    pub generic_operator_id: SerdeOperatorId,
+    pub operator_id: SerdeOperatorId,
 }
 
 pub struct UnionData {

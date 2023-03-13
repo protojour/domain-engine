@@ -26,7 +26,7 @@ pub fn build_openapi_schemas<'e>(
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
-        if let Some(operator_id) = &type_info.generic_operator_id {
+        if let Some(operator_id) = &type_info.operator_id {
             graph_builder.visit(*operator_id, env);
         }
     }
@@ -46,7 +46,7 @@ pub fn build_standalone_schema<'e>(
     let mut graph_builder = SchemaGraphBuilder::default();
 
     let operator_id = type_info
-        .generic_operator_id
+        .operator_id
         .ok_or("no serde operator id available")?;
     graph_builder.visit(operator_id, env);
 

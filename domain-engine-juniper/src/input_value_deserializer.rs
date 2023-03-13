@@ -39,7 +39,7 @@ pub fn deserialize_def_argument(
         arguments,
         name,
         type_info
-            .generic_operator_id
+            .operator_id
             .expect("This type cannot be deserialized"),
         env,
         typing_purpose,

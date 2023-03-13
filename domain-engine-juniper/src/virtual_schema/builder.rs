@@ -175,9 +175,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     fn make_node_type(&mut self, type_info: &TypeInfo) -> NewType {
-        let operator_id = type_info
-            .generic_operator_id
-            .expect("No selection operator id");
+        let operator_id = type_info.operator_id.expect("No selection operator id");
 
         self.make_node_type_inner(type_info, operator_id)
     }
@@ -277,13 +275,13 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
         let typename = type_info.name.as_str();
-        let generic_operator_id = type_info.generic_operator_id.unwrap();
+        let operator_id = type_info.operator_id.unwrap();
 
         let mut fields = IndexMap::default();
 
         if let Some(entity_id) = type_info.entity_id {
             let id_type_info = self.env.get_type_info(entity_id);
-            let id_operator_id = id_type_info.generic_operator_id.expect("No id_operator_id");
+            let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
             fields.insert(
                 "_id".into(),
@@ -307,7 +305,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info.entity_id,
-                        generic_operator_id,
+                        operator_id,
                     }),
                 }),
             },
@@ -416,7 +414,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         );
 
         let id_type_info = self.env.get_type_info(entity_info.id_def_id);
-        let id_operator_id = id_type_info.generic_operator_id.expect("No id_operator_id");
+        let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
         {
             let query = self.schema.object_data_mut(self.schema.query);

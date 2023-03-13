@@ -66,7 +66,7 @@ impl VirtualSchema {
         for (_, def_id) in &domain.type_names {
             let type_info = domain.type_info(*def_id);
 
-            if let Some(operator_id) = type_info.generic_operator_id {
+            if let Some(operator_id) = type_info.operator_id {
                 debug!("adapt type `{name}` {operator_id:?}", name = type_info.name,);
 
                 let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
