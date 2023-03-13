@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::DefId;
@@ -17,7 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub enum NaiveSelection {
     Node(IndexMap<String, NaiveSelection>),
-    Union(IndexMap<DefId, IndexMap<String, NaiveSelection>>),
+    Union(FnvHashMap<DefId, IndexMap<String, NaiveSelection>>),
     Scalar,
 }
 
@@ -42,7 +43,8 @@ pub fn analyze_selection(
             NaiveSelection::Node(map)
         }
         TypeKind::Union(union_data) => {
-            let mut union_map: IndexMap<DefId, IndexMap<String, NaiveSelection>> = IndexMap::new();
+            let mut union_map: FnvHashMap<DefId, IndexMap<String, NaiveSelection>> =
+                FnvHashMap::default();
 
             for field_look_ahead in look_ahead.children() {
                 let field_name = field_look_ahead.field_name();

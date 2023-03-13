@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-
+use fnv::{FnvHashMap, FnvHashSet};
 use tracing::debug;
 
 use crate::{
@@ -29,7 +28,7 @@ impl<'l> PropertyProbe<'l> {
         env: &Env,
         origin: &TypeInfo,
         destination: &TypeInfo,
-    ) -> Option<HashMap<PropertyId, HashSet<PropertyId>>> {
+    ) -> Option<FnvHashMap<PropertyId, FnvHashSet<PropertyId>>> {
         let dest_serde_operator_id = destination.operator_id?;
         let serde_operator = &env.get_serde_operator(dest_serde_operator_id);
 
@@ -43,10 +42,10 @@ impl<'l> PropertyProbe<'l> {
                     .map(|(_, serde_property)| {
                         (
                             serde_property.property_id,
-                            HashSet::from([serde_property.property_id]),
+                            [serde_property.property_id].into_iter().collect(),
                         )
                     })
-                    .collect::<HashMap<_, _>>();
+                    .collect::<FnvHashMap<_, FnvHashSet<_>>>();
 
                 self.prop_stack.stack.push(Props::Map(start_map));
                 self.abstract_vm
@@ -68,8 +67,8 @@ impl<'l> PropertyProbe<'l> {
 
 #[derive(Clone, Debug)]
 enum Props {
-    Set(HashSet<PropertyId>),
-    Map(HashMap<PropertyId, HashSet<PropertyId>>),
+    Set(FnvHashSet<PropertyId>),
+    Map(FnvHashMap<PropertyId, FnvHashSet<PropertyId>>),
 }
 
 #[derive(Default)]
@@ -133,7 +132,7 @@ impl Stack for PropStack {
     }
 
     fn constant(&mut self, _k: i64, _: DefId) {
-        self.stack.push(Props::Set([].into()));
+        self.stack.push(Props::Set(FnvHashSet::default()));
     }
 }
 
@@ -149,7 +148,7 @@ impl PropStack {
     }
 
     #[inline(always)]
-    fn get_map_mut(&mut self, local: Local) -> &mut HashMap<PropertyId, HashSet<PropertyId>> {
+    fn get_map_mut(&mut self, local: Local) -> &mut FnvHashMap<PropertyId, FnvHashSet<PropertyId>> {
         match self.local_mut(local) {
             Props::Map(map) => map,
             Props::Set(_) => panic!("expected map"),
@@ -157,7 +156,7 @@ impl PropStack {
     }
 
     #[inline(always)]
-    fn pop_set(&mut self) -> HashSet<PropertyId> {
+    fn pop_set(&mut self) -> FnvHashSet<PropertyId> {
         match self.stack.pop() {
             Some(Props::Set(set)) => set,
             _ => panic!("expected set"),
