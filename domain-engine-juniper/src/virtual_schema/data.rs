@@ -7,7 +7,7 @@ use super::TypingPurpose;
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct TypeIndex(pub u32);
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 pub enum Optionality {
     #[default]
     Mandatory,
@@ -24,7 +24,7 @@ impl Optionality {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TypeModifier {
     Unit(Optionality),
     Array(Optionality, Optionality),
@@ -43,14 +43,14 @@ impl TypeModifier {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum UnitTypeRef {
     Indexed(TypeIndex),
     ID(SerdeOperatorId),
     NativeScalar(NativeScalarRef),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum NativeScalarRef {
     Unit,
     Bool,
@@ -59,7 +59,7 @@ pub enum NativeScalarRef {
     String(SerdeOperatorId),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TypeRef {
     pub modifier: TypeModifier,
     pub unit: UnitTypeRef,
@@ -145,6 +145,7 @@ pub struct ScalarData {
     pub serde_operator_id: SerdeOperatorId,
 }
 
+#[derive(Debug)]
 pub struct FieldData {
     pub arguments: FieldArguments,
     pub field_type: TypeRef,
@@ -166,6 +167,7 @@ impl FieldData {
     }
 }
 
+#[derive(Debug)]
 pub enum FieldArguments {
     Empty,
     ConnectionQuery,
@@ -181,6 +183,7 @@ pub enum FieldArguments {
     },
 }
 
+#[derive(Debug)]
 pub enum FieldArgument {
     Input(TypeIndex, DefId, TypingPurpose),
     Id(SerdeOperatorId, TypingPurpose),

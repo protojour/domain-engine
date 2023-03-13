@@ -1,17 +1,19 @@
 use indexmap::IndexMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::DefId;
+use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     gql_scalar::GqlScalar,
     virtual_schema::{
-        data::{NodeData, ObjectData, ObjectKind, TypeData, TypeKind, UnionData, UnitTypeRef},
+        data::{FieldData, NodeData, ObjectData, ObjectKind, TypeData, TypeKind, UnitTypeRef},
         VirtualSchema,
     },
 };
 
 /// TODO: An "official" selection data type for domain-engine
+/// TODO: Must index by PropertyId, not string
 #[derive(Debug)]
 pub enum NaiveSelection {
     Node(IndexMap<String, NaiveSelection>),
@@ -28,24 +30,13 @@ pub fn analyze_selection(
         TypeKind::Object(object_data) => {
             let mut map: IndexMap<String, NaiveSelection> = IndexMap::new();
 
-            for child_look_ahead in look_ahead.children() {
-                let field_name = child_look_ahead.field_name();
-                let field_data = object_data.fields.get(field_name).expect("no such field");
+            for field_look_ahead in look_ahead.children() {
+                let field_name = field_look_ahead.field_name();
 
-                match field_data.field_type.unit {
-                    UnitTypeRef::Indexed(type_index) => {
-                        map.insert(
-                            field_name.into(),
-                            analyze_selection(
-                                child_look_ahead,
-                                virtual_schema.type_data(type_index),
-                                virtual_schema,
-                            ),
-                        );
-                    }
-                    UnitTypeRef::ID(_) => (),
-                    UnitTypeRef::NativeScalar(_) => (),
-                }
+                map.insert(
+                    field_name.into(),
+                    analyze_field(field_look_ahead, &object_data.fields, virtual_schema),
+                );
             }
 
             NaiveSelection::Node(map)
@@ -53,33 +44,42 @@ pub fn analyze_selection(
         TypeKind::Union(union_data) => {
             let mut union_map: IndexMap<DefId, IndexMap<String, NaiveSelection>> = IndexMap::new();
 
-            for child_look_ahead in look_ahead.children() {
-                let field_name = child_look_ahead.field_name();
+            for field_look_ahead in look_ahead.children() {
+                let field_name = field_look_ahead.field_name();
 
-                let applies_for = child_look_ahead.applies_for();
+                let applies_for = field_look_ahead.applies_for();
 
                 debug!("union field `{field_name}` applies for: {applies_for:?}",);
 
                 if let Some(applies_for) = applies_for {
-                    let variant_type_data =
-                        find_union_variant_by_typename(union_data, applies_for, virtual_schema)
-                            .expect("BUG: Union variant not found");
+                    let variant_type_data = union_data
+                        .variants
+                        .iter()
+                        .find_map(|type_index| {
+                            let type_data = virtual_schema.type_data(*type_index);
 
-                    let def_id = match &variant_type_data.kind {
+                            if type_data.typename == applies_for {
+                                Some(type_data)
+                            } else {
+                                None
+                            }
+                        })
+                        .expect("BUG: Union variant not found");
+
+                    let (fields, def_id) = match &variant_type_data.kind {
                         TypeKind::Object(ObjectData {
                             kind: ObjectKind::Node(NodeData { def_id, .. }),
-                            ..
-                        }) => *def_id,
+                            fields,
+                        }) => (fields, *def_id),
                         _ => panic!(
                             "Unable to extract def_id from union variant: Not an Object/Node"
                         ),
                     };
 
                     let variant_map = union_map.entry(def_id).or_default();
-
                     variant_map.insert(
                         field_name.into(),
-                        analyze_selection(child_look_ahead, variant_type_data, virtual_schema),
+                        analyze_field(field_look_ahead, fields, virtual_schema),
                     );
                 }
             }
@@ -93,18 +93,27 @@ pub fn analyze_selection(
     }
 }
 
-fn find_union_variant_by_typename<'s>(
-    union_data: &'s UnionData,
-    typename: &str,
-    virtual_schema: &'s VirtualSchema,
-) -> Option<&'s TypeData> {
-    for type_index in &union_data.variants {
-        let type_data = virtual_schema.type_data(*type_index);
+fn analyze_field(
+    field_look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+    field_map: &IndexMap<String, FieldData>,
+    virtual_schema: &VirtualSchema,
+) -> NaiveSelection {
+    let field_name = field_look_ahead.field_name();
+    let field_data = field_map.get(field_name).expect("Field not found");
 
-        if type_data.typename == typename {
-            return Some(type_data);
+    match field_data.field_type.unit {
+        UnitTypeRef::Indexed(type_index) => {
+            let selection = analyze_selection(
+                field_look_ahead,
+                virtual_schema.type_data(type_index),
+                virtual_schema,
+            );
+
+            debug!("{field_name} selection: {selection:?}");
+
+            selection
         }
+        UnitTypeRef::ID(_) => NaiveSelection::Scalar,
+        UnitTypeRef::NativeScalar(_) => NaiveSelection::Scalar,
     }
-
-    None
 }
