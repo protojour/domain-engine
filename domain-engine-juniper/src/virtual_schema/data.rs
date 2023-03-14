@@ -160,8 +160,8 @@ impl FieldData {
 
 #[derive(Debug)]
 pub enum FieldKind {
-    Property(PropertyId),
-    Id(RelationId),
+    Property(PropertyData),
+    Id(IdPropertyData),
     Node,
     Edges,
     Connection {
@@ -179,4 +179,16 @@ pub enum FieldKind {
     DeleteMutation {
         id: argument::Id,
     },
+}
+
+#[derive(Debug)]
+pub struct PropertyData {
+    pub property_id: PropertyId,
+    pub value_operator_id: SerdeOperatorId,
+}
+
+#[derive(Debug)]
+pub struct IdPropertyData {
+    pub relation_id: RelationId,
+    pub operator_id: SerdeOperatorId,
 }

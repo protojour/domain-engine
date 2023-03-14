@@ -157,6 +157,7 @@ pub struct TypeInfo {
 pub struct EntityInfo {
     pub id_relation_id: RelationId,
     pub id_value_def_id: DefId,
+    pub id_operator_id: SerdeOperatorId,
 }
 
 pub struct EnvBuilder {

@@ -134,16 +134,16 @@ pub fn analyze(
             key: unit_property(),
             selection: analyze_data(look_ahead, type_data, virtual_schema),
         },
-        (FieldKind::Property(property_id), Ok(type_data)) => KeyedPropertySelection {
-            key: *property_id,
+        (FieldKind::Property(property_data), Ok(type_data)) => KeyedPropertySelection {
+            key: property_data.property_id,
             selection: analyze_data(look_ahead, type_data, virtual_schema),
         },
-        (FieldKind::Property(property_id), Err(_scalar_ref)) => KeyedPropertySelection {
-            key: *property_id,
+        (FieldKind::Property(property_data), Err(_scalar_ref)) => KeyedPropertySelection {
+            key: property_data.property_id,
             selection: Query::Leaf,
         },
-        (FieldKind::Id(relation_id), Err(_scalar_ref)) => KeyedPropertySelection {
-            key: PropertyId::subject(*relation_id),
+        (FieldKind::Id(id_property_data), Err(_scalar_ref)) => KeyedPropertySelection {
+            key: PropertyId::subject(id_property_data.relation_id),
             selection: Query::Leaf,
         },
         (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),

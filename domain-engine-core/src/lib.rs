@@ -7,7 +7,7 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, MapOrUnionQuery},
     serde::processor::{ProcessorLevel, ProcessorMode},
-    value::Value,
+    value::Attribute,
     DefId, PackageId,
 };
 
@@ -30,12 +30,12 @@ pub trait DomainAPI: Send + Sync + 'static {
         &self,
         package_id: PackageId,
         entity_query: EntityQuery,
-    ) -> Result<Vec<Value>, DomainError>;
+    ) -> Result<Vec<Attribute>, DomainError>;
 }
 
 pub struct DummyDomainAPI {
     env: Arc<Env>,
-    entities: HashMap<DefId, Result<Vec<Value>, DomainError>>,
+    entities: HashMap<DefId, Result<Vec<Attribute>, DomainError>>,
 }
 
 impl DummyDomainAPI {
@@ -63,7 +63,7 @@ impl DummyDomainAPI {
 
         let result = self.entities.entry(type_info.def_id).or_insert(Ok(vec![]));
         match result {
-            Ok(entities) => entities.push(attribute.value),
+            Ok(entities) => entities.push(attribute),
             Err(_) => panic!(),
         }
     }
@@ -75,7 +75,7 @@ impl DomainAPI for DummyDomainAPI {
         &self,
         _: PackageId,
         query: EntityQuery,
-    ) -> Result<Vec<Value>, DomainError> {
+    ) -> Result<Vec<Attribute>, DomainError> {
         match &query.source {
             MapOrUnionQuery::Map(map) => match self.entities.get(&map.def_id) {
                 None => Ok(vec![]),

@@ -181,6 +181,12 @@ impl<'m> Compiler<'m> {
                             Some(EntityInfo {
                                 id_relation_id: *id_relation_id,
                                 id_value_def_id: relationship.object.0,
+                                id_operator_id: serde_generator
+                                    .get_serde_operator_id(SerdeKey::Def(DefVariant::new(
+                                        relationship.object.0,
+                                        DataModifier::IDENTITY,
+                                    )))
+                                    .unwrap(),
                             })
                         } else {
                             None

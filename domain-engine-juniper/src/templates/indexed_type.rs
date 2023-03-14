@@ -1,18 +1,27 @@
+use std::collections::BTreeMap;
+
+use juniper::graphql_value;
+use ontol_runtime::{
+    value::{Attribute, Data, PropertyId, Value},
+    DefId,
+};
+use tracing::debug;
+
 use crate::{
     gql_scalar::GqlScalar,
     resolve::resolve_value,
     type_info::GraphqlTypeName,
-    value_serializer::SerializedValue,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
-        data::{FieldKind, TypeKind},
+        data::{FieldKind, ObjectKind, TypeKind},
         TypingPurpose, VirtualIndexedTypeInfo,
     },
     GqlContext,
 };
 
+#[derive(Clone, Copy)]
 pub struct IndexedType<'v> {
-    pub value: &'v SerializedValue,
+    pub attr: &'v Attribute,
 }
 
 impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
@@ -22,6 +31,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
     fn type_name<'i>(&self, type_info: &'i Self::TypeInfo) -> Option<&'i str> {
         Some(type_info.graphql_type_name())
     }
+
     fn resolve_field(
         &self,
         info: &Self::TypeInfo,
@@ -34,25 +44,80 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
             TypeKind::Object(object_data) => {
                 let field_data = object_data.fields.get(field_name).unwrap();
 
-                match (self.value, &field_data.kind) {
-                    (SerializedValue::Map(_, _map), FieldKind::Property(_property_id)) => {
-                        todo!("property");
-                    }
-                    (SerializedValue::Connection(values), FieldKind::Edges) => {
+                debug!("resolve field {field_name}");
+
+                match (&field_data.kind, &object_data.kind, &self.attr.value.data) {
+                    (FieldKind::Edges, _, Data::Sequence(attributes)) => {
                         let type_index = virtual_schema
                             .lookup_type_index(field_data.field_type.unit)
                             .unwrap();
 
                         resolve_value(
-                            values
+                            attributes
                                 .iter()
-                                .map(|value| IndexedType { value })
+                                .map(|attribute| IndexedType { attr: attribute })
                                 .collect::<Vec<_>>(),
                             virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
                             executor,
                         )
                     }
-                    other => panic!("unhandled combination: {other:?}"),
+                    (FieldKind::Node, _, Data::Map(_)) => {
+                        let type_index = virtual_schema
+                            .lookup_type_index(field_data.field_type.unit)
+                            .unwrap();
+
+                        resolve_value(
+                            self,
+                            virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
+                            executor,
+                        )
+                    }
+                    (
+                        FieldKind::Connection {
+                            property_id: Some(property_id),
+                            ..
+                        },
+                        _,
+                        Data::Map(map),
+                    ) => {
+                        let type_info = virtual_schema.indexed_type_info(
+                            virtual_schema
+                                .lookup_type_index(field_data.field_type.unit)
+                                .unwrap(),
+                            TypingPurpose::Selection,
+                        );
+
+                        match map.get(property_id) {
+                            Some(attribute) => {
+                                resolve_value(IndexedType { attr: attribute }, type_info, executor)
+                            }
+                            None => {
+                                let empty = Attribute {
+                                    value: Value::new(Data::Sequence(vec![]), DefId::unit()),
+                                    rel_params: Value::unit(),
+                                };
+
+                                resolve_value(IndexedType { attr: &empty }, type_info, executor)
+                            }
+                        }
+                    }
+                    (
+                        FieldKind::Property(property_data),
+                        ObjectKind::Node(_node_data),
+                        Data::Map(map),
+                    ) => {
+                        debug!("lookup property {field_name}");
+                        resolve_property(map, property_data.property_id)
+                    }
+                    (
+                        FieldKind::Id(_id_property_data),
+                        ObjectKind::Node(_node_data),
+                        Data::Map(_map),
+                    ) => {
+                        //resolve_property(map, PropertyId::subject(id_property_data.relation_id)),
+                        Ok(graphql_value!("FIXME/test_id"))
+                    }
+                    (field, _, value) => panic!("unhandled combination: ({field:?} ? {value:?})"),
                 }
             }
             TypeKind::Union(_) => todo!("union"),
@@ -125,3 +190,15 @@ impl<'v> juniper::GraphQLValueAsync<GqlScalar> for IndexedType<'v> {
     }
 }
 */
+
+fn resolve_property(
+    map: &BTreeMap<PropertyId, Attribute>,
+    property_id: PropertyId,
+) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+    match map.get(&property_id) {
+        Some(_attribute) => {
+            panic!("existing property");
+        }
+        None => Ok(graphql_value!(None)),
+    }
+}

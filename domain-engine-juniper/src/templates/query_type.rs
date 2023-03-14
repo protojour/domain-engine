@@ -1,3 +1,7 @@
+use ontol_runtime::{
+    value::{Attribute, Data, Value},
+    DefId,
+};
 use tracing::debug;
 
 use crate::{
@@ -7,7 +11,6 @@ use crate::{
     resolve::resolve_value,
     templates::indexed_type::IndexedType,
     type_info::GraphqlTypeName,
-    value_serializer::ValueSerializer,
     virtual_registry::VirtualRegistry,
     virtual_schema::{TypingPurpose, VirtualIndexedTypeInfo},
 };
@@ -58,22 +61,21 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             debug!("Executing query {field_name}: {entity_query:#?}");
 
-            let entities = virtual_schema
+            let entity_attributes = virtual_schema
                 .domain_api()
                 .query_entities(virtual_schema.package_id(), entity_query)
                 .await?;
 
-            let value_serializer = ValueSerializer::new(virtual_schema);
-            let operator_id = value_serializer
-                .find_operator_id(query_field)
-                .expect("found no operator");
-            let serialized_value = value_serializer.serialize_values(entities, operator_id);
+            let attribute = Attribute {
+                value: Value::new(Data::Sequence(entity_attributes), DefId::unit()),
+                rel_params: Value::unit(),
+            };
+
+            debug!("query result: {attribute:#?}");
 
             match virtual_schema.lookup_type_index(query_field.field_type.unit) {
                 Ok(type_index) => resolve_value(
-                    IndexedType {
-                        value: &serialized_value,
-                    },
+                    IndexedType { attr: &attribute },
                     virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
                     executor,
                 ),

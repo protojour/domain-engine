@@ -15,9 +15,9 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 use super::{
     argument,
     data::{
-        EdgeData, FieldData, FieldKind, NativeScalarRef, NodeData, ObjectData, ObjectKind,
-        Optionality, ScalarData, TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData,
-        UnitTypeRef,
+        EdgeData, FieldData, FieldKind, IdPropertyData, NativeScalarRef, NodeData, ObjectData,
+        ObjectKind, Optionality, PropertyData, ScalarData, TypeData, TypeIndex, TypeKind,
+        TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -317,7 +317,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
             fields.insert(
                 "_id".into(),
                 FieldData {
-                    kind: FieldKind::Id(entity_info.id_relation_id),
+                    kind: FieldKind::Id(IdPropertyData {
+                        relation_id: entity_info.id_relation_id,
+                        operator_id: entity_info.id_operator_id,
+                    }),
                     field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::ID(
                         id_operator_id,
                     ))),
@@ -392,10 +395,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                     rel_params: property.rel_params_operator_id,
                                 },
                             );
+
                             fields.insert(
                                 property_name.clone(),
                                 FieldData {
-                                    kind: FieldKind::Property(property.property_id),
+                                    kind: FieldKind::Property(PropertyData {
+                                        property_id: property.property_id,
+                                        value_operator_id: property.value_operator_id,
+                                    }),
                                     field_type: TypeRef::mandatory(edge_ref)
                                         .to_array(Optionality::from_optional(property.optional)),
                                 },
@@ -418,7 +425,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     fields.insert(
                         property_name.clone(),
                         FieldData {
-                            kind: FieldKind::Property(property.property_id),
+                            kind: FieldKind::Property(PropertyData {
+                                property_id: property.property_id,
+                                value_operator_id: property.value_operator_id,
+                            }),
                             field_type: TypeRef {
                                 modifier: TypeModifier::new_unit(Optionality::from_optional(
                                     property.optional,
@@ -444,7 +454,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
             },
         );
         FieldData {
-            kind: FieldKind::Property(property.property_id),
+            kind: FieldKind::Property(PropertyData {
+                property_id: property.property_id,
+                value_operator_id: property.value_operator_id,
+            }),
             field_type: TypeRef {
                 modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
                 unit: unit_ref,

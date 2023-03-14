@@ -91,7 +91,14 @@ async fn test_graphql_artist_and_instrument_connections() {
         .await,
         Ok(graphql_value!({
             "artistList": {
-                "edges": [],
+                "edges": [{
+                    "node": {
+                        "_id": "FIXME/test_id",
+                        "plays": {
+                            "edges": []
+                        }
+                    }
+                }],
             },
         })),
     );
