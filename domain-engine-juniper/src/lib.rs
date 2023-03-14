@@ -8,6 +8,7 @@ pub mod gql_scalar;
 mod virtual_schema;
 
 mod input_value_deserializer;
+mod look_ahead_utils;
 mod macros;
 mod query_analyzer;
 mod templates;

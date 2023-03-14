@@ -5,11 +5,14 @@ use ontol_runtime::{
     value::PropertyId,
     DefId, RelationId,
 };
+use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     gql_scalar::GqlScalar,
+    look_ahead_utils::ArgsWrapper,
     virtual_schema::{
+        argument::FieldArg,
         data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
         VirtualSchema,
     },
@@ -30,7 +33,11 @@ pub fn analyze(
         virtual_schema.lookup_type_data(field_data.field_type.unit),
     ) {
         (
-            FieldKind::Connection { property_id, .. },
+            FieldKind::Connection {
+                property_id,
+                first,
+                after,
+            },
             Ok(TypeData {
                 kind: TypeKind::Object(object_data),
                 ..
@@ -48,8 +55,14 @@ pub fn analyze(
                 }
             }
 
-            let limit = virtual_schema.config().default_limit;
-            let cursor = None;
+            let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+
+            let limit = args_wrapper
+                .deserialize::<u32>(first.name())
+                .unwrap()
+                .unwrap_or_else(|| virtual_schema.config().default_limit)
+                .into();
+            let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
             KeyedPropertySelection {
                 key: property_id.unwrap_or(unit_property()),
