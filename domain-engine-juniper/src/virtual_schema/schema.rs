@@ -121,6 +121,19 @@ impl VirtualSchema {
         }
     }
 
+    pub fn indexed_type_info_by_unit(
+        self: &Arc<Self>,
+        type_ref: UnitTypeRef,
+        typing_purpose: TypingPurpose,
+    ) -> Result<VirtualIndexedTypeInfo, NativeScalarRef> {
+        self.lookup_type_index(type_ref)
+            .map(|type_index| VirtualIndexedTypeInfo {
+                virtual_schema: self.clone(),
+                type_index,
+                typing_purpose,
+            })
+    }
+
     pub fn query_type_info(self: &Arc<Self>) -> VirtualIndexedTypeInfo {
         self.indexed_type_info(self.query, TypingPurpose::Selection)
     }

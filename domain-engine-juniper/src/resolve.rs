@@ -1,6 +1,6 @@
 use crate::virtual_schema::VirtualIndexedTypeInfo;
 
-pub fn resolve_value<'e, T, C, S>(
+pub fn resolve_indexed_type<'e, T, C, S>(
     value: T,
     sub_type_info: VirtualIndexedTypeInfo,
     executor: &juniper::Executor<'e, 'e, C, S>,

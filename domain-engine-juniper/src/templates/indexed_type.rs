@@ -9,7 +9,7 @@ use tracing::debug;
 
 use crate::{
     gql_scalar::GqlScalar,
-    resolve::resolve_value,
+    resolve::resolve_indexed_type,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
@@ -43,35 +43,27 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {
                 let field_data = object_data.fields.get(field_name).unwrap();
+                let unit_type_ref = field_data.field_type.unit;
 
                 debug!("resolve field {field_name}");
 
                 match (&field_data.kind, &object_data.kind, &self.attr.value.data) {
-                    (FieldKind::Edges, _, Data::Sequence(attributes)) => {
-                        let type_index = virtual_schema
-                            .lookup_type_index(field_data.field_type.unit)
-                            .unwrap();
-
-                        resolve_value(
-                            attributes
-                                .iter()
-                                .map(|attribute| IndexedType { attr: attribute })
-                                .collect::<Vec<_>>(),
-                            virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
-                            executor,
-                        )
-                    }
-                    (FieldKind::Node, _, Data::Map(_)) => {
-                        let type_index = virtual_schema
-                            .lookup_type_index(field_data.field_type.unit)
-                            .unwrap();
-
-                        resolve_value(
-                            self,
-                            virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
-                            executor,
-                        )
-                    }
+                    (FieldKind::Edges, _, Data::Sequence(seq)) => resolve_indexed_type(
+                        seq.iter()
+                            .map(|attribute| IndexedType { attr: attribute })
+                            .collect::<Vec<_>>(),
+                        virtual_schema
+                            .indexed_type_info_by_unit(unit_type_ref, TypingPurpose::Selection)
+                            .unwrap(),
+                        executor,
+                    ),
+                    (FieldKind::Node, _, Data::Map(_)) => resolve_indexed_type(
+                        self,
+                        virtual_schema
+                            .indexed_type_info_by_unit(unit_type_ref, TypingPurpose::Selection)
+                            .unwrap(),
+                        executor,
+                    ),
                     (
                         FieldKind::Connection {
                             property_id: Some(property_id),
@@ -80,24 +72,27 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
                         _,
                         Data::Map(map),
                     ) => {
-                        let type_info = virtual_schema.indexed_type_info(
-                            virtual_schema
-                                .lookup_type_index(field_data.field_type.unit)
-                                .unwrap(),
-                            TypingPurpose::Selection,
-                        );
+                        let type_info = virtual_schema
+                            .indexed_type_info_by_unit(unit_type_ref, TypingPurpose::Selection)
+                            .unwrap();
 
                         match map.get(property_id) {
-                            Some(attribute) => {
-                                resolve_value(IndexedType { attr: attribute }, type_info, executor)
-                            }
+                            Some(attribute) => resolve_indexed_type(
+                                IndexedType { attr: attribute },
+                                type_info,
+                                executor,
+                            ),
                             None => {
                                 let empty = Attribute {
                                     value: Value::new(Data::Sequence(vec![]), DefId::unit()),
                                     rel_params: Value::unit(),
                                 };
 
-                                resolve_value(IndexedType { attr: &empty }, type_info, executor)
+                                resolve_indexed_type(
+                                    IndexedType { attr: &empty },
+                                    type_info,
+                                    executor,
+                                )
                             }
                         }
                     }
@@ -107,7 +102,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
                         Data::Map(map),
                     ) => {
                         debug!("lookup property {field_name}");
-                        resolve_property(map, property_data.property_id)
+                        resolve_property(map, property_data.property_id, executor)
                     }
                     (
                         FieldKind::Id(_id_property_data),
@@ -194,6 +189,7 @@ impl<'v> juniper::GraphQLValueAsync<GqlScalar> for IndexedType<'v> {
 fn resolve_property(
     map: &BTreeMap<PropertyId, Attribute>,
     property_id: PropertyId,
+    _executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
 ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
     match map.get(&property_id) {
         Some(_attribute) => {

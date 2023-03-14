@@ -8,7 +8,7 @@ use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     query_analyzer,
-    resolve::resolve_value,
+    resolve::resolve_indexed_type,
     templates::indexed_type::IndexedType,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
@@ -74,7 +74,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             debug!("query result: {attribute:#?}");
 
             match virtual_schema.lookup_type_index(query_field.field_type.unit) {
-                Ok(type_index) => resolve_value(
+                Ok(type_index) => resolve_indexed_type(
                     IndexedType { attr: &attribute },
                     virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
                     executor,
