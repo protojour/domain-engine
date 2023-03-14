@@ -1,8 +1,9 @@
+use juniper::LookAheadMethods;
 use tracing::debug;
 
 use crate::{
     gql_scalar::GqlScalar,
-    input_value_deserializer::deserialize_argument,
+    look_ahead_utils::ArgsWrapper,
     macros::impl_graphql_value,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
@@ -40,25 +41,28 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
         &'a self,
         info: &'a Self::TypeInfo,
         field_name: &'a str,
-        arguments: &'a juniper::Arguments<GqlScalar>,
-        _executor: &'a juniper::Executor<Self::Context, GqlScalar>,
+        _arguments: &'a juniper::Arguments<GqlScalar>,
+        executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let mutation_field = info.type_data().fields().unwrap().get(field_name).unwrap();
-            match &mutation_field.kind {
+            let look_ahead = executor.look_ahead();
+            let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+
+            let field_data = info.type_data().fields().unwrap().get(field_name).unwrap();
+            match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
-                    let input_value = deserialize_argument(input, arguments, info.env())?;
+                    let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
                     debug!("CREATE {input_value:?}");
                 }
                 FieldKind::UpdateMutation { id, input } => {
-                    let id_value = deserialize_argument(id, arguments, info.env())?;
-                    let input_value = deserialize_argument(input, arguments, info.env())?;
+                    let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
+                    let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
                     debug!("UPDATE {id_value:?}: {input_value:?}");
                 }
                 FieldKind::DeleteMutation { id } => {
-                    let id_value = deserialize_argument(id, arguments, info.env())?;
+                    let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
 
                     debug!("DELETE {id_value:?}");
                 }
