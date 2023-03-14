@@ -5,6 +5,7 @@ use crate::{
     gql_scalar::GqlScalar,
     look_ahead_utils::ArgsWrapper,
     macros::impl_graphql_value,
+    query_analyzer,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{data::FieldKind, VirtualIndexedTypeInfo},
@@ -47,19 +48,27 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
         Box::pin(async move {
             let look_ahead = executor.look_ahead();
             let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
-
             let field_data = info.type_data().fields().unwrap().get(field_name).unwrap();
+
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    debug!("CREATE {input_value:?}");
+                    let selection =
+                        query_analyzer::analyze(&look_ahead, field_data, &info.virtual_schema)
+                            .selection;
+
+                    debug!("CREATE {input_value:#?} -> {selection:#?}");
                 }
                 FieldKind::UpdateMutation { id, input } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    debug!("UPDATE {id_value:?}: {input_value:?}");
+                    let selection =
+                        query_analyzer::analyze(&look_ahead, field_data, &info.virtual_schema)
+                            .selection;
+
+                    debug!("UPDATE {id_value:?} -> {input_value:#?} -> {selection:#?}");
                 }
                 FieldKind::DeleteMutation { id } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;

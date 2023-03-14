@@ -109,7 +109,10 @@ pub fn analyze(
                 selection: PropertySelection::Leaf,
             })
         }
-        (FieldKind::Node, Ok(type_data)) => KeyedPropertySelection {
+        (
+            FieldKind::Node | FieldKind::CreateMutation { .. } | FieldKind::UpdateMutation { .. },
+            Ok(type_data),
+        ) => KeyedPropertySelection {
             key: unit_property(),
             selection: analyze_data(look_ahead, type_data, virtual_schema),
         },

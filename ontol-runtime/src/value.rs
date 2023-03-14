@@ -104,10 +104,11 @@ pub struct PropertyId {
 
 impl Debug for PropertyId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("PropertyId")
-            .field(&self.role)
-            .field(&self.relation_id.0)
-            .finish()
+        write!(
+            f,
+            "PropertyId({:?}, {:?}, {:?})",
+            self.role, self.relation_id.0 .0 .0, self.relation_id.0 .1
+        )
     }
 }
 
