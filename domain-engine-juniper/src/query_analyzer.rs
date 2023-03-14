@@ -41,7 +41,7 @@ pub fn analyze_map_query(
 ) -> MapOrUnionQuery {
     match analyze(look_ahead, field_data, virtual_schema).selection {
         Query::Map(map) => MapOrUnionQuery::Map(map),
-        Query::MapUnion(union) => MapOrUnionQuery::Union(union),
+        Query::MapUnion(def_id, variants) => MapOrUnionQuery::Union(def_id, variants),
         query => panic!("BUG: not a map query: {query:?}"),
     }
 }
@@ -94,8 +94,8 @@ pub fn analyze(
                         limit,
                         cursor,
                     }),
-                    Some(Query::MapUnion(objects)) => Query::Entity(EntityQuery {
-                        source: MapOrUnionQuery::Union(objects),
+                    Some(Query::MapUnion(def_id, variants)) => Query::Entity(EntityQuery {
+                        source: MapOrUnionQuery::Union(def_id, variants),
                         limit,
                         cursor,
                     }),
@@ -231,6 +231,7 @@ pub fn analyze_data(
             }
 
             Query::MapUnion(
+                union_data.union_def_id,
                 union_map
                     .into_iter()
                     .map(|(def_id, properties)| MapQuery { def_id, properties })

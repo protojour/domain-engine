@@ -7,7 +7,7 @@ use crate::{value::PropertyId, DefId};
 pub enum Query {
     Leaf,
     Map(MapQuery),
-    MapUnion(Vec<MapQuery>),
+    MapUnion(DefId, Vec<MapQuery>),
     Entity(EntityQuery),
 }
 
@@ -21,7 +21,16 @@ pub struct EntityQuery {
 #[derive(Debug)]
 pub enum MapOrUnionQuery {
     Map(MapQuery),
-    Union(Vec<MapQuery>),
+    Union(DefId, Vec<MapQuery>),
+}
+
+impl MapOrUnionQuery {
+    pub fn def_id(&self) -> DefId {
+        match self {
+            Self::Map(map) => map.def_id,
+            Self::Union(def_id, _) => *def_id,
+        }
+    }
 }
 
 #[derive(Debug)]

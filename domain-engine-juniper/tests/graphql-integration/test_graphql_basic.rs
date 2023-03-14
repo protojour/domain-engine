@@ -36,7 +36,7 @@ async fn test_graphql_basic_schema() {
         .await,
         Ok(graphql_value!({
             "fooList": {
-                "edges": None,
+                "edges": [],
             },
         })),
     );
@@ -83,7 +83,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         .await,
         Ok(graphql_value!({
             "artistList": {
-                "edges": None,
+                "edges": [],
             },
         })),
     );
@@ -110,7 +110,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         .await,
         Ok(graphql_value!({
             "instrumentList": {
-                "edges": None
+                "edges": []
             },
         })),
     );
@@ -176,7 +176,7 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
         .await,
         Ok(graphql_value!({
             "artistList": {
-                "edges": None
+                "edges": []
             },
         })),
     );

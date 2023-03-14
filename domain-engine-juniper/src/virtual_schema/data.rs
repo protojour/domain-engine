@@ -75,7 +75,7 @@ impl TypeRef {
 
     pub fn _optional(unit: UnitTypeRef) -> Self {
         Self {
-            modifier: TypeModifier::Unit(Optionality::Mandatory),
+            modifier: TypeModifier::Unit(Optionality::Optional),
             unit,
         }
     }

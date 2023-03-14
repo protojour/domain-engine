@@ -1,9 +1,15 @@
-use juniper::graphql_value;
 use tracing::debug;
 
 use crate::{
-    gql_scalar::GqlScalar, macros::impl_graphql_value, query_analyzer, type_info::GraphqlTypeName,
-    virtual_registry::VirtualRegistry, virtual_schema::VirtualIndexedTypeInfo,
+    gql_scalar::GqlScalar,
+    macros::impl_graphql_value,
+    query_analyzer,
+    resolve::resolve_value,
+    templates::indexed_type::IndexedType,
+    type_info::GraphqlTypeName,
+    value_serializer::ValueSerializer,
+    virtual_registry::VirtualRegistry,
+    virtual_schema::{TypingPurpose, VirtualIndexedTypeInfo},
 };
 
 pub struct QueryType;
@@ -52,12 +58,27 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             debug!("Executing query {field_name}: {entity_query:#?}");
 
-            let _entities = virtual_schema
+            let entities = virtual_schema
                 .domain_api()
                 .query_entities(virtual_schema.package_id(), entity_query)
                 .await?;
 
-            Ok(graphql_value!({ "edges": None }))
+            let value_serializer = ValueSerializer::new(virtual_schema);
+            let operator_id = value_serializer
+                .find_operator_id(query_field)
+                .expect("found no operator");
+            let serialized_value = value_serializer.serialize_values(entities, operator_id);
+
+            match virtual_schema.lookup_type_index(query_field.field_type.unit) {
+                Ok(type_index) => resolve_value(
+                    IndexedType {
+                        value: &serialized_value,
+                    },
+                    virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
+                    executor,
+                ),
+                Err(_) => panic!(),
+            }
         })
     }
 }

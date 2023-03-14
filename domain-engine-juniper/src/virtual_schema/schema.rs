@@ -133,11 +133,16 @@ impl VirtualSchema {
         &self.types[type_index.0 as usize]
     }
 
-    pub fn lookup_type_data(&self, type_ref: UnitTypeRef) -> Result<&TypeData, NativeScalarRef> {
+    pub fn lookup_type_index(&self, type_ref: UnitTypeRef) -> Result<TypeIndex, NativeScalarRef> {
         match type_ref {
-            UnitTypeRef::Indexed(type_index) => Ok(self.type_data(type_index)),
+            UnitTypeRef::Indexed(type_index) => Ok(type_index),
             UnitTypeRef::Scalar(scalar_ref) => Err(scalar_ref),
         }
+    }
+
+    pub fn lookup_type_data(&self, type_ref: UnitTypeRef) -> Result<&TypeData, NativeScalarRef> {
+        self.lookup_type_index(type_ref)
+            .map(|type_index| self.type_data(type_index))
     }
 
     pub fn type_index_by_def(&self, def_id: DefId, query_level: QueryLevel) -> Option<TypeIndex> {

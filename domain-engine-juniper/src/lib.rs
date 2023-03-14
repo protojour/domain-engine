@@ -11,8 +11,10 @@ mod virtual_schema;
 mod look_ahead_utils;
 mod macros;
 mod query_analyzer;
+mod resolve;
 mod templates;
 mod type_info;
+mod value_serializer;
 mod virtual_registry;
 
 pub struct GqlContext;
