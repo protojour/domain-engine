@@ -60,8 +60,7 @@ pub fn analyze(
             let limit = args_wrapper
                 .deserialize::<u32>(first.name())
                 .unwrap()
-                .unwrap_or_else(|| virtual_schema.config().default_limit)
-                .into();
+                .unwrap_or_else(|| virtual_schema.config().default_limit);
             let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
             KeyedPropertySelection {
