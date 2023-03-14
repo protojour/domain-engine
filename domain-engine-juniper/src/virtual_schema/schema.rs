@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::Config;
+use domain_engine_core::{Config, DomainAPI};
 use fnv::FnvHashMap;
 use ontol_runtime::{
     discriminator::Discriminant,
@@ -32,8 +32,9 @@ use super::{
 /// parsing field arguments, etc.
 pub struct VirtualSchema {
     pub(super) env: Arc<Env>,
+    pub(super) domain_api: Arc<dyn DomainAPI>,
     pub(super) config: Arc<Config>,
-    pub(super) _package_id: PackageId,
+    pub(super) package_id: PackageId,
     pub(super) query: TypeIndex,
     pub(super) mutation: TypeIndex,
     pub(super) types: Vec<TypeData>,
@@ -45,6 +46,7 @@ impl VirtualSchema {
     pub fn build(
         package_id: PackageId,
         env: Arc<Env>,
+        domain_api: Arc<dyn DomainAPI>,
         config: Arc<Config>,
     ) -> Result<Self, SchemaBuildError> {
         let domain = env
@@ -53,8 +55,9 @@ impl VirtualSchema {
 
         let mut schema = Self {
             env: env.clone(),
+            domain_api,
             config,
-            _package_id: package_id,
+            package_id,
             query: TypeIndex(0),
             mutation: TypeIndex(0),
             types: Vec::with_capacity(domain.type_names.len()),
@@ -94,8 +97,16 @@ impl VirtualSchema {
         &self.env
     }
 
+    pub fn domain_api(&self) -> &dyn DomainAPI {
+        self.domain_api.as_ref()
+    }
+
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    pub fn package_id(&self) -> PackageId {
+        self.package_id
     }
 
     pub fn indexed_type_info(

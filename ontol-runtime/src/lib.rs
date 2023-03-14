@@ -10,6 +10,7 @@ pub mod json_schema;
 pub mod proc;
 pub mod property_probe;
 pub mod query;
+pub mod query_translate;
 pub mod serde;
 pub mod string_pattern;
 pub mod string_types;

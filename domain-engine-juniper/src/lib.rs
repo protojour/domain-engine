@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use domain_engine_core::DomainAPI;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 use tracing::debug;
@@ -34,10 +35,11 @@ pub enum SchemaBuildError {
 pub fn create_graphql_schema(
     package_id: PackageId,
     env: Arc<Env>,
+    domain_api: Arc<dyn DomainAPI>,
     config: Arc<domain_engine_core::Config>,
 ) -> Result<Schema, SchemaBuildError> {
     let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(
-        package_id, env, config,
+        package_id, env, domain_api, config,
     )?);
 
     let schema = Schema::new_with_info(

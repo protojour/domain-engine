@@ -41,15 +41,21 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
+            let virtual_schema = &info.virtual_schema;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
             let entity_query = query_analyzer::analyze_entity_query(
                 &executor.look_ahead(),
                 query_field,
-                &info.virtual_schema,
+                virtual_schema,
             );
 
             debug!("Executing query {field_name}: {entity_query:#?}");
+
+            let _entities = virtual_schema
+                .domain_api()
+                .query_entities(virtual_schema.package_id(), entity_query)
+                .await?;
 
             Ok(graphql_value!({ "edges": None }))
         })

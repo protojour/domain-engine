@@ -11,5 +11,7 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
+async-trait = "0.1"
+thiserror = "1"
 
 [dev-dependencies]
