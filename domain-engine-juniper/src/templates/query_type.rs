@@ -1,5 +1,4 @@
 use juniper::graphql_value;
-use ontol_runtime::query::PropertySelection;
 use tracing::debug;
 
 use crate::{
@@ -44,14 +43,11 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
         Box::pin(async move {
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let selection =
-                query_analyzer::analyze(&executor.look_ahead(), query_field, &info.virtual_schema)
-                    .selection;
-
-            let entity_query = match selection {
-                PropertySelection::EntityQuery(query) => query,
-                other => panic!("Not an entity query: {other:?}"),
-            };
+            let entity_query = query_analyzer::analyze_entity_query(
+                &executor.look_ahead(),
+                query_field,
+                &info.virtual_schema,
+            );
 
             debug!("Executing query {field_name}: {entity_query:#?}");
 

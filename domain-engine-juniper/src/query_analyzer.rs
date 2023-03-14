@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
-    query::{EntityQuery, EntityQuerySource, ObjectSource, PropertySelection},
+    query::{EntityQuery, MapOrUnionQuery, MapQuery, Query},
     value::PropertyId,
     DefId, RelationId,
 };
@@ -20,7 +20,30 @@ use crate::{
 
 pub struct KeyedPropertySelection {
     pub key: PropertyId,
-    pub selection: PropertySelection,
+    pub selection: Query,
+}
+
+pub fn analyze_entity_query(
+    look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+    field_data: &FieldData,
+    virtual_schema: &VirtualSchema,
+) -> EntityQuery {
+    match analyze(look_ahead, field_data, virtual_schema).selection {
+        Query::Entity(entity_query) => entity_query,
+        query => panic!("BUG: not an entity query: {query:?}"),
+    }
+}
+
+pub fn analyze_map_query(
+    look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+    field_data: &FieldData,
+    virtual_schema: &VirtualSchema,
+) -> MapOrUnionQuery {
+    match analyze(look_ahead, field_data, virtual_schema).selection {
+        Query::Map(map) => MapOrUnionQuery::Map(map),
+        Query::MapUnion(union) => MapOrUnionQuery::Union(union),
+        query => panic!("BUG: not a map query: {query:?}"),
+    }
 }
 
 pub fn analyze(
@@ -66,22 +89,18 @@ pub fn analyze(
             KeyedPropertySelection {
                 key: property_id.unwrap_or(unit_property()),
                 selection: match selection {
-                    Some(PropertySelection::Object(object)) => {
-                        PropertySelection::EntityQuery(EntityQuery {
-                            source: EntityQuerySource::Entity(object),
-                            limit,
-                            cursor,
-                        })
-                    }
-                    Some(PropertySelection::ObjectUnion(objects)) => {
-                        PropertySelection::EntityQuery(EntityQuery {
-                            source: EntityQuerySource::EntityUnion(objects),
-                            limit,
-                            cursor,
-                        })
-                    }
-                    Some(PropertySelection::EntityQuery(_)) => panic!("Query in query"),
-                    Some(PropertySelection::Leaf) | None => PropertySelection::Leaf,
+                    Some(Query::Map(object)) => Query::Entity(EntityQuery {
+                        source: MapOrUnionQuery::Map(object),
+                        limit,
+                        cursor,
+                    }),
+                    Some(Query::MapUnion(objects)) => Query::Entity(EntityQuery {
+                        source: MapOrUnionQuery::Union(objects),
+                        limit,
+                        cursor,
+                    }),
+                    Some(Query::Entity(_)) => panic!("Query in query"),
+                    Some(Query::Leaf) | None => Query::Leaf,
                 },
             }
         }
@@ -105,7 +124,7 @@ pub fn analyze(
 
             selection.unwrap_or_else(|| KeyedPropertySelection {
                 key: unit_property(),
-                selection: PropertySelection::Leaf,
+                selection: Query::Leaf,
             })
         }
         (
@@ -121,11 +140,11 @@ pub fn analyze(
         },
         (FieldKind::Property(property_id), Err(_scalar_ref)) => KeyedPropertySelection {
             key: *property_id,
-            selection: PropertySelection::Leaf,
+            selection: Query::Leaf,
         },
         (FieldKind::Id(relation_id), Err(_scalar_ref)) => KeyedPropertySelection {
             key: PropertyId::subject(*relation_id),
-            selection: PropertySelection::Leaf,
+            selection: Query::Leaf,
         },
         (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
     }
@@ -135,12 +154,11 @@ pub fn analyze_data(
     look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
     type_data: &TypeData,
     virtual_schema: &VirtualSchema,
-) -> PropertySelection {
+) -> Query {
     match &type_data.kind {
         TypeKind::Object(object_data) => match &object_data.kind {
             ObjectKind::Node(node_data) => {
-                let mut properties: FnvHashMap<PropertyId, PropertySelection> =
-                    FnvHashMap::default();
+                let mut properties: FnvHashMap<PropertyId, Query> = FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name();
@@ -154,7 +172,7 @@ pub fn analyze_data(
                     properties.insert(property_id, selection);
                 }
 
-                PropertySelection::Object(ObjectSource {
+                Query::Map(MapQuery {
                     def_id: node_data.def_id,
                     properties,
                 })
@@ -165,7 +183,7 @@ pub fn analyze_data(
             | ObjectKind::Mutation => panic!("Bug in virtual schema"),
         },
         TypeKind::Union(union_data) => {
-            let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, PropertySelection>> =
+            let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Query>> =
                 FnvHashMap::default();
 
             for field_look_ahead in look_ahead.children() {
@@ -212,16 +230,16 @@ pub fn analyze_data(
                 }
             }
 
-            PropertySelection::ObjectUnion(
+            Query::MapUnion(
                 union_map
                     .into_iter()
-                    .map(|(def_id, properties)| ObjectSource { def_id, properties })
+                    .map(|(def_id, properties)| MapQuery { def_id, properties })
                     .collect(),
             )
         }
         TypeKind::CustomScalar(_) => {
             assert!(look_ahead.children().is_empty());
-            PropertySelection::Leaf
+            Query::Leaf
         }
     }
 }

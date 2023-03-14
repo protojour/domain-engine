@@ -54,21 +54,25 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                 FieldKind::CreateMutation { input } => {
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    let selection =
-                        query_analyzer::analyze(&look_ahead, field_data, &info.virtual_schema)
-                            .selection;
+                    let query = query_analyzer::analyze_map_query(
+                        &look_ahead,
+                        field_data,
+                        &info.virtual_schema,
+                    );
 
-                    debug!("CREATE {input_value:#?} -> {selection:#?}");
+                    debug!("CREATE {input_value:#?} -> {query:#?}");
                 }
                 FieldKind::UpdateMutation { id, input } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    let selection =
-                        query_analyzer::analyze(&look_ahead, field_data, &info.virtual_schema)
-                            .selection;
+                    let query = query_analyzer::analyze_map_query(
+                        &look_ahead,
+                        field_data,
+                        &info.virtual_schema,
+                    );
 
-                    debug!("UPDATE {id_value:?} -> {input_value:#?} -> {selection:#?}");
+                    debug!("UPDATE {id_value:?} -> {input_value:#?} -> {query:#?}");
                 }
                 FieldKind::DeleteMutation { id } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
