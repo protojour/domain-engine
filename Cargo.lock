@@ -218,7 +218,10 @@ dependencies = [
  "async-trait",
  "ontol-compiler",
  "ontol-runtime",
+ "serde",
+ "serde_json",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

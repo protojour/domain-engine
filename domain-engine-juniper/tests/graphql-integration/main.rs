@@ -2,23 +2,41 @@ use std::{fmt::Display, sync::Arc};
 
 use domain_engine_core::DummyDomainAPI;
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
+use ontol_runtime::{env::Env, DefId};
 use ontol_test_utils::{TestCompile, TEST_PKG};
 
 mod test_graphql_basic;
 mod test_graphql_input;
 
+pub struct Mocker {
+    pub env: Arc<Env>,
+    pub api: DummyDomainAPI,
+}
+
+impl Mocker {
+    pub fn def_id_by_name(&self, type_name: &str) -> DefId {
+        let domain = self.env.find_domain(&TEST_PKG).unwrap();
+        *domain.type_names.get(type_name).unwrap()
+    }
+}
+
 trait TestCompileSchema {
-    fn compile_schema(self) -> TestSchema;
+    fn compile_schema(self, setup: &dyn Fn(&mut Mocker)) -> TestSchema;
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn compile_schema(self) -> TestSchema {
+    fn compile_schema(self, setup: &dyn Fn(&mut Mocker)) -> TestSchema {
         let env = self.compile_ok(|_| {});
+        let mut mocker = Mocker {
+            env: env.clone(),
+            api: DummyDomainAPI::new(env.clone()),
+        };
+        setup(&mut mocker);
         TestSchema {
             schema: create_graphql_schema(
                 TEST_PKG,
                 env,
-                Arc::new(DummyDomainAPI),
+                Arc::new(mocker.api),
                 Arc::new(domain_engine_core::Config::default()),
             )
             .unwrap(),

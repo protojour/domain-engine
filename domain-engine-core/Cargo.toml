@@ -13,5 +13,8 @@ ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 async-trait = "0.1"
 thiserror = "1"
+serde = "1"
+serde_json = "1"
+tracing = "0.1"
 
 [dev-dependencies]

@@ -1,5 +1,6 @@
 use juniper::graphql_value;
 use pretty_assertions::assert_eq;
+use serde_json::json;
 use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
@@ -9,7 +10,7 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".compile_schema();
+    "".compile_schema(&|_| {});
 }
 
 #[test(tokio::test)]
@@ -20,7 +21,7 @@ async fn test_graphql_basic_schema() {
         rel ['prop'] int
     }
     "
-    .compile_schema();
+    .compile_schema(&|_| {});
 
     assert_eq!(
         "{
@@ -59,7 +60,14 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let schema = ARTIST_AND_INSTRUMENT.compile_schema();
+    let schema = ARTIST_AND_INSTRUMENT.compile_schema(&|mocker| {
+        mocker.api.add_entity(
+            mocker.def_id_by_name("artist"),
+            json!({
+                "name": "Radiohead"
+            }),
+        );
+    });
 
     assert_eq!(
         "{
@@ -148,7 +156,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let schema = GUITAR_SYNTH_UNION.compile_schema();
+    let schema = GUITAR_SYNTH_UNION.compile_schema(&|_| {});
 
     assert_eq!(
         "{

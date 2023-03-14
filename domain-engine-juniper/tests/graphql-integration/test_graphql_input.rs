@@ -11,7 +11,7 @@ async fn test_graphql_input_deserialization_error() {
         rel ['prop'] 'const'
     }
     "
-    .compile_schema();
+    .compile_schema(&|_| {});
 
     assert_error_msg!(
         r#"
