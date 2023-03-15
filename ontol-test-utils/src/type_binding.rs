@@ -60,29 +60,11 @@ impl<'e> TypeBinding<'e> {
         self.env
     }
 
-    pub fn new_entity(&self, id: serde_json::Value, data: serde_json::Value) -> Value {
-        let entity_info = self.type_info.entity_info.as_ref().expect("Not an entity!");
-        let mut value = self.deserialize_value(data).unwrap();
-        let id = self
-            .env
-            .new_serde_processor(
-                entity_info.id_operator_id,
-                None,
-                ProcessorMode::Create,
-                ProcessorLevel::Root,
-            )
-            .deserialize(&mut serde_json::Deserializer::from_str(
-                &serde_json::to_string(&id).unwrap(),
-            ))
-            .unwrap();
-
-        match &mut value.data {
-            Data::Map(map) => {
-                map.insert(PropertyId::subject(entity_info.id_relation_id), id);
-            }
-            other => panic!("Entity data was not a map, but {other:?}"),
+    pub fn value_builder(&self) -> ValueBuilder<'_, 'e> {
+        ValueBuilder {
+            binding: self,
+            value: Value::unit(),
         }
-        value
     }
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
@@ -205,4 +187,70 @@ fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
         .with_draft(jsonschema::Draft::Draft202012)
         .compile(&serde_json::to_value(&standalone_schema).unwrap())
         .unwrap()
+}
+
+pub struct ValueBuilder<'t, 'e> {
+    binding: &'t TypeBinding<'e>,
+    value: Value,
+}
+
+impl<'t, 'e> ValueBuilder<'t, 'e> {
+    pub fn data(mut self, json: serde_json::Value) -> Self {
+        let value = self.binding.deserialize_value(json).unwrap();
+        match (&mut self.value.data, value) {
+            (Data::Unit, value) => {
+                self.value = value;
+            }
+            (
+                Data::Map(map_a),
+                Value {
+                    data: Data::Map(map_b),
+                    ..
+                },
+            ) => {
+                map_a.extend(map_b);
+            }
+            (a, b) => panic!("Unable to merge {a:?} and {b:?}"),
+        }
+        self
+    }
+
+    pub fn id(mut self, json: serde_json::Value) -> Self {
+        let entity_info = self
+            .binding
+            .type_info
+            .entity_info
+            .as_ref()
+            .expect("Not an entity!");
+        let id = self
+            .binding
+            .env
+            .new_serde_processor(
+                entity_info.id_operator_id,
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
+            .deserialize(&mut serde_json::Deserializer::from_str(
+                &serde_json::to_string(&json).unwrap(),
+            ))
+            .unwrap();
+
+        let property_id = PropertyId::subject(entity_info.id_relation_id);
+
+        match &mut self.value.data {
+            Data::Map(map) => {
+                map.insert(property_id, id);
+            }
+            Data::Unit => self.value.data = Data::Map([(property_id, id)].into()),
+            other => {
+                panic!("Value data was not a map/unit, but {other:?}.")
+            }
+        }
+        self
+    }
+
+    pub fn to_attribute(self) -> Attribute {
+        self.value.to_attribute()
+    }
 }

@@ -73,16 +73,16 @@ async fn test_graphql_artist_and_instrument_connections() {
     let schema = ARTIST_AND_INSTRUMENT
         .schema_builder()
         .api_mock(|env| {
+            let artist = TypeBinding::new(env, "artist");
             (
                 DomainAPIMock::query_entities
                     .next_call(matching!(_, _))
-                    .returns(Ok(vec![TypeBinding::new(env, "artist")
-                        .new_entity(
-                            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-                            json!({
-                                "name": "Radiohead"
-                            }),
-                        )
+                    .returns(Ok(vec![artist
+                        .value_builder()
+                        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
+                        .data(json!({
+                            "name": "Radiohead"
+                        }))
                         .to_attribute()])),
                 DomainAPIMock::query_entities
                     .next_call(matching!(_, _))
@@ -189,10 +189,26 @@ async fn test_graphql_artist_and_instrument_connections() {
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION
         .schema_builder()
-        .api_mock(|_env| {
+        .api_mock(|env| {
+            let artist = TypeBinding::new(env, "artist");
+
             DomainAPIMock::query_entities
                 .next_call(matching!(&TEST_PKG, _))
-                .returns(Ok(vec![]))
+                .returns(Ok(vec![artist
+                    .value_builder()
+                    .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
+                    .data(json!({
+                        "name": "foobar",
+                        "plays": [
+                            /*
+                            {
+                                "type": "synth",
+                                "polyphony": 42,
+                            }
+                            */
+                        ]
+                    }))
+                    .to_attribute()]))
         })
         .build();
 
@@ -222,7 +238,13 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
         .await,
         Ok(graphql_value!({
             "artistList": {
-                "edges": []
+                "edges": [{
+                    "node": {
+                        "plays": {
+                            "edges": []
+                        }
+                    }
+                }]
             },
         })),
     );
