@@ -1,48 +1,22 @@
 use std::{fmt::Display, sync::Arc};
 
+use domain_engine_core::{Config, EngineAPIMock};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_runtime::env::Env;
 use ontol_test_utils::{TestCompile, TEST_PKG};
-use unimock::Unimock;
+use unimock::*;
 
 mod test_graphql_basic;
 mod test_graphql_input;
 
 trait TestCompileSchema {
-    fn builder(self) -> ContextBuilder;
+    fn compile_schema(self) -> (Arc<Env>, Schema);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn builder(self) -> ContextBuilder {
+    fn compile_schema(self) -> (Arc<Env>, Schema) {
         let env = self.compile_ok(|_| {});
-        ContextBuilder {
-            env,
-            api_mock: Unimock::new(()),
-        }
-    }
-}
-
-pub struct ContextBuilder {
-    env: Arc<Env>,
-    api_mock: Unimock,
-}
-
-impl ContextBuilder {
-    fn api_mock<C: unimock::Clause>(self, f: impl Fn(&Env) -> C) -> Self {
-        Self {
-            api_mock: Unimock::new(f(&self.env)),
-            env: self.env,
-        }
-    }
-
-    fn build(self) -> TestContext {
-        TestContext {
-            schema: create_graphql_schema(TEST_PKG, self.env).unwrap(),
-            context: GqlContext {
-                config: Arc::new(domain_engine_core::Config::default()),
-                domain_api: Arc::new(self.api_mock),
-            },
-        }
+        (env.clone(), create_graphql_schema(TEST_PKG, env).unwrap())
     }
 }
 
@@ -73,32 +47,50 @@ impl Display for TestError {
                         write!(f, ", ")?;
                     }
                 }
-
                 Ok(())
             }
         }
     }
 }
 
-struct TestContext {
-    schema: Schema,
-    context: GqlContext,
+pub fn mock_default_config() -> impl unimock::Clause {
+    EngineAPIMock::get_config
+        .each_call(matching!())
+        .returns(Config::default())
+}
+
+pub fn mock_query_entities_empty() -> impl unimock::Clause {
+    EngineAPIMock::query_entities
+        .next_call(matching!(_, _))
+        .returns(Ok(vec![]))
 }
 
 #[async_trait::async_trait]
-trait Exec {
-    async fn exec(self, ctx: &TestContext) -> Result<juniper::Value<GqlScalar>, TestError>;
+trait MockExec {
+    async fn mock_exec(
+        self,
+        schema: &Schema,
+        mock_clause: impl unimock::Clause + Send,
+    ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
 #[async_trait::async_trait]
-impl Exec for &'static str {
-    async fn exec(self, ctx: &TestContext) -> Result<juniper::Value<GqlScalar>, TestError> {
+impl MockExec for &'static str {
+    async fn mock_exec(
+        self,
+        schema: &Schema,
+        mock_clause: impl unimock::Clause + Send,
+    ) -> Result<juniper::Value<GqlScalar>, TestError> {
+        let unimock = Unimock::new(mock_clause);
+
         match juniper::execute(
             self,
             None,
-            &ctx.schema,
+            schema,
             &juniper::Variables::new(),
-            &ctx.context,
+            &GqlContext {
+                domain_api: Arc::new(unimock),
+            },
         )
         .await
         {

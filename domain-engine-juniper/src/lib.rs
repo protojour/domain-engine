@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::{Config, DomainAPI};
+use domain_engine_core::EngineAPI;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 use tracing::debug;
@@ -17,8 +17,7 @@ mod type_info;
 mod virtual_registry;
 
 pub struct GqlContext {
-    pub config: Arc<Config>,
-    pub domain_api: Arc<dyn DomainAPI>,
+    pub domain_api: Arc<dyn EngineAPI>,
 }
 
 impl juniper::Context for GqlContext {}

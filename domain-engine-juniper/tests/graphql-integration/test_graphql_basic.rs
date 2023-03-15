@@ -1,37 +1,30 @@
-use domain_engine_core::DomainAPIMock;
+use domain_engine_core::EngineAPIMock;
 use juniper::graphql_value;
 use ontol_test_utils::type_binding::TypeBinding;
-use ontol_test_utils::TEST_PKG;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 use unimock::*;
 
-use crate::{Exec, TestCompileSchema};
+use crate::{mock_default_config, mock_query_entities_empty, MockExec, TestCompileSchema};
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".builder().build();
+    "".compile_schema();
 }
 
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
-    let schema = "
+    let (_env, schema) = "
     type foo {
         rel [id] string
         rel ['prop'] int
     }
     "
-    .builder()
-    .api_mock(|_| {
-        DomainAPIMock::query_entities
-            .next_call(matching!(_, _))
-            .returns(Ok(vec![]))
-    })
-    .build();
+    .compile_schema();
 
     assert_eq!(
         "{
@@ -43,7 +36,10 @@ async fn test_graphql_basic_schema() {
                 }
             }    
         }"
-        .exec(&schema)
+        .mock_exec(
+            &schema,
+            (mock_default_config(), mock_query_entities_empty())
+        )
         .await,
         Ok(graphql_value!({
             "fooList": {
@@ -62,7 +58,7 @@ async fn test_graphql_basic_schema() {
                 prop
             }
         }"
-        .exec(&schema)
+        .mock_exec(&schema, ())
         .await,
         Ok(graphql_value!(None)),
     );
@@ -70,26 +66,15 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let schema = ARTIST_AND_INSTRUMENT
-        .builder()
-        .api_mock(|env| {
-            let artist = TypeBinding::new(env, "artist");
-            (
-                DomainAPIMock::query_entities
-                    .next_call(matching!(_, _))
-                    .returns(Ok(vec![artist
-                        .value_builder()
-                        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
-                        .data(json!({
-                            "name": "Radiohead"
-                        }))
-                        .to_attribute()])),
-                DomainAPIMock::query_entities
-                    .next_call(matching!(_, _))
-                    .returns(Ok(vec![])),
-            )
-        })
-        .build();
+    let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
+    let artist = TypeBinding::new(&env, "artist");
+    let artist_entity = artist
+        .value_builder()
+        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
+        .data(json!({
+            "name": "Radiohead"
+        }))
+        .to_attribute();
 
     assert_eq!(
         "{
@@ -110,7 +95,15 @@ async fn test_graphql_artist_and_instrument_connections() {
                 }
             }
         }"
-        .exec(&schema)
+        .mock_exec(
+            &schema,
+            (
+                mock_default_config(),
+                EngineAPIMock::query_entities
+                    .next_call(matching!(_))
+                    .returns(Ok(vec![artist_entity]))
+            )
+        )
         .await,
         Ok(graphql_value!({
             "artistList": {
@@ -145,7 +138,10 @@ async fn test_graphql_artist_and_instrument_connections() {
                 }
             }
         }"
-        .exec(&schema)
+        .mock_exec(
+            &schema,
+            (mock_default_config(), mock_query_entities_empty())
+        )
         .await,
         Ok(graphql_value!({
             "instrumentList": {
@@ -179,7 +175,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }
         "#
-        .exec(&schema)
+        .mock_exec(&schema, ())
         .await,
         Ok(graphql_value!(None))
     );
@@ -187,32 +183,25 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let schema = GUITAR_SYNTH_UNION
-        .builder()
-        .api_mock(|env| {
-            let artist = TypeBinding::new(env, "artist");
-
-            DomainAPIMock::query_entities
-                .next_call(matching!(&TEST_PKG, _))
-                .returns(Ok(vec![artist
-                    .value_builder()
-                    .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
-                    .data(json!({
-                        "name": "foobar",
-                        "plays": [
-                            {
-                                "type": "synth",
-                                "polyphony": 42,
-                            },
-                            {
-                                "type": "guitar",
-                                "string_count": 91,
-                            }
-                        ]
-                    }))
-                    .to_attribute()]))
-        })
-        .build();
+    let (env, schema) = GUITAR_SYNTH_UNION.compile_schema();
+    let artist = TypeBinding::new(&env, "artist");
+    let artist_entity = artist
+        .value_builder()
+        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
+        .data(json!({
+            "name": "foobar",
+            "plays": [
+                {
+                    "type": "synth",
+                    "polyphony": 42,
+                },
+                {
+                    "type": "guitar",
+                    "string_count": 91,
+                }
+            ]
+        }))
+        .to_attribute();
 
     assert_eq!(
         "{
@@ -236,7 +225,15 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
                 }
             }
         }"
-        .exec(&schema)
+        .mock_exec(
+            &schema,
+            (
+                mock_default_config(),
+                EngineAPIMock::query_entities
+                    .next_call(matching!(_))
+                    .returns(Ok(vec![artist_entity]))
+            )
+        )
         .await,
         Ok(graphql_value!({
             "artistList": {
