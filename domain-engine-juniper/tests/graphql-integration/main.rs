@@ -1,50 +1,18 @@
 use std::{fmt::Display, sync::Arc};
 
-use domain_engine_core::DummyDomainAPI;
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
-use ontol_runtime::{env::Env, DefId};
+use ontol_runtime::env::Env;
 use ontol_test_utils::{TestCompile, TEST_PKG};
 use unimock::Unimock;
 
 mod test_graphql_basic;
 mod test_graphql_input;
 
-pub struct Mocker {
-    pub env: Arc<Env>,
-    pub api: DummyDomainAPI,
-}
-
-impl Mocker {
-    pub fn def_id_by_name(&self, type_name: &str) -> DefId {
-        let domain = self.env.find_domain(&TEST_PKG).unwrap();
-        *domain.type_names.get(type_name).unwrap()
-    }
-}
-
 trait TestCompileSchema {
-    fn compile_schema(self, setup: &dyn Fn(&mut Mocker)) -> TestSchema;
     fn schema_builder(self) -> SchemaBuilder;
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn compile_schema(self, setup: &dyn Fn(&mut Mocker)) -> TestSchema {
-        let env = self.compile_ok(|_| {});
-        let mut mocker = Mocker {
-            env: env.clone(),
-            api: DummyDomainAPI::new(env.clone()),
-        };
-        setup(&mut mocker);
-        TestSchema {
-            schema: create_graphql_schema(
-                TEST_PKG,
-                env,
-                Arc::new(mocker.api),
-                Arc::new(domain_engine_core::Config::default()),
-            )
-            .unwrap(),
-        }
-    }
-
     fn schema_builder(self) -> SchemaBuilder {
         let env = self.compile_ok(|_| {});
         SchemaBuilder {
@@ -60,10 +28,11 @@ pub struct SchemaBuilder {
 }
 
 impl SchemaBuilder {
-    fn api_mock(self, unimock: Unimock) -> Self {
+    fn api_mock<C: unimock::Clause>(self, f: impl Fn(&Env) -> C) -> Self {
+        let api_mock = Unimock::new(f(&self.env));
         Self {
             env: self.env,
-            api_mock: unimock,
+            api_mock,
         }
     }
 

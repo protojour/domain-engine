@@ -1,5 +1,6 @@
 use domain_engine_core::DomainAPIMock;
 use juniper::graphql_value;
+use ontol_test_utils::type_binding::TypeBinding;
 use ontol_test_utils::TEST_PKG;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -13,7 +14,7 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".compile_schema(&|_| {});
+    "".schema_builder().build();
 }
 
 #[test(tokio::test)]
@@ -24,7 +25,13 @@ async fn test_graphql_basic_schema() {
         rel ['prop'] int
     }
     "
-    .compile_schema(&|_| {});
+    .schema_builder()
+    .api_mock(|_| {
+        DomainAPIMock::query_entities
+            .next_call(matching!(_, _))
+            .returns(Ok(vec![]))
+    })
+    .build();
 
     assert_eq!(
         "{
@@ -63,15 +70,26 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let schema = ARTIST_AND_INSTRUMENT.compile_schema(&|mocker| {
-        mocker.api.add_entity(
-            mocker.def_id_by_name("artist"),
-            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-            json!({
-                "name": "Radiohead"
-            }),
-        );
-    });
+    let schema = ARTIST_AND_INSTRUMENT
+        .schema_builder()
+        .api_mock(|env| {
+            (
+                DomainAPIMock::query_entities
+                    .next_call(matching!(_, _))
+                    .returns(Ok(vec![TypeBinding::new(env, "artist")
+                        .new_entity(
+                            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                            json!({
+                                "name": "Radiohead"
+                            }),
+                        )
+                        .to_attribute()])),
+                DomainAPIMock::query_entities
+                    .next_call(matching!(_, _))
+                    .returns(Ok(vec![])),
+            )
+        })
+        .build();
 
     assert_eq!(
         "{
@@ -79,6 +97,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 edges {
                     node {
                         _id
+                        name
                         plays {
                             edges {
                                 node {
@@ -98,6 +117,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 "edges": [{
                     "node": {
                         "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "name": "Radiohead",
                         "plays": {
                             "edges": []
                         }
@@ -169,11 +189,11 @@ async fn test_graphql_artist_and_instrument_connections() {
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION
         .schema_builder()
-        .api_mock(Unimock::new(
+        .api_mock(|_env| {
             DomainAPIMock::query_entities
                 .next_call(matching!(&TEST_PKG, _))
-                .returns(Ok(vec![])),
-        ))
+                .returns(Ok(vec![]))
+        })
         .build();
 
     assert_eq!(

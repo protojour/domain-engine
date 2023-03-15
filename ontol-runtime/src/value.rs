@@ -54,6 +54,13 @@ impl Value {
         self.get_attribute(property_id).map(|attr| &attr.value)
     }
 
+    pub fn to_attribute(self) -> Attribute {
+        Attribute {
+            value: self,
+            rel_params: Value::unit(),
+        }
+    }
+
     pub fn cast_ref<T>(&self) -> &<Self as Cast<T>>::Ref
     where
         Self: Cast<T>,

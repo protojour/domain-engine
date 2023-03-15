@@ -60,6 +60,31 @@ impl<'e> TypeBinding<'e> {
         self.env
     }
 
+    pub fn new_entity(&self, id: serde_json::Value, data: serde_json::Value) -> Value {
+        let entity_info = self.type_info.entity_info.as_ref().expect("Not an entity!");
+        let mut value = self.deserialize_value(data).unwrap();
+        let id = self
+            .env
+            .new_serde_processor(
+                entity_info.id_operator_id,
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
+            .deserialize(&mut serde_json::Deserializer::from_str(
+                &serde_json::to_string(&id).unwrap(),
+            ))
+            .unwrap();
+
+        match &mut value.data {
+            Data::Map(map) => {
+                map.insert(PropertyId::subject(entity_info.id_relation_id), id);
+            }
+            other => panic!("Entity data was not a map, but {other:?}"),
+        }
+        value
+    }
+
     fn serde_operator_id(&self) -> SerdeOperatorId {
         self.type_info.operator_id.expect("No serde operator id")
     }
