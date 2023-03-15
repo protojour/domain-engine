@@ -12,7 +12,7 @@ use crate::{
     virtual_schema::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
-            FieldData, FieldKind, NativeScalarRef, Optionality, TypeIndex, TypeKind, TypeModifier,
+            FieldData, FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier,
             TypeRef, UnitTypeRef,
         },
         QueryLevel, TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
@@ -263,24 +263,22 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 },
                 type_ref.modifier,
             ),
-            UnitTypeRef::Scalar(NativeScalarRef::Unit) => {
-                todo!("Unit type")
-            }
-            UnitTypeRef::Scalar(NativeScalarRef::Bool) => {
-                self.get_modified_type::<bool>(&(), type_ref.modifier)
-            }
-            UnitTypeRef::Scalar(NativeScalarRef::Int(_)) => {
-                self.get_modified_type::<i32>(&(), type_ref.modifier)
-            }
-            UnitTypeRef::Scalar(NativeScalarRef::Number(_)) => {
-                self.get_modified_type::<f64>(&(), type_ref.modifier)
-            }
-            UnitTypeRef::Scalar(NativeScalarRef::String(_)) => {
-                self.get_modified_type::<std::string::String>(&(), type_ref.modifier)
-            }
-            UnitTypeRef::Scalar(NativeScalarRef::ID(_operator_id)) => {
-                self.get_modified_type::<juniper::ID>(&(), type_ref.modifier)
-            }
+            UnitTypeRef::Scalar(scalar_ref) => match &scalar_ref.kind {
+                NativeScalarKind::Unit => {
+                    todo!("Unit type")
+                }
+                NativeScalarKind::Bool => self.get_modified_type::<bool>(&(), type_ref.modifier),
+                NativeScalarKind::Int(_) => self.get_modified_type::<i32>(&(), type_ref.modifier),
+                NativeScalarKind::Number(_) => {
+                    self.get_modified_type::<f64>(&(), type_ref.modifier)
+                }
+                NativeScalarKind::String => {
+                    self.get_modified_type::<std::string::String>(&(), type_ref.modifier)
+                }
+                NativeScalarKind::ID => {
+                    self.get_modified_type::<juniper::ID>(&(), type_ref.modifier)
+                }
+            },
         }
     }
 

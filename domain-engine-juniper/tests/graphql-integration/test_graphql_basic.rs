@@ -63,6 +63,7 @@ async fn test_graphql_artist_and_instrument_connections() {
     let schema = ARTIST_AND_INSTRUMENT.compile_schema(&|mocker| {
         mocker.api.add_entity(
             mocker.def_id_by_name("artist"),
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({
                 "name": "Radiohead"
             }),
@@ -93,7 +94,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             "artistList": {
                 "edges": [{
                     "node": {
-                        "_id": "FIXME/test_id",
+                        "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
                         "plays": {
                             "edges": []
                         }

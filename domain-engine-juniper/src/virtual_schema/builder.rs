@@ -15,9 +15,9 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 use super::{
     argument,
     data::{
-        EdgeData, FieldData, FieldKind, IdPropertyData, NativeScalarRef, NodeData, ObjectData,
-        ObjectKind, Optionality, PropertyData, ScalarData, TypeData, TypeIndex, TypeKind,
-        TypeModifier, TypeRef, UnionData, UnitTypeRef,
+        EdgeData, FieldData, FieldKind, IdPropertyData, NativeScalarKind, NativeScalarRef,
+        NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
+        TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -282,25 +282,23 @@ impl<'a> VirtualSchemaBuilder<'a> {
         operator_id: SerdeOperatorId,
         serde_operator: &SerdeOperator,
     ) -> NewType {
-        match serde_operator {
-            SerdeOperator::Unit => NewType::NativeScalar(NativeScalarRef::Unit),
-            SerdeOperator::Int(def_id) => NewType::NativeScalar(NativeScalarRef::Int(*def_id)),
-            SerdeOperator::Number(def_id) => {
-                NewType::NativeScalar(NativeScalarRef::Number(*def_id))
-            }
+        let kind = match serde_operator {
+            SerdeOperator::Unit => NativeScalarKind::Unit,
+            SerdeOperator::Int(def_id) => NativeScalarKind::Int(*def_id),
+            SerdeOperator::Number(def_id) => NativeScalarKind::Number(*def_id),
             SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
-            | SerdeOperator::CapturingStringPattern(_) => {
-                NewType::NativeScalar(NativeScalarRef::String(operator_id))
-            }
+            | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
             SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::Id(_) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
             | SerdeOperator::Map(_)
             | SerdeOperator::RelationSequence(_) => panic!("not a scalar"),
-        }
+        };
+
+        NewType::NativeScalar(NativeScalarRef { operator_id, kind })
     }
 
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
@@ -311,9 +309,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
         let mut fields = IndexMap::default();
 
         if let Some(entity_info) = &type_info.entity_info {
-            let id_type_info = self.env.get_type_info(entity_info.id_value_def_id);
-            let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
-
             fields.insert(
                 "_id".into(),
                 FieldData {
@@ -321,9 +316,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         relation_id: entity_info.id_relation_id,
                         operator_id: entity_info.id_operator_id,
                     }),
-                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::ID(
-                        id_operator_id,
-                    ))),
+                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef {
+                        operator_id: entity_info.id_operator_id,
+                        kind: NativeScalarKind::ID,
+                    })),
                 },
             );
         }
@@ -530,7 +526,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     kind: FieldKind::DeleteMutation {
                         id: argument::Id(id_operator_id),
                     },
-                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef::Bool)),
+                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef {
+                        operator_id: SerdeOperatorId(42),
+                        kind: NativeScalarKind::Bool,
+                    })),
                 },
             );
         }

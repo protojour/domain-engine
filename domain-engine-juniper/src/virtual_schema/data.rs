@@ -50,13 +50,19 @@ pub enum UnitTypeRef {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum NativeScalarRef {
+pub struct NativeScalarRef {
+    pub operator_id: SerdeOperatorId,
+    pub kind: NativeScalarKind,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum NativeScalarKind {
     Unit,
     Bool,
     Int(DefId),
     Number(DefId),
-    String(SerdeOperatorId),
-    ID(SerdeOperatorId),
+    String,
+    ID,
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -7,7 +7,7 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, MapOrUnionQuery},
     serde::processor::{ProcessorLevel, ProcessorMode},
-    value::Attribute,
+    value::{Attribute, Data, PropertyId},
     DefId, PackageId,
 };
 
@@ -46,11 +46,16 @@ impl DummyDomainAPI {
         }
     }
 
-    pub fn add_entity(&mut self, def_id: DefId, json: serde_json::Value) {
+    pub fn add_entity(
+        &mut self,
+        def_id: DefId,
+        id_json: serde_json::Value,
+        json: serde_json::Value,
+    ) {
         let type_info = self.env.get_type_info(def_id);
-        let json_string = serde_json::to_string(&json).unwrap();
+        let entity_info = type_info.entity_info.as_ref().unwrap();
 
-        let attribute = self
+        let mut attribute = self
             .env
             .new_serde_processor(
                 type_info.operator_id.unwrap(),
@@ -58,8 +63,29 @@ impl DummyDomainAPI {
                 ProcessorMode::Create,
                 ProcessorLevel::Root,
             )
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string))
+            .deserialize(&mut serde_json::Deserializer::from_str(
+                &serde_json::to_string(&json).unwrap(),
+            ))
             .unwrap();
+
+        let id = self
+            .env
+            .new_serde_processor(
+                entity_info.id_operator_id,
+                None,
+                ProcessorMode::Create,
+                ProcessorLevel::Root,
+            )
+            .deserialize(&mut serde_json::Deserializer::from_str(
+                &serde_json::to_string(&id_json).unwrap(),
+            ))
+            .unwrap();
+
+        if let Data::Map(map) = &mut attribute.value.data {
+            map.insert(PropertyId::subject(entity_info.id_relation_id), id);
+        } else {
+            panic!();
+        }
 
         let result = self.entities.entry(type_info.def_id).or_insert(Ok(vec![]));
         match result {
