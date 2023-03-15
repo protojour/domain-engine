@@ -1,7 +1,10 @@
+use domain_engine_core::DomainAPIMock;
 use juniper::graphql_value;
+use ontol_test_utils::TEST_PKG;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
+use unimock::*;
 
 use crate::{Exec, TestCompileSchema};
 
@@ -164,7 +167,14 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let schema = GUITAR_SYNTH_UNION.compile_schema(&|_| {});
+    let schema = GUITAR_SYNTH_UNION
+        .schema_builder()
+        .api_mock(Unimock::new(
+            DomainAPIMock::query_entities
+                .next_call(matching!(&TEST_PKG, _))
+                .returns(Ok(vec![])),
+        ))
+        .build();
 
     assert_eq!(
         "{

@@ -4,6 +4,7 @@ use domain_engine_core::DummyDomainAPI;
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_runtime::{env::Env, DefId};
 use ontol_test_utils::{TestCompile, TEST_PKG};
+use unimock::Unimock;
 
 mod test_graphql_basic;
 mod test_graphql_input;
@@ -22,6 +23,7 @@ impl Mocker {
 
 trait TestCompileSchema {
     fn compile_schema(self, setup: &dyn Fn(&mut Mocker)) -> TestSchema;
+    fn schema_builder(self) -> SchemaBuilder;
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
@@ -37,6 +39,40 @@ impl<T: TestCompile> TestCompileSchema for T {
                 TEST_PKG,
                 env,
                 Arc::new(mocker.api),
+                Arc::new(domain_engine_core::Config::default()),
+            )
+            .unwrap(),
+        }
+    }
+
+    fn schema_builder(self) -> SchemaBuilder {
+        let env = self.compile_ok(|_| {});
+        SchemaBuilder {
+            env,
+            api_mock: Unimock::new(()),
+        }
+    }
+}
+
+pub struct SchemaBuilder {
+    env: Arc<Env>,
+    api_mock: Unimock,
+}
+
+impl SchemaBuilder {
+    fn api_mock(self, unimock: Unimock) -> Self {
+        Self {
+            env: self.env,
+            api_mock: unimock,
+        }
+    }
+
+    fn build(self) -> TestSchema {
+        TestSchema {
+            schema: create_graphql_schema(
+                TEST_PKG,
+                self.env,
+                Arc::new(self.api_mock),
                 Arc::new(domain_engine_core::Config::default()),
             )
             .unwrap(),

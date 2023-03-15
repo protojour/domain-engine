@@ -222,6 +222,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
+ "unimock",
 ]
 
 [[package]]
@@ -244,6 +245,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "unimock",
 ]
 
 [[package]]
@@ -1259,6 +1261,28 @@ name = "unicode-width"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
+
+[[package]]
+name = "unimock"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d287bcbde515749baa159c8aff96aefb16808ba43669f1639ae3228e5350f9f"
+dependencies = [
+ "once_cell",
+ "pretty_assertions",
+ "unimock_macros",
+]
+
+[[package]]
+name = "unimock_macros"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64677cf333b99077788547ec64d5f6aebb323e4d7ce76efb7f19bf6a7fb36165"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "unreachable"

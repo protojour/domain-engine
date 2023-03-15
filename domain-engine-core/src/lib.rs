@@ -24,6 +24,7 @@ impl Default for Config {
 #[derive(Error, Clone, Debug)]
 pub enum DomainError {}
 
+#[unimock::unimock(api = DomainAPIMock)]
 #[async_trait::async_trait]
 pub trait DomainAPI: Send + Sync + 'static {
     async fn query_entities(
