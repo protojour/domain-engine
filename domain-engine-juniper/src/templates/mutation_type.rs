@@ -5,7 +5,7 @@ use crate::{
     gql_scalar::GqlScalar,
     look_ahead_utils::ArgsWrapper,
     macros::impl_graphql_value,
-    query_analyzer,
+    query_analyzer::QueryAnalyzer,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{data::FieldKind, VirtualIndexedTypeInfo},
@@ -49,16 +49,13 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
             let look_ahead = executor.look_ahead();
             let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
             let field_data = info.type_data().fields().unwrap().get(field_name).unwrap();
+            let query_analyzer = QueryAnalyzer::new(&info.virtual_schema, executor.context());
 
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    let query = query_analyzer::analyze_map_query(
-                        &look_ahead,
-                        field_data,
-                        &info.virtual_schema,
-                    );
+                    let query = query_analyzer.analyze_map_query(&look_ahead, field_data);
 
                     debug!("CREATE {input_value:#?} -> {query:#?}");
                 }
@@ -66,11 +63,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
                     let input_value = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    let query = query_analyzer::analyze_map_query(
-                        &look_ahead,
-                        field_data,
-                        &info.virtual_schema,
-                    );
+                    let query = query_analyzer.analyze_map_query(&look_ahead, field_data);
 
                     debug!("UPDATE {id_value:?} -> {input_value:#?} -> {query:#?}");
                 }

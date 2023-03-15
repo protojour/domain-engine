@@ -14,7 +14,7 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".schema_builder().build();
+    "".builder().build();
 }
 
 #[test(tokio::test)]
@@ -25,7 +25,7 @@ async fn test_graphql_basic_schema() {
         rel ['prop'] int
     }
     "
-    .schema_builder()
+    .builder()
     .api_mock(|_| {
         DomainAPIMock::query_entities
             .next_call(matching!(_, _))
@@ -71,7 +71,7 @@ async fn test_graphql_basic_schema() {
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
     let schema = ARTIST_AND_INSTRUMENT
-        .schema_builder()
+        .builder()
         .api_mock(|env| {
             let artist = TypeBinding::new(env, "artist");
             (
@@ -188,7 +188,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let schema = GUITAR_SYNTH_UNION
-        .schema_builder()
+        .builder()
         .api_mock(|env| {
             let artist = TypeBinding::new(env, "artist");
 

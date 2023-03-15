@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::DomainAPI;
+use domain_engine_core::{Config, DomainAPI};
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 use tracing::debug;
@@ -16,7 +16,10 @@ mod templates;
 mod type_info;
 mod virtual_registry;
 
-pub struct GqlContext;
+pub struct GqlContext {
+    pub config: Arc<Config>,
+    pub domain_api: Arc<dyn DomainAPI>,
+}
 
 impl juniper::Context for GqlContext {}
 
@@ -36,12 +39,8 @@ pub enum SchemaBuildError {
 pub fn create_graphql_schema(
     package_id: PackageId,
     env: Arc<Env>,
-    domain_api: Arc<dyn DomainAPI>,
-    config: Arc<domain_engine_core::Config>,
 ) -> Result<Schema, SchemaBuildError> {
-    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(
-        package_id, env, domain_api, config,
-    )?);
+    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(package_id, env)?);
 
     let schema = Schema::new_with_info(
         templates::query_type::QueryType,

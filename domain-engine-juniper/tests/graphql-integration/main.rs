@@ -9,42 +9,39 @@ mod test_graphql_basic;
 mod test_graphql_input;
 
 trait TestCompileSchema {
-    fn schema_builder(self) -> SchemaBuilder;
+    fn builder(self) -> ContextBuilder;
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn schema_builder(self) -> SchemaBuilder {
+    fn builder(self) -> ContextBuilder {
         let env = self.compile_ok(|_| {});
-        SchemaBuilder {
+        ContextBuilder {
             env,
             api_mock: Unimock::new(()),
         }
     }
 }
 
-pub struct SchemaBuilder {
+pub struct ContextBuilder {
     env: Arc<Env>,
     api_mock: Unimock,
 }
 
-impl SchemaBuilder {
+impl ContextBuilder {
     fn api_mock<C: unimock::Clause>(self, f: impl Fn(&Env) -> C) -> Self {
-        let api_mock = Unimock::new(f(&self.env));
         Self {
+            api_mock: Unimock::new(f(&self.env)),
             env: self.env,
-            api_mock,
         }
     }
 
-    fn build(self) -> TestSchema {
-        TestSchema {
-            schema: create_graphql_schema(
-                TEST_PKG,
-                self.env,
-                Arc::new(self.api_mock),
-                Arc::new(domain_engine_core::Config::default()),
-            )
-            .unwrap(),
+    fn build(self) -> TestContext {
+        TestContext {
+            schema: create_graphql_schema(TEST_PKG, self.env).unwrap(),
+            context: GqlContext {
+                config: Arc::new(domain_engine_core::Config::default()),
+                domain_api: Arc::new(self.api_mock),
+            },
         }
     }
 }
@@ -83,24 +80,25 @@ impl Display for TestError {
     }
 }
 
-struct TestSchema {
+struct TestContext {
     schema: Schema,
+    context: GqlContext,
 }
 
 #[async_trait::async_trait]
 trait Exec {
-    async fn exec(self, schema: &TestSchema) -> Result<juniper::Value<GqlScalar>, TestError>;
+    async fn exec(self, ctx: &TestContext) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
 #[async_trait::async_trait]
 impl Exec for &'static str {
-    async fn exec(self, test_schema: &TestSchema) -> Result<juniper::Value<GqlScalar>, TestError> {
+    async fn exec(self, ctx: &TestContext) -> Result<juniper::Value<GqlScalar>, TestError> {
         match juniper::execute(
             self,
             None,
-            &test_schema.schema,
+            &ctx.schema,
             &juniper::Variables::new(),
-            &GqlContext,
+            &ctx.context,
         )
         .await
         {

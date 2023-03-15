@@ -7,7 +7,7 @@ use tracing::debug;
 use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
-    query_analyzer,
+    query_analyzer::QueryAnalyzer,
     resolve::resolve_indexed_type,
     templates::indexed_type::IndexedType,
     type_info::GraphqlTypeName,
@@ -53,16 +53,14 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let virtual_schema = &info.virtual_schema;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let entity_query = query_analyzer::analyze_entity_query(
-                &executor.look_ahead(),
-                query_field,
-                virtual_schema,
-            );
+            let entity_query = QueryAnalyzer::new(virtual_schema, executor.context())
+                .analyze_entity_query(&executor.look_ahead(), query_field);
 
             debug!("Executing query {field_name}: {entity_query:#?}");
 
-            let entity_attributes = virtual_schema
-                .domain_api()
+            let entity_attributes = executor
+                .context()
+                .domain_api
                 .query_entities(virtual_schema.package_id(), entity_query)
                 .await?;
 
