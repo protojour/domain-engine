@@ -200,12 +200,14 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
                     .data(json!({
                         "name": "foobar",
                         "plays": [
-                            /*
                             {
                                 "type": "synth",
                                 "polyphony": 42,
+                            },
+                            {
+                                "type": "guitar",
+                                "string_count": 91,
                             }
-                            */
                         ]
                     }))
                     .to_attribute()]))
@@ -241,7 +243,22 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
                 "edges": [{
                     "node": {
                         "plays": {
-                            "edges": []
+                            "edges": [
+                                {
+                                    "node": {
+                                        "__typename": "synth",
+                                        // BUG: Floating point
+                                        "polyphony": 42.0
+                                    },
+                                },
+                                {
+                                    "node": {
+                                        "__typename": "guitar",
+                                        // BUG: Floating point
+                                        "string_count": 91.0
+                                    }
+                                }
+                            ]
                         }
                     }
                 }]

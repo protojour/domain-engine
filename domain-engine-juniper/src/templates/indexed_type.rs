@@ -14,7 +14,9 @@ use crate::{
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
-        data::{FieldKind, ObjectKind, TypeKind, TypeRef},
+        data::{
+            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeRef, UnionData,
+        },
         TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
     },
     GqlContext,
@@ -25,12 +27,72 @@ pub struct IndexedType<'v> {
     pub attr: &'v Attribute,
 }
 
+impl<'v> IndexedType<'v> {
+    fn find_union_variant<'s>(
+        &self,
+        union_data: &'s UnionData,
+        virtual_schema: &'s VirtualSchema,
+    ) -> (TypeIndex, &'s TypeData) {
+        for variant_type_index in &union_data.variants {
+            let variant_type_data = virtual_schema.type_data(*variant_type_index);
+            match &variant_type_data.kind {
+                TypeKind::Object(ObjectData {
+                    kind: ObjectKind::Node(node_data),
+                    ..
+                }) => {
+                    if node_data.def_id == self.attr.value.type_def_id {
+                        return (*variant_type_index, variant_type_data);
+                    }
+                }
+                _ => panic!("Unsupported union variant"),
+            }
+        }
+
+        panic!("union variant not found")
+    }
+}
+
 impl<'v> ::juniper::GraphQLValue<GqlScalar> for IndexedType<'v> {
     type Context = GqlContext;
     type TypeInfo = VirtualIndexedTypeInfo;
 
     fn type_name<'i>(&self, type_info: &'i Self::TypeInfo) -> Option<&'i str> {
         Some(type_info.graphql_type_name())
+    }
+
+    fn concrete_type_name(&self, _context: &Self::Context, info: &Self::TypeInfo) -> String {
+        match &info.type_data().kind {
+            TypeKind::Union(union_data) => {
+                let (_, variant_data) = self.find_union_variant(union_data, &info.virtual_schema);
+                variant_data.typename.to_string()
+            }
+            _ => panic!(
+                "should not need concrete type name for other things than unions or interfaces"
+            ),
+        }
+    }
+
+    fn resolve_into_type(
+        &self,
+        info: &Self::TypeInfo,
+        _type_name: &str,
+        selection_set: Option<&[juniper::Selection<GqlScalar>]>,
+        executor: &juniper::Executor<Self::Context, GqlScalar>,
+    ) -> juniper::ExecutionResult<GqlScalar> {
+        match &info.type_data().kind {
+            TypeKind::Union(union_data) => {
+                let (variant_type_index, _) =
+                    self.find_union_variant(union_data, &info.virtual_schema);
+                self.resolve(
+                    &info
+                        .virtual_schema
+                        .indexed_type_info(variant_type_index, TypingPurpose::Selection),
+                    selection_set,
+                    executor,
+                )
+            }
+            _ => panic!("BUG: resolve_into_type called for non-union"),
+        }
     }
 
     fn resolve_field(
