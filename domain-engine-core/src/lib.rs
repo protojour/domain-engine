@@ -30,5 +30,5 @@ pub trait EngineAPI: Send + Sync + 'static {
 }
 
 pub struct Engine {
-    env: Arc<Env>,
+    _env: Arc<Env>,
 }

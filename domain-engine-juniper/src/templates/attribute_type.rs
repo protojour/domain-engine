@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     gql_scalar::{GqlScalar, GqlScalarSerializer},
-    resolve::resolve_attribute_type,
+    templates::{resolve_virtual_schema_field, sequence_type::SequenceType},
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
@@ -111,16 +111,14 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                 debug!("resolve field {field_name}");
 
                 match (&field_data.kind, &self.attr.value.data) {
-                    (FieldKind::Edges, Data::Sequence(seq)) => resolve_attribute_type(
-                        seq.iter()
-                            .map(|attribute| AttributeType { attr: attribute })
-                            .collect::<Vec<_>>(),
+                    (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(
+                        SequenceType { seq },
                         virtual_schema
                             .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
                             .unwrap(),
                         executor,
                     ),
-                    (FieldKind::Node, Data::Map(_)) => resolve_attribute_type(
+                    (FieldKind::Node, Data::Map(_)) => resolve_virtual_schema_field(
                         self,
                         virtual_schema
                             .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
@@ -139,7 +137,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                             .unwrap();
 
                         match map.get(property_id) {
-                            Some(attribute) => resolve_attribute_type(
+                            Some(attribute) => resolve_virtual_schema_field(
                                 AttributeType { attr: attribute },
                                 type_info,
                                 executor,
@@ -150,7 +148,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                                     rel_params: Value::unit(),
                                 };
 
-                                resolve_attribute_type(
+                                resolve_virtual_schema_field(
                                     AttributeType { attr: &empty },
                                     type_info,
                                     executor,
