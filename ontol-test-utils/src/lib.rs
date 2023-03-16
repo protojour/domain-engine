@@ -49,9 +49,15 @@ macro_rules! assert_json_io_matches {
     };
 }
 
+#[derive(Clone)]
+pub struct TestEnv {
+    pub env: Arc<Env>,
+    pub test_json_schema: bool,
+}
+
 pub trait TestCompile: Sized {
     /// Compile
-    fn compile_ok(self, validator: impl Fn(Arc<Env>)) -> Arc<Env>;
+    fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv;
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -63,7 +69,7 @@ pub trait TestCompile: Sized {
 }
 
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(Arc<Env>)) -> Arc<Env> {
+    fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv {
         TestPackages::with_root(self).compile_ok(validator)
     }
 
@@ -146,10 +152,13 @@ impl TestPackages {
 }
 
 impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(Arc<Env>)) -> Arc<Env> {
+    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
         match self.compile_topology() {
             Ok(env) => {
-                let env = Arc::new(env);
+                let env = TestEnv {
+                    env: Arc::new(env),
+                    test_json_schema: true,
+                };
                 validator(env.clone());
                 env
             }

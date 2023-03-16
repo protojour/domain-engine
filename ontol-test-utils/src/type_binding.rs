@@ -12,7 +12,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use tracing::{debug, error};
 
-use crate::TEST_PKG;
+use crate::{TestEnv, TEST_PKG};
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
@@ -23,12 +23,13 @@ const TEST_JSON_SCHEMA_VALIDATION: bool = false;
 
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
-    json_schema: JSONSchema,
+    json_schema: Option<JSONSchema>,
     env: &'e Env,
 }
 
 impl<'e> TypeBinding<'e> {
-    pub fn new(env: &'e Env, type_name: &str) -> Self {
+    pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
+        let env = &test_env.env;
         let domain = env.find_domain(&TEST_PKG).unwrap();
         let def_id = domain
             .type_names
@@ -47,7 +48,11 @@ impl<'e> TypeBinding<'e> {
             ))
         );
 
-        let json_schema = compile_json_schema(env, &type_info);
+        let json_schema = if test_env.test_json_schema {
+            Some(compile_json_schema(env, &type_info))
+        } else {
+            None
+        };
 
         Self {
             type_info,
@@ -139,34 +144,35 @@ impl<'e> TypeBinding<'e> {
             )
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
-        if TEST_JSON_SCHEMA_VALIDATION {
-            let json_schema_result = self.json_schema.validate(&json);
+        match self.json_schema.as_ref() {
+            Some(json_schema) if TEST_JSON_SCHEMA_VALIDATION => {
+                let json_schema_result = json_schema.validate(&json);
 
-            match (attribute_result, json_schema_result) {
-                (Ok(Attribute { value, rel_params }), Ok(())) => {
-                    assert_eq!(rel_params.type_def_id, DefId::unit());
+                match (attribute_result, json_schema_result) {
+                    (Ok(Attribute { value, rel_params }), Ok(())) => {
+                        assert_eq!(rel_params.type_def_id, DefId::unit());
 
-                    Ok(value)
-                }
-                (Err(json_error), Err(_)) => Err(json_error),
-                (Ok(_), Err(validation_errors)) => {
-                    for error in validation_errors {
-                        error!("JSON schema error: {error}");
+                        Ok(value)
                     }
-                    panic!("BUG: JSON schema did not accept input {json_string}");
-                }
-                (Err(json_error), Ok(())) => {
-                    panic!(
-                        "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
-                    );
+                    (Err(json_error), Err(_)) => Err(json_error),
+                    (Ok(_), Err(validation_errors)) => {
+                        for error in validation_errors {
+                            error!("JSON schema error: {error}");
+                        }
+                        panic!("BUG: JSON schema did not accept input {json_string}");
+                    }
+                    (Err(json_error), Ok(())) => {
+                        panic!(
+                            "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
+                        );
+                    }
                 }
             }
-        } else {
-            attribute_result.map(|Attribute { value, rel_params }| {
+            _ => attribute_result.map(|Attribute { value, rel_params }| {
                 assert_eq!(rel_params.type_def_id, DefId::unit());
 
                 value
-            })
+            }),
         }
     }
 

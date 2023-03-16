@@ -1,20 +1,19 @@
-use ontol_runtime::env::Env;
-use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TEST_PKG};
+use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TestEnv, TEST_PKG};
 use serde_json::json;
 use test_log::test;
 
 fn assert_translate(
-    env: &Env,
+    test_env: &TestEnv,
     translation: (&str, &str),
     input: serde_json::Value,
     expected: serde_json::Value,
 ) {
-    let input_binding = TypeBinding::new(env, translation.0);
-    let output_binding = TypeBinding::new(env, translation.1);
+    let input_binding = TypeBinding::new(test_env, translation.0);
+    let output_binding = TypeBinding::new(test_env, translation.1);
 
     let value = input_binding.deserialize_value(input).unwrap();
 
-    let procedure = match env.get_translator(
+    let procedure = match test_env.env.get_translator(
         input_binding.type_info.def_id,
         output_binding.type_info.def_id,
     ) {
@@ -25,7 +24,7 @@ fn assert_translate(
         ),
     };
 
-    let mut translator = env.new_translator();
+    let mut translator = test_env.env.new_translator();
     let value = translator.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(&value);
@@ -207,20 +206,20 @@ fn test_eq_complex_flow() {
         }
     }
     "
-    .compile_ok(|env| {
+    .compile_ok(|test_env| {
         assert_translate(
-            &env,
+            &test_env,
             ("one", "two"),
             json!({ "a": "A", "b": "B" }),
             json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
         );
 
         // FIXME: Property probe does not make completely sense for this translation:
-        let domain = env.find_domain(&TEST_PKG).unwrap();
-        let mut property_probe = env.new_property_probe();
+        let domain = test_env.env.find_domain(&TEST_PKG).unwrap();
+        let mut property_probe = test_env.env.new_property_probe();
         let property_map = property_probe
             .probe_from_serde_operator(
-                &env,
+                &test_env.env,
                 domain.type_info(*domain.type_names.get("one").unwrap()),
                 domain.type_info(*domain.type_names.get("two").unwrap()),
             )
