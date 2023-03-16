@@ -1,7 +1,10 @@
 use domain_engine_core::EngineAPIMock;
 use juniper::graphql_value;
 use ontol_runtime::value::Attribute;
-use ontol_test_utils::type_binding::{ToSequence, TypeBinding};
+use ontol_test_utils::{
+    type_binding::{ToSequence, TypeBinding},
+    SourceName, TestPackages,
+};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
@@ -310,4 +313,19 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
             },
         })),
     );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_municipalities() {
+    let (_env, _schema) = TestPackages::with_sources([
+        (
+            SourceName::root(),
+            include_str!("../../../examples/municipalities.ont"),
+        ),
+        (
+            SourceName("geojson"),
+            include_str!("../../../examples/geojson.ont"),
+        ),
+    ])
+    .compile_schema();
 }

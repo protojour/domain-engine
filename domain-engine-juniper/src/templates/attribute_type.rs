@@ -22,6 +22,8 @@ use crate::{
     GqlContext,
 };
 
+use super::indexed_input_value::IndexedInputValue;
+
 #[derive(Clone, Copy)]
 pub struct AttributeType<'v> {
     pub attr: &'v Attribute,
@@ -126,7 +128,9 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
 
                 registry.build_union_type::<Self>(info, &types).into_meta()
             }
-            TypeKind::CustomScalar(_) => todo!(),
+            TypeKind::CustomScalar(_) => registry
+                .build_scalar_type::<IndexedInputValue>(info)
+                .into_meta(),
         }
     }
 }

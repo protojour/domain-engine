@@ -175,9 +175,23 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::ValueType(value_op) => {
                 self.get_operator_argument(name, value_op.inner_operator_id, rel_params, opt)
             }
-            SerdeOperator::Union(_union_op) => {
-                // self.register_def_argument(name, union_type.union_def_variant.def_id)
-                todo!()
+            SerdeOperator::Union(union_op) => {
+                let type_index = self
+                    .virtual_schema
+                    .type_index_by_def(union_op.union_def_variant().def_id, QueryLevel::Node)
+                    .expect("No union found");
+                let type_info = self
+                    .virtual_schema
+                    .indexed_type_info(type_index, TypingPurpose::Input);
+
+                match opt {
+                    Optionality::Mandatory => {
+                        self.registry.arg::<IndexedInputValue>(name, &type_info)
+                    }
+                    Optionality::Optional => self
+                        .registry
+                        .arg::<Option<IndexedInputValue>>(name, &type_info),
+                }
             }
             SerdeOperator::Id(_) => {
                 panic!()
@@ -267,7 +281,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 },
                 type_ref.modifier,
             ),
-            UnitTypeRef::Scalar(scalar_ref) => match &scalar_ref.kind {
+            UnitTypeRef::NativeScalar(scalar_ref) => match &scalar_ref.kind {
                 NativeScalarKind::Unit => {
                     todo!("Unit type")
                 }

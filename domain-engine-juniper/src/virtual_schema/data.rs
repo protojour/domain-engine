@@ -46,7 +46,7 @@ impl TypeModifier {
 #[derive(Clone, Copy, Debug)]
 pub enum UnitTypeRef {
     Indexed(TypeIndex),
-    Scalar(NativeScalarRef),
+    NativeScalar(NativeScalarRef),
 }
 
 #[derive(Clone, Copy, Debug)]

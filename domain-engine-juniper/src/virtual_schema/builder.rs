@@ -74,18 +74,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.schema.types[type_index.0 as usize] = type_data;
                 UnitTypeRef::Indexed(type_index)
             }
-            NewType::NativeScalar(scalar_ref) => UnitTypeRef::Scalar(scalar_ref),
-        }
-    }
-
-    pub fn get_operator_scalar_type_ref(
-        &mut self,
-        operator_id: SerdeOperatorId,
-        serde_operator: &SerdeOperator,
-    ) -> UnitTypeRef {
-        match self.make_new_scalar(operator_id, serde_operator) {
-            NewType::Indexed(..) => panic!("BUG: Scalars should not be indexed"),
-            NewType::NativeScalar(native_scalar) => UnitTypeRef::Scalar(native_scalar),
+            NewType::NativeScalar(scalar_ref) => UnitTypeRef::NativeScalar(scalar_ref),
         }
     }
 
@@ -118,9 +107,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 let edge_index = self.alloc_def_type_index(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QueryLevel::Node);
 
+                let mut field_namespace = Namespace::default();
+
                 // FIXME: what if some of the relation data's fields are called "node"
                 let mut fields: IndexMap<String, FieldData> = [(
-                    smart_format!("node"),
+                    field_namespace.unique_literal("node"),
                     FieldData {
                         kind: FieldKind::Node,
                         field_type: TypeRef::mandatory(node_ref),
@@ -135,20 +126,23 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 self.get_def_type_ref(map_op.def_variant.def_id, QueryLevel::Node);
 
                             let rel_type_info = self.env.get_type_info(map_op.def_variant.def_id);
-                            let rel_typename = &rel_type_info.name;
+                            let rel_typename = rel_type_info.name.as_str();
 
                             // Register edge fields
-                            self.register_fields(map_op, &mut fields, &|property_data| {
-                                FieldKind::EdgeProperty(property_data)
-                            });
+                            self.register_fields(
+                                map_op,
+                                &mut fields,
+                                &FieldKind::EdgeProperty,
+                                &mut field_namespace,
+                            );
 
                             NewType::Indexed(
                                 edge_index,
                                 TypeData {
-                                    typename: smart_format!("{rel_typename}{typename}Edge"),
-                                    input_typename: Some(smart_format!(
-                                        "{rel_typename}{typename}EdgeInput"
-                                    )),
+                                    typename: self.namespace.edge(Some(rel_typename), typename),
+                                    input_typename: Some(
+                                        self.namespace.edge_input(Some(rel_typename), typename),
+                                    ),
                                     partial_input_typename: None,
                                     kind: TypeKind::Object(ObjectData {
                                         fields,
@@ -168,8 +162,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     NewType::Indexed(
                         edge_index,
                         TypeData {
-                            typename: smart_format!("{typename}Edge"),
-                            input_typename: Some(smart_format!("{typename}EdgeInput")),
+                            typename: self.namespace.edge(None, typename),
+                            input_typename: Some(self.namespace.edge_input(None, typename)),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -189,7 +183,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 NewType::Indexed(
                     connection_index,
                     TypeData {
-                        typename: smart_format!("{typename}Connection"),
+                        typename: self.namespace.connection(typename),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -221,9 +215,21 @@ impl<'a> VirtualSchemaBuilder<'a> {
         type_info: &TypeInfo,
         operator_id: SerdeOperatorId,
     ) -> NewType {
+        let typename = type_info.name.as_str();
+
         match self.env.get_serde_operator(operator_id) {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
-            SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
+            SerdeOperator::ConstructorSequence(_) => NewType::Indexed(
+                self.alloc_def_type_index(type_info.def_id, QueryLevel::Node),
+                TypeData {
+                    typename: self.namespace.typename(typename),
+                    input_typename: Some(self.namespace.input(typename)),
+                    partial_input_typename: Some(self.namespace.partial_input(typename)),
+                    kind: TypeKind::CustomScalar(ScalarData {
+                        serde_operator_id: operator_id,
+                    }),
+                },
+            ),
             SerdeOperator::ValueType(_) => todo!("value type"),
             SerdeOperator::Union(union_op) => {
                 match union_op.variants(ProcessorMode::Select, ProcessorLevel::Root) {
@@ -248,13 +254,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                     }
                                 }
                                 TypeClassification::Id => {}
-                                TypeClassification::Scalar => {
+                                TypeClassification::NativeScalar => {
                                     panic!("BUG: Scalar in union");
                                 }
                             }
                         }
-
-                        let typename = type_info.name.as_str();
 
                         debug!(
                             "created a union for `{typename}`: {operator_id:?} variants={variants:?}",
@@ -263,11 +267,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         NewType::Indexed(
                             node_index,
                             TypeData {
-                                typename: type_info.name.clone(),
-                                input_typename: Some(smart_format!("{typename}UnionInput")),
-                                partial_input_typename: Some(smart_format!(
-                                    "{typename}UnionPartialInput"
-                                )),
+                                typename: self.namespace.typename(&type_info.name),
+                                input_typename: Some(self.namespace.union_input(typename)),
+                                partial_input_typename: Some(
+                                    self.namespace.union_partial_input(typename),
+                                ),
                                 kind: TypeKind::Union(UnionData {
                                     union_def_id: type_info.def_id,
                                     variants: type_variants,
@@ -278,15 +282,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 }
             }
             SerdeOperator::Map(map_op) => self.make_map_type(type_info, map_op),
-            operator => self.make_new_scalar(operator_id, operator),
+            operator => NewType::NativeScalar(self.make_new_native_scalar(operator_id, operator)),
         }
     }
 
-    fn make_new_scalar(
+    fn make_new_native_scalar(
         &mut self,
         operator_id: SerdeOperatorId,
         serde_operator: &SerdeOperator,
-    ) -> NewType {
+    ) -> NativeScalarRef {
         let kind = match serde_operator {
             SerdeOperator::Unit => NativeScalarKind::Unit,
             SerdeOperator::Int(def_id) => NativeScalarKind::Int(*def_id),
@@ -295,15 +299,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
-            SerdeOperator::ConstructorSequence(_) => todo!("custom scalar"),
             SerdeOperator::Id(_) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
             | SerdeOperator::Map(_)
-            | SerdeOperator::RelationSequence(_) => panic!("not a scalar"),
+            | SerdeOperator::RelationSequence(_)
+            | SerdeOperator::ConstructorSequence(_) => panic!("not a native scalar"),
         };
 
-        NewType::NativeScalar(NativeScalarRef { operator_id, kind })
+        NativeScalarRef { operator_id, kind }
     }
 
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
@@ -321,7 +325,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         relation_id: entity_info.id_relation_id,
                         operator_id: entity_info.id_operator_id,
                     }),
-                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef {
+                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
                         operator_id: entity_info.id_operator_id,
                         kind: NativeScalarKind::ID,
                     })),
@@ -329,14 +333,17 @@ impl<'a> VirtualSchemaBuilder<'a> {
             );
         }
 
-        self.register_fields(map_type, &mut fields, &|property_data| {
-            FieldKind::Property(property_data)
-        });
+        self.register_fields(
+            map_type,
+            &mut fields,
+            &FieldKind::Property,
+            &mut Namespace::default(),
+        );
 
         NewType::Indexed(
             type_index,
             TypeData {
-                typename: typename.into(),
+                typename: self.namespace.typename(typename),
                 input_typename: Some(self.namespace.input(typename)),
                 partial_input_typename: Some(self.namespace.partial_input(typename)),
                 kind: TypeKind::Object(ObjectData {
@@ -359,18 +366,19 @@ impl<'a> VirtualSchemaBuilder<'a> {
         map_op: &MapOperator,
         fields: &mut IndexMap<String, FieldData>,
         make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
+        field_namespace: &mut Namespace,
     ) {
         for (property_name, property) in &map_op.properties {
             match self.env.get_serde_operator(property.value_operator_id) {
                 SerdeOperator::Map(property_map_op) => {
                     fields.insert(
-                        property_name.clone(),
+                        field_namespace.unique_literal(property_name),
                         self.unit_def_field_data(property, property_map_op.def_variant.def_id),
                     );
                 }
                 SerdeOperator::Union(union_op) => {
                     fields.insert(
-                        property_name.clone(),
+                        field_namespace.unique_literal(property_name),
                         self.unit_def_field_data(property, union_op.union_def_variant().def_id),
                     );
                 }
@@ -385,7 +393,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             );
 
                             fields.insert(
-                                property_name.clone(),
+                                field_namespace.unique_literal(property_name),
                                 FieldData::mandatory(
                                     FieldKind::Connection {
                                         property_id: Some(property.property_id),
@@ -405,7 +413,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             );
 
                             fields.insert(
-                                property_name.clone(),
+                                field_namespace.unique_literal(property_name),
                                 FieldData {
                                     kind: make_property_field_kind(PropertyData {
                                         property_id: property.property_id,
@@ -419,7 +427,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         TypeClassification::Id => {
                             debug!("Id not handled here");
                         }
-                        TypeClassification::Scalar => {
+                        TypeClassification::NativeScalar => {
                             panic!(
                                 "Unhandled scalar: {:?}",
                                 self.env.get_serde_operator(seq_op.ranges[0].operator_id)
@@ -427,11 +435,18 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         }
                     }
                 }
-                operator => {
-                    let scalar_ref =
-                        self.get_operator_scalar_type_ref(property.value_operator_id, operator);
+                SerdeOperator::ConstructorSequence(seq_op) => {
                     fields.insert(
-                        property_name.clone(),
+                        field_namespace.unique_literal(property_name),
+                        self.unit_def_field_data(property, seq_op.def_variant.def_id),
+                    );
+                }
+                operator => {
+                    let scalar_ref = UnitTypeRef::NativeScalar(
+                        self.make_new_native_scalar(property.value_operator_id, operator),
+                    );
+                    fields.insert(
+                        field_namespace.unique_literal(property_name),
                         FieldData {
                             kind: make_property_field_kind(PropertyData {
                                 property_id: property.property_id,
@@ -538,7 +553,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     kind: FieldKind::DeleteMutation {
                         id: argument::Id(id_operator_id),
                     },
-                    field_type: TypeRef::mandatory(UnitTypeRef::Scalar(NativeScalarRef {
+                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
                         operator_id: SerdeOperatorId(42),
                         kind: NativeScalarKind::Bool,
                     })),

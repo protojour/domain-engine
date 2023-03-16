@@ -131,7 +131,7 @@ impl VirtualSchema {
     pub fn lookup_type_index(&self, type_ref: UnitTypeRef) -> Result<TypeIndex, NativeScalarRef> {
         match type_ref {
             UnitTypeRef::Indexed(type_index) => Ok(type_index),
-            UnitTypeRef::Scalar(scalar_ref) => Err(scalar_ref),
+            UnitTypeRef::NativeScalar(scalar_ref) => Err(scalar_ref),
         }
     }
 
@@ -187,7 +187,7 @@ impl VirtualSchema {
 pub enum TypeClassification {
     Type(NodeClassification, DefId, SerdeOperatorId),
     Id,
-    Scalar,
+    NativeScalar,
 }
 
 pub enum NodeClassification {
@@ -239,10 +239,10 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                                     operator_id,
                                 );
                             }
-                            (_, TypeClassification::Scalar) => {
+                            (_, TypeClassification::NativeScalar) => {
                                 // downgrade
                                 debug!("    Downgrade to Scalar");
-                                classification = TypeClassification::Scalar;
+                                classification = TypeClassification::NativeScalar;
                             }
                             _ => {}
                         }
@@ -253,9 +253,14 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
             }
         }
         SerdeOperator::Id(_) => TypeClassification::Id,
+        SerdeOperator::ConstructorSequence(seq_op) => TypeClassification::Type(
+            NodeClassification::Node,
+            seq_op.def_variant.def_id,
+            operator_id,
+        ),
         operator => {
             debug!("    operator interpreted as Scalar: {operator:?}");
-            TypeClassification::Scalar
+            TypeClassification::NativeScalar
         }
     }
 }
