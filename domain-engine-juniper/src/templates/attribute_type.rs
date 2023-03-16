@@ -27,31 +27,6 @@ pub struct AttributeType<'v> {
     pub attr: &'v Attribute,
 }
 
-impl<'v> AttributeType<'v> {
-    fn find_union_variant<'s>(
-        &self,
-        union_data: &'s UnionData,
-        virtual_schema: &'s VirtualSchema,
-    ) -> (TypeIndex, &'s TypeData) {
-        for variant_type_index in &union_data.variants {
-            let variant_type_data = virtual_schema.type_data(*variant_type_index);
-            match &variant_type_data.kind {
-                TypeKind::Object(ObjectData {
-                    kind: ObjectKind::Node(node_data),
-                    ..
-                }) => {
-                    if node_data.def_id == self.attr.value.type_def_id {
-                        return (*variant_type_index, variant_type_data);
-                    }
-                }
-                _ => panic!("Unsupported union variant"),
-            }
-        }
-
-        panic!("union variant not found")
-    }
-}
-
 impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     type Context = GqlContext;
     type TypeInfo = VirtualIndexedTypeInfo;
@@ -102,97 +77,13 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
         _arguments: &juniper::Arguments<crate::gql_scalar::GqlScalar>,
         executor: &juniper::Executor<Self::Context, crate::gql_scalar::GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-        let virtual_schema = &info.virtual_schema;
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {
-                let field_data = object_data.fields.get(field_name).unwrap();
-                let type_ref = field_data.field_type;
-
-                debug!("resolve field `{field_name}`: {:?}", self.attr);
-
-                match (&field_data.kind, &self.attr.value.data) {
-                    (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(
-                        SequenceType { seq },
-                        virtual_schema
-                            .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
-                            .unwrap(),
-                        executor,
-                    ),
-                    (FieldKind::Node, Data::Map(_)) => resolve_virtual_schema_field(
-                        self,
-                        virtual_schema
-                            .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
-                            .unwrap(),
-                        executor,
-                    ),
-                    (
-                        FieldKind::Connection {
-                            property_id: Some(property_id),
-                            ..
-                        },
-                        Data::Map(map),
-                    ) => {
-                        let type_info = virtual_schema
-                            .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
-                            .unwrap();
-
-                        match map.get(property_id) {
-                            Some(attribute) => resolve_virtual_schema_field(
-                                AttributeType { attr: attribute },
-                                type_info,
-                                executor,
-                            ),
-                            None => {
-                                let empty = Attribute {
-                                    value: Value::new(Data::Sequence(vec![]), DefId::unit()),
-                                    rel_params: Value::unit(),
-                                };
-
-                                resolve_virtual_schema_field(
-                                    AttributeType { attr: &empty },
-                                    type_info,
-                                    executor,
-                                )
-                            }
-                        }
-                    }
-                    (FieldKind::Property(property_data), Data::Map(map)) => {
-                        debug!("lookup property {field_name}");
-                        resolve_property(
-                            map,
-                            property_data.property_id,
-                            type_ref,
-                            &info.virtual_schema,
-                            executor,
-                        )
-                    }
-                    (FieldKind::Id(id_property_data), Data::Map(map)) => resolve_property(
-                        map,
-                        PropertyId::subject(id_property_data.relation_id),
-                        type_ref,
-                        &info.virtual_schema,
-                        executor,
-                    ),
-                    (FieldKind::EdgeProperty(property_data), _) => {
-                        match &self.attr.rel_params.data {
-                            Data::Map(rel_map) => resolve_property(
-                                rel_map,
-                                property_data.property_id,
-                                type_ref,
-                                &info.virtual_schema,
-                                executor,
-                            ),
-                            other => {
-                                panic!("Tried to read edge property from {other:?}");
-                            }
-                        }
-                    }
-                    (field, value) => panic!("unhandled combination: ({field:?} ? {value:?})"),
-                }
+                self.resolve_object_field(info, object_data, field_name, executor)
             }
-            TypeKind::Union(_) => todo!("union"),
+            TypeKind::Union(_) => panic!("union should be resolved earlier"),
             TypeKind::CustomScalar(_) => {
-                panic!("Scalar value must be resolved using a different type")
+                panic!("Scalar value must be resolved using SerdeProcessor")
             }
         }
     }
@@ -240,38 +131,6 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
     }
 }
 
-fn resolve_property(
-    map: &BTreeMap<PropertyId, Attribute>,
-    property_id: PropertyId,
-    type_ref: TypeRef,
-    virtual_schema: &Arc<VirtualSchema>,
-    _executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
-) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-    let attribute = match map.get(&property_id) {
-        Some(attribute) => attribute,
-        None => return Ok(graphql_value!(None)),
-    };
-
-    match virtual_schema.lookup_type_index(type_ref.unit) {
-        Ok(_type_index) => {
-            panic!("type_index property. TODO: resolve using IndexedType")
-        }
-        Err(scalar_ref) => {
-            let scalar = virtual_schema
-                .env()
-                .new_serde_processor(
-                    scalar_ref.operator_id,
-                    None,
-                    ProcessorMode::Select,
-                    ProcessorLevel::Root,
-                )
-                .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
-
-            Ok(juniper::Value::Scalar(scalar))
-        }
-    }
-}
-
 // Note: No need for async for now.
 // in the future there might be a need for this.
 /*
@@ -292,3 +151,152 @@ impl<'v> juniper::GraphQLValueAsync<GqlScalar> for IndexedType<'v> {
     }
 }
 */
+
+impl<'v> AttributeType<'v> {
+    fn find_union_variant<'s>(
+        &self,
+        union_data: &'s UnionData,
+        virtual_schema: &'s VirtualSchema,
+    ) -> (TypeIndex, &'s TypeData) {
+        for variant_type_index in &union_data.variants {
+            let variant_type_data = virtual_schema.type_data(*variant_type_index);
+            match &variant_type_data.kind {
+                TypeKind::Object(ObjectData {
+                    kind: ObjectKind::Node(node_data),
+                    ..
+                }) => {
+                    if node_data.def_id == self.attr.value.type_def_id {
+                        return (*variant_type_index, variant_type_data);
+                    }
+                }
+                _ => panic!("Unsupported union variant"),
+            }
+        }
+
+        panic!("union variant not found")
+    }
+
+    fn resolve_object_field(
+        &self,
+        info: &VirtualIndexedTypeInfo,
+        object_data: &ObjectData,
+        field_name: &str,
+        executor: &juniper::Executor<GqlContext, GqlScalar>,
+    ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+        let virtual_schema = &info.virtual_schema;
+        let field_data = object_data.fields.get(field_name).unwrap();
+        let type_ref = field_data.field_type;
+
+        debug!("resolve object field `{field_name}`: {:?}", self.attr);
+
+        match (&field_data.kind, &self.attr.value.data) {
+            (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(
+                SequenceType { seq },
+                virtual_schema
+                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (FieldKind::Node, Data::Map(_)) => resolve_virtual_schema_field(
+                self,
+                virtual_schema
+                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (
+                FieldKind::Connection {
+                    property_id: Some(property_id),
+                    ..
+                },
+                Data::Map(map),
+            ) => {
+                let type_info = virtual_schema
+                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .unwrap();
+
+                match map.get(property_id) {
+                    Some(attribute) => resolve_virtual_schema_field(
+                        AttributeType { attr: attribute },
+                        type_info,
+                        executor,
+                    ),
+                    None => {
+                        let empty = Attribute {
+                            value: Value::new(Data::Sequence(vec![]), DefId::unit()),
+                            rel_params: Value::unit(),
+                        };
+
+                        resolve_virtual_schema_field(
+                            AttributeType { attr: &empty },
+                            type_info,
+                            executor,
+                        )
+                    }
+                }
+            }
+            (FieldKind::Property(property_data), Data::Map(map)) => {
+                debug!("lookup property {field_name}");
+                Self::resolve_property(
+                    map,
+                    property_data.property_id,
+                    type_ref,
+                    &info.virtual_schema,
+                    executor,
+                )
+            }
+            (FieldKind::Id(id_property_data), Data::Map(map)) => Self::resolve_property(
+                map,
+                PropertyId::subject(id_property_data.relation_id),
+                type_ref,
+                &info.virtual_schema,
+                executor,
+            ),
+            (FieldKind::EdgeProperty(property_data), _) => match &self.attr.rel_params.data {
+                Data::Map(rel_map) => Self::resolve_property(
+                    rel_map,
+                    property_data.property_id,
+                    type_ref,
+                    &info.virtual_schema,
+                    executor,
+                ),
+                other => {
+                    panic!("BUG: Tried to read edge property from {other:?}");
+                }
+            },
+            other => panic!("BUG: unhandled combination: {other:?}"),
+        }
+    }
+
+    fn resolve_property(
+        map: &BTreeMap<PropertyId, Attribute>,
+        property_id: PropertyId,
+        type_ref: TypeRef,
+        virtual_schema: &Arc<VirtualSchema>,
+        _executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
+    ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+        let attribute = match map.get(&property_id) {
+            Some(attribute) => attribute,
+            None => return Ok(graphql_value!(None)),
+        };
+
+        match virtual_schema.lookup_type_index(type_ref.unit) {
+            Ok(_type_index) => {
+                panic!("type_index property. TODO: resolve using IndexedType")
+            }
+            Err(scalar_ref) => {
+                let scalar = virtual_schema
+                    .env()
+                    .new_serde_processor(
+                        scalar_ref.operator_id,
+                        None,
+                        ProcessorMode::Select,
+                        ProcessorLevel::Root,
+                    )
+                    .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+
+                Ok(juniper::Value::Scalar(scalar))
+            }
+        }
+    }
+}
