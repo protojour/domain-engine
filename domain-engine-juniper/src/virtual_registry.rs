@@ -8,7 +8,7 @@ use tracing::{debug, warn};
 
 use crate::{
     gql_scalar::GqlScalar,
-    templates::{indexed_input_value::IndexedInputValue, indexed_type::IndexedType},
+    templates::{attribute_type::AttributeType, indexed_input_value::IndexedInputValue},
     virtual_schema::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
@@ -51,7 +51,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     description: None,
                     arguments: self.get_arguments_for_field(&field_data.kind),
                     field_type: self
-                        .get_type::<IndexedType>(field_data.field_type, TypingPurpose::Selection),
+                        .get_type::<AttributeType>(field_data.field_type, TypingPurpose::Selection),
                     deprecation_status: juniper::meta::DeprecationStatus::Current,
                 })
                 .collect(),

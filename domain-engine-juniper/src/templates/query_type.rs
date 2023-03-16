@@ -8,8 +8,8 @@ use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
-    resolve::resolve_indexed_type,
-    templates::indexed_type::IndexedType,
+    resolve::resolve_attribute_type,
+    templates::attribute_type::AttributeType,
     type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{TypingPurpose, VirtualIndexedTypeInfo},
@@ -41,7 +41,7 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
 }
 
 impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
-    /// TODO: Might implement resolve_async instead, so we can have just one query
+    /// TODO: Might implement resolve_async instead, so we can have just one engine_api call?
     fn resolve_field_async<'a>(
         &'a self,
         info: &'a Self::TypeInfo,
@@ -60,7 +60,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             let entity_attributes = executor
                 .context()
-                .domain_api
+                .engine_api
                 .query_entities(virtual_schema.package_id(), entity_query)
                 .await?;
 
@@ -71,14 +71,16 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             debug!("query result: {attribute:#?}");
 
-            match virtual_schema.lookup_type_index(query_field.field_type.unit) {
-                Ok(type_index) => resolve_indexed_type(
-                    IndexedType { attr: &attribute },
-                    virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
-                    executor,
-                ),
-                Err(_) => panic!(),
-            }
+            resolve_attribute_type(
+                AttributeType { attr: &attribute },
+                virtual_schema
+                    .indexed_type_info_by_unit(
+                        query_field.field_type.unit,
+                        TypingPurpose::Selection,
+                    )
+                    .unwrap(),
+                executor,
+            )
         })
     }
 }

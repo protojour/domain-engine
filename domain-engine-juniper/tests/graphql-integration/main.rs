@@ -89,7 +89,7 @@ impl MockExec for &'static str {
             schema,
             &juniper::Variables::new(),
             &GqlContext {
-                domain_api: Arc::new(unimock),
+                engine_api: Arc::new(unimock),
             },
         )
         .await

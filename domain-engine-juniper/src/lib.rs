@@ -17,7 +17,7 @@ mod type_info;
 mod virtual_registry;
 
 pub struct GqlContext {
-    pub domain_api: Arc<dyn EngineAPI>,
+    pub engine_api: Arc<dyn EngineAPI>,
 }
 
 impl juniper::Context for GqlContext {}

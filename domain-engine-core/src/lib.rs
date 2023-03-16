@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use ontol_runtime::{query::EntityQuery, value::Attribute, PackageId};
+use ontol_runtime::{env::Env, query::EntityQuery, value::Attribute, PackageId};
 
 pub struct Config {
     pub default_limit: u32,
@@ -29,9 +29,6 @@ pub trait EngineAPI: Send + Sync + 'static {
     ) -> Result<Vec<Attribute>, DomainError>;
 }
 
-/// Facade interface used by "user facing" APIs.
-/// Not sure if this is the right way to design this.
-pub struct EngineFrontFacade {
-    pub config: Arc<Config>,
-    pub engine_api: Arc<dyn EngineAPI>,
+pub struct Engine {
+    env: Arc<Env>,
 }
