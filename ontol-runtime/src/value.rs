@@ -54,10 +54,10 @@ impl Value {
         self.get_attribute(property_id).map(|attr| &attr.value)
     }
 
-    pub fn to_attribute(self) -> Attribute {
+    pub fn to_attribute(self, rel_params: Value) -> Attribute {
         Attribute {
             value: self,
-            rel_params: Value::unit(),
+            rel_params,
         }
     }
 

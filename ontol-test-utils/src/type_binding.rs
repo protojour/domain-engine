@@ -60,11 +60,25 @@ impl<'e> TypeBinding<'e> {
         self.env
     }
 
-    pub fn value_builder(&self) -> ValueBuilder<'_, 'e> {
+    pub fn value_builder(&self, data: serde_json::Value) -> ValueBuilder<'_, 'e> {
         ValueBuilder {
             binding: self,
             value: Value::unit(),
         }
+        .data(data)
+    }
+
+    pub fn entity_builder(
+        &self,
+        id: serde_json::Value,
+        data: serde_json::Value,
+    ) -> ValueBuilder<'_, 'e> {
+        ValueBuilder {
+            binding: self,
+            value: Value::unit(),
+        }
+        .id(id)
+        .data(data)
     }
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
@@ -189,13 +203,39 @@ fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
         .unwrap()
 }
 
+#[derive(Clone)]
 pub struct ValueBuilder<'t, 'e> {
     binding: &'t TypeBinding<'e>,
     value: Value,
 }
 
+impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Value {
+    fn from(b: ValueBuilder<'t, 'e>) -> Self {
+        b.value
+    }
+}
+
+impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Attribute {
+    fn from(b: ValueBuilder<'t, 'e>) -> Attribute {
+        b.to_unit_attribute()
+    }
+}
+
 impl<'t, 'e> ValueBuilder<'t, 'e> {
-    pub fn data(mut self, json: serde_json::Value) -> Self {
+    pub fn relationship(self, name: &str, attribute: Attribute) -> Self {
+        let property_id = self.binding.find_property(name).expect("unknown property");
+        self.merge_attribute(property_id, attribute)
+    }
+
+    pub fn to_unit_attribute(self) -> Attribute {
+        self.value.to_attribute(Value::unit())
+    }
+
+    pub fn to_attribute(self, rel_params: impl Into<Value>) -> Attribute {
+        self.value.to_attribute(rel_params.into())
+    }
+
+    fn data(mut self, json: serde_json::Value) -> Self {
         let value = self.binding.deserialize_value(json).unwrap();
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {
@@ -215,7 +255,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
         self
     }
 
-    pub fn id(mut self, json: serde_json::Value) -> Self {
+    fn id(self, json: serde_json::Value) -> Self {
         let entity_info = self
             .binding
             .type_info
@@ -236,21 +276,33 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
             ))
             .unwrap();
 
-        let property_id = PropertyId::subject(entity_info.id_relation_id);
+        self.merge_attribute(PropertyId::subject(entity_info.id_relation_id), id)
+    }
 
+    fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {
         match &mut self.value.data {
             Data::Map(map) => {
-                map.insert(property_id, id);
+                map.insert(property_id, attribute);
             }
-            Data::Unit => self.value.data = Data::Map([(property_id, id)].into()),
+            Data::Unit => self.value.data = Data::Map([(property_id, attribute)].into()),
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")
             }
         }
         self
     }
+}
 
-    pub fn to_attribute(self) -> Attribute {
-        self.value.to_attribute()
+pub trait ToSequence {
+    fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute;
+}
+
+impl ToSequence for Vec<Attribute> {
+    fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
+        Value {
+            data: Data::Sequence(self),
+            type_def_id: ty.type_info.def_id,
+        }
+        .to_attribute(Value::unit())
     }
 }

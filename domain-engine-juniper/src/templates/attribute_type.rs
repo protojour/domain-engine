@@ -108,7 +108,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                 let field_data = object_data.fields.get(field_name).unwrap();
                 let type_ref = field_data.field_type;
 
-                debug!("resolve field {field_name}");
+                debug!("resolve field `{field_name}`: {:?}", self.attr);
 
                 match (&field_data.kind, &self.attr.value.data) {
                     (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(

@@ -1,6 +1,7 @@
 use domain_engine_core::EngineAPIMock;
 use juniper::graphql_value;
-use ontol_test_utils::type_binding::TypeBinding;
+use ontol_runtime::value::Attribute;
+use ontol_test_utils::type_binding::{ToSequence, TypeBinding};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
@@ -68,13 +69,28 @@ async fn test_graphql_basic_schema() {
 async fn test_graphql_artist_and_instrument_connections() {
     let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
     let artist = TypeBinding::new(&env, "artist");
-    let artist_entity = artist
-        .value_builder()
-        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
-        .data(json!({
-            "name": "Radiohead"
-        }))
-        .to_attribute();
+    let instrument = TypeBinding::new(&env, "instrument");
+    let plays = TypeBinding::new(&env, "plays");
+    let ziggy: Attribute = artist
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({
+                "name": "Ziggy",
+            }),
+        )
+        .relationship(
+            "plays",
+            vec![instrument
+                .entity_builder(
+                    json!("instrument/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                    json!({
+                        "name": "Guitar",
+                    }),
+                )
+                .to_attribute(plays.value_builder(json!({ "how_much": "A lot" })))]
+            .to_sequence_attribute(&instrument),
+        )
+        .into();
 
     assert_eq!(
         "{
@@ -101,7 +117,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 mock_default_config(),
                 EngineAPIMock::query_entities
                     .next_call(matching!(_))
-                    .returns(Ok(vec![artist_entity]))
+                    .returns(Ok(vec![ziggy]))
             )
         )
         .await,
@@ -110,9 +126,14 @@ async fn test_graphql_artist_and_instrument_connections() {
                 "edges": [{
                     "node": {
                         "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
-                        "name": "Radiohead",
+                        "name": "Ziggy",
                         "plays": {
-                            "edges": []
+                            "edges": [{
+                                "node": {
+                                    "_id": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
+                                    "name": "Guitar",
+                                }
+                            }]
                         }
                     }
                 }],
@@ -185,23 +206,24 @@ async fn test_graphql_artist_and_instrument_connections() {
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let (env, schema) = GUITAR_SYNTH_UNION.compile_schema();
     let artist = TypeBinding::new(&env, "artist");
-    let artist_entity = artist
-        .value_builder()
-        .id(json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"))
-        .data(json!({
-            "name": "foobar",
-            "plays": [
-                {
-                    "type": "synth",
-                    "polyphony": 42,
-                },
-                {
-                    "type": "guitar",
-                    "string_count": 91,
-                }
-            ]
-        }))
-        .to_attribute();
+    let artist_entity: Attribute = artist
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({
+                "name": "foobar",
+                "plays": [
+                    {
+                        "type": "synth",
+                        "polyphony": 42,
+                    },
+                    {
+                        "type": "guitar",
+                        "string_count": 91,
+                    }
+                ]
+            }),
+        )
+        .into();
 
     assert_eq!(
         "{
