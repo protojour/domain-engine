@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use ontol_runtime::{env::Env, query::EntityQuery, value::Attribute, PackageId};
+use ontol_runtime::{
+    env::Env,
+    query::{EntityQuery, MapOrUnionQuery},
+    value::{Attribute, Value},
+};
 
 pub struct Config {
     pub default_limit: u32,
@@ -22,11 +26,13 @@ pub enum DomainError {}
 pub trait EngineAPI: Send + Sync + 'static {
     fn get_config(&self) -> &Config;
 
-    async fn query_entities(
+    async fn query_entities(&self, query: EntityQuery) -> Result<Vec<Attribute>, DomainError>;
+
+    async fn create_entity(
         &self,
-        package_id: PackageId,
-        entity_query: EntityQuery,
-    ) -> Result<Vec<Attribute>, DomainError>;
+        value: Value,
+        query: MapOrUnionQuery,
+    ) -> Result<Value, DomainError>;
 }
 
 pub struct Engine {

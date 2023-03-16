@@ -19,13 +19,15 @@ fn test_graphql_empty_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
-    let (_env, schema) = "
+    let (env, schema) = "
     type foo {
         rel [id] string
         rel ['prop'] int
     }
     "
     .compile_schema();
+    let foo = TypeBinding::new(&env, "foo");
+    let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
 
     assert_eq!(
         "{
@@ -59,9 +61,19 @@ async fn test_graphql_basic_schema() {
                 prop
             }
         }"
-        .mock_exec(&schema, ())
+        .mock_exec(
+            &schema,
+            EngineAPIMock::create_entity
+                .next_call(matching!(_, _))
+                .returns(Ok(entity.into()))
+        )
         .await,
-        Ok(graphql_value!(None)),
+        Ok(graphql_value!({
+            "createfoo": {
+                // BUG: floating point
+                "prop": 42.0
+            }
+        })),
     );
 }
 
@@ -118,7 +130,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 mock_default_config(),
                 EngineAPIMock::query_entities
                     .next_call(matching!(_))
-                    .returns(Ok(vec![ziggy]))
+                    .returns(Ok(vec![ziggy.clone()]))
             )
         )
         .await,
@@ -179,7 +191,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         r#"
         mutation {
             createartist(input: {
-                name: "Someone",
+                name: "Ziggy",
                 plays: [
                     {
                         name: "Instrument",
@@ -200,9 +212,19 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }
         "#
-        .mock_exec(&schema, ())
+        .mock_exec(
+            &schema,
+            EngineAPIMock::create_entity
+                .next_call(matching!(_, _))
+                .returns(Ok(ziggy.value))
+        )
         .await,
-        Ok(graphql_value!(None))
+        Ok(graphql_value!({
+            "createartist": {
+                "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                "name": "Ziggy"
+            }
+        }))
     );
 }
 

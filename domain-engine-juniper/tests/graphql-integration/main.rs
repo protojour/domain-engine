@@ -65,7 +65,7 @@ pub fn mock_default_config() -> impl unimock::Clause {
 
 pub fn mock_query_entities_empty() -> impl unimock::Clause {
     EngineAPIMock::query_entities
-        .next_call(matching!(_, _))
+        .next_call(matching!(_))
         .returns(Ok(vec![]))
 }
 
