@@ -173,6 +173,20 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                         &info.virtual_schema,
                         executor,
                     ),
+                    (FieldKind::EdgeProperty(property_data), _) => {
+                        match &self.attr.rel_params.data {
+                            Data::Map(rel_map) => resolve_property(
+                                rel_map,
+                                property_data.property_id,
+                                type_ref,
+                                &info.virtual_schema,
+                                executor,
+                            ),
+                            other => {
+                                panic!("Tried to read edge property from {other:?}");
+                            }
+                        }
+                    }
                     (field, value) => panic!("unhandled combination: ({field:?} ? {value:?})"),
                 }
             }

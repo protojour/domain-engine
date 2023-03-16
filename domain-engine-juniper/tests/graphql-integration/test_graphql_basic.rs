@@ -105,6 +105,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                                     _id
                                     name
                                 }
+                                how_much
                             }
                         }
                     }
@@ -128,12 +129,15 @@ async fn test_graphql_artist_and_instrument_connections() {
                         "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
                         "name": "Ziggy",
                         "plays": {
-                            "edges": [{
-                                "node": {
-                                    "_id": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
-                                    "name": "Guitar",
+                            "edges": [
+                                {
+                                    "node": {
+                                        "_id": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
+                                        "name": "Guitar",
+                                    },
+                                    "how_much": "A lot"
                                 }
-                            }]
+                            ]
                         }
                     }
                 }],

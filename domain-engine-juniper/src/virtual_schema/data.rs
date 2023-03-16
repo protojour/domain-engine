@@ -167,6 +167,7 @@ impl FieldData {
 #[derive(Debug)]
 pub enum FieldKind {
     Property(PropertyData),
+    EdgeProperty(PropertyData),
     Id(IdPropertyData),
     Node,
     Edges,

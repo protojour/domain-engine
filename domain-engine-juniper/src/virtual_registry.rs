@@ -220,7 +220,11 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 Some(vec![self.get_domain_arg(id), self.get_domain_arg(input)])
             }
             FieldKind::DeleteMutation { id } => Some(vec![self.get_domain_arg(id)]),
-            FieldKind::Property(_) | FieldKind::Id(_) | FieldKind::Edges | FieldKind::Node => None,
+            FieldKind::Property(_)
+            | FieldKind::EdgeProperty(_)
+            | FieldKind::Id(_)
+            | FieldKind::Edges
+            | FieldKind::Node => None,
         }
     }
 

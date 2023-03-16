@@ -119,7 +119,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 let node_ref = self.get_def_type_ref(def_id, QueryLevel::Node);
 
                 // FIXME: what if some of the relation data's fields are called "node"
-                let fields: IndexMap<String, FieldData> = [(
+                let mut fields: IndexMap<String, FieldData> = [(
                     smart_format!("node"),
                     FieldData {
                         kind: FieldKind::Node,
@@ -136,6 +136,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                             let rel_type_info = self.env.get_type_info(map_op.def_variant.def_id);
                             let rel_typename = &rel_type_info.name;
+
+                            // Register edge fields
+                            self.register_fields(map_op, &mut fields, &|property_data| {
+                                FieldKind::EdgeProperty(property_data)
+                            });
 
                             NewType::Indexed(
                                 edge_index,
@@ -324,7 +329,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
             );
         }
 
-        self.register_fields(map_type, &mut fields);
+        self.register_fields(map_type, &mut fields, &|property_data| {
+            FieldKind::Property(property_data)
+        });
 
         NewType::Indexed(
             type_index,
@@ -347,7 +354,12 @@ impl<'a> VirtualSchemaBuilder<'a> {
         )
     }
 
-    fn register_fields(&mut self, map_op: &MapOperator, fields: &mut IndexMap<String, FieldData>) {
+    fn register_fields(
+        &mut self,
+        map_op: &MapOperator,
+        fields: &mut IndexMap<String, FieldData>,
+        make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
+    ) {
         for (property_name, property) in &map_op.properties {
             match self.env.get_serde_operator(property.value_operator_id) {
                 SerdeOperator::Map(property_map_op) => {
@@ -395,7 +407,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             fields.insert(
                                 property_name.clone(),
                                 FieldData {
-                                    kind: FieldKind::Property(PropertyData {
+                                    kind: make_property_field_kind(PropertyData {
                                         property_id: property.property_id,
                                         value_operator_id: property.value_operator_id,
                                     }),
@@ -421,7 +433,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     fields.insert(
                         property_name.clone(),
                         FieldData {
-                            kind: FieldKind::Property(PropertyData {
+                            kind: make_property_field_kind(PropertyData {
                                 property_id: property.property_id,
                                 value_operator_id: property.value_operator_id,
                             }),
