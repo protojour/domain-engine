@@ -79,7 +79,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {
-                self.resolve_object_field(info, object_data, field_name, executor)
+                self.resolve_object_field(&info.virtual_schema, object_data, field_name, executor)
             }
             TypeKind::Union(_) => panic!("union should be resolved earlier"),
             TypeKind::CustomScalar(_) => {
@@ -178,14 +178,13 @@ impl<'v> AttributeType<'v> {
 
     fn resolve_object_field(
         &self,
-        info: &VirtualIndexedTypeInfo,
+        virtual_schema: &Arc<VirtualSchema>,
         object_data: &ObjectData,
         field_name: &str,
         executor: &juniper::Executor<GqlContext, GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-        let virtual_schema = &info.virtual_schema;
         let field_data = object_data.fields.get(field_name).unwrap();
-        let type_ref = field_data.field_type;
+        let field_type = field_data.field_type;
 
         debug!("resolve object field `{field_name}`: {:?}", self.attr);
 
@@ -193,14 +192,14 @@ impl<'v> AttributeType<'v> {
             (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(
                 SequenceType { seq },
                 virtual_schema
-                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
             (FieldKind::Node, Data::Map(_)) => resolve_virtual_schema_field(
                 self,
                 virtual_schema
-                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
@@ -212,7 +211,7 @@ impl<'v> AttributeType<'v> {
                 Data::Map(map),
             ) => {
                 let type_info = virtual_schema
-                    .indexed_type_info_by_unit(type_ref.unit, TypingPurpose::Selection)
+                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
                 match map.get(property_id) {
@@ -240,24 +239,24 @@ impl<'v> AttributeType<'v> {
                 Self::resolve_property(
                     map,
                     property_data.property_id,
-                    type_ref,
-                    &info.virtual_schema,
+                    field_type,
+                    virtual_schema,
                     executor,
                 )
             }
             (FieldKind::Id(id_property_data), Data::Map(map)) => Self::resolve_property(
                 map,
                 PropertyId::subject(id_property_data.relation_id),
-                type_ref,
-                &info.virtual_schema,
+                field_type,
+                virtual_schema,
                 executor,
             ),
             (FieldKind::EdgeProperty(property_data), _) => match &self.attr.rel_params.data {
                 Data::Map(rel_map) => Self::resolve_property(
                     rel_map,
                     property_data.property_id,
-                    type_ref,
-                    &info.virtual_schema,
+                    field_type,
+                    virtual_schema,
                     executor,
                 ),
                 other => {
