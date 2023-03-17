@@ -69,35 +69,29 @@ pub fn mock_query_entities_empty() -> impl unimock::Clause {
         .returns(Ok(vec![]))
 }
 
+pub fn mock_gql_context(clauses: impl unimock::Clause + Send) -> GqlContext {
+    GqlContext {
+        engine_api: Arc::new(Unimock::new(clauses)),
+    }
+}
+
 #[async_trait::async_trait]
-trait MockExec {
-    async fn mock_exec(
+trait Exec {
+    async fn exec(
         self,
         schema: &Schema,
-        mock_clause: impl unimock::Clause + Send,
+        context: &GqlContext,
     ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
 #[async_trait::async_trait]
-impl MockExec for &'static str {
-    async fn mock_exec(
+impl Exec for &'static str {
+    async fn exec(
         self,
         schema: &Schema,
-        mock_clause: impl unimock::Clause + Send,
+        context: &GqlContext,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
-        let unimock = Unimock::new(mock_clause);
-
-        match juniper::execute(
-            self,
-            None,
-            schema,
-            &juniper::Variables::new(),
-            &GqlContext {
-                engine_api: Arc::new(unimock),
-            },
-        )
-        .await
-        {
+        match juniper::execute(self, None, schema, &juniper::Variables::new(), context).await {
             Ok((value, execution_errors)) => {
                 if !execution_errors.is_empty() {
                     Err(TestError::Execution(execution_errors))

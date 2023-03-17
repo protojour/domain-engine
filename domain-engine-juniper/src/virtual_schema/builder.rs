@@ -402,12 +402,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             );
                         }
                         TypeClassification::Type(NodeClassification::Node, node_id, _) => {
-                            let edge_ref = self.get_def_type_ref(
-                                node_id,
-                                QueryLevel::Edge {
-                                    rel_params: property.rel_params_operator_id,
+                            // Only introduce an Edge level if there are rel_params
+                            let query_level = match property.rel_params_operator_id {
+                                Some(rel_params) => QueryLevel::Edge {
+                                    rel_params: Some(rel_params),
                                 },
-                            );
+                                None => QueryLevel::Node,
+                            };
+                            let edge_ref = self.get_def_type_ref(node_id, query_level);
 
                             fields.insert(
                                 field_namespace.unique_literal(property_name),
