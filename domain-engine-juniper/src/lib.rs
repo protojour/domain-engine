@@ -12,7 +12,6 @@ mod look_ahead_utils;
 mod macros;
 mod query_analyzer;
 mod templates;
-mod type_info;
 mod virtual_registry;
 
 pub struct GqlContext {

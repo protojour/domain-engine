@@ -3,7 +3,6 @@ use tracing::{debug, warn};
 use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
-    type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
         data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
@@ -13,11 +12,11 @@ use crate::{
 
 pub struct IndexedInputValue;
 
-impl_graphql_value!(IndexedInputValue, TypeInfo = VirtualIndexedTypeInfo);
+impl_graphql_value!(IndexedInputValue);
 
 impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
     fn name(info: &VirtualIndexedTypeInfo) -> Option<&str> {
-        Some(info.graphql_type_name())
+        Some(info.typename())
     }
 
     fn meta<'r>(

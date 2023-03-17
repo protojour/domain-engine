@@ -8,8 +8,6 @@ use ontol_runtime::{
     },
 };
 
-use crate::type_info::GraphqlTypeName;
-
 use self::data::{TypeData, TypeIndex};
 
 pub mod argument;
@@ -64,10 +62,8 @@ impl VirtualIndexedTypeInfo {
     pub fn type_data(&self) -> &TypeData {
         self.virtual_schema.type_data(self.type_index)
     }
-}
 
-impl GraphqlTypeName for VirtualIndexedTypeInfo {
-    fn graphql_type_name(&self) -> &str {
+    pub fn typename(&self) -> &str {
         let type_data = &self.type_data();
         match self.typing_purpose {
             TypingPurpose::Selection => &type_data.typename,

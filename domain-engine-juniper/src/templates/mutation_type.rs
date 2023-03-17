@@ -8,18 +8,17 @@ use crate::{
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
     templates::{attribute_type::AttributeType, resolve_virtual_schema_field},
-    type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
-    virtual_schema::{data::FieldKind, TypingPurpose, VirtualIndexedTypeInfo},
+    virtual_schema::{data::FieldKind, TypingPurpose},
 };
 
 pub struct MutationType;
 
-impl_graphql_value!(MutationType, TypeInfo = VirtualIndexedTypeInfo);
+impl_graphql_value!(MutationType);
 
 impl juniper::GraphQLType<GqlScalar> for MutationType {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
-        Some(info.graphql_type_name())
+        Some(info.typename())
     }
 
     fn meta<'r>(

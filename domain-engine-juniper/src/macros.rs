@@ -1,11 +1,11 @@
 macro_rules! impl_graphql_value {
-    ($ident:ident $(<$generics:tt>)?, TypeInfo = $type_info:ty) => {
+    ($ident:ident $(<$generics:tt>)?) => {
         impl $(<$generics>)? ::juniper::GraphQLValue<crate::gql_scalar::GqlScalar> for $ident $(<$generics>)? {
             type Context = crate::GqlContext;
-            type TypeInfo = $type_info;
+            type TypeInfo = crate::virtual_schema::VirtualIndexedTypeInfo;
 
-            fn type_name<'i>(&self, type_info: &'i Self::TypeInfo) -> Option<&'i str> {
-                Some(type_info.graphql_type_name())
+            fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+                Some(info.typename())
             }
 
             fn resolve_field(

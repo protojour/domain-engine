@@ -9,18 +9,17 @@ use crate::{
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
     templates::{attribute_type::AttributeType, resolve_virtual_schema_field},
-    type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
-    virtual_schema::{TypingPurpose, VirtualIndexedTypeInfo},
+    virtual_schema::TypingPurpose,
 };
 
 pub struct QueryType;
 
-impl_graphql_value!(QueryType, TypeInfo = VirtualIndexedTypeInfo);
+impl_graphql_value!(QueryType);
 
 impl juniper::GraphQLType<GqlScalar> for QueryType {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
-        Some(info.graphql_type_name())
+        Some(info.typename())
     }
 
     fn meta<'r>(

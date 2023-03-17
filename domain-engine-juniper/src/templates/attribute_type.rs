@@ -11,7 +11,6 @@ use tracing::debug;
 use crate::{
     gql_scalar::{GqlScalar, GqlScalarSerializer},
     templates::{resolve_virtual_schema_field, sequence_type::SequenceType},
-    type_info::GraphqlTypeName,
     virtual_registry::VirtualRegistry,
     virtual_schema::{
         data::{
@@ -33,8 +32,8 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     type Context = GqlContext;
     type TypeInfo = VirtualIndexedTypeInfo;
 
-    fn type_name<'i>(&self, type_info: &'i Self::TypeInfo) -> Option<&'i str> {
-        Some(type_info.graphql_type_name())
+    fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+        Some(info.typename())
     }
 
     fn concrete_type_name(&self, _context: &Self::Context, info: &Self::TypeInfo) -> String {
@@ -93,7 +92,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
 
 impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
     fn name(info: &Self::TypeInfo) -> Option<&str> {
-        Some(info.graphql_type_name())
+        Some(info.typename())
     }
 
     fn meta<'r>(
