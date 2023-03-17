@@ -17,11 +17,11 @@ use crate::SchemaBuildError;
 use super::{
     builder::VirtualSchemaBuilder,
     data::{
-        NativeScalarRef, NodeData, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind,
-        UnitTypeRef,
+        EntityData, NativeScalarRef, NodeData, ObjectData, ObjectKind, TypeData, TypeIndex,
+        TypeKind, UnitTypeRef,
     },
     namespace::{DomainDisambiguation, Namespace},
-    EntityInfo, QueryLevel, TypingPurpose, VirtualIndexedTypeInfo,
+    QueryLevel, TypingPurpose, VirtualIndexedTypeInfo,
 };
 
 /// The virtual schema is a schema representation
@@ -155,7 +155,7 @@ impl VirtualSchema {
         }
     }
 
-    fn entity_check(&self, type_ref: UnitTypeRef) -> Option<EntityInfo> {
+    fn entity_check(&self, type_ref: UnitTypeRef) -> Option<EntityData> {
         if let UnitTypeRef::Indexed(type_index) = type_ref {
             let type_data = &self.type_data(type_index);
 
@@ -173,7 +173,7 @@ impl VirtualSchema {
                 ..
             } = type_data
             {
-                Some(EntityInfo {
+                Some(EntityData {
                     type_index,
                     node_def_id: *node_def_id,
                     id_def_id: *id_def_id,

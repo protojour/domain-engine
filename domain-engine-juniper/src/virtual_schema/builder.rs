@@ -15,13 +15,13 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 use super::{
     argument,
     data::{
-        EdgeData, FieldData, FieldKind, IdPropertyData, NativeScalarKind, NativeScalarRef,
-        NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
-        TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+        EdgeData, EntityData, FieldData, FieldKind, IdPropertyData, NativeScalarKind,
+        NativeScalarRef, NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData,
+        TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
-    EntityInfo, QueryLevel, TypingPurpose, VirtualSchema,
+    QueryLevel, TypingPurpose, VirtualSchema,
 };
 
 enum NewType {
@@ -487,16 +487,16 @@ impl<'a> VirtualSchemaBuilder<'a> {
         }
     }
 
-    pub fn add_entity_queries_and_mutations(&mut self, entity_info: EntityInfo) {
-        let type_info = self.env.get_type_info(entity_info.node_def_id);
+    pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
+        let type_info = self.env.get_type_info(entity_data.node_def_id);
 
-        let node_ref = UnitTypeRef::Indexed(entity_info.type_index);
+        let node_ref = UnitTypeRef::Indexed(entity_data.type_index);
         let connection_ref = self.get_def_type_ref(
-            entity_info.node_def_id,
+            entity_data.node_def_id,
             QueryLevel::Connection { rel_params: None },
         );
 
-        let id_type_info = self.env.get_type_info(entity_info.id_def_id);
+        let id_type_info = self.env.get_type_info(entity_data.id_def_id);
         let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
         {
@@ -521,8 +521,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 FieldData {
                     kind: FieldKind::CreateMutation {
                         input: argument::Input(
-                            entity_info.type_index,
-                            entity_info.node_def_id,
+                            entity_data.type_index,
+                            entity_data.node_def_id,
                             TypingPurpose::Input,
                         ),
                     },
@@ -535,8 +535,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 FieldData {
                     kind: FieldKind::UpdateMutation {
                         input: argument::Input(
-                            entity_info.type_index,
-                            entity_info.node_def_id,
+                            entity_data.type_index,
+                            entity_data.node_def_id,
                             TypingPurpose::PartialInput,
                         ),
                         id: argument::Id(id_operator_id),

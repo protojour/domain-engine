@@ -199,3 +199,9 @@ pub struct IdPropertyData {
     pub relation_id: RelationId,
     pub operator_id: SerdeOperatorId,
 }
+
+pub struct EntityData {
+    pub type_index: TypeIndex,
+    pub node_def_id: DefId,
+    pub id_def_id: DefId,
+}

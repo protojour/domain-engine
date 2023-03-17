@@ -69,9 +69,9 @@ pub fn mock_query_entities_empty() -> impl unimock::Clause {
         .returns(Ok(vec![]))
 }
 
-pub fn mock_gql_context(clauses: impl unimock::Clause + Send) -> GqlContext {
+pub fn mock_gql_context(setup: impl unimock::Clause) -> GqlContext {
     GqlContext {
-        engine_api: Arc::new(Unimock::new(clauses)),
+        engine_api: Arc::new(Unimock::new(setup)),
     }
 }
 

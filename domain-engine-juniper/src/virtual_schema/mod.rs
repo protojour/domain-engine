@@ -6,7 +6,6 @@ use ontol_runtime::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
-    DefId,
 };
 
 use crate::type_info::GraphqlTypeName;
@@ -89,10 +88,4 @@ pub enum QueryLevel {
     Node,
     Edge { rel_params: Option<SerdeOperatorId> },
     Connection { rel_params: Option<SerdeOperatorId> },
-}
-
-struct EntityInfo {
-    type_index: TypeIndex,
-    node_def_id: DefId,
-    id_def_id: DefId,
 }
