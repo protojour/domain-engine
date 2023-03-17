@@ -20,7 +20,7 @@ use super::{
         NativeScalarRef, NodeData, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind,
         UnitTypeRef,
     },
-    namespace::Namespace,
+    namespace::{DomainDisambiguation, Namespace},
     EntityInfo, QueryLevel, TypingPurpose, VirtualIndexedTypeInfo,
 };
 
@@ -56,7 +56,10 @@ impl VirtualSchema {
                 Default::default(),
             ),
         };
-        let mut namespace = Namespace::default();
+        let mut namespace = Namespace::with_domain_disambiguation(DomainDisambiguation {
+            root_domain: package_id,
+            env: env.clone(),
+        });
         let mut builder = VirtualSchemaBuilder {
             env: env.as_ref(),
             schema: &mut schema,

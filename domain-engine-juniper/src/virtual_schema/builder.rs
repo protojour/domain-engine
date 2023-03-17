@@ -99,7 +99,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
     fn make_def_type(&mut self, def_id: DefId, level: QueryLevel) -> NewType {
         let type_info = self.env.get_type_info(def_id);
-        let typename = type_info.name.as_str();
 
         match level {
             QueryLevel::Node => self.make_node_type(type_info),
@@ -107,7 +106,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 let edge_index = self.alloc_def_type_index(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QueryLevel::Node);
 
-                let mut field_namespace = Namespace::default();
+                let mut field_namespace = Namespace::new();
 
                 // FIXME: what if some of the relation data's fields are called "node"
                 let mut fields: IndexMap<String, FieldData> = [(
@@ -126,7 +125,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 self.get_def_type_ref(map_op.def_variant.def_id, QueryLevel::Node);
 
                             let rel_type_info = self.env.get_type_info(map_op.def_variant.def_id);
-                            let rel_typename = rel_type_info.name.as_str();
 
                             // Register edge fields
                             self.register_fields(
@@ -139,9 +137,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             NewType::Indexed(
                                 edge_index,
                                 TypeData {
-                                    typename: self.namespace.edge(Some(rel_typename), typename),
+                                    typename: self.namespace.edge(Some(rel_type_info), type_info),
                                     input_typename: Some(
-                                        self.namespace.edge_input(Some(rel_typename), typename),
+                                        self.namespace.edge_input(Some(rel_type_info), type_info),
                                     ),
                                     partial_input_typename: None,
                                     kind: TypeKind::Object(ObjectData {
@@ -162,8 +160,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     NewType::Indexed(
                         edge_index,
                         TypeData {
-                            typename: self.namespace.edge(None, typename),
-                            input_typename: Some(self.namespace.edge_input(None, typename)),
+                            typename: self.namespace.edge(None, type_info),
+                            input_typename: Some(self.namespace.edge_input(None, type_info)),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -183,7 +181,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 NewType::Indexed(
                     connection_index,
                     TypeData {
-                        typename: self.namespace.connection(typename),
+                        typename: self.namespace.connection(type_info),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -222,9 +220,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::ConstructorSequence(_) => NewType::Indexed(
                 self.alloc_def_type_index(type_info.def_id, QueryLevel::Node),
                 TypeData {
-                    typename: self.namespace.typename(typename),
-                    input_typename: Some(self.namespace.input(typename)),
-                    partial_input_typename: Some(self.namespace.partial_input(typename)),
+                    typename: self.namespace.typename(type_info),
+                    input_typename: Some(self.namespace.input(type_info)),
+                    partial_input_typename: Some(self.namespace.partial_input(type_info)),
                     kind: TypeKind::CustomScalar(ScalarData {
                         serde_operator_id: operator_id,
                     }),
@@ -267,10 +265,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         NewType::Indexed(
                             node_index,
                             TypeData {
-                                typename: self.namespace.typename(&type_info.name),
-                                input_typename: Some(self.namespace.union_input(typename)),
+                                typename: self.namespace.typename(type_info),
+                                input_typename: Some(self.namespace.union_input(type_info)),
                                 partial_input_typename: Some(
-                                    self.namespace.union_partial_input(typename),
+                                    self.namespace.union_partial_input(type_info),
                                 ),
                                 kind: TypeKind::Union(UnionData {
                                     union_def_id: type_info.def_id,
@@ -312,7 +310,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
     fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
         let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
-        let typename = type_info.name.as_str();
         let operator_id = type_info.operator_id.unwrap();
 
         let mut fields = IndexMap::default();
@@ -337,15 +334,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
             map_type,
             &mut fields,
             &FieldKind::Property,
-            &mut Namespace::default(),
+            &mut Namespace::new(),
         );
 
         NewType::Indexed(
             type_index,
             TypeData {
-                typename: self.namespace.typename(typename),
-                input_typename: Some(self.namespace.input(typename)),
-                partial_input_typename: Some(self.namespace.partial_input(typename)),
+                typename: self.namespace.typename(type_info),
+                input_typename: Some(self.namespace.input(type_info)),
+                partial_input_typename: Some(self.namespace.partial_input(type_info)),
                 kind: TypeKind::Object(ObjectData {
                     fields,
                     kind: ObjectKind::Node(NodeData {
@@ -489,8 +486,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     pub fn add_entity_queries_and_mutations(&mut self, entity_info: EntityInfo) {
-        let type_data = self.schema.type_data(entity_info.type_index);
-        let typename = type_data.typename.clone();
+        let type_info = self.env.get_type_info(entity_info.node_def_id);
 
         let node_ref = UnitTypeRef::Indexed(entity_info.type_index);
         let connection_ref = self.get_def_type_ref(
@@ -504,7 +500,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         {
             let query = self.schema.object_data_mut(self.schema.query);
             query.fields.insert(
-                self.namespace.list(&typename),
+                self.namespace.list(type_info),
                 FieldData::mandatory(
                     FieldKind::Connection {
                         property_id: None,
@@ -519,7 +515,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         {
             let mutation = self.schema.object_data_mut(self.schema.mutation);
             mutation.fields.insert(
-                self.namespace.create(&typename),
+                self.namespace.create(type_info),
                 FieldData {
                     kind: FieldKind::CreateMutation {
                         input: argument::Input(
@@ -533,7 +529,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             );
 
             mutation.fields.insert(
-                self.namespace.update(&typename),
+                self.namespace.update(type_info),
                 FieldData {
                     kind: FieldKind::UpdateMutation {
                         input: argument::Input(
@@ -548,7 +544,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             );
 
             mutation.fields.insert(
-                self.namespace.delete(&typename),
+                self.namespace.delete(type_info),
                 FieldData {
                     kind: FieldKind::DeleteMutation {
                         id: argument::Id(id_operator_id),

@@ -1,15 +1,37 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use convert_case::{Case, Casing};
-use ontol_runtime::smart_format;
+use ontol_runtime::{
+    env::{Env, TypeInfo},
+    DefId, PackageId,
+};
 use smartstring::alias::String;
 
-#[derive(Default)]
 pub struct Namespace {
     rewrites: HashMap<String, String>,
+    domain_disambiguation: Option<DomainDisambiguation>,
+}
+
+pub struct DomainDisambiguation {
+    pub root_domain: PackageId,
+    pub env: Arc<Env>,
 }
 
 impl Namespace {
+    pub fn new() -> Self {
+        Self {
+            rewrites: Default::default(),
+            domain_disambiguation: None,
+        }
+    }
+
+    pub fn with_domain_disambiguation(domain_disambiguation: DomainDisambiguation) -> Self {
+        Self {
+            rewrites: Default::default(),
+            domain_disambiguation: Some(domain_disambiguation),
+        }
+    }
+
     pub fn unique_literal(&mut self, literal: &str) -> String {
         let mut string: String = literal.into();
         while self.rewrites.contains_key(&string) {
@@ -18,62 +40,79 @@ impl Namespace {
         self.rewrite(&string).into()
     }
 
-    pub fn typename(&mut self, typename: &str) -> String {
-        self.rewrite(typename).into()
+    pub fn typename(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info)])
     }
 
-    pub fn list(&mut self, typename: &str) -> String {
-        smart_format!("{}List", self.rewrite(typename))
+    pub fn list(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"List"])
     }
 
-    pub fn create(&mut self, typename: &str) -> String {
-        smart_format!("create{}", self.rewrite(typename))
+    pub fn create(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&"create", &Typename(type_info)])
     }
 
-    pub fn update(&mut self, typename: &str) -> String {
-        smart_format!("update{}", self.rewrite(typename))
+    pub fn update(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&"update", &Typename(type_info)])
     }
 
-    pub fn delete(&mut self, typename: &str) -> String {
-        smart_format!("delete{}", self.rewrite(typename))
+    pub fn delete(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&"delete", &Typename(type_info)])
     }
 
-    pub fn connection(&mut self, typename: &str) -> String {
-        smart_format!("{}Connection", self.rewrite(typename))
+    pub fn connection(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"Connection"])
     }
 
-    pub fn edge(&mut self, rel_typename: Option<&str>, typename: &str) -> String {
-        if let Some(rel_typename) = rel_typename {
-            let rel_typename: String = self.rewrite(rel_typename).into();
-            smart_format!("{rel_typename}{}Edge", self.rewrite(typename))
+    pub fn edge(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
+        if let Some(rel_type_info) = rel_type_info {
+            self.concat(&[&Typename(rel_type_info), &Typename(type_info), &"Edge"])
         } else {
-            smart_format!("{}Edge", self.rewrite(typename))
+            self.concat(&[&Typename(type_info), &"Edge"])
         }
     }
 
-    pub fn input(&mut self, typename: &str) -> String {
-        smart_format!("{}Input", self.rewrite(typename))
+    pub fn input(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"Input"])
     }
 
-    pub fn partial_input(&mut self, typename: &str) -> String {
-        smart_format!("{}PartialInput", self.rewrite(typename))
+    pub fn partial_input(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"PartialInput"])
     }
 
-    pub fn union_input(&mut self, typename: &str) -> String {
-        smart_format!("{}UnionInput", self.rewrite(typename))
+    pub fn union_input(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"UnionInput"])
     }
 
-    pub fn union_partial_input(&mut self, typename: &str) -> String {
-        smart_format!("{}UnionPartialInput", self.rewrite(typename))
+    pub fn union_partial_input(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"UnionPartialInput"])
     }
 
-    pub fn edge_input(&mut self, rel_typename: Option<&str>, typename: &str) -> String {
-        if let Some(rel_typename) = rel_typename {
-            let rel_typename: String = self.rewrite(rel_typename).into();
-            smart_format!("{rel_typename}{}EdgeInput", self.rewrite(typename))
+    pub fn edge_input(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
+        if let Some(rel_type_info) = rel_type_info {
+            self.concat(&[&Typename(rel_type_info), &Typename(type_info), &"EdgeInput"])
         } else {
-            smart_format!("{}EdgeInput", self.rewrite(typename))
+            self.concat(&[&Typename(type_info), &"EdgeInput"])
         }
+    }
+
+    fn concat(&mut self, elements: &[&dyn ProcessName]) -> String {
+        let mut output: String = "".into();
+
+        if let Some(domain_disambiguation) = &self.domain_disambiguation {
+            if let Some(def_id) = elements.iter().find_map(|elem| elem.def_id()) {
+                let package_id = def_id.0;
+                if package_id != domain_disambiguation.root_domain {
+                    // FIXME: Domains could have globally unique names that we can use here?
+                    output.push_str(&format!("_domain{}_", package_id.0));
+                }
+            }
+        }
+
+        for element in elements {
+            output.push_str(element.process(self));
+        }
+        output
     }
 
     fn rewrite(&mut self, typename: &str) -> &str {
@@ -96,6 +135,34 @@ impl Namespace {
             self.rewrites.insert(typename.into(), rewritten);
             self.rewrites.get(typename).unwrap()
         }
+    }
+}
+
+trait ProcessName {
+    fn def_id(&self) -> Option<DefId>;
+
+    fn process<'n>(&self, namespace: &'n mut Namespace) -> &'n str;
+}
+
+struct Typename<'a>(&'a TypeInfo);
+
+impl<'a> ProcessName for Typename<'a> {
+    fn def_id(&self) -> Option<DefId> {
+        Some(self.0.def_id)
+    }
+
+    fn process<'n>(&self, namespace: &'n mut Namespace) -> &'n str {
+        namespace.rewrite(&self.0.name)
+    }
+}
+
+impl ProcessName for &'static str {
+    fn def_id(&self) -> Option<DefId> {
+        None
+    }
+
+    fn process<'n>(&self, _: &'n mut Namespace) -> &'n str {
+        self
     }
 }
 
