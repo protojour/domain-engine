@@ -15,7 +15,6 @@ use crate::{
     string_pattern::StringPattern,
     string_types::StringLikeType,
     translate::Translator,
-    value::{Data, Value},
     DefId, PackageId, RelationId,
 };
 
@@ -52,13 +51,6 @@ impl Env {
 
     pub fn new_property_probe(&self) -> PropertyProbe<'_> {
         PropertyProbe::new(&self.lib)
-    }
-
-    pub fn unit_value(&self) -> Value {
-        Value {
-            type_def_id: DefId::unit(),
-            data: Data::Unit,
-        }
     }
 
     pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {

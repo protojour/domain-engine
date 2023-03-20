@@ -36,5 +36,26 @@ pub trait EngineAPI: Send + Sync + 'static {
 }
 
 pub struct Engine {
-    _env: Arc<Env>,
+    env: Arc<Env>,
+    config: Arc<Config>,
+}
+
+#[async_trait::async_trait]
+impl EngineAPI for Engine {
+    fn get_config(&self) -> &Config {
+        &self.config
+    }
+
+    async fn query_entities(&self, _query: EntityQuery) -> Result<Vec<Attribute>, DomainError> {
+        let _ = self.env.domain_count();
+        Ok(vec![])
+    }
+
+    async fn create_entity(
+        &self,
+        _value: Value,
+        _query: MapOrUnionQuery,
+    ) -> Result<Value, DomainError> {
+        Ok(Value::unit())
+    }
 }
