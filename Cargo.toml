@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "domain-engine-core",
     "domain-engine-juniper",
@@ -9,6 +8,14 @@ members = [
     "ontol-parser",
     "ontol-test-utils"
 ]
+
+[workspace.dependencies]
+tracing = "0.1"
+serde = "1"
+serde_json = "1"
+smartstring = { version = "1", features = ["serde"] }
+indexmap = "1"
+fnv = "1"
 
 # Set the settings for build scripts and proc-macros.
 [profile.release.package.domain-engine-wasm]

@@ -10,9 +10,9 @@ doctest = false
 
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
+tracing.workspace = true
+smartstring.workspace = true
 chumsky = "0.9"
-smartstring = { version = "1", features = ["serde"] }
-tracing = "0.1"
 
 [dev-dependencies]
 assert_matches = "1"

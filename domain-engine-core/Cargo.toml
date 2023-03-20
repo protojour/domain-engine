@@ -11,11 +11,12 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
+tracing.workspace = true
+smartstring.workspace = true
 async-trait = "0.1"
 thiserror = "1"
 serde = "1"
 serde_json = "1"
-tracing = "0.1"
 unimock = "0.4"
 
 [dev-dependencies]
