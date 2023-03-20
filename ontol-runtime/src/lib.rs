@@ -46,6 +46,7 @@ impl DefId {
 
 bitflags::bitflags! {
     /// Modifier for (de)serializers.
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
     pub struct DataModifier: u32 {
         const IDENTITY = 0b00000000;
         const ARRAY    = 0b00000001;

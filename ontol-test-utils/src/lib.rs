@@ -157,7 +157,8 @@ impl TestCompile for TestPackages {
             Ok(env) => {
                 let env = TestEnv {
                     env: Arc::new(env),
-                    test_json_schema: true,
+                    // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
+                    test_json_schema: false,
                 };
                 validator(env.clone());
                 env
