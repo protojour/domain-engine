@@ -29,6 +29,7 @@ pub mod serde_codegen;
 
 mod codegen;
 mod compiler_queries;
+mod core;
 mod def;
 mod expr;
 mod lowering;
