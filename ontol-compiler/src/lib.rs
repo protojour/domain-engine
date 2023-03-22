@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use codegen::{execute_codegen_tasks, CodegenTasks};
 use compiler_queries::GetPropertyMeta;
 use def::Defs;
@@ -14,7 +12,6 @@ use namespace::Namespaces;
 use ontol_runtime::{
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
-    string_types::StringLikeType,
     DataModifier, DefId, DefVariant, PackageId,
 };
 use package::{PackageTopology, Packages};
@@ -216,10 +213,7 @@ impl<'m> Compiler<'m> {
             .lib(self.codegen_tasks.result_lib)
             .translations(self.codegen_tasks.result_translations)
             .serde_operators(serde_operators, serde_operators_per_def)
-            .string_like_types(HashMap::from_iter([(
-                self.defs.uuid(),
-                StringLikeType::Uuid,
-            )]))
+            .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()
     }

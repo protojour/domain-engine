@@ -1,7 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
-use ontol_runtime::{proc::BuiltinProc, DefId, PackageId, RelationId};
+use ontol_runtime::{
+    proc::BuiltinProc, string_types::StringLikeType, DefId, PackageId, RelationId,
+};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
@@ -187,11 +189,11 @@ pub struct Defs<'m> {
     int: DefId,
     number: DefId,
     string: DefId,
-    uuid: DefId,
     pub(crate) map: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_hirs: FnvHashMap<DefId, regex_syntax::hir::Hir>,
+    pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
 }
 
 impl<'m> Defs<'m> {
@@ -208,11 +210,11 @@ impl<'m> Defs<'m> {
             int: DefId::unit(),
             number: DefId::unit(),
             string: DefId::unit(),
-            uuid: DefId::unit(),
             map: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
             literal_regex_hirs: Default::default(),
+            string_like_types: Default::default(),
         };
 
         defs.unit = defs.add_primitive(Primitive::Unit);
@@ -244,7 +246,6 @@ impl<'m> Defs<'m> {
         defs.int = defs.add_primitive(Primitive::Int);
         defs.number = defs.add_primitive(Primitive::Number);
         defs.string = defs.add_primitive(Primitive::String);
-        defs.uuid = defs.add_primitive(Primitive::Uuid);
 
         defs
     }
@@ -279,10 +280,6 @@ impl<'m> Defs<'m> {
 
     pub fn string(&self) -> DefId {
         self.string
-    }
-
-    pub fn uuid(&self) -> DefId {
-        self.uuid
     }
 
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
@@ -407,7 +404,6 @@ impl<'m> Compiler<'m> {
         let int_ty = self.def_core_type_name(self.defs.int, "int", Type::Int);
         let _ = self.def_core_type_name(self.defs.number, "number", Type::Number);
         let string_ty = self.def_core_type_name(self.defs.string, "string", Type::String);
-        let _ = self.def_core_type_name(self.defs.uuid, "uuid", Type::Uuid);
 
         let int_int_ty = self.types.intern([int_ty, int_ty]);
         let string_string_ty = self.types.intern([string_ty, string_ty]);
@@ -435,12 +431,19 @@ impl<'m> Compiler<'m> {
             string_string_to_string,
         );
 
-        // string-like types
-        self.relations
-            .properties_by_type_mut(self.defs.uuid)
-            .constructor = Constructor::StringPattern(StringPatternSegment::Regex(uuid_regex()));
+        self.def_uuid();
 
         self
+    }
+
+    fn def_uuid(&mut self) {
+        let uuid = self.defs.add_primitive(Primitive::Uuid);
+        let _ = self.def_core_type_name(uuid, "uuid", Type::Uuid);
+        self.relations.properties_by_type_mut(uuid).constructor =
+            Constructor::StringPattern(StringPatternSegment::Regex(uuid_regex()));
+        self.defs
+            .string_like_types
+            .insert(uuid, StringLikeType::Uuid);
     }
 
     pub fn add_named_def(
