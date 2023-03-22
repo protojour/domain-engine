@@ -67,12 +67,7 @@ impl<'m> Compiler<'m> {
             .insert(uuid, StringLikeType::Uuid);
     }
 
-    fn def_core_type(
-        &mut self,
-        def_id: impl DefIdSource,
-        ty_fn: impl Fn(DefId) -> Type<'m>,
-    ) -> TypeRef<'m> {
-        let def_id = def_id.get(self);
+    fn def_core_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
         self.def_types.map.insert(def_id, ty);
         ty
@@ -80,11 +75,10 @@ impl<'m> Compiler<'m> {
 
     fn def_core_type_name(
         &mut self,
-        def_id: impl DefIdSource,
+        def_id: DefId,
         ident: &str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> TypeRef<'m> {
-        let def_id = def_id.get(self);
         let ty = self.types.intern(ty_fn(def_id));
         self.namespaces
             .get_mut(CORE_PKG, Space::Type)
@@ -98,21 +92,5 @@ impl<'m> Compiler<'m> {
         self.def_types.map.insert(def_id, ty);
 
         def_id
-    }
-}
-
-trait DefIdSource {
-    fn get(self, compiler: &mut Compiler) -> DefId;
-}
-
-impl DefIdSource for DefId {
-    fn get(self, _: &mut Compiler) -> DefId {
-        self
-    }
-}
-
-impl DefIdSource for () {
-    fn get(self, compiler: &mut Compiler) -> DefId {
-        compiler.defs.alloc_def_id(CORE_PKG)
     }
 }
