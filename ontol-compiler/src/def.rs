@@ -13,7 +13,7 @@ use crate::{
     mem::{Intern, Mem},
     namespace::Space,
     package::CORE_PKG,
-    regex::parse_literal_regex_to_hir,
+    regex_util::parse_literal_regex_to_hir,
     relation::RelationshipId,
     source::SourceSpan,
     strings::Strings,
@@ -56,7 +56,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
-            Self::Primitive(Primitive::Uuid) => Some("uuid".into()),
+            Self::Primitive(Primitive::Other(name)) => Some((*name).into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
@@ -81,7 +81,7 @@ pub enum Primitive {
     /// All numbers (realistically all rational numbers as all computer numbers are rational)
     Number,
     String,
-    Uuid,
+    Other(&'static str),
 }
 
 /// This definition expresses that a relation _exists_

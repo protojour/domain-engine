@@ -10,6 +10,7 @@ use crate::{
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum StringLikeType {
     Uuid,
+    DateTime,
 }
 
 #[derive(Debug)]
@@ -23,11 +24,17 @@ impl StringLikeType {
                     Uuid::parse_str(str).map_err(|error| ParseError(smart_format!("{}", error)))?;
                 Ok(Value::new(Data::Uuid(uuid), def_id))
             }
+            Self::DateTime => {
+                let datetime = chrono::DateTime::parse_from_rfc3339(str)
+                    .map_err(|error| ParseError(smart_format!("{}", error)))?;
+                Ok(Value::new(Data::ChronoDateTime(datetime.into()), def_id))
+            }
         }
     }
     pub fn type_name(&self) -> &'static str {
         match self {
             Self::Uuid => "uuid",
+            Self::DateTime => "datetime",
         }
     }
 }

@@ -35,7 +35,7 @@ mod expr;
 mod lowering;
 mod namespace;
 mod patterns;
-mod regex;
+mod regex_util;
 mod relation;
 mod sequence;
 mod source;

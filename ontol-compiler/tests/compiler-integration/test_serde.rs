@@ -174,6 +174,34 @@ fn test_serde_uuid() {
 }
 
 #[test]
+fn test_serde_datetime() {
+    "
+    type my_dt
+    rel . [datetime] my_dt
+    "
+    .compile_ok(|env| {
+        let my_dt = TypeBinding::new(&env, "my_dt");
+        assert_matches!(
+            my_dt.deserialize_data_variant(json!("1983-01-01T01:31:32.59+01:00")),
+            Ok(Data::ChronoDateTime(_))
+        );
+        assert_json_io_matches!(
+            my_dt,
+            json!("1983-01-01T01:31:32.59+01:00"),
+            json!("1983-01-01T00:31:32.590+00:00")
+        );
+        assert_error_msg!(
+            my_dt.deserialize_data(json!(42)),
+            "invalid type: integer `42`, expected `datetime` at line 1 column 2"
+        );
+        assert_error_msg!(
+            my_dt.deserialize_data(json!("foobar")),
+            r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
+        );
+    });
+}
+
+#[test]
 fn test_jsonml() {
     "
     type element

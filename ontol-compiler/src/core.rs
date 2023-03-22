@@ -8,7 +8,7 @@ use crate::{
     namespace::Space,
     package::CORE_PKG,
     patterns::StringPatternSegment,
-    regex::uuid_regex,
+    regex_util,
     relation::Constructor,
     types::{Type, TypeRef},
     Compiler, SourceSpan,
@@ -53,18 +53,29 @@ impl<'m> Compiler<'m> {
         );
 
         self.def_uuid();
+        self.def_datetime();
 
         self
     }
 
     fn def_uuid(&mut self) {
-        let uuid = self.defs.add_primitive(Primitive::Uuid);
+        let uuid = self.defs.add_primitive(Primitive::Other("uuid"));
         let _ = self.def_core_type_name(uuid, "uuid", Type::Uuid);
         self.relations.properties_by_type_mut(uuid).constructor =
-            Constructor::StringPattern(StringPatternSegment::Regex(uuid_regex()));
+            Constructor::StringPattern(StringPatternSegment::Regex(regex_util::uuid()));
         self.defs
             .string_like_types
             .insert(uuid, StringLikeType::Uuid);
+    }
+
+    fn def_datetime(&mut self) {
+        let datetime = self.defs.add_primitive(Primitive::Other("datetime"));
+        let _ = self.def_core_type_name(datetime, "datetime", Type::DateTime);
+        self.relations.properties_by_type_mut(datetime).constructor =
+            Constructor::StringPattern(StringPatternSegment::Regex(regex_util::datetime_rfc3339()));
+        self.defs
+            .string_like_types
+            .insert(datetime, StringLikeType::DateTime);
     }
 
     fn def_core_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {

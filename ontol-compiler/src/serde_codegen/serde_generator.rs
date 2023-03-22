@@ -300,6 +300,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(&def_variant),
                 SerdeOperator::String(def_variant.def_id),
             )),
+            Type::DateTime(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                SerdeOperator::String(def_variant.def_id),
+            )),
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
             }

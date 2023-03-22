@@ -11,7 +11,7 @@ use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    regex::{collect_hir_constant_parts, constant_prefix, empty_string_regex},
+    regex_util::{collect_hir_constant_parts, constant_prefix, empty_string_regex},
     relation::Constructor,
     Compiler,
 };

@@ -77,6 +77,9 @@ pub enum Data {
     Rational(Box<num::rational::BigRational>),
     String(String),
     Uuid(uuid::Uuid),
+    ChronoDateTime(chrono::DateTime<chrono::Utc>),
+    ChronoDate(chrono::NaiveDate),
+    ChronoTime(chrono::NaiveTime),
 
     /// A collection of attributes keyed by property.
     Map(BTreeMap<PropertyId, Attribute>),
@@ -98,6 +101,11 @@ impl<'d> Display for FormatStringData<'d> {
         match self.0 {
             Data::String(s) => write!(f, "{s}"),
             Data::Uuid(uuid) => write!(f, "{uuid}"),
+            Data::ChronoDateTime(datetime) => {
+                // FIXME: A way to not do this via String
+                // Chrono 0.5 hopefully fixes this
+                write!(f, "{}", datetime.to_rfc3339())
+            }
             data => panic!("not a string-like type: {data:?}"),
         }
     }

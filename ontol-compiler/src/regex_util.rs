@@ -12,7 +12,7 @@ use regex_syntax::{
 use smartstring::alias::String;
 use tracing::debug;
 
-pub fn uuid_regex() -> Hir {
+pub fn uuid() -> Hir {
     let hex = Hir::class(Class::Unicode(ClassUnicode::new([
         ClassUnicodeRange::new('0', '9'),
         ClassUnicodeRange::new('a', 'f'),
@@ -43,6 +43,12 @@ pub fn uuid_regex() -> Hir {
         opt_dash,
         repeat_exact(hex, 12),
     ])
+}
+
+pub fn datetime_rfc3339() -> Hir {
+    Parser::new()
+        .parse(r#"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"#)
+        .unwrap()
 }
 
 pub fn empty_string_regex() -> Hir {

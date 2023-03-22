@@ -30,6 +30,7 @@ pub enum Type<'m> {
     StringConstant(DefId),
     Regex(DefId),
     Uuid(DefId),
+    DateTime(DefId),
     Array(TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
@@ -60,6 +61,7 @@ impl<'m> Type<'m> {
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::Uuid(def_id) => Some(*def_id),
+            Self::DateTime(def_id) => Some(*def_id),
             Self::Array(_) => None,
             Self::Option(_) => None,
             Self::Function { .. } => None,
@@ -174,6 +176,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "/{lit}/")
             }
             Type::Uuid(_) => write!(f, "uuid"),
+            Type::DateTime(_) => write!(f, "datetime"),
             Type::Array(ty) => {
                 write!(f, "{}[]", FormatType(ty, defs))
             }
