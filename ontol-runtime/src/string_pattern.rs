@@ -1,12 +1,16 @@
 use std::{collections::BTreeMap, fmt::Display};
 
 use regex::Regex;
+use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    string_types::{ParseError, StringLikeType},
-    value::{Attribute, Data, FormatStringData, PropertyId, Value},
+    env::Env,
+    serde::processor::{ProcessorLevel, ProcessorMode},
+    smart_format,
+    string_types::ParseError,
+    value::{Data, FormatStringData, PropertyId},
     DefId,
 };
 
@@ -17,35 +21,51 @@ pub struct StringPattern {
 }
 
 impl StringPattern {
-    pub fn try_capturing_match(&self, input: &str) -> Result<Data, ParseError> {
+    pub fn try_capturing_match(&self, input: &str, env: &Env) -> Result<Data, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
                 Ok(Data::String(match_.as_str().into()))
             } else {
-                Err(ParseError)
+                Err(ParseError(smart_format!(
+                    "regular expression did not match"
+                )))
             }
         } else {
-            let captures = self.regex.captures(input).ok_or(ParseError)?;
+            let captures = self.regex.captures(input).ok_or(ParseError(smart_format!(
+                "regular expression did not match"
+            )))?;
             let mut properties = BTreeMap::new();
 
             for part in &self.constant_parts {
                 match part {
                     StringPatternConstantPart::Property(property) => {
-                        debug!("fetching capture group {}", property.capture_group);
+                        let capture_group = property.capture_group;
+                        debug!("fetching capture group {}", capture_group);
 
                         let text = captures
-                            .get(property.capture_group)
+                            .get(capture_group)
                             .expect("expected property match")
                             .as_str();
 
-                        let value = match &property.string_type {
-                            Some(string_like_type) => string_like_type
-                                .try_deserialize(property.type_def_id, text)
-                                .expect("BUG: string-like type did not match pattern"),
-                            None => Value::new(Data::String(text.into()), property.type_def_id),
-                        };
+                        let type_info = env.get_type_info(property.type_def_id);
+                        let processor = env.new_serde_processor(
+                            type_info
+                                .operator_id
+                                .expect("No operator id for pattern constant part"),
+                            None,
+                            ProcessorMode::Create,
+                            ProcessorLevel::Root,
+                        );
 
-                        properties.insert(property.property_id, Attribute::with_unit_params(value));
+                        let attribute = processor
+                            .deserialize(StrDeserializer::<serde_json::Error>::new(text))
+                            .map_err(|err| {
+                                ParseError(smart_format!(
+                                    "capture group {capture_group} failed to parse: {err}"
+                                ))
+                            })?;
+
+                        properties.insert(property.property_id, attribute);
                     }
                     StringPatternConstantPart::Literal(_) => {}
                 }
@@ -67,7 +87,6 @@ pub struct StringPatternProperty {
     pub property_id: PropertyId,
     pub type_def_id: DefId,
     pub capture_group: usize,
-    pub string_type: Option<StringLikeType>,
 }
 
 pub struct FormatPattern<'a> {

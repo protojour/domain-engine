@@ -1,6 +1,7 @@
 use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TestEnv, TEST_PKG};
 use serde_json::json;
 use test_log::test;
+use tracing::debug;
 
 fn assert_translate(
     test_env: &TestEnv,
@@ -224,7 +225,7 @@ fn test_eq_complex_flow() {
                 domain.type_info(*domain.type_names.get("two").unwrap()),
             )
             .unwrap();
-        println!("{property_map:?}");
+        debug!("{property_map:?}");
     });
 }
 

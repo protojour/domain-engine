@@ -1,7 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
-    string_types::StringLikeType,
     value::PropertyId,
     DefId,
 };
@@ -32,7 +31,6 @@ pub enum StringPatternSegment {
     Property {
         property_id: PropertyId,
         type_def_id: DefId,
-        string_like_type: Option<StringLikeType>,
         segment: Box<StringPatternSegment>,
     },
     Concat(Vec<StringPatternSegment>),
@@ -152,7 +150,6 @@ impl StringPatternSegment {
             Self::Property {
                 property_id,
                 type_def_id,
-                string_like_type,
                 ..
             } => {
                 let index = capture_cursor.increment();
@@ -160,7 +157,6 @@ impl StringPatternSegment {
                     property_id: *property_id,
                     type_def_id: *type_def_id,
                     capture_group: index as usize,
-                    string_type: string_like_type.clone(),
                 }));
             }
             Self::Concat(segments) => {

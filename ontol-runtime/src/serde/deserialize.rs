@@ -148,6 +148,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 CapturingStringPatternMatcher {
                     pattern: self.env.string_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
+                    env: self.env,
                 }
                 .into_visitor_no_params(self),
             ),

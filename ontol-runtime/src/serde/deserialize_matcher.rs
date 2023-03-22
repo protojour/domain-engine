@@ -165,6 +165,7 @@ impl<'e> ValueMatcher for StringPatternMatcher<'e> {
 pub struct CapturingStringPatternMatcher<'e> {
     pub pattern: &'e StringPattern,
     pub def_id: DefId,
+    pub env: &'e Env,
 }
 
 impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
@@ -173,7 +174,10 @@ impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        let data = self.pattern.try_capturing_match(str).map_err(|_| ())?;
+        let data = self
+            .pattern
+            .try_capturing_match(str, self.env)
+            .map_err(|_| ())?;
         Ok(Value::new(data, self.def_id))
     }
 }
@@ -347,7 +351,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     let result_type = variant.discriminator.def_variant.def_id;
                     let pattern = self.env.string_patterns.get(def_id).unwrap();
 
-                    if let Ok(data) = pattern.try_capturing_match(str) {
+                    if let Ok(data) = pattern.try_capturing_match(str, self.env) {
                         return Ok(Value::new(data, result_type));
                     }
                 }

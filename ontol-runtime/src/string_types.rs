@@ -1,6 +1,8 @@
+use smartstring::alias::String;
 use uuid::Uuid;
 
 use crate::{
+    smart_format,
     value::{Data, Value},
     DefId,
 };
@@ -11,13 +13,14 @@ pub enum StringLikeType {
 }
 
 #[derive(Debug)]
-pub struct ParseError;
+pub struct ParseError(pub String);
 
 impl StringLikeType {
     pub fn try_deserialize(&self, def_id: DefId, str: &str) -> Result<Value, ParseError> {
         match self {
             Self::Uuid => {
-                let uuid = Uuid::parse_str(str).map_err(|_| ParseError)?;
+                let uuid =
+                    Uuid::parse_str(str).map_err(|error| ParseError(smart_format!("{}", error)))?;
                 Ok(Value::new(Data::Uuid(uuid), def_id))
             }
         }

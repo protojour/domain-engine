@@ -1,10 +1,9 @@
-use ontol_runtime::{string_types::StringLikeType, value::PropertyId, DefId, RelationId};
+use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, Primitive, PropertyCardinality, Relation, RelationIdent, Relationship,
-        ValueCardinality,
+        Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship, ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
@@ -308,7 +307,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .expect("regex hir not found for literal regex")
                     .clone(),
             ),
-            def_kind => {
+            _ => {
                 match self
                     .relations
                     .properties_by_type(rel_def_id)
@@ -318,13 +317,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         StringPatternSegment::Property {
                             property_id: PropertyId::subject(relation.0),
                             type_def_id: rel_def_id,
-                            // FIXME: Should be a common place to compute this:
-                            string_like_type: match def_kind {
-                                Some(DefKind::Primitive(Primitive::Uuid)) => {
-                                    Some(StringLikeType::Uuid)
-                                }
-                                _ => None,
-                            },
                             segment: Box::new(rel_segment.clone()),
                         }
                     }
