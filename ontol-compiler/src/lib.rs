@@ -193,14 +193,12 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
-                let full_modifier = DataModifier::UNION | DataModifier::ID | DataModifier::PROPS;
-
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     name: type_name,
                     entity_info,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, full_modifier),
+                        DefVariant::new(type_def_id, DataModifier::default()),
                     )),
                 });
             }

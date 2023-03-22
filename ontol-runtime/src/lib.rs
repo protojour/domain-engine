@@ -56,43 +56,41 @@ bitflags::bitflags! {
     }
 }
 
+impl Default for DataModifier {
+    fn default() -> Self {
+        Self::UNION | Self::ID | Self::PROPS
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DefVariant {
     pub def_id: DefId,
-    pub local_mod: DataModifier,
-    pub global_mod: DataModifier,
+    pub modifier: DataModifier,
 }
 
 impl DefVariant {
     pub const fn new(def_id: DefId, modifier: DataModifier) -> Self {
-        Self {
-            def_id,
-            local_mod: modifier,
-            global_mod: modifier,
-        }
+        Self { def_id, modifier }
     }
 
     pub fn with_def(self, def_id: DefId) -> Self {
         Self {
             def_id,
-            local_mod: self.local_mod,
-            global_mod: self.global_mod,
+            modifier: self.modifier,
         }
     }
 
     pub fn with_local_mod(self, local_mod: DataModifier) -> Self {
         Self {
             def_id: self.def_id,
-            local_mod,
-            global_mod: self.global_mod,
+            modifier: local_mod,
         }
     }
 
     pub fn minus_local_mod(self, diff: DataModifier) -> Self {
         Self {
             def_id: self.def_id,
-            local_mod: self.local_mod.difference(diff),
-            global_mod: self.global_mod,
+            modifier: self.modifier.difference(diff),
         }
     }
 }
@@ -102,7 +100,7 @@ impl Debug for DefVariant {
         write!(
             f,
             "DefVariant({}, {}, {:?})",
-            self.def_id.0 .0, self.def_id.1, self.local_mod,
+            self.def_id.0 .0, self.def_id.1, self.modifier,
         )
     }
 }

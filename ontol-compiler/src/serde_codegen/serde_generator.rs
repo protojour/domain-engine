@@ -73,18 +73,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         type_def_id: DefId,
         cardinality: Cardinality,
-        global_mod: DataModifier,
     ) -> (PropertyCardinality, SerdeOperatorId) {
-        // FIXME: The variant of the property depends on what kind of map we are building?
-        // Anyway; when requesting a property, the data variant should be "reset".
-
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
                 self.get_serde_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
-                    local_mod: global_mod,
-                    global_mod,
+                    modifier: DataModifier::default(),
                 }))
                 .expect("no property operator"),
             ),
@@ -92,8 +87,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 cardinality.0,
                 self.get_serde_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
-                    local_mod: global_mod | DataModifier::ARRAY,
-                    global_mod,
+                    modifier: DataModifier::default() | DataModifier::ARRAY,
                 }))
                 .expect("no property operator"),
             ),
@@ -144,7 +138,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::Map(intersected_map),
                 ))
             }
-            SerdeKey::Def(def_variant) if def_variant.local_mod == DataModifier::ID => {
+            SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::ID => {
                 match self.get_def_type(def_variant.def_id)? {
                     Type::Domain(_) => {
                         let id_relation_id = self
@@ -170,7 +164,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     _ => None,
                 }
             }
-            SerdeKey::Def(def_variant) if def_variant.local_mod.contains(DataModifier::ARRAY) => {
+            SerdeKey::Def(def_variant) if def_variant.modifier.contains(DataModifier::ARRAY) => {
                 let item_operator_id = self.get_serde_operator_id(SerdeKey::Def(
                     def_variant.minus_local_mod(DataModifier::ARRAY),
                 ))?;
@@ -238,7 +232,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     properties,
                 )
             }
-            Some(type_ref) => match def_variant.local_mod {
+            Some(type_ref) => match def_variant.modifier {
                 DataModifier::IDENTITY => {
                     self.create_core_type_serde_operator(def_variant, type_ref)
                 }
@@ -331,7 +325,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let properties = match (properties, def_variant.local_mod) {
+        let properties = match (properties, def_variant.modifier) {
             (None, DataModifier::IDENTITY) => {
                 return Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
@@ -364,7 +358,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let value_def = relation.ident_def().unwrap();
 
                 let (requirement, inner_operator_id) =
-                    self.get_property_operator(value_def, *cardinality, def_variant.global_mod);
+                    self.get_property_operator(value_def, *cardinality);
 
                 if !matches!(requirement, PropertyCardinality::Mandatory) {
                     panic!("Value properties must be mandatory, fix this during type check");
@@ -385,7 +379,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    if def_variant.local_mod.contains(DataModifier::UNION) {
+                    if def_variant.modifier.contains(DataModifier::UNION) {
                         self.create_union_operator(def_variant, typename, properties)
                     } else {
                         // just the inherent properties are requested.
@@ -458,7 +452,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> Option<OperatorAllocation> {
         let union_id = DataModifier::UNION | DataModifier::ID;
 
-        if def_variant.local_mod.contains(union_id) {
+        if def_variant.modifier.contains(union_id) {
             let id_relation_id = match properties.id {
                 Some(id) => id,
                 None => {
@@ -618,7 +612,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 let (property_cardinality, value_operator_id) =
-                    self.get_property_operator(type_def_id, *cardinality, def_variant.global_mod);
+                    self.get_property_operator(type_def_id, *cardinality);
 
                 let rel_params_operator_id = match relationship.rel_params {
                     RelParams::Type(def_id) => {

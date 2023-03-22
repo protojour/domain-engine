@@ -224,13 +224,13 @@ impl Display for Key {
 
         write!(f, "{}_{}", package.0, self.0.def_id.1)?;
 
-        if variant.local_mod.contains(DataModifier::ID) {
+        if variant.modifier.contains(DataModifier::ID) {
             write!(f, "_id")?;
         }
-        if variant.local_mod.contains(DataModifier::UNION) {
+        if variant.modifier.contains(DataModifier::UNION) {
             write!(f, "_union")?;
         }
-        if variant.local_mod.contains(DataModifier::ARRAY) {
+        if variant.modifier.contains(DataModifier::ARRAY) {
             write!(f, "_array")?;
         }
 
