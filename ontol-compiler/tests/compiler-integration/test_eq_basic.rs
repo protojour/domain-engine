@@ -70,8 +70,8 @@ fn test_meters() {
     "
     type meters
     type millimeters
-    rel . [int] meters
-    rel . [int] millimeters
+    rel () [int] meters
+    rel () [int] millimeters
     eq (x) {
         meters { x / 1000 }
         millimeters { x }
@@ -87,10 +87,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     type celsius {
-        rel . [int]
+        rel () [int]
     }
     type fahrenheit {
-        rel . [int]
+        rel () [int]
     }
 
     eq(x) {
@@ -109,7 +109,7 @@ fn test_eq_value_to_map() {
     "
     type one
     type two
-    rel . [string] one
+    rel () [string] one
     rel two ['a'] string
     eq(x) {
         one { x }
@@ -129,7 +129,7 @@ fn test_eq_value_to_map_func() {
     "
     type one
     type two
-    rel . [int] one
+    rel () [int] one
     rel two ['a'] int
     eq(x) {
         one { x }
@@ -233,10 +233,10 @@ fn test_eq_complex_flow() {
 fn test_eq_delegation() {
     "
     type meters {
-        rel . [int]
+        rel () [int]
     }
     type millimeters {
-        rel . [int]
+        rel () [int]
     }
 
     eq(m) {

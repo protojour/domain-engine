@@ -78,9 +78,9 @@ fn rel_duplicate_anonymous_relation() {
     type foo
     type bar
     rel // ERROR unit type `bar` cannot be part of a union
-        . [bar] foo
+        () [bar] foo
     rel // ERROR duplicate anonymous relationship
-        . [bar] foo
+        () [bar] foo
     "
     .compile_fail()
 }
@@ -90,7 +90,7 @@ fn rel_mix_anonymous_and_named() {
     "
     type foo
     type bar
-    rel . [bar] foo
+    rel () [bar] foo
 
     rel // ERROR invalid mix of relationship type for subject
         foo ['foobar'] bar
@@ -104,8 +104,8 @@ fn map_union_unit_type() {
     type foo
     type bar
     type u
-    rel . [foo] u // ERROR unit type `foo` cannot be part of a union
-    rel . [bar] u // ERROR unit type `bar` cannot be part of a union
+    rel () [foo] u // ERROR unit type `foo` cannot be part of a union
+    rel () [bar] u // ERROR unit type `bar` cannot be part of a union
     "
     .compile_fail()
 }
@@ -118,8 +118,8 @@ fn map_union_missing_discriminator() {
     rel foo ['a'] 'constant'
     rel bar ['b'] string
     type u
-    rel . [foo] u
-    rel . [bar] u // ERROR cannot discriminate type
+    rel () [foo] u
+    rel () [bar] u // ERROR cannot discriminate type
     "
     .compile_fail()
 }
@@ -132,8 +132,8 @@ fn map_union_non_uniform_discriminators() {
     rel foo ['a'] 'constant'
     rel bar ['b'] 'other-constant'
     type u // ERROR no uniform discriminator found for union variants
-    rel . [foo] u
-    rel . [bar] u
+    rel () [foo] u
+    rel () [bar] u
     "
     .compile_fail()
 }
@@ -142,8 +142,8 @@ fn map_union_non_uniform_discriminators() {
 fn non_disjoint_string_union() {
     "
     type u1
-    rel . ['a'] u1
-    rel . ['a'] u1 // ERROR duplicate anonymous relationship
+    rel () ['a'] u1
+    rel () ['a'] u1 // ERROR duplicate anonymous relationship
     "
     .compile_fail()
 }
@@ -152,14 +152,14 @@ fn non_disjoint_string_union() {
 fn union_tree() {
     "
     type u1
-    rel . ['1a'] u1
-    rel . ['1b'] u1
+    rel () ['1a'] u1
+    rel () ['1b'] u1
     type u2
-    rel . ['2a'] u2
-    rel . ['2b'] u2
+    rel () ['2a'] u2
+    rel () ['2b'] u2
     type u3
-    rel . [u1] u3 // ERROR union tree not supported
-    rel . [u2] u3 // ERROR union tree not supported
+    rel () [u1] u3 // ERROR union tree not supported
+    rel () [u2] u3 // ERROR union tree not supported
     "
     .compile_fail()
 }
@@ -168,7 +168,7 @@ fn union_tree() {
 fn sequence_mix1() {
     "
     type u
-    rel . [int] u
+    rel () [int] u
     rel u [0] string // ERROR invalid mix of relationship type for subject
     "
     .compile_fail();
@@ -251,7 +251,7 @@ fn eq_attribute_mismatch() {
     type foo
     type bar
     rel foo ['prop'] bar
-    rel . [int] bar
+    rel () [int] bar
     eq(x) {
         foo { // ERROR missing property `prop`
             x // ERROR expected named property
@@ -363,8 +363,8 @@ fn test_serde_object_property_not_sugared() {
     "
     type foo
     type bar
-    rel foo ['a' | 'aa'*: .] bar // ERROR only entities may have named reverse relationship
-    rel foo ['b' | 'bb'*: .] string // ERROR only entities may have named reverse relationship
+    rel foo ['a' | 'aa'*: ()] bar // ERROR only entities may have named reverse relationship
+    rel foo ['b' | 'bb'*: ()] string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -374,8 +374,8 @@ fn unresolved_transitive_eq() {
     "
     type a
     type b
-    rel . [int] a
-    rel . [int] b
+    rel () [int] a
+    rel () [int] b
 
     type c
     type d
@@ -413,7 +413,7 @@ fn various_monadic_properties() {
     // a is either a string or null
     rel bar ['nullable'] string
     // FIXME: Should this work?
-    rel bar ['nullable'] . // ERROR union in named relationship is not supported yet. Make a union type instead.
+    rel bar ['nullable'] () // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail()
 }
@@ -434,7 +434,7 @@ fn invalid_subject_types() {
     "
     rel
         'a' // ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
-        [.]
+        [()]
         string
     "
     .compile_fail()
@@ -444,11 +444,11 @@ fn invalid_subject_types() {
 fn invalid_relation_chain() {
     "
     rel
-        . [.]
-        . [.] [.]
-        .
-        . // ERROR parse error: found `.`, expected one of `[`, `type`, `rel`, `eq`
-        [.]
+        () [()]
+        () [()] [()]
+        ()
+        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `eq`
+        [()]
     "
     .compile_fail()
 }
@@ -457,7 +457,7 @@ fn invalid_relation_chain() {
 fn spans_are_correct_projected_from_regex_syntax_errors() {
     r#"
     type lol
-    rel . [/abc\/(?P<42>.)/] lol // ERROR invalid regex: invalid capture group character
+    rel () [/abc\/(?P<42>.)/] lol // ERROR invalid regex: invalid capture group character
     "#
     .compile_fail_then(|errors| {
         assert_eq!("4", errors[0].span_text);
@@ -476,9 +476,9 @@ fn complains_about_ambiguous_pattern_based_unions() {
     rel '' ['bar'] [uuid] bar
     rel '' ['barbar'] [uuid] barbar
 
-    rel . [foo] union
-    rel . [bar] union
-    rel . [barbar] union
+    rel () [foo] union
+    rel () [bar] union
+    rel () [barbar] union
     "
     .compile_fail();
 }

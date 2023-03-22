@@ -15,8 +15,8 @@ type synth {
     rel ['polyphony'] int
 }
 type instrument {
-    rel . [guitar]
-    rel . [synth]
+    rel () [guitar]
+    rel () [synth]
 }
 type artist {
     rel [id] string

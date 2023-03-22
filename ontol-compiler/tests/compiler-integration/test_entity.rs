@@ -322,8 +322,8 @@ fn union_with_ambiguous_id_should_fail() {
         rel ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
-        rel . [animal]
-        rel . [plant]
+        rel () [animal]
+        rel () [plant]
     }
     type owner {
         rel [id] string

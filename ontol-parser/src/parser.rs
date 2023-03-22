@@ -253,7 +253,9 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
 
 /// Type parser
 fn ty() -> impl AstParser<Type> {
-    let unit = sigil('.').to(Type::Unit);
+    let unit = just(Token::Open('('))
+        .then(just(Token::Close(')')))
+        .map(|_| Type::Unit);
     let path = path().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
