@@ -36,7 +36,8 @@ pub struct TypeStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub ident: Spanned<String>,
-    pub rel_block: Spanned<Option<Vec<Spanned<RelStatement>>>>,
+    pub params: Option<Spanned<Vec<Spanned<GenericParam>>>>,
+    pub rel_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -115,7 +116,7 @@ pub struct EqAttributeRel {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Unit,
-    Path(Path),
+    Path(Path, Option<Spanned<Vec<Spanned<GenericArgument>>>>),
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),
@@ -143,4 +144,16 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct GenericParam {
+    pub ident: Spanned<String>,
+    pub default: Option<Spanned<Type>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct GenericArgument {
+    pub ident: Spanned<String>,
+    pub default: Option<Spanned<Type>>,
 }

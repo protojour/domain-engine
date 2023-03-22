@@ -64,14 +64,14 @@ rel () [Geometry] GeometryOrNull
 // TODO: Not supported yet (union tree):
 // rel () [] GeometryOrNull
 
-type Feature
-rel Feature ['type'] 'Feature'
-rel Feature ['geometry'] GeometryOrNull
+type Feature<properties = ()>
+rel Feature<> ['type'] 'Feature'
+rel Feature<> ['geometry'] GeometryOrNull
 
 // FIXME: Features is a map of 'anything'.
 // This could be a good use case for generics in ONTOL.
-rel Feature ['properties'] ()
+rel Feature<properties> ['properties'] ()
 
-type FeatureCollection
-rel FeatureCollection ['type'] 'FeatureCollection'
-rel FeatureCollection ['features'*] Feature
+type FeatureCollection<properties = ()>
+rel FeatureCollection<> ['type'] 'FeatureCollection'
+rel FeatureCollection<properties> ['features'*] Feature<properties>

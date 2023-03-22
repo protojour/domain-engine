@@ -98,7 +98,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let mut root_defs: RootDefs = [def_id].into();
 
-                if let Some(rel_block) = type_stmt.rel_block.0 {
+                if let Some((rel_block, _span)) = type_stmt.rel_block {
                     // The inherent relation block on the type uses the just defined
                     // type as its context
                     let block_context = BlockContext::Context((def_id, span.clone()));
@@ -328,7 +328,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn ast_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
         match ast_ty {
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
-            ast::Type::Path(path) => self.lookup_path(&path, span),
+            ast::Type::Path(path, _arguments) => self.lookup_path(&path, span),
             ast::Type::StringLiteral(lit) => match lit.as_str() {
                 "" => Ok(self.compiler.defs.empty_string()),
                 _ => Ok(self

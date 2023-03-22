@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use derive_debug_extras::DebugExtras;
+use value::Value;
 
 pub mod cast;
 pub mod discriminator;
@@ -103,6 +104,20 @@ impl Debug for DefVariant {
             self.def_id.0 .0, self.def_id.1, self.modifier,
         )
     }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DefParamId(pub u32);
+
+impl Debug for DefParamId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DefParamId({})", self.0)
+    }
+}
+
+pub enum DefParam {
+    Def(DefId),
+    Const(Value),
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]

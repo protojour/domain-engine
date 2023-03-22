@@ -3,7 +3,7 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::ast::{Path, UseStatement};
+use crate::ast::{GenericArgument, GenericParam, Path, UseStatement};
 
 use super::{
     ast::{
@@ -56,19 +56,35 @@ fn use_statement() -> impl AstParser<UseStatement> {
 }
 
 fn type_statement() -> impl AstParser<TypeStatement> {
+    fn generic_params() -> impl AstParser<Vec<Spanned<GenericParam>>> {
+        just(Token::Sigil('<'))
+            .ignore_then(spanned(generic_param()).separated_by(just(Token::Sigil(','))))
+            .then_ignore(just(Token::Sigil('>')))
+    }
+
+    fn generic_param() -> impl AstParser<GenericParam> {
+        spanned(ident())
+            .then(just(Token::Sigil('=')).ignore_then(spanned(ty())).or_not())
+            .map(|(ident, default)| GenericParam { ident, default })
+    }
+
     doc_comments()
         .then(keyword(Token::Type))
         .then(spanned(ident()))
-        .then(spanned(
-            spanned(rel_statement())
-                .repeated()
-                .delimited_by(open('{'), close('}'))
-                .or_not(),
-        ))
-        .map(|(((docs, kw), ident), rel_block)| TypeStatement {
+        .then(spanned(generic_params()).or_not())
+        .then(
+            spanned(
+                spanned(rel_statement())
+                    .repeated()
+                    .delimited_by(open('{'), close('}')),
+            )
+            .or_not(),
+        )
+        .map(|((((docs, kw), ident), params), rel_block)| TypeStatement {
             docs,
             kw,
             ident,
+            params,
             rel_block,
         })
 }
@@ -253,19 +269,33 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
 
 /// Type parser
 fn ty() -> impl AstParser<Type> {
-    let unit = just(Token::Open('('))
-        .then(just(Token::Close(')')))
-        .map(|_| Type::Unit);
-    let path = path().map(Type::Path);
-    let number_literal = number_literal().map(Type::NumberLiteral);
-    let string_literal = string_literal().map(Type::StringLiteral);
-    let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
+    recursive(|ty| {
+        let generic_argument = spanned(ident())
+            .then(just(Token::Sigil('=')).ignore_then(spanned(ty)).or_not())
+            .map(|(ident, default)| GenericArgument { ident, default })
+            .labelled("generic argument");
 
-    unit.or(path)
-        .or(number_literal)
-        .or(string_literal)
-        .or(regex)
-        .labelled("type")
+        let generic_arguments = just(Token::Sigil('<'))
+            .ignore_then(spanned(generic_argument).separated_by(just(Token::Sigil(','))))
+            .then_ignore(just(Token::Sigil('>')))
+            .labelled("generic arguments");
+
+        let unit = just(Token::Open('('))
+            .then(just(Token::Close(')')))
+            .map(|_| Type::Unit);
+        let path = path()
+            .then(spanned(generic_arguments).or_not())
+            .map(|(path, args)| Type::Path(path, args));
+        let number_literal = number_literal().map(Type::NumberLiteral);
+        let string_literal = string_literal().map(Type::StringLiteral);
+        let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
+
+        unit.or(path)
+            .or(number_literal)
+            .or(string_literal)
+            .or(regex)
+            .labelled("type")
+    })
 }
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
