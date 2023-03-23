@@ -128,8 +128,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                 let mut typed_properties = IndexMap::new();
 
-                                for ((def_id, prop_span), value) in attributes.iter() {
-                                    let attr_prop = match self.defs.get_def_kind(*def_id) {
+                                for ((def, prop_span), value) in attributes.iter() {
+                                    let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                         Some(DefKind::StringLiteral(lit)) => lit,
                                         _ => {
                                             self.error(
@@ -204,7 +204,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     }
                     Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
-                        [((def_id, _), value)] if *def_id == DefId::unit() => {
+                        [((def, _), value)] if def.def_id == DefId::unit() => {
                             let (_, relation) = self
                                 .get_relationship_meta(*relationship_id)
                                 .expect("BUG: problem getting anonymous property meta");

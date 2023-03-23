@@ -32,9 +32,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             other => panic!("TODO: relation not found, got {other:?}"),
         };
 
-        match relation.ident {
-            RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => {
-                self.check_def(def_id);
+        match &relation.ident {
+            RelationIdent::Named(def) | RelationIdent::Typed(def) => {
+                self.check_def(def.def_id);
             }
             _ => {}
         };
@@ -294,30 +294,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         origin: StringPatternSegment,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
-        let rel_def_id = match relation.1.ident {
-            RelationIdent::Typed(def_id) | RelationIdent::Named(def_id) => def_id,
+        let rel_def = match &relation.1.ident {
+            RelationIdent::Typed(def) | RelationIdent::Named(def) => def,
             _ => todo!(),
         };
 
-        let appendee = match self.defs.get_def_kind(rel_def_id) {
+        let appendee = match self.defs.get_def_kind(rel_def.def_id) {
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
             Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
                 self.defs
                     .literal_regex_hirs
-                    .get(&rel_def_id)
+                    .get(&rel_def.def_id)
                     .expect("regex hir not found for literal regex")
                     .clone(),
             ),
             _ => {
                 match self
                     .relations
-                    .properties_by_type(rel_def_id)
+                    .properties_by_type(rel_def.def_id)
                     .map(Properties::constructor)
                 {
                     Some(Constructor::StringPattern(rel_segment)) => {
                         StringPatternSegment::Property {
                             property_id: PropertyId::subject(relation.0),
-                            type_def_id: rel_def_id,
+                            type_def_id: rel_def.def_id,
                             segment: Box::new(rel_segment.clone()),
                         }
                     }

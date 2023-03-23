@@ -1,6 +1,6 @@
 use ontol_runtime::DefId;
 
-use crate::{source::SourceSpan, Compiler};
+use crate::{def::DefReference, source::SourceSpan, Compiler};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ExprId(pub u32);
@@ -12,7 +12,7 @@ pub struct Expr {
     pub span: SourceSpan,
 }
 
-type ObjKey = (DefId, SourceSpan);
+type ObjKey = (DefReference, SourceSpan);
 
 #[derive(Debug)]
 pub enum ExprKind {

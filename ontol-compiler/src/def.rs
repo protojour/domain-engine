@@ -95,7 +95,7 @@ pub enum Primitive {
     String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DefReference {
     pub def_id: DefId,
     pub params: FnvHashMap<DefParamId, (DefReference, SourceSpan)>,
@@ -111,15 +111,15 @@ pub struct Relation<'m> {
 
 impl<'m> Relation<'m> {
     pub fn ident_def(&self) -> Option<DefId> {
-        match self.ident {
-            RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => Some(def_id),
+        match &self.ident {
+            RelationIdent::Named(def) | RelationIdent::Typed(def) => Some(def.def_id),
             _ => None,
         }
     }
 
     pub fn named_ident(&self, defs: &'m Defs) -> Option<&'m str> {
-        match self.ident {
-            RelationIdent::Named(def_id) => match defs.get_def_kind(def_id) {
+        match &self.ident {
+            RelationIdent::Named(def) => match defs.get_def_kind(def.def_id) {
                 Some(DefKind::StringLiteral(lit)) => Some(lit),
                 _ => panic!(),
             },
@@ -136,10 +136,10 @@ impl<'m> Relation<'m> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub enum RelationIdent {
-    Named(DefId),
-    Typed(DefId),
+    Named(DefReference),
+    Typed(DefReference),
     Id,
     Indexed,
 }
@@ -163,7 +163,7 @@ pub struct Relationship {
 #[derive(Debug)]
 pub enum RelParams {
     Unit,
-    Type(DefId),
+    Type(DefReference),
     IndexRange(Range<Option<u16>>),
 }
 

@@ -63,8 +63,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             debug!("check union {relationship:?}");
 
-            let variant_def = match relation.ident {
-                RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => def_id,
+            let variant_def = match &relation.ident {
+                RelationIdent::Named(def) | RelationIdent::Typed(def) => def.def_id,
                 _ => relationship.object.0.def_id,
             };
 

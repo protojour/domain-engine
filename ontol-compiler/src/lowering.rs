@@ -147,7 +147,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         if let Some((rel_block, _span)) = type_stmt.rel_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
-            let block_context = BlockContext::Context((def_id, span.clone()));
+            let def = DefReference {
+                def_id,
+                params: Default::default(),
+            };
+            let block_context = BlockContext::Context((def, span.clone()));
 
             for (rel_stmt, rel_span) in rel_block {
                 match self.ast_relationship_chain_to_def(rel_stmt, rel_span, block_context.clone())
@@ -169,7 +173,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         rel: ast::RelStatement,
         span: Span,
-        contextual_def: BlockContext<(DefId, Span)>,
+        contextual_def: BlockContext<(DefReference, Span)>,
     ) -> Res<RootDefs> {
         let ast::RelStatement {
             docs: _,
@@ -185,13 +189,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let (mut subject_def, mut subject_span, object_def, object_span) =
             match (subject, object, contextual_def) {
                 (Some(subject), Some(object), BlockContext::NoContext) => (
-                    self.resolve_type_to_def(subject.0, &subject.1)?,
+                    self.resolve_type_reference(subject.0, &subject.1)?,
                     subject.1,
-                    self.resolve_type_to_def(object.0, &object.1)?,
+                    self.resolve_type_reference(object.0, &object.1)?,
                     object.1,
                 ),
                 (Some(subject), None, BlockContext::Context(object)) => (
-                    self.resolve_type_to_def(subject.0, &subject.1)?,
+                    self.resolve_type_reference(subject.0, &subject.1)?,
                     subject.1,
                     object.0,
                     object.1,
@@ -199,15 +203,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 (None, Some(object), BlockContext::Context(subject)) => (
                     subject.0,
                     subject.1,
-                    self.resolve_type_to_def(object.0, &object.1)?,
+                    self.resolve_type_reference(object.0, &object.1)?,
                     object.1,
                 ),
                 _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
             };
 
         for chain_item in chain {
-            let (next_ty, next_ty_span) = match chain_item.subject {
-                Some((ast_ty, ty_span)) => (self.resolve_type_to_def(ast_ty, &ty_span)?, ty_span),
+            let (next_def, next_ty_span) = match chain_item.subject {
+                Some((ast_ty, ty_span)) => {
+                    (self.resolve_type_reference(ast_ty, &ty_span)?, ty_span)
+                }
                 None => {
                     // implicit, anonymous type:
                     let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
@@ -219,19 +225,25 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         }),
                         &span,
                     );
-                    (anonymous_def_id, span.clone())
+                    (
+                        DefReference {
+                            def_id: anonymous_def_id,
+                            params: Default::default(),
+                        },
+                        span.clone(),
+                    )
                 }
             };
 
             root_defs.push(self.ast_relationship_to_def(
                 (subject_def, &subject_span),
                 connection,
-                (next_ty, &next_ty_span),
+                (next_def.clone(), &next_ty_span),
                 span.clone(),
             )?);
 
             connection = chain_item.connection;
-            subject_def = next_ty;
+            subject_def = next_def;
             subject_span = next_ty_span;
         }
 
@@ -247,9 +259,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn ast_relationship_to_def(
         &mut self,
-        subject: (DefId, &Span),
+        subject: (DefReference, &Span),
         ast_connection: ast::RelConnection,
-        object: (DefId, &Span),
+        object: (DefReference, &Span),
         span: Span,
     ) -> Res<DefId> {
         let ast::RelConnection {
@@ -266,14 +278,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Option<Range<Option<u16>>>,
         ) = match relation_ty {
             ast::RelType::Type((ty, span)) => {
-                let def_id = self.resolve_type_to_def(ty, &span)?;
+                let def = self.resolve_type_reference(ty, &span)?;
 
-                match self.compiler.defs.get_def_kind(def_id) {
+                match self.compiler.defs.get_def_kind(def.def_id) {
                     Some(DefKind::StringLiteral(_)) => {
-                        (RelationIdent::Named(def_id), span.clone(), None)
+                        (RelationIdent::Named(def), span.clone(), None)
                     }
-                    Some(DefKind::Relation(relation)) => (relation.ident, span.clone(), None),
-                    _ => (RelationIdent::Typed(def_id), span.clone(), None),
+                    Some(DefKind::Relation(relation)) => {
+                        (relation.ident.clone(), span.clone(), None)
+                    }
+                    _ => (RelationIdent::Typed(def), span.clone(), None),
                 }
             }
             ast::RelType::IntRange((range, span)) => (RelationIdent::Indexed, span, Some(range)),
@@ -282,7 +296,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(relation_ident) {
+        let relation_id = match self.define_relation_if_undefined(&relation_ident) {
             ImplicitRelationId::New(relation_id) => {
                 let object_prop =
                     object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
@@ -313,7 +327,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } else {
             match rel_params {
                 Some(rel_params) => {
-                    RelParams::Type(self.resolve_type_to_def(rel_params.0, &rel_params.1)?)
+                    RelParams::Type(self.resolve_type_reference(rel_params.0, &rel_params.1)?)
                 }
                 None => RelParams::Unit,
             }
@@ -322,23 +336,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(self.define(
             DefKind::Relationship(Relationship {
                 relation_id,
-                subject: (
-                    DefReference {
-                        def_id: subject.0,
-                        params: Default::default(),
-                    },
-                    self.src.span(subject.1),
-                ),
+                subject: (subject.0, self.src.span(subject.1)),
                 subject_cardinality: subject_cardinality
                     .map(convert_cardinality)
                     .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
-                object: (
-                    DefReference {
-                        def_id: object.0,
-                        params: Default::default(),
-                    },
-                    self.src.span(object.1),
-                ),
+                object: (object.0, self.src.span(object.1)),
                 object_cardinality: object_cardinality.map(convert_cardinality).unwrap_or_else(
                     || {
                         if has_object_prop {
@@ -358,24 +360,42 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ))
     }
 
-    fn resolve_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
+    fn resolve_type_reference(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefReference> {
         match ast_ty {
-            ast::Type::Unit => Ok(self.compiler.defs.unit()),
-            ast::Type::Path(path, _arguments) => self.lookup_path(&path, span),
-            ast::Type::StringLiteral(lit) => match lit.as_str() {
-                "" => Ok(self.compiler.defs.empty_string()),
-                _ => Ok(self
+            ast::Type::Unit => Ok(DefReference {
+                def_id: self.compiler.defs.unit(),
+                params: Default::default(),
+            }),
+            ast::Type::Path(path, _arguments) => Ok(DefReference {
+                def_id: self.lookup_path(&path, span)?,
+                params: Default::default(),
+            }),
+            ast::Type::StringLiteral(lit) => {
+                let def_id = match lit.as_str() {
+                    "" => self.compiler.defs.empty_string(),
+                    _ => self
+                        .compiler
+                        .defs
+                        .def_string_literal(&lit, &mut self.compiler.strings),
+                };
+                Ok(DefReference {
+                    def_id,
+                    params: Default::default(),
+                })
+            }
+            ast::Type::Regex(lit) => {
+                let def_id = self
                     .compiler
                     .defs
-                    .def_string_literal(&lit, &mut self.compiler.strings)),
-            },
-            ast::Type::Regex(lit) => self
-                .compiler
-                .defs
-                .def_regex(&lit, span, &mut self.compiler.strings)
-                .map_err(|(compile_error, err_span)| {
-                    (CompileError::InvalidRegex(compile_error), err_span)
-                }),
+                    .def_regex(&lit, span, &mut self.compiler.strings)
+                    .map_err(|(compile_error, err_span)| {
+                        (CompileError::InvalidRegex(compile_error), err_span)
+                    })?;
+                Ok(DefReference {
+                    def_id,
+                    params: Default::default(),
+                })
+            }
             _ => Err((CompileError::InvalidType, span.clone())),
             //ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
             // ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
@@ -393,7 +413,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .into_iter()
             .map(|eq_attr| match eq_attr {
                 ast::EqAttribute::Expr((expr, expr_span)) => {
-                    let key = (DefId::unit(), self.src.span(&expr_span));
+                    let key = (
+                        DefReference {
+                            def_id: DefId::unit(),
+                            params: Default::default(),
+                        },
+                        self.src.span(&expr_span),
+                    );
                     let expr = self.lower_expr((expr, expr_span), var_table)?;
 
                     Ok((key, expr))
@@ -405,10 +431,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let connection = rel.connection;
                     let (object, object_span) = rel.object.unwrap();
 
-                    let key = self.resolve_type_to_def(connection.0, &connection.1)?;
+                    let def = self.resolve_type_reference(connection.0, &connection.1)?;
 
                     self.lower_expr((object, object_span), var_table)
-                        .map(|expr| ((key, self.src.span(&connection.1)), expr))
+                        .map(|expr| ((def, self.src.span(&connection.1)), expr))
                 }
             })
             .collect::<Result<_, _>>()?;
@@ -529,10 +555,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, kind: RelationIdent) -> ImplicitRelationId {
+    fn define_relation_if_undefined(&mut self, kind: &RelationIdent) -> ImplicitRelationId {
         match kind {
-            RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => {
-                match self.compiler.relations.relations.entry(def_id) {
+            RelationIdent::Named(def) | RelationIdent::Typed(def) => {
+                match self.compiler.relations.relations.entry(def.def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(*vacant.insert(RelationId(
                         self.compiler.defs.alloc_def_id(self.src.package_id),
                     ))),

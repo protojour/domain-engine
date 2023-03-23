@@ -66,9 +66,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 .get_relationship_meta(*relationship_id)
                                                 .expect("BUG: problem getting property meta");
 
-                                            let variant_def = match relation.ident {
-                                                RelationIdent::Named(def_id)
-                                                | RelationIdent::Typed(def_id) => def_id,
+                                            let variant_def = match &relation.ident {
+                                                RelationIdent::Named(def)
+                                                | RelationIdent::Typed(def) => def.def_id,
                                                 _ => relationship.object.0.def_id,
                                             };
 

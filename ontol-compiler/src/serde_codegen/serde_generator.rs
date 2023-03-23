@@ -616,9 +616,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (property_cardinality, value_operator_id) =
                     self.get_property_operator(type_def_id, *cardinality);
 
-                let rel_params_operator_id = match relationship.rel_params {
-                    RelParams::Type(def_id) => {
-                        self.get_serde_operator_id(SerdeKey::identity(def_id))
+                let rel_params_operator_id = match &relationship.rel_params {
+                    RelParams::Type(def) => {
+                        self.get_serde_operator_id(SerdeKey::identity(def.def_id))
                     }
                     RelParams::Unit => None,
                     _ => todo!(),
