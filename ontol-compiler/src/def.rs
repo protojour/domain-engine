@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_runtime::{
     proc::BuiltinProc, string_types::StringLikeType, DefId, PackageId, RelationId,
 };
@@ -72,7 +73,11 @@ impl<'m> DefKind<'m> {
 #[derive(Debug)]
 pub struct TypeDef<'m> {
     pub ident: Option<&'m str>,
+    pub generics: Option<IndexMap<&'m str, GenericParam>>,
 }
+
+#[derive(Debug)]
+pub struct GenericParam {}
 
 #[derive(Debug)]
 pub struct Variables(pub SmallVec<[(ExprId, SourceSpan); 2]>);

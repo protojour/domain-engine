@@ -11,8 +11,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
-        TypeDef, ValueCardinality, Variables,
+        Def, DefKind, GenericParam, PropertyCardinality, RelParams, Relation, RelationIdent,
+        Relationship, TypeDef, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -84,43 +84,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(Default::default())
             }
-            ast::Statement::Type(type_stmt) => {
-                let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
-                    Ok(def_id) => def_id,
-                    Err(_) => {
-                        return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1))
-                    }
-                };
-                let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-                let kind = DefKind::Type(TypeDef { ident: Some(ident) });
-
-                self.set_def_kind(def_id, kind, &span);
-
-                let mut root_defs: RootDefs = [def_id].into();
-
-                if let Some((rel_block, _span)) = type_stmt.rel_block {
-                    // The inherent relation block on the type uses the just defined
-                    // type as its context
-                    let block_context = BlockContext::Context((def_id, span.clone()));
-
-                    for (rel_stmt, rel_span) in rel_block {
-                        match self.ast_relationship_chain_to_def(
-                            rel_stmt,
-                            rel_span,
-                            block_context.clone(),
-                        ) {
-                            Ok(mut defs) => {
-                                root_defs.append(&mut defs);
-                            }
-                            Err(error) => {
-                                self.report_error(error);
-                            }
-                        }
-                    }
-                }
-
-                Ok(root_defs)
-            }
+            ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
             ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_chain_to_def(rel_stmt, span, BlockContext::NoContext)
             }
@@ -149,6 +113,54 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 .into())
             }
         }
+    }
+
+    fn define_type(&mut self, type_stmt: ast::TypeStatement, span: Span) -> Res<RootDefs> {
+        let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
+            Ok(def_id) => def_id,
+            Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
+        };
+        let ident = self.compiler.strings.intern(&type_stmt.ident.0);
+        let generics = type_stmt.params.map(|(params, _span)| {
+            params
+                .into_iter()
+                .map(|(param, _span)| {
+                    let ident = self.compiler.strings.intern(param.ident.0.as_str());
+                    (ident, GenericParam {})
+                })
+                .collect()
+        });
+
+        self.set_def_kind(
+            def_id,
+            DefKind::Type(TypeDef {
+                ident: Some(ident),
+                generics,
+            }),
+            &span,
+        );
+
+        let mut root_defs: RootDefs = [def_id].into();
+
+        if let Some((rel_block, _span)) = type_stmt.rel_block {
+            // The inherent relation block on the type uses the just defined
+            // type as its context
+            let block_context = BlockContext::Context((def_id, span.clone()));
+
+            for (rel_stmt, rel_span) in rel_block {
+                match self.ast_relationship_chain_to_def(rel_stmt, rel_span, block_context.clone())
+                {
+                    Ok(mut defs) => {
+                        root_defs.append(&mut defs);
+                    }
+                    Err(error) => {
+                        self.report_error(error);
+                    }
+                }
+            }
+        }
+
+        Ok(root_defs)
     }
 
     fn ast_relationship_chain_to_def(
@@ -199,7 +211,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
                     self.set_def_kind(
                         anonymous_def_id,
-                        DefKind::Type(TypeDef { ident: None }),
+                        DefKind::Type(TypeDef {
+                            ident: None,
+                            generics: None,
+                        }),
                         &span,
                     );
                     (anonymous_def_id, span.clone())

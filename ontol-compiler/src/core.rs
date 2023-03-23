@@ -83,7 +83,10 @@ impl<'m> Compiler<'m> {
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_def(
-            DefKind::Type(TypeDef { ident: Some(ident) }),
+            DefKind::Type(TypeDef {
+                ident: Some(ident),
+                generics: None,
+            }),
             CORE_PKG,
             SourceSpan::none(),
         );
