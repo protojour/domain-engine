@@ -11,8 +11,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, GenericParam, PropertyCardinality, RelParams, Relation, RelationIdent,
-        Relationship, TypeDef, ValueCardinality, Variables,
+        Def, DefKind, DefReference, PropertyCardinality, RelParams, Relation, RelationIdent,
+        Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -121,12 +121,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
         };
         let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-        let generics = type_stmt.params.map(|(params, _span)| {
-            params
+        let params = type_stmt.params.map(|(ast_params, _span)| {
+            ast_params
                 .into_iter()
                 .map(|(param, _span)| {
                     let ident = self.compiler.strings.intern(param.ident.0.as_str());
-                    (ident, GenericParam {})
+                    let id = self.compiler.defs.alloc_def_param_id();
+
+                    (ident, TypeDefParam { id })
                 })
                 .collect()
         });
@@ -135,7 +137,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             def_id,
             DefKind::Type(TypeDef {
                 ident: Some(ident),
-                generics,
+                params,
             }),
             &span,
         );
@@ -183,13 +185,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let (mut subject_def, mut subject_span, object_def, object_span) =
             match (subject, object, contextual_def) {
                 (Some(subject), Some(object), BlockContext::NoContext) => (
-                    self.ast_type_to_def(subject.0, &subject.1)?,
+                    self.resolve_type_to_def(subject.0, &subject.1)?,
                     subject.1,
-                    self.ast_type_to_def(object.0, &object.1)?,
+                    self.resolve_type_to_def(object.0, &object.1)?,
                     object.1,
                 ),
                 (Some(subject), None, BlockContext::Context(object)) => (
-                    self.ast_type_to_def(subject.0, &subject.1)?,
+                    self.resolve_type_to_def(subject.0, &subject.1)?,
                     subject.1,
                     object.0,
                     object.1,
@@ -197,7 +199,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 (None, Some(object), BlockContext::Context(subject)) => (
                     subject.0,
                     subject.1,
-                    self.ast_type_to_def(object.0, &object.1)?,
+                    self.resolve_type_to_def(object.0, &object.1)?,
                     object.1,
                 ),
                 _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
@@ -205,7 +207,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         for chain_item in chain {
             let (next_ty, next_ty_span) = match chain_item.subject {
-                Some((ast_ty, ty_span)) => (self.ast_type_to_def(ast_ty, &ty_span)?, ty_span),
+                Some((ast_ty, ty_span)) => (self.resolve_type_to_def(ast_ty, &ty_span)?, ty_span),
                 None => {
                     // implicit, anonymous type:
                     let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
@@ -213,7 +215,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         anonymous_def_id,
                         DefKind::Type(TypeDef {
                             ident: None,
-                            generics: None,
+                            params: None,
                         }),
                         &span,
                     );
@@ -264,7 +266,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Option<Range<Option<u16>>>,
         ) = match relation_ty {
             ast::RelType::Type((ty, span)) => {
-                let def_id = self.ast_type_to_def(ty, &span)?;
+                let def_id = self.resolve_type_to_def(ty, &span)?;
 
                 match self.compiler.defs.get_def_kind(def_id) {
                     Some(DefKind::StringLiteral(_)) => {
@@ -311,7 +313,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } else {
             match rel_params {
                 Some(rel_params) => {
-                    RelParams::Type(self.ast_type_to_def(rel_params.0, &rel_params.1)?)
+                    RelParams::Type(self.resolve_type_to_def(rel_params.0, &rel_params.1)?)
                 }
                 None => RelParams::Unit,
             }
@@ -320,11 +322,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(self.define(
             DefKind::Relationship(Relationship {
                 relation_id,
-                subject: (subject.0, self.src.span(subject.1)),
+                subject: (
+                    DefReference {
+                        def_id: subject.0,
+                        params: Default::default(),
+                    },
+                    self.src.span(subject.1),
+                ),
                 subject_cardinality: subject_cardinality
                     .map(convert_cardinality)
                     .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
-                object: (object.0, self.src.span(object.1)),
+                object: (
+                    DefReference {
+                        def_id: object.0,
+                        params: Default::default(),
+                    },
+                    self.src.span(object.1),
+                ),
                 object_cardinality: object_cardinality.map(convert_cardinality).unwrap_or_else(
                     || {
                         if has_object_prop {
@@ -344,7 +358,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ))
     }
 
-    fn ast_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
+    fn resolve_type_to_def(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefId> {
         match ast_ty {
             ast::Type::Unit => Ok(self.compiler.defs.unit()),
             ast::Type::Path(path, _arguments) => self.lookup_path(&path, span),
@@ -391,7 +405,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let connection = rel.connection;
                     let (object, object_span) = rel.object.unwrap();
 
-                    let key = self.ast_type_to_def(connection.0, &connection.1)?;
+                    let key = self.resolve_type_to_def(connection.0, &connection.1)?;
 
                     self.lower_expr((object, object_span), var_table)
                         .map(|expr| ((key, self.src.span(&connection.1)), expr))

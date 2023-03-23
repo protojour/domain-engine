@@ -3,7 +3,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, PropertyCardinality, Relation, RelationIdent, Relationship, ValueCardinality,
+        Def, DefKind, DefReference, PropertyCardinality, Relation, RelationIdent, Relationship,
+        ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
@@ -39,26 +40,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         self.relations.relationships_by_subject.insert(
-            (relationship.subject.0, relationship.relation_id),
+            (relationship.subject.0.def_id, relationship.relation_id),
             RelationshipId(def_id),
         );
         self.relations.relationships_by_object.insert(
-            (relationship.object.0, relationship.relation_id),
+            (relationship.object.0.def_id, relationship.relation_id),
             RelationshipId(def_id),
         );
 
         self.check_subject_property(
             (RelationshipId(def_id), relationship),
             (relationship.relation_id, relation),
-            relationship.subject,
-            relationship.object,
+            &relationship.subject,
+            &relationship.object,
             span,
         );
         self.check_object_property(
             (RelationshipId(def_id), relationship),
             (relationship.relation_id, relation),
-            relationship.object,
-            relationship.subject,
+            &relationship.object,
+            &relationship.subject,
             span,
         );
 
@@ -69,12 +70,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
-        subject: (DefId, SourceSpan),
-        object: (DefId, SourceSpan),
+        subject: &(DefReference, SourceSpan),
+        object: &(DefReference, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let subject_ty = self.check_def(subject.0);
-        let object_ty = self.check_def(object.0);
+        let subject_ty = self.check_def(subject.0.def_id);
+        let object_ty = self.check_def(object.0.def_id);
 
         match subject_ty {
             Type::Unit(_) | Type::EmptySequence(_) => return object_ty,
@@ -88,7 +89,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(subject.0);
+        let properties = self.relations.properties_by_type_mut(subject.0.def_id);
 
         match (
             &relation.1.ident,
@@ -155,16 +156,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
-        object: (DefId, SourceSpan),
-        subject: (DefId, SourceSpan),
+        object: &(DefReference, SourceSpan),
+        subject: &(DefReference, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let object_ty = self.check_def(object.0);
-        let subject_ty = self.check_def(subject.0);
+        let object_ty = self.check_def(object.0.def_id);
+        let subject_ty = self.check_def(subject.0.def_id);
 
         match subject_ty {
             Type::Unit(_) => {
-                let object_properties = self.relations.properties_by_type_mut(object.0);
+                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
 
                 match &mut object_properties.constructor {
                     Constructor::Identity => {
@@ -189,7 +190,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 );
 
                                 // Register union for check later
-                                self.relations.value_unions.insert(object.0);
+                                self.relations.value_unions.insert(object.0.def_id);
                             }
                             _ => {
                                 return self.error(
@@ -208,7 +209,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
                 if let Err(e) = self.extend_string_pattern_constructor(
                     relation,
-                    object.0,
+                    object.0.def_id,
                     object_ty,
                     StringPatternSegment::EmptyString,
                     span,
@@ -219,14 +220,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Anonymous(_) => {
                 let subject_constructor = self
                     .relations
-                    .properties_by_type(subject.0)
+                    .properties_by_type(subject.0.def_id)
                     .map(|props| &props.constructor);
 
                 match subject_constructor {
                     Some(Constructor::StringPattern(subject_pattern)) => {
                         if let Err(e) = self.extend_string_pattern_constructor(
                             relation,
-                            object.0,
+                            object.0.def_id,
                             object_ty,
                             subject_pattern.clone(),
                             span,
@@ -240,7 +241,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ => {
-                let object_properties = self.relations.properties_by_type_mut(object.0);
+                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
 
                 match (
                     &relation.1.object_prop,

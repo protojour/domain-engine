@@ -85,7 +85,7 @@ impl<'m> Compiler<'m> {
         let def_id = self.defs.add_def(
             DefKind::Type(TypeDef {
                 ident: Some(ident),
-                generics: None,
+                params: None,
             }),
             CORE_PKG,
             SourceSpan::none(),

@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    proc::BuiltinProc, string_types::StringLikeType, DefId, PackageId, RelationId,
+    proc::BuiltinProc, string_types::StringLikeType, DefId, DefParamId, PackageId, RelationId,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -73,11 +73,13 @@ impl<'m> DefKind<'m> {
 #[derive(Debug)]
 pub struct TypeDef<'m> {
     pub ident: Option<&'m str>,
-    pub generics: Option<IndexMap<&'m str, GenericParam>>,
+    pub params: Option<IndexMap<&'m str, TypeDefParam>>,
 }
 
 #[derive(Debug)]
-pub struct GenericParam {}
+pub struct TypeDefParam {
+    pub id: DefParamId,
+}
 
 #[derive(Debug)]
 pub struct Variables(pub SmallVec<[(ExprId, SourceSpan); 2]>);
@@ -91,6 +93,12 @@ pub enum Primitive {
     /// All numbers (realistically all rational numbers as all computer numbers are rational)
     Number,
     String,
+}
+
+#[derive(Debug)]
+pub struct DefReference {
+    pub def_id: DefId,
+    pub params: FnvHashMap<DefParamId, (DefReference, SourceSpan)>,
 }
 
 /// This definition expresses that a relation _exists_
@@ -141,11 +149,11 @@ pub enum RelationIdent {
 pub struct Relationship {
     pub relation_id: RelationId,
 
-    pub subject: (DefId, SourceSpan),
+    pub subject: (DefReference, SourceSpan),
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
 
-    pub object: (DefId, SourceSpan),
+    pub object: (DefReference, SourceSpan),
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
 
@@ -188,6 +196,7 @@ pub enum ValueCardinality {
 pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
     def_id_allocators: FnvHashMap<PackageId, u16>,
+    next_def_param: DefParamId,
     next_expr_id: ExprId,
     unit: DefId,
     id_relation: DefId,
@@ -210,6 +219,7 @@ impl<'m> Defs<'m> {
             mem,
             def_id_allocators: Default::default(),
             next_expr_id: ExprId(0),
+            next_def_param: DefParamId(0),
             unit: DefId::unit(),
             id_relation: DefId::unit(),
             indexed_relation: DefId::unit(),
@@ -337,6 +347,12 @@ impl<'m> Defs<'m> {
     pub fn alloc_expr_id(&mut self) -> ExprId {
         let id = self.next_expr_id;
         self.next_expr_id.0 += 1;
+        id
+    }
+
+    pub fn alloc_def_param_id(&mut self) -> DefParamId {
+        let id = self.next_def_param;
+        self.next_def_param.0 += 1;
         id
     }
 

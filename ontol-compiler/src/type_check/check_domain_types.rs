@@ -43,7 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .unwrap();
                     let object_properties = self
                         .relations
-                        .properties_by_type(relationship.object.0)
+                        .properties_by_type(relationship.object.0.def_id)
                         .unwrap();
 
                     if properties.id.is_some() && object_properties.id.is_some() {
@@ -69,7 +69,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             let variant_def = match relation.ident {
                                                 RelationIdent::Named(def_id)
                                                 | RelationIdent::Typed(def_id) => def_id,
-                                                _ => relationship.object.0,
+                                                _ => relationship.object.0.def_id,
                                             };
 
                                             let subject_properties = self
@@ -104,7 +104,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .unwrap();
                         let subject_properties = self
                             .relations
-                            .properties_by_type(relationship.subject.0)
+                            .properties_by_type(relationship.subject.0.def_id)
                             .unwrap();
 
                         if subject_properties.id.is_some() {

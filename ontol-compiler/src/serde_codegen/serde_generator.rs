@@ -150,10 +150,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let (relationship, _) = self
                             .get_subject_property_meta(def_variant.def_id, id_relation_id)
                             .expect("Problem getting subject property meta");
-                        let object = relationship.object;
+                        let object = &relationship.object;
 
                         let object_operator_id = self
-                            .get_serde_operator_id(SerdeKey::identity(object.0))
+                            .get_serde_operator_id(SerdeKey::identity(object.0.def_id))
                             .expect("No object operator for _id property");
 
                         Some(OperatorAllocation::Allocated(
@@ -406,7 +406,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 .expect("Problem getting relationship meta");
 
                             self.get_serde_operator_id(SerdeKey::Def(
-                                def_variant.with_def(relationship.object.0),
+                                def_variant.with_def(relationship.object.0.def_id),
                             ))
                             .expect("no inner operator")
                         }
@@ -494,7 +494,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 ),
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
-                                    relationship.object.0,
+                                    relationship.object.0.def_id,
                                     DataModifier::IDENTITY,
                                 ),
                             },
@@ -591,25 +591,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let (relationship, relation) = self
                             .get_subject_property_meta(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting subject property meta");
-                        let object = relationship.object;
+                        let object = relationship.object.0.def_id;
 
                         let prop_key = relation
                             .subject_prop(self.defs)
                             .expect("Subject property has no name");
 
-                        (relationship, prop_key, object.0)
+                        (relationship, prop_key, object)
                     }
                     Role::Object => {
                         let (relationship, relation) = self
                             .get_object_property_meta(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting object property meta");
-                        let subject = relationship.subject;
+                        let subject = relationship.subject.0.def_id;
 
                         let prop_key = relation
                             .object_prop(self.defs)
                             .expect("Object property has no name");
 
-                        (relationship, prop_key, subject.0)
+                        (relationship, prop_key, subject)
                     }
                 };
 

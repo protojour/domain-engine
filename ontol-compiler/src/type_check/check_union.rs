@@ -65,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let variant_def = match relation.ident {
                 RelationIdent::Named(def_id) | RelationIdent::Typed(def_id) => def_id,
-                _ => relationship.object.0,
+                _ => relationship.object.0.def_id,
             };
 
             if used_variants.contains(&variant_def) {
@@ -87,7 +87,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
-                        relationship.object.0,
+                        relationship.object.0.def_id,
                         &mut error_set,
                         span,
                     );
@@ -216,7 +216,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");
 
-                        def_id = relationship.object.0;
+                        def_id = relationship.object.0.def_id;
                         continue;
                     }
                     Constructor::Value(_, _, _) => {
@@ -257,8 +257,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .get_subject_property_meta(variant_def, property_id.relation_id)
                 .expect("BUG: problem getting property meta");
 
-            let (object_def, _) = relationship.object;
-            let object_ty = self.def_types.map.get(&object_def).unwrap();
+            let (object_reference, _) = &relationship.object;
+            let object_ty = self.def_types.map.get(&object_reference.def_id).unwrap();
             let Some(property_name) = relation.object_prop(self.defs) else {
                 continue;
             };

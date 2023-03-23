@@ -119,7 +119,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             MatchProperty {
                                                 relation_id: property_id.relation_id,
                                                 cardinality: relationship.subject_cardinality,
-                                                object_def: relationship.object.0,
+                                                object_def: relationship.object.0.def_id,
                                                 used: false,
                                             },
                                         )
