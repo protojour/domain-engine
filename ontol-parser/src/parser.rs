@@ -3,7 +3,7 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::ast::{GenericArgument, GenericParam, Path, UseStatement};
+use crate::ast::{Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement};
 
 use super::{
     ast::{
@@ -56,16 +56,16 @@ fn use_statement() -> impl AstParser<UseStatement> {
 }
 
 fn type_statement() -> impl AstParser<TypeStatement> {
-    fn generic_params() -> impl AstParser<Vec<Spanned<GenericParam>>> {
+    fn generic_params() -> impl AstParser<Vec<Spanned<TypeParam>>> {
         just(Token::Sigil('<'))
             .ignore_then(spanned(generic_param()).separated_by(just(Token::Sigil(','))))
             .then_ignore(just(Token::Sigil('>')))
     }
 
-    fn generic_param() -> impl AstParser<GenericParam> {
+    fn generic_param() -> impl AstParser<TypeParam> {
         spanned(ident())
             .then(just(Token::Sigil('=')).ignore_then(spanned(ty())).or_not())
-            .map(|(ident, default)| GenericParam { ident, default })
+            .map(|(ident, default)| TypeParam { ident, default })
     }
 
     doc_comments()
@@ -270,22 +270,32 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
 /// Type parser
 fn ty() -> impl AstParser<Type> {
     recursive(|ty| {
-        let generic_argument = spanned(ident())
-            .then(just(Token::Sigil('=')).ignore_then(spanned(ty)).or_not())
-            .map(|(ident, default)| GenericArgument { ident, default })
-            .labelled("generic argument");
+        let binding = just(Token::Sigil('='))
+            .ignore_then(spanned(ty))
+            .map(TypeParamPatternBinding::Equals);
 
-        let generic_arguments = just(Token::Sigil('<'))
-            .ignore_then(spanned(generic_argument).separated_by(just(Token::Sigil(','))))
-            .then_ignore(just(Token::Sigil('>')))
-            .labelled("generic arguments");
+        let param_pattern = spanned(ident())
+            .then(binding.or_not())
+            .map(|(ident, binding)| TypeParamPattern {
+                ident,
+                binding: binding.unwrap_or(TypeParamPatternBinding::None),
+            })
+            .labelled("parameter pattern");
 
         let unit = just(Token::Open('('))
             .then(just(Token::Close(')')))
             .map(|_| Type::Unit);
         let path = path()
-            .then(spanned(generic_arguments).or_not())
-            .map(|(path, args)| Type::Path(path, args));
+            .then(
+                spanned(
+                    just(Token::Sigil('<'))
+                        .ignore_then(spanned(param_pattern).separated_by(just(Token::Sigil(','))))
+                        .then_ignore(just(Token::Sigil('>')))
+                        .labelled("generic arguments"),
+                )
+                .or_not(),
+            )
+            .map(|(path, param_patterns)| Type::Path(path, param_patterns));
         let number_literal = number_literal().map(Type::NumberLiteral);
         let string_literal = string_literal().map(Type::StringLiteral);
         let regex = select! { Token::Regex(string) => string }.map(Type::Regex);

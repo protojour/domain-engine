@@ -36,7 +36,7 @@ pub struct TypeStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub ident: Spanned<String>,
-    pub params: Option<Spanned<Vec<Spanned<GenericParam>>>>,
+    pub params: Option<Spanned<Vec<Spanned<TypeParam>>>>,
     pub rel_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
 
@@ -116,7 +116,7 @@ pub struct EqAttributeRel {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Unit,
-    Path(Path, Option<Spanned<Vec<Spanned<GenericArgument>>>>),
+    Path(Path, Option<Spanned<Vec<Spanned<TypeParamPattern>>>>),
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),
@@ -147,13 +147,19 @@ pub enum BinaryOp {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct GenericParam {
+pub struct TypeParam {
     pub ident: Spanned<String>,
     pub default: Option<Spanned<Type>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct GenericArgument {
+pub struct TypeParamPattern {
     pub ident: Spanned<String>,
-    pub default: Option<Spanned<Type>>,
+    pub binding: TypeParamPatternBinding,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum TypeParamPatternBinding {
+    None,
+    Equals(Spanned<Type>),
 }

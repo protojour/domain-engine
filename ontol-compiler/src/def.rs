@@ -98,7 +98,13 @@ pub enum Primitive {
 #[derive(Debug, Clone)]
 pub struct DefReference {
     pub def_id: DefId,
-    pub params: FnvHashMap<DefParamId, (DefReference, SourceSpan)>,
+    pub pattern_bindings: FnvHashMap<DefParamId, DefParamBinding>,
+}
+
+#[derive(Debug, Clone)]
+pub enum DefParamBinding {
+    Bound(u32),
+    Provided(DefReference, SourceSpan),
 }
 
 /// This definition expresses that a relation _exists_

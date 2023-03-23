@@ -3,16 +3,17 @@ use std::{
     ops::Range,
 };
 
+use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
-use ontol_runtime::{DefId, RelationId};
+use ontol_runtime::{DefId, DefParamId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefReference, PropertyCardinality, RelParams, Relation, RelationIdent,
-        Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
+        Def, DefKind, DefParamBinding, DefReference, PropertyCardinality, RelParams, Relation,
+        RelationIdent, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -94,7 +95,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 first,
                 second,
             }) => {
-                let mut var_table = VarTable::default();
+                let mut var_table = ExprVarTable::default();
                 let mut variables = vec![];
                 for (param, span) in ast_variables.into_iter() {
                     variables.push((
@@ -149,7 +150,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             // type as its context
             let def = DefReference {
                 def_id,
-                params: Default::default(),
+                pattern_bindings: Default::default(),
             };
             let block_context = BlockContext::Context((def, span.clone()));
 
@@ -228,7 +229,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     (
                         DefReference {
                             def_id: anonymous_def_id,
-                            params: Default::default(),
+                            pattern_bindings: Default::default(),
                         },
                         span.clone(),
                     )
@@ -364,12 +365,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match ast_ty {
             ast::Type::Unit => Ok(DefReference {
                 def_id: self.compiler.defs.unit(),
-                params: Default::default(),
+                pattern_bindings: Default::default(),
             }),
-            ast::Type::Path(path, _arguments) => Ok(DefReference {
-                def_id: self.lookup_path(&path, span)?,
-                params: Default::default(),
-            }),
+            ast::Type::Path(path, param_patterns) => {
+                let def_id = self.lookup_path(&path, span)?;
+                let args = if let Some((patterns, patterns_span)) = param_patterns {
+                    self.resolve_type_pattern_bindings(patterns, patterns_span, def_id)
+                } else {
+                    Default::default()
+                };
+
+                Ok(DefReference {
+                    def_id,
+                    pattern_bindings: args,
+                })
+            }
             ast::Type::StringLiteral(lit) => {
                 let def_id = match lit.as_str() {
                     "" => self.compiler.defs.empty_string(),
@@ -380,7 +390,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 };
                 Ok(DefReference {
                     def_id,
-                    params: Default::default(),
+                    pattern_bindings: Default::default(),
                 })
             }
             ast::Type::Regex(lit) => {
@@ -393,19 +403,69 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     })?;
                 Ok(DefReference {
                     def_id,
-                    params: Default::default(),
+                    pattern_bindings: Default::default(),
                 })
             }
             _ => Err((CompileError::InvalidType, span.clone())),
-            //ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
+            // ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
             // ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
+        }
+    }
+
+    fn resolve_type_pattern_bindings(
+        &mut self,
+        ast_patterns: Vec<(ast::TypeParamPattern, Range<usize>)>,
+        span: Range<usize>,
+        def_id: DefId,
+    ) -> FnvHashMap<DefParamId, DefParamBinding> {
+        match self.compiler.defs.get_def_kind(def_id).unwrap() {
+            DefKind::Type(TypeDef {
+                params: Some(params),
+                ..
+            }) => {
+                let mut args: FnvHashMap<DefParamId, DefParamBinding> = Default::default();
+                for (ast_pattern, _span) in ast_patterns {
+                    match params.get(ast_pattern.ident.0.as_str()) {
+                        Some(type_def_param) => match ast_pattern.binding {
+                            ast::TypeParamPatternBinding::None => {
+                                args.insert(type_def_param.id, DefParamBinding::Bound(0));
+                            }
+                            ast::TypeParamPatternBinding::Equals((ty, ty_span)) => {
+                                match self.resolve_type_reference(ty, &ty_span) {
+                                    Ok(value) => {
+                                        args.insert(
+                                            type_def_param.id,
+                                            DefParamBinding::Provided(
+                                                value,
+                                                self.src.span(&ty_span),
+                                            ),
+                                        );
+                                    }
+                                    Err(error) => {
+                                        self.report_error(error);
+                                    }
+                                }
+                            }
+                        },
+                        None => self.report_error((
+                            CompileError::UnknownTypeParameter,
+                            ast_pattern.ident.1,
+                        )),
+                    }
+                }
+                args
+            }
+            _ => {
+                self.report_error((CompileError::InvalidTypeParameters, span));
+                Default::default()
+            }
         }
     }
 
     fn lower_eq_type_to_obj(
         &mut self,
         (eq_type, span): (ast::EqType, Span),
-        var_table: &mut VarTable,
+        var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
         let type_def_id = self.lookup_path(&eq_type.path.0, &eq_type.path.1)?;
         let attributes = eq_type
@@ -416,7 +476,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let key = (
                         DefReference {
                             def_id: DefId::unit(),
-                            params: Default::default(),
+                            pattern_bindings: Default::default(),
                         },
                         self.src.span(&expr_span),
                     );
@@ -458,7 +518,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn lower_expr(
         &mut self,
         (ast_expr, span): (ast::Expression, Span),
-        var_table: &VarTable,
+        var_table: &ExprVarTable,
     ) -> Res<Expr> {
         match ast_expr {
             ast::Expression::NumberLiteral(int) => {
@@ -626,11 +686,11 @@ enum ImplicitRelationId {
 }
 
 #[derive(Default)]
-struct VarTable {
+struct ExprVarTable {
     variables: HashMap<String, ExprId>,
 }
 
-impl VarTable {
+impl ExprVarTable {
     fn new_var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
         *self
             .variables

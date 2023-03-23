@@ -108,6 +108,10 @@ pub enum CompileError {
     CannotConcatenateStringPattern,
     #[error("invalid regex: {0}")]
     InvalidRegex(String),
+    #[error("invalid type parameters")]
+    InvalidTypeParameters,
+    #[error("unknown type parameter")]
+    UnknownTypeParameter,
 }
 
 #[derive(Debug)]
