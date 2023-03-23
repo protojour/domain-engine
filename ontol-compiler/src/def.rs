@@ -56,7 +56,6 @@ impl<'m> DefKind<'m> {
             Self::Primitive(Primitive::Int) => Some("int".into()),
             Self::Primitive(Primitive::Number) => Some("number".into()),
             Self::Primitive(Primitive::String) => Some("string".into()),
-            Self::Primitive(Primitive::Other(name)) => Some((*name).into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
@@ -81,7 +80,6 @@ pub enum Primitive {
     /// All numbers (realistically all rational numbers as all computer numbers are rational)
     Number,
     String,
-    Other(&'static str),
 }
 
 /// This definition expresses that a relation _exists_

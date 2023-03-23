@@ -3,7 +3,7 @@
 use ontol_runtime::{proc::BuiltinProc, string_types::StringLikeType, DefId};
 
 use crate::{
-    def::{DefKind, Primitive},
+    def::DefKind,
     mem::Intern,
     namespace::Space,
     package::CORE_PKG,
@@ -19,12 +19,12 @@ impl<'m> Compiler<'m> {
         self.define_package(CORE_PKG);
 
         // fundamental types
-        let _ = self.def_core_type(self.defs.unit(), Type::Unit);
-        let _ = self.def_core_type(self.defs.empty_sequence(), Type::EmptySequence);
-        let _ = self.def_core_type_name(self.defs.id_relation(), "id", |_| Type::BuiltinRelation);
-        let int_ty = self.def_core_type_name(self.defs.int(), "int", Type::Int);
-        let _ = self.def_core_type_name(self.defs.number(), "number", Type::Number);
-        let string_ty = self.def_core_type_name(self.defs.string(), "string", Type::String);
+        let _ = self.register_type(self.defs.unit(), Type::Unit);
+        let _ = self.register_type(self.defs.empty_sequence(), Type::EmptySequence);
+        let _ = self.register_named_type(self.defs.id_relation(), "id", |_| Type::BuiltinRelation);
+        let int_ty = self.register_named_type(self.defs.int(), "int", Type::Int);
+        let _ = self.register_named_type(self.defs.number(), "number", Type::Number);
+        let string_ty = self.register_named_type(self.defs.string(), "string", Type::String);
 
         let int_int_ty = self.types.intern([int_ty, int_ty]);
         let string_string_ty = self.types.intern([string_ty, string_ty]);
@@ -59,8 +59,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_uuid(&mut self) {
-        let uuid = self.defs.add_primitive(Primitive::Other("uuid"));
-        let _ = self.def_core_type_name(uuid, "uuid", Type::Uuid);
+        let (uuid, _) = self.define_domain_type("uuid", Type::DateTime);
         self.relations.properties_by_type_mut(uuid).constructor =
             Constructor::StringPattern(StringPatternSegment::Regex(regex_util::uuid()));
         self.defs
@@ -69,8 +68,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_datetime(&mut self) {
-        let datetime = self.defs.add_primitive(Primitive::Other("datetime"));
-        let _ = self.def_core_type_name(datetime, "datetime", Type::DateTime);
+        let (datetime, _) = self.define_domain_type("datetime", Type::DateTime);
         self.relations.properties_by_type_mut(datetime).constructor =
             Constructor::StringPattern(StringPatternSegment::Regex(regex_util::datetime_rfc3339()));
         self.defs
@@ -78,13 +76,28 @@ impl<'m> Compiler<'m> {
             .insert(datetime, StringLikeType::DateTime);
     }
 
-    fn def_core_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
+    /// Define a core _domain_ type, i.e. not a primitive
+    fn define_domain_type(
+        &mut self,
+        name: &'static str,
+        ty_fn: impl Fn(DefId) -> Type<'m>,
+    ) -> (DefId, TypeRef<'m>) {
+        let def_id = self.defs.add_def(
+            DefKind::DomainType(Some(name)),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
+        let type_ref = self.register_named_type(def_id, name, ty_fn);
+        (def_id, type_ref)
+    }
+
+    fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
         self.def_types.map.insert(def_id, ty);
         ty
     }
 
-    fn def_core_type_name(
+    fn register_named_type(
         &mut self,
         def_id: DefId,
         ident: &str,

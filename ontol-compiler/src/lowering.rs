@@ -94,7 +94,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
                 let kind = DefKind::DomainType(Some(ident));
 
-                self.set_def(def_id, kind, &span);
+                self.set_def_kind(def_id, kind, &span);
 
                 let mut root_defs: RootDefs = [def_id].into();
 
@@ -142,7 +142,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let first = self.lower_eq_type_to_obj(first, &mut var_table)?;
                 let second = self.lower_eq_type_to_obj(second, &mut var_table)?;
 
-                Ok([self.def(
+                Ok([self.define(
                     DefKind::Equation(Variables(variables.into()), first, second),
                     &span,
                 )]
@@ -197,7 +197,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 None => {
                     // implicit, anonymous type:
                     let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-                    self.set_def(anonymous_def_id, DefKind::DomainType(None), &span);
+                    self.set_def_kind(anonymous_def_id, DefKind::DomainType(None), &span);
                     (anonymous_def_id, span.clone())
                 }
             };
@@ -266,7 +266,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let object_prop =
                     object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
 
-                self.set_def(
+                self.set_def_kind(
                     relation_id.0,
                     DefKind::Relation(Relation {
                         ident: relation_ident,
@@ -298,7 +298,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        Ok(self.def(
+        Ok(self.define(
             DefKind::Relationship(Relationship {
                 relation_id,
                 subject: (subject.0, self.src.span(subject.1)),
@@ -528,7 +528,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn set_def(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
+    fn define(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
+        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+        self.set_def_kind(def_id, kind, span);
+        def_id
+    }
+
+    fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
         self.compiler.defs.map.insert(
             def_id,
             self.compiler.defs.mem.bump.alloc(Def {
@@ -538,12 +544,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 span: self.src.span(span),
             }),
         );
-    }
-
-    fn def(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
-        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.set_def(def_id, kind, span);
-        def_id
     }
 
     fn expr(&self, kind: ExprKind, span: &Span) -> Expr {
