@@ -3,7 +3,7 @@
 use ontol_runtime::{proc::BuiltinProc, string_types::StringLikeType, DefId};
 
 use crate::{
-    def::DefKind,
+    def::{DefKind, TypeDef},
     mem::Intern,
     namespace::Space,
     package::CORE_PKG,
@@ -79,15 +79,15 @@ impl<'m> Compiler<'m> {
     /// Define a core _domain_ type, i.e. not a primitive
     fn define_domain_type(
         &mut self,
-        name: &'static str,
+        ident: &'static str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_def(
-            DefKind::DomainType(Some(name)),
+            DefKind::Type(TypeDef { ident: Some(ident) }),
             CORE_PKG,
             SourceSpan::none(),
         );
-        let type_ref = self.register_named_type(def_id, name, ty_fn);
+        let type_ref = self.register_named_type(def_id, ident, ty_fn);
         (def_id, type_ref)
     }
 

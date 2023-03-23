@@ -2,7 +2,7 @@ use ontol_runtime::DefId;
 
 use crate::{
     codegen::{CodegenTask, EqCodegenTask},
-    def::{DefKind, Primitive},
+    def::{DefKind, Primitive, TypeDef},
     mem::Intern,
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
@@ -23,12 +23,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .expect("BUG: definition not found");
 
         match &def.kind {
-            DefKind::DomainType(Some(_ident)) => {
+            DefKind::Type(TypeDef {
+                ident: Some(_ident),
+                ..
+            }) => {
                 let ty = self.types.intern(Type::Domain(def_id));
                 self.def_types.map.insert(def_id, ty);
                 ty
             }
-            DefKind::DomainType(None) => {
+            DefKind::Type(TypeDef { ident: None, .. }) => {
                 let ty = self.types.intern(Type::Anonymous(def_id));
                 self.def_types.map.insert(def_id, ty);
                 ty

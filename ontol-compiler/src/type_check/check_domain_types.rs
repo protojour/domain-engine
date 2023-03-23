@@ -20,7 +20,7 @@ enum Action {
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_domain_types(&mut self) {
         for (def_id, def) in &self.defs.map {
-            if let DefKind::DomainType(_) = &def.kind {
+            if let DefKind::Type(_) = &def.kind {
                 self.check_domain_type_properties(*def_id, def);
             }
         }

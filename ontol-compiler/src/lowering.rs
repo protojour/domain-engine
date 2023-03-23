@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, PropertyCardinality, RelParams, Relation, RelationIdent, Relationship,
-        ValueCardinality, Variables,
+        TypeDef, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -92,7 +92,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     }
                 };
                 let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-                let kind = DefKind::DomainType(Some(ident));
+                let kind = DefKind::Type(TypeDef { ident: Some(ident) });
 
                 self.set_def_kind(def_id, kind, &span);
 
@@ -197,7 +197,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 None => {
                     // implicit, anonymous type:
                     let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-                    self.set_def_kind(anonymous_def_id, DefKind::DomainType(None), &span);
+                    self.set_def_kind(
+                        anonymous_def_id,
+                        DefKind::Type(TypeDef { ident: None }),
+                        &span,
+                    );
                     (anonymous_def_id, span.clone())
                 }
             };

@@ -15,7 +15,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, ValueCardinality},
+    def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::Patterns,
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
@@ -222,8 +222,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(Type::Domain(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::DomainType(Some(ident))) => ident,
-                    Some(DefKind::DomainType(None)) => "anonymous",
+                    Some(DefKind::Type(TypeDef {
+                        ident: Some(ident), ..
+                    })) => ident,
+                    Some(DefKind::Type(TypeDef { ident: None, .. })) => "anonymous",
                     _ => "Unknown type",
                 };
                 self.create_domain_type_serde_operator(

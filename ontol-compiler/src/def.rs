@@ -38,7 +38,8 @@ pub enum DefKind<'m> {
     StringLiteral(&'m str),
     EmptySequence,
     Regex(&'m str),
-    DomainType(Option<&'m str>),
+    /// A type definition in some domain:
+    Type(TypeDef<'m>),
     Relation(Relation<'m>),
     Relationship(Relationship),
     // FIXME: This should not be builtin proc directly.
@@ -60,12 +61,17 @@ impl<'m> DefKind<'m> {
             Self::Regex(_) => None,
             Self::EmptySequence => None,
             Self::CoreFn(_) => None,
-            Self::DomainType(opt_ident) => opt_ident.map(|ident| ident.into()),
+            Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
             Self::Relation(_) => None,
             Self::Relationship(_) => None,
             Self::Equation(_, _, _) => None,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct TypeDef<'m> {
+    pub ident: Option<&'m str>,
 }
 
 #[derive(Debug)]
