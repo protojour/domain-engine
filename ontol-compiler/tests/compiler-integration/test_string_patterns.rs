@@ -9,7 +9,7 @@ use test_log::test;
 #[test]
 fn constant_string_pattern() {
     "
-    type foo
+    pub type foo
     rel '' ['foo'] foo
     "
     .compile_ok(|env| {
@@ -25,7 +25,7 @@ fn constant_string_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    type foobar
+    pub type foobar
     rel '' ['foo'] ['bar'] foobar
     "
     .compile_ok(|env| {
@@ -41,7 +41,7 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    type foo
+    pub type foo
     rel '' ['foo/'] [uuid] foo
     "
     .compile_ok(|env| {
@@ -73,7 +73,7 @@ fn test_string_pattern_constructor_union() {
     "
     type foo
     type bar
-    type foobar
+    pub type foobar
 
     rel '' ['foo/'] [uuid] foo
     rel '' ['bar/'] [uuid] bar
@@ -103,7 +103,7 @@ fn test_string_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    type foo
+    pub type foo
     rel foo ['prop'] /abc*/
     "
     .compile_ok(|env| {
@@ -121,7 +121,7 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    type re
+    pub type re
     rel '' [/a/] [/bc*/] re
     "
     .compile_ok(|env| {

@@ -8,7 +8,7 @@ use test_log::test;
 
 #[test]
 fn deserialize_empty_type() {
-    "type foo".compile_ok(|env| {
+    "pub type foo".compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_error_msg!(
             foo.deserialize_data(json!(42)),
@@ -28,7 +28,7 @@ fn deserialize_empty_type() {
 #[test]
 fn deserialize_int() {
     "
-    type foo
+    pub type foo
     rel () [int] foo
     "
     .compile_ok(|env| {
@@ -50,7 +50,7 @@ fn deserialize_int() {
 #[test]
 fn deserialize_string() {
     "
-    type foo
+    pub type foo
     rel () [string] foo
     "
     .compile_ok(|env| {
@@ -70,7 +70,7 @@ fn deserialize_string() {
 #[test]
 fn deserialize_object_properties() {
     "
-    type obj
+    pub type obj
     rel obj ['a'] string
     rel obj ['b'] int
     "
@@ -99,8 +99,8 @@ fn deserialize_object_properties() {
 #[test]
 fn deserialize_nested() {
     "
-    type one
-    type two
+    pub type one
+    pub type two
     type three
     rel one ['x'] two
     rel one ['y'] three
@@ -124,8 +124,8 @@ fn deserialize_nested() {
 #[test]
 fn deserialize_recursive() {
     "
-    type foo
-    type bar
+    pub type foo
+    pub type bar
     rel foo ['b'] bar
     rel bar ['f'] foo
     "
@@ -147,7 +147,7 @@ fn deserialize_recursive() {
 #[test]
 fn deserialize_union_of_primitives() {
     "
-    type foo
+    pub type foo
     rel () [string] foo
     rel () [int] foo
     "
@@ -168,7 +168,7 @@ fn deserialize_union_of_primitives() {
 #[test]
 fn deserialize_string_constant() {
     "
-    type foo
+    pub type foo
     rel () ['my_value'] foo
     "
     .compile_ok(|env| {
@@ -191,7 +191,7 @@ fn deserialize_string_constant() {
 #[test]
 fn deserialize_finite_non_uniform_sequence() {
     "
-    type foo
+    pub type foo
     rel foo [0] int
     rel foo [1] 'a'
     "
@@ -219,7 +219,7 @@ fn deserialize_finite_non_uniform_sequence() {
 #[test]
 fn deserialize_finite_uniform_sequence() {
     "
-    type foo
+    pub type foo
     rel foo [..2] int
     "
     .compile_ok(|env| {
@@ -246,7 +246,7 @@ fn deserialize_finite_uniform_sequence() {
 #[test]
 fn deserialize_string_union() {
     "
-    type foo
+    pub type foo
     rel () ['a'] foo
     rel () ['b'] foo
     "
@@ -266,13 +266,13 @@ fn deserialize_string_union() {
 #[test]
 fn deserialize_map_union() {
     "
-    type foo
-    type bar
+    pub type foo
+    pub type bar
     rel foo ['variant'] 'foo'
     rel bar ['variant'] 'bar'
     rel bar ['prop'] int
 
-    type union
+    pub type union
     rel () [foo] union
     rel () [bar] union
     "

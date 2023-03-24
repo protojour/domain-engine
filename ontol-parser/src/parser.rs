@@ -3,7 +3,9 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use smartstring::alias::String;
 
-use crate::ast::{Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement};
+use crate::ast::{
+    Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement, Visibility,
+};
 
 use super::{
     ast::{
@@ -69,6 +71,7 @@ fn type_statement() -> impl AstParser<TypeStatement> {
     }
 
     doc_comments()
+        .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Type))
         .then(spanned(ident()))
         .then(spanned(generic_params()).or_not())
@@ -80,13 +83,19 @@ fn type_statement() -> impl AstParser<TypeStatement> {
             )
             .or_not(),
         )
-        .map(|((((docs, kw), ident), params), rel_block)| TypeStatement {
-            docs,
-            kw,
-            ident,
-            params,
-            rel_block,
-        })
+        .map(
+            |(((((docs, public), kw), ident), params), rel_block)| TypeStatement {
+                docs,
+                visibility: match public {
+                    Some(span) => (Visibility::Public, span),
+                    None => (Visibility::Private, kw.clone()),
+                },
+                kw,
+                ident,
+                params,
+                rel_block,
+            },
+        )
 }
 
 fn rel_statement() -> impl AstParser<RelStatement> {

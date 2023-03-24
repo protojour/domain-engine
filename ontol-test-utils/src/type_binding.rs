@@ -37,6 +37,10 @@ impl<'e> TypeBinding<'e> {
             .unwrap_or_else(|| panic!("type name not found: `{type_name}`"));
         let type_info = domain.type_info(*def_id).clone();
 
+        if !type_info.public {
+            panic!("`{}` is not public!", type_info.name);
+        }
+
         debug!(
             "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
             operator_id = type_info.operator_id,

@@ -1,6 +1,6 @@
 use codegen::{execute_codegen_tasks, CodegenTasks};
 use compiler_queries::GetPropertyMeta;
-use def::Defs;
+use def::{DefKind, Defs, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
@@ -193,8 +193,14 @@ impl<'m> Compiler<'m> {
                         None
                     };
 
+                let public = match self.defs.get_def_kind(type_def_id) {
+                    Some(DefKind::Type(TypeDef { public, .. })) => *public,
+                    _ => true,
+                };
+
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
+                    public,
                     name: type_name,
                     entity_info,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(

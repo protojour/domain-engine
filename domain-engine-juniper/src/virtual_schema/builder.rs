@@ -203,7 +203,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     fn make_node_type(&mut self, type_info: &TypeInfo) -> NewType {
-        let operator_id = type_info.operator_id.expect("No selection operator id");
+        let operator_id = type_info
+            .operator_id
+            .unwrap_or_else(|| panic!("No selection operator id for `{}`", type_info.name));
 
         self.make_node_type_inner(type_info, operator_id)
     }

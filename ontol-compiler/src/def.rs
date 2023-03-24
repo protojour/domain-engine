@@ -72,6 +72,7 @@ impl<'m> DefKind<'m> {
 
 #[derive(Debug)]
 pub struct TypeDef<'m> {
+    pub public: bool,
     pub ident: Option<&'m str>,
     pub params: Option<IndexMap<&'m str, TypeDefParam>>,
 }

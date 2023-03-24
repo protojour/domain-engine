@@ -5,12 +5,12 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn lex_error() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `eq`".compile_fail();
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `eq`, `pub`".compile_fail();
 }
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `eq`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `eq`, `pub`"
         .compile_fail();
 }
 
@@ -447,7 +447,7 @@ fn invalid_relation_chain() {
         () [()]
         () [()] [()]
         ()
-        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `eq`
+        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `eq`, `pub`
         [()]
     "
     .compile_fail()
@@ -489,10 +489,27 @@ fn compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `eq`
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `eq`, `pub`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),
+    ])
+    .compile_fail();
+}
+
+#[test]
+fn fail_import_private_type() {
+    TestPackages::with_sources([
+        (SourceName("dep"), "type foo"),
+        (
+            SourceName::root(),
+            "
+            use 'dep' as dep
+            pub type bar {
+                rel ['foo'] dep.foo // ERROR private type
+            }
+            ",
+        ),
     ])
     .compile_fail();
 }

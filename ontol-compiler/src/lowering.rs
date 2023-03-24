@@ -137,6 +137,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         self.set_def_kind(
             def_id,
             DefKind::Type(TypeDef {
+                public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
                 ident: Some(ident),
                 params,
             }),
@@ -221,6 +222,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     self.set_def_kind(
                         anonymous_def_id,
                         DefKind::Type(TypeDef {
+                            public: false,
                             ident: None,
                             params: None,
                         }),
@@ -608,7 +610,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
 
                 match def_id {
-                    Some(def_id) => Ok(*def_id),
+                    Some(def_id) => match self.compiler.defs.get_def_kind(*def_id) {
+                        Some(DefKind::Type(TypeDef { public: false, .. })) => {
+                            Err((CompileError::PrivateType, span.clone()))
+                        }
+                        _ => Ok(*def_id),
+                    },
                     None => Err((CompileError::TypeNotFound, span.clone())),
                 }
             }

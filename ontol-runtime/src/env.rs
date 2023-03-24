@@ -123,6 +123,7 @@ impl Domain {
         while self.info.len() < index + 1 {
             self.info.push(TypeInfo {
                 def_id: DefId(type_info.def_id.0, self.info.len() as u16),
+                public: false,
                 name: "".into(),
                 entity_info: None,
                 operator_id: None,
@@ -136,6 +137,8 @@ impl Domain {
 #[derive(Clone, Debug)]
 pub struct TypeInfo {
     pub def_id: DefId,
+
+    pub public: bool,
 
     pub name: String,
 

@@ -152,7 +152,7 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    type node {
+    pub type node {
         rel [id] string
         rel ['name'] string
         rel ['children'* | 'parent'?] node
@@ -200,7 +200,7 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    type node {
+    pub type node {
         rel [id] string
         rel ['children'* | 'parent'] node
     }
@@ -292,8 +292,8 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    type language { rel [id] string }
-    type programmer {
+    pub type language { rel [id] string }
+    pub type programmer {
         rel [id] string
         rel ['name'] string
         rel ['favorite-language'] language

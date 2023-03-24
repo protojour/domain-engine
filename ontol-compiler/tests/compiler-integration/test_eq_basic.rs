@@ -36,8 +36,8 @@ fn assert_translate(
 #[test]
 fn test_eq_simple() {
     "
-    type foo
-    type bar
+    pub type foo
+    pub type bar
     rel foo ['f'] string
     rel bar ['b'] string
     eq (x) {
@@ -68,8 +68,8 @@ fn test_eq_simple() {
 #[test]
 fn test_meters() {
     "
-    type meters
-    type millimeters
+    pub type meters
+    pub type millimeters
     rel () [int] meters
     rel () [int] millimeters
     eq (x) {
@@ -86,10 +86,10 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    type celsius {
+    pub type celsius {
         rel () [int]
     }
-    type fahrenheit {
+    pub type fahrenheit {
         rel () [int]
     }
 
@@ -107,8 +107,8 @@ fn test_temperature() {
 #[test]
 fn test_eq_value_to_map() {
     "
-    type one
-    type two
+    pub type one
+    pub type two
     rel () [string] one
     rel two ['a'] string
     eq(x) {
@@ -127,8 +127,8 @@ fn test_eq_value_to_map() {
 #[test]
 fn test_eq_value_to_map_func() {
     "
-    type one
-    type two
+    pub type one
+    pub type two
     rel () [int] one
     rel two ['a'] int
     eq(x) {
@@ -147,8 +147,8 @@ fn test_eq_value_to_map_func() {
 #[test]
 fn test_eq_simple_array() {
     "
-    type foo
-    type bar
+    pub type foo
+    pub type bar
     rel foo ['a'*] int
     rel bar ['b'*] int
     eq(x) {
@@ -183,11 +183,11 @@ fn test_eq_complex_flow() {
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
-    type one {
+    pub type one {
         rel ['a'] string
         rel ['b'] string
     }
-    type two {
+    pub type two {
         rel ['a'] string
         rel ['b'] string
         rel ['c'] string
@@ -244,11 +244,11 @@ fn test_eq_delegation() {
         millimeters { m * 1000 }
     }
 
-    type car {
+    pub type car {
         rel ['length'] meters
     }
 
-    type vehicle {
+    pub type vehicle {
         rel ['length'] millimeters
     }
     

@@ -71,6 +71,9 @@ impl VirtualSchema {
 
         for (_, def_id) in &domain.type_names {
             let type_info = domain.type_info(*def_id);
+            if !type_info.public {
+                continue;
+            }
 
             if let Some(operator_id) = type_info.operator_id {
                 debug!("adapt type `{name}` {operator_id:?}", name = type_info.name,);

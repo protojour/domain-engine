@@ -10,36 +10,36 @@ type position-ring
 rel position-ring [..4] position
 rel position-ring [4..] position
 
-type Geometry
-type LeafGeometry
+pub type Geometry
+pub type LeafGeometry
 
-type Point
+pub type Point
 rel Point ['type'] 'Point'
 rel Point ['coordinates'] position
 
-type MultiPoint
+pub type MultiPoint
 rel MultiPoint ['type'] 'MultiPoint'
 rel MultiPoint ['coordinates'*] position
 
-type LineString
+pub type LineString
 rel LineString ['type'] 'LineString'
 rel LineString ['coordinates'] position-list
 
-type MultiLineString
+pub type MultiLineString
 rel MultiLineString ['type'] 'MultiLineString'
 rel MultiLineString ['coordinates'*] position-list
 
-type Polygon {
+pub type Polygon {
     rel ['type'] 'Polygon'
     rel ['coordinates'] position-ring
 }
 
-type MultiPolygon {
+pub type MultiPolygon {
     rel ['type'] 'MultiPolygon'
     rel ['coordinates'*] position-ring
 }
 
-type GeometryCollection
+pub type GeometryCollection
 rel GeometryCollection ['type'] 'GeometryCollection'
 rel GeometryCollection ['geometries'*] LeafGeometry
 

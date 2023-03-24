@@ -15,6 +15,7 @@ pub enum Token {
     Type,
     Rel,
     Eq,
+    Pub,
     Number(String),
     StringLiteral(String),
     Regex(String),
@@ -30,6 +31,7 @@ impl Display for Token {
             Self::Type => write!(f, "`type`"),
             Self::Rel => write!(f, "`rel`"),
             Self::Eq => write!(f, "`eq`"),
+            Self::Pub => write!(f, "`pub`"),
             Self::Number(_) => write!(f, "`number`"),
             Self::StringLiteral(_) => write!(f, "`string`"),
             Self::Regex(_) => write!(f, "`regex`"),
@@ -46,6 +48,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "type" => Token::Type,
         "rel" => Token::Rel,
         "eq" => Token::Eq,
+        "pub" => Token::Pub,
         _ => Token::Sym(ident),
     });
 

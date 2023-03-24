@@ -8,7 +8,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "type foo".compile_ok(|env| {
+    "pub type foo".compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_json_io_matches!(foo, json!({}));
     });
@@ -17,7 +17,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_value_type() {
     "
-    type foo
+    pub type foo
     rel () [string] foo
     "
     .compile_ok(|env| {
@@ -29,7 +29,7 @@ fn test_serde_value_type() {
 #[test]
 fn test_serde_map_type() {
     "
-    type foo
+    pub type foo
     rel foo ['a'] string
     "
     .compile_ok(|env| {
@@ -41,7 +41,7 @@ fn test_serde_map_type() {
 #[test]
 fn test_serde_complex_type() {
     "
-    type foo
+    pub type foo
     type bar
     rel foo ['a'] string
     rel foo ['b'] bar
@@ -56,7 +56,7 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    type t
+    pub type t
     rel t [0] string
     rel t [1] int
     "
@@ -69,7 +69,7 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    type u
+    pub type u
     rel () ['a'] u
     rel () ['b'] u
     "
@@ -86,7 +86,7 @@ fn test_serde_string_or_unit() {
     rel () [string] string-or-unit
     rel () [()] string-or-unit
 
-    type foo
+    pub type foo
     rel foo ['a'] string-or-unit
     "
     .compile_ok(|env| {
@@ -106,7 +106,7 @@ fn test_serde_map_union() {
     rel bar ['type'] 'bar'
     rel bar ['d'] int
 
-    type u
+    pub type u
     rel () [foo] u
     rel () [bar] u
     "
@@ -119,7 +119,7 @@ fn test_serde_map_union() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    type foo
+    pub type foo
     rel foo ['s'*] string
     "
     .compile_ok(|env| {
@@ -132,7 +132,7 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    type foo
+    pub type foo
     rel foo [ ..2] int
     rel foo [2..4] string
     rel foo [5..6] int
@@ -152,7 +152,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    type my_id
+    pub type my_id
     rel () [uuid] my_id
     "
     .compile_ok(|env| {
@@ -176,7 +176,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    type my_dt
+    pub type my_dt
     rel () [datetime] my_dt
     "
     .compile_ok(|env| {
@@ -204,7 +204,7 @@ fn test_serde_datetime() {
 #[test]
 fn test_jsonml() {
     "
-    type element
+    pub type element
     type tag
     type tag_name
     type attributes

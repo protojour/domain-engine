@@ -84,6 +84,7 @@ impl<'m> Compiler<'m> {
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_def(
             DefKind::Type(TypeDef {
+                public: true,
                 ident: Some(ident),
                 params: None,
             }),

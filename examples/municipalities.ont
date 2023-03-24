@@ -1,6 +1,6 @@
 use 'geojson' as geojson
 
-type municipality {
+pub type municipality {
     rel [id] string
     rel ['code'] string
     rel ['geometry'] geojson.Geometry
