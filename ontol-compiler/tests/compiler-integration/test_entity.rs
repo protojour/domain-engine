@@ -326,30 +326,42 @@ fn entity_relationship_without_reverse() {
 }
 
 #[test]
-fn union_with_ambiguous_id_should_fail() {
+fn recursive_entity_union() {
     "
-    type animal_id { rel '' [string] }
-    type plant_id { rel '' [string] }
-    type owner_id { rel '' [string] }
-    type animal {
+    pub type animal_id { rel '' ['animal/'] [string] }
+    pub type plant_id { rel '' ['plant/'] [string] }
+    pub type owner_id { rel '' [string] }
+
+    pub type lifeform // ERROR entity variants of the union are not uniquely identifiable
+    pub type animal {
         rel animal_id [identifies]
         rel ['class'] 'animal'
-        // TODO: Test this:
-        // rel ['eats'*] lifeform
+        rel ['eats'*] lifeform
     }
-    type plant {
+    pub type plant {
         rel plant_id [identifies]
         rel ['class'] 'plant'
     }
-    type lifeform { // ERROR entity variants of the union are not uniquely identifiable
-        rel () [animal]
-        rel () [plant]
-    }
-    type owner {
+    rel () [animal] lifeform
+    rel () [plant] lifeform
+
+    pub type owner {
         rel owner_id [identifies]
         rel ['name'] string
         rel ['owns'*] lifeform
     }
     "
-    .compile_fail();
+    .compile_ok(|env| {
+        let lifeform = TypeBinding::new(&env, "lifeform");
+        assert_json_io_matches!(
+            lifeform,
+            json!({
+                "class": "animal",
+                "eats": [
+                    { "class": "plant" },
+                    { "class": "animal", "eats": [] },
+                ]
+            })
+        );
+    });
 }
