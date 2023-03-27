@@ -167,7 +167,7 @@ fn test_entity_self_relationship_optional_object() {
     "
     pub type node_id { rel '' [string] }
     pub type node {
-        rel [id] node_id
+        rel node_id [identifies]
         rel ['name'] string
         rel ['children'* | 'parent'?] node
     }
@@ -216,7 +216,7 @@ fn test_entity_self_relationship_mandatory_object() {
     "
     pub type node_id { rel '' [string] }
     pub type node {
-        rel [id] node_id
+        rel node_id [identifies]
         rel ['children'* | 'parent'] node
     }
     "
@@ -309,9 +309,9 @@ fn entity_relationship_without_reverse() {
     "
     pub type lang_id { rel '' [string] }
     pub type prog_id { rel '' [string] }
-    pub type language { rel [id] lang_id }
+    pub type language { rel lang_id [identifies] }
     pub type programmer {
-        rel [id] prog_id
+        rel prog_id [identifies]
         rel ['name'] string
         rel ['favorite-language'] language
     }
@@ -332,13 +332,13 @@ fn union_with_ambiguous_id_should_fail() {
     type plant_id { rel '' [string] }
     type owner_id { rel '' [string] }
     type animal {
-        rel [id] animal_id
+        rel animal_id [identifies]
         rel ['class'] 'animal'
         // TODO: Test this:
         // rel ['eats'*] lifeform
     }
     type plant {
-        rel [id] plant_id
+        rel plant_id [identifies]
         rel ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
@@ -346,7 +346,7 @@ fn union_with_ambiguous_id_should_fail() {
         rel () [plant]
     }
     type owner {
-        rel [id] owner_id
+        rel owner_id [identifies]
         rel ['name'] string
         rel ['owns'*] lifeform
     }

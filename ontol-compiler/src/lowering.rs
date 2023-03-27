@@ -299,8 +299,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let (relation_id, swap_subj_obj) = match self.define_relation_if_undefined(&relation_ident)
-        {
+        let relation_id = match self.define_relation_if_undefined(&relation_ident) {
             ImplicitRelationId::New(relation_id) => {
                 let object_prop =
                     object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
@@ -314,10 +313,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     }),
                     &ident_span,
                 );
-                (relation_id, false)
+                relation_id
             }
-            ImplicitRelationId::Reused(relation_id) => (relation_id, false),
-            ImplicitRelationId::IdentifiedBy(relation_id) => (relation_id, true),
+            ImplicitRelationId::Reused(relation_id) => relation_id,
         };
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
@@ -340,7 +338,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         debug!("define relation {relation_id:?}");
 
-        let mut relationship = Relationship {
+        let relationship = Relationship {
             relation_id,
             subject: (subject.0, self.src.span(subject.1)),
             subject_cardinality: subject_cardinality
@@ -362,14 +360,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }),
             rel_params,
         };
-
-        if swap_subj_obj {
-            std::mem::swap(&mut relationship.subject, &mut relationship.object);
-            std::mem::swap(
-                &mut relationship.subject_cardinality,
-                &mut relationship.object_cardinality,
-            );
-        }
 
         Ok(self.define(DefKind::Relationship(relationship), &span))
     }
@@ -646,9 +636,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             RelationIdent::Identifies => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.identifies_relation()))
             }
-            RelationIdent::IdentifiedBy => ImplicitRelationId::IdentifiedBy(RelationId(
-                self.compiler.defs.identifies_relation(),
-            )),
             RelationIdent::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
             }
@@ -704,7 +691,6 @@ enum BlockContext<T> {
 enum ImplicitRelationId {
     New(RelationId),
     Reused(RelationId),
-    IdentifiedBy(RelationId),
 }
 
 #[derive(Default)]

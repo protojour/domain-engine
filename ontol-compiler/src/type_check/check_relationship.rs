@@ -24,11 +24,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        assert_ne!(
-            relationship.relation_id.0,
-            self.defs.identified_by_relation()
-        );
-
         let relation = match self.defs.map.get(&relationship.relation_id.0) {
             Some(Def {
                 kind: DefKind::Relation(relation),
@@ -125,7 +120,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (RelationIdent::IdentifiedBy, _, _) => panic!("Should not occur"),
             (RelationIdent::Indexed, None, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 

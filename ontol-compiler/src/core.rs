@@ -24,9 +24,6 @@ impl<'m> Compiler<'m> {
         let _ = self.register_named_type(self.defs.identifies_relation(), "identifies", |_| {
             Type::BuiltinRelation
         });
-        let _ = self.register_named_type(self.defs.identified_by_relation(), "id", |_| {
-            Type::BuiltinRelation
-        });
         let int_ty = self.register_named_type(self.defs.int(), "int", Type::Int);
         let _ = self.register_named_type(self.defs.number(), "number", Type::Number);
         let string_ty = self.register_named_type(self.defs.string(), "string", Type::String);
