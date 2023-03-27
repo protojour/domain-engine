@@ -465,6 +465,27 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 }
 
 #[test]
+fn complains_about_non_disambiguatable_string_id() {
+    "
+    type animal_id { rel '' [string] }
+    type plant_id { rel '' [string] }
+    type animal {
+        rel animal_id [identifies]
+        rel ['class'] 'animal'
+    }
+    type plant {
+        rel plant_id [identifies]
+        rel ['class'] 'plant'
+    }
+    type lifeform { // ERROR entity variants of the union are not uniquely identifiable
+        rel () [animal]
+        rel () [plant]
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn complains_about_ambiguous_pattern_based_unions() {
     "
     type foo

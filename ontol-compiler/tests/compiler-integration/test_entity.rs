@@ -341,7 +341,7 @@ fn union_with_ambiguous_id_should_fail() {
         rel plant_id [identifies]
         rel ['class'] 'plant'
     }
-    type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
+    type lifeform { // ERROR entity variants of the union are not uniquely identifiable
         rel () [animal]
         rel () [plant]
     }

@@ -7,7 +7,7 @@ type attack_pattern_id {
 }
 
 type identity_id {
-    via '' ['identity--'] [uuid] => self
+    via '' ['identity--'] [uuid] self
     rel self [identifies] identity
 }
 

@@ -92,7 +92,7 @@ pub enum CompileError {
     AlreadyIdentifiesAType,
     #[error("must identify a type within the domain")]
     MustIdentifyWithinDomain,
-    #[error("entity variants of the union have `id` patterns that are not disjoint")]
+    #[error("entity variants of the union are not uniquely identifiable")]
     NonDisjointIdsInEntityUnion,
     #[error("union in named relationship is not supported yet. Make a union type instead.")]
     UnionInNamedRelationshipNotSupported,
