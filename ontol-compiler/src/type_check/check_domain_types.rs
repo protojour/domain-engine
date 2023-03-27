@@ -39,14 +39,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match property_id.role {
                 Role::Subject => {
                     let (relationship, _) = self
-                        .get_subject_property_meta(def_id, property_id.relation_id)
+                        .property_meta_by_subject(def_id, property_id.relation_id)
                         .unwrap();
                     let object_properties = self
                         .relations
                         .properties_by_type(relationship.object.0.def_id)
                         .unwrap();
 
-                    if properties.id.is_some() && object_properties.id.is_some() {
+                    if properties.identified_by.is_some()
+                        && object_properties.identified_by.is_some()
+                    {
                         actions.push(Action::AdjustEntityPropertyCardinality(
                             def_id,
                             *property_id,
@@ -54,7 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 Role::Object => {
-                    if properties.id.is_none() {
+                    if properties.identified_by.is_none() {
                         match &properties.constructor {
                             Constructor::ValueUnion(relationships) => {
                                 if let Some(map) = &properties.map {
@@ -77,7 +79,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 .properties_by_type(variant_def)
                                                 .unwrap();
 
-                                            subject_properties.id.is_some()
+                                            subject_properties.identified_by.is_some()
                                         });
 
                                     if all_entities {
@@ -100,14 +102,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     } else {
                         let (relationship, _) = self
-                            .get_object_property_meta(def_id, property_id.relation_id)
+                            .property_meta_by_object(def_id, property_id.relation_id)
                             .unwrap();
                         let subject_properties = self
                             .relations
                             .properties_by_type(relationship.subject.0.def_id)
                             .unwrap();
 
-                        if subject_properties.id.is_some() {
+                        if subject_properties.identified_by.is_some() {
                             actions.push(Action::AdjustEntityPropertyCardinality(
                                 def_id,
                                 *property_id,
@@ -129,7 +131,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match action {
                 Action::ReportNonEntityInObjectRelationship(def_id, relation_id) => {
                     let (relationship, _) =
-                        self.get_object_property_meta(def_id, relation_id).unwrap();
+                        self.property_meta_by_object(def_id, relation_id).unwrap();
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,

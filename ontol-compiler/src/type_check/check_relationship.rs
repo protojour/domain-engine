@@ -3,8 +3,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefReference, PropertyCardinality, Relation, RelationIdent, Relationship,
-        ValueCardinality,
+        Def, DefKind, DefReference, Primitive, PropertyCardinality, Relation, RelationIdent,
+        Relationship, ValueCardinality,
     },
     error::CompileError,
     mem::Intern,
@@ -24,6 +24,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        assert_ne!(
+            relationship.relation_id.0,
+            self.defs.identified_by_relation()
+        );
+
         let relation = match self.defs.map.get(&relationship.relation_id.0) {
             Some(Def {
                 kind: DefKind::Relation(relation),
@@ -96,10 +101,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut properties.map,
             &mut properties.constructor,
         ) {
-            (RelationIdent::Id, _, _) => match properties.id {
-                Some(_) => todo!("Already has an id, report error"),
-                None => properties.id = Some(relation.0),
-            },
+            (RelationIdent::Identifies, _, _) => {
+                if properties.identifies.is_some() {
+                    return self.error(CompileError::AlreadyIdentifiesAType, span);
+                }
+                if subject.0.def_id.package_id() != object.0.def_id.package_id() {
+                    return self.error(CompileError::MustIdentifyWithinDomain, span);
+                }
+
+                properties.identifies = Some(RelationId(self.defs.identifies_relation()));
+                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
+                match object_properties.identified_by {
+                    Some(id) => {
+                        debug!(
+                            "Object is identified by {id:?}, this relation is {:?}",
+                            relation.0
+                        );
+                        todo!("Object is already identified, report error")
+                    }
+                    None => {
+                        object_properties.identified_by =
+                            Some(RelationId(self.defs.identifies_relation()))
+                    }
+                }
+            }
+            (RelationIdent::IdentifiedBy, _, _) => panic!("Should not occur"),
             (RelationIdent::Indexed, None, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
@@ -300,6 +326,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         let appendee = match self.defs.get_def_kind(rel_def.def_id) {
+            Some(DefKind::Primitive(Primitive::String)) => StringPatternSegment::AllStrings,
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
             Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
                 self.defs

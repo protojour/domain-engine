@@ -80,14 +80,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
 
             if let Some(properties) = self.relations.properties_by_type(variant_def) {
-                if let Some(id_relation_id) = &properties.id {
-                    let (relationship, _) = self
-                        .get_subject_property_meta(variant_def, *id_relation_id)
+                if let Some(id_relation_id) = &properties.identified_by {
+                    let (identifies_relationship, _) = self
+                        .property_meta_by_object(variant_def, *id_relation_id)
                         .expect("BUG: problem getting property meta");
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
-                        relationship.object.0.def_id,
+                        identifies_relationship.subject.0.def_id,
                         &mut error_set,
                         span,
                     );
@@ -254,7 +254,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (property_id, _cardinality) in property_set {
             let (relationship, relation) = self
-                .get_subject_property_meta(variant_def, property_id.relation_id)
+                .property_meta_by_subject(variant_def, property_id.relation_id)
                 .expect("BUG: problem getting property meta");
 
             let (object_reference, _) = &relationship.object;
@@ -360,6 +360,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         let mut prefix_index: PatriciaMap<FnvHashSet<DefId>> = Default::default();
+        let mut guaranteed_ambiguous_count = 0;
 
         for (variant_def_id, segment) in &builder.pattern_candidates {
             let prefix = segment.constant_prefix();
@@ -370,7 +371,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 } else {
                     prefix_index.insert(prefix, HashSet::from_iter([*variant_def_id]));
                 }
+            } else {
+                guaranteed_ambiguous_count += 1;
             }
+        }
+
+        if guaranteed_ambiguous_count > 1 {
+            error_set.report(union_def_id, error_variant, &union_def.span);
+            return;
         }
 
         // Also check for ambiguity with string literals

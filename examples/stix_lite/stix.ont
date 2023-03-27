@@ -1,0 +1,30 @@
+pub type attack_pattern
+pub type identity
+
+type attack_pattern_id {
+    via '' ['attack-pattern--'] [uuid] self
+    rel self [identifies] attack_pattern
+}
+
+type identity_id {
+    via '' ['identity--'] [uuid] => self
+    rel self [identifies] identity
+}
+
+type core {
+    rel ['created_by_ref'] identity_id
+}
+
+with attack_pattern {
+    via () [core] self
+    rel attack_pattern_id [identifies] self
+    rel ['type'] 'attack-pattern'
+    rel ['name'] string
+    rel ['description'] string
+    rel ['aliases'*] string
+}
+
+with identity {
+    rel identity_id [identifies] self
+    rel ['type'] 'identity'
+}

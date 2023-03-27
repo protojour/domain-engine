@@ -32,6 +32,12 @@ pub struct PackageId(pub u16);
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DefId(pub PackageId, pub u16);
 
+impl DefId {
+    pub fn package_id(&self) -> PackageId {
+        self.0
+    }
+}
+
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DefId({}, {})", self.0 .0, self.1)

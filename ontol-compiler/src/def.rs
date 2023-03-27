@@ -147,7 +147,8 @@ impl<'m> Relation<'m> {
 pub enum RelationIdent {
     Named(DefReference),
     Typed(DefReference),
-    Id,
+    Identifies,
+    IdentifiedBy,
     Indexed,
 }
 
@@ -206,7 +207,8 @@ pub struct Defs<'m> {
     next_def_param: DefParamId,
     next_expr_id: ExprId,
     unit: DefId,
-    id_relation: DefId,
+    identifies_relation: DefId,
+    identified_by_relation: DefId,
     indexed_relation: DefId,
     empty_sequence: DefId,
     empty_string: DefId,
@@ -228,7 +230,8 @@ impl<'m> Defs<'m> {
             next_expr_id: ExprId(0),
             next_def_param: DefParamId(0),
             unit: DefId::unit(),
-            id_relation: DefId::unit(),
+            identifies_relation: DefId::unit(),
+            identified_by_relation: DefId::unit(),
             indexed_relation: DefId::unit(),
             empty_sequence: DefId::unit(),
             empty_string: DefId::unit(),
@@ -247,9 +250,18 @@ impl<'m> Defs<'m> {
 
         // Add some extremely fundamental definitions here already.
         // These are even independent from CORE being defined.
-        defs.id_relation = defs.add_def(
+        defs.identifies_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Id,
+                ident: RelationIdent::Identifies,
+                subject_prop: None,
+                object_prop: None,
+            }),
+            CORE_PKG,
+            SourceSpan::none(),
+        );
+        defs.identified_by_relation = defs.add_def(
+            DefKind::Relation(Relation {
+                ident: RelationIdent::IdentifiedBy,
                 subject_prop: None,
                 object_prop: None,
             }),
@@ -279,8 +291,12 @@ impl<'m> Defs<'m> {
         self.unit
     }
 
-    pub fn id_relation(&self) -> DefId {
-        self.id_relation
+    pub fn identifies_relation(&self) -> DefId {
+        self.identifies_relation
+    }
+
+    pub fn identified_by_relation(&self) -> DefId {
+        self.identified_by_relation
     }
 
     pub fn indexed_relation(&self) -> DefId {

@@ -76,7 +76,7 @@ impl UnionBuilder {
 
         for (discriminant, count) in ambiguous_discriminant_debug {
             if count > 1 {
-                return Err(smart_format!("Discriminant {discriminant:?} is ambiguous"));
+                return Err(smart_format!("Discriminant {discriminant:?} is ambiguous:"));
             }
         }
 

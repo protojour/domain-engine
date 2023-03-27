@@ -88,6 +88,10 @@ pub enum CompileError {
     NoUniformDiscriminatorFound,
     #[error("variants of the union have prefixes that are prefixes of other variants")]
     SharedPrefixInPatternUnion,
+    #[error("already identifies another type")]
+    AlreadyIdentifiesAType,
+    #[error("must identify a type within the domain")]
+    MustIdentifyWithinDomain,
     #[error("entity variants of the union have `id` patterns that are not disjoint")]
     NonDisjointIdsInEntityUnion,
     #[error("union in named relationship is not supported yet. Make a union type instead.")]

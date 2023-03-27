@@ -105,7 +105,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .iter()
                                     .map(|(property_id, _cardinality)| {
                                         let (relationship, relation) = self
-                                            .get_subject_property_meta(
+                                            .property_meta_by_subject(
                                                 *subject_id,
                                                 property_id.relation_id,
                                             )

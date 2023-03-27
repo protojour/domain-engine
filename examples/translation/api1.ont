@@ -1,0 +1,3 @@
+type car {
+    rel ['count'] int
+}

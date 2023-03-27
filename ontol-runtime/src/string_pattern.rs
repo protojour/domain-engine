@@ -38,6 +38,8 @@ impl StringPattern {
 
             for part in &self.constant_parts {
                 match part {
+                    StringPatternConstantPart::AllStrings => {}
+                    StringPatternConstantPart::Literal(_) => {}
                     StringPatternConstantPart::Property(property) => {
                         let capture_group = property.capture_group;
                         debug!("fetching capture group {}", capture_group);
@@ -67,7 +69,6 @@ impl StringPattern {
 
                         properties.insert(property.property_id, attribute);
                     }
-                    StringPatternConstantPart::Literal(_) => {}
                 }
             }
 
@@ -78,6 +79,7 @@ impl StringPattern {
 
 #[derive(Debug)]
 pub enum StringPatternConstantPart {
+    AllStrings,
     Literal(String),
     Property(StringPatternProperty),
 }

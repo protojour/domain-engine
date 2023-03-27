@@ -16,7 +16,7 @@ use tracing::debug;
 use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
-    patterns::Patterns,
+    patterns::{Patterns, StringPatternSegment},
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type, TypeRef},
@@ -141,24 +141,24 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::ID => {
                 match self.get_def_type(def_variant.def_id)? {
                     Type::Domain(_) => {
-                        let id_relation_id = self
+                        let identifies_relation_id = self
                             .relations
                             .properties_by_type
                             .get(&def_variant.def_id)?
-                            .id?;
+                            .identified_by?;
 
-                        let (relationship, _) = self
-                            .get_subject_property_meta(def_variant.def_id, id_relation_id)
-                            .expect("Problem getting subject property meta");
-                        let object = &relationship.object;
+                        let (identifies_relationship, _) = self
+                            .property_meta_by_object(def_variant.def_id, identifies_relation_id)
+                            .expect("Problem getting property meta");
+                        let subject = &identifies_relationship.subject;
 
-                        let object_operator_id = self
-                            .get_serde_operator_id(SerdeKey::identity(object.0.def_id))
-                            .expect("No object operator for _id property");
+                        let subject_operator_id = self
+                            .get_serde_operator_id(SerdeKey::identity(subject.0.def_id))
+                            .expect("No subject operator for _id property");
 
                         Some(OperatorAllocation::Allocated(
                             self.alloc_operator_id_for_key(&key),
-                            SerdeOperator::Id(object_operator_id),
+                            SerdeOperator::Id(subject_operator_id),
                         ))
                     }
                     _ => None,
@@ -432,15 +432,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }),
                 ))
             }
-            Constructor::StringPattern(_) => {
+            Constructor::StringPattern(segment) => {
                 assert!(self
                     .patterns
                     .string_patterns
                     .contains_key(&def_variant.def_id));
 
+                let operator = match segment {
+                    StringPatternSegment::AllStrings => SerdeOperator::String(def_variant.def_id),
+                    _ => SerdeOperator::CapturingStringPattern(def_variant.def_id),
+                };
+
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::CapturingStringPattern(def_variant.def_id),
+                    operator,
                 ))
             }
         }
@@ -455,7 +460,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let union_id = DataModifier::UNION | DataModifier::ID;
 
         if def_variant.modifier.contains(union_id) {
-            let id_relation_id = match properties.id {
+            let identifies_relation_id = match properties.identified_by {
                 Some(id) => id,
                 None => {
                     return Some(OperatorAllocation::Redirect(
@@ -463,8 +468,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ));
                 }
             };
-            let (relationship, _) = self
-                .get_subject_property_meta(def_variant.def_id, id_relation_id)
+            let (identifies_relationship, _) = self
+                .property_meta_by_object(def_variant.def_id, identifies_relation_id)
                 .expect("Problem getting subject property meta");
 
             let id_def_variant = def_variant.with_local_mod(DataModifier::ID);
@@ -489,12 +494,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
-                                    id_relation_id,
+                                    identifies_relation_id,
                                     "_id".into(),
                                 ),
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
-                                    relationship.object.0.def_id,
+                                    identifies_relationship.subject.0.def_id,
                                     DataModifier::IDENTITY,
                                 ),
                             },
@@ -589,7 +594,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (relationship, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
                         let (relationship, relation) = self
-                            .get_subject_property_meta(def_variant.def_id, property_id.relation_id)
+                            .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting subject property meta");
                         let object = relationship.object.0.def_id;
 
@@ -601,7 +606,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let (relationship, relation) = self
-                            .get_object_property_meta(def_variant.def_id, property_id.relation_id)
+                            .property_meta_by_object(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting object property meta");
                         let subject = relationship.subject.0.def_id;
 

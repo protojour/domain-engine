@@ -51,11 +51,15 @@ pub fn datetime_rfc3339() -> Hir {
         .unwrap()
 }
 
-pub fn empty_string_regex() -> Hir {
+pub fn empty_string() -> Hir {
     Hir::concat(vec![
         Hir::anchor(Anchor::StartText),
         Hir::anchor(Anchor::EndText),
     ])
+}
+
+pub fn set_of_all_strings() -> Hir {
+    Parser::new().parse(r#".*"#).unwrap()
 }
 
 pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {

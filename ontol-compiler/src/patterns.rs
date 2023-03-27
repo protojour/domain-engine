@@ -10,11 +10,7 @@ use smartstring::alias::String;
 use std::fmt::Write;
 use tracing::debug;
 
-use crate::{
-    regex_util::{collect_hir_constant_parts, constant_prefix, empty_string_regex},
-    relation::Constructor,
-    Compiler,
-};
+use crate::{regex_util, relation::Constructor, Compiler};
 
 #[derive(Default, Debug)]
 pub struct Patterns {
@@ -26,6 +22,7 @@ pub enum StringPatternSegment {
     /// Matches only the empty string:
     #[default]
     EmptyString,
+    AllStrings,
     Literal(String),
     Regex(Hir),
     Property {
@@ -89,8 +86,9 @@ impl StringPatternSegment {
     pub fn constant_prefix(&self) -> Option<String> {
         match self {
             Self::EmptyString => None,
+            Self::AllStrings => None,
             Self::Literal(string) => Some(string.clone()),
-            Self::Regex(hir) => constant_prefix(hir),
+            Self::Regex(hir) => regex_util::constant_prefix(hir),
             Self::Property { .. } => None,
             Self::Concat(segments) => segments.iter().next().and_then(Self::constant_prefix),
             Self::Alternation(_) => None,
@@ -99,7 +97,8 @@ impl StringPatternSegment {
 
     fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
-            Self::EmptyString => empty_string_regex(),
+            Self::EmptyString => regex_util::empty_string(),
+            Self::AllStrings => regex_util::set_of_all_strings(),
             Self::Literal(string) => Hir::concat(
                 string
                     .chars()
@@ -137,12 +136,15 @@ impl StringPatternSegment {
     ) {
         match self {
             Self::EmptyString => {}
+            Self::AllStrings => {
+                // parts.push(StringPatternConstantPart::AllStrings);
+            }
             Self::Literal(string) => {
                 parts.push(StringPatternConstantPart::Literal(string.clone()));
             }
             Self::Regex(hir) => {
                 let mut string = String::new();
-                collect_hir_constant_parts(hir, &mut string);
+                regex_util::collect_hir_constant_parts(hir, &mut string);
                 if !string.is_empty() {
                     parts.push(StringPatternConstantPart::Literal(string));
                 }

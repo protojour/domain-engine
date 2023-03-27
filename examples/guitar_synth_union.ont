@@ -4,8 +4,12 @@ pub type guitar_id {
 pub type synth_id {
     rel '' ['synth/'] [uuid]
 }
+pub type artist_id {
+    rel '' [string]
+}
+
 pub type guitar {
-    rel [id] guitar_id
+    rel guitar_id [identifies]
     rel ['type'] 'guitar'
     rel ['string_count'] int
 }
@@ -19,7 +23,7 @@ pub type instrument {
     rel () [synth]
 }
 pub type artist {
-    rel [id] string
+    rel [id] artist_id
     rel ['name'] string
     rel ['plays'* | 'played-by'*] instrument
 }

@@ -1,7 +1,11 @@
 use 'geojson' as geojson
 
+pub type municipality_id {
+    rel '' [string]
+}
+
 pub type municipality {
-    rel [id] string
+    rel [id] municipality_id
     rel ['code'] string
     rel ['geometry'] geojson.Geometry
 }

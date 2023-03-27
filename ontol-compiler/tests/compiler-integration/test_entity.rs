@@ -9,6 +9,19 @@ const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_i
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
 
 #[test]
+fn id_should_not_identify_two_things() {
+    "
+    type foo
+    type bar
+    type id {
+        rel [identifies] foo
+        rel [identifies] bar // ERROR already identifies another type
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn artist_and_instrument_io_artist() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let artist = TypeBinding::new(&env, "artist");
@@ -152,8 +165,9 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
+    pub type node_id { rel '' [string] }
     pub type node {
-        rel [id] string
+        rel [id] node_id
         rel ['name'] string
         rel ['children'* | 'parent'?] node
     }
@@ -200,8 +214,9 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
+    pub type node_id { rel '' [string] }
     pub type node {
-        rel [id] string
+        rel [id] node_id
         rel ['children'* | 'parent'] node
     }
     "
@@ -292,9 +307,11 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub type language { rel [id] string }
+    pub type lang_id { rel '' [string] }
+    pub type prog_id { rel '' [string] }
+    pub type language { rel [id] lang_id }
     pub type programmer {
-        rel [id] string
+        rel [id] prog_id
         rel ['name'] string
         rel ['favorite-language'] language
     }
@@ -311,14 +328,17 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn union_with_ambiguous_id_should_fail() {
     "
+    type animal_id { rel '' [string] }
+    type plant_id { rel '' [string] }
+    type owner_id { rel '' [string] }
     type animal {
-        rel [id] string
+        rel [id] animal_id
         rel ['class'] 'animal'
         // TODO: Test this:
         // rel ['eats'*] lifeform
     }
     type plant {
-        rel [id] string
+        rel [id] plant_id
         rel ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union have `id` patterns that are not disjoint
@@ -326,7 +346,7 @@ fn union_with_ambiguous_id_should_fail() {
         rel () [plant]
     }
     type owner {
-        rel [id] string
+        rel [id] owner_id
         rel ['name'] string
         rel ['owns'*] lifeform
     }

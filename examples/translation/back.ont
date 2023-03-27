@@ -1,0 +1,4 @@
+pub type A {
+    rel [id] string
+    rel ['name'] string
+}

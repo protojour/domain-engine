@@ -33,7 +33,8 @@ impl Relations {
 pub struct Properties {
     pub constructor: Constructor,
     pub map: Option<IndexMap<PropertyId, Cardinality>>,
-    pub id: Option<RelationId>,
+    pub identifies: Option<RelationId>,
+    pub identified_by: Option<RelationId>,
 }
 
 impl Properties {
