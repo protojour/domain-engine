@@ -75,12 +75,12 @@ fn test_municipalities() {
             use 'geojson' as geojson
 
             type kommunenummer {
-                rel '' [/[0-9]{4}/]
+                rel '' [/[0-9]{4}/] _
             }
 
             type kommune {
-                rel ['kommunenummer'] kommunenummer
-                rel ['geometry'] geojson.Polygon
+                rel _ ['kommunenummer'] kommunenummer
+                rel _ ['geometry'] geojson.Polygon
             }
             ",
         ),

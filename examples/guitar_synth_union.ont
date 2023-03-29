@@ -1,29 +1,29 @@
 pub type guitar_id {
-    rel '' ['guitar/'] [uuid]
+    rel '' ['guitar/'] [uuid] _
 }
 pub type synth_id {
-    rel '' ['synth/'] [uuid]
+    rel '' ['synth/'] [uuid] _
 }
 pub type artist_id {
-    rel '' [string]
+    rel '' [string] _
 }
 
 pub type guitar {
-    rel guitar_id [identifies]
-    rel ['type'] 'guitar'
-    rel ['string_count'] int
+    rel guitar_id [identifies] _
+    rel _ ['type'] 'guitar'
+    rel _ ['string_count'] int
 }
 pub type synth {
-    rel synth_id [identifies]
-    rel ['type'] 'synth'
-    rel ['polyphony'] int
+    rel synth_id [identifies] _
+    rel _ ['type'] 'synth'
+    rel _ ['polyphony'] int
 }
 pub type instrument {
-    rel () [guitar]
-    rel () [synth]
+    rel () [guitar] _
+    rel () [synth] _
 }
 pub type artist {
-    rel artist_id [identifies]
-    rel ['name'] string
-    rel ['plays'* | 'played-by'*] instrument
+    rel artist_id [identifies] _
+    rel _ ['name'] string
+    rel _ ['plays'* | 'played-by'*] instrument
 }

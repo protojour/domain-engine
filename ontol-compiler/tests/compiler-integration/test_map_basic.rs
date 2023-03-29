@@ -87,10 +87,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     pub type celsius {
-        rel () [int]
+        rel () [int] _
     }
     pub type fahrenheit {
-        rel () [int]
+        rel () [int] _
     }
 
     map (x) {
@@ -184,14 +184,14 @@ fn test_map_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     pub type one {
-        rel ['a'] string
-        rel ['b'] string
+        rel _ ['a'] string
+        rel _ ['b'] string
     }
     pub type two {
-        rel ['a'] string
-        rel ['b'] string
-        rel ['c'] string
-        rel ['d'] string
+        rel _ ['a'] string
+        rel _ ['b'] string
+        rel _ ['c'] string
+        rel _ ['d'] string
     }
 
     map (x y) {
@@ -233,10 +233,10 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     "
     type meters {
-        rel () [int]
+        rel () [int] _
     }
     type millimeters {
-        rel () [int]
+        rel () [int] _
     }
 
     map (m) {
@@ -245,11 +245,11 @@ fn test_map_delegation() {
     }
 
     pub type car {
-        rel ['length'] meters
+        rel _ ['length'] meters
     }
 
     pub type vehicle {
-        rel ['length'] millimeters
+        rel _ ['length'] millimeters
     }
     
     map (l) {

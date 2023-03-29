@@ -30,13 +30,13 @@ rel MultiLineString ['type'] 'MultiLineString'
 rel MultiLineString ['coordinates'*] position-list
 
 pub type Polygon {
-    rel ['type'] 'Polygon'
-    rel ['coordinates'] position-ring
+    rel _ ['type'] 'Polygon'
+    rel _ ['coordinates'] position-ring
 }
 
 pub type MultiPolygon {
-    rel ['type'] 'MultiPolygon'
-    rel ['coordinates'*] position-ring
+    rel _ ['type'] 'MultiPolygon'
+    rel _ ['coordinates'*] position-ring
 }
 
 pub type GeometryCollection

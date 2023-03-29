@@ -1,8 +1,8 @@
 pub type artist-id {
-    rel '' ['artist/'] [uuid]
+    rel '' ['artist/'] [uuid] _
 }
 pub type instrument-id {
-    rel '' ['instrument/'] [uuid]
+    rel '' ['instrument/'] [uuid] _
 }
 
 pub type artist
@@ -13,8 +13,8 @@ pub type record
 rel record ['name'] string
 
 pub type instrument {
-    rel instrument-id [identifies]
-    rel ['name'] string
+    rel instrument-id [identifies] _
+    rel _ ['name'] string
 }
 
 pub type plays

@@ -14,8 +14,8 @@ fn id_should_not_identify_two_things() {
     type foo
     type bar
     type id {
-        rel [identifies] foo
-        rel [identifies] bar // ERROR already identifies another type
+        rel _ [identifies] foo
+        rel _ [identifies] bar // ERROR already identifies another type
     }
     "
     .compile_fail();
@@ -165,11 +165,11 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    pub type node_id { rel '' [string] }
+    pub type node_id { rel '' [string] _ }
     pub type node {
-        rel node_id [identifies]
-        rel ['name'] string
-        rel ['children'* | 'parent'?] node
+        rel node_id [identifies] _
+        rel _ ['name'] string
+        rel _ ['children'* | 'parent'?] node
     }
     "
     .compile_ok(|env| {
@@ -214,10 +214,10 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    pub type node_id { rel '' [string] }
+    pub type node_id { rel '' [string] _ }
     pub type node {
-        rel node_id [identifies]
-        rel ['children'* | 'parent'] node
+        rel node_id [identifies] _
+        rel _ ['children'* | 'parent'] node
     }
     "
     .compile_ok(|env| {
@@ -307,13 +307,13 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub type lang_id { rel '' [string] }
-    pub type prog_id { rel '' [string] }
-    pub type language { rel lang_id [identifies] }
+    pub type lang_id { rel '' [string] _ }
+    pub type prog_id { rel '' [string] _ }
+    pub type language { rel lang_id [identifies] _ }
     pub type programmer {
-        rel prog_id [identifies]
-        rel ['name'] string
-        rel ['favorite-language'] language
+        rel prog_id [identifies] _
+        rel _ ['name'] string
+        rel _ ['favorite-language'] language
     }
     "
     .compile_ok(|env| {
@@ -328,27 +328,27 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    pub type animal_id { rel '' ['animal/'] [string] }
-    pub type plant_id { rel '' ['plant/'] [string] }
-    pub type owner_id { rel '' [string] }
+    pub type animal_id { rel '' ['animal/'] [string] _ }
+    pub type plant_id { rel '' ['plant/'] [string] _ }
+    pub type owner_id { rel '' [string] _ }
 
     pub type lifeform // ERROR entity variants of the union are not uniquely identifiable
     pub type animal {
-        rel animal_id [identifies]
-        rel ['class'] 'animal'
-        rel ['eats'*] lifeform
+        rel animal_id [identifies] _
+        rel _ ['class'] 'animal'
+        rel _ ['eats'*] lifeform
     }
     pub type plant {
-        rel plant_id [identifies]
-        rel ['class'] 'plant'
+        rel plant_id [identifies] _
+        rel _ ['class'] 'plant'
     }
     rel () [animal] lifeform
     rel () [plant] lifeform
 
     pub type owner {
-        rel owner_id [identifies]
-        rel ['name'] string
-        rel ['owns'*] lifeform
+        rel owner_id [identifies] _
+        rel _ ['name'] string
+        rel _ ['owns'*] lifeform
     }
     "
     .compile_ok(|env| {

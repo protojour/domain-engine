@@ -467,19 +467,19 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 #[test]
 fn complains_about_non_disambiguatable_string_id() {
     "
-    type animal_id { rel '' [string] }
-    type plant_id { rel '' [string] }
+    type animal_id { rel '' [string] _ }
+    type plant_id { rel '' [string] _ }
     type animal {
-        rel animal_id [identifies]
-        rel ['class'] 'animal'
+        rel animal_id [identifies] _
+        rel _ ['class'] 'animal'
     }
     type plant {
-        rel plant_id [identifies]
-        rel ['class'] 'plant'
+        rel plant_id [identifies] _
+        rel _ ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union are not uniquely identifiable
-        rel () [animal]
-        rel () [plant]
+        rel () [animal] _
+        rel () [plant] _
     }
     "
     .compile_fail();
@@ -527,7 +527,7 @@ fn fail_import_private_type() {
             "
             use 'dep' as dep
             pub type bar {
-                rel ['foo'] dep.foo // ERROR private type
+                rel _ ['foo'] dep.foo // ERROR private type
             }
             ",
         ),
@@ -539,7 +539,7 @@ fn fail_import_private_type() {
 fn namespace_not_found() {
     "
     type foo {
-        rel ['prop']
+        rel _ ['prop']
             dep // ERROR namespace not found
             .foo
     }

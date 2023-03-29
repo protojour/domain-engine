@@ -103,7 +103,7 @@ fn rel_statement() -> impl AstParser<RelStatement> {
     doc_comments()
         .then(keyword(Token::Rel))
         // subject
-        .then(spanned(ty()).or_not())
+        .then(spanned_ty_or_underscore())
         // connection
         .then(rel_connection())
         // chain
@@ -118,7 +118,7 @@ fn rel_statement() -> impl AstParser<RelStatement> {
                 .repeated(),
         )
         // object
-        .then(spanned(ty()).or_not())
+        .then(spanned_ty_or_underscore())
         .map(
             |(((((docs, kw), subject), connection), chain), object)| RelStatement {
                 docs,
@@ -275,6 +275,10 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
                 )
             })
     })
+}
+
+fn spanned_ty_or_underscore() -> impl AstParser<Option<Spanned<Type>>> {
+    spanned(ty()).map(Some).or(sigil('_').map(|_| None))
 }
 
 /// Type parser
@@ -481,9 +485,9 @@ mod tests {
         /// doc comment
         type bar {
             rel a [''] b
-            rel [lol] c
-            rel [''] ['']
-            rel [''] b ['']
+            rel _ [lol] c
+            rel _ [''] [''] _
+            rel _ [''] b [''] _
         }
         ";
 
