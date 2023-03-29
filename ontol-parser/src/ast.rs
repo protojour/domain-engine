@@ -38,7 +38,7 @@ pub struct TypeStatement {
     pub kw: Span,
     pub ident: Spanned<String>,
     pub params: Option<Spanned<Vec<Spanned<TypeParam>>>>,
-    pub rel_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -49,6 +49,7 @@ pub struct RelStatement {
     pub connection: RelConnection,
     pub chain: Vec<ChainedSubjectConnection>,
     pub object: Option<Spanned<Type>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

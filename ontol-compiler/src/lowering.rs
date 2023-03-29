@@ -146,7 +146,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut root_defs: RootDefs = [def_id].into();
 
-        if let Some((rel_block, _span)) = type_stmt.rel_block {
+        if let Some((rel_block, _span)) = type_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
             let def = DefReference {
@@ -184,6 +184,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             mut connection,
             chain,
             object,
+            ctx_block: _,
         } = rel;
 
         let mut root_defs = SmallVec::new();

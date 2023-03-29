@@ -447,7 +447,7 @@ fn invalid_relation_chain() {
         () [()]
         () [()] [()]
         ()
-        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `map`, `pub`
+        () // ERROR parse error: found `(`, expected one of `[`, `{`, `type`, `rel`, `map`, `pub`
         [()]
     "
     .compile_fail()

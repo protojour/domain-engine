@@ -85,7 +85,7 @@ fn type_statement() -> impl AstParser<TypeStatement> {
             .or_not(),
         )
         .map(
-            |(((((docs, public), kw), ident), params), rel_block)| TypeStatement {
+            |(((((docs, public), kw), ident), params), ctx_block)| TypeStatement {
                 docs,
                 visibility: match public {
                     Some(span) => (Visibility::Public, span),
@@ -94,41 +94,51 @@ fn type_statement() -> impl AstParser<TypeStatement> {
                 kw,
                 ident,
                 params,
-                rel_block,
+                ctx_block,
             },
         )
 }
 
 fn rel_statement() -> impl AstParser<RelStatement> {
-    doc_comments()
-        .then(keyword(Token::Rel))
-        // subject
-        .then(spanned_ty_or_underscore())
-        // connection
-        .then(rel_connection())
-        // chain
-        .then(
-            spanned(ty())
-                .or_not()
-                .then(rel_connection())
-                .map(|(subject, connection)| ChainedSubjectConnection {
-                    subject,
-                    connection,
-                })
-                .repeated(),
-        )
-        // object
-        .then(spanned_ty_or_underscore())
-        .map(
-            |(((((docs, kw), subject), connection), chain), object)| RelStatement {
-                docs,
-                kw,
-                subject,
-                connection,
-                chain,
-                object,
-            },
-        )
+    recursive(|rel_stmt| {
+        let ctx_block = spanned(rel_stmt)
+            .repeated()
+            .delimited_by(open('{'), close('}'));
+
+        doc_comments()
+            .then(keyword(Token::Rel))
+            // subject
+            .then(spanned_ty_or_underscore())
+            // connection
+            .then(rel_connection())
+            // chain
+            .then(
+                spanned(ty())
+                    .or_not()
+                    .then(rel_connection())
+                    .map(|(subject, connection)| ChainedSubjectConnection {
+                        subject,
+                        connection,
+                    })
+                    .repeated(),
+            )
+            // object
+            .then(spanned_ty_or_underscore())
+            .then(spanned(ctx_block).or_not())
+            .map(
+                |((((((docs, kw), subject), connection), chain), object), ctx_block)| {
+                    RelStatement {
+                        docs,
+                        kw,
+                        subject,
+                        connection,
+                        chain,
+                        object,
+                        ctx_block,
+                    }
+                },
+            )
+    })
 }
 
 fn rel_connection() -> impl AstParser<RelConnection> {
