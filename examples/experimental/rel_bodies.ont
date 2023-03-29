@@ -1,0 +1,62 @@
+
+
+domain a {
+    type foo {
+        rel _ 'foo' int,
+        rel _ ['geo'] geojson.geometry {
+            _ properties map
+        }
+    }
+}
+
+domain b {
+    type id {
+        '' => 'my-id/' uuid _
+    }
+
+    type coord {
+        [] => int int _
+    }
+
+    type coord2 {
+        coord => int _
+    }
+
+    type bar {
+        rel id identifies _
+        rel _ [bar] int
+        rel _ [xy] coord
+    }
+
+    type baz {
+        rel _ ['baz'] int
+
+        rel _ ['has_bar'] bar {
+            rel _ ['how_much'] int
+        }
+    }
+}
+
+rel a [route] b {
+    rel foo [eq x c] bar {
+    } {
+    }
+
+    map (x c a b c q fdkl fdsjklfds jfdl) {
+        foo {
+            rel _ ['foo'] x
+            rel _ ['geo'] {
+                rel _ ['coordinates'] {
+                    rel _ ['x'] x
+                }
+            } {
+                // note this body is for the relation itself
+                rel _ ['how_much'] h
+            }
+        }
+        bar {
+            rel _ ['bar'] x,
+            rel _ ['xy'] c
+        }
+    }
+}
