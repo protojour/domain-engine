@@ -47,7 +47,7 @@ pub enum DefKind<'m> {
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
     CoreFn(BuiltinProc),
-    Equation(Variables, ExprId, ExprId),
+    Mapping(Variables, ExprId, ExprId),
 }
 
 impl<'m> DefKind<'m> {
@@ -65,7 +65,7 @@ impl<'m> DefKind<'m> {
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
             Self::Relation(_) => None,
             Self::Relationship(_) => None,
-            Self::Equation(_, _, _) => None,
+            Self::Mapping(_, _, _) => None,
         }
     }
 }

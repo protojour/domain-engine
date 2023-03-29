@@ -9,8 +9,9 @@ use crate::ast::{
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, ChainedSubjectConnection, EqAttribute, EqAttributeRel, EqStatement,
-        EqType, Expression, RelConnection, RelStatement, RelType, Statement, Type, TypeStatement,
+        BinaryOp, Cardinality, ChainedSubjectConnection, Expression, MapAttribute, MapAttributeRel,
+        MapStatement, MapType, RelConnection, RelStatement, RelType, Statement, Type,
+        TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -40,9 +41,9 @@ fn header_statement() -> impl AstParser<Spanned<Statement>> {
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     let type_stmt = spanned(type_statement()).map(span_map(Statement::Type));
     let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
-    let eq_stmt = spanned(eq_statement()).map(span_map(Statement::Eq));
+    let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
 
-    type_stmt.or(rel_stmt).or(eq_stmt)
+    type_stmt.or(rel_stmt).or(map_stmt)
 }
 
 fn use_statement() -> impl AstParser<UseStatement> {
@@ -177,19 +178,19 @@ fn cardinality() -> impl AstParser<Option<Cardinality>> {
     })
 }
 
-fn eq_statement() -> impl AstParser<EqStatement> {
-    keyword(Token::Eq)
+fn map_statement() -> impl AstParser<MapStatement> {
+    keyword(Token::Map)
         .then(
             spanned(variable())
                 .repeated()
                 .delimited_by(open('('), close(')')),
         )
         .then(
-            spanned(eq_type())
-                .then(spanned(eq_type()))
+            spanned(map_type())
+                .then(spanned(map_type()))
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|((kw, variables), (first, second))| EqStatement {
+        .map(|((kw, variables), (first, second))| MapStatement {
             kw,
             variables,
             first,
@@ -197,25 +198,25 @@ fn eq_statement() -> impl AstParser<EqStatement> {
         })
 }
 
-fn eq_type() -> impl AstParser<EqType> {
+fn map_type() -> impl AstParser<MapType> {
     spanned(path())
         .then(
-            eq_attribute()
+            map_attribute()
                 .repeated()
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(path, attributes)| EqType { path, attributes })
+        .map(|(path, attributes)| MapType { path, attributes })
 }
 
-fn eq_attribute() -> impl AstParser<EqAttribute> {
-    let variable = expression().map(EqAttribute::Expr);
+fn map_attribute() -> impl AstParser<MapAttribute> {
+    let variable = expression().map(MapAttribute::Expr);
     let rel = keyword(Token::Rel)
         .then(expression().or_not())
         .then(spanned(ty()).delimited_by(open('['), close(']')))
         .then(expression().or_not())
         .map_with_span(|(((kw, subject), connection), object), span| {
-            EqAttribute::Rel((
-                EqAttributeRel {
+            MapAttribute::Rel((
+                MapAttributeRel {
                     kw,
                     subject,
                     connection,
@@ -493,9 +494,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_eq() {
+    fn parse_map() {
         let source = "
-        eq(x y) {
+        map (x y) {
             foo { x }
             bar {
                 rel ['foo'] x
@@ -503,7 +504,7 @@ mod tests {
         }
 
         // comment
-        eq(x y) {
+        map (x y) {
             foo { x + 1 }
             bar {
                 rel ['foo'] (x / 3) + 4
@@ -512,6 +513,6 @@ mod tests {
         ";
 
         let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Eq(_), Statement::Eq(_)]);
+        assert_matches!(stmts.as_slice(), [Statement::Map(_), Statement::Map(_)]);
     }
 }

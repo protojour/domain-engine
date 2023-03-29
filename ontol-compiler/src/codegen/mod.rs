@@ -50,11 +50,11 @@ impl<'m> CodegenTasks<'m> {
 
 #[derive(Debug)]
 pub enum CodegenTask<'m> {
-    Eq(EqCodegenTask<'m>),
+    Map(MapCodegenTask<'m>),
 }
 
 #[derive(Debug)]
-pub struct EqCodegenTask<'m> {
+pub struct MapCodegenTask<'m> {
     pub typed_expr_table: SealedTypedExprTable<'m>,
     pub node_a: ExprRef,
     pub node_b: ExprRef,
@@ -167,7 +167,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for task in tasks {
         match task {
-            CodegenTask::Eq(mut eq_task) => {
+            CodegenTask::Map(mut eq_task) => {
                 // a -> b
                 codegen_translate_rewrite(
                     &mut proc_table,

@@ -34,13 +34,13 @@ fn assert_translate(
 }
 
 #[test]
-fn test_eq_simple() {
+fn test_map_simple() {
     "
     pub type foo
     pub type bar
     rel foo ['f'] string
     rel bar ['b'] string
-    eq (x) {
+    map (x) {
         foo {
             rel ['f'] x
         }
@@ -72,7 +72,7 @@ fn test_meters() {
     pub type millimeters
     rel () [int] meters
     rel () [int] millimeters
-    eq (x) {
+    map (x) {
         meters { x / 1000 }
         millimeters { x }
     }
@@ -93,7 +93,7 @@ fn test_temperature() {
         rel () [int]
     }
 
-    eq(x) {
+    map (x) {
         celsius { x }
         fahrenheit { x * 9 / 5 + 32 }
     }
@@ -105,13 +105,13 @@ fn test_temperature() {
 }
 
 #[test]
-fn test_eq_value_to_map() {
+fn test_map_value_to_map() {
     "
     pub type one
     pub type two
     rel () [string] one
     rel two ['a'] string
-    eq(x) {
+    map (x) {
         one { x }
         two {
             rel ['a'] x
@@ -125,13 +125,13 @@ fn test_eq_value_to_map() {
 }
 
 #[test]
-fn test_eq_value_to_map_func() {
+fn test_map_value_to_map_func() {
     "
     pub type one
     pub type two
     rel () [int] one
     rel two ['a'] int
-    eq(x) {
+    map (x) {
         one { x }
         two {
             rel ['a'] x * 2
@@ -145,13 +145,13 @@ fn test_eq_value_to_map_func() {
 }
 
 #[test]
-fn test_eq_simple_array() {
+fn test_map_simple_array() {
     "
     pub type foo
     pub type bar
     rel foo ['a'*] int
     rel bar ['b'*] int
-    eq(x) {
+    map (x) {
         foo {
             rel ['a'] x
         }
@@ -177,7 +177,7 @@ fn test_eq_simple_array() {
 }
 
 #[test]
-fn test_eq_complex_flow() {
+fn test_map_complex_flow() {
     // FIXME: This should be a one-way translation.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
     // But perhaps let's accept that this might be what the user wants.
@@ -194,7 +194,7 @@ fn test_eq_complex_flow() {
         rel ['d'] string
     }
 
-    eq(x y) {
+    map (x y) {
         one {
             rel ['a'] x
             rel ['b'] y
@@ -230,7 +230,7 @@ fn test_eq_complex_flow() {
 }
 
 #[test]
-fn test_eq_delegation() {
+fn test_map_delegation() {
     "
     type meters {
         rel () [int]
@@ -239,7 +239,7 @@ fn test_eq_delegation() {
         rel () [int]
     }
 
-    eq(m) {
+    map (m) {
         meters { m }
         millimeters { m * 1000 }
     }
@@ -252,7 +252,7 @@ fn test_eq_delegation() {
         rel ['length'] millimeters
     }
     
-    eq(l) {
+    map (l) {
         car {
             rel ['length'] l
         }

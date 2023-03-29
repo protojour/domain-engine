@@ -5,12 +5,12 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn lex_error() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `eq`, `pub`".compile_fail();
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `map`, `pub`".compile_fail();
 }
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `eq`, `pub`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `map`, `pub`"
         .compile_fail();
 }
 
@@ -37,7 +37,7 @@ fn lex_error_recovery_works() {
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(x) {
+    map (x) {
         foo {
             rel ['prop'] x
         }
@@ -205,11 +205,11 @@ fn sequence_ambiguous_infinite_tail() {
 }
 
 #[test]
-fn eq_undeclared_variable() {
+fn map_undeclared_variable() {
     "
     type foo
     type bar
-    eq() {
+    map () {
         foo { x } // ERROR undeclared variable
         bar {}
     }
@@ -219,9 +219,9 @@ fn eq_undeclared_variable() {
 
 #[test]
 #[ignore = "there are no functions right now, only infix operators"]
-fn eq_incorrect_function_arguments() {
+fn map_incorrect_function_arguments() {
     "
-    eq(x) {
+    map (x) {
         (+ ;; ERROR function takes 2 parameters, but 1 was supplied
             x
         )
@@ -232,10 +232,10 @@ fn eq_incorrect_function_arguments() {
 }
 
 #[test]
-fn eq_obj_non_domain_type_and_unit_type() {
+fn map_obj_non_domain_type_and_unit_type() {
     "
     type foo
-    eq(x) {
+    map (x) {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
             rel ['prop'] x
@@ -246,13 +246,13 @@ fn eq_obj_non_domain_type_and_unit_type() {
 }
 
 #[test]
-fn eq_attribute_mismatch() {
+fn map_attribute_mismatch() {
     "
     type foo
     type bar
     rel foo ['prop'] bar
     rel () [int] bar
-    eq(x) {
+    map (x) {
         foo { // ERROR missing property `prop`
             x // ERROR expected named property
         }
@@ -263,12 +263,12 @@ fn eq_attribute_mismatch() {
 }
 
 #[test]
-fn eq_duplicate_unknown_property() {
+fn map_duplicate_unknown_property() {
     "
     type foo
     type bar
     rel foo ['a'] bar
-    eq(x) {
+    map (x) {
         foo {
             rel ['a'] x
             rel ['a'] x // ERROR duplicate property
@@ -281,13 +281,13 @@ fn eq_duplicate_unknown_property() {
 }
 
 #[test]
-fn eq_type_mismatch() {
+fn map_type_mismatch() {
     "
     type foo
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(x) {
+    map (x) {
         foo {
             rel ['prop'] x
         }
@@ -303,13 +303,13 @@ fn eq_type_mismatch() {
 }
 
 #[test]
-fn eq_type_mismatch_in_func() {
+fn map_type_mismatch_in_func() {
     "
     type foo
     type bar
     rel foo ['prop'] string
     rel bar ['prop'] int
-    eq(x) {
+    map (x) {
         foo {
             rel ['prop'] x
         }
@@ -324,7 +324,7 @@ fn eq_type_mismatch_in_func() {
 }
 
 #[test]
-fn eq_array_mismatch() {
+fn map_array_mismatch() {
     "
     type foo
     rel foo ['a'*] string
@@ -334,7 +334,7 @@ fn eq_array_mismatch() {
     rel bar ['a'] string
     rel bar ['b'*] int
 
-    eq(x y) {
+    map (x y) {
         foo {
             rel ['a'] x
             rel ['b'] y
@@ -370,7 +370,7 @@ fn test_serde_object_property_not_sugared() {
 }
 
 #[test]
-fn unresolved_transitive_eq() {
+fn unresolved_transitive_map() {
     "
     type a
     type b
@@ -382,7 +382,7 @@ fn unresolved_transitive_eq() {
     rel c ['p0'] a
     rel d ['p1'] b
 
-    eq(x) {
+    map (x) {
         c {
             rel ['p0']
                 x // ERROR cannot convert this `a` from `b`: These types are not equated.
@@ -447,7 +447,7 @@ fn invalid_relation_chain() {
         () [()]
         () [()] [()]
         ()
-        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `eq`, `pub`
+        () // ERROR parse error: found `(`, expected one of `[`, `type`, `rel`, `map`, `pub`
         [()]
     "
     .compile_fail()
@@ -510,7 +510,7 @@ fn compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `eq`, `pub`
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `map`, `pub`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),

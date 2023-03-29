@@ -9,7 +9,7 @@ pub enum Statement {
     Use(UseStatement),
     Type(TypeStatement),
     Rel(RelStatement),
-    Eq(EqStatement),
+    Map(MapStatement),
 }
 
 impl Statement {
@@ -19,7 +19,7 @@ impl Statement {
             Self::Use(_) => &[],
             Self::Type(ty) => &ty.docs,
             Self::Rel(rel) => &rel.docs,
-            Self::Eq(_) => &[],
+            Self::Map(_) => &[],
         }
     }
 }
@@ -87,27 +87,27 @@ pub struct RelChain {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct EqStatement {
+pub struct MapStatement {
     pub kw: Span,
     pub variables: Vec<Spanned<String>>,
-    pub first: Spanned<EqType>,
-    pub second: Spanned<EqType>,
+    pub first: Spanned<MapType>,
+    pub second: Spanned<MapType>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct EqType {
+pub struct MapType {
     pub path: Spanned<Path>,
-    pub attributes: Vec<EqAttribute>,
+    pub attributes: Vec<MapAttribute>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum EqAttribute {
+pub enum MapAttribute {
     Expr(Spanned<Expression>),
-    Rel(Spanned<EqAttributeRel>),
+    Rel(Spanned<MapAttributeRel>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct EqAttributeRel {
+pub struct MapAttributeRel {
     pub kw: Span,
     pub subject: Option<Spanned<Expression>>,
     pub connection: Spanned<Type>,

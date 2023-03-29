@@ -1,7 +1,7 @@
 use ontol_runtime::DefId;
 
 use crate::{
-    codegen::{CodegenTask, EqCodegenTask},
+    codegen::{CodegenTask, MapCodegenTask},
     def::{DefKind, Primitive, TypeDef},
     mem::Intern,
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
@@ -51,7 +51,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(Primitive::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number(def_id)),
-            DefKind::Equation(variables, first_id, second_id) => {
+            DefKind::Mapping(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),
                     typed_expr_table: TypedExprTable::default(),
@@ -70,7 +70,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let (_, node_a) = self.check_expr_id(*first_id, &mut ctx);
                 let (_, node_b) = self.check_expr_id(*second_id, &mut ctx);
 
-                self.codegen_tasks.push(CodegenTask::Eq(EqCodegenTask {
+                self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
                     typed_expr_table: ctx.typed_expr_table.seal(),
                     node_a,
                     node_b,

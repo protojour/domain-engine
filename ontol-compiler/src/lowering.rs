@@ -89,7 +89,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_chain_to_def(rel_stmt, span, BlockContext::NoContext)
             }
-            ast::Statement::Eq(ast::EqStatement {
+            ast::Statement::Map(ast::MapStatement {
                 kw: _,
                 variables: ast_variables,
                 first,
@@ -104,11 +104,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                let first = self.lower_eq_type_to_obj(first, &mut var_table)?;
-                let second = self.lower_eq_type_to_obj(second, &mut var_table)?;
+                let first = self.lower_map_type_to_obj(first, &mut var_table)?;
+                let second = self.lower_map_type_to_obj(second, &mut var_table)?;
 
                 Ok([self.define(
-                    DefKind::Equation(Variables(variables.into()), first, second),
+                    DefKind::Mapping(Variables(variables.into()), first, second),
                     &span,
                 )]
                 .into())
@@ -465,17 +465,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lower_eq_type_to_obj(
+    fn lower_map_type_to_obj(
         &mut self,
-        (eq_type, span): (ast::EqType, Span),
+        (map_type, span): (ast::MapType, Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
-        let type_def_id = self.lookup_path(&eq_type.path.0, &eq_type.path.1)?;
-        let attributes = eq_type
+        let type_def_id = self.lookup_path(&map_type.path.0, &map_type.path.1)?;
+        let attributes = map_type
             .attributes
             .into_iter()
-            .map(|eq_attr| match eq_attr {
-                ast::EqAttribute::Expr((expr, expr_span)) => {
+            .map(|map_attr| match map_attr {
+                ast::MapAttribute::Expr((expr, expr_span)) => {
                     let key = (
                         DefReference {
                             def_id: DefId::unit(),
@@ -487,7 +487,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                     Ok((key, expr))
                 }
-                ast::EqAttribute::Rel((rel, _rel_span)) => {
+                ast::MapAttribute::Rel((rel, _rel_span)) => {
                     // FIXME: For now:
                     assert!(rel.subject.is_none());
 
@@ -506,7 +506,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ExprKind::Obj(
                 TypePath {
                     def_id: type_def_id,
-                    span: self.src.span(&eq_type.path.1),
+                    span: self.src.span(&map_type.path.1),
                 },
                 attributes,
             ),
