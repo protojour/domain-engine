@@ -78,9 +78,9 @@ fn rel_duplicate_anonymous_relation() {
     type foo
     type bar
     rel // ERROR unit type `bar` cannot be part of a union
-        () [bar] foo
+        foo [or] bar
     rel // ERROR duplicate anonymous relationship
-        () [bar] foo
+        foo [or] bar
     "
     .compile_fail()
 }
@@ -90,7 +90,7 @@ fn rel_mix_anonymous_and_named() {
     "
     type foo
     type bar
-    rel () [bar] foo
+    rel foo [or] bar
 
     rel // ERROR invalid mix of relationship type for subject
         foo ['foobar'] bar
@@ -103,9 +103,10 @@ fn map_union_unit_type() {
     "
     type foo
     type bar
-    type u
-    rel () [foo] u // ERROR unit type `foo` cannot be part of a union
-    rel () [bar] u // ERROR unit type `bar` cannot be part of a union
+    type u {
+        rel _ [or] foo // ERROR unit type `foo` cannot be part of a union
+        rel _ [or] bar // ERROR unit type `bar` cannot be part of a union
+    }
     "
     .compile_fail()
 }
@@ -118,8 +119,8 @@ fn map_union_missing_discriminator() {
     rel foo ['a'] 'constant'
     rel bar ['b'] string
     type u
-    rel () [foo] u
-    rel () [bar] u // ERROR cannot discriminate type
+    rel u [or] foo
+    rel u [or] bar // ERROR cannot discriminate type
     "
     .compile_fail()
 }
@@ -131,9 +132,10 @@ fn map_union_non_uniform_discriminators() {
     type bar
     rel foo ['a'] 'constant'
     rel bar ['b'] 'other-constant'
-    type u // ERROR no uniform discriminator found for union variants
-    rel () [foo] u
-    rel () [bar] u
+    type u { // ERROR no uniform discriminator found for union variants
+        rel _ [or] foo
+        rel _ [or] bar
+    }
     "
     .compile_fail()
 }
@@ -141,9 +143,10 @@ fn map_union_non_uniform_discriminators() {
 #[test]
 fn non_disjoint_string_union() {
     "
-    type u1
-    rel () ['a'] u1
-    rel () ['a'] u1 // ERROR duplicate anonymous relationship
+    type u1 {
+        rel _ [or] 'a'
+        rel _ [or] 'a' // ERROR duplicate anonymous relationship
+    }
     "
     .compile_fail()
 }
@@ -151,15 +154,18 @@ fn non_disjoint_string_union() {
 #[test]
 fn union_tree() {
     "
-    type u1
-    rel () ['1a'] u1
-    rel () ['1b'] u1
-    type u2
-    rel () ['2a'] u2
-    rel () ['2b'] u2
-    type u3
-    rel () [u1] u3 // ERROR union tree not supported
-    rel () [u2] u3 // ERROR union tree not supported
+    type u1 {
+        rel _ [or] '1a'
+        rel _ [or] '1b'
+    }
+    type u2 {
+        rel _ [or] '2a'
+        rel _ [or] '2b'
+    }
+    type u3 {
+        rel _ [or] u1 // ERROR union tree not supported
+        rel _ [or] u2 // ERROR union tree not supported
+    }
     "
     .compile_fail()
 }
@@ -167,9 +173,10 @@ fn union_tree() {
 #[test]
 fn sequence_mix1() {
     "
-    type u
-    rel () [int] u
-    rel u [0] string // ERROR invalid mix of relationship type for subject
+    type u {
+        rel _ [or] int
+        rel _ [0] string // ERROR invalid mix of relationship type for subject
+    }
     "
     .compile_fail();
 }
@@ -251,7 +258,7 @@ fn map_attribute_mismatch() {
     type foo
     type bar
     rel foo ['prop'] bar
-    rel () [int] bar
+    rel bar [or] int
     map (x) {
         foo { // ERROR missing property `prop`
             x // ERROR expected named property
@@ -372,15 +379,11 @@ fn test_serde_object_property_not_sugared() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a
-    type b
-    rel () [int] a
-    rel () [int] b
+    type a { rel _ [or] int }
+    type b { rel _ [or] int }
 
-    type c
-    type d
-    rel c ['p0'] a
-    rel d ['p1'] b
+    type c { rel _ ['p0'] a }
+    type d { rel _ ['p1'] b }
 
     map (x) {
         c {
@@ -433,7 +436,7 @@ fn mix_of_index_and_edge_type() {
 fn invalid_subject_types() {
     "
     rel
-        'a' // ERROR invalid subject type. Must be a domain type, unit, empty sequence or empty string
+        'a' // ERROR invalid subject type. Must be a domain type, empty sequence or empty string
         [()]
         string
     "
@@ -478,8 +481,8 @@ fn complains_about_non_disambiguatable_string_id() {
         rel _ ['class'] 'plant'
     }
     type lifeform { // ERROR entity variants of the union are not uniquely identifiable
-        rel () [animal] _
-        rel () [plant] _
+        rel _ [or] animal
+        rel _ [or] plant
     }
     "
     .compile_fail();
@@ -497,9 +500,9 @@ fn complains_about_ambiguous_pattern_based_unions() {
     rel '' ['bar'] [uuid] bar
     rel '' ['barbar'] [uuid] barbar
 
-    rel () [foo] union
-    rel () [bar] union
-    rel () [barbar] union
+    rel union [or] foo
+    rel union [or] bar
+    rel union [or] barbar
     "
     .compile_fail();
 }

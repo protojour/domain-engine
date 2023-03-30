@@ -18,7 +18,7 @@ fn test_serde_empty_type() {
 fn test_serde_value_type() {
     "
     pub type foo
-    rel () [string] foo
+    rel foo [or] string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -70,8 +70,8 @@ fn test_serde_sequence() {
 fn test_serde_value_union1() {
     "
     pub type u
-    rel () ['a'] u
-    rel () ['b'] u
+    rel u [or] 'a'
+    rel u [or] 'b'
     "
     .compile_ok(|env| {
         let u = TypeBinding::new(&env, "u");
@@ -83,8 +83,8 @@ fn test_serde_value_union1() {
 fn test_serde_string_or_unit() {
     "
     type string-or-unit
-    rel () [string] string-or-unit
-    rel () [()] string-or-unit
+    rel string-or-unit [or] string
+    rel string-or-unit [or] ()
 
     pub type foo
     rel foo ['a'] string-or-unit
@@ -107,8 +107,8 @@ fn test_serde_map_union() {
     rel bar ['d'] int
 
     pub type u
-    rel () [foo] u
-    rel () [bar] u
+    rel u [or] foo
+    rel u [or] bar
     "
     .compile_ok(|env| {
         let u = TypeBinding::new(&env, "u");
@@ -153,7 +153,7 @@ fn test_serde_infinite_sequence() {
 fn test_serde_uuid() {
     "
     pub type my_id
-    rel () [uuid] my_id
+    rel my_id [or] uuid
     "
     .compile_ok(|env| {
         let my_id = TypeBinding::new(&env, "my_id");
@@ -177,7 +177,7 @@ fn test_serde_uuid() {
 fn test_serde_datetime() {
     "
     pub type my_dt
-    rel () [datetime] my_dt
+    rel my_dt [or] datetime
     "
     .compile_ok(|env| {
         let my_dt = TypeBinding::new(&env, "my_dt");
@@ -204,13 +204,14 @@ fn test_serde_datetime() {
 #[test]
 fn test_jsonml() {
     "
-    pub type element
     type tag
     type tag_name
     type attributes
 
-    rel () [tag] element
-    rel () [string] element
+    pub type element {
+        rel _ [or] tag
+        rel _ [or] string
+    }
 
     rel tag [0] tag_name
 
@@ -220,9 +221,9 @@ fn test_jsonml() {
 
     rel tag [2..] element
 
-    rel () ['div'] tag_name
-    rel () ['em'] tag_name
-    rel () ['strong'] tag_name
+    rel tag_name [or] 'div'
+    rel tag_name [or] 'em'
+    rel tag_name [or] 'strong'
 
     // BUG: should accept any string as key
     rel attributes ['class'?] string

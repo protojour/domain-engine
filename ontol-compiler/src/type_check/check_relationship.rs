@@ -78,11 +78,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def(object.0.def_id);
 
         match subject_ty {
-            Type::Unit(_) | Type::EmptySequence(_) => return object_ty,
+            Type::EmptySequence(_) => return object_ty,
             Type::StringConstant(def_id) if *def_id == self.defs.empty_string() => {
                 return object_ty;
             }
-            Type::StringConstant(_) => {
+            Type::Unit(_) | Type::StringConstant(_) => {
                 return self.error(CompileError::InvalidSubjectType, &subject.1)
             }
             _ => {}
@@ -96,6 +96,45 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut properties.map,
             &mut properties.constructor,
         ) {
+            (RelationIdent::And, _, _) => {
+                todo!("and")
+            }
+            (RelationIdent::Or, _, Constructor::Identity) => {
+                properties.constructor =
+                    Constructor::Value(relationship.0, *span, relationship.1.subject_cardinality);
+            }
+            (
+                RelationIdent::Or,
+                _,
+                Constructor::Value(existing_relationship_id, existing_span, cardinality),
+            ) => {
+                match (relationship.1.subject_cardinality, cardinality) {
+                    (
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                    ) => {
+                        properties.constructor = Constructor::ValueUnion(
+                            [
+                                (*existing_relationship_id, *existing_span),
+                                (relationship.0, *span),
+                            ]
+                            .into(),
+                        );
+
+                        // Register union for check later
+                        self.relations.value_unions.insert(subject.0.def_id);
+                    }
+                    _ => {
+                        return self.error(CompileError::InvalidCardinaltyCombinationInUnion, span);
+                    }
+                }
+            }
+            (RelationIdent::Or, _, Constructor::ValueUnion(variants)) => {
+                variants.push((relationship.0, *span));
+            }
+            (RelationIdent::Or, _, _) => {
+                return self.error(CompileError::ConstructorMismatch, span)
+            }
             (RelationIdent::Identifies, _, _) => {
                 if properties.identifies.is_some() {
                     return self.error(CompileError::AlreadyIdentifiesAType, span);
@@ -184,48 +223,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def(subject.0.def_id);
 
         match subject_ty {
-            Type::Unit(_) => {
-                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
-
-                match &mut object_properties.constructor {
-                    Constructor::Identity => {
-                        object_properties.constructor = Constructor::Value(
-                            relationship.0,
-                            *span,
-                            relationship.1.subject_cardinality,
-                        );
-                    }
-                    Constructor::Value(existing_relationship_id, existing_span, cardinality) => {
-                        match (relationship.1.subject_cardinality, cardinality) {
-                            (
-                                (PropertyCardinality::Mandatory, ValueCardinality::One),
-                                (PropertyCardinality::Mandatory, ValueCardinality::One),
-                            ) => {
-                                object_properties.constructor = Constructor::ValueUnion(
-                                    [
-                                        (*existing_relationship_id, *existing_span),
-                                        (relationship.0, *span),
-                                    ]
-                                    .into(),
-                                );
-
-                                // Register union for check later
-                                self.relations.value_unions.insert(object.0.def_id);
-                            }
-                            _ => {
-                                return self.error(
-                                    CompileError::InvalidCardinaltyCombinationInUnion,
-                                    span,
-                                );
-                            }
-                        }
-                    }
-                    Constructor::ValueUnion(properties) => {
-                        properties.push((relationship.0, *span));
-                    }
-                    _ => return self.error(CompileError::ConstructorMismatch, span),
-                }
-            }
             Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
                 if let Err(e) = self.extend_string_pattern_constructor(
                     relation,

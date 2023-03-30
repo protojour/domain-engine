@@ -78,8 +78,8 @@ fn test_string_pattern_constructor_union() {
     rel '' ['foo/'] [uuid] foo
     rel '' ['bar/'] [uuid] bar
 
-    rel () [foo] foobar
-    rel () [bar] foobar
+    rel foobar [or] foo
+    rel foobar [or] bar
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(&env, "foobar");
@@ -167,7 +167,7 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     "
     type lol
-    rel () [/abc(?<named>.)/] lol // ERROR invalid regex: unrecognized flag
+    rel lol [or] /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
     "
     .compile_fail()
 }

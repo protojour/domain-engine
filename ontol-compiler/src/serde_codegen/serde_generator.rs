@@ -353,11 +353,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.create_identity_constructor_operator(def_variant, typename, properties)
             }
             Constructor::Value(relationship_id, _, cardinality) => {
-                let Ok((_, relation)) = self.get_relationship_meta(*relationship_id) else {
+                let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
                     panic!("Problem getting property meta");
                 };
 
-                let value_def = relation.ident_def().unwrap();
+                let value_def = relationship.object.0.def_id;
 
                 let (requirement, inner_operator_id) =
                     self.get_property_operator(value_def, *cardinality);
