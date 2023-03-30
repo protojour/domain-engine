@@ -140,8 +140,7 @@ impl<'m> Relation<'m> {
 pub enum RelationIdent {
     Named(DefReference),
     Typed(DefReference),
-    And,
-    Or,
+    Is,
     Identifies,
     Indexed,
 }
@@ -201,8 +200,7 @@ pub struct Defs<'m> {
     next_def_param: DefParamId,
     next_expr_id: ExprId,
     unit: DefId,
-    and_relation: DefId,
-    or_relation: DefId,
+    is_relation: DefId,
     identifies_relation: DefId,
     indexed_relation: DefId,
     empty_sequence: DefId,
@@ -225,8 +223,7 @@ impl<'m> Defs<'m> {
             next_expr_id: ExprId(0),
             next_def_param: DefParamId(0),
             unit: DefId::unit(),
-            and_relation: DefId::unit(),
-            or_relation: DefId::unit(),
+            is_relation: DefId::unit(),
             identifies_relation: DefId::unit(),
             indexed_relation: DefId::unit(),
             empty_sequence: DefId::unit(),
@@ -246,18 +243,9 @@ impl<'m> Defs<'m> {
 
         // Add some extremely fundamental definitions here already.
         // These are even independent from CORE being defined.
-        defs.and_relation = defs.add_def(
+        defs.is_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::And,
-                subject_prop: None,
-                object_prop: None,
-            }),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
-        defs.or_relation = defs.add_def(
-            DefKind::Relation(Relation {
-                ident: RelationIdent::Or,
+                ident: RelationIdent::Is,
                 subject_prop: None,
                 object_prop: None,
             }),
@@ -296,12 +284,8 @@ impl<'m> Defs<'m> {
         self.unit
     }
 
-    pub fn and_relation(&self) -> DefId {
-        self.and_relation
-    }
-
-    pub fn or_relation(&self) -> DefId {
-        self.or_relation
+    pub fn is_relation(&self) -> DefId {
+        self.is_relation
     }
 
     pub fn identifies_relation(&self) -> DefId {

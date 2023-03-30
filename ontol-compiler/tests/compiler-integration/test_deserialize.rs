@@ -29,7 +29,7 @@ fn deserialize_empty_type() {
 fn deserialize_int() {
     "
     pub type foo
-    rel foo [or] int
+    rel foo [is?] int
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -51,7 +51,7 @@ fn deserialize_int() {
 fn deserialize_string() {
     "
     pub type foo
-    rel foo [or] string
+    rel foo [is?] string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -105,7 +105,7 @@ fn deserialize_nested() {
     rel one ['x'] two
     rel one ['y'] three
     rel two ['y'] three
-    rel three [or] string
+    rel three [is?] string
     "
     .compile_ok(|env| {
         let one = TypeBinding::new(&env, "one");
@@ -148,8 +148,8 @@ fn deserialize_recursive() {
 fn deserialize_union_of_primitives() {
     "
     pub type foo
-    rel foo [or] string
-    rel foo [or] int
+    rel foo [is?] string
+    rel foo [is?] int
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -169,7 +169,7 @@ fn deserialize_union_of_primitives() {
 fn deserialize_string_constant() {
     "
     pub type foo
-    rel foo [or] 'my_value'
+    rel foo [is?] 'my_value'
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -247,8 +247,8 @@ fn deserialize_finite_uniform_sequence() {
 fn deserialize_string_union() {
     "
     pub type foo
-    rel foo [or] 'a'
-    rel foo [or] 'b'
+    rel foo [is?] 'a'
+    rel foo [is?] 'b'
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -273,8 +273,8 @@ fn deserialize_map_union() {
     rel bar ['prop'] int
 
     pub type union
-    rel union [or] foo
-    rel union [or] bar
+    rel union [is?] foo
+    rel union [is?] bar
     "
     .compile_ok(|env| {
         let union = TypeBinding::new(&env, "union");

@@ -22,8 +22,7 @@ impl<'m> Compiler<'m> {
         self.register_type(self.defs.unit(), Type::Unit);
         self.register_type(self.defs.empty_sequence(), Type::EmptySequence);
 
-        self.register_named_type(self.defs.and_relation(), "and", |_| Type::BuiltinRelation);
-        self.register_named_type(self.defs.or_relation(), "or", |_| Type::BuiltinRelation);
+        self.register_named_type(self.defs.is_relation(), "is", |_| Type::BuiltinRelation);
         self.register_named_type(self.defs.identifies_relation(), "identifies", |_| {
             Type::BuiltinRelation
         });

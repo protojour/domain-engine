@@ -70,8 +70,8 @@ fn test_meters() {
     "
     pub type meters
     pub type millimeters
-    rel meters [or] int
-    rel millimeters [or] int
+    rel meters [is] int
+    rel millimeters [is] int
     map (x) {
         meters { x / 1000 }
         millimeters { x }
@@ -87,10 +87,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     pub type celsius {
-        rel _ [or] int
+        rel _ [is] int
     }
     pub type fahrenheit {
-        rel _ [or] int
+        rel _ [is] int
     }
 
     map (x) {
@@ -109,7 +109,7 @@ fn test_map_value_to_map() {
     "
     pub type one
     pub type two
-    rel one [or] string
+    rel one [is] string
     rel two ['a'] string
     map (x) {
         one { x }
@@ -129,7 +129,7 @@ fn test_map_value_to_map_func() {
     "
     pub type one
     pub type two
-    rel one [or] int
+    rel one [is] int
     rel two ['a'] int
     map (x) {
         one { x }
@@ -233,10 +233,10 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     "
     type meters {
-        rel _ [or] int
+        rel _ [is] int
     }
     type millimeters {
-        rel _ [or] int
+        rel _ [is] int
     }
 
     map (m) {

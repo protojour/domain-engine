@@ -4,7 +4,7 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, DefReference, Primitive, PropertyCardinality, Relation, RelationIdent,
-        Relationship, ValueCardinality,
+        Relationship,
     },
     error::CompileError,
     mem::Intern,
@@ -96,44 +96,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut properties.map,
             &mut properties.constructor,
         ) {
-            (RelationIdent::And, _, _) => {
-                todo!("and")
-            }
-            (RelationIdent::Or, _, Constructor::Identity) => {
-                properties.constructor =
-                    Constructor::Value(relationship.0, *span, relationship.1.subject_cardinality);
-            }
-            (
-                RelationIdent::Or,
-                _,
-                Constructor::Value(existing_relationship_id, existing_span, cardinality),
-            ) => {
-                match (relationship.1.subject_cardinality, cardinality) {
-                    (
-                        (PropertyCardinality::Mandatory, ValueCardinality::One),
-                        (PropertyCardinality::Mandatory, ValueCardinality::One),
-                    ) => {
-                        properties.constructor = Constructor::ValueUnion(
-                            [
-                                (*existing_relationship_id, *existing_span),
-                                (relationship.0, *span),
-                            ]
-                            .into(),
+            (RelationIdent::Is, _, constructor) => {
+                match (relationship.1.subject_cardinality.0, constructor) {
+                    (PropertyCardinality::Mandatory, Constructor::Identity) => {
+                        properties.constructor = Constructor::Value(
+                            relationship.0,
+                            *span,
+                            relationship.1.subject_cardinality,
                         );
-
+                    }
+                    (PropertyCardinality::Optional, Constructor::Identity) => {
+                        properties.constructor =
+                            Constructor::ValueUnion([(relationship.0, *span)].into());
                         // Register union for check later
                         self.relations.value_unions.insert(subject.0.def_id);
                     }
-                    _ => {
-                        return self.error(CompileError::InvalidCardinaltyCombinationInUnion, span);
+                    (PropertyCardinality::Optional, Constructor::ValueUnion(variants)) => {
+                        variants.push((relationship.0, *span));
                     }
+                    _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
-            }
-            (RelationIdent::Or, _, Constructor::ValueUnion(variants)) => {
-                variants.push((relationship.0, *span));
-            }
-            (RelationIdent::Or, _, _) => {
-                return self.error(CompileError::ConstructorMismatch, span)
             }
             (RelationIdent::Identifies, _, _) => {
                 if properties.identifies.is_some() {

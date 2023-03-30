@@ -634,11 +634,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationIdent::And => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.and_relation()))
-            }
-            RelationIdent::Or => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.or_relation()))
+            RelationIdent::Is => {
+                ImplicitRelationId::Reused(RelationId(self.compiler.defs.is_relation()))
             }
             RelationIdent::Identifies => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.identifies_relation()))

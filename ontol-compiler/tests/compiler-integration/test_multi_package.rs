@@ -82,7 +82,7 @@ fn dependency_dag() {
             }
             ",
         ),
-        (SourceName("c"), "pub type c { rel _ [or] int }"),
+        (SourceName("c"), "pub type c { rel _ [is] int }"),
     ])
     .compile_ok(|env| {
         // four user domains, plus core:
