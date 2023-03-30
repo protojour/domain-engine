@@ -117,13 +117,6 @@ pub struct Relation<'m> {
 }
 
 impl<'m> Relation<'m> {
-    pub fn ident_def(&self) -> Option<DefId> {
-        match &self.ident {
-            RelationIdent::Named(def) | RelationIdent::Typed(def) => Some(def.def_id),
-            _ => None,
-        }
-    }
-
     pub fn named_ident(&self, defs: &'m Defs) -> Option<&'m str> {
         match &self.ident {
             RelationIdent::Named(def) => match defs.get_def_kind(def.def_id) {
