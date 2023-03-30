@@ -43,26 +43,27 @@ pub type GeometryCollection
 rel GeometryCollection ['type'] 'GeometryCollection'
 rel GeometryCollection ['geometries'*] LeafGeometry
 
-rel () [Point] LeafGeometry
-rel () [MultiPoint] LeafGeometry
-rel () [LineString] LeafGeometry
-rel () [MultiLineString] LeafGeometry
-rel () [Polygon] LeafGeometry
-rel () [MultiPolygon] LeafGeometry
+rel LeafGeometry [or] Point
+rel LeafGeometry [or] MultiPoint
+rel LeafGeometry [or] LineString
+rel LeafGeometry [or] MultiLineString
+rel LeafGeometry [or] Polygon
+rel LeafGeometry [or] MultiPolygon
 
 // Note: Geometry is an extension of LeafGeometry + GeometryCollection
-rel () [Point] Geometry
-rel () [MultiPoint] Geometry
-rel () [LineString] Geometry
-rel () [MultiLineString] Geometry
-rel () [Polygon] Geometry
-rel () [MultiPolygon] Geometry
-rel () [GeometryCollection] Geometry
+rel Geometry [or] Point
+rel Geometry [or] MultiPoint
+rel Geometry [or] LineString
+rel Geometry [or] MultiLineString
+rel Geometry [or] Polygon
+rel Geometry [or] MultiPolygon
+rel Geometry [or] GeometryCollection
 
-type GeometryOrNull
-rel () [Geometry] GeometryOrNull
-// TODO: Not supported yet (union tree):
-// rel () [] GeometryOrNull
+type GeometryOrNull {
+    rel _ [or] Geometry
+    // TODO: Not supported yet (union tree):
+    // rel _ [or] ()
+}
 
 type Feature<properties = ()>
 rel Feature<> ['type'] 'Feature'

@@ -205,11 +205,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
                         [((def, _), value)] if def.def_id == DefId::unit() => {
-                            let (_, relation) = self
+                            let (relationship, _) = self
                                 .get_relationship_meta(*relationship_id)
                                 .expect("BUG: problem getting anonymous property meta");
 
-                            let object_ty = self.check_def(relation.ident_def().unwrap());
+                            let object_ty = self.check_def(relationship.object.0.def_id);
                             let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
 
                             ctx.typed_expr_table.add_expr(TypedExpr {

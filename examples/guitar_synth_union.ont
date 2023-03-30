@@ -19,8 +19,8 @@ pub type synth {
     rel _ ['polyphony'] int
 }
 pub type instrument {
-    rel () [guitar] _
-    rel () [synth] _
+    rel _ [or] guitar
+    rel _ [or] synth
 }
 pub type artist {
     rel artist_id [identifies] _

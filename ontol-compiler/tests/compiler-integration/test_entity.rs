@@ -342,8 +342,8 @@ fn recursive_entity_union() {
         rel plant_id [identifies] _
         rel _ ['class'] 'plant'
     }
-    rel () [animal] lifeform
-    rel () [plant] lifeform
+    rel lifeform [or] animal
+    rel lifeform [or] plant
 
     pub type owner {
         rel owner_id [identifies] _

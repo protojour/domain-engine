@@ -19,11 +19,15 @@ impl<'m> Compiler<'m> {
         self.define_package(CORE_PKG);
 
         // fundamental types
-        let _ = self.register_type(self.defs.unit(), Type::Unit);
-        let _ = self.register_type(self.defs.empty_sequence(), Type::EmptySequence);
-        let _ = self.register_named_type(self.defs.identifies_relation(), "identifies", |_| {
+        self.register_type(self.defs.unit(), Type::Unit);
+        self.register_type(self.defs.empty_sequence(), Type::EmptySequence);
+
+        self.register_named_type(self.defs.and_relation(), "and", |_| Type::BuiltinRelation);
+        self.register_named_type(self.defs.or_relation(), "or", |_| Type::BuiltinRelation);
+        self.register_named_type(self.defs.identifies_relation(), "identifies", |_| {
             Type::BuiltinRelation
         });
+
         let int_ty = self.register_named_type(self.defs.int(), "int", Type::Int);
         let _ = self.register_named_type(self.defs.number(), "number", Type::Number);
         let string_ty = self.register_named_type(self.defs.string(), "string", Type::String);
