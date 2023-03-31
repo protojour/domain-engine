@@ -75,7 +75,7 @@ fn test_municipalities() {
             use 'geojson' as geojson
 
             type kommunenummer {
-                rel '' [/[0-9]{4}/] _
+                fmt '' => /[0-9]{4}/ => _
             }
 
             type kommune {

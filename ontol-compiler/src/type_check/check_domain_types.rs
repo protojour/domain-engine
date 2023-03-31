@@ -3,7 +3,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, PropertyCardinality, RelationIdent, ValueCardinality},
+    def::{Cardinality, Def, DefKind, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
     relation::Constructor,
 };
@@ -68,9 +68,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 .get_relationship_meta(*relationship_id)
                                                 .expect("BUG: problem getting property meta");
 
-                                            let variant_def = match &relation.ident {
-                                                RelationIdent::Named(def)
-                                                | RelationIdent::Typed(def) => def.def_id,
+                                            let variant_def = match &relation.kind {
+                                                RelationKind::Named(def)
+                                                | RelationKind::Transition(def) => def.def_id,
                                                 _ => relationship.object.0.def_id,
                                             };
 

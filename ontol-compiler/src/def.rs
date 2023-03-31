@@ -111,15 +111,15 @@ pub enum DefParamBinding {
 /// This definition expresses that a relation _exists_
 #[derive(Debug)]
 pub struct Relation<'m> {
-    pub ident: RelationIdent,
+    pub kind: RelationKind,
     pub subject_prop: Option<&'m str>,
     pub object_prop: Option<&'m str>,
 }
 
 impl<'m> Relation<'m> {
     pub fn named_ident(&self, defs: &'m Defs) -> Option<&'m str> {
-        match &self.ident {
-            RelationIdent::Named(def) => match defs.get_def_kind(def.def_id) {
+        match &self.kind {
+            RelationKind::Named(def) => match defs.get_def_kind(def.def_id) {
                 Some(DefKind::StringLiteral(lit)) => Some(lit),
                 _ => panic!(),
             },
@@ -137,9 +137,9 @@ impl<'m> Relation<'m> {
 }
 
 #[derive(Clone, Debug)]
-pub enum RelationIdent {
+pub enum RelationKind {
     Named(DefReference),
-    Typed(DefReference),
+    Transition(DefReference),
     Is,
     Identifies,
     Indexed,
@@ -245,7 +245,7 @@ impl<'m> Defs<'m> {
         // These are even independent from CORE being defined.
         defs.is_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Is,
+                kind: RelationKind::Is,
                 subject_prop: None,
                 object_prop: None,
             }),
@@ -254,7 +254,7 @@ impl<'m> Defs<'m> {
         );
         defs.identifies_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Identifies,
+                kind: RelationKind::Identifies,
                 subject_prop: None,
                 object_prop: None,
             }),
@@ -263,7 +263,7 @@ impl<'m> Defs<'m> {
         );
         defs.indexed_relation = defs.add_def(
             DefKind::Relation(Relation {
-                ident: RelationIdent::Indexed,
+                kind: RelationKind::Indexed,
                 subject_prop: None,
                 object_prop: None,
             }),

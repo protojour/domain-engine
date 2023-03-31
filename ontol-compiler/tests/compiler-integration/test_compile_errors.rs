@@ -5,12 +5,12 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn lex_error() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `map`, `pub`".compile_fail();
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`".compile_fail();
 }
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `map`, `pub`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
@@ -436,9 +436,20 @@ fn mix_of_index_and_edge_type() {
 fn invalid_subject_types() {
     "
     rel
-        'a' // ERROR invalid subject type. Must be a domain type, empty sequence or empty string
-        [()]
-        string
+        'a' // ERROR Subject must be a domain type
+        ['b'] string
+    "
+    .compile_fail()
+}
+
+#[test]
+fn invalid_relation_type() {
+    "
+    type foo
+    type bar
+    rel foo
+        [uuid] // ERROR invalid relation type
+        bar
     "
     .compile_fail()
 }
@@ -450,7 +461,7 @@ fn invalid_relation_chain() {
         () [()]
         () [()] [()]
         ()
-        () // ERROR parse error: found `(`, expected one of `[`, `{`, `type`, `rel`, `map`, `pub`
+        () // ERROR parse error: found `(`, expected one of `[`, `{`, `type`, `rel`, `fmt`, `map`, `pub`
         [()]
     "
     .compile_fail()
@@ -470,8 +481,8 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 #[test]
 fn complains_about_non_disambiguatable_string_id() {
     "
-    type animal_id { rel '' [string] _ }
-    type plant_id { rel '' [string] _ }
+    type animal_id { fmt '' => string => _ }
+    type plant_id { fmt '' => string => _ }
     type animal {
         rel animal_id [identifies] _
         rel _ ['class'] 'animal'
@@ -496,9 +507,9 @@ fn complains_about_ambiguous_pattern_based_unions() {
     type barbar
     type union // ERROR variants of the union have prefixes that are prefixes of other variants
 
-    rel '' ['foo'] [uuid] foo
-    rel '' ['bar'] [uuid] bar
-    rel '' ['barbar'] [uuid] barbar
+    fmt '' => 'foo' => uuid => foo
+    fmt '' => 'bar' => uuid => bar
+    fmt '' => 'barbar' => uuid => barbar
 
     rel union [is?] foo
     rel union [is?] bar
@@ -513,7 +524,7 @@ fn compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `map`, `pub`
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),

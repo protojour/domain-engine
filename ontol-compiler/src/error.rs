@@ -54,10 +54,12 @@ pub enum CompileError {
     InvalidInteger,
     #[error("expected domain type")]
     DomainTypeExpected,
+    #[error("invalid relation type")]
+    InvalidRelationType,
     #[error("duplicate anonymous relationship")]
     DuplicateAnonymousRelationship,
-    #[error("invalid subject type. Must be a domain type, empty sequence or empty string")]
-    InvalidSubjectType,
+    #[error("Subject must be a domain type")]
+    SubjectMustBeDomainType,
     #[error("invalid mix of relationship type for subject")]
     InvalidMixOfRelationshipTypeForSubject,
     #[error("cannot mix index relation identifiers and edge types")]

@@ -1,11 +1,11 @@
 pub type guitar_id {
-    rel '' ['guitar/'] [uuid] _
+    fmt '' => 'guitar/' => uuid => _
 }
 pub type synth_id {
-    rel '' ['synth/'] [uuid] _
+    fmt '' => 'synth/' => uuid => _
 }
 pub type artist_id {
-    rel '' [string] _
+    fmt '' => string => _
 }
 
 pub type guitar {

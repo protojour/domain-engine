@@ -14,7 +14,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, PropertyCardinality, RelationIdent, ValueCardinality},
+    def::{Cardinality, Def, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::Constructor,
@@ -63,8 +63,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             debug!("check union {relationship:?}");
 
-            let variant_def = match &relation.ident {
-                RelationIdent::Named(def) | RelationIdent::Typed(def) => def.def_id,
+            let variant_def = match &relation.kind {
+                RelationKind::Named(def) | RelationKind::Transition(def) => def.def_id,
                 _ => relationship.object.0.def_id,
             };
 

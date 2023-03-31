@@ -10,7 +10,7 @@ use test_log::test;
 fn constant_string_pattern() {
     "
     pub type foo
-    rel '' ['foo'] foo
+    fmt '' => 'foo' => foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -26,7 +26,7 @@ fn constant_string_pattern() {
 fn concatenated_constant_string_constructor_pattern() {
     "
     pub type foobar
-    rel '' ['foo'] ['bar'] foobar
+    fmt '' => 'foo' => 'bar' => foobar
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(&env, "foobar");
@@ -42,7 +42,7 @@ fn concatenated_constant_string_constructor_pattern() {
 fn uuid_in_string_constructor_pattern() {
     "
     pub type foo
-    rel '' ['foo/'] [uuid] foo
+    fmt '' => 'foo/' => uuid => foo
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -75,8 +75,8 @@ fn test_string_pattern_constructor_union() {
     type bar
     pub type foobar
 
-    rel '' ['foo/'] [uuid] foo
-    rel '' ['bar/'] [uuid] bar
+    fmt '' => 'foo/' => uuid => foo
+    fmt '' => 'bar/' => uuid => bar
 
     rel foobar [is?] foo
     rel foobar [is?] bar
@@ -122,7 +122,7 @@ fn test_regex_property() {
 fn test_simple_regex_pattern_constructor() {
     "
     pub type re
-    rel '' [/a/] [/bc*/] re
+    fmt '' => /a/ => /bc*/ => re
     "
     .compile_ok(|env| {
         let re = TypeBinding::new(&env, "re");

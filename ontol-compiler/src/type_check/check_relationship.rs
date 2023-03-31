@@ -3,7 +3,7 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefReference, Primitive, PropertyCardinality, Relation, RelationIdent,
+        Def, DefKind, DefReference, Primitive, PropertyCardinality, Relation, RelationKind,
         Relationship,
     },
     error::CompileError,
@@ -32,8 +32,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             other => panic!("TODO: relation not found, got {other:?}"),
         };
 
-        match &relation.ident {
-            RelationIdent::Named(def) | RelationIdent::Typed(def) => {
+        match &relation.kind {
+            RelationKind::Named(def) | RelationKind::Transition(def) => {
                 self.check_def(def.def_id);
             }
             _ => {}
@@ -77,13 +77,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def(subject.0.def_id);
         let object_ty = self.check_def(object.0.def_id);
 
+        if matches!(&relation.1.kind, RelationKind::Transition(_)) {
+            return subject_ty;
+        }
+
         match subject_ty {
             Type::EmptySequence(_) => return object_ty,
             Type::StringConstant(def_id) if *def_id == self.defs.empty_string() => {
                 return object_ty;
             }
             Type::Unit(_) | Type::StringConstant(_) => {
-                return self.error(CompileError::InvalidSubjectType, &subject.1)
+                return self.error(CompileError::SubjectMustBeDomainType, &subject.1)
             }
             _ => {}
         }
@@ -92,11 +96,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_type_mut(subject.0.def_id);
 
         match (
-            &relation.1.ident,
+            &relation.1.kind,
             &mut properties.map,
             &mut properties.constructor,
         ) {
-            (RelationIdent::Is, _, constructor) => {
+            (RelationKind::Is, _, constructor) => {
                 match (relationship.1.subject_cardinality.0, constructor) {
                     (PropertyCardinality::Mandatory, Constructor::Identity) => {
                         properties.constructor = Constructor::Value(
@@ -117,7 +121,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
             }
-            (RelationIdent::Identifies, _, _) => {
+            (RelationKind::Identifies, _, _) => {
                 if properties.identifies.is_some() {
                     return self.error(CompileError::AlreadyIdentifiesAType, span);
                 }
@@ -141,7 +145,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (RelationIdent::Indexed, None, Constructor::Identity) => {
+            (RelationKind::Indexed, None, Constructor::Identity) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -152,14 +156,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 properties.constructor = Constructor::Sequence(sequence);
             }
-            (RelationIdent::Indexed, None, Constructor::Sequence(sequence)) => {
+            (RelationKind::Indexed, None, Constructor::Sequence(sequence)) => {
                 if let Err(error) =
                     sequence.define_relationship(&relationship.1.rel_params, relationship.0)
                 {
                     return self.error(error, span);
                 }
             }
-            (RelationIdent::Named(_), None, Constructor::Identity) => {
+            (RelationKind::Named(_), None, Constructor::Identity) => {
                 properties.map = Some(
                     [(
                         PropertyId::subject(relation.0),
@@ -168,7 +172,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (RelationIdent::Named(_), Some(map), Constructor::Identity) => {
+            (RelationKind::Named(_), Some(map), Constructor::Identity) => {
                 if map
                     .insert(
                         PropertyId::subject(relation.0),
@@ -179,11 +183,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (
-                RelationIdent::Named(_) | RelationIdent::Typed(_),
-                None,
-                Constructor::StringPattern(_),
-            ) => {
+            (RelationKind::Transition(_), None, Constructor::StringPattern(_)) => {
                 debug!("should concatenate string pattern");
             }
             _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
@@ -204,80 +204,86 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def(object.0.def_id);
         let subject_ty = self.check_def(subject.0.def_id);
 
-        match subject_ty {
-            Type::StringConstant(subject_def_id) if *subject_def_id == self.defs.empty_string() => {
-                if let Err(e) = self.extend_string_pattern_constructor(
-                    relation,
-                    object.0.def_id,
-                    object_ty,
-                    StringPatternSegment::EmptyString,
-                    span,
-                ) {
-                    return e;
-                }
-            }
-            Type::Anonymous(_) => {
-                let subject_constructor = self
-                    .relations
-                    .properties_by_type(subject.0.def_id)
-                    .map(|props| &props.constructor);
-
-                match subject_constructor {
-                    Some(Constructor::StringPattern(subject_pattern)) => {
-                        if let Err(e) = self.extend_string_pattern_constructor(
-                            relation,
-                            object.0.def_id,
-                            object_ty,
-                            subject_pattern.clone(),
-                            span,
-                        ) {
-                            return e;
-                        }
-                    }
-                    _ => {
-                        return self.error(CompileError::ConstructorMismatch, span);
+        if matches!(&relation.1.kind, RelationKind::Transition(_)) {
+            match subject_ty {
+                Type::StringConstant(subject_def_id)
+                    if *subject_def_id == self.defs.empty_string() =>
+                {
+                    if let Err(e) = self.extend_string_pattern_constructor(
+                        relation,
+                        object.0.def_id,
+                        object_ty,
+                        StringPatternSegment::EmptyString,
+                        span,
+                    ) {
+                        return e;
                     }
                 }
-            }
-            _ => {
-                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
+                Type::Anonymous(_) => {
+                    let subject_constructor = self
+                        .relations
+                        .properties_by_type(subject.0.def_id)
+                        .map(|props| &props.constructor);
 
-                match (
-                    &relation.1.object_prop,
-                    object_ty,
-                    &mut object_properties.map,
-                ) {
-                    (Some(_), Type::Domain(_), None) => {
-                        object_properties.map = Some(
-                            [(
-                                PropertyId::object(relation.0),
-                                relationship.1.object_cardinality,
-                            )]
-                            .into(),
-                        );
-                    }
-                    (Some(_), Type::Domain(_), Some(map)) => {
-                        if map
-                            .insert(
-                                PropertyId::object(relation.0),
-                                relationship.1.object_cardinality,
-                            )
-                            .is_some()
-                        {
-                            return self
-                                .error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                    match subject_constructor {
+                        Some(Constructor::StringPattern(subject_pattern)) => {
+                            if let Err(e) = self.extend_string_pattern_constructor(
+                                relation,
+                                object.0.def_id,
+                                object_ty,
+                                subject_pattern.clone(),
+                                span,
+                            ) {
+                                return e;
+                            }
+                        }
+                        _ => {
+                            return self.error(CompileError::ConstructorMismatch, span);
                         }
                     }
-                    (Some(_), _, _) => {
-                        // non-domain type in object
-                        return self.error(CompileError::NonEntityInReverseRelationship, span);
+                }
+                _ => {
+                    return self.error(CompileError::ConstructorMismatch, span);
+                }
+            }
+        } else {
+            let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
+
+            match (
+                &relation.1.object_prop,
+                object_ty,
+                &mut object_properties.map,
+            ) {
+                (Some(_), Type::Domain(_), None) => {
+                    object_properties.map = Some(
+                        [(
+                            PropertyId::object(relation.0),
+                            relationship.1.object_cardinality,
+                        )]
+                        .into(),
+                    );
+                }
+                (Some(_), Type::Domain(_), Some(map)) => {
+                    if map
+                        .insert(
+                            PropertyId::object(relation.0),
+                            relationship.1.object_cardinality,
+                        )
+                        .is_some()
+                    {
+                        return self
+                            .error(CompileError::UnionInNamedRelationshipNotSupported, span);
                     }
-                    (None, _, _) => {
-                        debug!(
-                            "ignored object property with constructor {:?}",
-                            object_properties.constructor
-                        );
-                    }
+                }
+                (Some(_), _, _) => {
+                    // non-domain type in object
+                    return self.error(CompileError::NonEntityInReverseRelationship, span);
+                }
+                (None, _, _) => {
+                    debug!(
+                        "ignored object property with constructor {:?}",
+                        object_properties.constructor
+                    );
                 }
             }
         }
@@ -293,8 +299,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         origin: StringPatternSegment,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
-        let rel_def = match &relation.1.ident {
-            RelationIdent::Typed(def) | RelationIdent::Named(def) => def,
+        let rel_def = match &relation.1.kind {
+            RelationKind::Transition(def) | RelationKind::Named(def) => def,
             _ => todo!(),
         };
 

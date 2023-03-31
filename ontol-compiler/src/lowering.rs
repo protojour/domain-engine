@@ -13,7 +13,7 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, DefParamBinding, DefReference, PropertyCardinality, RelParams, Relation,
-        RelationIdent, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
+        RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
@@ -47,7 +47,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     pub fn lower_statement(&mut self, stmt: (ast::Statement, Span)) -> Result<(), ()> {
-        match self.stmt_to_def(stmt) {
+        match self.stmt_to_def(stmt, BlockContext::NoContext) {
             Ok(root_defs) => {
                 self.root_defs.extend(root_defs.into_iter());
                 Ok(())
@@ -64,7 +64,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .push_error(error.spanned(&self.src.span(&span)));
     }
 
-    fn stmt_to_def(&mut self, (stmt, span): (ast::Statement, Span)) -> Res<RootDefs> {
+    fn stmt_to_def(
+        &mut self,
+        (stmt, span): (ast::Statement, Span),
+        block_context: BlockContext,
+    ) -> Res<RootDefs> {
         match stmt {
             ast::Statement::Use(use_stmt) => {
                 let reference = PackageReference::Named(use_stmt.reference.0);
@@ -87,7 +91,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
             ast::Statement::Rel(rel_stmt) => {
-                self.ast_relationship_chain_to_def(rel_stmt, span, BlockContext::NoContext)
+                self.ast_relationship_chain_to_def(rel_stmt, span, block_context)
+            }
+            ast::Statement::Fmt(fmt_stmt) => {
+                self.fmt_transitions_to_def(fmt_stmt, span, block_context)
             }
             ast::Statement::Map(ast::MapStatement {
                 kw: _,
@@ -146,18 +153,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut root_defs: RootDefs = [def_id].into();
 
-        if let Some((rel_block, _span)) = type_stmt.ctx_block {
+        if let Some((ctx_block, _span)) = type_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
             let def = DefReference {
                 def_id,
                 pattern_bindings: Default::default(),
             };
-            let block_context = BlockContext::Context((def, span.clone()));
+            let context_fn = move || def.clone();
 
-            for (rel_stmt, rel_span) in rel_block {
-                match self.ast_relationship_chain_to_def(rel_stmt, rel_span, block_context.clone())
-                {
+            for spanned_stmt in ctx_block {
+                match self.stmt_to_def(
+                    spanned_stmt,
+                    BlockContext::Context(&context_fn, span.clone()),
+                ) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
                     }
@@ -175,7 +184,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         rel: ast::RelStatement,
         span: Span,
-        contextual_def: BlockContext<(DefReference, Span)>,
+        block_context: BlockContext,
     ) -> Res<RootDefs> {
         let ast::RelStatement {
             docs: _,
@@ -190,22 +199,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let mut root_defs = SmallVec::new();
 
         let (mut subject_def, mut subject_span, object_def, object_span) =
-            match (subject, object, contextual_def) {
+            match (subject, object, block_context) {
                 (Some(subject), Some(object), BlockContext::NoContext) => (
                     self.resolve_type_reference(subject.0, &subject.1)?,
                     subject.1,
                     self.resolve_type_reference(object.0, &object.1)?,
                     object.1,
                 ),
-                (Some(subject), None, BlockContext::Context(object)) => (
+                (Some(subject), None, BlockContext::Context(func, span)) => (
                     self.resolve_type_reference(subject.0, &subject.1)?,
                     subject.1,
-                    object.0,
-                    object.1,
+                    func(),
+                    span,
                 ),
-                (None, Some(object), BlockContext::Context(subject)) => (
-                    subject.0,
-                    subject.1,
+                (None, Some(object), BlockContext::Context(func, span)) => (
+                    func(),
+                    span,
                     self.resolve_type_reference(object.0, &object.1)?,
                     object.1,
                 ),
@@ -276,31 +285,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
             rel_params,
         } = ast_connection;
 
-        let (relation_ident, ident_span, index_range_rel_params): (
-            _,
-            _,
-            Option<Range<Option<u16>>>,
-        ) = match relation_ty {
-            ast::RelType::Type((ty, span)) => {
-                let def = self.resolve_type_reference(ty, &span)?;
+        let (kind, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
+            match relation_ty {
+                ast::RelType::Type((ty, span)) => {
+                    let def = self.resolve_type_reference(ty, &span)?;
 
-                match self.compiler.defs.get_def_kind(def.def_id) {
-                    Some(DefKind::StringLiteral(_)) => {
-                        (RelationIdent::Named(def), span.clone(), None)
+                    match self.compiler.defs.get_def_kind(def.def_id) {
+                        Some(DefKind::StringLiteral(_)) => {
+                            (RelationKind::Named(def), span.clone(), None)
+                        }
+                        Some(DefKind::Relation(relation)) => {
+                            (relation.kind.clone(), span.clone(), None)
+                        }
+                        _ => return Err((CompileError::InvalidRelationType, span)),
                     }
-                    Some(DefKind::Relation(relation)) => {
-                        (relation.ident.clone(), span.clone(), None)
-                    }
-                    _ => (RelationIdent::Typed(def), span.clone(), None),
                 }
-            }
-            ast::RelType::IntRange((range, span)) => (RelationIdent::Indexed, span, Some(range)),
-        };
+                ast::RelType::IntRange((range, span)) => (RelationKind::Indexed, span, Some(range)),
+            };
 
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(&relation_ident) {
+        let relation_id = match self.define_relation_if_undefined(&kind) {
             ImplicitRelationId::New(relation_id) => {
                 let object_prop =
                     object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
@@ -308,7 +314,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.set_def_kind(
                     relation_id.0,
                     DefKind::Relation(Relation {
-                        ident: relation_ident,
+                        kind,
                         subject_prop: None,
                         object_prop,
                     }),
@@ -363,6 +369,126 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         Ok(self.define(DefKind::Relationship(relationship), &span))
+    }
+
+    fn fmt_transitions_to_def(
+        &mut self,
+        fmt: ast::FmtStatement,
+        span: Span,
+        block_context: BlockContext,
+    ) -> Res<RootDefs> {
+        let ast::FmtStatement {
+            docs: _,
+            kw: _,
+            origin: (origin, mut origin_span),
+            transitions,
+        } = fmt;
+
+        let mut root_defs = SmallVec::new();
+        let mut origin_def = self.resolve_type_reference(origin, &origin_span)?;
+        let mut iter = transitions.into_iter().peekable();
+
+        let mut transition = match iter.next() {
+            Some(Some(next)) => next,
+            _ => todo!("ERROR: one transition is required"),
+        };
+
+        let target = loop {
+            let (next_transition, span) = match iter.next() {
+                Some(item) if iter.peek().is_none() => {
+                    // end of iterator, found the final target. Handle this outside the loop:
+                    break item;
+                }
+                Some(Some(item)) => item,
+                _ => todo!("Report error"),
+            };
+
+            // implicit, anonymous type:
+            let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+            self.set_def_kind(
+                anonymous_def_id,
+                DefKind::Type(TypeDef {
+                    public: false,
+                    ident: None,
+                    params: None,
+                }),
+                &span,
+            );
+            let next_def = DefReference {
+                def_id: anonymous_def_id,
+                pattern_bindings: Default::default(),
+            };
+
+            root_defs.push(self.ast_transition_to_def(
+                (origin_def, &origin_span),
+                transition,
+                (next_def.clone(), &span),
+                span.clone(),
+            )?);
+
+            transition = (next_transition, span.clone());
+            origin_def = next_def;
+            origin_span = span;
+        };
+
+        let (end_def, end_span) = match (target, block_context) {
+            (Some(end), BlockContext::NoContext) => {
+                (self.resolve_type_reference(end.0, &end.1)?, end.1)
+            }
+            (None, BlockContext::Context(func, span)) => (func(), span),
+            _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
+        };
+
+        root_defs.push(self.ast_transition_to_def(
+            (origin_def, &origin_span),
+            transition,
+            (end_def, &end_span),
+            span,
+        )?);
+
+        Ok(root_defs)
+    }
+
+    fn ast_transition_to_def(
+        &mut self,
+        from: (DefReference, &Span),
+        transition: (ast::Type, Span),
+        to: (DefReference, &Span),
+        span: Span,
+    ) -> Res<DefId> {
+        let transition_def = self.resolve_type_reference(transition.0, &transition.1)?;
+        let kind = RelationKind::Transition(transition_def);
+
+        // This syntax just defines the relation the first time it's used
+        let relation_id = match self.define_relation_if_undefined(&kind) {
+            ImplicitRelationId::New(relation_id) => {
+                self.set_def_kind(
+                    relation_id.0,
+                    DefKind::Relation(Relation {
+                        kind,
+                        subject_prop: None,
+                        object_prop: None,
+                    }),
+                    &transition.1,
+                );
+                relation_id
+            }
+            ImplicitRelationId::Reused(relation_id) => relation_id,
+        };
+
+        debug!("define transition relation {relation_id:?}");
+
+        Ok(self.define(
+            DefKind::Relationship(Relationship {
+                relation_id,
+                subject: (from.0, self.src.span(from.1)),
+                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                object: (to.0, self.src.span(to.1)),
+                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                rel_params: RelParams::Unit,
+            }),
+            &span,
+        ))
     }
 
     fn resolve_type_reference(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefReference> {
@@ -624,9 +750,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, kind: &RelationIdent) -> ImplicitRelationId {
+    fn define_relation_if_undefined(&mut self, kind: &RelationKind) -> ImplicitRelationId {
         match kind {
-            RelationIdent::Named(def) | RelationIdent::Typed(def) => {
+            RelationKind::Named(def) | RelationKind::Transition(def) => {
                 match self.compiler.relations.relations.entry(def.def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(*vacant.insert(RelationId(
                         self.compiler.defs.alloc_def_id(self.src.package_id),
@@ -634,13 +760,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationIdent::Is => {
+            RelationKind::Is => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.is_relation()))
             }
-            RelationIdent::Identifies => {
+            RelationKind::Identifies => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.identifies_relation()))
             }
-            RelationIdent::Indexed => {
+            RelationKind::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
             }
         }
@@ -687,9 +813,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 }
 
 #[derive(Clone)]
-enum BlockContext<T> {
+enum BlockContext<'a> {
     NoContext,
-    Context(T),
+    Context(&'a dyn Fn() -> DefReference, Span),
 }
 
 enum ImplicitRelationId {

@@ -4,7 +4,8 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement, Visibility,
+    FmtStatement, Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement,
+    Visibility,
 };
 
 use super::{
@@ -39,11 +40,14 @@ fn header_statement() -> impl AstParser<Spanned<Statement>> {
 }
 
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
-    let type_stmt = spanned(type_statement()).map(span_map(Statement::Type));
-    let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
-    let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
+    recursive(|stmt_parser| {
+        let type_stmt = spanned(type_statement(stmt_parser)).map(span_map(Statement::Type));
+        let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
+        let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
+        let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
 
-    type_stmt.or(rel_stmt).or(map_stmt)
+        type_stmt.or(rel_stmt).or(fmt_stmt).or(map_stmt)
+    })
 }
 
 fn use_statement() -> impl AstParser<UseStatement> {
@@ -58,7 +62,9 @@ fn use_statement() -> impl AstParser<UseStatement> {
         })
 }
 
-fn type_statement() -> impl AstParser<TypeStatement> {
+fn type_statement(
+    stmt_parser: impl AstParser<Spanned<Statement>>,
+) -> impl AstParser<TypeStatement> {
     fn generic_params() -> impl AstParser<Vec<Spanned<TypeParam>>> {
         just(Token::Sigil('<'))
             .ignore_then(spanned(generic_param()).separated_by(just(Token::Sigil(','))))
@@ -76,14 +82,7 @@ fn type_statement() -> impl AstParser<TypeStatement> {
         .then(keyword(Token::Type))
         .then(spanned(ident()))
         .then(spanned(generic_params()).or_not())
-        .then(
-            spanned(
-                spanned(rel_statement())
-                    .repeated()
-                    .delimited_by(open('{'), close('}')),
-            )
-            .or_not(),
-        )
+        .then(spanned(stmt_parser.repeated().delimited_by(open('{'), close('}'))).or_not())
         .map(
             |(((((docs, public), kw), ident), params), ctx_block)| TypeStatement {
                 docs,
@@ -186,6 +185,25 @@ fn cardinality() -> impl AstParser<Option<Cardinality>> {
             (false, false) => None,
         }
     })
+}
+
+fn fmt_statement() -> impl AstParser<FmtStatement> {
+    doc_comments()
+        .then(keyword(Token::Fmt))
+        // origin
+        .then(spanned(ty()))
+        // transitions
+        .then(
+            just(Token::FatArrow)
+                .ignore_then(spanned_ty_or_underscore())
+                .repeated(),
+        )
+        .map(|(((docs, kw), origin), transitions)| FmtStatement {
+            docs,
+            kw,
+            origin,
+            transitions,
+        })
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {
@@ -505,6 +523,14 @@ mod tests {
         assert_matches!(stmts.as_slice(), [Statement::Type(_), Statement::Type(_)]);
 
         assert_eq!(1, stmts[0].docs().len());
+    }
+
+    #[test]
+    fn parse_fmt() {
+        let source = "fmt '' => '' => ''";
+
+        let stmts = parse(source).unwrap();
+        assert_matches!(stmts.as_slice(), [Statement::Fmt(_)]);
     }
 
     #[test]

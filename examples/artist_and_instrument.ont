@@ -1,8 +1,8 @@
 pub type artist-id {
-    rel '' ['artist/'] [uuid] _
+    fmt '' => 'artist/' => uuid => _
 }
 pub type instrument-id {
-    rel '' ['instrument/'] [uuid] _
+    fmt '' => 'instrument/' => uuid => _
 }
 
 pub type artist

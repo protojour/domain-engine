@@ -165,7 +165,7 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    pub type node_id { rel '' [string] _ }
+    pub type node_id { fmt '' => string => _ }
     pub type node {
         rel node_id [identifies] _
         rel _ ['name'] string
@@ -214,7 +214,7 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    pub type node_id { rel '' [string] _ }
+    pub type node_id { fmt '' => string => _ }
     pub type node {
         rel node_id [identifies] _
         rel _ ['children'* | 'parent'] node
@@ -307,8 +307,8 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub type lang_id { rel '' [string] _ }
-    pub type prog_id { rel '' [string] _ }
+    pub type lang_id { fmt '' => string => _ }
+    pub type prog_id { fmt '' => string => _ }
     pub type language { rel lang_id [identifies] _ }
     pub type programmer {
         rel prog_id [identifies] _
@@ -328,9 +328,9 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    pub type animal_id { rel '' ['animal/'] [string] _ }
-    pub type plant_id { rel '' ['plant/'] [string] _ }
-    pub type owner_id { rel '' [string] _ }
+    pub type animal_id { fmt '' => 'animal/' => string => _ }
+    pub type plant_id { fmt '' => 'plant/' => string => _ }
+    pub type owner_id { fmt '' => string => _ }
 
     pub type lifeform // ERROR entity variants of the union are not uniquely identifiable
     pub type animal {

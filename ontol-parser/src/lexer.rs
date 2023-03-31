@@ -14,8 +14,10 @@ pub enum Token {
     Use,
     Type,
     Rel,
+    Fmt,
     Map,
     Pub,
+    FatArrow,
     Number(String),
     StringLiteral(String),
     Regex(String),
@@ -30,8 +32,10 @@ impl Display for Token {
             Self::Use => write!(f, "`use`"),
             Self::Type => write!(f, "`type`"),
             Self::Rel => write!(f, "`rel`"),
+            Self::Fmt => write!(f, "`fmt`"),
             Self::Map => write!(f, "`map`"),
             Self::Pub => write!(f, "`pub`"),
+            Self::FatArrow => write!(f, "`=>`"),
             Self::Number(_) => write!(f, "`number`"),
             Self::StringLiteral(_) => write!(f, "`string`"),
             Self::Regex(_) => write!(f, "`regex`"),
@@ -47,6 +51,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "use" => Token::Use,
         "type" => Token::Type,
         "rel" => Token::Rel,
+        "fmt" => Token::Fmt,
         "map" => Token::Map,
         "pub" => Token::Pub,
         _ => Token::Sym(ident),
@@ -58,6 +63,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .padded();
 
     doc_comment()
+        .or(just("=>").map(|_| Token::FatArrow))
         .or(one_of(".,:?_+-*|=<>").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))

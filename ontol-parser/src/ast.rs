@@ -9,6 +9,7 @@ pub enum Statement {
     Use(UseStatement),
     Type(TypeStatement),
     Rel(RelStatement),
+    Fmt(FmtStatement),
     Map(MapStatement),
 }
 
@@ -19,6 +20,7 @@ impl Statement {
             Self::Use(_) => &[],
             Self::Type(ty) => &ty.docs,
             Self::Rel(rel) => &rel.docs,
+            Self::Fmt(rel) => &rel.docs,
             Self::Map(_) => &[],
         }
     }
@@ -38,7 +40,7 @@ pub struct TypeStatement {
     pub kw: Span,
     pub ident: Spanned<String>,
     pub params: Option<Spanned<Vec<Spanned<TypeParam>>>>,
-    pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -50,6 +52,14 @@ pub struct RelStatement {
     pub chain: Vec<ChainedSubjectConnection>,
     pub object: Option<Spanned<Type>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct FmtStatement {
+    pub docs: Vec<String>,
+    pub kw: Span,
+    pub origin: Spanned<Type>,
+    pub transitions: Vec<Option<Spanned<Type>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

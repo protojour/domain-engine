@@ -1,7 +1,7 @@
 use 'geojson' as geojson
 
 pub type municipality_id {
-    rel '' [string] _
+    fmt '' => string => _
 }
 
 pub type municipality {

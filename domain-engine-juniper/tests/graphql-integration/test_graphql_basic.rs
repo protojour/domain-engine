@@ -25,7 +25,7 @@ fn test_graphql_empty_schema() {
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
     let (env, schema) = "
-    pub type foo_id { rel '' [string] _ }
+    pub type foo_id { fmt '' => string => _ }
     pub type foo {
         rel foo_id [identifies] _
         rel _ ['prop'] int
