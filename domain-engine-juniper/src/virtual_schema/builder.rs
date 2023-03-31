@@ -216,7 +216,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_node_type(&mut self, type_info: &TypeInfo) -> NewType {
         let operator_id = type_info
             .operator_id
-            .unwrap_or_else(|| panic!("No selection operator id for `{}`", type_info.name));
+            .unwrap_or_else(|| panic!("No selection operator id for `{:?}`", type_info.name));
 
         self.make_node_type_inner(type_info, operator_id)
     }
@@ -226,7 +226,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         type_info: &TypeInfo,
         operator_id: SerdeOperatorId,
     ) -> NewType {
-        let typename = type_info.name.as_str();
+        let typename = type_info.name.as_ref();
 
         match self.env.get_serde_operator(operator_id) {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
@@ -271,7 +271,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         }
 
                         debug!(
-                            "created a union for `{typename}`: {operator_id:?} variants={variants:?}",
+                            "created a union for `{typename:?}`: {operator_id:?} variants={variants:?}",
                         );
 
                         NewType::Indexed(

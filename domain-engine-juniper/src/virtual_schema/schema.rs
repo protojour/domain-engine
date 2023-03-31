@@ -76,7 +76,10 @@ impl VirtualSchema {
             }
 
             if let Some(operator_id) = type_info.operator_id {
-                debug!("adapt type `{name}` {operator_id:?}", name = type_info.name,);
+                debug!(
+                    "adapt type `{name:?}` {operator_id:?}",
+                    name = type_info.name
+                );
 
                 let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
 

@@ -111,9 +111,10 @@ impl Domain {
 
     pub fn add_type(&mut self, type_info: TypeInfo) {
         let def_id = type_info.def_id;
-        let type_name = type_info.name.clone();
+        if let Some(type_name) = type_info.name.as_ref() {
+            self.type_names.insert(type_name.clone(), def_id);
+        }
         self.register_type_info(type_info);
-        self.type_names.insert(type_name, def_id);
     }
 
     fn register_type_info(&mut self, type_info: TypeInfo) {
@@ -124,7 +125,7 @@ impl Domain {
             self.info.push(TypeInfo {
                 def_id: DefId(type_info.def_id.0, self.info.len() as u16),
                 public: false,
-                name: "".into(),
+                name: None,
                 entity_info: None,
                 operator_id: None,
             });
@@ -140,7 +141,7 @@ pub struct TypeInfo {
 
     pub public: bool,
 
-    pub name: String,
+    pub name: Option<String>,
 
     /// Some if this type is an entity
     pub entity_info: Option<EntityInfo>,

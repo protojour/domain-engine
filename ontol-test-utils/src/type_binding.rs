@@ -38,7 +38,7 @@ impl<'e> TypeBinding<'e> {
         let type_info = domain.type_info(*def_id).clone();
 
         if !type_info.public {
-            panic!("`{}` is not public!", type_info.name);
+            panic!("`{:?}` is not public!", type_info.name);
         }
 
         debug!(

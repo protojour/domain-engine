@@ -202,7 +202,7 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public,
-                    name: type_name,
+                    name: Some(type_name),
                     entity_info,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, DataModifier::default()),
@@ -214,7 +214,7 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: false,
-                    name: "".into(),
+                    name: None,
                     entity_info: None,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, DataModifier::default()),

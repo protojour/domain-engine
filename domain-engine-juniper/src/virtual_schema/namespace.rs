@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use convert_case::{Case, Casing};
 use ontol_runtime::{
     env::{Env, TypeInfo},
-    DefId, PackageId,
+    smart_format, DefId, PackageId,
 };
 use smartstring::alias::String;
 
@@ -152,7 +152,15 @@ impl<'a> ProcessName for Typename<'a> {
     }
 
     fn process<'n>(&self, namespace: &'n mut Namespace) -> &'n str {
-        namespace.rewrite(&self.0.name)
+        let type_info = self.0;
+        match &type_info.name {
+            Some(name) => namespace.rewrite(name),
+            None => namespace.rewrite(&smart_format!(
+                "__anon{}_{}",
+                type_info.def_id.0 .0,
+                type_info.def_id.1
+            )),
+        }
     }
 }
 
