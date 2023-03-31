@@ -348,7 +348,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut transition = match iter.next() {
             Some(Some(next)) => next,
-            _ => todo!("ERROR: one transition is required"),
+            Some(None) => return Err((CompileError::FmtMisplacedWildcard, span)),
+            None => return Err((CompileError::FmtTooFewTransitions, span)),
         };
 
         let target = loop {
@@ -358,7 +359,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     break item;
                 }
                 Some(Some(item)) => item,
-                _ => todo!("Report error"),
+                Some(None) => return Err((CompileError::FmtMisplacedWildcard, span)),
+                _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
             // implicit, anonymous type:

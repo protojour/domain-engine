@@ -58,8 +58,12 @@ pub enum CompileError {
     InvalidRelationType,
     #[error("duplicate anonymous relationship")]
     DuplicateAnonymousRelationship,
-    #[error("Subject must be a domain type")]
+    #[error("subject must be a domain type")]
     SubjectMustBeDomainType,
+    #[error("fmt needs at least two transitions: `fmt a => b => c`")]
+    FmtTooFewTransitions,
+    #[error("fmt only supports `_` at the final target position")]
+    FmtMisplacedWildcard,
     #[error("invalid mix of relationship type for subject")]
     InvalidMixOfRelationshipTypeForSubject,
     #[error("cannot mix index relation identifiers and edge types")]

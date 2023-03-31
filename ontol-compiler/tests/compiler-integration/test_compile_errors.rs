@@ -436,7 +436,7 @@ fn mix_of_index_and_edge_type() {
 fn invalid_subject_types() {
     "
     rel
-        'a' // ERROR Subject must be a domain type
+        'a' // ERROR subject must be a domain type
         ['b'] string
     "
     .compile_fail()
@@ -455,9 +455,19 @@ fn invalid_relation_type() {
 }
 
 #[test]
-fn invalid_fmt_chain() {
+fn invalid_fmt_syntax() {
     "
     fmt () => () () // ERROR parse error: found `(`, expected one of `type`, `rel`, `fmt`, `map`, `pub`, `=>`
+    "
+    .compile_fail()
+}
+
+#[test]
+fn invalid_fmt_semantics() {
+    "
+    fmt () // ERROR fmt needs at least two transitions: `fmt a => b => c`
+    fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
+    fmt () => _ => 'bar' // ERROR fmt only supports `_` at the final target position
     "
     .compile_fail()
 }
