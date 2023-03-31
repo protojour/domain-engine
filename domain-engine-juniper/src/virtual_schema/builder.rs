@@ -2,7 +2,10 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     serde::{
-        operator::{FilteredVariants, MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty},
+        operator::{
+            FilteredVariants, MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty,
+            ValueOperator,
+        },
         processor::{ProcessorLevel, ProcessorMode},
     },
     smart_format, DefId,
@@ -119,43 +122,51 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 .into();
 
                 if let Some(rel_params) = rel_params {
-                    match self.env.get_serde_operator(rel_params) {
+                    let rel_def_id = match self.env.get_serde_operator(rel_params) {
                         SerdeOperator::Map(map_op) => {
-                            let rel_edge_ref =
-                                self.get_def_type_ref(map_op.def_variant.def_id, QueryLevel::Node);
-
-                            let rel_type_info = self.env.get_type_info(map_op.def_variant.def_id);
-
-                            // Register edge fields
-                            self.register_fields(
+                            self.register_map_op_fields(
                                 map_op,
                                 &mut fields,
                                 &FieldKind::EdgeProperty,
                                 &mut field_namespace,
                             );
 
-                            NewType::Indexed(
-                                edge_index,
-                                TypeData {
-                                    typename: self.namespace.edge(Some(rel_type_info), type_info),
-                                    input_typename: Some(
-                                        self.namespace.edge_input(Some(rel_type_info), type_info),
-                                    ),
-                                    partial_input_typename: None,
-                                    kind: TypeKind::Object(ObjectData {
-                                        fields,
-                                        kind: ObjectKind::Edge(EdgeData {
-                                            node_operator_id: type_info.operator_id.unwrap(),
-                                            rel_edge_ref: Some(rel_edge_ref),
-                                        }),
-                                    }),
-                                },
-                            )
+                            map_op.def_variant.def_id
+                        }
+                        SerdeOperator::ValueType(value_op) => {
+                            self.register_value_op_fields(
+                                value_op,
+                                &mut fields,
+                                &FieldKind::EdgeProperty,
+                                &mut field_namespace,
+                            );
+                            value_op.def_variant.def_id
                         }
                         other => {
                             panic!("Tried to register edge rel_params for {other:?}");
                         }
-                    }
+                    };
+
+                    let rel_edge_ref = self.get_def_type_ref(rel_def_id, QueryLevel::Node);
+                    let rel_type_info = self.env.get_type_info(rel_def_id);
+
+                    NewType::Indexed(
+                        edge_index,
+                        TypeData {
+                            typename: self.namespace.edge(Some(rel_type_info), type_info),
+                            input_typename: Some(
+                                self.namespace.edge_input(Some(rel_type_info), type_info),
+                            ),
+                            partial_input_typename: None,
+                            kind: TypeKind::Object(ObjectData {
+                                fields,
+                                kind: ObjectKind::Edge(EdgeData {
+                                    node_operator_id: type_info.operator_id.unwrap(),
+                                    rel_edge_ref: Some(rel_edge_ref),
+                                }),
+                            }),
+                        },
+                    )
                 } else {
                     NewType::Indexed(
                         edge_index,
@@ -230,7 +241,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     }),
                 },
             ),
-            SerdeOperator::ValueType(_) => todo!("value type"),
             SerdeOperator::Union(union_op) => {
                 match union_op.variants(ProcessorMode::Select, ProcessorLevel::Root) {
                     FilteredVariants::Single(operator_id) => {
@@ -281,7 +291,30 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     }
                 }
             }
-            SerdeOperator::Map(map_op) => self.make_map_type(type_info, map_op),
+            SerdeOperator::ValueType(value_op) => {
+                let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
+                NewType::Indexed(
+                    type_index,
+                    TypeData {
+                        typename: self.namespace.typename(type_info),
+                        input_typename: Some(self.namespace.input(type_info)),
+                        partial_input_typename: Some(self.namespace.partial_input(type_info)),
+                        kind: self.make_value_op_type_kind(type_info, value_op),
+                    },
+                )
+            }
+            SerdeOperator::Map(map_op) => {
+                let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
+                NewType::Indexed(
+                    type_index,
+                    TypeData {
+                        typename: self.namespace.typename(type_info),
+                        input_typename: Some(self.namespace.input(type_info)),
+                        partial_input_typename: Some(self.namespace.partial_input(type_info)),
+                        kind: self.make_map_op_type_kind(type_info, map_op),
+                    },
+                )
+            }
             operator => NewType::NativeScalar(self.make_new_native_scalar(operator_id, operator)),
         }
     }
@@ -310,10 +343,22 @@ impl<'a> VirtualSchemaBuilder<'a> {
         NativeScalarRef { operator_id, kind }
     }
 
-    fn make_map_type(&mut self, type_info: &TypeInfo, map_type: &MapOperator) -> NewType {
-        let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
-        let operator_id = type_info.operator_id.unwrap();
+    fn make_value_op_type_kind(
+        &mut self,
+        type_info: &TypeInfo,
+        value_op: &ValueOperator,
+    ) -> TypeKind {
+        match self.env.get_serde_operator(value_op.inner_operator_id) {
+            SerdeOperator::ValueType(inner_value_op) => {
+                self.make_value_op_type_kind(type_info, inner_value_op)
+            }
+            SerdeOperator::Map(map_op) => self.make_map_op_type_kind(type_info, map_op),
+            other => panic!("Unsupported: {other:?}"),
+        }
+    }
 
+    fn make_map_op_type_kind(&mut self, type_info: &TypeInfo, map_op: &MapOperator) -> TypeKind {
+        let operator_id = type_info.operator_id.unwrap();
         let mut fields = IndexMap::default();
 
         if let Some(entity_info) = &type_info.entity_info {
@@ -332,35 +377,53 @@ impl<'a> VirtualSchemaBuilder<'a> {
             );
         }
 
-        self.register_fields(
-            map_type,
+        self.register_map_op_fields(
+            map_op,
             &mut fields,
             &FieldKind::Property,
             &mut Namespace::new(),
         );
 
-        NewType::Indexed(
-            type_index,
-            TypeData {
-                typename: self.namespace.typename(type_info),
-                input_typename: Some(self.namespace.input(type_info)),
-                partial_input_typename: Some(self.namespace.partial_input(type_info)),
-                kind: TypeKind::Object(ObjectData {
-                    fields,
-                    kind: ObjectKind::Node(NodeData {
-                        def_id: type_info.def_id,
-                        entity_id: type_info
-                            .entity_info
-                            .as_ref()
-                            .map(|entity_info| entity_info.id_value_def_id),
-                        operator_id,
-                    }),
-                }),
-            },
-        )
+        TypeKind::Object(ObjectData {
+            fields,
+            kind: ObjectKind::Node(NodeData {
+                def_id: type_info.def_id,
+                entity_id: type_info
+                    .entity_info
+                    .as_ref()
+                    .map(|entity_info| entity_info.id_value_def_id),
+                operator_id,
+            }),
+        })
     }
 
-    fn register_fields(
+    fn register_value_op_fields(
+        &mut self,
+        value_op: &ValueOperator,
+        fields: &mut IndexMap<String, FieldData>,
+        make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
+        field_namespace: &mut Namespace,
+    ) {
+        match self.env.get_serde_operator(value_op.inner_operator_id) {
+            SerdeOperator::Map(map_op) => {
+                self.register_map_op_fields(
+                    map_op,
+                    fields,
+                    make_property_field_kind,
+                    field_namespace,
+                );
+            }
+            SerdeOperator::ValueType(inner) => self.register_value_op_fields(
+                inner,
+                fields,
+                make_property_field_kind,
+                field_namespace,
+            ),
+            other => panic!("other operator: {other:?}"),
+        }
+    }
+
+    fn register_map_op_fields(
         &mut self,
         map_op: &MapOperator,
         fields: &mut IndexMap<String, FieldData>,

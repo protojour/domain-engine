@@ -219,13 +219,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn create_item_operator(&mut self, def_variant: DefVariant) -> Option<OperatorAllocation> {
         match self.get_def_type(def_variant.def_id) {
-            Some(Type::Domain(def_id)) => {
+            Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
                 let properties = self.relations.properties_by_type.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(TypeDef {
                         ident: Some(ident), ..
                     })) => ident,
-                    Some(DefKind::Type(TypeDef { ident: None, .. })) => "anonymous",
+                    Some(DefKind::Type(TypeDef { ident: None, .. })) => "<anonymous>",
                     _ => "Unknown type",
                 };
                 self.create_domain_type_serde_operator(

@@ -117,6 +117,9 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     }
                 }
             }
+            SerdeOperator::ValueType(value_op) => {
+                self.collect_operator_arguments(value_op.inner_operator_id, output, typing_purpose);
+            }
             SerdeOperator::Id(id_operator_id) => output.push(self.get_operator_argument(
                 "_id",
                 *id_operator_id,

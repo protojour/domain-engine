@@ -20,4 +20,6 @@ pub type instrument {
 pub type plays
 rel plays ['how_much'] string
 
-rel artist ['plays'* | 'played_by'*: plays] instrument
+rel artist ['plays'* | 'played_by'*] instrument {
+    rel _ [is] plays
+}

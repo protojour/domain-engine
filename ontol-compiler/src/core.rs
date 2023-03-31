@@ -114,7 +114,7 @@ impl<'m> Compiler<'m> {
     ) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
         self.namespaces
-            .get_mut(CORE_PKG, Space::Type)
+            .get_namespace_mut(CORE_PKG, Space::Type)
             .insert(ident.into(), def_id);
         self.def_types.map.insert(def_id, ty);
         ty

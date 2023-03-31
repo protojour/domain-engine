@@ -166,7 +166,8 @@ impl<'m> Compiler<'m> {
         for package_id in package_ids {
             let mut domain = Domain::default();
 
-            let type_namespace = namespaces.remove(&package_id).unwrap().types;
+            let namespace = namespaces.remove(&package_id).unwrap();
+            let type_namespace = namespace.types;
 
             for (type_name, type_def_id) in type_namespace {
                 let entity_info =
@@ -203,6 +204,18 @@ impl<'m> Compiler<'m> {
                     public,
                     name: type_name,
                     entity_info,
+                    operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
+                        DefVariant::new(type_def_id, DataModifier::default()),
+                    )),
+                });
+            }
+
+            for type_def_id in namespace.anonymous {
+                domain.add_type(TypeInfo {
+                    def_id: type_def_id,
+                    public: false,
+                    name: "".into(),
+                    entity_info: None,
                     operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(type_def_id, DataModifier::default()),
                     )),

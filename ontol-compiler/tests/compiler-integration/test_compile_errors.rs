@@ -370,8 +370,8 @@ fn test_serde_object_property_not_sugared() {
     "
     type foo
     type bar
-    rel foo ['a' | 'aa'*: ()] bar // ERROR only entities may have named reverse relationship
-    rel foo ['b' | 'bb'*: ()] string // ERROR only entities may have named reverse relationship
+    rel foo ['a' | 'aa'*] bar {} // ERROR only entities may have named reverse relationship
+    rel foo ['b' | 'bb'*] string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -427,7 +427,9 @@ fn mix_of_index_and_edge_type() {
     type foo
     type bar
 
-    rel foo [0: bar] string // ERROR cannot mix index relation identifiers and edge types
+    rel foo [0] string { // ERROR cannot mix index relation identifiers and edge types
+        rel _ [is] bar
+    }
     "#
     .compile_fail()
 }

@@ -19,6 +19,7 @@ pub enum Space {
 pub struct Namespace {
     pub(crate) types: IndexMap<String, DefId>,
     pub(crate) relations: IndexMap<String, DefId>,
+    pub(crate) anonymous: Vec<DefId>,
 }
 
 impl Namespace {
@@ -56,7 +57,19 @@ impl Namespaces {
         None
     }
 
-    pub fn get_mut(&mut self, package: PackageId, space: Space) -> &mut IndexMap<String, DefId> {
+    pub fn get_namespace_mut(
+        &mut self,
+        package: PackageId,
+        space: Space,
+    ) -> &mut IndexMap<String, DefId> {
         self.namespaces.entry(package).or_default().space_mut(space)
+    }
+
+    pub fn add_anonymous(&mut self, package: PackageId, def_id: DefId) {
+        self.namespaces
+            .entry(package)
+            .or_default()
+            .anonymous
+            .push(def_id);
     }
 }

@@ -4,7 +4,7 @@ use std::{
 };
 
 use fnv::FnvHashMap;
-use ontol_parser::{ast, Span};
+use ontol_parser::{ast, Span, Spanned};
 use ontol_runtime::{DefId, DefParamId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -83,7 +83,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let type_namespace = self
                     .compiler
                     .namespaces
-                    .get_mut(self_package_def_id, Space::Type);
+                    .get_namespace_mut(self_package_def_id, Space::Type);
 
                 type_namespace.insert(use_stmt.as_ident.0, *used_package_def_id);
 
@@ -192,7 +192,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             subject,
             connection,
             object,
-            ctx_block: _,
+            ctx_block,
         } = rel;
 
         let (subject_def, subject_span, object_def, object_span) =
@@ -218,14 +218,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
             };
 
-        let def = self.def_relationship(
+        self.def_relationship(
             (subject_def, &subject_span),
             connection,
             (object_def, &object_span),
             span,
-        )?;
-
-        Ok([def].into())
+            ctx_block,
+        )
     }
 
     fn def_relationship(
@@ -234,13 +233,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ast_connection: ast::RelConnection,
         object: (DefReference, &Span),
         span: Span,
-    ) -> Res<DefId> {
+        ctx_block: Option<Spanned<Vec<Spanned<ast::RelStatement>>>>,
+    ) -> Res<RootDefs> {
+        let mut root_defs = RootDefs::new();
         let ast::RelConnection {
             ty: relation_ty,
             subject_cardinality,
             object_prop_ident,
             object_cardinality,
-            rel_params,
         } = ast_connection;
 
         let (kind, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
@@ -284,7 +284,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
-            if let Some((_, span)) = rel_params {
+            if let Some((_, span)) = ctx_block {
                 return Err((
                     CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
                     span,
@@ -292,13 +292,33 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
 
             RelParams::IndexRange(index_range_rel_params)
-        } else {
-            match rel_params {
-                Some(rel_params) => {
-                    RelParams::Type(self.resolve_type_reference(rel_params.0, &rel_params.1)?)
+        } else if let Some((ast_rels, block_span)) = ctx_block {
+            let rel_def = self.define_anonymous_type(&span);
+            let context_fn = || rel_def.clone();
+
+            // This type needs to be part of the anonymous part of the namespace
+            self.compiler
+                .namespaces
+                .add_anonymous(self.src.package_id, rel_def.def_id);
+
+            for (rel, span) in ast_rels {
+                match self.ast_relationship_to_def(
+                    rel,
+                    span,
+                    BlockContext::Context(&context_fn, block_span.clone()),
+                ) {
+                    Ok(mut defs) => {
+                        root_defs.append(&mut defs);
+                    }
+                    Err(error) => {
+                        self.report_error(error);
+                    }
                 }
-                None => RelParams::Unit,
             }
+
+            RelParams::Type(rel_def)
+        } else {
+            RelParams::Unit
         };
 
         debug!("define relation {relation_id:?}");
@@ -326,7 +346,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             rel_params,
         };
 
-        Ok(self.define(DefKind::Relationship(relationship), &span))
+        root_defs.push(self.define(DefKind::Relationship(relationship), &span));
+
+        Ok(root_defs)
     }
 
     fn fmt_transitions_to_def(
@@ -363,31 +385,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            // implicit, anonymous type:
-            let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-            self.set_def_kind(
-                anonymous_def_id,
-                DefKind::Type(TypeDef {
-                    public: false,
-                    ident: None,
-                    params: None,
-                }),
-                &span,
-            );
-            let next_def = DefReference {
-                def_id: anonymous_def_id,
-                pattern_bindings: Default::default(),
-            };
+            let target_def = self.define_anonymous_type(&span);
 
             root_defs.push(self.ast_transition_to_def(
                 (origin_def, &origin_span),
                 transition,
-                (next_def.clone(), &span),
+                (target_def.clone(), &span),
                 span.clone(),
             )?);
 
             transition = (next_transition, span.clone());
-            origin_def = next_def;
+            origin_def = target_def;
             origin_span = span;
         };
 
@@ -710,6 +718,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
+    fn define_anonymous_type(&mut self, span: &Span) -> DefReference {
+        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+        self.set_def_kind(
+            anonymous_def_id,
+            DefKind::Type(TypeDef {
+                public: false,
+                ident: None,
+                params: None,
+            }),
+            span,
+        );
+        DefReference {
+            def_id: anonymous_def_id,
+            pattern_bindings: Default::default(),
+        }
+    }
+
     fn define_relation_if_undefined(&mut self, kind: &RelationKind) -> ImplicitRelationId {
         match kind {
             RelationKind::Named(def) | RelationKind::Transition(def) => {
@@ -737,7 +762,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match self
             .compiler
             .namespaces
-            .get_mut(self.src.package_id, space)
+            .get_namespace_mut(self.src.package_id, space)
             .insert(ident.clone(), def_id)
         {
             Some(old_def_id) => Err(old_def_id),

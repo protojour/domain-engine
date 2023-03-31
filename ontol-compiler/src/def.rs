@@ -444,7 +444,7 @@ impl<'m> Compiler<'m> {
     ) -> DefId {
         let def_id = self.defs.alloc_def_id(package);
         self.namespaces
-            .get_mut(package, space)
+            .get_namespace_mut(package, space)
             .insert(name.into(), def_id);
         self.defs.map.insert(
             def_id,
@@ -474,7 +474,7 @@ impl<'m> Compiler<'m> {
         self.def_types.map.insert(def_id, ty);
 
         // make sure the namespace exists
-        self.namespaces.get_mut(package_id, Space::Type);
+        self.namespaces.get_namespace_mut(package_id, Space::Type);
 
         def_id
     }

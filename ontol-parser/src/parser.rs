@@ -141,11 +141,9 @@ fn rel_connection() -> impl AstParser<RelConnection> {
                 .then(cardinality())
                 .or_not(),
         )
-        // rel params
-        .then(spanned(sigil(':').ignore_then(ty())).or_not())
         // within {}
         .delimited_by(open('['), close(']'))
-        .map(|(((ty, subject_cardinality), object), rel_params)| {
+        .map(|((ty, subject_cardinality), object)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
                 None => (None, None),
@@ -156,7 +154,6 @@ fn rel_connection() -> impl AstParser<RelConnection> {
                 subject_cardinality,
                 object_prop_ident,
                 object_cardinality,
-                rel_params,
             }
         })
 }
