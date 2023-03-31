@@ -5,12 +5,13 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn lex_error() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`".compile_fail();
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`"
+        .compile_fail();
 }
 
 #[test]
 fn invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
@@ -459,7 +460,7 @@ fn invalid_relation_type() {
 #[test]
 fn invalid_fmt_syntax() {
     "
-    fmt () => () () // ERROR parse error: found `(`, expected one of `type`, `rel`, `fmt`, `map`, `pub`, `=>`
+    fmt () => () () // ERROR parse error: found `(`, expected one of `type`, `with`, `rel`, `fmt`, `map`, `pub`, `=>`
     "
     .compile_fail()
 }
@@ -531,7 +532,7 @@ fn compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `rel`, `fmt`, `map`, `pub`
+            ! // ERROR parse error: found `!`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),

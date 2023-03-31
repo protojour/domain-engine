@@ -90,6 +90,27 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(Default::default())
             }
             ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
+            ast::Statement::With(with_stmt) => {
+                let mut root_defs = RootDefs::new();
+                let def = self.resolve_type_reference(with_stmt.ty.0, &with_stmt.ty.1)?;
+                let context_fn = move || def.clone();
+
+                for spanned_stmt in with_stmt.statements.0 {
+                    match self.stmt_to_def(
+                        spanned_stmt,
+                        BlockContext::Context(&context_fn, span.clone()),
+                    ) {
+                        Ok(mut defs) => {
+                            root_defs.append(&mut defs);
+                        }
+                        Err(error) => {
+                            self.report_error(error);
+                        }
+                    }
+                }
+
+                Ok(root_defs)
+            }
             ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_to_def(rel_stmt, span, block_context)
             }

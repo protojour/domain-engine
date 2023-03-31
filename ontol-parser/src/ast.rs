@@ -8,6 +8,7 @@ use super::{Span, Spanned};
 pub enum Statement {
     Use(UseStatement),
     Type(TypeStatement),
+    With(WithStatement),
     Rel(RelStatement),
     Fmt(FmtStatement),
     Map(MapStatement),
@@ -19,6 +20,7 @@ impl Statement {
         match self {
             Self::Use(_) => &[],
             Self::Type(ty) => &ty.docs,
+            Self::With(_) => &[],
             Self::Rel(rel) => &rel.docs,
             Self::Fmt(rel) => &rel.docs,
             Self::Map(_) => &[],
@@ -41,6 +43,13 @@ pub struct TypeStatement {
     pub ident: Spanned<String>,
     pub params: Option<Spanned<Vec<Spanned<TypeParam>>>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct WithStatement {
+    pub kw: Span,
+    pub ty: Spanned<Type>,
+    pub statements: Spanned<Vec<Spanned<Statement>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

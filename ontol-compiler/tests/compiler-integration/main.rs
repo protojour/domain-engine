@@ -5,6 +5,7 @@ mod test_geojson;
 mod test_map_basic;
 mod test_multi_package;
 mod test_serde;
+mod test_stix_lite;
 mod test_string_patterns;
 
 fn main() {}

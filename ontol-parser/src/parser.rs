@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::ast::{
     FmtStatement, Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement,
-    Visibility,
+    Visibility, WithStatement,
 };
 
 use super::{
@@ -38,17 +38,6 @@ fn header_statement() -> impl AstParser<Spanned<Statement>> {
     spanned(use_statement()).map(span_map(Statement::Use))
 }
 
-fn domain_statement() -> impl AstParser<Spanned<Statement>> {
-    recursive(|stmt_parser| {
-        let type_stmt = spanned(type_statement(stmt_parser)).map(span_map(Statement::Type));
-        let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
-        let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
-        let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
-
-        type_stmt.or(rel_stmt).or(fmt_stmt).or(map_stmt)
-    })
-}
-
 fn use_statement() -> impl AstParser<UseStatement> {
     keyword(Token::Use)
         .then(spanned(string_literal()))
@@ -59,6 +48,22 @@ fn use_statement() -> impl AstParser<UseStatement> {
             reference: source,
             as_ident,
         })
+}
+
+fn domain_statement() -> impl AstParser<Spanned<Statement>> {
+    recursive(|stmt_parser| {
+        let type_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Type));
+        let with_stmt = spanned(with_statement(stmt_parser)).map(span_map(Statement::With));
+        let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
+        let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
+        let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
+
+        type_stmt
+            .or(with_stmt)
+            .or(rel_stmt)
+            .or(fmt_stmt)
+            .or(map_stmt)
+    })
 }
 
 fn type_statement(
@@ -95,6 +100,17 @@ fn type_statement(
                 ctx_block,
             },
         )
+}
+
+fn with_statement(
+    stmt_parser: impl AstParser<Spanned<Statement>>,
+) -> impl AstParser<WithStatement> {
+    keyword(Token::With)
+        .then(spanned(ty()))
+        .then(spanned(
+            stmt_parser.repeated().delimited_by(open('{'), close('}')),
+        ))
+        .map(|((kw, ty), statements)| WithStatement { kw, ty, statements })
 }
 
 fn rel_statement() -> impl AstParser<RelStatement> {

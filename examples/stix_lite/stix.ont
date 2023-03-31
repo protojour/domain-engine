@@ -2,29 +2,28 @@ pub type attack_pattern
 pub type identity
 
 type attack_pattern_id {
-    via '' ['attack-pattern--'] [uuid] self
-    rel self [identifies] attack_pattern
+    fmt '' => 'attack-pattern--' => uuid => _
+    rel _ [identifies] attack_pattern
 }
 
 type identity_id {
-    via '' ['identity--'] [uuid] self
-    rel self [identifies] identity
+    fmt '' => 'identity--' => uuid => _
+    rel _ [identifies] identity
 }
 
 type core {
-    rel ['created_by_ref'] identity_id
+    rel _ ['created_by_ref'] identity_id
 }
 
 with attack_pattern {
-    via () [core] self
-    rel attack_pattern_id [identifies] self
-    rel ['type'] 'attack-pattern'
-    rel ['name'] string
-    rel ['description'] string
-    rel ['aliases'*] string
+    rel _ [is] core
+
+    rel _ ['type'] 'attack-pattern' // ERROR invalid mix of relationship type for subject
+    rel _ ['name'] string // ERROR invalid mix of relationship type for subject
+    rel _ ['description'] string // ERROR invalid mix of relationship type for subject
+    rel _ ['aliases'*] string // ERROR invalid mix of relationship type for subject
 }
 
 with identity {
-    rel identity_id [identifies] self
-    rel ['type'] 'identity'
+    rel _ ['type'] 'identity'
 }
