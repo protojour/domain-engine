@@ -87,19 +87,6 @@ fn rel_duplicate_anonymous_relation() {
 }
 
 #[test]
-fn rel_mix_anonymous_and_named() {
-    "
-    type foo
-    type bar
-    rel foo [is] bar
-
-    rel // ERROR invalid mix of relationship type for subject
-        foo ['foobar'] bar
-    "
-    .compile_fail()
-}
-
-#[test]
 fn map_union_unit_type() {
     "
     type foo

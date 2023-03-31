@@ -17,11 +17,10 @@ type core {
 
 with attack_pattern {
     rel _ [is] core
-
-    rel _ ['type'] 'attack-pattern' // ERROR invalid mix of relationship type for subject
-    rel _ ['name'] string // ERROR invalid mix of relationship type for subject
-    rel _ ['description'] string // ERROR invalid mix of relationship type for subject
-    rel _ ['aliases'*] string // ERROR invalid mix of relationship type for subject
+    rel _ ['type'] 'attack-pattern'
+    rel _ ['name'] string
+    rel _ ['description'] string
+    rel _ ['aliases'*] string
 }
 
 with identity {

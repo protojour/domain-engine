@@ -117,6 +117,22 @@ fn test_serde_map_union() {
 }
 
 #[test]
+fn test_serde_weird1() {
+    "
+    type bar
+    pub type foo {
+        rel _ [is] bar
+        rel _ ['foobar'] bar
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        // BUG: Should probably require "foobar": null:
+        assert_json_io_matches!(foo, json!({}));
+    });
+}
+
+#[test]
 fn test_serde_many_cardinality() {
     "
     pub type foo

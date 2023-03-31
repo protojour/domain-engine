@@ -163,7 +163,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(error, span);
                 }
             }
-            (RelationKind::Named(_), None, Constructor::Identity) => {
+            (RelationKind::Named(_), None, _) => {
                 properties.map = Some(
                     [(
                         PropertyId::subject(relation.0),
@@ -172,7 +172,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .into(),
                 );
             }
-            (RelationKind::Named(_), Some(map), Constructor::Identity) => {
+            (RelationKind::Named(_), Some(map), _) => {
                 if map
                     .insert(
                         PropertyId::subject(relation.0),
