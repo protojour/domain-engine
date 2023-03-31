@@ -10,9 +10,8 @@ use crate::ast::{
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, ChainedSubjectConnection, Expression, MapAttribute, MapAttributeRel,
-        MapStatement, MapType, RelConnection, RelStatement, RelType, Statement, Type,
-        TypeStatement,
+        BinaryOp, Cardinality, Expression, MapAttribute, MapAttributeRel, MapStatement, MapType,
+        RelConnection, RelStatement, RelType, Statement, Type, TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -110,31 +109,17 @@ fn rel_statement() -> impl AstParser<RelStatement> {
             .then(spanned_ty_or_underscore())
             // connection
             .then(rel_connection())
-            // chain
-            .then(
-                spanned(ty())
-                    .or_not()
-                    .then(rel_connection())
-                    .map(|(subject, connection)| ChainedSubjectConnection {
-                        subject,
-                        connection,
-                    })
-                    .repeated(),
-            )
             // object
             .then(spanned_ty_or_underscore())
             .then(spanned(ctx_block).or_not())
             .map(
-                |((((((docs, kw), subject), connection), chain), object), ctx_block)| {
-                    RelStatement {
-                        docs,
-                        kw,
-                        subject,
-                        connection,
-                        chain,
-                        object,
-                        ctx_block,
-                    }
+                |(((((docs, kw), subject), connection), object), ctx_block)| RelStatement {
+                    docs,
+                    kw,
+                    subject,
+                    connection,
+                    object,
+                    ctx_block,
                 },
             )
     })
@@ -514,8 +499,7 @@ mod tests {
         type bar {
             rel a [''] b
             rel _ [lol] c
-            rel _ [''] [''] _
-            rel _ [''] b [''] _
+            fmt a => _ => _
         }
         ";
 

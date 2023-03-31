@@ -49,7 +49,6 @@ pub struct RelStatement {
     pub kw: Span,
     pub subject: Option<Spanned<Type>>,
     pub connection: RelConnection,
-    pub chain: Vec<ChainedSubjectConnection>,
     pub object: Option<Spanned<Type>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
@@ -60,12 +59,6 @@ pub struct FmtStatement {
     pub kw: Span,
     pub origin: Spanned<Type>,
     pub transitions: Vec<Option<Spanned<Type>>>,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct ChainedSubjectConnection {
-    pub subject: Option<Spanned<Type>>,
-    pub connection: RelConnection,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

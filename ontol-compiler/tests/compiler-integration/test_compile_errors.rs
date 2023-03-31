@@ -455,14 +455,9 @@ fn invalid_relation_type() {
 }
 
 #[test]
-fn invalid_relation_chain() {
+fn invalid_fmt_chain() {
     "
-    rel
-        () [()]
-        () [()] [()]
-        ()
-        () // ERROR parse error: found `(`, expected one of `[`, `{`, `type`, `rel`, `fmt`, `map`, `pub`
-        [()]
+    fmt () => () () // ERROR parse error: found `(`, expected one of `type`, `rel`, `fmt`, `map`, `pub`, `=>`
     "
     .compile_fail()
 }

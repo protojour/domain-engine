@@ -91,7 +91,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
             ast::Statement::Rel(rel_stmt) => {
-                self.ast_relationship_chain_to_def(rel_stmt, span, block_context)
+                self.ast_relationship_to_def(rel_stmt, span, block_context)
             }
             ast::Statement::Fmt(fmt_stmt) => {
                 self.fmt_transitions_to_def(fmt_stmt, span, block_context)
@@ -180,7 +180,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(root_defs)
     }
 
-    fn ast_relationship_chain_to_def(
+    fn ast_relationship_to_def(
         &mut self,
         rel: ast::RelStatement,
         span: Span,
@@ -190,15 +190,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
             docs: _,
             kw: _,
             subject,
-            mut connection,
-            chain,
+            connection,
             object,
             ctx_block: _,
         } = rel;
 
-        let mut root_defs = SmallVec::new();
-
-        let (mut subject_def, mut subject_span, object_def, object_span) =
+        let (subject_def, subject_span, object_def, object_span) =
             match (subject, object, block_context) {
                 (Some(subject), Some(object), BlockContext::NoContext) => (
                     self.resolve_type_reference(subject.0, &subject.1)?,
@@ -221,56 +218,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
             };
 
-        for chain_item in chain {
-            let (next_def, next_ty_span) = match chain_item.subject {
-                Some((ast_ty, ty_span)) => {
-                    (self.resolve_type_reference(ast_ty, &ty_span)?, ty_span)
-                }
-                None => {
-                    // implicit, anonymous type:
-                    let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-                    self.set_def_kind(
-                        anonymous_def_id,
-                        DefKind::Type(TypeDef {
-                            public: false,
-                            ident: None,
-                            params: None,
-                        }),
-                        &span,
-                    );
-                    (
-                        DefReference {
-                            def_id: anonymous_def_id,
-                            pattern_bindings: Default::default(),
-                        },
-                        span.clone(),
-                    )
-                }
-            };
-
-            root_defs.push(self.ast_relationship_to_def(
-                (subject_def, &subject_span),
-                connection,
-                (next_def.clone(), &next_ty_span),
-                span.clone(),
-            )?);
-
-            connection = chain_item.connection;
-            subject_def = next_def;
-            subject_span = next_ty_span;
-        }
-
-        root_defs.push(self.ast_relationship_to_def(
+        let def = self.def_relationship(
             (subject_def, &subject_span),
             connection,
             (object_def, &object_span),
             span,
-        )?);
+        )?;
 
-        Ok(root_defs)
+        Ok([def].into())
     }
 
-    fn ast_relationship_to_def(
+    fn def_relationship(
         &mut self,
         subject: (DefReference, &Span),
         ast_connection: ast::RelConnection,
