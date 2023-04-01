@@ -409,6 +409,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ))
                 }
             }
+            Constructor::Intersection(_) => todo!(),
             Constructor::Union(_) => {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(

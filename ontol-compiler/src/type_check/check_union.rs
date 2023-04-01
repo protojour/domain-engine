@@ -222,6 +222,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Constructor::Value(_, _, _) => {
                         todo!("test non-standard value cardinality");
                     }
+                    Constructor::Intersection(_) => {
+                        todo!()
+                    }
                     Constructor::Union(_) => {
                         return Err(UnionCheckError::UnionTreeNotSupported);
                     }

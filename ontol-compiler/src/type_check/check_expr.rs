@@ -223,6 +223,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
                     },
+                    Some(Constructor::Intersection(_)) => {
+                        todo!()
+                    }
                     Some(Constructor::Union(_property_set)) => {
                         todo!()
                     }
