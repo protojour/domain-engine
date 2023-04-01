@@ -58,7 +58,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Role::Object => {
                     if properties.identified_by.is_none() {
                         match &properties.constructor {
-                            Constructor::ValueUnion(relationships) => {
+                            Constructor::Union(relationships) => {
                                 if let Some(map) = &properties.map {
                                     assert!(map.get(property_id).is_some());
 

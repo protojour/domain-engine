@@ -55,17 +55,18 @@ bitflags::bitflags! {
     /// Modifier for (de)serializers.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
     pub struct DataModifier: u32 {
-        const IDENTITY = 0b00000000;
-        const ARRAY    = 0b00000001;
-        const UNION    = 0b00000010;
-        const ID       = 0b00000100;
-        const PROPS    = 0b00001000;
+        const IDENTITY     = 0b00000000;
+        const ARRAY        = 0b00000001;
+        const UNION        = 0b00000010;
+        const INTERSECTION = 0b00000100;
+        const ID           = 0b00001000;
+        const PROPS        = 0b00010000;
     }
 }
 
 impl Default for DataModifier {
     fn default() -> Self {
-        Self::UNION | Self::ID | Self::PROPS
+        Self::UNION | Self::INTERSECTION | Self::ID | Self::PROPS
     }
 }
 
@@ -94,7 +95,7 @@ impl DefVariant {
         }
     }
 
-    pub fn minus_local_mod(self, diff: DataModifier) -> Self {
+    pub fn remove_modifier(self, diff: DataModifier) -> Self {
         Self {
             def_id: self.def_id,
             modifier: self.modifier.difference(diff),

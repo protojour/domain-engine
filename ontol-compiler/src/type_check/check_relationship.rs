@@ -111,11 +111,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     (PropertyCardinality::Optional, Constructor::Identity) => {
                         properties.constructor =
-                            Constructor::ValueUnion([(relationship.0, *span)].into());
+                            Constructor::Union([(relationship.0, *span)].into());
                         // Register union for check later
                         self.relations.value_unions.insert(subject.0.def_id);
                     }
-                    (PropertyCardinality::Optional, Constructor::ValueUnion(variants)) => {
+                    (PropertyCardinality::Optional, Constructor::Union(variants)) => {
                         variants.push((relationship.0, *span));
                     }
                     _ => return self.error(CompileError::ConstructorMismatch, span),

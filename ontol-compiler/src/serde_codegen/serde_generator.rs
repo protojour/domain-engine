@@ -166,7 +166,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             SerdeKey::Def(def_variant) if def_variant.modifier.contains(DataModifier::ARRAY) => {
                 let item_operator_id = self.get_serde_operator_id(SerdeKey::Def(
-                    def_variant.minus_local_mod(DataModifier::ARRAY),
+                    def_variant.remove_modifier(DataModifier::ARRAY),
                 ))?;
 
                 Some(OperatorAllocation::Allocated(
@@ -212,6 +212,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 } else {
                     result
                 }
+            }
+            SerdeOperator::ValueType(value_op) => {
+                self.find_unambiguous_map_operator(value_op.inner_operator_id)
             }
             _ => Err(operator),
         }
@@ -353,31 +356,60 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.create_identity_constructor_operator(def_variant, typename, properties)
             }
             Constructor::Value(relationship_id, _, cardinality) => {
-                let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
-                    panic!("Problem getting property meta");
-                };
+                let modifier = &def_variant.modifier;
+                if modifier.contains(DataModifier::INTERSECTION) {
+                    if properties.map.is_some() {
+                        self.create_serde_operator_from_key(SerdeKey::Intersection(Box::new(
+                            [
+                                // Require intersected properties via [is] relation:
+                                SerdeKey::Def(def_variant.remove_modifier(
+                                    DataModifier::INTERSECTION | DataModifier::PROPS,
+                                )),
+                                // Require inherent propserties:
+                                SerdeKey::Def(
+                                    def_variant.remove_modifier(DataModifier::INTERSECTION),
+                                ),
+                            ]
+                            .into(),
+                        )))
+                    } else {
+                        Some(OperatorAllocation::Redirect(def_variant.remove_modifier(
+                            DataModifier::INTERSECTION | DataModifier::PROPS,
+                        )))
+                    }
+                } else if modifier.contains(DataModifier::PROPS) {
+                    let operator_id = self.alloc_operator_id(&def_variant);
+                    Some(OperatorAllocation::Allocated(
+                        operator_id,
+                        self.create_map_operator(def_variant, typename, properties),
+                    ))
+                } else {
+                    let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
+                        panic!("Problem getting property meta");
+                    };
 
-                let value_def = relationship.object.0.def_id;
+                    let value_def = relationship.object.0.def_id;
 
-                let (requirement, inner_operator_id) =
-                    self.get_property_operator(value_def, *cardinality);
+                    let (requirement, inner_operator_id) =
+                        self.get_property_operator(value_def, *cardinality);
 
-                if !matches!(requirement, PropertyCardinality::Mandatory) {
-                    panic!("Value properties must be mandatory, fix this during type check");
+                    if !matches!(requirement, PropertyCardinality::Mandatory) {
+                        panic!("Value properties must be mandatory, fix this during type check");
+                    }
+
+                    let operator_id = self.alloc_operator_id(&def_variant);
+
+                    Some(OperatorAllocation::Allocated(
+                        operator_id,
+                        SerdeOperator::ValueType(ValueOperator {
+                            typename: typename.into(),
+                            def_variant,
+                            inner_operator_id,
+                        }),
+                    ))
                 }
-
-                let operator_id = self.alloc_operator_id(&def_variant);
-
-                Some(OperatorAllocation::Allocated(
-                    operator_id,
-                    SerdeOperator::ValueType(ValueOperator {
-                        typename: typename.into(),
-                        def_variant,
-                        inner_operator_id,
-                    }),
-                ))
             }
-            Constructor::ValueUnion(_) => {
+            Constructor::Union(_) => {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(
                     operator_id,
@@ -464,7 +496,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(id) => id,
                 None => {
                     return Some(OperatorAllocation::Redirect(
-                        def_variant.minus_local_mod(union_id),
+                        def_variant.remove_modifier(union_id),
                     ));
                 }
             };
@@ -473,7 +505,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .expect("Problem getting subject property meta");
 
             let id_def_variant = def_variant.with_local_mod(DataModifier::ID);
-            let map_def_variant = def_variant.minus_local_mod(union_id);
+            let map_def_variant = def_variant.remove_modifier(union_id);
 
             // Create a union between { '_id' } and the map properties itself
             let id_operator_id = self

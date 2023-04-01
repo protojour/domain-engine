@@ -117,7 +117,7 @@ fn test_serde_map_union() {
 }
 
 #[test]
-fn test_serde_weird1() {
+fn test_serde_noop_intersection() {
     "
     type bar
     pub type foo {
@@ -127,8 +127,7 @@ fn test_serde_weird1() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        // BUG: Should probably require "foobar": null:
-        assert_json_io_matches!(foo, json!({}));
+        assert_json_io_matches!(foo, json!({ "foobar": {} }));
     });
 }
 
