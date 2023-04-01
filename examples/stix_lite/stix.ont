@@ -1,28 +1,245 @@
-pub type attack_pattern
-pub type identity
+type spec_version {
+    rel _ [is?] '2.0'
+    rel _ [is?] '2.1'
+}
+
+// FIXME: should probably be defined in core
+type url {
+    rel _ [is] string
+}
+
+/// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
+type lang_rfc5646 {
+    rel _ [is] string
+}
+
+type confidence {
+    // BUG: Must be an integer percentage between 0 and 100
+    rel _ [is] int
+}
 
 type attack_pattern_id {
     fmt '' => 'attack-pattern--' => uuid => _
-    rel _ [identifies] attack_pattern
 }
 
 type identity_id {
     fmt '' => 'identity--' => uuid => _
-    rel _ [identifies] identity
 }
 
-type core {
-    rel _ ['created_by_ref'] identity_id
+type marking_definition_id {
+    fmt '' => 'marking-definition--' => uuid => _
 }
 
-with attack_pattern {
-    rel _ [is] core
+/// The `Hashes` type represents one or more cryptographic hashes, as a special set of key/value pairs.
+/// Accordingly, the name of each hashing algorithm MUST be specified as a key in the dictionary and **MUST** identify the name of the hashing algorithm used to generate the corresponding value.
+/// This name **SHOULD** come from one of the values defined in the `hash-algorithm-ov` open vocabulary.
+///
+/// Dictionary keys **MUST** be unique in each hashes property, **MUST** be in ASCII, and are limited to the characters a-z (lowercase ASCII), A-Z (uppercase ASCII), numerals 0-9, hyphen (-), and underscore (_).
+/// Dictionary keys MUST have a minimum length of 3 ASCII characters and MUST be no longer than 250 ASCII characters in length.
+/// The value MUST be a `string` in the appropriate format defined by the hash type indicated in the dictionary key.
+///
+/// To enhance compatibility, the SHA-256 hash `SHOULD` be used whenever possible.
+///
+/// ## Examples
+/// _SHA-256_ and _User-Defined Hash_
+///
+/// ```json
+/// {
+///     "SHA-256": "6db12788c37247f2316052e142f42f4b259d6561751e5f401a1ae2a6df9c674b",
+///     "x_foo_hash": "aaaabbbbccccddddeeeeffff0123457890"
+/// }
+/// ```
+type Hashes {
+    // FIXME: Dictionary support:
+    // rel _ [/(a-zA-Z0-9-_){3,250}/] string
+}
+
+type external-reference {
+    /// The name of the source that the external-reference is defined within (system, registry, organization, etc.).
+    rel _ ['source_name'] string
+
+    /// A human readable description.
+    rel _ ['description'?] string
+
+    /// A URL reference to an external resource [[RFC3986](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.vaucl8w7ov0y)].
+    rel _ ['url'?] url
+
+    /// Specifies a dictionary of hashes for the contents of the **url**. This **SHOULD** be provided when the **url** property is present.
+    ///
+    /// Dictionary keys **MUST** come from one of the entries listed in the `hash-algorithm-ov` open vocabulary.
+    ///
+    /// As stated in Section [2.7](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_odoabbtwuxyd), to ensure interoperability, a SHA-256 hash **SHOULD** be included whenever possible.
+    rel _ ['hashes'?] Hashes
+
+    /// An identifier for the external reference content.
+    rel _ ['external_id'?] string
+}
+
+// FIXME: This type has union-like properties:
+type granular-marking {
+    /// The **lang** property identifies the language of the text identified by this marking.
+    /// The value of the lang property, if present, **MUST** be an [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code.
+    ///
+    /// If the **marking_ref** property is not present, this property **MUST** be present. If the marking_ref property is present, this property **MUST NOT** be present.
+    rel _ ['lang'?] lang_rfc5646
+
+    /// The **marking_ref** property specifies the ID of the `marking-definition` object that describes the marking.
+    ///
+    /// If the **lang** property is not present, this property **MUST** be present.
+    /// If the **lang** property is present, this property **MUST NOT** be present.
+    rel _ ['marking_ref'?] marking_definition_id
+
+    /// The selectors property specifies a list of selectors for content contained within the STIX Object in which this property appears.
+    /// Selectors **MUST** conform to the syntax defined below.
+    ///
+    /// The `marking-definition` referenced in the **marking_ref** property is applied to the content selected by the selectors in this list.
+    ///
+    /// The [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code specified by the lang property is applied to the content selected by the selectors in this list.
+    rel _ ['selectors'*] string
+}
+
+/// Base type for SDO and SRO
+type stix_domain_relationship_object {
+    /// The version of the STIX specification used to represent this object.
+    ///
+    /// The value of this property **MUST** be `2.1` for STIX Objects defined according to this specification.
+    ///
+    /// If objects are found where this property is not present, the implicit value for all STIX Objects other than SCOs is `2.0`.
+    /// Since SCOs are now top-level objects in STIX 2.1, the default value for SCOs is `2.1`.
+    rel _ ['spec_version'] spec_version
+
+    /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
+    ///
+    /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
+    rel _ ['created_by_ref'?] identity_id
+
+    /// The **created** property represents the time at which the object was originally created.
+    ///
+    /// The object creator can use the time it deems most appropriate as the time the object was created. The minimum precision **MUST** be milliseconds (three digits after the decimal place in seconds), but **MAY** be more precise.
+    ///
+    /// The **created** property **MUST NOT** be changed when creating a new version of the object.
+    ///
+    /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
+    rel _ ['created'] datetime
+
+    /// The **modified** property is only used by STIX Objects that support versioning and represents the time that this particular version of the object was last modified.
+    ///
+    /// The object creator can use the time it deems most appropriate as the time this version of the object was modified.
+    /// The minimum precision **MUST** be milliseconds (three digits after the decimal place in seconds), but **MAY** be more precise.
+    ///
+    /// If the **created** property is defined, then the value of the **modified** property for a given object version **MUST** be later than or equal to the value of the **created** property.
+    ///
+    /// Object creators **MUST** set the **modified** property when creating a new version of an object if the **created** property was set.
+    ///
+    /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
+    rel _ ['modified'] datetime
+
+    /// The **revoked** property is only used by STIX Objects that support versioning and indicates whether the object has been revoked.
+    ///
+    /// Revoked objects are no longer considered valid by the object creator.
+    /// Revoking an object is permanent; future versions of the object with this **id** **MUST NOT** be created.
+    ///
+    /// The default value of this property is `false`.
+    ///
+    /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
+    // FIXME: Default value `false`
+    rel _ ['revoked'?] bool // ERROR type not found
+
+    /// The **labels** property specifies a set of terms used to describe this object.
+    /// The terms are user-defined or trust-group defined and their meaning is outside the scope of this specification and **MAY** be ignored.
+    ///
+    /// Where an object has a specific property defined in the specification for characterizing subtypes of that object, the labels property **MUST NOT** be used for that purpose.
+    ///
+    /// For example, the Malware SDO has a property **malware_types** that contains a list of Malware subtypes (dropper, RAT, etc.). In this example, the labels property cannot be used to describe these Malware subtypes.
+    rel _ ['labels'*?] string
+
+    /// The **confidence** property identifies the confidence that the creator has in the correctness of their data.
+    /// The confidence value **MUST** be a number in the range of 0-100.
+    ///
+    /// [Appendix A](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_1v6elyto0uqg) contains a table of normative mappings to other confidence scales that MUST be used when presenting the confidence value in one of those scales.
+    ///
+    /// If the confidence property is not present, then the confidence of the content is unspecified.
+    rel _ ['confidence'?] confidence
+
+    /// The **lang** property identifies the language of the text content in this object.
+    /// When present, it **MUST** be a language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
+    /// If the property is not present, then the language of the content is en (English).
+    ///
+    /// This property **SHOULD** be present if the object type contains translatable text properties (e.g. name, description).
+    ///
+    /// The language of individual fields in this object **MAY** be overridden by the **lang** property in granular markings (see section 7.2.3).
+    rel _ ['lang'?] lang_rfc5646
+
+    /// The **external_references** property specifies a list of external references which refers to non-STIX information.
+    /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
+    rel _ ['external_references'*] external-reference
+}
+
+type stix_markings_object {
+    /// The **object_marking_refs** property specifies a list of id properties of marking-definition objects that apply to this object.
+    ///
+    /// In some cases, though uncommon, marking definitions themselves may be marked with sharing or handling guidance.
+    /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
+    ///
+    /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
+    rel _ ['object_marking_refs'*?] marking_definition_id
+
+    /// The **granular_markings** property specifies a list of granular markings applied to this object.
+    ///
+    /// In some cases, though uncommon, marking definitions themselves may be marked with sharing or handling guidance.
+    /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
+    ///
+    /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
+    rel _ ['granular_markings'*?] granular-marking
+}
+
+/// STIX defines a set of STIX Domain Objects (SDOs): Attack Pattern, Campaign, Course of Action, Grouping, Identity, Indicator, Infrastructure, Intrusion Set, Location, Malware, Malware Analysis, Note, Observed Data, Opinion, Report, Threat Actor, Tool, and Vulnerability.
+/// Each of these objects corresponds to a concept commonly used in CTI.
+///
+/// STIX Domain Objects are defined in section 4.
+type stix_domain_object {
+    rel _ [is] stix_domain_relationship_object
+    rel _ [is] stix_markings_object
+}
+
+type stix_relationship_object {
+    rel _ [is] stix_domain_relationship_object
+    rel _ [is] stix_markings_object
+}
+
+/// STIX defines a set of STIX Cyber-observable Objects (SCOs) for characterizing host-based and network-based information. SCOs are used by various STIX Domain Objects (SDOs) to provide supporting context. The Observed Data SDO, for example, indicates that the raw data was observed at a particular time.
+///
+/// STIX Cyber-observable Objects (SCOs) document the facts concerning what happened on a network or host, and do not capture the who, when, or why. By associating SCOs with STIX Domain Objects (SDOs), it is possible to convey a higher-level understanding of the threat landscape, and to potentially provide insight as to the who and the why particular intelligence may be relevant to an organization. For example, information about a file that existed, a process that was observed running, or that network traffic occurred between two IPs can all be captured as SCOs.
+///
+/// STIX Cyber-observable Objects (SCOs) are defined in section 6.
+///
+/// Previously, in STIX 2.0, Cyber-observable Objects could only exist as objects within an Observed Data object. It is still possible to represent Cyber-observable Objects in this way, but this method has been deprecated. See section 2.13.
+type stix_cyber_observable_object {
+    rel _ [is] stix_markings_object
+
+    /// This property defines whether or not the data contained within the object has been defanged.
+    ///
+    /// The default value for this property is `false`.
+    ///
+    /// This property **MUST NOT** be used on any STIX Objects other than SCOs.
+    rel _ ['defanged'?] bool // ERROR type not found
+}
+
+/// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
+pub type attack_pattern {
+    rel _ [is] stix_domain_object
+
+    rel attack_pattern_id [identifies] _
     rel _ ['type'] 'attack-pattern'
     rel _ ['name'] string
     rel _ ['description'] string
     rel _ ['aliases'*] string
 }
 
-with identity {
+/// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, or groups.
+pub type identity {
+    rel _ [is] stix_domain_object
+
+    rel identity_id [identifies] _
     rel _ ['type'] 'identity'
 }
