@@ -60,7 +60,7 @@ pub enum Constructor {
     Value(RelationshipId, SourceSpan, Cardinality),
     /// The type represents an intersection any number of other types.
     /// It has several [is] relations.
-    Intersection(Vec<(RelationshipId, SourceSpan)>),
+    Intersection(Vec<(RelationshipId, SourceSpan, Cardinality)>),
     /// The type represents a union (either-or) of other types.
     /// Union uses a Vec even if we have to prove that properties have disjoint types.
     /// serializers etc should try things in sequence anyway.

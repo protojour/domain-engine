@@ -223,13 +223,13 @@ fn test_serde_datetime() {
     .compile_ok(|env| {
         let my_dt = TypeBinding::new(&env, "my_dt");
         assert_matches!(
-            my_dt.deserialize_data_variant(json!("1983-01-01T01:31:32.59+01:00")),
+            my_dt.deserialize_data_variant(json!("1983-10-01T01:31:32.59+01:00")),
             Ok(Data::ChronoDateTime(_))
         );
         assert_json_io_matches!(
             my_dt,
-            json!("1983-01-01T01:31:32.59+01:00"),
-            json!("1983-01-01T00:31:32.590+00:00")
+            json!("1983-10-01T01:31:32.59+01:00"),
+            json!("1983-10-01T00:31:32.590+00:00")
         );
         assert_error_msg!(
             my_dt.deserialize_data(json!(42)),

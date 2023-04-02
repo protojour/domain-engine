@@ -109,18 +109,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     (
                         PropertyCardinality::Mandatory,
-                        Constructor::Value(existing_relationship_id, existing_span, _),
+                        Constructor::Value(
+                            existing_relationship_id,
+                            existing_span,
+                            existing_cardinality,
+                        ),
                     ) => {
                         properties.constructor = Constructor::Intersection(
                             [
-                                (*existing_relationship_id, *existing_span),
-                                (relationship.0, *span),
+                                (
+                                    *existing_relationship_id,
+                                    *existing_span,
+                                    *existing_cardinality,
+                                ),
+                                (relationship.0, *span, relationship.1.subject_cardinality),
                             ]
                             .into(),
                         );
                     }
                     (PropertyCardinality::Mandatory, Constructor::Intersection(intersection)) => {
-                        intersection.push((relationship.0, *span));
+                        intersection.push((
+                            relationship.0,
+                            *span,
+                            relationship.1.subject_cardinality,
+                        ));
                     }
                     (PropertyCardinality::Optional, Constructor::Identity) => {
                         properties.constructor =
@@ -292,12 +304,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     // non-domain type in object
                     return self.error(CompileError::NonEntityInReverseRelationship, span);
                 }
-                (None, _, _) => {
-                    debug!(
-                        "ignored object property with constructor {:?}",
-                        object_properties.constructor
-                    );
-                }
+                (None, _, _) => {}
             }
         }
 
