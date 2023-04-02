@@ -52,8 +52,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
             TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: smart_format!("{}", FormatType(actual, self.defs)),
-                expected: smart_format!("{}", FormatType(expected, self.defs)),
+                actual: smart_format!("{}", FormatType(actual, self.defs, self.primitives)),
+                expected: smart_format!("{}", FormatType(expected, self.defs, self.primitives)),
             },
         };
         self.error(compile_error, span)

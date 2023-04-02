@@ -6,6 +6,7 @@ use ontol_runtime::DefId;
 use crate::{
     def::{DefKind, Defs},
     mem::{Intern, Mem},
+    primitive::Primitives,
     type_check::inference::TypeVar,
 };
 
@@ -19,6 +20,8 @@ pub enum Type<'m> {
     Tautology,
     IntConstant(i32),
     Unit(DefId),
+    // The DefId encodes which variant this is, false, true or bool
+    Bool(DefId),
     EmptySequence(DefId),
     /// Any integer
     Int(DefId),
@@ -53,6 +56,7 @@ impl<'m> Type<'m> {
         match self {
             Self::Tautology => None,
             Self::Unit(def_id) => Some(*def_id),
+            Self::Bool(def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
             Self::IntConstant(_) => todo!(),
             Self::Int(def_id) => Some(*def_id),
@@ -146,17 +150,25 @@ pub struct DefTypes<'m> {
     pub map: FnvHashMap<DefId, TypeRef<'m>>,
 }
 
-pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>);
+pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>, pub &'c Primitives);
 
 impl<'m, 'c> Display for FormatType<'m, 'c> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ty = self.0;
-        let defs = self.1;
+        let Self(ty, defs, primitives) = self;
 
         match ty {
             Type::Tautology => write!(f, "tautology"),
             Type::IntConstant(val) => write!(f, "int({val})"),
             Type::Unit(_) => write!(f, "unit"),
+            Type::Bool(def_id) => {
+                if *def_id == primitives.true_value {
+                    write!(f, "true")
+                } else if *def_id == primitives.false_value {
+                    write!(f, "false")
+                } else {
+                    write!(f, "bool")
+                }
+            }
             Type::EmptySequence(_) => write!(f, "[]"),
             Type::Int(_) => write!(f, "int"),
             Type::Number(_) => write!(f, "number"),
@@ -178,10 +190,10 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Uuid(_) => write!(f, "uuid"),
             Type::DateTime(_) => write!(f, "datetime"),
             Type::Array(ty) => {
-                write!(f, "{}[]", FormatType(ty, defs))
+                write!(f, "{}[]", FormatType(ty, defs, primitives))
             }
             Type::Option(ty) => {
-                write!(f, "{}?", FormatType(ty, defs))
+                write!(f, "{}?", FormatType(ty, defs, primitives))
             }
             Type::Function { .. } => write!(f, "function"),
             Type::Domain(def_id) => {

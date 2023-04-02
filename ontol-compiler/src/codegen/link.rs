@@ -62,5 +62,5 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 fn format_def(compiler: &Compiler, def_id: DefId) -> String {
     let ty = compiler.def_types.map.get(&def_id).unwrap();
 
-    smart_format!("{}", FormatType(ty, &compiler.defs))
+    smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }

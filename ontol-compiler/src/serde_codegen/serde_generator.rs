@@ -260,6 +260,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(&def_variant),
                 SerdeOperator::Unit,
             )),
+            Type::Bool(_) => todo!(),
             Type::IntConstant(_) => todo!(),
             Type::Int(_) => Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),

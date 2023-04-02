@@ -22,6 +22,9 @@ impl<'m> Compiler<'m> {
         self.register_type(self.primitives.unit, Type::Unit);
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
+        self.register_named_type(self.primitives.false_value, "false", Type::Bool);
+        self.register_named_type(self.primitives.true_value, "true", Type::Bool);
+        self.register_named_type(self.primitives.bool, "bool", Type::Bool);
         self.register_named_type(self.primitives.is_relation, "is", |_| Type::BuiltinRelation);
         self.register_named_type(self.primitives.identifies_relation, "identifies", |_| {
             Type::BuiltinRelation

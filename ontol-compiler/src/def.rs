@@ -58,6 +58,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(PrimitiveKind::Unit) => Some("unit".into()),
             Self::Primitive(PrimitiveKind::False) => Some("false".into()),
             Self::Primitive(PrimitiveKind::True) => Some("true".into()),
+            Self::Primitive(PrimitiveKind::Bool) => Some("bool".into()),
             Self::Primitive(PrimitiveKind::Int) => Some("int".into()),
             Self::Primitive(PrimitiveKind::Number) => Some("number".into()),
             Self::Primitive(PrimitiveKind::String) => Some("string".into()),

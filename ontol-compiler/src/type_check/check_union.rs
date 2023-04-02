@@ -509,7 +509,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
                 let ty = self.def_types.map.get(&def_id).unwrap();
-                CompileError::UnitTypePartOfUnion(smart_format!("{}", FormatType(ty, self.defs)))
+                CompileError::UnitTypePartOfUnion(smart_format!(
+                    "{}",
+                    FormatType(ty, self.defs, self.primitives)
+                ))
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,
