@@ -34,6 +34,9 @@ impl<'e> SerdeProcessor<'e> {
                 cast_ref::<()>(value);
                 serializer.serialize_unit()
             }
+            SerdeOperator::False(_) => serializer.serialize_bool(false),
+            SerdeOperator::True(_) => serializer.serialize_bool(true),
+            SerdeOperator::Bool(_) => serializer.serialize_bool(*cast_ref::<bool>(value)),
             SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
                 self.serialize_number(value, serializer)
             }

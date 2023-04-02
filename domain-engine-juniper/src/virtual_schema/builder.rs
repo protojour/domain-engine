@@ -326,6 +326,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
     ) -> NativeScalarRef {
         let kind = match serde_operator {
             SerdeOperator::Unit => NativeScalarKind::Unit,
+            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
+                NativeScalarKind::Bool
+            }
             SerdeOperator::Int(def_id) => NativeScalarKind::Int(*def_id),
             SerdeOperator::Number(def_id) => NativeScalarKind::Number(*def_id),
             SerdeOperator::String(_)

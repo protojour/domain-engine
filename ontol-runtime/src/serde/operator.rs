@@ -21,6 +21,9 @@ pub struct SerdeOperatorId(pub u32);
 #[derive(Debug)]
 pub enum SerdeOperator {
     Unit,
+    True(DefId),
+    False(DefId),
+    Bool(DefId),
     Int(DefId),
     Number(DefId),
     String(DefId),

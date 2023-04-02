@@ -263,6 +263,17 @@ fn serialize_schema_inline<S: Serializer>(
         SerdeOperator::Unit => {
             map.serialize_entry("type", "object")?;
         }
+        SerdeOperator::True(_) => {
+            map.serialize_entry("type", "boolean")?;
+            map.serialize_entry("enum", &[true])?;
+        }
+        SerdeOperator::False(_) => {
+            map.serialize_entry("type", "boolean")?;
+            map.serialize_entry("enum", &[false])?;
+        }
+        SerdeOperator::Bool(_) => {
+            map.serialize_entry("type", "boolean")?;
+        }
         // FIXME: Distinguish different number types
         SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
             map.serialize_entry("type", "integer")?;
@@ -375,6 +386,9 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
 
         match value_operator {
             SerdeOperator::Unit
+            | SerdeOperator::False(_)
+            | SerdeOperator::True(_)
+            | SerdeOperator::Bool(_)
             | SerdeOperator::Int(_)
             | SerdeOperator::Number(_)
             | SerdeOperator::String(_)
@@ -662,6 +676,9 @@ impl SchemaGraphBuilder {
 
         match operator {
             SerdeOperator::Unit
+            | SerdeOperator::False(_)
+            | SerdeOperator::True(_)
+            | SerdeOperator::Bool(_)
             | SerdeOperator::Int(_)
             | SerdeOperator::Number(_)
             | SerdeOperator::String(_)

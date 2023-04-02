@@ -149,6 +149,9 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::Unit => {
                 todo!("unit argument")
             }
+            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
+                self.get_native_argument::<bool>(name, opt)
+            }
             SerdeOperator::Int(_) => self.get_native_argument::<i32>(name, opt),
             SerdeOperator::Number(_) => self.get_native_argument::<f64>(name, opt),
             SerdeOperator::String(_) => self.get_native_argument::<String>(name, opt),

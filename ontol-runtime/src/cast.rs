@@ -41,6 +41,30 @@ impl Cast<()> for Value {
     }
 }
 
+impl Cast<bool> for Value {
+    type Ref = bool;
+
+    fn cast_into(self) -> bool {
+        match self.data {
+            Data::Int(i) => i != 0,
+            _ => panic!("not a unit"),
+        }
+    }
+
+    fn cast_ref(&self) -> &Self::Ref {
+        match self.data {
+            Data::Int(i) => {
+                if i != 0 {
+                    &true
+                } else {
+                    &false
+                }
+            }
+            _ => panic!("not a unit"),
+        }
+    }
+}
+
 impl Cast<String> for Value {
     type Ref = str;
 

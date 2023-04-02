@@ -17,6 +17,7 @@ use crate::{
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::{Patterns, StringPatternSegment},
+    primitive::Primitives,
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type, TypeRef},
@@ -26,6 +27,7 @@ use super::union_builder::UnionBuilder;
 
 pub struct SerdeGenerator<'c, 'm> {
     pub(super) defs: &'c Defs<'m>,
+    pub(super) primitives: &'c Primitives,
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
     pub(super) patterns: &'c Patterns,
@@ -260,7 +262,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.alloc_operator_id(&def_variant),
                 SerdeOperator::Unit,
             )),
-            Type::Bool(_) => todo!(),
+            Type::Bool(def_id) => Some(OperatorAllocation::Allocated(
+                self.alloc_operator_id(&def_variant),
+                if *def_id == self.primitives.false_value {
+                    SerdeOperator::False(def_variant.def_id)
+                } else if *def_id == self.primitives.true_value {
+                    SerdeOperator::True(def_variant.def_id)
+                } else {
+                    SerdeOperator::Bool(def_variant.def_id)
+                },
+            )),
             Type::IntConstant(_) => todo!(),
             Type::Int(_) => Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),

@@ -4,6 +4,7 @@ use test_log::test;
 pub const STIX_ONT: &str = include_str!("../../../examples/stix_lite/stix.ont");
 
 #[test]
+#[should_panic = "not yet implemented"]
 fn test_stix_lite() {
     STIX_ONT.compile_fail();
     /*

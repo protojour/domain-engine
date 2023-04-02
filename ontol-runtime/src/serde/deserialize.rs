@@ -117,6 +117,9 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Unit => {
                 deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
             }
+            SerdeOperator::False(def_id) => todo!(),
+            SerdeOperator::True(def_id) => todo!(),
+            SerdeOperator::Bool(def_id) => todo!(),
             SerdeOperator::Int(def_id) => {
                 deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
             }

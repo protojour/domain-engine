@@ -129,6 +129,9 @@ impl<'e> Display for SerdeProcessor<'e> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value_operator {
             SerdeOperator::Unit => write!(f, "unit"),
+            SerdeOperator::False(_) => write!(f, "false"),
+            SerdeOperator::True(_) => write!(f, "true"),
+            SerdeOperator::Bool(_) => write!(f, "bool"),
             SerdeOperator::Int(_) => write!(f, "`int`"),
             SerdeOperator::Number(_) => write!(f, "`number`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
