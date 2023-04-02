@@ -133,6 +133,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
+                        intersected_map.n_mandatory_properties +=
+                            next_map_type.n_mandatory_properties;
                     }
                 }
 
