@@ -27,6 +27,32 @@ fn test_serde_value_type() {
 }
 
 #[test]
+fn test_serde_booleans() {
+    "
+    pub type f { rel _ [is] false }
+    pub type t { rel _ [is] true }
+    pub type b { rel _ [is] bool }
+    "
+    .compile_ok(|env| {
+        let [f, t, b] = ["f", "t", "b"].map(|n| TypeBinding::new(&env, n));
+
+        assert_json_io_matches!(f, json!(false));
+        assert_json_io_matches!(t, json!(true));
+        assert_json_io_matches!(b, json!(false));
+        assert_json_io_matches!(b, json!(true));
+
+        assert_error_msg!(
+            f.deserialize_data(json!(true)),
+            "invalid type: boolean `true`, expected false at line 1 column 4"
+        );
+        assert_error_msg!(
+            t.deserialize_data(json!(false)),
+            "invalid type: boolean `false`, expected true at line 1 column 5"
+        );
+    });
+}
+
+#[test]
 fn test_serde_map_type() {
     "
     pub type foo
