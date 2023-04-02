@@ -2,13 +2,11 @@ use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
-    def::{
-        Def, DefKind, DefReference, Primitive, PropertyCardinality, Relation, RelationKind,
-        Relationship,
-    },
+    def::{Def, DefKind, DefReference, PropertyCardinality, Relation, RelationKind, Relationship},
     error::CompileError,
     mem::Intern,
     patterns::StringPatternSegment,
+    primitive::PrimitiveKind,
     relation::{Constructor, Properties, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
@@ -83,7 +81,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match subject_ty {
             Type::EmptySequence(_) => return object_ty,
-            Type::StringConstant(def_id) if *def_id == self.defs.empty_string() => {
+            Type::StringConstant(def_id) if *def_id == self.primitives.empty_string => {
                 return object_ty;
             }
             Type::Unit(_) | Type::StringConstant(_) => {
@@ -144,7 +142,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::MustIdentifyWithinDomain, span);
                 }
 
-                properties.identifies = Some(RelationId(self.defs.identifies_relation()));
+                properties.identifies = Some(RelationId(self.primitives.identifies_relation));
                 let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
                 match object_properties.identified_by {
                     Some(id) => {
@@ -156,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     None => {
                         object_properties.identified_by =
-                            Some(RelationId(self.defs.identifies_relation()))
+                            Some(RelationId(self.primitives.identifies_relation))
                     }
                 }
             }
@@ -222,7 +220,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if matches!(&relation.1.kind, RelationKind::Transition(_)) {
             match subject_ty {
                 Type::StringConstant(subject_def_id)
-                    if *subject_def_id == self.defs.empty_string() =>
+                    if *subject_def_id == self.primitives.empty_string =>
                 {
                     if let Err(e) = self.extend_string_pattern_constructor(
                         relation,
@@ -320,7 +318,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         let appendee = match self.defs.get_def_kind(rel_def.def_id) {
-            Some(DefKind::Primitive(Primitive::String)) => StringPatternSegment::AllStrings,
+            Some(DefKind::Primitive(PrimitiveKind::String)) => StringPatternSegment::AllStrings,
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
             Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
                 self.defs
