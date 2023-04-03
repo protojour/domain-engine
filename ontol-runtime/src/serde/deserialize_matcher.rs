@@ -482,7 +482,7 @@ pub enum MapMatchKind<'e> {
 
 impl<'e> MapMatcher<'e> {
     pub fn match_attribute(self, property: &str, value: &serde_value::Value) -> MapMatchResult<'e> {
-        // debug!("match_attribute '{property}': {:#?}", self.union_op);
+        // debug!("match_attribute '{property}': {:#?}", self.variants);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
@@ -515,7 +515,7 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Map(map_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
-                    SerdeOperator::Id(name, operator_id) => MapMatchResult::Match(
+                    SerdeOperator::PrimaryId(name, operator_id) => MapMatchResult::Match(
                         self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
                     ),
                     SerdeOperator::Union(union_op) => {
@@ -553,7 +553,7 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Map(map_op) => {
                         return MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
-                    SerdeOperator::Id(name, operator_id) => {
+                    SerdeOperator::PrimaryId(name, operator_id) => {
                         return MapMatchResult::Match(
                             self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
                         )

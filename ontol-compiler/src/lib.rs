@@ -1,5 +1,5 @@
 use codegen::{execute_codegen_tasks, CodegenTasks};
-use compiler_queries::GetPropertyMeta;
+use compiler_queries::{GetPropertyMeta, RelationshipMeta};
 use def::{DefKind, Defs, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
@@ -12,12 +12,13 @@ use namespace::Namespaces;
 use ontol_runtime::{
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
-    DataModifier, DefId, DefVariant, PackageId,
+    value::PropertyId,
+    DataModifier, DefId, DefVariant, PackageId, RelationId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
-use relation::Relations;
+use relation::{Properties, Relations};
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
@@ -185,7 +186,14 @@ impl<'m> Compiler<'m> {
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
-                                id_property_name: Some("_id".into()),
+                                id_property_name: match self
+                                    .find_inherent_primary_id(type_def_id, properties)
+                                {
+                                    Some((_, relation)) => {
+                                        relation.subject_prop(&self.defs).map(|name| name.into())
+                                    }
+                                    None => None,
+                                },
                                 id_relation_id: *id_relation_id,
                                 id_value_def_id: identifies_relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
@@ -242,6 +250,18 @@ impl<'m> Compiler<'m> {
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()
+    }
+
+    fn find_inherent_primary_id(
+        &self,
+        entity_id: DefId,
+        properties: &Properties,
+    ) -> Option<RelationshipMeta<'m>> {
+        let map = properties.map.as_ref()?;
+        let relation_id = RelationId(self.primitives.identifies_relation);
+        let _property = map.get(&(PropertyId::subject(relation_id)))?;
+
+        self.property_meta_by_subject(entity_id, relation_id).ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

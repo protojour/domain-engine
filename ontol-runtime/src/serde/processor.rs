@@ -64,7 +64,7 @@ impl<'e> SerdeProcessor<'e> {
             .new_serde_processor(operator_id, rel_params_operator_id, self.mode, self.level)
     }
 
-    /// Return a processor that processes a new value that is a child of value of this processor.
+    /// Return a processor that processes a new value that is a child value of this processor.
     pub fn new_child(&self, operator_id: SerdeOperatorId) -> Self {
         self.env
             .new_serde_processor(operator_id, None, self.mode, ProcessorLevel::Child)
@@ -167,7 +167,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_op) => Backticks(&value_op.typename).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
-            SerdeOperator::Id(..) => write!(f, "id"),
+            SerdeOperator::PrimaryId(..) => write!(f, "id"),
             SerdeOperator::Map(map_op) => Backticks(&map_op.typename).fmt(f),
         }
     }

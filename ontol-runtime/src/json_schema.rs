@@ -224,7 +224,7 @@ impl Display for Key {
 
         write!(f, "{}_{}", package.0, self.0.def_id.1)?;
 
-        if variant.modifier.contains(DataModifier::ID) {
+        if variant.modifier.contains(DataModifier::PRIMARY_ID) {
             write!(f, "_id")?;
         }
         if variant.modifier.contains(DataModifier::UNION) {
@@ -348,7 +348,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
         }
-        SerdeOperator::Id(_name, _inner_operator_id) => {
+        SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
             panic!("BUG: Id not handled here")
         }
         SerdeOperator::Map(map_op) => {
@@ -426,7 +426,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Union(union_op) => self
                 .compose(self.ctx.ref_link(union_op.union_def_variant()))
                 .serialize(serializer),
-            SerdeOperator::Id(name, id_operator_id) => self
+            SerdeOperator::PrimaryId(name, id_operator_id) => self
                 .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
                 .serialize(serializer),
             SerdeOperator::Map(map_op) => self
@@ -707,7 +707,7 @@ impl SchemaGraphBuilder {
                     self.visit(discriminator.operator_id, env);
                 }
             }
-            SerdeOperator::Id(_, id_operator_id) => {
+            SerdeOperator::PrimaryId(_, id_operator_id) => {
                 // id is not represented in the graph
                 self.visit(*id_operator_id, env);
             }

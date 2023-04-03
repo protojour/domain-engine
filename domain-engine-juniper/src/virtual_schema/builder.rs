@@ -335,7 +335,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
-            SerdeOperator::Id(..) => panic!("Id should not appear in GraphQL"),
+            SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
             | SerdeOperator::Map(_)

@@ -210,7 +210,7 @@ fn compile_string_pattern_constructors(compiler: &mut Compiler) {
             segment.to_regex_hir(&mut CaptureCursor(1)),
             Hir::anchor(Anchor::EndText),
         ]);
-        debug!("{def_id:?} regex: {anchored_hir}");
+        debug!("{def_id:?} regex: {anchored_hir:?}");
 
         let mut constant_parts = vec![];
         segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));

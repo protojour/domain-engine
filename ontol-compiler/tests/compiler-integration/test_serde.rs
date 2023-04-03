@@ -199,7 +199,7 @@ fn test_serde_uuid() {
     .compile_ok(|env| {
         let my_id = TypeBinding::new(&env, "my_id");
         assert_matches!(
-            my_id.deserialize_data_variant(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            my_id.deserialize_data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Uuid(_))
         );
         assert_json_io_matches!(my_id, json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));
@@ -223,7 +223,7 @@ fn test_serde_datetime() {
     .compile_ok(|env| {
         let my_dt = TypeBinding::new(&env, "my_dt");
         assert_matches!(
-            my_dt.deserialize_data_variant(json!("1983-10-01T01:31:32.59+01:00")),
+            my_dt.deserialize_data(json!("1983-10-01T01:31:32.59+01:00")),
             Ok(Data::ChronoDateTime(_))
         );
         assert_json_io_matches!(

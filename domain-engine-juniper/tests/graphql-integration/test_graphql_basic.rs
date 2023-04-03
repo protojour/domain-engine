@@ -124,12 +124,12 @@ async fn test_graphql_artist_and_instrument_connections() {
                 artistList {
                     edges {
                         node {
-                            _id
+                            ID
                             name
                             plays {
                                 edges {
                                     node {
-                                        _id
+                                        ID
                                         name
                                     }
                                     how_much
@@ -145,13 +145,13 @@ async fn test_graphql_artist_and_instrument_connections() {
                 "artistList": {
                     "edges": [{
                         "node": {
-                            "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                            "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
                             "name": "Ziggy",
                             "plays": {
                                 "edges": [
                                     {
                                         "node": {
-                                            "_id": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
+                                            "ID": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
                                             "name": "Guitar",
                                         },
                                         "how_much": "A lot"
@@ -172,7 +172,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 instrumentList {
                     edges {
                         node {
-                            _id
+                            ID
                             name
                             played_by {
                                 edges {
@@ -214,14 +214,14 @@ async fn test_graphql_artist_and_instrument_connections() {
                             }
                         },
                         {
-                            _id: "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                            ID: "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                             _edge: {
                                 how_much: "A little bit less"
                             }
                         }
                     ]
                 }) {
-                    _id
+                    ID
                     name
                 }
             }
@@ -230,7 +230,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             .await,
             Ok(graphql_value!({
                 "createartist": {
-                    "_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                    "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
                     "name": "Ziggy"
                 }
             }))
@@ -344,7 +344,6 @@ async fn test_graphql_municipalities() {
                 municipalityList {
                     edges {
                         node {
-                            _id
                             code
                             geometry {
                                 __typename

@@ -175,11 +175,13 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 .into_visitor(self),
             ),
             SerdeOperator::ValueType(value_op) => {
-                let typed_value = self
+                let mut typed_attribute = self
                     .narrow(value_op.inner_operator_id)
                     .deserialize(deserializer)?;
 
-                Ok(typed_value)
+                typed_attribute.value.type_def_id = value_op.def_variant.def_id;
+
+                Ok(typed_attribute)
             }
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(operator_id) => {
@@ -198,7 +200,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 ),
             },
 
-            SerdeOperator::Id(_name, _inner_operator_id) => {
+            SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
                 //deserializer.deserialize_map()
                 todo!()
             }

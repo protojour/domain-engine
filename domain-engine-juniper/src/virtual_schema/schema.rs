@@ -261,7 +261,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                 }
             }
         }
-        SerdeOperator::Id(..) => TypeClassification::Id,
+        SerdeOperator::PrimaryId(..) => TypeClassification::Id,
         SerdeOperator::ConstructorSequence(seq_op) => TypeClassification::Type(
             NodeClassification::Node,
             seq_op.def_variant.def_id,

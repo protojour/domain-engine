@@ -143,31 +143,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::Map(intersected_map),
                 ))
             }
-            SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::ID => {
-                match self.get_def_type(def_variant.def_id)? {
-                    Type::Domain(_) => {
-                        let identifies_relation_id = self
-                            .relations
-                            .properties_by_type
-                            .get(&def_variant.def_id)?
-                            .identified_by?;
+            SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
+                let map = self
+                    .relations
+                    .properties_by_type
+                    .get(&def_variant.def_id)?
+                    .map
+                    .as_ref()?;
 
-                        let (identifies_relationship, _) = self
-                            .property_meta_by_object(def_variant.def_id, identifies_relation_id)
-                            .expect("Problem getting property meta");
-                        let subject = &identifies_relationship.subject;
+                let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
-                        let subject_operator_id = self
-                            .get_serde_operator_id(SerdeKey::no_modifier(subject.0.def_id))
-                            .expect("No subject operator for _id property");
+                let (relationship, relation) = self
+                    .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
+                    .expect("Problem getting property meta");
 
-                        Some(OperatorAllocation::Allocated(
-                            self.alloc_operator_id_for_key(&key),
-                            SerdeOperator::Id("_id".into(), subject_operator_id),
-                        ))
-                    }
-                    _ => None,
-                }
+                let property_name = relation.subject_prop(self.defs)?;
+
+                let object_operator_id = self
+                    .get_serde_operator_id(SerdeKey::no_modifier(relationship.object.0.def_id))
+                    .expect("No object operator for primary id property");
+
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id_for_key(&key),
+                    SerdeOperator::PrimaryId(property_name.into(), object_operator_id),
+                ))
             }
             SerdeKey::Def(def_variant) if def_variant.modifier.contains(DataModifier::ARRAY) => {
                 let item_operator_id = self.get_serde_operator_id(SerdeKey::Def(
@@ -243,7 +242,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )
             }
             Some(type_ref) => match def_variant.modifier {
-                DataModifier::NONE => self.create_core_type_serde_operator(def_variant, type_ref),
+                DataModifier::NONE => self.alloc_core_type_serde_operator(def_variant, type_ref),
                 _ => Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
                     DataModifier::NONE,
@@ -253,7 +252,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn create_core_type_serde_operator(
+    fn alloc_core_type_serde_operator(
         &mut self,
         def_variant: DefVariant,
         type_ref: TypeRef,
@@ -461,7 +460,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> Option<OperatorAllocation> {
-        let union_id = DataModifier::UNION | DataModifier::ID;
+        let union_id = DataModifier::UNION | DataModifier::PRIMARY_ID;
 
         if def_variant.modifier.contains(union_id) {
             let identifies_relation_id = match properties.identified_by {
@@ -472,25 +471,38 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ));
                 }
             };
+
+            let id_operator_id = match self.get_serde_operator_id(SerdeKey::Def(
+                def_variant.with_local_mod(DataModifier::PRIMARY_ID),
+            )) {
+                Some(id_operator_id) => id_operator_id,
+                None => {
+                    // This type has no inherent id
+                    return Some(OperatorAllocation::Redirect(
+                        def_variant.remove_modifier(union_id),
+                    ));
+                }
+            };
+
+            let map_def_variant = def_variant.remove_modifier(union_id);
+
             let (identifies_relationship, _) = self
                 .property_meta_by_object(def_variant.def_id, identifies_relation_id)
                 .expect("Problem getting subject property meta");
 
-            let id_def_variant = def_variant.with_local_mod(DataModifier::ID);
-            let map_def_variant = def_variant.remove_modifier(union_id);
-
             // Create a union between { '_id' } and the map properties itself
-            let id_operator_id = self
-                .get_serde_operator_id(SerdeKey::Def(id_def_variant))
-                .expect("No _id operator");
             let map_properties_operator_id = self
                 .get_serde_operator_id(SerdeKey::Def(map_def_variant))
                 .expect("No property map operator");
 
-            let operator_id = self.alloc_operator_id(&def_variant);
+            let id_property_name =
+                match self.operators_by_id.get(id_operator_id.0 as usize).unwrap() {
+                    SerdeOperator::PrimaryId(id_property_name, _) => id_property_name.clone(),
+                    other => panic!("id operator was not an Id: {other:?}"),
+                };
 
             Some(OperatorAllocation::Allocated(
-                operator_id,
+                self.alloc_operator_id(&def_variant),
                 SerdeOperator::Union(UnionOperator::new(
                     typename.into(),
                     def_variant,
@@ -499,7 +511,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
                                     identifies_relation_id,
-                                    "_id".into(),
+                                    id_property_name,
                                 ),
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
@@ -521,9 +533,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )),
             ))
         } else {
-            let operator_id = self.alloc_operator_id(&def_variant);
             Some(OperatorAllocation::Allocated(
-                operator_id,
+                self.alloc_operator_id(&def_variant),
                 self.create_map_operator(def_variant, typename, properties),
             ))
         }
@@ -682,6 +693,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if let Some(map) = &properties.map {
             for (property_id, property) in map {
+                if property.is_entity_id {
+                    continue;
+                }
+
                 let (relationship, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
                         if property_id.relation_id.0 == self.primitives.identifies_relation {

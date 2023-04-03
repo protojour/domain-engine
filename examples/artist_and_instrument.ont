@@ -6,14 +6,16 @@ pub type instrument-id {
 }
 
 pub type artist
-rel artist 'name': string
 rel artist-id identifies: artist
+rel artist 'ID': artist-id
+rel artist 'name': string
 
 pub type record
 rel record 'name': string
 
 pub type instrument {
     rel instrument-id identifies: _
+    rel _ 'ID': instrument-id
     rel _ 'name': string
 }
 

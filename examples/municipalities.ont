@@ -1,11 +1,11 @@
 use 'geojson' as geojson
 
-pub type municipality_id {
+pub type code {
     fmt '' => string => _
 }
 
 pub type municipality {
-    rel municipality_id identifies: _
-    rel _ 'code': string
+    rel code identifies: _
+    rel _ 'code': code
     rel _ 'geometry': geojson.Geometry
 }

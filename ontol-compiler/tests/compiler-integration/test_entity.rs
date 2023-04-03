@@ -22,15 +22,34 @@ fn id_cannot_identify_two_things() {
 }
 
 #[test]
-fn identifier_as_property() {
+fn entity_without_inherent_id() {
     "
-    type id { rel _ is: string }
-    type foo {
-        rel id identifies: _
-        rel _ 'id': id
+    pub type some_id { fmt '' => string => _ }
+    pub type entity {
+        rel some_id identifies: _
+        rel _ 'foo': string
     }
     "
-    .compile_ok(|_env| {});
+    .compile_ok(|env| {
+        let entity = TypeBinding::new(&env, "entity");
+        assert_json_io_matches!(entity, json!({ "foo": "foo" }));
+    });
+}
+
+#[test]
+fn identifier_as_property() {
+    "
+    type foo_id { rel _ is: string }
+    pub type foo {
+        rel foo_id identifies: _
+        rel _ 'key': foo_id
+        rel _ 'children'*: foo
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        assert_json_io_matches!(foo, json!({ "children": [{ "key": "some_key" }] }));
+    });
 }
 
 #[test]
@@ -104,7 +123,7 @@ fn artist_and_instrument_id_as_relation_object() {
                 "name": "Jimi Hendrix",
                 "plays": [
                     {
-                        "_id": example_id,
+                        "ID": example_id,
                         "_edge": {
                             "how_much": "all the time"
                         }
@@ -118,7 +137,7 @@ fn artist_and_instrument_id_as_relation_object() {
                 "name": "John McLaughlin",
                 "plays": [
                     {
-                        "_id": example_id,
+                        "ID": example_id,
                         "_edge": {
                             "how_much": "much."
                         }
@@ -142,34 +161,34 @@ fn artist_and_instrument_id_as_relation_object() {
                 "name": "Santana",
                 "plays": [
                     {
-                        "_id": "junk",
+                        "ID": "junk",
                     }
                 ]
             })),
-            r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 41"#
+            r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 40"#
         );
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Robert Fripp",
-                "plays": [{ "_id": example_id }]
+                "plays": [{ "ID": example_id }]
             })),
-            r#"missing properties, expected "_edge" at line 1 column 89"#
+            r#"missing properties, expected "_edge" at line 1 column 88"#
         );
 
-        // The following tests show that { "_id" } and the property map is a type union:
+        // The following tests show that { "ID" } and the property map is a type union:
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Tony Levin",
-                "plays": [{ "_id": example_id, "name": "Chapman stick" }]
+                "plays": [{ "ID": example_id, "name": "Chapman stick" }]
             })),
-            r#"unknown property `name` at line 1 column 93"#
+            r#"unknown property `name` at line 1 column 92"#
         );
         assert_error_msg!(
             artist.deserialize_data(json!({
                 "name": "Allan Holdsworth",
-                "plays": [{ "name": "Synthaxe", "_id": example_id }]
+                "plays": [{ "name": "Synthaxe", "ID": example_id }]
             })),
-            r#"unknown property `name` at line 1 column 99"#
+            r#"unknown property `name` at line 1 column 98"#
         );
     });
 }
@@ -269,7 +288,7 @@ fn entity_union_with_object_relation() {
                 "polyphony": 8,
                 "played-by": [
                     {
-                        "_id": "some_artist"
+                        "artist-id": "some_artist"
                     }
                 ]
             })
@@ -293,8 +312,8 @@ fn entity_union_in_relation_with_ids() {
         let json = json!({
             "name": "Someone",
             "plays": [
-                { "_id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
-                { "_id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+                { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+                { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
             ]
         });
 
@@ -321,7 +340,10 @@ fn entity_relationship_without_reverse() {
     "
     pub type lang_id { fmt '' => string => _ }
     pub type prog_id { fmt '' => string => _ }
-    pub type language { rel lang_id identifies: _ }
+    pub type language {
+        rel lang_id identifies: _
+        rel _ 'lang-id': lang_id
+    }
     pub type programmer {
         rel prog_id identifies: _
         rel _ 'name': string
@@ -332,7 +354,7 @@ fn entity_relationship_without_reverse() {
         let programmer = TypeBinding::new(&env, "programmer");
         assert_json_io_matches!(
             programmer,
-            json!({ "name": "audun", "favorite-language": { "_id": "rust" }})
+            json!({ "name": "audun", "favorite-language": { "lang-id": "rust" }})
         );
     });
 }

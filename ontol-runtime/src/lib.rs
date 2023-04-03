@@ -59,14 +59,14 @@ bitflags::bitflags! {
         const ARRAY          = 0b00000001;
         const UNION          = 0b00000010;
         const INTERSECTION   = 0b00000100;
-        const ID             = 0b00001000;
+        const PRIMARY_ID     = 0b00001000;
         const INHERENT_PROPS = 0b00010000;
     }
 }
 
 impl Default for DataModifier {
     fn default() -> Self {
-        Self::UNION | Self::INTERSECTION | Self::ID | Self::INHERENT_PROPS
+        Self::UNION | Self::INTERSECTION | Self::PRIMARY_ID | Self::INHERENT_PROPS
     }
 }
 
