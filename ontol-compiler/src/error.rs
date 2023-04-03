@@ -96,6 +96,8 @@ pub enum CompileError {
     SharedPrefixInPatternUnion,
     #[error("already identifies another type")]
     AlreadyIdentifiesAType,
+    #[error("already identified by another type; secondary ids not supported (yet)")]
+    AlreadyIdentified,
     #[error("must identify a type within the domain")]
     MustIdentifyWithinDomain,
     #[error("entity variants of the union are not uniquely identifiable")]

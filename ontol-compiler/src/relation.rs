@@ -68,5 +68,5 @@ pub enum Constructor {
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern
-    StringPattern(StringPatternSegment),
+    StringFmt(StringPatternSegment),
 }

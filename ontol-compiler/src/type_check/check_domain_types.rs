@@ -70,7 +70,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                             let variant_def = match &relation.kind {
                                                 RelationKind::Named(def)
-                                                | RelationKind::Transition(def) => def.def_id,
+                                                | RelationKind::FmtTransition(def) => def.def_id,
                                                 _ => relationship.object.0.def_id,
                                             };
 

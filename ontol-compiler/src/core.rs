@@ -69,7 +69,7 @@ impl<'m> Compiler<'m> {
     fn def_uuid(&mut self) {
         let (uuid, _) = self.define_domain_type("uuid", Type::DateTime);
         self.relations.properties_by_type_mut(uuid).constructor =
-            Constructor::StringPattern(StringPatternSegment::Regex(regex_util::uuid()));
+            Constructor::StringFmt(StringPatternSegment::Regex(regex_util::uuid()));
         self.defs
             .string_like_types
             .insert(uuid, StringLikeType::Uuid);
@@ -78,7 +78,7 @@ impl<'m> Compiler<'m> {
     fn def_datetime(&mut self) {
         let (datetime, _) = self.define_domain_type("datetime", Type::DateTime);
         self.relations.properties_by_type_mut(datetime).constructor =
-            Constructor::StringPattern(StringPatternSegment::Regex(regex_util::datetime_rfc3339()));
+            Constructor::StringFmt(StringPatternSegment::Regex(regex_util::datetime_rfc3339()));
         self.defs
             .string_like_types
             .insert(datetime, StringLikeType::DateTime);

@@ -201,7 +201,7 @@ fn compile_string_pattern_constructors(compiler: &mut Compiler) {
             .properties_by_type(def_id)
             .map(|p| &p.constructor)
         {
-            Some(Constructor::StringPattern(segment)) => segment,
+            Some(Constructor::StringFmt(segment)) => segment,
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 

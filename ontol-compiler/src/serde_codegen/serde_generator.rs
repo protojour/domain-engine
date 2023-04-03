@@ -438,7 +438,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }),
                 ))
             }
-            Constructor::StringPattern(segment) => {
+            Constructor::StringFmt(segment) => {
                 assert!(self
                     .patterns
                     .string_patterns

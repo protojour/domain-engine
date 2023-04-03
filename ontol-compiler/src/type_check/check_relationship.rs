@@ -31,7 +31,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match &relation.kind {
-            RelationKind::Named(def) | RelationKind::Transition(def) => {
+            RelationKind::Named(def) | RelationKind::FmtTransition(def) => {
                 self.check_def(def.def_id);
             }
             _ => {}
@@ -75,7 +75,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def(subject.0.def_id);
         let object_ty = self.check_def(object.0.def_id);
 
-        if matches!(&relation.1.kind, RelationKind::Transition(_)) {
+        if matches!(&relation.1.kind, RelationKind::FmtTransition(_)) {
             return subject_ty;
         }
 
@@ -162,7 +162,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             "Object is identified by {id:?}, this relation is {:?}",
                             relation.0
                         );
-                        todo!("Object is already identified, report error")
+                        return self.error(CompileError::AlreadyIdentified, span);
                     }
                     None => {
                         object_properties.identified_by =
@@ -208,7 +208,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
                 }
             }
-            (RelationKind::Transition(_), None, Constructor::StringPattern(_)) => {
+            (RelationKind::FmtTransition(_), None, Constructor::StringFmt(_)) => {
                 debug!("should concatenate string pattern");
             }
             _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
@@ -229,12 +229,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def(object.0.def_id);
         let subject_ty = self.check_def(subject.0.def_id);
 
-        if matches!(&relation.1.kind, RelationKind::Transition(_)) {
+        if matches!(&relation.1.kind, RelationKind::FmtTransition(_)) {
             match subject_ty {
                 Type::StringConstant(subject_def_id)
                     if *subject_def_id == self.primitives.empty_string =>
                 {
-                    if let Err(e) = self.extend_string_pattern_constructor(
+                    if let Err(e) = self.extend_string_pattern_fmt_constructor(
                         relation,
                         object.0.def_id,
                         object_ty,
@@ -251,8 +251,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .map(|props| &props.constructor);
 
                     match subject_constructor {
-                        Some(Constructor::StringPattern(subject_pattern)) => {
-                            if let Err(e) = self.extend_string_pattern_constructor(
+                        Some(Constructor::StringFmt(subject_pattern)) => {
+                            if let Err(e) = self.extend_string_pattern_fmt_constructor(
                                 relation,
                                 object.0.def_id,
                                 object_ty,
@@ -311,7 +311,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         subject_ty
     }
 
-    fn extend_string_pattern_constructor(
+    fn extend_string_pattern_fmt_constructor(
         &mut self,
         relation: (RelationId, &Relation),
         object_def: DefId,
@@ -320,7 +320,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let rel_def = match &relation.1.kind {
-            RelationKind::Transition(def) | RelationKind::Named(def) => def,
+            RelationKind::FmtTransition(def) | RelationKind::Named(def) => def,
             _ => todo!(),
         };
 
@@ -340,13 +340,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_type(rel_def.def_id)
                     .map(Properties::constructor)
                 {
-                    Some(Constructor::StringPattern(rel_segment)) => {
-                        StringPatternSegment::Property {
-                            property_id: PropertyId::subject(relation.0),
-                            type_def_id: rel_def.def_id,
-                            segment: Box::new(rel_segment.clone()),
-                        }
-                    }
+                    Some(Constructor::StringFmt(rel_segment)) => StringPatternSegment::Property {
+                        property_id: PropertyId::subject(relation.0),
+                        type_def_id: rel_def.def_id,
+                        segment: Box::new(rel_segment.clone()),
+                    },
                     _ => {
                         return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
                     }
@@ -359,7 +357,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match &mut object_properties.constructor {
             Constructor::Identity => {
                 object_properties.constructor =
-                    Constructor::StringPattern(StringPatternSegment::concat([origin, appendee]));
+                    Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
 
                 if !object_ty.is_anonymous() {
                     // constructors of unnamable types do not need to be processed..

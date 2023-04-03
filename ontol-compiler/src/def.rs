@@ -132,7 +132,7 @@ impl<'m> Relation<'m> {
 #[derive(Clone, Debug)]
 pub enum RelationKind {
     Named(DefReference),
-    Transition(DefReference),
+    FmtTransition(DefReference),
     Is,
     Identifies,
     Indexed,

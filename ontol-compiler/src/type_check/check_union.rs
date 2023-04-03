@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("check union {relationship:?}");
 
             let variant_def = match &relation.kind {
-                RelationKind::Named(def) | RelationKind::Transition(def) => def.def_id,
+                RelationKind::Named(def) | RelationKind::FmtTransition(def) => def.def_id,
                 _ => relationship.object.0.def_id,
             };
 
@@ -231,7 +231,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
                     }
-                    Constructor::StringPattern(segment) => {
+                    Constructor::StringFmt(segment) => {
                         return Ok(DomainTypeMatchData::ConstructorStringPattern(segment));
                     }
                 },

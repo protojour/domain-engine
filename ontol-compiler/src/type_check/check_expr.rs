@@ -230,7 +230,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         todo!()
                     }
                     Some(Constructor::Sequence(_)) => todo!(),
-                    Some(Constructor::StringPattern(_)) => todo!(),
+                    Some(Constructor::StringFmt(_)) => todo!(),
                 };
 
                 (domain_type, typed_expr_ref)

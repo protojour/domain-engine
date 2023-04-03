@@ -408,7 +408,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             let target_def = self.define_anonymous_type(&span);
 
-            root_defs.push(self.ast_transition_to_def(
+            root_defs.push(self.ast_fmt_transition_to_def(
                 (origin_def, &origin_span),
                 transition,
                 (target_def.clone(), &span),
@@ -428,7 +428,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
         };
 
-        root_defs.push(self.ast_transition_to_def(
+        root_defs.push(self.ast_fmt_transition_to_def(
             (origin_def, &origin_span),
             transition,
             (end_def, &end_span),
@@ -438,7 +438,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(root_defs)
     }
 
-    fn ast_transition_to_def(
+    fn ast_fmt_transition_to_def(
         &mut self,
         from: (DefReference, &Span),
         transition: (ast::Type, Span),
@@ -446,7 +446,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         span: Span,
     ) -> Res<DefId> {
         let transition_def = self.resolve_type_reference(transition.0, &transition.1)?;
-        let kind = RelationKind::Transition(transition_def);
+        let kind = RelationKind::FmtTransition(transition_def);
 
         // This syntax just defines the relation the first time it's used
         let relation_id = match self.define_relation_if_undefined(&kind) {
@@ -758,7 +758,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn define_relation_if_undefined(&mut self, kind: &RelationKind) -> ImplicitRelationId {
         match kind {
-            RelationKind::Named(def) | RelationKind::Transition(def) => {
+            RelationKind::Named(def) | RelationKind::FmtTransition(def) => {
                 match self.compiler.relations.relations.entry(def.def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(*vacant.insert(RelationId(
                         self.compiler.defs.alloc_def_id(self.src.package_id),
