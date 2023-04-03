@@ -38,14 +38,14 @@ fn test_map_simple() {
     "
     pub type foo
     pub type bar
-    rel foo ['f'] string
-    rel bar ['b'] string
+    rel foo 'f': string
+    rel bar 'b': string
     map (x) {
         foo {
-            rel ['f'] x
+            rel 'f': x
         }
         bar {
-            rel ['b'] x
+            rel 'b': x
         }
     }
     "
@@ -70,8 +70,8 @@ fn test_meters() {
     "
     pub type meters
     pub type millimeters
-    rel meters [is] int
-    rel millimeters [is] int
+    rel meters is: int
+    rel millimeters is: int
     map (x) {
         meters { x / 1000 }
         millimeters { x }
@@ -87,10 +87,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     pub type celsius {
-        rel _ [is] int
+        rel _ is: int
     }
     pub type fahrenheit {
-        rel _ [is] int
+        rel _ is: int
     }
 
     map (x) {
@@ -109,12 +109,12 @@ fn test_map_value_to_map() {
     "
     pub type one
     pub type two
-    rel one [is] string
-    rel two ['a'] string
+    rel one is: string
+    rel two 'a': string
     map (x) {
         one { x }
         two {
-            rel ['a'] x
+            rel 'a': x
         }
     }
     "
@@ -129,12 +129,12 @@ fn test_map_value_to_map_func() {
     "
     pub type one
     pub type two
-    rel one [is] int
-    rel two ['a'] int
+    rel one is: int
+    rel two 'a': int
     map (x) {
         one { x }
         two {
-            rel ['a'] x * 2
+            rel 'a': x * 2
         }
     }
     "
@@ -149,14 +149,14 @@ fn test_map_simple_array() {
     "
     pub type foo
     pub type bar
-    rel foo ['a'*] int
-    rel bar ['b'*] int
+    rel foo 'a'*: int
+    rel bar 'b'*: int
     map (x) {
         foo {
-            rel ['a'] x
+            rel 'a': x
         }
         bar {
-            rel ['b'] x
+            rel 'b': x
         }
     }
     "
@@ -184,26 +184,26 @@ fn test_map_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     pub type one {
-        rel _ ['a'] string
-        rel _ ['b'] string
+        rel _ 'a': string
+        rel _ 'b': string
     }
     pub type two {
-        rel _ ['a'] string
-        rel _ ['b'] string
-        rel _ ['c'] string
-        rel _ ['d'] string
+        rel _ 'a': string
+        rel _ 'b': string
+        rel _ 'c': string
+        rel _ 'd': string
     }
 
     map (x y) {
         one {
-            rel ['a'] x
-            rel ['b'] y
+            rel 'a': x
+            rel 'b': y
         }
         two {
-            rel ['a'] x
-            rel ['b'] y
-            rel ['c'] x
-            rel ['d'] y
+            rel 'a': x
+            rel 'b': y
+            rel 'c': x
+            rel 'd': y
         }
     }
     "
@@ -233,10 +233,10 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     "
     type meters {
-        rel _ [is] int
+        rel _ is: int
     }
     type millimeters {
-        rel _ [is] int
+        rel _ is: int
     }
 
     map (m) {
@@ -245,19 +245,19 @@ fn test_map_delegation() {
     }
 
     pub type car {
-        rel _ ['length'] meters
+        rel _ 'length': meters
     }
 
     pub type vehicle {
-        rel _ ['length'] millimeters
+        rel _ 'length': millimeters
     }
     
     map (l) {
         car {
-            rel ['length'] l
+            rel 'length': l
         }
         vehicle {
-            rel ['length'] l
+            rel 'length': l
         }
     }
     "

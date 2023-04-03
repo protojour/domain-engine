@@ -36,14 +36,14 @@ fn lex_error_recovery_works() {
     "
     type foo
     type bar
-    rel foo ['prop'] string
-    rel bar ['prop'] int
+    rel foo 'prop': string
+    rel bar 'prop': int
     map (x) {
         foo {
-            rel ['prop'] x
+            rel 'prop': x
         }
         bar {
-            rel ['prop']
+            rel 'prop':
                 x
                 ;; // ERROR lex error: illegal character `;`
                 foobar // ERROR undeclared variable
@@ -57,9 +57,8 @@ fn lex_error_recovery_works() {
 fn rel_type_not_found() {
     "
     type foo
-    rel foo ['bar']
+    rel foo 'bar':
         baz // ERROR type not found
-    
     "
     .compile_fail()
 }
@@ -79,9 +78,9 @@ fn rel_duplicate_anonymous_relation() {
     type foo
     type bar
     rel // ERROR unit type `bar` cannot be part of a union
-        foo [is?] bar
+        foo is?: bar
     rel // ERROR duplicate anonymous relationship
-        foo [is?] bar
+        foo is?: bar
     "
     .compile_fail()
 }
@@ -92,8 +91,8 @@ fn map_union_unit_type() {
     type foo
     type bar
     type u {
-        rel _ [is?] foo // ERROR unit type `foo` cannot be part of a union
-        rel _ [is?] bar // ERROR unit type `bar` cannot be part of a union
+        rel _ is?: foo // ERROR unit type `foo` cannot be part of a union
+        rel _ is?: bar // ERROR unit type `bar` cannot be part of a union
     }
     "
     .compile_fail()
@@ -104,11 +103,11 @@ fn map_union_missing_discriminator() {
     "
     type foo
     type bar
-    rel foo ['a'] 'constant'
-    rel bar ['b'] string
+    rel foo 'a': 'constant'
+    rel bar 'b': string
     type u
-    rel u [is?] foo
-    rel u [is?] bar // ERROR cannot discriminate type
+    rel u is?: foo
+    rel u is?: bar // ERROR cannot discriminate type
     "
     .compile_fail()
 }
@@ -118,11 +117,11 @@ fn map_union_non_uniform_discriminators() {
     "
     type foo
     type bar
-    rel foo ['a'] 'constant'
-    rel bar ['b'] 'other-constant'
+    rel foo 'a': 'constant'
+    rel bar 'b': 'other-constant'
     type u { // ERROR no uniform discriminator found for union variants
-        rel _ [is?] foo
-        rel _ [is?] bar
+        rel _ is?: foo
+        rel _ is?: bar
     }
     "
     .compile_fail()
@@ -132,8 +131,8 @@ fn map_union_non_uniform_discriminators() {
 fn non_disjoint_string_union() {
     "
     type u1 {
-        rel _ [is?] 'a'
-        rel _ [is?] 'a' // ERROR duplicate anonymous relationship
+        rel _ is?: 'a'
+        rel _ is?: 'a' // ERROR duplicate anonymous relationship
     }
     "
     .compile_fail()
@@ -143,16 +142,16 @@ fn non_disjoint_string_union() {
 fn union_tree() {
     "
     type u1 {
-        rel _ [is?] '1a'
-        rel _ [is?] '1b'
+        rel _ is?: '1a'
+        rel _ is?: '1b'
     }
     type u2 {
-        rel _ [is?] '2a'
-        rel _ [is?] '2b'
+        rel _ is?: '2a'
+        rel _ is?: '2b'
     }
     type u3 {
-        rel _ [is?] u1 // ERROR union tree not supported
-        rel _ [is?] u2 // ERROR union tree not supported
+        rel _ is?: u1 // ERROR union tree not supported
+        rel _ is?: u2 // ERROR union tree not supported
     }
     "
     .compile_fail()
@@ -162,8 +161,8 @@ fn union_tree() {
 fn sequence_mix1() {
     "
     type u {
-        rel _ [is?] int
-        rel _ [0] string // ERROR invalid mix of relationship type for subject
+        rel _ is?: int
+        rel _ 0: string // ERROR invalid mix of relationship type for subject
     }
     "
     .compile_fail();
@@ -173,8 +172,8 @@ fn sequence_mix1() {
 fn sequence_mix2() {
     "
     type u
-    rel u ['a'] int
-    rel u [0] string // ERROR invalid mix of relationship type for subject
+    rel u 'a': int
+    rel u 0: string // ERROR invalid mix of relationship type for subject
     "
     .compile_fail();
 }
@@ -183,8 +182,8 @@ fn sequence_mix2() {
 fn sequence_overlapping_indices() {
     "
     type u
-    rel u [0..3] int
-    rel u [2..4] string // ERROR overlapping indexes
+    rel u 0..3: int
+    rel u 2..4: string // ERROR overlapping indexes
     "
     .compile_fail();
 }
@@ -193,8 +192,8 @@ fn sequence_overlapping_indices() {
 fn sequence_ambiguous_infinite_tail() {
     r#"
     type u
-    rel u [0..] int
-    rel u [1..] string // ERROR overlapping indexes
+    rel u 0..: int
+    rel u 1..: string // ERROR overlapping indexes
     "#
     .compile_fail();
 }
@@ -233,7 +232,7 @@ fn map_obj_non_domain_type_and_unit_type() {
     map (x) {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
-            rel ['prop'] x
+            rel 'prop': x
         }
     }
     "
@@ -245,8 +244,8 @@ fn map_attribute_mismatch() {
     "
     type foo
     type bar
-    rel foo ['prop'] bar
-    rel bar [is] int
+    rel foo 'prop': bar
+    rel bar is: int
     map (x) {
         foo { // ERROR missing property `prop`
             x // ERROR expected named property
@@ -262,12 +261,12 @@ fn map_duplicate_unknown_property() {
     "
     type foo
     type bar
-    rel foo ['a'] bar
+    rel foo 'a': bar
     map (x) {
         foo {
-            rel ['a'] x
-            rel ['a'] x // ERROR duplicate property
-            rel ['b'] x // ERROR unknown property
+            rel 'a': x
+            rel 'a': x // ERROR duplicate property
+            rel 'b': x // ERROR unknown property
         }
         bar {}
     }
@@ -280,14 +279,14 @@ fn map_type_mismatch() {
     "
     type foo
     type bar
-    rel foo ['prop'] string
-    rel bar ['prop'] int
+    rel foo 'prop': string
+    rel bar 'prop': int
     map (x) {
         foo {
-            rel ['prop'] x
+            rel 'prop': x
         }
         bar {
-            rel ['prop']
+            rel 'prop':
                 x // ERROR type mismatch: expected `int`, found `string`
         }
     }
@@ -302,14 +301,14 @@ fn map_type_mismatch_in_func() {
     "
     type foo
     type bar
-    rel foo ['prop'] string
-    rel bar ['prop'] int
+    rel foo 'prop': string
+    rel bar 'prop': int
     map (x) {
         foo {
-            rel ['prop'] x
+            rel 'prop': x
         }
         bar {
-            rel ['prop']
+            rel 'prop':
                 x // ERROR type mismatch: expected `int`, found `string`
                 * 2
         }
@@ -322,21 +321,21 @@ fn map_type_mismatch_in_func() {
 fn map_array_mismatch() {
     "
     type foo
-    rel foo ['a'*] string
-    rel foo ['b'*] string
+    rel foo 'a'*: string
+    rel foo 'b'*: string
 
     type bar
-    rel bar ['a'] string
-    rel bar ['b'*] int
+    rel bar 'a': string
+    rel bar 'b'*: int
 
     map (x y) {
         foo {
-            rel ['a'] x
-            rel ['b'] y
+            rel 'a': x
+            rel 'b': y
         }
         bar {
-            rel ['a'] x // ERROR type mismatch: expected `string`, found `string[]`
-            rel ['b'] y // ERROR type mismatch: expected `int[]`, found `string[]`
+            rel 'a': x // ERROR type mismatch: expected `string`, found `string[]`
+            rel 'b': y // ERROR type mismatch: expected `int[]`, found `string[]`
         }
     }
     "
@@ -347,8 +346,8 @@ fn map_array_mismatch() {
 fn union_in_named_relationship() {
     "
     type foo
-    rel foo ['a'] string
-    rel foo ['a'] int // ERROR union in named relationship is not supported yet. Make a union type instead.
+    rel foo 'a': string
+    rel foo 'a': int // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail();
 }
@@ -358,8 +357,8 @@ fn test_serde_object_property_not_sugared() {
     "
     type foo
     type bar
-    rel foo ['a' | 'aa'*] bar {} // ERROR only entities may have named reverse relationship
-    rel foo ['b' | 'bb'*] string // ERROR only entities may have named reverse relationship
+    rel foo 'a' | 'aa'*: bar {} // ERROR only entities may have named reverse relationship
+    rel foo 'b' | 'bb'*: string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -367,19 +366,19 @@ fn test_serde_object_property_not_sugared() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a { rel _ [is?] int }
-    type b { rel _ [is?] int }
+    type a { rel _ is?: int }
+    type b { rel _ is?: int }
 
-    type c { rel _ ['p0'] a }
-    type d { rel _ ['p1'] b }
+    type c { rel _ 'p0': a }
+    type d { rel _ 'p1': b }
 
     map (x) {
         c {
-            rel ['p0']
+            rel 'p0':
                 x // ERROR cannot convert this `a` from `b`: These types are not equated.
         }
         d {
-            rel ['p1']
+            rel 'p1':
                 x // ERROR cannot convert this `b` from `a`: These types are not equated.
         }
     }
@@ -391,20 +390,20 @@ fn unresolved_transitive_map() {
 fn various_monadic_properties() {
     "
     type foo
-    rel foo ['a'] string
-    // default foo ['a'] 'default'
+    rel foo 'a': string
+    // default foo 'a': 'default'
 
     type bar
     // a is either a string or not present
-    rel bar ['maybe'?] string
+    rel bar 'maybe'?: string
 
     // bar and string may be related via b many times
-    rel bar ['array'*] string
+    rel bar 'array'*: string
 
     // a is either a string or null
-    rel bar ['nullable'] string
+    rel bar 'nullable': string
     // FIXME: Should this work?
-    rel bar ['nullable'] () // ERROR union in named relationship is not supported yet. Make a union type instead.
+    rel bar 'nullable': () // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail()
 }
@@ -415,8 +414,8 @@ fn mix_of_index_and_edge_type() {
     type foo
     type bar
 
-    rel foo [0] string { // ERROR cannot mix index relation identifiers and edge types
-        rel _ [is] bar
+    rel foo 0: string { // ERROR cannot mix index relation identifiers and edge types
+        rel _ is: bar
     }
     "#
     .compile_fail()
@@ -427,7 +426,7 @@ fn invalid_subject_types() {
     "
     rel
         'a' // ERROR subject must be a domain type
-        ['b'] string
+        'b': string
     "
     .compile_fail()
 }
@@ -438,7 +437,7 @@ fn invalid_relation_type() {
     type foo
     type bar
     rel foo
-        [uuid] // ERROR invalid relation type
+        uuid: // ERROR invalid relation type
         bar
     "
     .compile_fail()
@@ -466,7 +465,7 @@ fn invalid_fmt_semantics() {
 fn spans_are_correct_projected_from_regex_syntax_errors() {
     r#"
     type lol
-    rel () [/abc\/(?P<42>.)/] lol // ERROR invalid regex: invalid capture group character
+    rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
     "#
     .compile_fail_then(|errors| {
         assert_eq!("4", errors[0].span_text);
@@ -479,16 +478,16 @@ fn complains_about_non_disambiguatable_string_id() {
     type animal_id { fmt '' => string => _ }
     type plant_id { fmt '' => string => _ }
     type animal {
-        rel animal_id [identifies] _
-        rel _ ['class'] 'animal'
+        rel animal_id identifies: _
+        rel _ 'class': 'animal'
     }
     type plant {
-        rel plant_id [identifies] _
-        rel _ ['class'] 'plant'
+        rel plant_id identifies: _
+        rel _ 'class': 'plant'
     }
     type lifeform { // ERROR entity variants of the union are not uniquely identifiable
-        rel _ [is?] animal
-        rel _ [is?] plant
+        rel _ is?: animal
+        rel _ is?: plant
     }
     "
     .compile_fail();
@@ -506,9 +505,9 @@ fn complains_about_ambiguous_pattern_based_unions() {
     fmt '' => 'bar' => uuid => bar
     fmt '' => 'barbar' => uuid => barbar
 
-    rel union [is?] foo
-    rel union [is?] bar
-    rel union [is?] barbar
+    rel union is?: foo
+    rel union is?: bar
+    rel union is?: barbar
     "
     .compile_fail();
 }
@@ -536,7 +535,7 @@ fn fail_import_private_type() {
             "
             use 'dep' as dep
             pub type bar {
-                rel _ ['foo'] dep.foo // ERROR private type
+                rel _ 'foo': dep.foo // ERROR private type
             }
             ",
         ),
@@ -548,7 +547,7 @@ fn fail_import_private_type() {
 fn namespace_not_found() {
     "
     type foo {
-        rel _ ['prop']
+        rel _ 'prop':
             dep // ERROR namespace not found
             .foo
     }

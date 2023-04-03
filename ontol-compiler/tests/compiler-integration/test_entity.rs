@@ -14,8 +14,8 @@ fn id_should_not_identify_two_things() {
     type foo
     type bar
     type id {
-        rel _ [identifies] foo
-        rel _ [identifies] bar // ERROR already identifies another type
+        rel _ identifies: foo
+        rel _ identifies: bar // ERROR already identifies another type
     }
     "
     .compile_fail();
@@ -167,9 +167,9 @@ fn test_entity_self_relationship_optional_object() {
     "
     pub type node_id { fmt '' => string => _ }
     pub type node {
-        rel node_id [identifies] _
-        rel _ ['name'] string
-        rel _ ['children'* | 'parent'?] node
+        rel node_id identifies: _
+        rel _ 'name': string
+        rel _ 'children'* | 'parent'?: node
     }
     "
     .compile_ok(|env| {
@@ -216,8 +216,8 @@ fn test_entity_self_relationship_mandatory_object() {
     "
     pub type node_id { fmt '' => string => _ }
     pub type node {
-        rel node_id [identifies] _
-        rel _ ['children'* | 'parent'] node
+        rel node_id identifies: _
+        rel _ 'children'* | 'parent': node
     }
     "
     .compile_ok(|env| {
@@ -309,11 +309,11 @@ fn entity_relationship_without_reverse() {
     "
     pub type lang_id { fmt '' => string => _ }
     pub type prog_id { fmt '' => string => _ }
-    pub type language { rel lang_id [identifies] _ }
+    pub type language { rel lang_id identifies: _ }
     pub type programmer {
-        rel prog_id [identifies] _
-        rel _ ['name'] string
-        rel _ ['favorite-language'] language
+        rel prog_id identifies: _
+        rel _ 'name': string
+        rel _ 'favorite-language': language
     }
     "
     .compile_ok(|env| {
@@ -334,21 +334,21 @@ fn recursive_entity_union() {
 
     pub type lifeform // ERROR entity variants of the union are not uniquely identifiable
     pub type animal {
-        rel animal_id [identifies] _
-        rel _ ['class'] 'animal'
-        rel _ ['eats'*] lifeform
+        rel animal_id identifies: _
+        rel _ 'class': 'animal'
+        rel _ 'eats'*: lifeform
     }
     pub type plant {
-        rel plant_id [identifies] _
-        rel _ ['class'] 'plant'
+        rel plant_id identifies: _
+        rel _ 'class': 'plant'
     }
-    rel lifeform [is?] animal
-    rel lifeform [is?] plant
+    rel lifeform is?: animal
+    rel lifeform is?: plant
 
     pub type owner {
-        rel owner_id [identifies] _
-        rel _ ['name'] string
-        rel _ ['owns'*] lifeform
+        rel owner_id identifies: _
+        rel _ 'name': string
+        rel _ 'owns'*: lifeform
     }
     "
     .compile_ok(|env| {

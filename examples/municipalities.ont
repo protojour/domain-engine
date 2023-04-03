@@ -5,7 +5,7 @@ pub type municipality_id {
 }
 
 pub type municipality {
-    rel municipality_id [identifies] _
-    rel _ ['code'] string
-    rel _ ['geometry'] geojson.Geometry
+    rel municipality_id identifies: _
+    rel _ 'code': string
+    rel _ 'geometry': geojson.Geometry
 }
