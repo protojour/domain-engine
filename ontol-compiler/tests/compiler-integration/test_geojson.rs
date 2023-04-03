@@ -79,8 +79,8 @@ fn test_municipalities() {
             }
 
             type kommune {
-                rel _ ['kommunenummer'] kommunenummer
-                rel _ ['geometry'] geojson.Polygon
+                rel _ 'kommunenummer': kommunenummer
+                rel _ 'geometry': geojson.Polygon
             }
             ",
         ),

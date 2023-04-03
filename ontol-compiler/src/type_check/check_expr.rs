@@ -223,7 +223,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
                         }
                     },
-                    Some(Constructor::ValueUnion(_property_set)) => {
+                    Some(Constructor::Intersection(_)) => {
+                        todo!()
+                    }
+                    Some(Constructor::Union(_property_set)) => {
                         todo!()
                     }
                     Some(Constructor::Sequence(_)) => todo!(),
@@ -233,7 +236,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (domain_type, typed_expr_ref)
             }
             ExprKind::Constant(k) => {
-                let ty = self.def_types.map.get(&self.defs.int()).unwrap();
+                let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (
                     ty,
                     ctx.typed_expr_table.add_expr(TypedExpr {

@@ -14,6 +14,7 @@ use crate::{
     mem::{Intern, Mem},
     namespace::Space,
     package::CORE_PKG,
+    primitive::PrimitiveKind,
     regex_util::parse_literal_regex_to_hir,
     relation::RelationshipId,
     source::SourceSpan,
@@ -35,7 +36,7 @@ pub struct Def<'m> {
 #[derive(Debug)]
 pub enum DefKind<'m> {
     Package(PackageId),
-    Primitive(Primitive),
+    Primitive(PrimitiveKind),
     StringLiteral(&'m str),
     EmptySequence,
     Regex(&'m str),
@@ -54,10 +55,13 @@ impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Package(_) => None,
-            Self::Primitive(Primitive::Unit) => Some("unit".into()),
-            Self::Primitive(Primitive::Int) => Some("int".into()),
-            Self::Primitive(Primitive::Number) => Some("number".into()),
-            Self::Primitive(Primitive::String) => Some("string".into()),
+            Self::Primitive(PrimitiveKind::Unit) => Some("unit".into()),
+            Self::Primitive(PrimitiveKind::False) => Some("false".into()),
+            Self::Primitive(PrimitiveKind::True) => Some("true".into()),
+            Self::Primitive(PrimitiveKind::Bool) => Some("bool".into()),
+            Self::Primitive(PrimitiveKind::Int) => Some("int".into()),
+            Self::Primitive(PrimitiveKind::Number) => Some("number".into()),
+            Self::Primitive(PrimitiveKind::String) => Some("string".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
@@ -84,17 +88,6 @@ pub struct TypeDefParam {
 
 #[derive(Debug)]
 pub struct Variables(pub SmallVec<[(ExprId, SourceSpan); 2]>);
-
-#[derive(Debug)]
-pub enum Primitive {
-    /// The unit data type which contains no information
-    Unit,
-    /// All the integers
-    Int,
-    /// All numbers (realistically all rational numbers as all computer numbers are rational)
-    Number,
-    String,
-}
 
 #[derive(Debug, Clone)]
 pub struct DefReference {
@@ -199,15 +192,6 @@ pub struct Defs<'m> {
     def_id_allocators: FnvHashMap<PackageId, u16>,
     next_def_param: DefParamId,
     next_expr_id: ExprId,
-    unit: DefId,
-    is_relation: DefId,
-    identifies_relation: DefId,
-    indexed_relation: DefId,
-    empty_sequence: DefId,
-    empty_string: DefId,
-    int: DefId,
-    number: DefId,
-    string: DefId,
     pub(crate) map: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
@@ -217,103 +201,17 @@ pub struct Defs<'m> {
 
 impl<'m> Defs<'m> {
     pub fn new(mem: &'m Mem) -> Self {
-        let mut defs = Self {
+        Self {
             mem,
             def_id_allocators: Default::default(),
             next_expr_id: ExprId(0),
             next_def_param: DefParamId(0),
-            unit: DefId::unit(),
-            is_relation: DefId::unit(),
-            identifies_relation: DefId::unit(),
-            indexed_relation: DefId::unit(),
-            empty_sequence: DefId::unit(),
-            empty_string: DefId::unit(),
-            int: DefId::unit(),
-            number: DefId::unit(),
-            string: DefId::unit(),
             map: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
             literal_regex_hirs: Default::default(),
             string_like_types: Default::default(),
-        };
-
-        defs.unit = defs.add_primitive(Primitive::Unit);
-        assert_eq!(DefId::unit(), defs.unit);
-
-        // Add some extremely fundamental definitions here already.
-        // These are even independent from CORE being defined.
-        defs.is_relation = defs.add_def(
-            DefKind::Relation(Relation {
-                kind: RelationKind::Is,
-                subject_prop: None,
-                object_prop: None,
-            }),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
-        defs.identifies_relation = defs.add_def(
-            DefKind::Relation(Relation {
-                kind: RelationKind::Identifies,
-                subject_prop: None,
-                object_prop: None,
-            }),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
-        defs.indexed_relation = defs.add_def(
-            DefKind::Relation(Relation {
-                kind: RelationKind::Indexed,
-                subject_prop: None,
-                object_prop: None,
-            }),
-            CORE_PKG,
-            SourceSpan::none(),
-        );
-        defs.empty_sequence = defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none());
-        defs.empty_string = defs.add_def(DefKind::StringLiteral(""), CORE_PKG, SourceSpan::none());
-
-        defs.int = defs.add_primitive(Primitive::Int);
-        defs.number = defs.add_primitive(Primitive::Number);
-        defs.string = defs.add_primitive(Primitive::String);
-
-        defs
-    }
-
-    pub fn unit(&self) -> DefId {
-        self.unit
-    }
-
-    pub fn is_relation(&self) -> DefId {
-        self.is_relation
-    }
-
-    pub fn identifies_relation(&self) -> DefId {
-        self.identifies_relation
-    }
-
-    pub fn indexed_relation(&self) -> DefId {
-        self.indexed_relation
-    }
-
-    pub fn empty_sequence(&self) -> DefId {
-        self.empty_sequence
-    }
-
-    pub fn empty_string(&self) -> DefId {
-        self.empty_string
-    }
-
-    pub fn int(&self) -> DefId {
-        self.int
-    }
-
-    pub fn number(&self) -> DefId {
-        self.number
-    }
-
-    pub fn string(&self) -> DefId {
-        self.string
+        }
     }
 
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
@@ -428,8 +326,8 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn add_primitive(&mut self, primitive: Primitive) -> DefId {
-        self.add_def(DefKind::Primitive(primitive), CORE_PKG, SourceSpan::none())
+    pub fn add_primitive(&mut self, kind: PrimitiveKind) -> DefId {
+        self.add_def(DefKind::Primitive(kind), CORE_PKG, SourceSpan::none())
     }
 }
 

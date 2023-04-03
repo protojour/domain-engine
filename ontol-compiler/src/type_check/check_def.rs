@@ -2,8 +2,9 @@ use ontol_runtime::DefId;
 
 use crate::{
     codegen::{CodegenTask, MapCodegenTask},
-    def::{DefKind, Primitive, TypeDef},
+    def::{DefKind, TypeDef},
     mem::Intern,
+    primitive::PrimitiveKind,
     typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
 };
@@ -49,8 +50,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
-            DefKind::Primitive(Primitive::Int) => self.types.intern(Type::Int(def_id)),
-            DefKind::Primitive(Primitive::Number) => self.types.intern(Type::Number(def_id)),
+            DefKind::Primitive(PrimitiveKind::Int) => self.types.intern(Type::Int(def_id)),
+            DefKind::Primitive(PrimitiveKind::Number) => self.types.intern(Type::Number(def_id)),
             DefKind::Mapping(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),

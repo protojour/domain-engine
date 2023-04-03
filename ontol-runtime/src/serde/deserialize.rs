@@ -17,9 +17,9 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching, IntMatcher,
-        MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher, UnionMatcher,
-        UnitMatcher, ValueMatcher,
+        BoolMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
+        IntMatcher, MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher,
+        UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
     processor::SerdeProcessor,
@@ -117,6 +117,12 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Unit => {
                 deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
             }
+            SerdeOperator::False(def_id) => deserializer
+                .deserialize_bool(BoolMatcher::False(*def_id).into_visitor_no_params(self)),
+            SerdeOperator::True(def_id) => deserializer
+                .deserialize_bool(BoolMatcher::True(*def_id).into_visitor_no_params(self)),
+            SerdeOperator::Bool(def_id) => deserializer
+                .deserialize_bool(BoolMatcher::Bool(*def_id).into_visitor_no_params(self)),
             SerdeOperator::Int(def_id) => {
                 deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
             }
@@ -218,6 +224,15 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             .matcher
             .match_unit()
             .map_err(|_| Error::invalid_type(Unexpected::Unit, &self))?;
+
+        Ok(Attribute::with_unit_params(value))
+    }
+
+    fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
+        let value = self
+            .matcher
+            .match_bool(v)
+            .map_err(|_| Error::invalid_type(Unexpected::Bool(v), &self))?;
 
         Ok(Attribute::with_unit_params(value))
     }

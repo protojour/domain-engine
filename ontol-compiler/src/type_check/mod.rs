@@ -7,6 +7,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId},
     mem::Intern,
+    primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
     CompileErrors, Compiler, SourceSpan,
@@ -39,6 +40,7 @@ pub struct TypeCheck<'c, 'm> {
     codegen_tasks: &'c mut CodegenTasks<'m>,
     expressions: &'c FnvHashMap<ExprId, Expr>,
     defs: &'c Defs<'m>,
+    primitives: &'c Primitives,
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -50,8 +52,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
             TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: smart_format!("{}", FormatType(actual, self.defs)),
-                expected: smart_format!("{}", FormatType(expected, self.defs)),
+                actual: smart_format!("{}", FormatType(actual, self.defs, self.primitives)),
+                expected: smart_format!("{}", FormatType(expected, self.defs, self.primitives)),
             },
         };
         self.error(compile_error, span)
@@ -80,6 +82,7 @@ impl<'m> Compiler<'m> {
             codegen_tasks: &mut self.codegen_tasks,
             expressions: &self.expressions,
             defs: &self.defs,
+            primitives: &self.primitives,
         }
     }
 }

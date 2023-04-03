@@ -9,21 +9,21 @@ pub type artist_id {
 }
 
 pub type guitar {
-    rel guitar_id [identifies] _
-    rel _ ['type'] 'guitar'
-    rel _ ['string_count'] int
+    rel guitar_id identifies: _
+    rel _ 'type': 'guitar'
+    rel _ 'string_count': int
 }
 pub type synth {
-    rel synth_id [identifies] _
-    rel _ ['type'] 'synth'
-    rel _ ['polyphony'] int
+    rel synth_id identifies: _
+    rel _ 'type': 'synth'
+    rel _ 'polyphony': int
 }
 pub type instrument {
-    rel _ [is?] guitar
-    rel _ [is?] synth
+    rel _ is?: guitar
+    rel _ is?: synth
 }
 pub type artist {
-    rel artist_id [identifies] _
-    rel _ ['name'] string
-    rel _ ['plays'* | 'played-by'*] instrument
+    rel artist_id identifies: _
+    rel _ 'name': string
+    rel _ 'plays'* | 'played-by'*: instrument
 }

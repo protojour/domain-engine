@@ -483,7 +483,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn resolve_type_reference(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefReference> {
         match ast_ty {
             ast::Type::Unit => Ok(DefReference {
-                def_id: self.compiler.defs.unit(),
+                def_id: self.compiler.primitives.unit,
                 pattern_bindings: Default::default(),
             }),
             ast::Type::Path(path, param_patterns) => {
@@ -501,7 +501,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Type::StringLiteral(lit) => {
                 let def_id = match lit.as_str() {
-                    "" => self.compiler.defs.empty_string(),
+                    "" => self.compiler.primitives.empty_string,
                     _ => self
                         .compiler
                         .defs
@@ -767,13 +767,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
             }
             RelationKind::Is => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.is_relation()))
+                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.is_relation))
             }
             RelationKind::Identifies => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.identifies_relation()))
+                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.identifies_relation))
             }
             RelationKind::Indexed => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.defs.indexed_relation()))
+                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.indexed_relation))
             }
         }
     }

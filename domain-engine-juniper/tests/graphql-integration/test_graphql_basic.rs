@@ -27,8 +27,8 @@ async fn test_graphql_basic_schema() {
     let (env, schema) = "
     pub type foo_id { fmt '' => string => _ }
     pub type foo {
-        rel foo_id [identifies] _
-        rel _ ['prop'] int
+        rel foo_id identifies: _
+        rel _ 'prop': int
     }
     "
     .compile_schema();

@@ -125,6 +125,7 @@ fn rel_statement() -> impl AstParser<RelStatement> {
             .then(spanned_ty_or_underscore())
             // connection
             .then(rel_connection())
+            .then_ignore(colon())
             // object
             .then(spanned_ty_or_underscore())
             .then(spanned(ctx_block).or_not())
@@ -158,7 +159,6 @@ fn rel_connection() -> impl AstParser<RelConnection> {
                 .or_not(),
         )
         // within {}
-        .delimited_by(open('['), close(']'))
         .map(|((ty, subject_cardinality), object)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
@@ -237,14 +237,14 @@ fn map_type() -> impl AstParser<MapType> {
 fn map_attribute() -> impl AstParser<MapAttribute> {
     let variable = expression().map(MapAttribute::Expr);
     let rel = keyword(Token::Rel)
+        .then(spanned(ty()))
+        .then_ignore(colon())
         .then(expression().or_not())
-        .then(spanned(ty()).delimited_by(open('['), close(']')))
-        .then(expression().or_not())
-        .map_with_span(|(((kw, subject), connection), object), span| {
+        .map_with_span(|((kw, connection), object), span| {
             MapAttribute::Rel((
                 MapAttributeRel {
                     kw,
-                    subject,
+                    subject: None,
                     connection,
                     object,
                 },
@@ -462,6 +462,10 @@ fn dot_dot() -> impl AstParser<()> {
     dot().then_ignore(dot())
 }
 
+fn colon() -> impl AstParser<()> {
+    just(Token::Sigil(':')).ignored()
+}
+
 fn string_literal() -> impl AstParser<String> {
     select! { Token::StringLiteral(string) => string }
 }
@@ -510,8 +514,8 @@ mod tests {
         type foo
         /// doc comment
         type bar {
-            rel a [''] b
-            rel _ [lol] c
+            rel a '': b
+            rel _ lol: c
             fmt a => _ => _
         }
         ";
@@ -536,7 +540,7 @@ mod tests {
         map (x y) {
             foo { x }
             bar {
-                rel ['foo'] x
+                rel 'foo': x
             }
         }
 
@@ -544,7 +548,7 @@ mod tests {
         map (x y) {
             foo { x + 1 }
             bar {
-                rel ['foo'] (x / 3) + 4
+                rel 'foo': (x / 3) + 4
             }
         }
         ";

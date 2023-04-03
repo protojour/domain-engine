@@ -78,8 +78,8 @@ fn test_string_pattern_constructor_union() {
     fmt '' => 'foo/' => uuid => foo
     fmt '' => 'bar/' => uuid => bar
 
-    rel foobar [is?] foo
-    rel foobar [is?] bar
+    rel foobar is?: foo
+    rel foobar is?: bar
     "
     .compile_ok(|env| {
         let foobar = TypeBinding::new(&env, "foobar");
@@ -104,7 +104,7 @@ fn test_string_pattern_constructor_union() {
 fn test_regex_property() {
     "
     pub type foo
-    rel foo ['prop'] /abc*/
+    rel foo 'prop': /abc*/
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
@@ -141,7 +141,7 @@ fn test_simple_regex_pattern_constructor() {
 fn test_string_patterns() {
     "
     type hex
-    rel '' [/a-zA-Z0-9/] hex
+    rel '' /a-zA-Z0-9/: hex
 
     type uuid
     rel
@@ -158,7 +158,7 @@ fn test_string_patterns() {
         uuid
 
     type my_id
-    rel '' ['my/'] [uuid] my_id
+    rel '' 'my/': [uuid] my_id
     "
     .compile_fail()
 }
@@ -167,7 +167,7 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     "
     type lol
-    rel lol [is] /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
+    rel lol is: /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
     "
     .compile_fail()
 }

@@ -16,6 +16,7 @@ use ontol_runtime::{
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
+use primitive::Primitives;
 use relation::Relations;
 pub use source::*;
 use strings::Strings;
@@ -35,6 +36,7 @@ mod expr;
 mod lowering;
 mod namespace;
 mod patterns;
+mod primitive;
 mod regex_util;
 mod relation;
 mod sequence;
@@ -52,6 +54,7 @@ pub struct Compiler<'m> {
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
+    pub(crate) primitives: Primitives,
     pub(crate) expressions: FnvHashMap<ExprId, Expr>,
 
     pub(crate) strings: Strings<'m>,
@@ -67,13 +70,17 @@ pub struct Compiler<'m> {
 
 impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem, sources: Sources) -> Self {
+        let mut defs = Defs::new(mem);
+        let primitives = Primitives::new(&mut defs);
+
         Self {
             packages: Default::default(),
             sources,
             strings: Strings::new(mem),
             types: Types::new(mem),
             namespaces: Default::default(),
-            defs: Defs::new(mem),
+            defs,
+            primitives,
             expressions: Default::default(),
             def_types: Default::default(),
             relations: Relations::default(),

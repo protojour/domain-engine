@@ -6,20 +6,20 @@ pub type instrument-id {
 }
 
 pub type artist
-rel artist ['name'] string
-rel artist-id [identifies] artist
+rel artist 'name': string
+rel artist-id identifies: artist
 
 pub type record
-rel record ['name'] string
+rel record 'name': string
 
 pub type instrument {
-    rel instrument-id [identifies] _
-    rel _ ['name'] string
+    rel instrument-id identifies: _
+    rel _ 'name': string
 }
 
 pub type plays
-rel plays ['how_much'] string
+rel plays 'how_much': string
 
-rel artist ['plays'* | 'played_by'*] instrument {
-    rel _ [is] plays
+rel artist 'plays'* | 'played_by'*: instrument {
+    rel _ is: plays
 }

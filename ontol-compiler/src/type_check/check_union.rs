@@ -46,7 +46,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             .relations
             .properties_by_type(value_union_def_id)
             .unwrap();
-        let Constructor::ValueUnion(relationship_ids) = &properties.constructor else {
+        let Constructor::Union(relationship_ids) = &properties.constructor else {
             panic!("not a union");
         };
 
@@ -222,7 +222,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Constructor::Value(_, _, _) => {
                         todo!("test non-standard value cardinality");
                     }
-                    Constructor::ValueUnion(_) => {
+                    Constructor::Intersection(_) => {
+                        todo!()
+                    }
+                    Constructor::Union(_) => {
                         return Err(UnionCheckError::UnionTreeNotSupported);
                     }
                     Constructor::Sequence(sequence) => {
@@ -506,7 +509,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
                 let ty = self.def_types.map.get(&def_id).unwrap();
-                CompileError::UnitTypePartOfUnion(smart_format!("{}", FormatType(ty, self.defs)))
+                CompileError::UnitTypePartOfUnion(smart_format!(
+                    "{}",
+                    FormatType(ty, self.defs, self.primitives)
+                ))
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
             UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,

@@ -11,6 +11,7 @@ impl<'m> Compiler<'m> {
     pub fn serde_generator(&self) -> SerdeGenerator<'_, 'm> {
         SerdeGenerator {
             defs: &self.defs,
+            primitives: &self.primitives,
             def_types: &self.def_types,
             relations: &self.relations,
             patterns: &self.patterns,
