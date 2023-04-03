@@ -681,9 +681,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
         if let Some(map) = &properties.map {
-            for (property_id, cardinality) in map {
+            for (property_id, property) in map {
                 let (relationship, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
+                        if property_id.relation_id.0 == self.primitives.identifies_relation {
+                            // panic!();
+                        }
+
                         let (relationship, relation) = self
                             .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting subject property meta");
@@ -710,7 +714,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 let (property_cardinality, value_operator_id) =
-                    self.get_property_operator(type_def_id, *cardinality);
+                    self.get_property_operator(type_def_id, property.cardinality);
 
                 let rel_params_operator_id = match &relationship.rel_params {
                     RelParams::Type(def) => self.get_serde_operator_id(SerdeKey::Def(

@@ -7,7 +7,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
-    relation::{Constructor, Properties, RelationshipId},
+    relation::{Constructor, Properties, Property, RelationshipId},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -192,7 +192,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 properties.map = Some(
                     [(
                         PropertyId::subject(relation.0),
-                        relationship.1.subject_cardinality,
+                        Property {
+                            cardinality: relationship.1.subject_cardinality,
+                            is_entity_id: false,
+                        },
                     )]
                     .into(),
                 );
@@ -201,7 +204,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if map
                     .insert(
                         PropertyId::subject(relation.0),
-                        relationship.1.subject_cardinality,
+                        Property {
+                            cardinality: relationship.1.subject_cardinality,
+                            is_entity_id: false,
+                        },
                     )
                     .is_some()
                 {
@@ -283,7 +289,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     object_properties.map = Some(
                         [(
                             PropertyId::object(relation.0),
-                            relationship.1.object_cardinality,
+                            Property {
+                                cardinality: relationship.1.object_cardinality,
+                                is_entity_id: false,
+                            },
                         )]
                         .into(),
                     );
@@ -292,7 +301,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if map
                         .insert(
                             PropertyId::object(relation.0),
-                            relationship.1.object_cardinality,
+                            Property {
+                                cardinality: relationship.1.object_cardinality,
+                                is_entity_id: false,
+                            },
                         )
                         .is_some()
                     {

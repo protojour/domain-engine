@@ -32,7 +32,7 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub map: Option<IndexMap<PropertyId, Cardinality>>,
+    pub map: Option<IndexMap<PropertyId, Property>>,
     pub identifies: Option<RelationId>,
     pub identified_by: Option<RelationId>,
 }
@@ -42,10 +42,16 @@ impl Properties {
         &self.constructor
     }
 
-    pub fn insert_map_property(&mut self, property_id: PropertyId, cardinality: Cardinality) {
+    pub fn insert_map_property(&mut self, property_id: PropertyId, property: Property) {
         let map = self.map.get_or_insert_with(Default::default);
-        map.insert(property_id, cardinality);
+        map.insert(property_id, property);
     }
+}
+
+#[derive(Debug)]
+pub struct Property {
+    pub cardinality: Cardinality,
+    pub is_entity_id: bool,
 }
 
 /// The "Constructor" represents different (exclusive) ways

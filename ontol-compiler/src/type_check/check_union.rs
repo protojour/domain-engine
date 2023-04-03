@@ -14,10 +14,10 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, PropertyCardinality, RelationKind, ValueCardinality},
+    def::{Def, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
     patterns::StringPatternSegment,
-    relation::Constructor,
+    relation::{Constructor, Property},
     sequence::Sequence,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -246,7 +246,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         variant_def: DefId,
-        property_set: &IndexMap<PropertyId, Cardinality>,
+        property_set: &IndexMap<PropertyId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
     ) {
@@ -528,7 +528,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Map(&'a IndexMap<PropertyId, Cardinality>),
+    Map(&'a IndexMap<PropertyId, Property>),
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a StringPatternSegment),
 }

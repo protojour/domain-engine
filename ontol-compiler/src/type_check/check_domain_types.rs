@@ -3,9 +3,9 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, PropertyCardinality, RelationKind, ValueCardinality},
+    def::{Def, DefKind, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
-    relation::Constructor,
+    relation::{Constructor, Property},
 };
 
 use super::TypeCheck;
@@ -15,6 +15,7 @@ enum Action {
     ReportNonEntityInObjectRelationship(DefId, RelationId),
     /// Many(*) value cardinality between two entities are always considered optional
     AdjustEntityPropertyCardinality(DefId, PropertyId),
+    RedefineAsPrimaryId(DefId, PropertyId),
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -53,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .unwrap();
 
                         if id_relationship.object.0.def_id == def_id {
-                            debug!("primary id property: {object_properties:?}");
+                            actions.push(Action::RedefineAsPrimaryId(def_id, *property_id));
                         }
                     }
 
@@ -156,13 +157,42 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         adjust_entity_prop_cardinality(cardinality);
                     }
                 }
+                Action::RedefineAsPrimaryId(def_id, property_id) => {
+                    let identifies_relation = self.primitives.identifies_relation;
+                    let relation_id = property_id.relation_id;
+                    let relationship_id = self
+                        .relations
+                        .relationships_by_subject
+                        .remove(&(def_id, relation_id))
+                        .unwrap();
+
+                    self.relations
+                        .relationships_by_subject
+                        .insert((def_id, RelationId(identifies_relation)), relationship_id);
+
+                    let properties = self.relations.properties_by_type_mut(def_id);
+
+                    if let Some(map) = &mut properties.map {
+                        map.remove(&property_id);
+                        map.insert(
+                            PropertyId::subject(RelationId(self.primitives.identifies_relation)),
+                            Property {
+                                cardinality: (
+                                    PropertyCardinality::Mandatory,
+                                    ValueCardinality::One,
+                                ),
+                                is_entity_id: true,
+                            },
+                        );
+                    }
+                }
             }
         }
     }
 }
 
-fn adjust_entity_prop_cardinality(cardinality: &mut Cardinality) {
-    if let ValueCardinality::Many = cardinality.1 {
-        cardinality.0 = PropertyCardinality::Optional;
+fn adjust_entity_prop_cardinality(property: &mut Property) {
+    if let ValueCardinality::Many = property.cardinality.1 {
+        property.cardinality.0 = PropertyCardinality::Optional;
     }
 }
