@@ -211,7 +211,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             docs: _,
             kw: _,
             subject,
-            connection,
+            relation,
             object,
             ctx_block,
         } = rel;
@@ -241,7 +241,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         self.def_relationship(
             (subject_def, &subject_span),
-            connection,
+            relation,
             (object_def, &object_span),
             span,
             ctx_block,
@@ -251,18 +251,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn def_relationship(
         &mut self,
         subject: (DefReference, &Span),
-        ast_connection: ast::RelConnection,
+        ast_relation: ast::Relation,
         object: (DefReference, &Span),
         span: Span,
         ctx_block: Option<Spanned<Vec<Spanned<ast::RelStatement>>>>,
     ) -> Res<RootDefs> {
         let mut root_defs = RootDefs::new();
-        let ast::RelConnection {
+        let ast::Relation {
             ty: relation_ty,
             subject_cardinality,
             object_prop_ident,
             object_cardinality,
-        } = ast_connection;
+        } = ast_relation;
 
         let (kind, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
             match relation_ty {
@@ -603,17 +603,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                     Ok((key, expr))
                 }
-                ast::MapAttribute::Rel((rel, _rel_span)) => {
+                ast::MapAttribute::Rel((
+                    ast::MapAttributeRel {
+                        subject,
+                        relation,
+                        object,
+                        ..
+                    },
+                    _span,
+                )) => {
                     // FIXME: For now:
-                    assert!(rel.subject.is_none());
+                    assert!(subject.is_none());
 
-                    let connection = rel.connection;
-                    let (object, object_span) = rel.object.unwrap();
+                    let (object, object_span) = object.unwrap();
 
-                    let def = self.resolve_type_reference(connection.0, &connection.1)?;
+                    let def = self.resolve_type_reference(relation.0, &relation.1)?;
 
                     self.lower_expr((object, object_span), var_table)
-                        .map(|expr| ((def, self.src.span(&connection.1)), expr))
+                        .map(|expr| ((def, self.src.span(&relation.1)), expr))
                 }
             })
             .collect::<Result<_, _>>()?;

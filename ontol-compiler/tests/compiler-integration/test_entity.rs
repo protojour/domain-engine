@@ -43,7 +43,7 @@ fn identifier_as_property() {
     pub type foo {
         rel foo_id identifies: _
         rel _ 'key': foo_id
-        rel _ 'children'*: foo
+        rel _ ['children']: foo
     }
     "
     .compile_ok(|env| {
@@ -200,7 +200,7 @@ fn test_entity_self_relationship_optional_object() {
     pub type node {
         rel node_id identifies: _
         rel _ 'name': string
-        rel _ 'children'* | 'parent'?: node
+        rel _ ['children'] | 'parent'?: node
     }
     "
     .compile_ok(|env| {
@@ -248,7 +248,7 @@ fn test_entity_self_relationship_mandatory_object() {
     pub type node_id { fmt '' => string => _ }
     pub type node {
         rel node_id identifies: _
-        rel _ 'children'* | 'parent': node
+        rel _ ['children'] | 'parent': node
     }
     "
     .compile_ok(|env| {
@@ -370,7 +370,7 @@ fn recursive_entity_union() {
     pub type animal {
         rel animal_id identifies: _
         rel _ 'class': 'animal'
-        rel _ 'eats'*: lifeform
+        rel _ ['eats']: lifeform
     }
     pub type plant {
         rel plant_id identifies: _
@@ -382,7 +382,7 @@ fn recursive_entity_union() {
     pub type owner {
         rel owner_id identifies: _
         rel _ 'name': string
-        rel _ 'owns'*: lifeform
+        rel _ ['owns']: lifeform
     }
     "
     .compile_ok(|env| {

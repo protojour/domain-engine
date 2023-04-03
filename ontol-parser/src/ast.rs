@@ -57,7 +57,7 @@ pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub subject: Option<Spanned<Type>>,
-    pub connection: RelConnection,
+    pub relation: Relation,
     pub object: Option<Spanned<Type>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
@@ -71,7 +71,7 @@ pub struct FmtStatement {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct RelConnection {
+pub struct Relation {
     pub ty: RelType,
     pub subject_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
@@ -95,7 +95,7 @@ pub enum Cardinality {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct RelChain {
     pub subject: Option<Spanned<Type>>,
-    pub connection: RelConnection,
+    pub connection: Relation,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -122,7 +122,7 @@ pub enum MapAttribute {
 pub struct MapAttributeRel {
     pub kw: Span,
     pub subject: Option<Spanned<Expression>>,
-    pub connection: Spanned<Type>,
+    pub relation: Spanned<Type>,
     pub object: Option<Spanned<Expression>>,
 }
 

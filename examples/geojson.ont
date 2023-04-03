@@ -37,7 +37,7 @@ pub type Point {
 /// positions.
 pub type MultiPoint {
     rel _ 'type': 'MultiPoint'
-    rel _ 'coordinates'*: position
+    rel _ ['coordinates']: position
 }
 
 /// For type "LineString", the "coordinates" member is an array of two or
@@ -51,7 +51,7 @@ pub type LineString {
 /// LineString coordinate arrays.
 pub type MultiLineString {
     rel _ 'type': 'MultiLineString'
-    rel _ 'coordinates'*: position-list
+    rel _ ['coordinates']: position-list
 }
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
@@ -65,7 +65,7 @@ pub type Polygon {
 /// Polygon coordinate arrays.
 pub type MultiPolygon {
     rel _ 'type': 'MultiPolygon'
-    rel _ 'coordinates'*: position-ring
+    rel _ ['coordinates']: position-ring
 }
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
@@ -85,7 +85,7 @@ pub type LeafGeometry {
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
 pub type GeometryCollection {
     rel _ 'type': 'GeometryCollection'
-    rel _ 'geometries'*: LeafGeometry
+    rel _ ['geometries']: LeafGeometry
 }
 
 /// A Geometry object represents points, curves, and surfaces in
@@ -127,4 +127,4 @@ rel Feature<properties> 'properties': ()
 /// is possible for this array to be empty.
 type FeatureCollection<properties = ()>
 rel FeatureCollection<> 'type': 'FeatureCollection'
-rel FeatureCollection<properties> 'features'*: Feature<properties>
+rel FeatureCollection<properties> ['features']: Feature<properties>

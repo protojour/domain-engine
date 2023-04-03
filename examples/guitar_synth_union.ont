@@ -28,5 +28,5 @@ pub type artist {
     rel artist_id identifies: _
     rel _ 'artist-id': artist_id
     rel _ 'name': string
-    rel _ 'plays'* | 'played-by'*: instrument
+    rel _ ['plays'] | ['played-by']: instrument
 }

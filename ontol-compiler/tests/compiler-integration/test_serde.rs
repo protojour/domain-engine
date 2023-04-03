@@ -161,7 +161,7 @@ fn test_serde_noop_intersection() {
 fn test_serde_many_cardinality() {
     "
     pub type foo
-    rel foo 's'*: string
+    rel foo ['s']: string
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");

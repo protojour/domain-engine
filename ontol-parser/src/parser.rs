@@ -11,7 +11,7 @@ use crate::ast::{
 use super::{
     ast::{
         BinaryOp, Cardinality, Expression, MapAttribute, MapAttributeRel, MapStatement, MapType,
-        RelConnection, RelStatement, RelType, Statement, Type, TypeStatement,
+        RelStatement, RelType, Relation, Statement, Type, TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -123,18 +123,18 @@ fn rel_statement() -> impl AstParser<RelStatement> {
             .then(keyword(Token::Rel))
             // subject
             .then(spanned_ty_or_underscore())
-            // connection
-            .then(rel_connection())
+            // relation
+            .then(relation())
             .then_ignore(colon())
             // object
             .then(spanned_ty_or_underscore())
             .then(spanned(ctx_block).or_not())
             .map(
-                |(((((docs, kw), subject), connection), object), ctx_block)| RelStatement {
+                |(((((docs, kw), subject), relation), object), ctx_block)| RelStatement {
                     docs,
                     kw,
                     subject,
-                    connection,
+                    relation,
                     object,
                     ctx_block,
                 },
@@ -142,20 +142,18 @@ fn rel_statement() -> impl AstParser<RelStatement> {
     })
 }
 
-fn rel_connection() -> impl AstParser<RelConnection> {
+fn relation() -> impl AstParser<Relation> {
     let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
     let rel_ty_type = spanned(ty()).map(RelType::Type);
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
     // type
-    rel_ty
-        .then(cardinality())
+    with_cardinality(rel_ty)
         // object prop and cardinality
         .then(
             sigil('|')
-                .ignore_then(spanned(string_literal()))
-                .then(cardinality())
+                .ignore_then(with_cardinality(spanned(string_literal())))
                 .or_not(),
         )
         // within {}
@@ -165,7 +163,7 @@ fn rel_connection() -> impl AstParser<RelConnection> {
                 None => (None, None),
             };
 
-            RelConnection {
+            Relation {
                 ty,
                 subject_cardinality,
                 object_prop_ident,
@@ -174,15 +172,29 @@ fn rel_connection() -> impl AstParser<RelConnection> {
         })
 }
 
-fn cardinality() -> impl AstParser<Option<Cardinality>> {
-    opt_sigil('*').then(opt_sigil('?')).map(|(many, option)| {
-        match (many.is_some(), option.is_some()) {
-            (true, true) => Some(Cardinality::OptionalMany),
-            (true, false) => Some(Cardinality::Many),
-            (false, true) => Some(Cardinality::Optional),
-            (false, false) => None,
-        }
-    })
+/// parse `inner`, `[inner]`, `inner?` or `[inner]?`
+fn with_cardinality<T>(
+    inner: impl AstParser<T> + Clone,
+) -> impl AstParser<(T, Option<Cardinality>)> {
+    struct Many(bool);
+    struct Optional(bool);
+
+    inner
+        .clone()
+        .map(|item| (item, Many(false)))
+        .or(inner
+            .delimited_by(open('['), close(']'))
+            .map(|item| (item, Many(true))))
+        .then(sigil('?').or_not().map(|q| Optional(q.is_some())))
+        .map(|((item, many), optional)| {
+            let cardinality = match (many, optional) {
+                (Many(true), Optional(true)) => Some(Cardinality::OptionalMany),
+                (Many(true), Optional(false)) => Some(Cardinality::Many),
+                (Many(false), Optional(true)) => Some(Cardinality::Optional),
+                (Many(false), Optional(false)) => None,
+            };
+            (item, cardinality)
+        })
 }
 
 fn fmt_statement() -> impl AstParser<FmtStatement> {
@@ -240,12 +252,12 @@ fn map_attribute() -> impl AstParser<MapAttribute> {
         .then(spanned(ty()))
         .then_ignore(colon())
         .then(expression().or_not())
-        .map_with_span(|((kw, connection), object), span| {
+        .map_with_span(|((kw, relation), object), span| {
             MapAttribute::Rel((
                 MapAttributeRel {
                     kw,
                     subject: None,
-                    connection,
+                    relation,
                     object,
                 },
                 span,
@@ -362,10 +374,6 @@ fn close(char: char) -> impl AstParser<Token> {
 
 fn sigil(char: char) -> impl AstParser<Token> {
     just(Token::Sigil(char))
-}
-
-fn opt_sigil(char: char) -> impl AstParser<Option<Token>> {
-    sigil(char).or_not()
 }
 
 fn keyword(token: Token) -> impl AstParser<Span> {

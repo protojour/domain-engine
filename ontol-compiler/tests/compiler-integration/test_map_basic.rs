@@ -149,8 +149,8 @@ fn test_map_simple_array() {
     "
     pub type foo
     pub type bar
-    rel foo 'a'*: int
-    rel bar 'b'*: int
+    rel foo ['a']: int
+    rel bar ['b']: int
     map (x) {
         foo {
             rel 'a': x
