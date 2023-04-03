@@ -243,9 +243,10 @@ type stix_cyber_observable_object {
 
 /// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
 pub type attack-pattern {
-    rel _ is: stix_domain_object
-    rel attack-pattern-id identifies: _
     rel _ 'type': 'attack-pattern'
+    rel _ 'id': attack-pattern-id
+    rel attack-pattern-id identifies: _
+    rel _ is: stix_domain_object
 
     /// A name used to identify the Attack Pattern.
     rel _ 'name': string
@@ -262,7 +263,8 @@ pub type attack-pattern {
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, or groups.
 pub type identity {
-    rel _ is: stix_domain_object
-    rel identity-id identifies: _
     rel _ 'type': 'identity'
+    rel _ 'id': identity-id
+    rel identity-id identifies: _
+    rel _ is: stix_domain_object
 }
