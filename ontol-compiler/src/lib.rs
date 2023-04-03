@@ -186,14 +186,6 @@ impl<'m> Compiler<'m> {
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
-                                id_property_name: match self
-                                    .find_inherent_primary_id(type_def_id, properties)
-                                {
-                                    Some((_, relation)) => {
-                                        relation.subject_prop(&self.defs).map(|name| name.into())
-                                    }
-                                    None => None,
-                                },
                                 id_relation_id: *id_relation_id,
                                 id_value_def_id: identifies_relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
@@ -202,6 +194,14 @@ impl<'m> Compiler<'m> {
                                         DataModifier::NONE,
                                     )))
                                     .unwrap(),
+                                id_inherent_property_name: match self
+                                    .find_inherent_primary_id(type_def_id, properties)
+                                {
+                                    Some((_, relation)) => {
+                                        relation.subject_prop(&self.defs).map(|name| name.into())
+                                    }
+                                    None => None,
+                                },
                             })
                         } else {
                             None

@@ -154,7 +154,7 @@ pub struct EntityInfo {
     pub id_relation_id: RelationId,
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
-    pub id_property_name: Option<String>,
+    pub id_inherent_property_name: Option<String>,
 }
 
 pub struct EnvBuilder {

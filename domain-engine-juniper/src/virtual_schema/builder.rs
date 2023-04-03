@@ -365,9 +365,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
         let mut fields = IndexMap::default();
 
         if let Some(entity_info) = &type_info.entity_info {
-            if let Some(id_property_name) = &entity_info.id_property_name {
+            if let Some(id_field_name) = &entity_info.id_inherent_property_name {
                 fields.insert(
-                    id_property_name.clone(),
+                    id_field_name.clone(),
                     FieldData {
                         kind: FieldKind::Id(IdPropertyData {
                             relation_id: entity_info.id_relation_id,
