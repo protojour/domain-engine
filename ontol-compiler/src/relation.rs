@@ -53,9 +53,9 @@ impl Properties {
 /// Not sure about the naming of this type.
 #[derive(Default, Debug)]
 pub enum Constructor {
-    /// There is nothing special about this type, it just has normal relations.
+    /// There is nothing special about this type, it is just a "struct" consisting of relations to other types.
     #[default]
-    Identity,
+    Struct,
     /// The type represents an abstraction of another type, using one [is] relation.
     Value(RelationshipId, SourceSpan, Cardinality),
     /// The type represents an intersection any number of other types.

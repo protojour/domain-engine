@@ -54,7 +54,7 @@ impl UnionBuilder {
                 Discriminant::IsSingletonProperty(relation_id, prop) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
-                    let operator = generator.get_serde_operator(SerdeKey::identity(result_type));
+                    let operator = generator.get_serde_operator(SerdeKey::no_modifier(result_type));
 
                     if let Some(SerdeOperator::CapturingStringPattern(def_id)) = operator {
                         // convert this

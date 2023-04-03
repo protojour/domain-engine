@@ -46,6 +46,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .properties_by_type(relationship.object.0.def_id)
                         .unwrap();
 
+                    // Check if the property is the primary id
+                    if let Some(id_relation) = object_properties.identifies {
+                        let (id_relationship, _) = self
+                            .property_meta_by_subject(relationship.object.0.def_id, id_relation)
+                            .unwrap();
+
+                        if id_relationship.object.0.def_id == def_id {
+                            debug!("primary id property: {object_properties:?}");
+                        }
+                    }
+
                     if properties.identified_by.is_some()
                         && object_properties.identified_by.is_some()
                     {

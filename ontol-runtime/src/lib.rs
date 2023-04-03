@@ -55,7 +55,7 @@ bitflags::bitflags! {
     /// Modifier for (de)serializers.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
     pub struct DataModifier: u32 {
-        const IDENTITY       = 0b00000000;
+        const NONE           = 0b00000000;
         const ARRAY          = 0b00000001;
         const UNION          = 0b00000010;
         const INTERSECTION   = 0b00000100;

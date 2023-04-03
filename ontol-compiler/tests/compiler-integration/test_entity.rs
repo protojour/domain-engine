@@ -9,7 +9,7 @@ const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_i
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
 
 #[test]
-fn id_should_not_identify_two_things() {
+fn id_cannot_identify_two_things() {
     "
     type foo
     type bar
@@ -19,6 +19,18 @@ fn id_should_not_identify_two_things() {
     }
     "
     .compile_fail();
+}
+
+#[test]
+fn identifier_as_property() {
+    "
+    type id { rel _ is: string }
+    type foo {
+        rel id identifies: _
+        rel _ 'id': id
+    }
+    "
+    .compile_ok(|_env| {});
 }
 
 #[test]

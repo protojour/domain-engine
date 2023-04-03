@@ -82,8 +82,8 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
         // serialize schema definitions belonging to the domain package first
         for (def_id, operator_id) in self.schema_graph.range(
-            DefVariant::new(DefId(package_id, 0), DataModifier::IDENTITY)
-                ..DefVariant::new(DefId(next_package_id, 0), DataModifier::IDENTITY),
+            DefVariant::new(DefId(package_id, 0), DataModifier::NONE)
+                ..DefVariant::new(DefId(next_package_id, 0), DataModifier::NONE),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
         }

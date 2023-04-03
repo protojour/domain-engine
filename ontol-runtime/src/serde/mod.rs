@@ -20,7 +20,7 @@ pub enum SerdeKey {
 }
 
 impl SerdeKey {
-    pub const fn identity(def_id: DefId) -> Self {
-        Self::Def(DefVariant::new(def_id, DataModifier::IDENTITY))
+    pub const fn no_modifier(def_id: DefId) -> Self {
+        Self::Def(DefVariant::new(def_id, DataModifier::NONE))
     }
 }

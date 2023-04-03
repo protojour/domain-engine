@@ -158,7 +158,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let subject = &identifies_relationship.subject;
 
                         let subject_operator_id = self
-                            .get_serde_operator_id(SerdeKey::identity(subject.0.def_id))
+                            .get_serde_operator_id(SerdeKey::no_modifier(subject.0.def_id))
                             .expect("No subject operator for _id property");
 
                         Some(OperatorAllocation::Allocated(
@@ -243,12 +243,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )
             }
             Some(type_ref) => match def_variant.modifier {
-                DataModifier::IDENTITY => {
-                    self.create_core_type_serde_operator(def_variant, type_ref)
-                }
+                DataModifier::NONE => self.create_core_type_serde_operator(def_variant, type_ref),
                 _ => Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
-                    DataModifier::IDENTITY,
+                    DataModifier::NONE,
                 ))),
             },
             None => panic!("no type available"),
@@ -346,7 +344,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
         let properties = match (properties, def_variant.modifier) {
-            (None, DataModifier::IDENTITY) => {
+            (None, DataModifier::NONE) => {
                 return Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::Map(MapOperator {
@@ -360,15 +358,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (None, _) => {
                 return Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
-                    DataModifier::IDENTITY,
+                    DataModifier::NONE,
                 )))
             }
             (Some(properties), _) => properties,
         };
 
         match &properties.constructor {
-            Constructor::Identity => {
-                self.alloc_identity_constructor_operator(def_variant, typename, properties)
+            Constructor::Struct => {
+                self.alloc_struct_constructor_operator(def_variant, typename, properties)
             }
             Constructor::Value(relationship_id, span, cardinality) => self
                 .alloc_intersection_operator(
@@ -404,7 +402,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 while let Some((_, element)) = element_iterator.next() {
                     let operator_id = match element {
                         None => self
-                            .get_serde_operator_id(SerdeKey::identity(DefId::unit()))
+                            .get_serde_operator_id(SerdeKey::no_modifier(DefId::unit()))
                             .unwrap(),
                         Some(relationship_id) => {
                             let (relationship, _relation) = self
@@ -457,7 +455,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn alloc_identity_constructor_operator(
+    fn alloc_struct_constructor_operator(
         &mut self,
         def_variant: DefVariant,
         typename: &str,
@@ -506,7 +504,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
                                     identifies_relationship.subject.0.def_id,
-                                    DataModifier::IDENTITY,
+                                    DataModifier::NONE,
                                 ),
                             },
                             operator_id: id_operator_id,

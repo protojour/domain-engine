@@ -100,7 +100,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ) {
             (RelationKind::Is, _, constructor) => {
                 match (relationship.1.subject_cardinality.0, constructor) {
-                    (PropertyCardinality::Mandatory, Constructor::Identity) => {
+                    (PropertyCardinality::Mandatory, Constructor::Struct) => {
                         properties.constructor = Constructor::Value(
                             relationship.0,
                             *span,
@@ -134,7 +134,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             relationship.1.subject_cardinality,
                         ));
                     }
-                    (PropertyCardinality::Optional, Constructor::Identity) => {
+                    (PropertyCardinality::Optional, Constructor::Struct) => {
                         properties.constructor =
                             Constructor::Union([(relationship.0, *span)].into());
                         // Register union for check later
@@ -170,7 +170,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (RelationKind::Indexed, None, Constructor::Identity) => {
+            (RelationKind::Indexed, None, Constructor::Struct) => {
                 let mut sequence = Sequence::default();
 
                 if let Err(error) =
@@ -355,7 +355,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_properties = self.relations.properties_by_type_mut(object_def);
 
         match &mut object_properties.constructor {
-            Constructor::Identity => {
+            Constructor::Struct => {
                 object_properties.constructor =
                     Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
 

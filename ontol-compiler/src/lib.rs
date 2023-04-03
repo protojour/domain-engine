@@ -191,7 +191,7 @@ impl<'m> Compiler<'m> {
                                 id_operator_id: serde_generator
                                     .get_serde_operator_id(SerdeKey::Def(DefVariant::new(
                                         identifies_relationship.subject.0.def_id,
-                                        DataModifier::IDENTITY,
+                                        DataModifier::NONE,
                                     )))
                                     .unwrap(),
                             })

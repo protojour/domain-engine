@@ -199,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         loop {
             match self.relations.properties_by_type(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Identity => match &properties.map {
+                    Constructor::Struct => match &properties.map {
                         Some(property_set) => {
                             return Ok(DomainTypeMatchData::Map(property_set));
                         }
@@ -436,7 +436,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsUnit,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
+                def_variant: DefVariant::new(def_id, DataModifier::NONE),
             })
         }
 
@@ -444,7 +444,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsInt,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(number.0, DataModifier::IDENTITY),
+                def_variant: DefVariant::new(number.0, DataModifier::NONE),
             })
         }
 
@@ -453,7 +453,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::MatchesCapturingStringPattern(variant_def_id),
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(variant_def_id, DataModifier::IDENTITY),
+                def_variant: DefVariant::new(variant_def_id, DataModifier::NONE),
             });
         }
 
@@ -463,7 +463,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: Discriminant::IsString,
                     purpose: VariantPurpose::Data,
-                    def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
+                    def_variant: DefVariant::new(def_id, DataModifier::NONE),
                 });
             }
             StringDiscriminator::Literals(literals) => {
@@ -471,7 +471,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     union_discriminator.variants.push(VariantDiscriminator {
                         discriminant: Discriminant::IsStringLiteral(literal),
                         purpose: VariantPurpose::Data,
-                        def_variant: DefVariant::new(def_id, DataModifier::IDENTITY),
+                        def_variant: DefVariant::new(def_id, DataModifier::NONE),
                     });
                 }
             }
@@ -481,7 +481,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsSequence,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(sequence_def_id, DataModifier::IDENTITY),
+                def_variant: DefVariant::new(sequence_def_id, DataModifier::NONE),
             });
         }
 
@@ -490,10 +490,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: candidate.discriminant,
                     purpose: VariantPurpose::Data,
-                    def_variant: DefVariant::new(
-                        map_discriminator.result_type,
-                        DataModifier::IDENTITY,
-                    ),
+                    def_variant: DefVariant::new(map_discriminator.result_type, DataModifier::NONE),
                 })
             }
         }

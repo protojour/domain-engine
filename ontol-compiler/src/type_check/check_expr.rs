@@ -92,7 +92,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let properties = self.relations.properties_by_type(type_path.def_id);
 
                 let typed_expr_ref = match properties.map(|props| &props.constructor) {
-                    Some(Constructor::Identity) | None => {
+                    Some(Constructor::Struct) | None => {
                         match properties.and_then(|props| props.map.as_ref()) {
                             Some(property_set) => {
                                 struct MatchProperty {
