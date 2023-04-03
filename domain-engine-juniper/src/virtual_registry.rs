@@ -120,12 +120,14 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::ValueType(value_op) => {
                 self.collect_operator_arguments(value_op.inner_operator_id, output, typing_purpose);
             }
-            SerdeOperator::Id(id_operator_id) => output.push(self.get_operator_argument(
-                "_id",
-                *id_operator_id,
-                None,
-                Optionality::Optional,
-            )),
+            SerdeOperator::Id(property_name, id_operator_id) => {
+                output.push(self.get_operator_argument(
+                    property_name,
+                    *id_operator_id,
+                    None,
+                    Optionality::Optional,
+                ))
+            }
             other => {
                 panic!("{other:?}");
             }
@@ -199,7 +201,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                         .arg::<Option<IndexedInputValue>>(name, &type_info),
                 }
             }
-            SerdeOperator::Id(_) => {
+            SerdeOperator::Id(..) => {
                 panic!()
             }
             SerdeOperator::Map(_map_op) => {

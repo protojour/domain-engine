@@ -185,6 +185,7 @@ impl<'m> Compiler<'m> {
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
+                                id_property_name: Some("_id".into()),
                                 id_relation_id: *id_relation_id,
                                 id_value_def_id: identifies_relationship.subject.0.def_id,
                                 id_operator_id: serde_generator

@@ -163,7 +163,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                         Some(OperatorAllocation::Allocated(
                             self.alloc_operator_id_for_key(&key),
-                            SerdeOperator::Id(subject_operator_id),
+                            SerdeOperator::Id("_id".into(), subject_operator_id),
                         ))
                     }
                     _ => None,

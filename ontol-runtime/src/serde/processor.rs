@@ -167,7 +167,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             }
             SerdeOperator::ValueType(value_op) => Backticks(&value_op.typename).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
-            SerdeOperator::Id(_) => write!(f, "id"),
+            SerdeOperator::Id(..) => write!(f, "id"),
             SerdeOperator::Map(map_op) => Backticks(&map_op.typename).fmt(f),
         }
     }

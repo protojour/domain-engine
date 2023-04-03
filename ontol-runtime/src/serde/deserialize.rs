@@ -23,7 +23,7 @@ use super::{
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
     processor::SerdeProcessor,
-    MapOperator, SerdeOperatorId, ID_PROPERTY,
+    MapOperator, SerdeOperatorId,
 };
 
 enum MapKey {
@@ -51,21 +51,21 @@ struct MapTypeVisitor<'e> {
 }
 
 #[derive(Clone, Copy)]
-struct SpecialOperatorIds {
+struct SpecialOperatorIds<'s> {
     rel_params: Option<SerdeOperatorId>,
-    id: Option<SerdeOperatorId>,
+    id: Option<(&'s str, SerdeOperatorId)>,
 }
 
 #[derive(Clone, Copy)]
 struct PropertySet<'s> {
     properties: &'s IndexMap<String, SerdeProperty>,
-    special_operator_ids: SpecialOperatorIds,
+    special_operator_ids: SpecialOperatorIds<'s>,
 }
 
 impl<'s> PropertySet<'s> {
     fn new(
         properties: &'s IndexMap<String, SerdeProperty>,
-        special_operator_ids: SpecialOperatorIds,
+        special_operator_ids: SpecialOperatorIds<'s>,
     ) -> Self {
         Self {
             properties,
@@ -198,7 +198,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 ),
             },
 
-            SerdeOperator::Id(_inner_operator_id) => {
+            SerdeOperator::Id(_name, _inner_operator_id) => {
                 //deserializer.deserialize_map()
                 todo!()
             }
@@ -367,7 +367,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                 rel_params_operator_id: map_match.rel_params_operator_id,
             }
             .visit_map(map),
-            MapMatchKind::IdType(serde_operator_id) => {
+            MapMatchKind::IdType(name, serde_operator_id) => {
                 let deserialized_map = deserialize_map(
                     self.processor,
                     map,
@@ -376,7 +376,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                     0,
                     SpecialOperatorIds {
                         rel_params: map_match.rel_params_operator_id,
-                        id: Some(serde_operator_id),
+                        id: Some((name, serde_operator_id)),
                     },
                 )?;
                 let id = deserialized_map
@@ -574,14 +574,13 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
                     Err(Error::custom("`_edge` property not accepted here"))
                 }
             }
-            ID_PROPERTY => {
-                if let Some(operator_id) = self.special_operator_ids.id {
-                    Ok(MapKey::Id(operator_id))
-                } else {
-                    Err(Error::custom("`_id` property not accepted here"))
-                }
-            }
             _ => {
+                if let Some((property_name, operator_id)) = self.special_operator_ids.id {
+                    if v == property_name {
+                        return Ok(MapKey::Id(operator_id));
+                    }
+                }
+
                 match self.properties.get(v) {
                     Some(serde_property) => Ok(MapKey::Property(*serde_property)),
                     None => {

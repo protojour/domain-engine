@@ -348,7 +348,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
         }
-        SerdeOperator::Id(_inner_operator_id) => {
+        SerdeOperator::Id(_name, _inner_operator_id) => {
             panic!("BUG: Id not handled here")
         }
         SerdeOperator::Map(map_op) => {
@@ -426,8 +426,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Union(union_op) => self
                 .compose(self.ctx.ref_link(union_op.union_def_variant()))
                 .serialize(serializer),
-            SerdeOperator::Id(id_operator_id) => self
-                .compose(self.ctx.singleton_object("_id", *id_operator_id))
+            SerdeOperator::Id(name, id_operator_id) => self
+                .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
                 .serialize(serializer),
             SerdeOperator::Map(map_op) => self
                 .compose(self.ctx.ref_link(map_op.def_variant))
@@ -707,7 +707,7 @@ impl SchemaGraphBuilder {
                     self.visit(discriminator.operator_id, env);
                 }
             }
-            SerdeOperator::Id(id_operator_id) => {
+            SerdeOperator::Id(_, id_operator_id) => {
                 // id is not represented in the graph
                 self.visit(*id_operator_id, env);
             }

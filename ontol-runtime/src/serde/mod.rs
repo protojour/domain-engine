@@ -12,7 +12,6 @@ pub mod operator;
 pub mod processor;
 
 const EDGE_PROPERTY: &str = "_edge";
-const ID_PROPERTY: &str = "_id";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SerdeKey {

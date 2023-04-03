@@ -477,7 +477,7 @@ pub struct MapMatch<'e> {
 #[derive(Debug)]
 pub enum MapMatchKind<'e> {
     MapType(&'e MapOperator),
-    IdType(SerdeOperatorId),
+    IdType(&'e str, SerdeOperatorId),
 }
 
 impl<'e> MapMatcher<'e> {
@@ -515,9 +515,9 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Map(map_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
-                    SerdeOperator::Id(operator_id) => {
-                        MapMatchResult::Match(self.new_match(MapMatchKind::IdType(*operator_id)))
-                    }
+                    SerdeOperator::Id(name, operator_id) => MapMatchResult::Match(
+                        self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
+                    ),
                     SerdeOperator::Union(union_op) => {
                         match union_op.variants(self.mode, self.level) {
                             FilteredVariants::Single(_) => todo!(),
@@ -553,9 +553,9 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Map(map_op) => {
                         return MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
                     }
-                    SerdeOperator::Id(operator_id) => {
+                    SerdeOperator::Id(name, operator_id) => {
                         return MapMatchResult::Match(
-                            self.new_match(MapMatchKind::IdType(*operator_id)),
+                            self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
                         )
                     }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),

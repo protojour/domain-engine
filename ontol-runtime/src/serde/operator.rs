@@ -50,7 +50,7 @@ pub enum SerdeOperator {
     Union(UnionOperator),
 
     /// A map with one property, "_id"
-    Id(SerdeOperatorId),
+    Id(String, SerdeOperatorId),
 
     /// A type with many properties
     Map(MapOperator),

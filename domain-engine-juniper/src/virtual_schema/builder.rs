@@ -335,7 +335,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
-            SerdeOperator::Id(_) => panic!("Id should not appear in GraphQL"),
+            SerdeOperator::Id(..) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
             | SerdeOperator::Map(_)
@@ -365,19 +365,23 @@ impl<'a> VirtualSchemaBuilder<'a> {
         let mut fields = IndexMap::default();
 
         if let Some(entity_info) = &type_info.entity_info {
-            fields.insert(
-                "_id".into(),
-                FieldData {
-                    kind: FieldKind::Id(IdPropertyData {
-                        relation_id: entity_info.id_relation_id,
-                        operator_id: entity_info.id_operator_id,
-                    }),
-                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
-                        operator_id: entity_info.id_operator_id,
-                        kind: NativeScalarKind::ID,
-                    })),
-                },
-            );
+            if let Some(id_property_name) = &entity_info.id_property_name {
+                fields.insert(
+                    id_property_name.clone(),
+                    FieldData {
+                        kind: FieldKind::Id(IdPropertyData {
+                            relation_id: entity_info.id_relation_id,
+                            operator_id: entity_info.id_operator_id,
+                        }),
+                        field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
+                            NativeScalarRef {
+                                operator_id: entity_info.id_operator_id,
+                                kind: NativeScalarKind::ID,
+                            },
+                        )),
+                    },
+                );
+            }
         }
 
         self.register_map_op_fields(

@@ -95,10 +95,10 @@ impl<'e> SerdeProcessor<'e> {
                     }
                 }
             },
-            SerdeOperator::Id(inner_operator_id) => {
+            SerdeOperator::Id(name, inner_operator_id) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
-                    "_id",
+                    name,
                     &Proxy {
                         value,
                         rel_params: None,
