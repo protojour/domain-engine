@@ -5,11 +5,11 @@ use ontol_test_utils::{
 use serde_json::json;
 use test_log::test;
 
-pub const GEOJSON_ONT: &str = include_str!("../../../examples/geojson.on");
+pub const GEOJSON: &str = include_str!("../../../examples/geojson.on");
 
 #[test]
 fn test_geojson() {
-    GEOJSON_ONT.compile_ok(|env| {
+    GEOJSON.compile_ok(|env| {
         let geometry = TypeBinding::new(&env, "Geometry");
         assert_json_io_matches!(
             geometry,
@@ -68,7 +68,7 @@ fn test_geojson() {
 #[test]
 fn test_municipalities() {
     TestPackages::with_sources([
-        (SourceName("geojson"), GEOJSON_ONT),
+        (SourceName("geojson"), GEOJSON),
         (
             SourceName::root(),
             "

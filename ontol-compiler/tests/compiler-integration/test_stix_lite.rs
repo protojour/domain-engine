@@ -4,11 +4,11 @@ use ontol_test_utils::{
 use serde_json::json;
 use test_log::test;
 
-pub const STIX_ONT: &str = include_str!("../../../examples/stix_lite/stix.on");
+pub const STIX_ON: &str = include_str!("../../../examples/stix_lite/stix.on");
 
 #[test]
 fn test_stix_lite() {
-    STIX_ONT.compile_ok(|env| {
+    STIX_ON.compile_ok(|env| {
         let attack_pattern = TypeBinding::new(&env, "attack-pattern");
         assert_error_msg!(
             attack_pattern.deserialize_data(json!({
