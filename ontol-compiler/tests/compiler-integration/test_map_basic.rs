@@ -1,4 +1,6 @@
-use ontol_test_utils::{type_binding::TypeBinding, TestCompile, TestEnv, TEST_PKG};
+use ontol_test_utils::{
+    type_binding::TypeBinding, SourceName, TestCompile, TestEnv, TestPackages, TEST_PKG,
+};
 use serde_json::json;
 use test_log::test;
 use tracing::debug;
@@ -231,36 +233,46 @@ fn test_map_complex_flow() {
 
 #[test]
 fn test_map_delegation() {
-    "
-    type meters {
-        rel _ is: int
-    }
-    type millimeters {
-        rel _ is: int
-    }
+    TestPackages::with_sources([
+        (
+            SourceName::root(),
+            "
+            use 'si' as si
 
-    map (m) {
-        meters { m }
-        millimeters { m * 1000 }
-    }
+            pub type car {
+                rel _ 'length': si.meters
+            }
+            pub type vehicle {
+                rel _ 'length': si.millimeters
+            }
 
-    pub type car {
-        rel _ 'length': meters
-    }
+            map (l) {
+                car {
+                    rel 'length': l
+                }
+                vehicle {
+                    rel 'length': l
+                }
+            }
+            ",
+        ),
+        (
+            SourceName("si"),
+            "
+            pub type meters {
+                rel _ is: int
+            }
+            pub type millimeters {
+                rel _ is: int
+            }
 
-    pub type vehicle {
-        rel _ 'length': millimeters
-    }
-    
-    map (l) {
-        car {
-            rel 'length': l
-        }
-        vehicle {
-            rel 'length': l
-        }
-    }
-    "
+            map (m) {
+                meters { m }
+                millimeters { m * 1000 }
+            }
+            ",
+        ),
+    ])
     .compile_ok(|env| {
         assert_translate(
             &env,
