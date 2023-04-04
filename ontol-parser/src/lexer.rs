@@ -163,6 +163,7 @@ fn regex() -> impl Parser<char, String, Error = Simple<char>> {
 
 fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
     just("///")
+        .ignore_then(just(' ').repeated())
         .ignore_then(take_until(just('\n')))
         .map(|(vec, _)| Token::DocComment(String::from_iter(vec.into_iter())))
 }
@@ -176,6 +177,8 @@ fn special_char(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
+
     use super::*;
 
     fn lex(input: &str) -> Result<Vec<Spanned<Token>>, Vec<Simple<char>>> {
@@ -192,5 +195,16 @@ mod tests {
     #[test]
     fn comment_at_eof() {
         lex("foobar // comment ").unwrap();
+    }
+
+    #[test]
+    fn doc_comment_drops_spaces() {
+        let source = "
+        ///      Over here
+        pub type PubType
+        ";
+        let tokens = lex(source).unwrap();
+        let doc_comment = &tokens.first().unwrap().0;
+        assert_matches!(doc_comment, Token::DocComment(_))
     }
 }
