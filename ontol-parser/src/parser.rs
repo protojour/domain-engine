@@ -53,8 +53,8 @@ fn use_statement() -> impl AstParser<UseStatement> {
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     recursive(|stmt_parser| {
         let type_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Type));
-        let with_stmt = spanned(with_statement(stmt_parser)).map(span_map(Statement::With));
-        let rel_stmt = spanned(rel_statement()).map(span_map(Statement::Rel));
+        let with_stmt = spanned(with_statement(stmt_parser.clone())).map(span_map(Statement::With));
+        let rel_stmt = spanned(rel_statement(stmt_parser)).map(span_map(Statement::Rel));
         let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
         let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
 
@@ -113,32 +113,28 @@ fn with_statement(
         .map(|((kw, ty), statements)| WithStatement { kw, ty, statements })
 }
 
-fn rel_statement() -> impl AstParser<RelStatement> {
-    recursive(|rel_stmt| {
-        let ctx_block = spanned(rel_stmt)
-            .repeated()
-            .delimited_by(open('{'), close('}'));
+fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
+    let ctx_block = stmt_parser.repeated().delimited_by(open('{'), close('}'));
 
-        doc_comments()
-            .then(keyword(Token::Rel))
-            // subject
-            .then(spanned_ty_or_underscore())
-            // relation
-            .then(relation())
-            // object
-            .then(spanned_ty_or_underscore())
-            .then(spanned(ctx_block).or_not())
-            .map(
-                |(((((docs, kw), subject), relation), object), ctx_block)| RelStatement {
-                    docs,
-                    kw,
-                    subject,
-                    relation,
-                    object,
-                    ctx_block,
-                },
-            )
-    })
+    doc_comments()
+        .then(keyword(Token::Rel))
+        // subject
+        .then(spanned_ty_or_underscore())
+        // relation
+        .then(relation())
+        // object
+        .then(spanned_ty_or_underscore())
+        .then(spanned(ctx_block).or_not())
+        .map(
+            |(((((docs, kw), subject), relation), object), ctx_block)| RelStatement {
+                docs,
+                kw,
+                subject,
+                relation,
+                object,
+                ctx_block,
+            },
+        )
 }
 
 fn relation() -> impl AstParser<Relation> {

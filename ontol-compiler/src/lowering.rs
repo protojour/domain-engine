@@ -230,7 +230,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ast_relation: ast::Relation,
         object: (DefReference, &Span),
         span: Span,
-        ctx_block: Option<Spanned<Vec<Spanned<ast::RelStatement>>>>,
+        ctx_block: Option<Spanned<Vec<Spanned<ast::Statement>>>>,
     ) -> Res<RootDefs> {
         let mut root_defs = RootDefs::new();
         let ast::Relation {
@@ -289,7 +289,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
 
             RelParams::IndexRange(index_range_rel_params)
-        } else if let Some((ast_rels, _)) = ctx_block {
+        } else if let Some((ctx_block, _)) = ctx_block {
             let rel_def = self.define_anonymous_type(&span);
             let context_fn = || rel_def.clone();
 
@@ -300,8 +300,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 .namespaces
                 .add_anonymous(self.src.package_id, rel_def.def_id);
 
-            for (rel, span) in ast_rels {
-                match self.ast_relationship_to_def(rel, span, BlockContext::Context(&context_fn)) {
+            for spanned_stmt in ctx_block {
+                match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
                     }

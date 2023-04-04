@@ -412,9 +412,14 @@ fn artist_etc_routing() {
             use 'gsu' as gsu
             use 'aai' as aai
 
-            rel gsu route: aai {}
+            rel gsu route: aai {
+                map () {
+                    gsu.artist {}
+                    aai.artist {}
+                }
+            }
             ",
         ),
     ])
-    .compile_ok(|_env| {});
+    .compile_fail()
 }

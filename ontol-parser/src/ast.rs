@@ -59,7 +59,7 @@ pub struct RelStatement {
     pub subject: Spanned<Option<Type>>,
     pub relation: Relation,
     pub object: Spanned<Option<Type>>,
-    pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
