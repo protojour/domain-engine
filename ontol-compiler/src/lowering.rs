@@ -96,10 +96,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let context_fn = move || def.clone();
 
                 for spanned_stmt in with_stmt.statements.0 {
-                    match self.stmt_to_def(
-                        spanned_stmt,
-                        BlockContext::Context(&context_fn, span.clone()),
-                    ) {
+                    match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
                         Ok(mut defs) => {
                             root_defs.append(&mut defs);
                         }
@@ -184,10 +181,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let context_fn = move || def.clone();
 
             for spanned_stmt in ctx_block {
-                match self.stmt_to_def(
-                    spanned_stmt,
-                    BlockContext::Context(&context_fn, span.clone()),
-                ) {
+                match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
                     }
@@ -210,34 +204,25 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let ast::RelStatement {
             docs: _,
             kw: _,
-            subject,
+            subject: (subject, subject_span),
             relation,
-            object,
+            object: (object, object_span),
             ctx_block,
         } = rel;
 
-        let (subject_def, subject_span, object_def, object_span) =
-            match (subject, object, block_context) {
-                (Some(subject), Some(object), BlockContext::NoContext) => (
-                    self.resolve_type_reference(subject.0, &subject.1)?,
-                    subject.1,
-                    self.resolve_type_reference(object.0, &object.1)?,
-                    object.1,
-                ),
-                (Some(subject), None, BlockContext::Context(func, span)) => (
-                    self.resolve_type_reference(subject.0, &subject.1)?,
-                    subject.1,
-                    func(),
-                    span,
-                ),
-                (None, Some(object), BlockContext::Context(func, span)) => (
-                    func(),
-                    span,
-                    self.resolve_type_reference(object.0, &object.1)?,
-                    object.1,
-                ),
-                _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
-            };
+        let (subject_def, object_def) = match (subject, object, block_context) {
+            (Some(subject), Some(object), BlockContext::NoContext) => (
+                self.resolve_type_reference(subject, &subject_span)?,
+                self.resolve_type_reference(object, &object_span)?,
+            ),
+            (Some(subject), None, BlockContext::Context(func)) => {
+                (self.resolve_type_reference(subject, &subject_span)?, func())
+            }
+            (None, Some(object), BlockContext::Context(func)) => {
+                (func(), self.resolve_type_reference(object, &object_span)?)
+            }
+            _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
+        };
 
         self.def_relationship(
             (subject_def, &subject_span),
@@ -313,7 +298,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
 
             RelParams::IndexRange(index_range_rel_params)
-        } else if let Some((ast_rels, block_span)) = ctx_block {
+        } else if let Some((ast_rels, _)) = ctx_block {
             let rel_def = self.define_anonymous_type(&span);
             let context_fn = || rel_def.clone();
 
@@ -323,11 +308,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 .add_anonymous(self.src.package_id, rel_def.def_id);
 
             for (rel, span) in ast_rels {
-                match self.ast_relationship_to_def(
-                    rel,
-                    span,
-                    BlockContext::Context(&context_fn, block_span.clone()),
-                ) {
+                match self.ast_relationship_to_def(rel, span, BlockContext::Context(&context_fn)) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
                     }
@@ -389,9 +370,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let mut origin_def = self.resolve_type_reference(origin, &origin_span)?;
         let mut iter = transitions.into_iter().peekable();
 
-        let mut transition = match iter.next() {
-            Some(Some(next)) => next,
-            Some(None) => return Err((CompileError::FmtMisplacedWildcard, span)),
+        let (mut transition, mut transition_span) = match iter.next() {
+            Some((Some(next), span)) => (next, span),
+            Some((None, _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
             None => return Err((CompileError::FmtTooFewTransitions, span)),
         };
 
@@ -401,8 +382,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     // end of iterator, found the final target. Handle this outside the loop:
                     break item;
                 }
-                Some(Some(item)) => item,
-                Some(None) => return Err((CompileError::FmtMisplacedWildcard, span)),
+                Some((Some(item), span)) => (item, span),
+                Some((None, _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
@@ -410,27 +391,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             root_defs.push(self.ast_fmt_transition_to_def(
                 (origin_def, &origin_span),
-                transition,
+                (transition, span.clone()),
                 (target_def.clone(), &span),
                 span.clone(),
             )?);
 
-            transition = (next_transition, span.clone());
+            transition = next_transition;
+            transition_span = span.clone();
             origin_def = target_def;
             origin_span = span;
         };
 
         let (end_def, end_span) = match (target, block_context) {
-            (Some(end), BlockContext::NoContext) => {
-                (self.resolve_type_reference(end.0, &end.1)?, end.1)
+            ((Some(end), span), BlockContext::NoContext) => {
+                (self.resolve_type_reference(end, &span)?, span)
             }
-            (None, BlockContext::Context(func, span)) => (func(), span),
+            ((None, span), BlockContext::Context(func)) => (func(), span),
             _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
         };
 
         root_defs.push(self.ast_fmt_transition_to_def(
             (origin_def, &origin_span),
-            transition,
+            (transition, transition_span),
             (end_def, &end_span),
             span,
         )?);
@@ -828,7 +810,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 #[derive(Clone)]
 enum BlockContext<'a> {
     NoContext,
-    Context(&'a dyn Fn() -> DefReference, Span),
+    Context(&'a dyn Fn() -> DefReference),
 }
 
 enum ImplicitRelationId {

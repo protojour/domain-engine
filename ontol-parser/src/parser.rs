@@ -314,8 +314,8 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
     })
 }
 
-fn spanned_ty_or_underscore() -> impl AstParser<Option<Spanned<Type>>> {
-    spanned(ty()).map(Some).or(sigil('_').map(|_| None))
+fn spanned_ty_or_underscore() -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(ty().map(Some).or(sigil('_').map(|_| None)))
 }
 
 /// Type parser

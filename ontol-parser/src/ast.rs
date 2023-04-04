@@ -56,9 +56,9 @@ pub struct WithStatement {
 pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
-    pub subject: Option<Spanned<Type>>,
+    pub subject: Spanned<Option<Type>>,
     pub relation: Relation,
-    pub object: Option<Spanned<Type>>,
+    pub object: Spanned<Option<Type>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<RelStatement>>>>,
 }
 
@@ -67,7 +67,7 @@ pub struct FmtStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub origin: Spanned<Type>,
-    pub transitions: Vec<Option<Spanned<Type>>>,
+    pub transitions: Vec<Spanned<Option<Type>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

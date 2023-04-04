@@ -527,6 +527,17 @@ fn compile_error_in_dependency() {
 }
 
 #[test]
+fn rel_wildcard_span() {
+    "
+    with int {
+        rel _ // ERROR subject must be a domain type
+            'likes': int
+    }
+    "
+    .compile_fail()
+}
+
+#[test]
 fn fail_import_private_type() {
     TestPackages::with_sources([
         (SourceName("dep"), "type foo"),
