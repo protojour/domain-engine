@@ -34,6 +34,7 @@ pub struct Primitives {
     pub is_relation: DefId,
     pub identifies_relation: DefId,
     pub indexed_relation: DefId,
+    pub route_relation: DefId,
     pub empty_sequence: DefId,
     pub empty_string: DefId,
     pub int: DefId,
@@ -71,6 +72,15 @@ impl Primitives {
             indexed_relation: defs.add_def(
                 DefKind::Relation(Relation {
                     kind: RelationKind::Indexed,
+                    subject_prop: None,
+                    object_prop: None,
+                }),
+                CORE_PKG,
+                SourceSpan::none(),
+            ),
+            route_relation: defs.add_def(
+                DefKind::Relation(Relation {
+                    kind: RelationKind::Route,
                     subject_prop: None,
                     object_prop: None,
                 }),

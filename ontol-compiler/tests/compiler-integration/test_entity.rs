@@ -412,9 +412,9 @@ fn artist_etc_routing() {
             use 'gsu' as gsu
             use 'aai' as aai
 
-            rel gsu 'to': aai {} // ERROR subject must be a domain type// ERROR object must be a data type
+            rel gsu route: aai {}
             ",
         ),
     ])
-    .compile_fail();
+    .compile_ok(|_env| {});
 }

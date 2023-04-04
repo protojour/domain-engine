@@ -293,6 +293,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let rel_def = self.define_anonymous_type(&span);
             let context_fn = || rel_def.clone();
 
+            root_defs.push(rel_def.def_id);
+
             // This type needs to be part of the anonymous part of the namespace
             self.compiler
                 .namespaces
@@ -762,6 +764,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             RelationKind::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.primitives.indexed_relation))
+            }
+            RelationKind::Route => {
+                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.route_relation))
             }
         }
     }

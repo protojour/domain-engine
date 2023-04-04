@@ -136,6 +136,7 @@ pub enum RelationKind {
     Is,
     Identifies,
     Indexed,
+    Route,
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object

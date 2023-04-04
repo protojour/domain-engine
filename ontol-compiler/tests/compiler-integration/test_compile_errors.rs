@@ -583,3 +583,21 @@ fn namespace_not_found() {
     "
     .compile_fail();
 }
+
+#[test]
+fn bad_domain_relation() {
+    TestPackages::with_sources([
+        (SourceName("a"), ""),
+        (SourceName("b"), ""),
+        (
+            SourceName::root(),
+            "
+            use 'a' as a
+            use 'b' as b
+
+            rel a 'to': b {} // ERROR subject must be a domain type// ERROR object must be a data type
+            ",
+        ),
+    ])
+    .compile_fail();
+}

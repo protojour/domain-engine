@@ -29,6 +29,9 @@ impl<'m> Compiler<'m> {
         self.register_named_type(self.primitives.identifies_relation, "identifies", |_| {
             Type::BuiltinRelation
         });
+        self.register_named_type(self.primitives.route_relation, "route", |_| {
+            Type::BuiltinRelation
+        });
 
         let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let _ = self.register_named_type(self.primitives.number, "number", Type::Number);

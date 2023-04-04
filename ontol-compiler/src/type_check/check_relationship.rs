@@ -75,21 +75,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def(subject.0.def_id);
         let object_ty = self.check_def(object.0.def_id);
 
-        if matches!(&relation.1.kind, RelationKind::FmtTransition(_)) {
-            return subject_ty;
-        }
-
-        match subject_ty {
-            Type::EmptySequence(_) => return object_ty,
-            Type::StringConstant(def_id) if *def_id == self.primitives.empty_string => {
-                return object_ty;
-            }
-            Type::Unit(_) | Type::StringConstant(_) => {
-                return self.error(CompileError::SubjectMustBeDomainType, &subject.1)
-            }
-            _ => {}
-        }
-
         match &relation.1.kind {
             RelationKind::Is => {
                 self.check_subject_data_type(subject_ty, &subject.1);
@@ -206,6 +191,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             RelationKind::Named(_) => {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
+
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
                 match &mut properties.map {
                     None => {
@@ -221,16 +207,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
                     }
                     Some(map) => {
-                        if map
-                            .insert(
-                                PropertyId::subject(relation.0),
-                                Property {
-                                    cardinality: relationship.1.subject_cardinality,
-                                    is_entity_id: false,
-                                },
-                            )
-                            .is_some()
-                        {
+                        let prev = map.insert(
+                            PropertyId::subject(relation.0),
+                            Property {
+                                cardinality: relationship.1.subject_cardinality,
+                                is_entity_id: false,
+                            },
+                        );
+                        if prev.is_some() {
                             return self
                                 .error(CompileError::UnionInNamedRelationshipNotSupported, span);
                         }
@@ -238,6 +222,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             RelationKind::FmtTransition(_) => return subject_ty,
+            RelationKind::Route => {
+                self.check_package_data_type(subject_ty, &subject.1);
+                self.check_package_data_type(object_ty, &object.1);
+            }
         };
 
         object_ty
@@ -347,7 +335,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match ty {
             Type::Domain(_) | Type::Anonymous(_) => {}
             _ => {
-                // panic!("other: {other:?}");
                 self.error(CompileError::SubjectMustBeDomainType, span);
             }
         }
@@ -364,6 +351,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.error(CompileError::ObjectMustBeDataType, span);
             }
             _ => {}
+        }
+    }
+
+    fn check_package_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
+        match ty {
+            Type::Package => {}
+            _ => {
+                self.error(CompileError::SubjectMustBeDomainType, span);
+            }
         }
     }
 

@@ -248,7 +248,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     DataModifier::NONE,
                 ))),
             },
-            None => panic!("no type available"),
+            None => panic!(
+                "no type available for {def_variant:?} ({:?})",
+                self.defs.get_def_kind(def_variant.def_id)
+            ),
         }
     }
 
