@@ -44,6 +44,8 @@ pub enum TypedExprKind<'m> {
     Constant(i64),
     /// A translation from one type to another
     Translate(ExprRef, TypeRef<'m>),
+    /// A mapping operation on an array
+    SequenceMap(ExprRef, TypeRef<'m>),
 }
 
 impl<'m> Debug for TypedExprTable<'m> {
@@ -123,59 +125,17 @@ impl<'m> TypedExprTable<'m> {
         (root_node, &self.expressions[root_node], span)
     }
 
-    pub fn debug_tree(&self, rewrites: &RewriteTable, expr_ref: ExprRef) -> String {
-        self.debug_tree_guard(rewrites, expr_ref, 0)
-    }
-
-    fn debug_tree_guard(&self, rewrites: &RewriteTable, expr_ref: ExprRef, depth: usize) -> String {
-        if depth > 20 {
-            return "[ERROR depth exceeded]".into();
-        }
-        let (target_expr_ref, expr, _) = self.resolve_expr(rewrites, expr_ref);
-        let s = match &expr.kind {
-            TypedExprKind::Unit => "unit".into(),
-            TypedExprKind::Call(proc, params) => {
-                let param_strings = params
-                    .iter()
-                    .map(|param_ref| self.debug_tree_guard(rewrites, *param_ref, depth + 1))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!("({proc:?} {param_strings})")
-            }
-            TypedExprKind::ValueObjPattern(expr_ref) => {
-                format!(
-                    "(obj! {})",
-                    self.debug_tree_guard(rewrites, *expr_ref, depth + 1)
-                )
-            }
-            TypedExprKind::MapObjPattern(attributes) => {
-                let attr_strings = attributes
-                    .iter()
-                    .map(|(property_id, expr_ref)| {
-                        let val = self.debug_tree_guard(rewrites, *expr_ref, depth + 1);
-                        format!("({:?} {})", (property_id.relation_id.0 .0), val)
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!("(obj! {attr_strings})")
-            }
-            TypedExprKind::Constant(c) => format!("{c}"),
-            TypedExprKind::Variable(SyntaxVar(v)) => format!("var:{v}"),
-            TypedExprKind::VariableRef(var_ref) => {
-                let val = self.debug_tree_guard(rewrites, *var_ref, depth + 1);
-                format!("=>{val}")
-            }
-            TypedExprKind::Translate(expr_ref, _) => {
-                format!(
-                    "(translate! {})",
-                    self.debug_tree_guard(rewrites, *expr_ref, depth + 1)
-                )
-            }
-        };
-        if expr_ref != target_expr_ref {
-            format!("{{{}->{}}}#{}", expr_ref.0, target_expr_ref.0, s)
-        } else {
-            format!("{{{}}}#{}", expr_ref.0, s)
+    pub fn debug<'a>(
+        &'a self,
+        rewrites: &'a RewriteTable,
+        root_expr: ExprRef,
+    ) -> DebugTree<'a, 'm> {
+        DebugTree {
+            table: self,
+            rewrites,
+            expr_ref: root_expr,
+            property_id: None,
+            depth: 0,
         }
     }
 }
@@ -204,5 +164,99 @@ impl<'m> SealedTypedExprTable<'m> {
                     .rewrite(ExprRef(index as u32), *var_ref);
             }
         }
+    }
+}
+
+pub struct DebugTree<'a, 'm> {
+    table: &'a TypedExprTable<'m>,
+    rewrites: &'a RewriteTable,
+    expr_ref: ExprRef,
+    property_id: Option<PropertyId>,
+    depth: usize,
+}
+
+impl<'a, 'm> DebugTree<'a, 'm> {
+    fn child(&self, expr_ref: ExprRef, property_id: Option<PropertyId>) -> Self {
+        Self {
+            table: self.table,
+            rewrites: self.rewrites,
+            expr_ref,
+            property_id,
+            depth: self.depth + 1,
+        }
+    }
+
+    fn header(&self, name: &str, target_expr_ref: ExprRef) -> String {
+        use std::fmt::Write;
+        let mut s = String::new();
+
+        if self.expr_ref != target_expr_ref {
+            write!(&mut s, "{{{}->{}}}", self.expr_ref.0, target_expr_ref.0).unwrap();
+        } else {
+            write!(&mut s, "{{{}}}", self.expr_ref.0).unwrap();
+        }
+
+        if let Some(property_id) = &self.property_id {
+            let def_id = &property_id.relation_id.0;
+            write!(&mut s, " (rel {}, {}) ", def_id.0 .0, def_id.1).unwrap();
+        }
+
+        write!(&mut s, "{}", name).unwrap();
+
+        s
+    }
+}
+
+impl<'a, 'm> Debug for DebugTree<'a, 'm> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.depth > 20 {
+            return write!(f, "[ERROR depth exceeded]");
+        }
+
+        let (target_expr_ref, expr, _) = self.table.resolve_expr(self.rewrites, self.expr_ref);
+
+        match &expr.kind {
+            TypedExprKind::Unit => f
+                .debug_tuple(&self.header("Unit", target_expr_ref))
+                .finish()?,
+            TypedExprKind::Call(proc, params) => {
+                let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}"), target_expr_ref));
+                for param in params {
+                    tup.field(&self.child(*param, None));
+                }
+                tup.finish()?
+            }
+            TypedExprKind::ValueObjPattern(expr_ref) => f
+                .debug_tuple(&self.header("ValueObj", target_expr_ref))
+                .field(&self.child(*expr_ref, None))
+                .finish()?,
+            TypedExprKind::MapObjPattern(attributes) => {
+                let mut tup = f.debug_tuple(&self.header("MapObj", target_expr_ref));
+                for (property_id, expr_ref) in attributes {
+                    tup.field(&self.child(*expr_ref, Some(*property_id)));
+                }
+                tup.finish()?;
+            }
+            TypedExprKind::Constant(c) => f
+                .debug_tuple(&self.header(&format!("Constant({c})"), target_expr_ref))
+                .finish()?,
+            TypedExprKind::Variable(SyntaxVar(v)) => f
+                .debug_tuple(&self.header(&format!("Variable({v})"), target_expr_ref))
+                .finish()?,
+            TypedExprKind::VariableRef(var_ref) => f
+                .debug_tuple(&self.header("VarRef", target_expr_ref))
+                .field(&self.child(*var_ref, None))
+                .finish()?,
+            TypedExprKind::Translate(expr_ref, _) => f
+                .debug_tuple(&self.header("Translate", target_expr_ref))
+                .field(&self.child(*expr_ref, None))
+                .finish()?,
+            TypedExprKind::SequenceMap(expr_ref, _) => f
+                .debug_tuple(&self.header("SequenceMap", target_expr_ref))
+                .field(&self.child(*expr_ref, None))
+                .finish()?,
+        };
+
+        Ok(())
     }
 }

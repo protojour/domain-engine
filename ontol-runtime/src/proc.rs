@@ -61,6 +61,8 @@ pub enum OpCode {
     PutUnitAttr(Local, PropertyId),
     /// Push a constant to the stack.
     Constant(i64, DefId),
+    /// Push a sequence to the stack.
+    Sequence(DefId),
 }
 
 /// A reference to a local on the value stack during procedure execution.

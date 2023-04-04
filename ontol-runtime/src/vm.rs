@@ -42,6 +42,7 @@ pub trait Stack {
     fn take_attr_value(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
     fn constant(&mut self, k: i64, result_type: DefId);
+    fn sequence(&mut self, result_type: DefId);
 }
 
 impl<'l> AbstractVm<'l> {
@@ -108,6 +109,10 @@ impl<'l> AbstractVm<'l> {
                 }
                 OpCode::Constant(k, result_type) => {
                     stack.constant(*k, *result_type);
+                    self.program_counter += 1;
+                }
+                OpCode::Sequence(result_type) => {
+                    stack.sequence(*result_type);
                     self.program_counter += 1;
                 }
             }

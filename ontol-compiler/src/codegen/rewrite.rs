@@ -140,6 +140,9 @@ impl<'t, 'm> Rewriter<'t, 'm> {
 
                 Ok(RewriteResult::Variable(cloned_param_id))
             }
+            TypedExprKind::SequenceMap(inner_node, _) => {
+                self.rewrite_expr_inner(*inner_node, indent.inc())
+            }
             kind => Err(RewriteError::UnhandledExpr(smart_format!("{kind:?}"))),
         }
     }
@@ -339,7 +342,7 @@ mod tests {
 
         table.rewriter().rewrite_expr(call).unwrap();
 
-        info!("source: {}", table.debug_tree(&table.source_rewrites, call));
-        info!("target: {}", table.debug_tree(&table.target_rewrites, call));
+        info!("source: {:?}", table.debug(&table.source_rewrites, call));
+        info!("target: {:?}", table.debug(&table.target_rewrites, call));
     }
 }

@@ -293,14 +293,34 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {
                     self.translate_if_possible(ctx, expr, typed_expr_ref, actual, expected)
+                        .unwrap_or_else(|_| {
+                            (
+                                self.type_error(
+                                    TypeError::Mismatch { actual, expected },
+                                    &expr.span,
+                                ),
+                                ERROR_NODE,
+                            )
+                        })
                 } else {
                     warn!("TODO: resolve var?");
                     (ty, typed_expr_ref)
                 }
             }
-            (ty, expected) if ty != expected => {
-                self.translate_if_possible(ctx, expr, typed_expr_ref, ty, expected)
-            }
+            (ty, expected) if ty != expected => self
+                .translate_if_possible(ctx, expr, typed_expr_ref, ty, expected)
+                .unwrap_or_else(|_| {
+                    (
+                        self.type_error(
+                            TypeError::Mismatch {
+                                actual: ty,
+                                expected,
+                            },
+                            &expr.span,
+                        ),
+                        ERROR_NODE,
+                    )
+                }),
             _ => {
                 // Ok
                 (ty, typed_expr_ref)
@@ -315,7 +335,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         typed_expr_ref: ExprRef,
         actual: TypeRef<'m>,
         expected: TypeRef<'m>,
-    ) -> (TypeRef<'m>, ExprRef) {
+    ) -> Result<(TypeRef<'m>, ExprRef), ()> {
         match (actual, expected) {
             (Type::Domain(_), Type::Domain(_)) => {
                 let translation_node = ctx.typed_expr_table.add_expr(TypedExpr {
@@ -323,12 +343,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     kind: TypedExprKind::Translate(typed_expr_ref, actual),
                     span: expr.span,
                 });
-                (expected, translation_node)
+                Ok((expected, translation_node))
             }
-            _ => {
-                let err = self.type_error(TypeError::Mismatch { actual, expected }, &expr.span);
-                (err, ERROR_NODE)
+            (Type::Array(actual_item), Type::Array(expected_item)) => {
+                let (_, translate_ref) = self.translate_if_possible(
+                    ctx,
+                    expr,
+                    typed_expr_ref,
+                    actual_item,
+                    expected_item,
+                )?;
+                let translation_node = ctx.typed_expr_table.add_expr(TypedExpr {
+                    ty: expected,
+                    kind: TypedExprKind::SequenceMap(translate_ref, actual),
+                    span: expr.span,
+                });
+
+                Ok((expected, translation_node))
             }
+            _ => Err(()),
         }
     }
 

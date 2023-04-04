@@ -56,14 +56,14 @@ fn codegen_translate(
     // for easier readability:
     match direction {
         DebugDirection::Forward => debug!(
-            "codegen source: {} target: {}",
-            expr_table.debug_tree(&expr_table.source_rewrites, from),
-            expr_table.debug_tree(&expr_table.target_rewrites, to),
+            "(forward) codegen source: {:#?} target: {:#?}",
+            expr_table.debug(&expr_table.source_rewrites, from),
+            expr_table.debug(&expr_table.target_rewrites, to),
         ),
         DebugDirection::Backward => debug!(
-            "codegen target: {} source: {}",
-            expr_table.debug_tree(&expr_table.target_rewrites, from),
-            expr_table.debug_tree(&expr_table.source_rewrites, to),
+            "(backward) codegen target: {:#?} source: {:#?}",
+            expr_table.debug(&expr_table.target_rewrites, from),
+            expr_table.debug(&expr_table.source_rewrites, to),
         ),
     }
 

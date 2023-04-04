@@ -118,6 +118,12 @@ impl Stack for ValueStack {
     fn constant(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
     }
+
+    #[inline(always)]
+    fn sequence(&mut self, result_type: DefId) {
+        self.stack
+            .push(Value::new(Data::Sequence(vec![]), result_type));
+    }
 }
 
 impl ValueStack {

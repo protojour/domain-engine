@@ -136,6 +136,11 @@ trait Codegen {
                 let to = find_translation_key(&expr.ty).unwrap();
                 opcodes.push((proc_table.gen_translate_call(from, to), span));
             }
+            TypedExprKind::SequenceMap(..) => {
+                debug!("array type: {:?}", expr.ty);
+                let return_def_id = expr.ty.get_single_def_id().unwrap();
+                opcodes.push((OpCode::Sequence(return_def_id), span));
+            }
             TypedExprKind::ValueObjPattern(_) => {
                 todo!()
             }

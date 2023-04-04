@@ -32,7 +32,7 @@ pub(super) fn codegen_map_obj_origin(
                 .kind
             {
                 TypedExprKind::Variable(var) => (*prop_id, *var),
-                _ => panic!("source property not a variable"),
+                other => panic!("source property not a variable: {other:?}"),
             }
         })
         .collect();
