@@ -249,7 +249,7 @@ fn test_entity_self_relationship_mandatory_object() {
     pub type node_id { fmt '' => string => _ }
     pub type node {
         rel node_id identifies: _
-        rel _ ['children']::'parent' node
+        rel _ ['children']::'parent' _
     }
     "
     .compile_ok(|env| {

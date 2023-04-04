@@ -32,8 +32,8 @@ pub enum CompileError {
     Parse(ParseError),
     #[error("package not found")]
     PackageNotFound,
-    #[error("this rel is contextual; specify only subject or object")]
-    TooMuchContextInContextualRel,
+    #[error("using `_` requires a contextual block")]
+    WildcardNeedsContextualBlock,
     #[error("invalid expression")]
     InvalidExpression,
     #[error("function takes {expected} parameters, but {actual} was supplied")]

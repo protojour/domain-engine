@@ -210,19 +210,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ctx_block,
         } = rel;
 
-        let (subject_def, object_def) = match (subject, object, block_context) {
-            (Some(subject), Some(object), BlockContext::NoContext) => (
-                self.resolve_type_reference(subject, &subject_span)?,
-                self.resolve_type_reference(object, &object_span)?,
-            ),
-            (Some(subject), None, BlockContext::Context(func)) => {
-                (self.resolve_type_reference(subject, &subject_span)?, func())
-            }
-            (None, Some(object), BlockContext::Context(func)) => {
-                (func(), self.resolve_type_reference(object, &object_span)?)
-            }
-            _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
-        };
+        let subject_def =
+            self.resolve_contextual_type_reference(subject, subject_span.clone(), &block_context)?;
+        let object_def =
+            self.resolve_contextual_type_reference(object, object_span.clone(), &block_context)?;
 
         self.def_relationship(
             (subject_def, &subject_span),
@@ -402,18 +393,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
             origin_span = span;
         };
 
-        let (end_def, end_span) = match (target, block_context) {
-            ((Some(end), span), BlockContext::NoContext) => {
-                (self.resolve_type_reference(end, &span)?, span)
-            }
-            ((None, span), BlockContext::Context(func)) => (func(), span),
-            _ => return Err((CompileError::TooMuchContextInContextualRel, span)),
-        };
+        let end_def =
+            self.resolve_contextual_type_reference(target.0, target.1.clone(), &block_context)?;
 
         root_defs.push(self.ast_fmt_transition_to_def(
             (origin_def, &origin_span),
             (transition, transition_span),
-            (end_def, &end_span),
+            (end_def, &target.1),
             span,
         )?);
 
@@ -460,6 +446,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }),
             &span,
         ))
+    }
+
+    fn resolve_contextual_type_reference(
+        &mut self,
+        ast_ty: Option<ast::Type>,
+        span: Range<usize>,
+        block_context: &BlockContext,
+    ) -> Res<DefReference> {
+        match (ast_ty, block_context) {
+            (Some(ast_ty), _) => self.resolve_type_reference(ast_ty, &span),
+            (None, BlockContext::Context(func)) => Ok(func()),
+            _ => Err((CompileError::WildcardNeedsContextualBlock, span)),
+        }
     }
 
     fn resolve_type_reference(&mut self, ast_ty: ast::Type, span: &Span) -> Res<DefReference> {
