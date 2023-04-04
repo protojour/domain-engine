@@ -244,10 +244,12 @@ fn map_attribute_mismatch() {
     "
     type foo
     type bar
-    rel foo 'prop': bar
+    rel foo 'prop0': bar
+    rel foo 'prop1': bar
+    rel foo 'prop2': bar
     rel bar is: int
     map (x) {
-        foo { // ERROR missing property `prop`
+        foo { // ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
             x // ERROR expected named property
         }
         bar {} // ERROR expected expression

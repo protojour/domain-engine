@@ -414,8 +414,8 @@ fn artist_etc_routing() {
 
             rel gsu route: aai {
                 map () {
-                    gsu.artist {}
-                    aai.artist {}
+                    gsu.artist {} // ERROR missing property `artist-id`// ERROR missing property `name`// ERROR missing property `plays`
+                    aai.artist {} // ERROR missing property `ID`// ERROR missing property `name`// ERROR missing property `plays`
                 }
             }
             ",

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
@@ -124,7 +124,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             },
                                         )
                                     })
-                                    .collect::<HashMap<_, _>>();
+                                    .collect::<IndexMap<_, _>>();
 
                                 let mut typed_properties = IndexMap::new();
 
