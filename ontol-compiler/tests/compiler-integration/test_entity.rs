@@ -426,10 +426,15 @@ fn artist_etc_routing() {
                     }
                 }
 
-                map () {
-                    gsu.instrument { // ERROR cannot map a union, map each variant instead
+                map (id t p n) {
+                    gsu.synth {
+                        rel 'instrument-id': id
+                        rel 'type': t
+                        rel 'polyphony': p
                     }
-                    ai.instrument { // ERROR missing property `ID`// ERROR missing property `name`
+                    ai.instrument {
+                        rel 'ID': id
+                        rel 'name': n
                     }
                 }
             }
