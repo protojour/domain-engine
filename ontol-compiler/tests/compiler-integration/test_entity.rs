@@ -405,17 +405,32 @@ fn recursive_entity_union() {
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
-        (SourceName("aai"), ARTIST_AND_INSTRUMENT),
+        (SourceName("ai"), ARTIST_AND_INSTRUMENT),
         (
             SourceName::root(),
             "
             use 'gsu' as gsu
-            use 'aai' as aai
+            use 'ai' as ai
 
-            rel gsu route: aai {
+            rel gsu route: ai {
+                map (id n p) {
+                    gsu.artist {
+                        rel 'artist-id': id
+                        rel 'name': n
+                        rel 'plays': p
+                    }
+                    ai.artist {
+                        rel 'ID': id
+                        rel 'name': n
+                        rel 'plays': p // ERROR type mismatch: expected `instrument[]`, found `instrument[]`
+                    }
+                }
+
                 map () {
-                    gsu.artist {} // ERROR missing property `artist-id`// ERROR missing property `name`// ERROR missing property `plays`
-                    aai.artist {} // ERROR missing property `ID`// ERROR missing property `name`// ERROR missing property `plays`
+                    gsu.instrument { // ERROR cannot map a union, map each variant instead
+                    }
+                    ai.instrument { // ERROR missing property `ID`// ERROR missing property `name`
+                    }
                 }
             }
             ",

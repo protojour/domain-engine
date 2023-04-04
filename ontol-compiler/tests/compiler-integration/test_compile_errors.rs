@@ -389,6 +389,28 @@ fn unresolved_transitive_map() {
 }
 
 #[test]
+fn map_union() {
+    "
+    type foo {
+        rel _ 'type': 'foo'
+    }
+    type bar {
+        rel _ 'type': 'bar'
+    }
+    type foobar {
+        rel _ is?: foo
+        rel _ is?: bar
+    }
+
+    map (x) {
+        foobar {} // ERROR cannot map a union, map each variant instead
+        foo {} // ERROR missing property `type`
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn various_monadic_properties() {
     "
     type foo

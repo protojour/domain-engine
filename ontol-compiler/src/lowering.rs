@@ -316,7 +316,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             RelParams::Unit
         };
 
-        debug!("define relation {relation_id:?}");
+        debug!("define relationship {relation_id:?}");
 
         let relationship = Relationship {
             relation_id,

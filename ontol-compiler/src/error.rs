@@ -128,6 +128,8 @@ pub enum CompileError {
     InvalidTypeParameters,
     #[error("unknown type parameter")]
     UnknownTypeParameter,
+    #[error("cannot map a union, map each variant instead")]
+    CannotMapUnion,
 }
 
 #[derive(Debug)]

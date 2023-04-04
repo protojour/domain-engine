@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, DefId, RelationId};
+use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
 use tracing::warn;
 
 use crate::{
@@ -103,26 +103,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                                 let mut match_properties = property_set
                                     .iter()
-                                    .map(|(property_id, _cardinality)| {
-                                        let (relationship, relation) = self
-                                            .property_meta_by_subject(
-                                                *subject_id,
-                                                property_id.relation_id,
-                                            )
-                                            .expect("BUG: problem getting property meta");
-                                        let property_name = relation
-                                            .subject_prop(self.defs)
-                                            .expect("BUG: Expected named subject property");
+                                    .filter_map(|(property_id, _cardinality)| {
+                                        match property_id.role {
+                                            Role::Subject => {
+                                                let (relationship, relation) = self
+                                                    .property_meta_by_subject(
+                                                        *subject_id,
+                                                        property_id.relation_id,
+                                                    )
+                                                    .expect("BUG: problem getting property meta");
+                                                let property_name = relation
+                                                    .subject_prop(self.defs)
+                                                    .expect("BUG: Expected named subject property");
 
-                                        (
-                                            property_name,
-                                            MatchProperty {
-                                                relation_id: property_id.relation_id,
-                                                cardinality: relationship.subject_cardinality,
-                                                object_def: relationship.object.0.def_id,
-                                                used: false,
-                                            },
-                                        )
+                                                Some((
+                                                    property_name,
+                                                    MatchProperty {
+                                                        relation_id: property_id.relation_id,
+                                                        cardinality: relationship
+                                                            .subject_cardinality,
+                                                        object_def: relationship.object.0.def_id,
+                                                        used: false,
+                                                    },
+                                                ))
+                                            }
+                                            Role::Object => None,
+                                        }
                                     })
                                     .collect::<IndexMap<_, _>>();
 
@@ -227,7 +233,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         todo!()
                     }
                     Some(Constructor::Union(_property_set)) => {
-                        todo!()
+                        return self.expr_error(CompileError::CannotMapUnion, &expr.span)
                     }
                     Some(Constructor::Sequence(_)) => todo!(),
                     Some(Constructor::StringFmt(_)) => todo!(),
