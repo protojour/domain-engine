@@ -544,6 +544,24 @@ fn fail_import_private_type() {
 }
 
 #[test]
+fn domain_named_relation() {
+    TestPackages::with_sources([
+        (SourceName("dep0"), ""),
+        (SourceName("dep1"), ""),
+        (
+            SourceName::root(),
+            "
+            use 'dep0' as dep0
+            use 'dep1' as dep1
+
+            rel dep0 'fond_of': dep1 // ERROR subject must be a domain type// ERROR object must be a data type
+            ",
+        ),
+    ])
+    .compile_fail();
+}
+
+#[test]
 fn namespace_not_found() {
     "
     type foo {

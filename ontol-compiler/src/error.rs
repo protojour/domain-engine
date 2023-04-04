@@ -60,6 +60,8 @@ pub enum CompileError {
     DuplicateAnonymousRelationship,
     #[error("subject must be a domain type")]
     SubjectMustBeDomainType,
+    #[error("object must be a data type")]
+    ObjectMustBeDataType,
     #[error("fmt needs at least two transitions: `fmt a => b => c`")]
     FmtTooFewTransitions,
     #[error("fmt only supports `_` at the final target position")]

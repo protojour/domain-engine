@@ -24,13 +24,13 @@ domain b {
 
     type bar {
         rel id identifies _
-        rel _ [bar] type {
-            rel _ [is] int
-            rel _ [is] lolg
+        rel _ bar: type {
+            rel _ is: int
+            rel _ is: lolg
         } rel {
 
         }
-        rel _ [xy] coord
+        rel _ xy: coord
     }
 
     type baz {
@@ -43,25 +43,20 @@ domain b {
 }
 
 rel a [route] b {
-    rel foo [eq x c] bar {
-    } {
-    }
-
     map (x c a b c q fdkl fdsjklfds jfdl) {
         foo {
-            rel _ 'foo': x
-            rel _ 'geo' {
-                // note this body is for the relation itself
-                rel _ 'how_much': h
-            }: {
-                rel _ 'coordinates': {
-                    rel _ 'x': x
+            rel 'foo': x
+            rel 'geo' {
+                rel :: 'how_much' h
+
+                rel 'coordinates': {
+                    rel 'x': x
                 }
             }
         }
         bar {
-            rel _ 'bar': x,
-            rel _ 'xy': c
+            rel 'bar': x,
+            rel 'xy': c
         }
     }
 }

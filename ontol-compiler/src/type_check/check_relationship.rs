@@ -90,16 +90,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => {}
         }
 
-        // Type of the property value/the property "range" / "co-domain":
-        let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+        match &relation.1.kind {
+            RelationKind::Is => {
+                self.check_subject_data_type(subject_ty, &subject.1);
+                self.check_object_data_type(object_ty, &object.1);
+                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
 
-        match (
-            &relation.1.kind,
-            &mut properties.map,
-            &mut properties.constructor,
-        ) {
-            (RelationKind::Is, _, constructor) => {
-                match (relationship.1.subject_cardinality.0, constructor) {
+                match (
+                    relationship.1.subject_cardinality.0,
+                    &mut properties.constructor,
+                ) {
                     (PropertyCardinality::Mandatory, Constructor::Struct) => {
                         properties.constructor = Constructor::Value(
                             relationship.0,
@@ -146,7 +146,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
             }
-            (RelationKind::Identifies, _, _) => {
+            RelationKind::Identifies => {
+                self.check_subject_data_type(subject_ty, &subject.1);
+                self.check_object_data_type(object_ty, &object.1);
+                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+
                 if properties.identifies.is_some() {
                     return self.error(CompileError::AlreadyIdentifiesAType, span);
                 }
@@ -170,55 +174,71 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (RelationKind::Indexed, None, Constructor::Struct) => {
-                let mut sequence = Sequence::default();
+            RelationKind::Indexed => {
+                self.check_subject_data_type(subject_ty, &subject.1);
+                self.check_object_data_type(object_ty, &object.1);
+                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                match (&properties.map, &mut properties.constructor) {
+                    (None, Constructor::Struct) => {
+                        let mut sequence = Sequence::default();
 
-                if let Err(error) =
-                    sequence.define_relationship(&relationship.1.rel_params, relationship.0)
-                {
-                    return self.error(error, span);
-                }
+                        if let Err(error) =
+                            sequence.define_relationship(&relationship.1.rel_params, relationship.0)
+                        {
+                            return self.error(error, span);
+                        }
 
-                properties.constructor = Constructor::Sequence(sequence);
-            }
-            (RelationKind::Indexed, None, Constructor::Sequence(sequence)) => {
-                if let Err(error) =
-                    sequence.define_relationship(&relationship.1.rel_params, relationship.0)
-                {
-                    return self.error(error, span);
+                        properties.constructor = Constructor::Sequence(sequence);
+                    }
+                    (None, Constructor::Sequence(sequence)) => {
+                        if let Err(error) =
+                            sequence.define_relationship(&relationship.1.rel_params, relationship.0)
+                        {
+                            return self.error(error, span);
+                        }
+                    }
+                    _ => {
+                        return self
+                            .error(CompileError::InvalidMixOfRelationshipTypeForSubject, span)
+                    }
                 }
             }
-            (RelationKind::Named(_), None, _) => {
-                properties.map = Some(
-                    [(
-                        PropertyId::subject(relation.0),
-                        Property {
-                            cardinality: relationship.1.subject_cardinality,
-                            is_entity_id: false,
-                        },
-                    )]
-                    .into(),
-                );
-            }
-            (RelationKind::Named(_), Some(map), _) => {
-                if map
-                    .insert(
-                        PropertyId::subject(relation.0),
-                        Property {
-                            cardinality: relationship.1.subject_cardinality,
-                            is_entity_id: false,
-                        },
-                    )
-                    .is_some()
-                {
-                    return self.error(CompileError::UnionInNamedRelationshipNotSupported, span);
+            RelationKind::Named(_) => {
+                self.check_subject_data_type(subject_ty, &subject.1);
+                self.check_object_data_type(object_ty, &object.1);
+                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                match &mut properties.map {
+                    None => {
+                        properties.map = Some(
+                            [(
+                                PropertyId::subject(relation.0),
+                                Property {
+                                    cardinality: relationship.1.subject_cardinality,
+                                    is_entity_id: false,
+                                },
+                            )]
+                            .into(),
+                        );
+                    }
+                    Some(map) => {
+                        if map
+                            .insert(
+                                PropertyId::subject(relation.0),
+                                Property {
+                                    cardinality: relationship.1.subject_cardinality,
+                                    is_entity_id: false,
+                                },
+                            )
+                            .is_some()
+                        {
+                            return self
+                                .error(CompileError::UnionInNamedRelationshipNotSupported, span);
+                        }
+                    }
                 }
             }
-            (RelationKind::FmtTransition(_), None, Constructor::StringFmt(_)) => {
-                debug!("should concatenate string pattern");
-            }
-            _ => return self.error(CompileError::InvalidMixOfRelationshipTypeForSubject, span),
-        }
+            RelationKind::FmtTransition(_) => return subject_ty,
+        };
 
         object_ty
     }
@@ -321,6 +341,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         subject_ty
+    }
+
+    fn check_subject_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
+        match ty {
+            Type::Domain(_) | Type::Anonymous(_) => {}
+            _ => {
+                // panic!("other: {other:?}");
+                self.error(CompileError::SubjectMustBeDomainType, span);
+            }
+        }
+    }
+
+    fn check_object_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
+        match ty {
+            Type::Tautology
+            | Type::BuiltinRelation
+            | Type::Function { .. }
+            | Type::Package
+            | Type::Infer(_)
+            | Type::Error => {
+                self.error(CompileError::ObjectMustBeDataType, span);
+            }
+            _ => {}
+        }
     }
 
     fn extend_string_pattern_fmt_constructor(

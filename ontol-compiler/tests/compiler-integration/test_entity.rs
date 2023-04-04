@@ -1,5 +1,6 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile,
+    TestPackages,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -398,4 +399,22 @@ fn recursive_entity_union() {
             })
         );
     });
+}
+
+#[test]
+fn artist_etc_routing() {
+    TestPackages::with_sources([
+        (SourceName("gsu"), GUITAR_SYNTH_UNION),
+        (SourceName("aai"), ARTIST_AND_INSTRUMENT),
+        (
+            SourceName::root(),
+            "
+            use 'gsu' as gsu
+            use 'aai' as aai
+
+            rel gsu 'to': aai {} // ERROR subject must be a domain type// ERROR object must be a data type
+            ",
+        ),
+    ])
+    .compile_fail();
 }
