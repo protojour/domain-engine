@@ -200,7 +200,7 @@ fn test_entity_self_relationship_optional_object() {
     pub type node {
         rel node_id identifies: _
         rel _ 'name': string
-        rel _ ['children'] | 'parent'?: node
+        rel _ ['children']::'parent'? node
     }
     "
     .compile_ok(|env| {
@@ -248,7 +248,7 @@ fn test_entity_self_relationship_mandatory_object() {
     pub type node_id { fmt '' => string => _ }
     pub type node {
         rel node_id identifies: _
-        rel _ ['children'] | 'parent': node
+        rel _ ['children']::'parent' node
     }
     "
     .compile_ok(|env| {
@@ -366,7 +366,7 @@ fn recursive_entity_union() {
     pub type plant_id { fmt '' => 'plant/' => string => _ }
     pub type owner_id { fmt '' => string => _ }
 
-    pub type lifeform // ERROR entity variants of the union are not uniquely identifiable
+    pub type lifeform
     pub type animal {
         rel animal_id identifies: _
         rel _ 'class': 'animal'

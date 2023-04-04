@@ -357,8 +357,8 @@ fn only_entities_may_have_reverse_relationship() {
     "
     type foo
     type bar
-    rel foo 'a' | ['aa']: bar {} // ERROR only entities may have named reverse relationship
-    rel foo 'b' | ['bb']: string // ERROR only entities may have named reverse relationship
+    rel foo 'a'::['aa'] bar {} // ERROR only entities may have named reverse relationship
+    rel foo 'b'::['bb'] string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }

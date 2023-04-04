@@ -125,7 +125,6 @@ fn rel_statement() -> impl AstParser<RelStatement> {
             .then(spanned_ty_or_underscore())
             // relation
             .then(relation())
-            .then_ignore(colon())
             // object
             .then(spanned_ty_or_underscore())
             .then(spanned(ctx_block).or_not())
@@ -150,13 +149,13 @@ fn relation() -> impl AstParser<Relation> {
 
     // type
     with_cardinality(rel_ty)
+        .then_ignore(colon())
         // object prop and cardinality
         .then(
-            sigil('|')
+            colon()
                 .ignore_then(with_cardinality(spanned(string_literal())))
                 .or_not(),
         )
-        // within {}
         .map(|((ty, subject_cardinality), object)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, cardinality)) => (Some(prop), cardinality),
