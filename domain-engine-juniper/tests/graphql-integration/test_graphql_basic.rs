@@ -14,8 +14,8 @@ use crate::{
     mock_default_config, mock_gql_context, mock_query_entities_empty, Exec, TestCompileSchema,
 };
 
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
+const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 #[test]
 fn test_graphql_empty_schema() {
@@ -328,11 +328,11 @@ async fn test_graphql_municipalities() {
     let (_env, schema) = TestPackages::with_sources([
         (
             SourceName::root(),
-            include_str!("../../../examples/municipalities.ont"),
+            include_str!("../../../examples/municipalities.on"),
         ),
         (
             SourceName("geojson"),
-            include_str!("../../../examples/geojson.ont"),
+            include_str!("../../../examples/geojson.on"),
         ),
     ])
     .compile_schema();

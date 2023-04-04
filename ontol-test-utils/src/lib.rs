@@ -15,7 +15,7 @@ pub mod type_binding;
 /// BUG: The generated package id is really dynamic
 pub const TEST_PKG: PackageId = PackageId(1);
 
-pub const ROOT_SRC_NAME: &str = "test_root.ont";
+pub const ROOT_SRC_NAME: &str = "test_root.on";
 
 #[macro_export]
 macro_rules! assert_error_msg {

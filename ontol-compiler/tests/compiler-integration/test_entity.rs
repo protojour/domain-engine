@@ -5,8 +5,8 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.ont");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.ont");
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
+const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 #[test]
 fn id_cannot_identify_two_things() {

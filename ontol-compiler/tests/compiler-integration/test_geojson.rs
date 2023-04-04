@@ -5,7 +5,7 @@ use ontol_test_utils::{
 use serde_json::json;
 use test_log::test;
 
-pub const GEOJSON_ONT: &str = include_str!("../../../examples/geojson.ont");
+pub const GEOJSON_ONT: &str = include_str!("../../../examples/geojson.on");
 
 #[test]
 fn test_geojson() {
