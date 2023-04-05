@@ -29,7 +29,6 @@ pub struct WasmEnv {
     package_id: PackageId,
 }
 
-pub const ONTOL_PKG: PackageId = PackageId(1);
 const ONTOL_ROOT: &str = "ontol_root.on";
 
 #[wasm_bindgen]
