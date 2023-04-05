@@ -12,7 +12,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::Constructor,
-    typed_expr::{ExprRef, TypedExpr, TypedExprEquation, TypedExprKind, ERROR_NODE},
+    typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -24,7 +24,7 @@ use super::{
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub equation: TypedExprEquation<'m>,
+    pub expressions: TypedExprTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, ExprRef>,
 }
 
@@ -71,7 +71,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             param_expr_refs.push(typed_expr_ref);
                         }
 
-                        let call_expr_ref = ctx.equation.add_expr(TypedExpr {
+                        let call_expr_ref = ctx.expressions.add(TypedExpr {
                             kind: TypedExprKind::Call(*proc, param_expr_refs.into()),
                             ty: output,
                             span: expr.span,
@@ -188,7 +188,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                 }
 
-                                ctx.equation.add_expr(TypedExpr {
+                                ctx.expressions.add(TypedExpr {
                                     ty: domain_type,
                                     kind: TypedExprKind::MapObjPattern(typed_properties),
                                     span: expr.span,
@@ -201,7 +201,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         &expr.span,
                                     );
                                 }
-                                ctx.equation.add_expr(TypedExpr {
+                                ctx.expressions.add(TypedExpr {
                                     kind: TypedExprKind::Unit,
                                     ty: domain_type,
                                     span: expr.span,
@@ -218,7 +218,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(relationship.object.0.def_id);
                             let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
 
-                            ctx.equation.add_expr(TypedExpr {
+                            ctx.expressions.add(TypedExpr {
                                 ty: domain_type,
                                 kind: TypedExprKind::ValueObjPattern(typed_expr_ref),
                                 span: expr.span,
@@ -245,7 +245,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (
                     ty,
-                    ctx.equation.add_expr(TypedExpr {
+                    ctx.expressions.add(TypedExpr {
                         ty,
                         kind: TypedExprKind::Constant(*k),
                         span: expr.span,
@@ -263,7 +263,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 (
                     ty,
-                    ctx.equation.add_expr(TypedExpr {
+                    ctx.expressions.add(TypedExpr {
                         ty,
                         kind: TypedExprKind::VariableRef(*var_ref),
                         span: expr.span,
@@ -338,7 +338,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<(TypeRef<'m>, ExprRef), ()> {
         match (actual, expected) {
             (Type::Domain(_), Type::Domain(_)) => {
-                let translation_node = ctx.equation.add_expr(TypedExpr {
+                let translation_node = ctx.expressions.add(TypedExpr {
                     ty: expected,
                     kind: TypedExprKind::Translate(typed_expr_ref, actual),
                     span: expr.span,
@@ -353,7 +353,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     actual_item,
                     expected_item,
                 )?;
-                let translation_node = ctx.equation.add_expr(TypedExpr {
+                let translation_node = ctx.expressions.add(TypedExpr {
                     ty: expected,
                     kind: TypedExprKind::SequenceMap(translate_ref, actual),
                     span: expr.span,

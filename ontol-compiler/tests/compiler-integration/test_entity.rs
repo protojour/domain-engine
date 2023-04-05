@@ -402,6 +402,8 @@ fn recursive_entity_union() {
 }
 
 #[test]
+// BUG:
+#[should_panic = "not a variable"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),

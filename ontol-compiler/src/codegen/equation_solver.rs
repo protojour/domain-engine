@@ -5,7 +5,9 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::typed_expr::{ExprRef, TypedExpr, TypedExprEquation, TypedExprKind, TypedExprVec};
+use crate::typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable};
+
+use super::equation::TypedExprEquation;
 
 /// A substitution table tracks rewrites of node indices.
 ///
@@ -19,6 +21,7 @@ use crate::typed_expr::{ExprRef, TypedExpr, TypedExprEquation, TypedExprKind, Ty
 pub struct SubstitutionTable(SmallVec<[ExprRef; 32]>);
 
 impl SubstitutionTable {
+    #[inline]
     pub fn push(&mut self) {
         let id = ExprRef(self.0.len() as u32);
         self.0.push(id);
@@ -88,7 +91,7 @@ pub enum Substitution {
 
 pub struct EquationSolver<'t, 'm> {
     /// The set of expressions that will be rewritten
-    expressions: &'t mut TypedExprVec<'m>,
+    expressions: &'t mut TypedExprTable<'m>,
     /// substitutions for the reduced side
     reductions: &'t mut SubstitutionTable,
     /// substitutions for the expanded side
@@ -96,11 +99,11 @@ pub struct EquationSolver<'t, 'm> {
 }
 
 impl<'t, 'm> EquationSolver<'t, 'm> {
-    pub fn new(table: &'t mut TypedExprEquation<'m>) -> Self {
+    pub fn new(equation: &'t mut TypedExprEquation<'m>) -> Self {
         Self {
-            expressions: &mut table.expr_vec,
-            reductions: &mut table.reductions,
-            expansions: &mut table.expansions,
+            expressions: &mut equation.expressions,
+            reductions: &mut equation.reductions,
+            expansions: &mut equation.expansions,
         }
     }
 
@@ -330,8 +333,9 @@ mod tests {
     use tracing::info;
 
     use crate::{
+        codegen::equation::TypedExprEquation,
         mem::{Intern, Mem},
-        typed_expr::{SyntaxVar, TypedExpr, TypedExprEquation, TypedExprKind},
+        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
         Compiler, SourceSpan, Sources,
     };
@@ -342,28 +346,29 @@ mod tests {
         let mut compiler = Compiler::new(&mem, Sources::default()).with_core();
         let int = compiler.types.intern(Type::Int(DefId(PackageId(0), 42)));
 
-        let mut eq = TypedExprEquation::default();
-        let var = eq.add_expr(TypedExpr {
+        let mut table = TypedExprTable::default();
+        let var = table.add(TypedExpr {
             kind: TypedExprKind::Variable(SyntaxVar(42)),
             ty: int,
             span: SourceSpan::none(),
         });
-        let var_ref = eq.add_expr(TypedExpr {
+        let var_ref = table.add(TypedExpr {
             kind: TypedExprKind::VariableRef(var),
             ty: int,
             span: SourceSpan::none(),
         });
-        let constant = eq.add_expr(TypedExpr {
+        let constant = table.add(TypedExpr {
             kind: TypedExprKind::Constant(1000),
             ty: int,
             span: SourceSpan::none(),
         });
-        let call = eq.add_expr(TypedExpr {
+        let call = table.add(TypedExpr {
             kind: TypedExprKind::Call(BuiltinProc::Mul, [var_ref, constant].into()),
             ty: int,
             span: SourceSpan::none(),
         });
 
+        let mut eq = TypedExprEquation::new(table);
         eq.solver().reduce_expr(call).unwrap();
 
         info!("source: {:?}", eq.debug_tree(call, &eq.reductions));

@@ -4,10 +4,13 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::map_obj::codegen_map_obj_origin,
-    typed_expr::{ExprRef, SealedTypedExprEquation, SyntaxVar, TypedExprEquation, TypedExprKind},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
 };
 
-use super::{find_translation_key, value_obj::codegen_value_obj_origin, ProcTable, UnlinkedProc};
+use super::{
+    equation::TypedExprEquation, find_translation_key, value_obj::codegen_value_obj_origin,
+    ProcTable, UnlinkedProc,
+};
 
 pub(super) enum DebugDirection {
     Forward,
@@ -16,23 +19,22 @@ pub(super) enum DebugDirection {
 
 pub(super) fn codegen_translate_rewrite(
     proc_table: &mut ProcTable,
-    equation: &mut SealedTypedExprEquation,
+    equation: &mut TypedExprEquation,
     (from, to): (ExprRef, ExprRef),
     direction: DebugDirection,
 ) -> bool {
     // solve equation
-    let mut solver = equation.inner.solver();
+    let mut solver = equation.solver();
     solver.reduce_expr(from).unwrap_or_else(|error| {
         panic!("TODO: could not solve: {error:?}");
     });
 
-    let from_def = find_translation_key(&equation.inner.expr_vec[from].ty);
-    let to_def = find_translation_key(&equation.inner.expr_vec[to].ty);
+    let from_def = find_translation_key(&equation.expressions[from].ty);
+    let to_def = find_translation_key(&equation.expressions[to].ty);
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
-            let procedure =
-                codegen_translate(proc_table, &equation.inner, (from, to), to_def, direction);
+            let procedure = codegen_translate(proc_table, &equation, (from, to), to_def, direction);
 
             proc_table.procedures.insert((from_def, to_def), procedure);
             true

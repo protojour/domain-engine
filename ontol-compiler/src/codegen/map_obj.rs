@@ -8,11 +8,11 @@ use tracing::debug;
 
 use crate::{
     codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprEquation, TypedExprKind},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
-use super::{ProcTable, UnlinkedProc};
+use super::{equation::TypedExprEquation, ProcTable, UnlinkedProc};
 
 /// Generate code originating from a map obj destructuring
 pub(super) fn codegen_map_obj_origin(

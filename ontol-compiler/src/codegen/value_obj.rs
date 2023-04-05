@@ -7,11 +7,11 @@ use tracing::debug;
 
 use crate::{
     codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprEquation, TypedExprKind},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
-use super::{ProcTable, UnlinkedProc};
+use super::{equation::TypedExprEquation, ProcTable, UnlinkedProc};
 
 pub(super) fn codegen_value_obj_origin(
     proc_table: &mut ProcTable,

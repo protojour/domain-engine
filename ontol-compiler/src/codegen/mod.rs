@@ -6,8 +6,8 @@ use ontol_runtime::{
     DefId,
 };
 
-pub mod equation_solver;
-
+mod equation;
+mod equation_solver;
 mod link;
 mod map_obj;
 mod translate;
@@ -17,12 +17,13 @@ use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
-    typed_expr::{ExprRef, SealedTypedExprEquation, SyntaxVar, TypedExprEquation, TypedExprKind},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
 use self::{
+    equation::TypedExprEquation,
     link::{link, LinkResult},
     translate::{codegen_translate_rewrite, DebugDirection},
 };
@@ -55,7 +56,7 @@ pub enum CodegenTask<'m> {
 
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
-    pub equation: SealedTypedExprEquation<'m>,
+    pub expressions: TypedExprTable<'m>,
     pub node_a: ExprRef,
     pub node_b: ExprRef,
     pub span: SourceSpan,
@@ -172,21 +173,23 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for task in tasks {
         match task {
-            CodegenTask::Map(mut map_task) => {
+            CodegenTask::Map(map_task) => {
+                let mut equation = TypedExprEquation::new(map_task.expressions);
+
                 // a -> b
                 codegen_translate_rewrite(
                     &mut proc_table,
-                    &mut map_task.equation,
+                    &mut equation,
                     (map_task.node_a, map_task.node_b),
                     DebugDirection::Forward,
                 );
 
-                map_task.equation.reset();
+                equation.reset();
 
                 // b -> a
                 codegen_translate_rewrite(
                     &mut proc_table,
-                    &mut map_task.equation,
+                    &mut equation,
                     (map_task.node_b, map_task.node_a),
                     DebugDirection::Backward,
                 );
