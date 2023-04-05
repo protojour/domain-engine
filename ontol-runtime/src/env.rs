@@ -54,7 +54,7 @@ impl Env {
     }
 
     pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {
-        match self.find_domain(&def_id.0) {
+        match self.find_domain(def_id.0) {
             Some(domain) => domain.type_info(def_id),
             None => {
                 panic!("No domain for {:?}", def_id.0)
@@ -66,8 +66,8 @@ impl Env {
         self.domains.len()
     }
 
-    pub fn find_domain(&self, package_id: &PackageId) -> Option<&Domain> {
-        self.domains.get(package_id)
+    pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
+        self.domains.get(&package_id)
     }
 
     pub fn get_translator(&self, from: DefId, to: DefId) -> Option<Procedure> {

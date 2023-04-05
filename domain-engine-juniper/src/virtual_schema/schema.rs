@@ -42,7 +42,7 @@ impl VirtualSchema {
     /// Builds a "shadow schema" before handing that over to juniper
     pub fn build(package_id: PackageId, env: Arc<Env>) -> Result<Self, SchemaBuildError> {
         let domain = env
-            .find_domain(&package_id)
+            .find_domain(package_id)
             .ok_or(SchemaBuildError::UnknownPackage)?;
 
         let mut schema = Self {

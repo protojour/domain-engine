@@ -12,7 +12,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use tracing::{debug, error};
 
-use crate::{TestEnv, TEST_PKG};
+use crate::TestEnv;
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
@@ -30,7 +30,7 @@ pub struct TypeBinding<'e> {
 impl<'e> TypeBinding<'e> {
     pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
         let env = &test_env.env;
-        let domain = env.find_domain(&TEST_PKG).unwrap();
+        let domain = env.find_domain(test_env.root_package).unwrap();
         let def_id = domain
             .type_names
             .get(type_name)

@@ -1,6 +1,4 @@
-use ontol_test_utils::{
-    type_binding::TypeBinding, SourceName, TestCompile, TestEnv, TestPackages, TEST_PKG,
-};
+use ontol_test_utils::{type_binding::TypeBinding, SourceName, TestCompile, TestEnv, TestPackages};
 use serde_json::json;
 use test_log::test;
 use tracing::debug;
@@ -255,7 +253,7 @@ fn test_map_complex_flow() {
         );
 
         // FIXME: Property probe does not make completely sense for this translation:
-        let domain = test_env.env.find_domain(&TEST_PKG).unwrap();
+        let domain = test_env.env.find_domain(test_env.root_package).unwrap();
         let mut property_probe = test_env.env.new_property_probe();
         let property_map = property_probe
             .probe_from_serde_operator(

@@ -12,9 +12,6 @@ use ontol_runtime::{env::Env, PackageId};
 pub mod diagnostics;
 pub mod type_binding;
 
-/// BUG: The generated package id is really dynamic
-pub const TEST_PKG: PackageId = PackageId(1);
-
 pub const ROOT_SRC_NAME: &str = "test_root.on";
 
 #[macro_export]
@@ -52,6 +49,7 @@ macro_rules! assert_json_io_matches {
 #[derive(Clone)]
 pub struct TestEnv {
     pub env: Arc<Env>,
+    pub root_package: PackageId,
     pub test_json_schema: bool,
 }
 
@@ -111,8 +109,9 @@ impl TestPackages {
         }
     }
 
-    fn load_topology(&mut self) -> Result<PackageTopology, UnifiedCompileError> {
+    fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
         let mut package_graph_builder = PackageGraphBuilder::new(ROOT_SRC_NAME.into());
+        let mut root_package = None;
 
         loop {
             match package_graph_builder.transition()? {
@@ -124,6 +123,10 @@ impl TestPackages {
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
+                        if source_name == ROOT_SRC_NAME {
+                            root_package = Some(request.package_id);
+                        }
+
                         if let Some(source_text) = self.sources_by_name.get(source_name) {
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
@@ -134,18 +137,26 @@ impl TestPackages {
                         }
                     }
                 }
-                GraphState::Built(topology) => return Ok(topology),
+                GraphState::Built(topology) => return Ok((topology, root_package.unwrap())),
             }
         }
     }
 
-    fn compile_topology(&mut self) -> Result<Env, UnifiedCompileError> {
-        let package_topology = self.load_topology()?;
+    fn compile_topology(&mut self) -> Result<TestEnv, UnifiedCompileError> {
+        let (package_topology, root_package) = self.load_topology()?;
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, self.sources.clone()).with_core();
 
         match compiler.compile_package_topology(package_topology) {
-            Ok(()) => Ok(compiler.into_env()),
+            Ok(()) => {
+                let env = compiler.into_env();
+                Ok(TestEnv {
+                    env: Arc::new(env),
+                    root_package,
+                    // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
+                    test_json_schema: false,
+                })
+            }
             Err(error) => Err(error),
         }
     }
@@ -154,14 +165,9 @@ impl TestPackages {
 impl TestCompile for TestPackages {
     fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
         match self.compile_topology() {
-            Ok(env) => {
-                let env = TestEnv {
-                    env: Arc::new(env),
-                    // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
-                    test_json_schema: false,
-                };
-                validator(env.clone());
-                env
+            Ok(test_env) => {
+                validator(test_env.clone());
+                test_env
             }
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.

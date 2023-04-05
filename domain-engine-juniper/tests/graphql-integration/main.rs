@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use domain_engine_core::{Config, EngineAPIMock};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
-use ontol_test_utils::{TestCompile, TestEnv, TEST_PKG};
+use ontol_test_utils::{TestCompile, TestEnv};
 use unimock::*;
 
 mod test_graphql_basic;
@@ -19,7 +19,7 @@ impl<T: TestCompile> TestCompileSchema for T {
         test_env.test_json_schema = false;
         (
             test_env.clone(),
-            create_graphql_schema(TEST_PKG, test_env.env).unwrap(),
+            create_graphql_schema(test_env.root_package, test_env.env).unwrap(),
         )
     }
 }
