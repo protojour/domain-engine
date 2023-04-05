@@ -147,7 +147,7 @@ fn test_map_value_to_map_func() {
 }
 
 #[test]
-fn test_map_simple_array() {
+fn test_map_matching_array() {
     "
     pub type foo
     pub type bar
@@ -174,6 +174,43 @@ fn test_map_simple_array() {
             ("bar", "foo"),
             json!({ "b": [42] }),
             json!({ "a": [42] }),
+        );
+    });
+}
+
+#[test]
+// BUG:
+#[should_panic]
+fn test_map_translate_array_item() {
+    "
+    type foo { rel _ 'f': string }
+    type bar { rel _ 'b': string }
+    pub type foos { rel _ ['foos']: foo }
+    pub type bars { rel _ ['bars']: bar }
+
+    map (x) {
+        foo {
+            rel 'f': x
+        }
+        bar {
+            rel 'b': x
+        }
+    }
+    map (x) {
+        foos {
+            rel 'foos': x
+        }
+        bars {
+            rel 'bars': x
+        }
+    }
+    "
+    .compile_ok(|env| {
+        assert_translate(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [{ "f": 42 }] }),
+            json!({ "bars": [{ "b": 42 }] }),
         );
     });
 }

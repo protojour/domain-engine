@@ -330,6 +330,7 @@ mod rules {
 #[cfg(test)]
 mod tests {
     use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
+    use test_log::test;
     use tracing::info;
 
     use crate::{
@@ -371,7 +372,7 @@ mod tests {
         let mut eq = TypedExprEquation::new(table);
         eq.solver().reduce_expr(call).unwrap();
 
-        info!("source: {:?}", eq.debug_tree(call, &eq.reductions));
-        info!("target: {:?}", eq.debug_tree(call, &eq.expansions));
+        info!("source: {:#?}", eq.debug_tree(call, &eq.reductions));
+        info!("target: {:#?}", eq.debug_tree(call, &eq.expansions));
     }
 }
