@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 
 use crate::{expr::ExprId, types::TypeRef};
 
-use super::TypeError;
+use super::{TypeEquation, TypeError};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeVar<'m>(pub u32, PhantomData<&'m ()>);
@@ -46,10 +46,10 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
                 if a == b {
                     Ok(value1.clone())
                 } else {
-                    Err(TypeError::Mismatch {
+                    Err(TypeError::Mismatch(TypeEquation {
                         actual: a,
                         expected: b,
-                    })
+                    }))
                 }
             }
             (Self::Known(_), Self::Unknown) => Ok(value1.clone()),

@@ -34,7 +34,7 @@ pub(super) fn codegen_translate_rewrite(
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
-            let procedure = codegen_translate(proc_table, &equation, (from, to), to_def, direction);
+            let procedure = codegen_translate(proc_table, equation, (from, to), to_def, direction);
 
             proc_table.procedures.insert((from_def, to_def), procedure);
             true

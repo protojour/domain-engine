@@ -23,10 +23,13 @@ mod check_relationship;
 
 #[derive(Debug)]
 pub enum TypeError<'m> {
-    Mismatch {
-        actual: TypeRef<'m>,
-        expected: TypeRef<'m>,
-    },
+    Mismatch(TypeEquation<'m>),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TypeEquation<'m> {
+    actual: TypeRef<'m>,
+    expected: TypeRef<'m>,
 }
 
 /// Type checking is a stage in compilation.
@@ -51,9 +54,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         let compile_error = match error {
-            TypeError::Mismatch { actual, expected } => CompileError::TypeMismatch {
-                actual: smart_format!("{}", FormatType(actual, self.defs, self.primitives)),
-                expected: smart_format!("{}", FormatType(expected, self.defs, self.primitives)),
+            TypeError::Mismatch(equation) => CompileError::TypeMismatch {
+                actual: smart_format!(
+                    "{}",
+                    FormatType(equation.actual, self.defs, self.primitives)
+                ),
+                expected: smart_format!(
+                    "{}",
+                    FormatType(equation.expected, self.defs, self.primitives)
+                ),
             },
         };
         self.error(compile_error, span)
