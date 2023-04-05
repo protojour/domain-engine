@@ -5,7 +5,7 @@ use crate::{
     def::{DefKind, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+    typed_expr::{SyntaxVar, TypedExpr, TypedExprEquation, TypedExprKind},
     types::{Type, TypeRef},
 };
 
@@ -55,12 +55,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Mapping(variables, first_id, second_id) => {
                 let mut ctx = CheckExprContext {
                     inference: Inference::new(),
-                    typed_expr_table: TypedExprTable::default(),
+                    equation: TypedExprEquation::default(),
                     bound_variables: Default::default(),
                 };
 
                 for (index, (variable_expr_id, variable_span)) in variables.0.iter().enumerate() {
-                    let var_ref = ctx.typed_expr_table.add_expr(TypedExpr {
+                    let var_ref = ctx.equation.add_expr(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
                         kind: TypedExprKind::Variable(SyntaxVar(index as u32)),
                         span: *variable_span,
@@ -72,7 +72,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let (_, node_b) = self.check_expr_id(*second_id, &mut ctx);
 
                 self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-                    typed_expr_table: ctx.typed_expr_table.seal(),
+                    equation: ctx.equation.seal(),
                     node_a,
                     node_b,
                     span: def.span,

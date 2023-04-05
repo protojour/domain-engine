@@ -9,7 +9,7 @@ use ontol_runtime::{proc::BuiltinProc, value::PropertyId};
 use smallvec::SmallVec;
 
 use crate::{
-    codegen::rewrite::{RewriteTable, Rewriter},
+    codegen::equation_solver::{EquationSolver, SubstitutionTable},
     types::TypeRef,
     SourceSpan,
 };
@@ -48,7 +48,7 @@ pub enum TypedExprKind<'m> {
     SequenceMap(ExprRef, TypeRef<'m>),
 }
 
-impl<'m> Debug for TypedExprTable<'m> {
+impl<'m> Debug for TypedExprEquation<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TypedExprTable").finish()
     }
@@ -63,9 +63,9 @@ pub struct ExprRef(pub u32);
 pub const ERROR_NODE: ExprRef = ExprRef(u32::MAX);
 
 #[derive(Default)]
-pub struct TypedExpressions<'m>(pub(super) Vec<TypedExpr<'m>>);
+pub struct TypedExprVec<'m>(pub(super) Vec<TypedExpr<'m>>);
 
-impl<'m> Index<ExprRef> for TypedExpressions<'m> {
+impl<'m> Index<ExprRef> for TypedExprVec<'m> {
     type Output = TypedExpr<'m>;
 
     fn index(&self, index: ExprRef) -> &Self::Output {
@@ -73,67 +73,62 @@ impl<'m> Index<ExprRef> for TypedExpressions<'m> {
     }
 }
 
-/// Table used to store expression trees
-/// suitable for equation-style rewriting.
+/// Table used to store equation-like expression trees
+/// suitable for rewriting.
 #[derive(Default)]
-pub struct TypedExprTable<'m> {
-    pub expressions: TypedExpressions<'m>,
-    pub source_rewrites: RewriteTable,
-    pub target_rewrites: RewriteTable,
+pub struct TypedExprEquation<'m> {
+    /// The set of expressions part of the equation
+    pub expr_vec: TypedExprVec<'m>,
+    /// Rewrites for the reduced side
+    pub reductions: SubstitutionTable,
+    /// Rewrites for the expanded side
+    pub expansions: SubstitutionTable,
 }
 
-impl<'m> TypedExprTable<'m> {
+impl<'m> TypedExprEquation<'m> {
     pub fn add_expr(&mut self, expr: TypedExpr<'m>) -> ExprRef {
-        let auto_rewrite = match &expr.kind {
-            TypedExprKind::VariableRef(var_ref) => Some(*var_ref),
-            _ => None,
-        };
-
-        let id = ExprRef(self.expressions.0.len() as u32);
-        self.expressions.0.push(expr);
-        self.source_rewrites.push();
-        self.target_rewrites.push();
-
-        if let Some(auto_rewrite) = auto_rewrite {
-            self.source_rewrites.rewrite(id, auto_rewrite);
-            self.target_rewrites.rewrite(id, auto_rewrite);
-        }
+        let id = ExprRef(self.expr_vec.0.len() as u32);
+        self.expr_vec.0.push(expr);
+        self.reductions.push();
+        self.expansions.push();
 
         id
     }
 
     /// Mark the table as "sealed".
     /// A sealed table can be reset to its original state.
-    pub fn seal(self) -> SealedTypedExprTable<'m> {
-        let size = self.expressions.0.len();
-        SealedTypedExprTable { size, inner: self }
+    pub fn seal(self) -> SealedTypedExprEquation<'m> {
+        let size = self.expr_vec.0.len();
+        let mut sealed = SealedTypedExprEquation { size, inner: self };
+        sealed.reset();
+        sealed
     }
 
-    /// Create a new rewriter
-    pub fn rewriter<'c>(&'c mut self) -> Rewriter<'c, 'm> {
-        Rewriter::new(self)
+    /// Create a new solver
+    pub fn solver<'e>(&'e mut self) -> EquationSolver<'e, 'm> {
+        EquationSolver::new(self)
     }
 
     #[inline]
-    pub fn resolve_expr<'t>(
-        &'t self,
-        rewrite_table: &RewriteTable,
+    pub fn resolve_expr<'e>(
+        &'e self,
+        substitutions: &SubstitutionTable,
         source_node: ExprRef,
-    ) -> (ExprRef, &'t TypedExpr<'m>, SourceSpan) {
-        let span = self.expressions[source_node].span;
-        let root_node = rewrite_table.resolve(source_node);
-        (root_node, &self.expressions[root_node], span)
+    ) -> (ExprRef, &'e TypedExpr<'m>, SourceSpan) {
+        let span = self.expr_vec[source_node].span;
+        let root_node = substitutions.resolve(source_node);
+        (root_node, &self.expr_vec[root_node], span)
     }
 
-    pub fn debug<'a>(
-        &'a self,
-        rewrites: &'a RewriteTable,
-        root_expr: ExprRef,
-    ) -> DebugTree<'a, 'm> {
+    pub fn debug_tree<'e>(
+        &'e self,
+        expr_ref: ExprRef,
+        substitutions: &'e SubstitutionTable,
+    ) -> DebugTree<'e, 'm> {
         DebugTree {
-            table: self,
-            rewrites,
-            expr_ref: root_expr,
+            equation: self,
+            substitutions,
+            expr_ref,
             property_id: None,
             depth: 0,
         }
@@ -141,35 +136,31 @@ impl<'m> TypedExprTable<'m> {
 }
 
 #[derive(Debug)]
-pub struct SealedTypedExprTable<'m> {
+pub struct SealedTypedExprEquation<'m> {
     size: usize,
-    pub inner: TypedExprTable<'m>,
+    pub inner: TypedExprEquation<'m>,
 }
 
-impl<'m> SealedTypedExprTable<'m> {
+impl<'m> SealedTypedExprEquation<'m> {
     /// Reset all rewrites, which backtracks to original state
     pub fn reset(&mut self) {
-        self.inner.expressions.0.truncate(self.size);
-        self.inner.source_rewrites.reset(self.size);
-        self.inner.target_rewrites.reset(self.size);
+        self.inner.expr_vec.0.truncate(self.size);
+        self.inner.reductions.reset(self.size);
+        self.inner.expansions.reset(self.size);
 
         // auto rewrites of variable refs
-        for (index, expr) in self.inner.expressions.0.iter().enumerate() {
+        for (index, expr) in self.inner.expr_vec.0.iter().enumerate() {
             if let TypedExprKind::VariableRef(var_ref) = &expr.kind {
-                self.inner
-                    .source_rewrites
-                    .rewrite(ExprRef(index as u32), *var_ref);
-                self.inner
-                    .target_rewrites
-                    .rewrite(ExprRef(index as u32), *var_ref);
+                self.inner.reductions[ExprRef(index as u32)] = *var_ref;
+                self.inner.expansions[ExprRef(index as u32)] = *var_ref;
             }
         }
     }
 }
 
 pub struct DebugTree<'a, 'm> {
-    table: &'a TypedExprTable<'m>,
-    rewrites: &'a RewriteTable,
+    equation: &'a TypedExprEquation<'m>,
+    substitutions: &'a SubstitutionTable,
     expr_ref: ExprRef,
     property_id: Option<PropertyId>,
     depth: usize,
@@ -178,20 +169,20 @@ pub struct DebugTree<'a, 'm> {
 impl<'a, 'm> DebugTree<'a, 'm> {
     fn child(&self, expr_ref: ExprRef, property_id: Option<PropertyId>) -> Self {
         Self {
-            table: self.table,
-            rewrites: self.rewrites,
+            equation: self.equation,
+            substitutions: self.substitutions,
             expr_ref,
             property_id,
             depth: self.depth + 1,
         }
     }
 
-    fn header(&self, name: &str, target_expr_ref: ExprRef) -> String {
+    fn header(&self, name: &str, resolved: ExprRef) -> String {
         use std::fmt::Write;
         let mut s = String::new();
 
-        if self.expr_ref != target_expr_ref {
-            write!(&mut s, "{{{}->{}}}", self.expr_ref.0, target_expr_ref.0).unwrap();
+        if self.expr_ref != resolved {
+            write!(&mut s, "{{{}->{}}}", self.expr_ref.0, resolved.0).unwrap();
         } else {
             write!(&mut s, "{{{}}}", self.expr_ref.0).unwrap();
         }
@@ -213,46 +204,46 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
             return write!(f, "[ERROR depth exceeded]");
         }
 
-        let (target_expr_ref, expr, _) = self.table.resolve_expr(self.rewrites, self.expr_ref);
+        let (resolved, expr, _) = self
+            .equation
+            .resolve_expr(self.substitutions, self.expr_ref);
 
         match &expr.kind {
-            TypedExprKind::Unit => f
-                .debug_tuple(&self.header("Unit", target_expr_ref))
-                .finish()?,
+            TypedExprKind::Unit => f.debug_tuple(&self.header("Unit", resolved)).finish()?,
             TypedExprKind::Call(proc, params) => {
-                let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}"), target_expr_ref));
+                let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}"), resolved));
                 for param in params {
                     tup.field(&self.child(*param, None));
                 }
                 tup.finish()?
             }
             TypedExprKind::ValueObjPattern(expr_ref) => f
-                .debug_tuple(&self.header("ValueObj", target_expr_ref))
+                .debug_tuple(&self.header("ValueObj", resolved))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
             TypedExprKind::MapObjPattern(attributes) => {
-                let mut tup = f.debug_tuple(&self.header("MapObj", target_expr_ref));
+                let mut tup = f.debug_tuple(&self.header("MapObj", resolved));
                 for (property_id, expr_ref) in attributes {
                     tup.field(&self.child(*expr_ref, Some(*property_id)));
                 }
                 tup.finish()?;
             }
             TypedExprKind::Constant(c) => f
-                .debug_tuple(&self.header(&format!("Constant({c})"), target_expr_ref))
+                .debug_tuple(&self.header(&format!("Constant({c})"), resolved))
                 .finish()?,
             TypedExprKind::Variable(SyntaxVar(v)) => f
-                .debug_tuple(&self.header(&format!("Variable({v})"), target_expr_ref))
+                .debug_tuple(&self.header(&format!("Variable({v})"), resolved))
                 .finish()?,
             TypedExprKind::VariableRef(var_ref) => f
-                .debug_tuple(&self.header("VarRef", target_expr_ref))
+                .debug_tuple(&self.header("VarRef", resolved))
                 .field(&self.child(*var_ref, None))
                 .finish()?,
             TypedExprKind::Translate(expr_ref, _) => f
-                .debug_tuple(&self.header("Translate", target_expr_ref))
+                .debug_tuple(&self.header("Translate", resolved))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
             TypedExprKind::SequenceMap(expr_ref, _) => f
-                .debug_tuple(&self.header("SequenceMap", target_expr_ref))
+                .debug_tuple(&self.header("SequenceMap", resolved))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
         };

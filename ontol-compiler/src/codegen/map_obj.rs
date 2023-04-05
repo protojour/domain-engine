@@ -8,7 +8,7 @@ use tracing::debug;
 
 use crate::{
     codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprEquation, TypedExprKind},
     SourceSpan,
 };
 
@@ -17,22 +17,29 @@ use super::{ProcTable, UnlinkedProc};
 /// Generate code originating from a map obj destructuring
 pub(super) fn codegen_map_obj_origin(
     proc_table: &mut ProcTable,
-    expr_table: &TypedExprTable,
+    equation: &TypedExprEquation,
     to: ExprRef,
     origin_attrs: &IndexMap<PropertyId, ExprRef>,
 ) -> UnlinkedProc {
-    let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
+    let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
+
+    debug!("origin attrs: {origin_attrs:#?}");
+    debug!("reductions: {:?}", equation.reductions.debug_table());
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
         .map(|(prop_id, expr_ref)| {
-            match &expr_table
-                .resolve_expr(&expr_table.source_rewrites, *expr_ref)
+            match &equation
+                .resolve_expr(&equation.reductions, *expr_ref)
                 .1
                 .kind
             {
                 TypedExprKind::Variable(var) => (*prop_id, *var),
-                other => panic!("source property not a variable: {other:?}"),
+                other => {
+                    panic!(
+                        "reduced property {prop_id:?} {expr_ref:?} not a variable, but {other:?}"
+                    )
+                }
             }
         })
         .collect();
@@ -76,14 +83,14 @@ pub(super) fn codegen_map_obj_origin(
             ));
 
             for (property_id, expr_ref) in dest_attrs {
-                map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
+                map_codegen.codegen_expr(proc_table, equation, *expr_ref, &mut ops);
                 ops.push((OpCode::PutUnitAttr(Local(1), *property_id), span));
             }
 
             ops.push((OpCode::Return(Local(1)), span));
         }
         TypedExprKind::ValueObjPattern(expr_ref) => {
-            map_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut ops);
+            map_codegen.codegen_expr(proc_table, equation, *expr_ref, &mut ops);
             ops.push((OpCode::Return(Local(1)), span));
         }
         kind => {

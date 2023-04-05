@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
+    typed_expr::{ExprRef, SyntaxVar, TypedExprEquation, TypedExprKind},
     SourceSpan,
 };
 
@@ -15,11 +15,11 @@ use super::{ProcTable, UnlinkedProc};
 
 pub(super) fn codegen_value_obj_origin(
     proc_table: &mut ProcTable,
-    expr_table: &TypedExprTable,
+    equation: &TypedExprEquation,
     to: ExprRef,
     to_def: DefId,
 ) -> UnlinkedProc {
-    let (_, to_expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, to);
+    let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     struct ValueCodegen {
         input_local: Local,
@@ -48,7 +48,7 @@ pub(super) fn codegen_value_obj_origin(
 
     match &to_expr.kind {
         TypedExprKind::ValueObjPattern(expr_ref) => {
-            value_codegen.codegen_expr(proc_table, expr_table, *expr_ref, &mut opcodes);
+            value_codegen.codegen_expr(proc_table, equation, *expr_ref, &mut opcodes);
             opcodes.push((OpCode::Return0, to_expr.span));
         }
         TypedExprKind::MapObjPattern(dest_attrs) => {
@@ -60,7 +60,7 @@ pub(super) fn codegen_value_obj_origin(
             value_codegen.input_local = Local(1);
 
             for (property_id, node) in dest_attrs {
-                value_codegen.codegen_expr(proc_table, expr_table, *node, &mut opcodes);
+                value_codegen.codegen_expr(proc_table, equation, *node, &mut opcodes);
                 opcodes.push((OpCode::PutUnitAttr(Local(0), *property_id), span));
             }
 

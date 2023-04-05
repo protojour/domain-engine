@@ -6,7 +6,7 @@ use ontol_runtime::{
     DefId,
 };
 
-pub mod rewrite;
+pub mod equation_solver;
 
 mod link;
 mod map_obj;
@@ -17,7 +17,7 @@ use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
-    typed_expr::{ExprRef, SealedTypedExprTable, SyntaxVar, TypedExprKind, TypedExprTable},
+    typed_expr::{ExprRef, SealedTypedExprEquation, SyntaxVar, TypedExprEquation, TypedExprKind},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -55,7 +55,7 @@ pub enum CodegenTask<'m> {
 
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
-    pub typed_expr_table: SealedTypedExprTable<'m>,
+    pub equation: SealedTypedExprEquation<'m>,
     pub node_a: ExprRef,
     pub node_b: ExprRef,
     pub span: SourceSpan,
@@ -102,15 +102,15 @@ trait Codegen {
     fn codegen_expr(
         &mut self,
         proc_table: &mut ProcTable,
-        expr_table: &TypedExprTable,
+        equation: &TypedExprEquation,
         expr_id: ExprRef,
         opcodes: &mut SpannedOpCodes,
     ) {
-        let (_, expr, span) = expr_table.resolve_expr(&expr_table.target_rewrites, expr_id);
+        let (_, expr, span) = equation.resolve_expr(&equation.expansions, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
                 for param in params.iter() {
-                    self.codegen_expr(proc_table, expr_table, *param, opcodes);
+                    self.codegen_expr(proc_table, equation, *param, opcodes);
                 }
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
@@ -126,7 +126,7 @@ trait Codegen {
             }
             TypedExprKind::VariableRef(_) => panic!(),
             TypedExprKind::Translate(param_id, from_ty) => {
-                self.codegen_expr(proc_table, expr_table, *param_id, opcodes);
+                self.codegen_expr(proc_table, equation, *param_id, opcodes);
 
                 debug!(
                     "translate from {from_ty:?} to {:?}, span = {span:?}",
@@ -172,22 +172,22 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for task in tasks {
         match task {
-            CodegenTask::Map(mut eq_task) => {
+            CodegenTask::Map(mut map_task) => {
                 // a -> b
                 codegen_translate_rewrite(
                     &mut proc_table,
-                    &mut eq_task.typed_expr_table,
-                    (eq_task.node_a, eq_task.node_b),
+                    &mut map_task.equation,
+                    (map_task.node_a, map_task.node_b),
                     DebugDirection::Forward,
                 );
 
-                eq_task.typed_expr_table.reset();
+                map_task.equation.reset();
 
                 // b -> a
                 codegen_translate_rewrite(
                     &mut proc_table,
-                    &mut eq_task.typed_expr_table,
-                    (eq_task.node_b, eq_task.node_a),
+                    &mut map_task.equation,
+                    (map_task.node_b, map_task.node_a),
                     DebugDirection::Backward,
                 );
             }
