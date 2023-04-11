@@ -1,0 +1,26 @@
+{
+  "name": "ontol",
+  "displayName": "ONTOL",
+  "description": "ONTOL language support for VSCode",
+  "version": "0.0.1",
+  "publisher": "Protojour",
+  "engines": {
+    "vscode": "^1.77.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "ontol",
+      "aliases": ["ONTOL", "ontol"],
+      "extensions": [".on"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "ontol",
+      "scopeName": "source.ontol",
+      "path": "./syntaxes/ONTOL.tmLanguage"
+    }]
+  }
+}

@@ -1,0 +1,66 @@
+// SYNTAX TEST "Packages/ontol-sublime/ONTOL.tmLanguage"
+
+use some_domain.some_type
+// <- keyword.import.ontol
+//             ^ keyword.operator.ontol
+use 'some_domain'
+//  ^^^^^^^^^^^^^ string.quoted.single.ontol
+use "some_domain"
+//  ^^^^^^^^^^^^^ string.quoted.double.ontol
+
+use some_domain as another_domain
+//             *^^^ keyword.import.as.ontol
+
+/// # This is a doc comment
+// ^^^^^^^^^^^^^^^^^^^^^^^^ comment.block.documentation.ontol
+/// It can span several lines, contain **Markdown**,
+/// and is connected to the statement below
+pub type test {
+// <- storage.modifier.pub.ontol
+//  ^^^^ keyword.declaration.type.ontol
+    rel _ 'some_int' int
+//  ^^^ keyword.declaration.rel.ontol
+//     ^^^ variable.language.ontol
+//                   ^^^ storage.type.ontol
+    rel _ 'some_string' string
+    rel _ 'some_regex' regex
+}
+
+with test {
+// <- keyword.context.block.with.ontol
+    rel _ 'three_oh_three' 303
+//                        *^^^ constant.numeric.ontol
+    rel _ 'p_value' 0.05
+//                 *^^^^ constant.numeric.ontol
+    rel _ 'infinity!' inf
+//                   *^^^ constant.language.ontol
+    rel _ 'ready?' true
+//                *^^^^ constant.language.ontol
+    rel _ 'regex' /test\s.*test/
+//                ^^^^^^^^^^^^^^ string.regexp.ontol
+}
+
+type testtest {
+    fmt '' => 'test' => 'test' => _
+//  ^^^ keyword.declaration.fmt.ontol
+//         ^^ keyword.operator.fatarrow.ontol
+}
+
+map (front back) {
+// <- keyword.declaration.map.ontol
+//   ^^^^^^^^^^ variable.parameter.ontol
+}
+
+rel plays 'how_much': string
+//                  ^ keyword.operator.ontol
+
+rel artist ['plays']::['played_by'] instrument {
+//                  ^^ keyword.operator.ontol
+    rel _ is: plays
+}
+
+type position-ring {
+    rel _ ..4: position
+    rel _ 4..: position
+}
+

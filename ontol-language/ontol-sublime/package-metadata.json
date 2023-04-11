@@ -1,0 +1,8 @@
+{
+    "platforms": ["*"],
+    "dependencies": [],
+    "description": "ONTOL syntax highlighting for Sublime Text",
+    "sublime_text": ">=3000",
+    "version": "0.0.1",
+    "url": "https://github.com/protojour/ontol-sublime"
+}
