@@ -342,6 +342,8 @@ dependencies = [
  "domain-engine-juniper",
  "ontol-compiler",
  "ontol-runtime",
+ "serde-wasm-bindgen",
+ "unimock",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -1097,6 +1099,17 @@ checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
  "ordered-float",
  "serde",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

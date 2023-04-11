@@ -15,6 +15,8 @@ ontol-compiler.path = "../ontol-compiler"
 domain-engine-juniper.path = "../domain-engine-juniper"
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
+serde-wasm-bindgen = "0.5"
+unimock = "0.4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

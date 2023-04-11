@@ -18,6 +18,10 @@ pub struct GqlContext {
     pub engine_api: Arc<dyn EngineAPI>,
 }
 
+pub mod juniper {
+    pub use ::juniper::*;
+}
+
 impl juniper::Context for GqlContext {}
 
 pub type Schema = juniper::RootNode<
