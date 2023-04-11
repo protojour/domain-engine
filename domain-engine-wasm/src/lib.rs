@@ -40,7 +40,7 @@ pub struct WasmGraphqlSchema {
 
 #[wasm_bindgen]
 impl WasmGraphqlSchema {
-    async fn execute(
+    pub async fn execute(
         &self,
         document: String,
         operation_name: Option<String>,

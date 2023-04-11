@@ -345,6 +345,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "unimock",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 
