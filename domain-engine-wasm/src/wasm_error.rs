@@ -7,9 +7,9 @@ pub struct WasmError {
     pub msg: String,
 }
 
-impl Into<JsValue> for WasmError {
-    fn into(self) -> JsValue {
-        JsValue::from_str(&self.msg)
+impl From<WasmError> for JsValue {
+    fn from(value: WasmError) -> Self {
+        JsValue::from_str(&value.msg)
     }
 }
 
