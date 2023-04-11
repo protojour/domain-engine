@@ -17,3 +17,11 @@ test:
   image: rust:latest
   script:
     - cargo test
+
+test-wasm:
+  stage: check
+  image: rust:latest
+  script:
+    - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - cd domain-engine-wasm/
+    - wasm-pack build --target web
