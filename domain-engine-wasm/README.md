@@ -2,6 +2,14 @@
 WebAssembly distribution/API of domain engine
 
 ## development
+Build a wasm release:
+
+```
+wasm-pack build --release
+```
+
+The wasm distrubution ends up in `./pkg`.
+
 Run tests in js environment (from this directory):
 
 ```
