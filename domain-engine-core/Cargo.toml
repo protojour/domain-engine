@@ -17,6 +17,6 @@ async-trait = "0.1"
 thiserror = "1"
 serde = "1"
 serde_json = "1"
-unimock = "0.4"
+unimock = "0.5"
 
 [dev-dependencies]
