@@ -1,7 +1,7 @@
 use std::{array, collections::BTreeMap};
 
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     cast::Cast,
@@ -94,10 +94,36 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
+    fn remove(&mut self, local: Local) {
+        let stack_pos = self.local0_pos;
+        self.stack.remove(stack_pos + local.0 as usize);
+    }
+
+    #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
         let stack_pos = self.local0_pos;
         self.stack
             .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
+    }
+
+    #[inline(always)]
+    fn for_each(&mut self, seq: Local, index: Local) -> bool {
+        let i = *self.int_local_mut(index) as usize;
+        let seq = self.sequence_local_mut(seq);
+
+        if seq.len() <= i {
+            false
+        } else {
+            let mut attr = Attribute::with_unit_params(Value::unit());
+            std::mem::swap(&mut seq[i], &mut attr);
+
+            self.stack.push(attr.rel_params);
+            self.stack.push(attr.value);
+
+            *self.int_local_mut(index) += 1;
+
+            true
+        }
     }
 
     #[inline(always)]
@@ -115,14 +141,26 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn constant(&mut self, k: i64, result_type: DefId) {
+    fn push_constant(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
     }
 
     #[inline(always)]
-    fn sequence(&mut self, result_type: DefId) {
+    fn push_sequence(&mut self, result_type: DefId) {
         self.stack
             .push(Value::new(Data::Sequence(vec![]), result_type));
+    }
+
+    #[inline(always)]
+    fn push_unit(&mut self) {
+        self.stack.push(Value::unit());
+    }
+
+    fn append_attr(&mut self, seq: Local) {
+        let [rel_params, value]: [Value; 2] = self.pop_n();
+        let seq = self.sequence_local_mut(seq);
+
+        seq.push(Attribute { value, rel_params });
     }
 }
 
@@ -130,23 +168,23 @@ impl ValueStack {
     fn eval_builtin(&mut self, proc: BuiltinProc) -> Data {
         match proc {
             BuiltinProc::Add => {
-                let [a, b]: [i64; 2] = self.pop_n();
+                let [b, a]: [i64; 2] = self.pop_n();
                 Data::Int(a + b)
             }
             BuiltinProc::Sub => {
-                let [a, b]: [i64; 2] = self.pop_n();
+                let [b, a]: [i64; 2] = self.pop_n();
                 Data::Int(a - b)
             }
             BuiltinProc::Mul => {
-                let [a, b]: [i64; 2] = self.pop_n();
+                let [b, a]: [i64; 2] = self.pop_n();
                 Data::Int(a * b)
             }
             BuiltinProc::Div => {
-                let [a, b]: [i64; 2] = self.pop_n();
+                let [b, a]: [i64; 2] = self.pop_n();
                 Data::Int(a / b)
             }
             BuiltinProc::Append => {
-                let [a, b]: [String; 2] = self.pop_n();
+                let [b, a]: [String; 2] = self.pop_n();
                 Data::String(a + b)
             }
             BuiltinProc::NewMap => Data::Map([].into()),
@@ -163,10 +201,24 @@ impl ValueStack {
         &mut self.stack[self.local0_pos + local.0 as usize]
     }
 
+    fn int_local_mut(&mut self, local: Local) -> &mut i64 {
+        match &mut self.local_mut(local).data {
+            Data::Int(int) => int,
+            _ => panic!("Value at {local:?} is not an int"),
+        }
+    }
+
     fn map_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
         match &mut self.local_mut(local).data {
             Data::Map(map) => map,
             _ => panic!("Value at {local:?} is not a map"),
+        }
+    }
+
+    fn sequence_local_mut(&mut self, local: Local) -> &mut Vec<Attribute> {
+        match &mut self.local_mut(local).data {
+            Data::Sequence(seq) => seq,
+            _ => panic!("Value at {local:?} is not a sequence"),
         }
     }
 
@@ -178,13 +230,12 @@ impl ValueStack {
         }
     }
 
+    /// Pop n items from stack (NB: returned in reverse order, top of stack is first array item)
     fn pop_n<T, const N: usize>(&mut self) -> [T; N]
     where
         Value: Cast<T>,
     {
-        let mut arr = array::from_fn(|_| self.pop_one().cast_into());
-        arr.reverse();
-        arr
+        array::from_fn(|_| self.pop_one().cast_into())
     }
 }
 
@@ -192,17 +243,18 @@ struct Tracer;
 
 impl VmDebug<ValueStack> for Tracer {
     fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
-        debug!("   -> {:?}", stack.stack);
-        debug!("{:?}", vm.pending_opcode());
+        trace!("   -> {:?}", stack.stack);
+        trace!("{:?}", vm.pending_opcode());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use fnv::FnvHashSet;
+    use test_log::test;
 
     use crate::{
-        proc::{NParams, OpCode},
+        proc::{AddressOffset, NParams, OpCode},
         value::{Attribute, Value},
         DefId, PackageId, RelationId,
     };
@@ -338,5 +390,55 @@ mod tests {
         };
         assert_eq!(666, a);
         assert_eq!(42, b);
+    }
+
+    #[test]
+    fn map_sequence() {
+        let mut lib = Lib::default();
+
+        let proc = lib.append_procedure(
+            NParams(1),
+            [
+                // result sequence
+                OpCode::PushSequence(def_id(0)),
+                // index counter
+                OpCode::PushConstant(0, def_id(0)),
+                // Offset(2): for each in Local(0)
+                OpCode::ForEach(Local(0), Local(2), AddressOffset(4)),
+                OpCode::Return(Local(1)),
+                // Offset(4): map item
+                // remove rel params
+                OpCode::Remove(Local(3)),
+                OpCode::PushConstant(2, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
+                // add rel params
+                OpCode::PushUnit,
+                // pop (rel_params, value), append to sequence
+                OpCode::AppendAttr(Local(1)),
+                OpCode::Goto(AddressOffset(2)),
+            ],
+        );
+
+        let mut vm = Translator::new(&lib);
+        let output = vm.trace_eval(
+            proc,
+            [Value::new(
+                Data::Sequence(vec![
+                    Attribute::with_unit_params(Value::new(Data::Int(1), def_id(0))),
+                    Attribute::with_unit_params(Value::new(Data::Int(2), def_id(0))),
+                ]),
+                def_id(0),
+            )],
+        );
+
+        let Data::Sequence(seq) = output.data else {
+            panic!();
+        };
+        let output = seq
+            .into_iter()
+            .map(|attr| attr.value.cast_into())
+            .collect::<Vec<i64>>();
+
+        assert_eq!(vec![2, 4], output);
     }
 }

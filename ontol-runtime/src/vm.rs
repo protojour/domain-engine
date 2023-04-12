@@ -12,6 +12,8 @@ use crate::{
 pub struct AbstractVm<'l> {
     /// The position of the pending program opcode
     program_counter: usize,
+    /// The address where the current frame started executing
+    proc_address: usize,
     /// Stack for restoring state when returning from a subroutine.
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
     call_stack: Vec<CallStackFrame>,
@@ -27,6 +29,8 @@ struct CallStackFrame {
     local0_pos: usize,
     /// The program position to resume when this frame is popped.
     program_counter: usize,
+    /// What the program counter started as
+    proc_address: usize,
 }
 
 /// Trait for implementing stacks.
@@ -38,17 +42,22 @@ pub trait Stack {
     fn truncate(&mut self, n_locals: usize);
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
+    fn remove(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
+    fn for_each(&mut self, seq: Local, index: Local) -> bool;
     fn take_attr_value(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
-    fn constant(&mut self, k: i64, result_type: DefId);
-    fn sequence(&mut self, result_type: DefId);
+    fn push_constant(&mut self, k: i64, result_type: DefId);
+    fn push_sequence(&mut self, result_type: DefId);
+    fn push_unit(&mut self);
+    fn append_attr(&mut self, seq: Local);
 }
 
 impl<'l> AbstractVm<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             program_counter: 0,
+            proc_address: 0,
             lib,
             call_stack: vec![],
         }
@@ -64,7 +73,8 @@ impl<'l> AbstractVm<'l> {
         stack: &mut S,
         debug: &mut impl VmDebug<S>,
     ) {
-        self.program_counter = procedure.address as usize;
+        self.program_counter = procedure.address.0 as usize;
+        self.proc_address = procedure.address.0 as usize;
 
         let opcodes = self.lib.opcodes.as_slice();
 
@@ -72,13 +82,18 @@ impl<'l> AbstractVm<'l> {
             debug.tick(self, stack);
 
             match &opcodes[self.program_counter] {
+                OpCode::Goto(offset) => {
+                    self.program_counter = self.proc_address + offset.0 as usize;
+                }
                 OpCode::Call(procedure) => {
                     self.call_stack.push(CallStackFrame {
                         program_counter: self.program_counter + 1,
+                        proc_address: self.proc_address,
                         local0_pos: stack.local0_pos(),
                     });
                     *stack.local0_pos_mut() = stack.size() - procedure.n_params.0 as usize;
-                    self.program_counter = procedure.address as usize;
+                    self.program_counter = procedure.address.0 as usize;
+                    self.proc_address = procedure.address.0 as usize;
                 }
                 OpCode::Return(local) => {
                     stack.swap(*local, Local(0));
@@ -95,6 +110,10 @@ impl<'l> AbstractVm<'l> {
                     stack.clone(*source);
                     self.program_counter += 1;
                 }
+                OpCode::Remove(local) => {
+                    stack.remove(*local);
+                    self.program_counter += 1;
+                }
                 OpCode::Swap(a, b) => {
                     stack.swap(*a, *b);
                     self.program_counter += 1;
@@ -107,12 +126,27 @@ impl<'l> AbstractVm<'l> {
                     stack.put_unit_attr(*target, *property_id);
                     self.program_counter += 1;
                 }
-                OpCode::Constant(k, result_type) => {
-                    stack.constant(*k, *result_type);
+                OpCode::PushConstant(k, result_type) => {
+                    stack.push_constant(*k, *result_type);
                     self.program_counter += 1;
                 }
-                OpCode::Sequence(result_type) => {
-                    stack.sequence(*result_type);
+                OpCode::PushSequence(result_type) => {
+                    stack.push_sequence(*result_type);
+                    self.program_counter += 1;
+                }
+                OpCode::PushUnit => {
+                    stack.push_unit();
+                    self.program_counter += 1;
+                }
+                OpCode::ForEach(seq, index, offset) => {
+                    if stack.for_each(*seq, *index) {
+                        self.program_counter = self.proc_address + offset.0 as usize;
+                    } else {
+                        self.program_counter += 1;
+                    }
+                }
+                OpCode::AppendAttr(seq) => {
+                    stack.append_attr(*seq);
                     self.program_counter += 1;
                 }
             }
@@ -127,9 +161,11 @@ macro_rules! return0 {
         match $vm.call_stack.pop() {
             Some(CallStackFrame {
                 program_counter,
+                proc_address,
                 local0_pos,
             }) => {
                 $vm.program_counter = program_counter;
+                $vm.proc_address = proc_address;
                 *$stack.local0_pos_mut() = local0_pos;
             }
             None => {

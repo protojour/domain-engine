@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Lib, NParams, OpCode, Procedure},
+    proc::{Address, Lib, NParams, OpCode, Procedure},
     DefId,
 };
 
@@ -72,7 +72,7 @@ impl ProcTable {
     /// Allocate a temporary procedure address for a translate call.
     /// This will be resolved to final "physical" ID in the link phase.
     fn gen_translate_call(&mut self, from: DefId, to: DefId) -> OpCode {
-        let address = self.translate_calls.len() as u32;
+        let address = Address(self.translate_calls.len() as u32);
         self.translate_calls.push(TranslateCall {
             translation: (from, to),
         });
@@ -120,7 +120,7 @@ trait Codegen {
             }
             TypedExprKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
-                opcodes.push((OpCode::Constant(*k, return_def_id), span));
+                opcodes.push((OpCode::PushConstant(*k, return_def_id), span));
             }
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(*var, opcodes, &span);
@@ -140,7 +140,7 @@ trait Codegen {
             TypedExprKind::SequenceMap(..) => {
                 debug!("array type: {:?}", expr.ty);
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
-                opcodes.push((OpCode::Sequence(return_def_id), span));
+                opcodes.push((OpCode::PushSequence(return_def_id), span));
             }
             TypedExprKind::ValueObjPattern(_) => {
                 todo!()

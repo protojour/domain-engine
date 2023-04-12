@@ -112,10 +112,19 @@ impl Stack for PropStack {
         self.stack.push(value);
     }
 
+    fn remove(&mut self, local: Local) {
+        let local0_pos = self.local0_pos;
+        self.stack.remove(local0_pos + local.0 as usize);
+    }
+
     fn swap(&mut self, a: Local, b: Local) {
         let local0_pos = self.local0_pos;
         self.stack
             .swap(local0_pos + a.0 as usize, local0_pos + b.0 as usize);
+    }
+
+    fn for_each(&mut self, _seq: Local, _index: Local) -> bool {
+        false
     }
 
     fn take_attr_value(&mut self, source: Local, key: PropertyId) {
@@ -131,12 +140,20 @@ impl Stack for PropStack {
         target_set.extend(source_set.into_iter());
     }
 
-    fn constant(&mut self, _k: i64, _: DefId) {
+    fn push_constant(&mut self, _k: i64, _: DefId) {
         self.stack.push(Props::Set(FnvHashSet::default()));
     }
 
-    fn sequence(&mut self, _: DefId) {
+    fn push_sequence(&mut self, _: DefId) {
         self.stack.push(Props::Set(FnvHashSet::default()));
+    }
+
+    fn push_unit(&mut self) {
+        self.stack.push(Props::Set(FnvHashSet::default()));
+    }
+
+    fn append_attr(&mut self, _seq: Local) {
+        todo!();
     }
 }
 

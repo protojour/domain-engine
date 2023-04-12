@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Lib, OpCode, Procedure},
+    proc::{Address, Lib, OpCode, Procedure},
     smart_format, DefId,
 };
 use smartstring::alias::String;
@@ -36,14 +36,14 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     // correct "call" opcodes to point to correct address
     for (index, opcode) in lib.opcodes.iter_mut().enumerate() {
         if let OpCode::Call(call_procedure) = opcode {
-            let translate_call = &proc_table.translate_calls[call_procedure.address as usize];
+            let translate_call = &proc_table.translate_calls[call_procedure.address.0 as usize];
 
             match translations.get(&translate_call.translation) {
                 Some(translation_procedure) => {
                     call_procedure.address = translation_procedure.address;
                 }
                 None => {
-                    call_procedure.address = 0;
+                    call_procedure.address = Address(0);
                     compiler.push_error(
                         CompileError::CannotConvertMissingEquation {
                             input: format_def(compiler, translate_call.translation.0),
