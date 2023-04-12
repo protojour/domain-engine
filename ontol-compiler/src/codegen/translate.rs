@@ -17,7 +17,7 @@ pub(super) enum DebugDirection {
     Backward,
 }
 
-pub(super) fn codegen_translate_rewrite(
+pub(super) fn codegen_translate_solve(
     proc_table: &mut ProcTable,
     equation: &mut TypedExprEquation,
     (from, to): (ExprRef, ExprRef),

@@ -25,7 +25,7 @@ use crate::{
 use self::{
     equation::TypedExprEquation,
     link::{link, LinkResult},
-    translate::{codegen_translate_rewrite, DebugDirection},
+    translate::{codegen_translate_solve, DebugDirection},
 };
 
 #[derive(Default)]
@@ -176,8 +176,18 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
             CodegenTask::Map(map_task) => {
                 let mut equation = TypedExprEquation::new(map_task.expressions);
 
+                for (index, expr) in equation.expressions.0.iter().enumerate() {
+                    debug!("{{{index}}}: {expr:?}");
+                }
+
+                debug!(
+                    "equation before solve: left: {:#?} right: {:#?}",
+                    equation.debug_tree(map_task.node_a, &equation.reductions),
+                    equation.debug_tree(map_task.node_b, &equation.expansions),
+                );
+
                 // a -> b
-                codegen_translate_rewrite(
+                codegen_translate_solve(
                     &mut proc_table,
                     &mut equation,
                     (map_task.node_a, map_task.node_b),
@@ -187,7 +197,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 equation.reset();
 
                 // b -> a
-                codegen_translate_rewrite(
+                codegen_translate_solve(
                     &mut proc_table,
                     &mut equation,
                     (map_task.node_b, map_task.node_a),

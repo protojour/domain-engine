@@ -168,8 +168,28 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(cloned_param_id))
             }
-            TypedExprKind::SequenceMap(inner_node, _) => {
-                self.reduce_expr_inner(*inner_node, indent.inc())
+            TypedExprKind::SequenceMap(inner_node, param_ty) => {
+                let param_ty = *param_ty;
+                let param_ref = match self.reduce_expr_inner(*inner_node, indent.inc())? {
+                    Substitution::Variable(var_id) => var_id,
+                    Substitution::Constant => return Ok(Substitution::Constant),
+                };
+
+                let (cloned_param_id, cloned_param) = self.clone_expr(param_ref);
+                let cloned_param_span = cloned_param.span;
+                let expr = &self.expressions[expr_ref];
+                let (inverted_map_id, _) = self.add_expr(TypedExpr {
+                    kind: TypedExprKind::SequenceMap(cloned_param_id, expr.ty),
+                    ty: param_ty,
+                    span: cloned_param_span,
+                });
+
+                // remove the map call from the reductions
+                self.reductions[expr_ref] = param_ref;
+                // add inverted map call to the expansions
+                self.expansions[param_ref] = inverted_map_id;
+
+                Ok(Substitution::Variable(cloned_param_id))
             }
             kind => Err(SolveError::UnhandledExpr(smart_format!("{kind:?}"))),
         }

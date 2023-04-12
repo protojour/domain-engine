@@ -403,7 +403,7 @@ fn recursive_entity_union() {
 
 #[test]
 // BUG:
-#[should_panic = "not a variable"]
+#[should_panic = "index out of bounds: the len is 3 but the index is 3"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
