@@ -2,11 +2,10 @@ use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams, OpCode},
     DefId,
 };
-use smallvec::smallvec;
 use tracing::debug;
 
 use crate::{
-    codegen::{translate::VarFlowTracker, Codegen, SpannedOpCodes},
+    codegen::{translate::VarFlowTracker, Block, Codegen, ProcBuilder, SpannedOpCodes, Terminator},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
@@ -29,14 +28,15 @@ pub(super) fn codegen_value_obj_origin(
     impl Codegen for ValueCodegen {
         fn codegen_variable(
             &mut self,
+            builder: &mut ProcBuilder,
+            block: &mut Block,
             var: SyntaxVar,
-            opcodes: &mut SpannedOpCodes,
             span: &SourceSpan,
         ) {
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
             self.var_tracker.count_use(var);
-            opcodes.push((OpCode::Clone(self.input_local), *span));
+            builder.push_stack(1, (OpCode::Clone(self.input_local), *span), block);
         }
     }
 
@@ -44,34 +44,37 @@ pub(super) fn codegen_value_obj_origin(
         input_local: Local(0),
         var_tracker: Default::default(),
     };
-    let mut opcodes = smallvec![];
+    let mut builder = ProcBuilder::new(NParams(1));
+    let mut block = builder.new_block(Terminator::Return(Local(0)), span);
 
     match &to_expr.kind {
         TypedExprKind::ValueObjPattern(expr_ref) => {
-            value_codegen.codegen_expr(proc_table, equation, *expr_ref, &mut opcodes);
-            opcodes.push((OpCode::Return0, to_expr.span));
+            value_codegen.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
         }
         TypedExprKind::MapObjPattern(dest_attrs) => {
-            opcodes.push((OpCode::CallBuiltin(BuiltinProc::NewMap, to_def), span));
+            block
+                .opcodes
+                .push((OpCode::CallBuiltin(BuiltinProc::NewMap, to_def), span));
 
             // the input value is not a map, so it will be consumed.
             // Therefore it must be top of the stack:
-            opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
+            block.opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
             value_codegen.input_local = Local(1);
 
             for (property_id, node) in dest_attrs {
-                value_codegen.codegen_expr(proc_table, equation, *node, &mut opcodes);
-                opcodes.push((OpCode::PutUnitAttr(Local(0), *property_id), span));
+                value_codegen.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
+                block
+                    .opcodes
+                    .push((OpCode::PutUnitAttr(Local(0), *property_id), span));
             }
-
-            opcodes.push((OpCode::Return0, span));
         }
         kind => {
             todo!("target: {kind:?}");
         }
     }
 
-    let opcodes = opcodes
+    block.opcodes = block
+        .opcodes
         .into_iter()
         .filter(|op| {
             match op {
@@ -86,10 +89,9 @@ pub(super) fn codegen_value_obj_origin(
         })
         .collect::<SpannedOpCodes>();
 
-    debug!("{opcodes:#?}");
+    debug!("{:#?}", block.opcodes);
 
-    UnlinkedProc {
-        n_params: NParams(1),
-        opcodes,
-    }
+    builder.commit(block);
+
+    UnlinkedProc::new(builder)
 }

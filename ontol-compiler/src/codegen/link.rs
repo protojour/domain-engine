@@ -21,14 +21,12 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     let mut spans: Vec<SourceSpan> = vec![];
 
     for ((from, to), unlinked_proc) in std::mem::take(&mut proc_table.procedures) {
-        spans.extend(unlinked_proc.opcodes.iter().map(|(_, span)| span));
+        let opcodes = unlinked_proc.builder.build();
+        spans.extend(opcodes.iter().map(|(_, span)| span));
 
         let procedure = lib.append_procedure(
             unlinked_proc.n_params,
-            unlinked_proc
-                .opcodes
-                .into_iter()
-                .map(|(opcode, _span)| opcode),
+            opcodes.into_iter().map(|(opcode, _span)| opcode),
         );
         translations.insert((from, to), procedure);
     }

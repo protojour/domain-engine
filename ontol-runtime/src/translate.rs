@@ -243,7 +243,14 @@ struct Tracer;
 
 impl VmDebug<ValueStack> for Tracer {
     fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
-        trace!("   -> {:?}", stack.stack);
+        trace!(
+            "   -> {:#?}",
+            stack
+                .stack
+                .iter()
+                .map(|value| format!("{value:?}"))
+                .collect::<Vec<_>>()
+        );
         trace!("{:?}", vm.pending_opcode());
     }
 }

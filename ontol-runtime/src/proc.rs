@@ -65,6 +65,7 @@ pub enum OpCode {
     /// Swap the position of two locals.
     Swap(Local, Local),
     /// Iterate all items in #0, #1 is the counter.
+    /// Pushes two items on the stack
     ForEach(Local, Local, AddressOffset),
     /// Take an attribute from local map, and put its value on the top of the stack.
     /// Discards the attribute edge.
