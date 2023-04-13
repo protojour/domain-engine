@@ -47,6 +47,7 @@ impl SubstitutionTable {
         }
     }
 
+    #[allow(unused)]
     pub fn debug_table(&self) -> Vec<(u32, u32)> {
         let mut out = vec![];
         for i in 0..self.0.len() {
@@ -168,9 +169,10 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(cloned_param_id))
             }
-            TypedExprKind::SequenceMap(inner_node, param_ty) => {
+            TypedExprKind::SequenceMap(expr_node, iter_var, _body_node, param_ty) => {
+                let iter_var = *iter_var;
                 let param_ty = *param_ty;
-                let param_ref = match self.reduce_expr_inner(*inner_node, indent.inc())? {
+                let param_ref = match self.reduce_expr_inner(*expr_node, indent.inc())? {
                     Substitution::Variable(var_id) => var_id,
                     Substitution::Constant => return Ok(Substitution::Constant),
                 };
@@ -179,7 +181,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 let cloned_param_span = cloned_param.span;
                 let expr = &self.expressions[expr_ref];
                 let (inverted_map_id, _) = self.add_expr(TypedExpr {
-                    kind: TypedExprKind::SequenceMap(cloned_param_id, expr.ty),
+                    kind: TypedExprKind::SequenceMap(expr_ref, iter_var, cloned_param_id, expr.ty),
                     ty: param_ty,
                     span: cloned_param_span,
                 });
@@ -356,7 +358,7 @@ mod tests {
     use crate::{
         codegen::equation::TypedExprEquation,
         mem::{Intern, Mem},
-        typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+        typed_expr::{BindDepth, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
         types::Type,
         Compiler, SourceSpan, Sources,
     };
@@ -369,7 +371,7 @@ mod tests {
 
         let mut table = TypedExprTable::default();
         let var = table.add(TypedExpr {
-            kind: TypedExprKind::Variable(SyntaxVar(42)),
+            kind: TypedExprKind::Variable(SyntaxVar(42, BindDepth(0))),
             ty: int,
             span: SourceSpan::none(),
         });

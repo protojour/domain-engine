@@ -5,11 +5,11 @@ use crate::{
     def::{DefKind, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_expr::{SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+    typed_expr::{TypedExpr, TypedExprKind},
     types::{Type, TypeRef},
 };
 
-use super::{check_expr::CheckExprContext, inference::Inference, TypeCheck};
+use super::{check_expr::CheckExprContext, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
@@ -53,16 +53,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Primitive(PrimitiveKind::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(PrimitiveKind::Number) => self.types.intern(Type::Number(def_id)),
             DefKind::Mapping(variables, first_id, second_id) => {
-                let mut ctx = CheckExprContext {
-                    inference: Inference::new(),
-                    expressions: TypedExprTable::default(),
-                    bound_variables: Default::default(),
-                };
+                let mut ctx = CheckExprContext::new();
 
                 for (index, (variable_expr_id, variable_span)) in variables.0.iter().enumerate() {
                     let var_ref = ctx.expressions.add(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(SyntaxVar(index as u32)),
+                        kind: TypedExprKind::Variable(ctx.syntax_var(index as u16)),
                         span: *variable_span,
                     });
                     ctx.bound_variables.insert(*variable_expr_id, var_ref);

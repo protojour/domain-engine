@@ -48,7 +48,6 @@ pub trait Stack {
     fn take_attr_value(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
     fn push_constant(&mut self, k: i64, result_type: DefId);
-    fn push_sequence(&mut self, result_type: DefId);
     fn push_unit(&mut self);
     fn append_attr(&mut self, seq: Local);
 }
@@ -130,15 +129,11 @@ impl<'l> AbstractVm<'l> {
                     stack.push_constant(*k, *result_type);
                     self.program_counter += 1;
                 }
-                OpCode::PushSequence(result_type) => {
-                    stack.push_sequence(*result_type);
-                    self.program_counter += 1;
-                }
                 OpCode::PushUnit => {
                     stack.push_unit();
                     self.program_counter += 1;
                 }
-                OpCode::ForEach(seq, index, offset) => {
+                OpCode::Iter(seq, index, offset) => {
                     if stack.for_each(*seq, *index) {
                         self.program_counter = self.proc_address + offset.0 as usize;
                     } else {

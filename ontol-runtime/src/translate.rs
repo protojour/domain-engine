@@ -146,12 +146,6 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn push_sequence(&mut self, result_type: DefId) {
-        self.stack
-            .push(Value::new(Data::Sequence(vec![]), result_type));
-    }
-
-    #[inline(always)]
     fn push_unit(&mut self) {
         self.stack.push(Value::unit());
     }
@@ -188,6 +182,7 @@ impl ValueStack {
                 Data::String(a + b)
             }
             BuiltinProc::NewMap => Data::Map([].into()),
+            BuiltinProc::NewSeq => Data::Sequence(vec![]),
         }
     }
 
@@ -407,11 +402,11 @@ mod tests {
             NParams(1),
             [
                 // result sequence
-                OpCode::PushSequence(def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
                 // index counter
                 OpCode::PushConstant(0, def_id(0)),
                 // Offset(2): for each in Local(0)
-                OpCode::ForEach(Local(0), Local(2), AddressOffset(4)),
+                OpCode::Iter(Local(0), Local(2), AddressOffset(4)),
                 OpCode::Return(Local(1)),
                 // Offset(4): map item
                 // remove rel params

@@ -66,7 +66,7 @@ pub enum OpCode {
     Swap(Local, Local),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
-    ForEach(Local, Local, AddressOffset),
+    Iter(Local, Local, AddressOffset),
     /// Take an attribute from local map, and put its value on the top of the stack.
     /// Discards the attribute edge.
     TakeAttrValue(Local, PropertyId),
@@ -78,13 +78,11 @@ pub enum OpCode {
     PushConstant(i64, DefId),
     /// Push a unit value to the stack.
     PushUnit,
-    /// Push a sequence to the stack.
-    PushSequence(DefId),
 }
 
 /// A reference to a local on the value stack during procedure execution.
 #[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
-pub struct Local(pub u32);
+pub struct Local(pub u16);
 
 /// Builtin procedures.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -95,4 +93,5 @@ pub enum BuiltinProc {
     Div,
     Append,
     NewMap,
+    NewSeq,
 }

@@ -12,7 +12,9 @@ use crate::{
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
     relation::Constructor,
-    typed_expr::{ExprRef, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE},
+    typed_expr::{
+        BindDepth, ExprRef, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE,
+    },
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -26,6 +28,29 @@ pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
     pub expressions: TypedExprTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, ExprRef>,
+    bind_depth: BindDepth,
+}
+
+impl<'m> CheckExprContext<'m> {
+    pub fn new() -> Self {
+        Self {
+            inference: Inference::new(),
+            expressions: TypedExprTable::default(),
+            bound_variables: Default::default(),
+            bind_depth: BindDepth(0),
+        }
+    }
+
+    pub fn new_bind_level<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.bind_depth.0 += 1;
+        let ret = f(self);
+        self.bind_depth.0 -= 1;
+        ret
+    }
+
+    pub fn syntax_var(&self, id: u16) -> SyntaxVar {
+        SyntaxVar(id, self.bind_depth)
+    }
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -292,12 +317,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {
-                    translate_if_possible(ctx, expr, typed_expr_ref, type_eq).unwrap_or_else(|_| {
-                        (
-                            self.type_error(TypeError::Mismatch(type_eq), &expr.span),
-                            ERROR_NODE,
-                        )
-                    })
+                    self.translate_if_possible(ctx, expr, typed_expr_ref, type_eq)
+                        .unwrap_or_else(|_| {
+                            (
+                                self.type_error(TypeError::Mismatch(type_eq), &expr.span),
+                                ERROR_NODE,
+                            )
+                        })
                 } else {
                     warn!("TODO: resolve var?");
                     (ty, typed_expr_ref)
@@ -308,12 +334,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     actual: ty,
                     expected,
                 };
-                translate_if_possible(ctx, expr, typed_expr_ref, type_eq).unwrap_or_else(|_| {
-                    (
-                        self.type_error(TypeError::Mismatch(type_eq), &expr.span),
-                        ERROR_NODE,
-                    )
-                })
+                self.translate_if_possible(ctx, expr, typed_expr_ref, type_eq)
+                    .unwrap_or_else(|_| {
+                        (
+                            self.type_error(TypeError::Mismatch(type_eq), &expr.span),
+                            ERROR_NODE,
+                        )
+                    })
             }
             _ => {
                 // Ok
@@ -322,45 +349,58 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
+    fn translate_if_possible(
+        &mut self,
+        ctx: &mut CheckExprContext<'m>,
+        expr: &Expr,
+        typed_expr_ref: ExprRef,
+        type_eq: TypeEquation<'m>,
+    ) -> Result<(TypeRef<'m>, ExprRef), ()> {
+        match (type_eq.actual, type_eq.expected) {
+            (Type::Domain(_), Type::Domain(_)) => {
+                let translation_node = ctx.expressions.add(TypedExpr {
+                    ty: type_eq.expected,
+                    kind: TypedExprKind::Translate(typed_expr_ref, type_eq.actual),
+                    span: expr.span,
+                });
+                Ok((type_eq.expected, translation_node))
+            }
+            (Type::Array(actual_item), Type::Array(expected_item)) => ctx.new_bind_level(|ctx| {
+                let iter_var = ctx.syntax_var(0);
+                let iter_ref = ctx.expressions.add(TypedExpr {
+                    ty: self.types.intern(Type::Tautology),
+                    kind: TypedExprKind::Variable(iter_var),
+                    span: expr.span,
+                });
+
+                let (_, translate_expr_ref) = self.translate_if_possible(
+                    ctx,
+                    expr,
+                    iter_ref,
+                    TypeEquation {
+                        actual: actual_item,
+                        expected: expected_item,
+                    },
+                )?;
+                let translation_node = ctx.expressions.add(TypedExpr {
+                    ty: type_eq.expected,
+                    kind: TypedExprKind::SequenceMap(
+                        typed_expr_ref,
+                        iter_var,
+                        translate_expr_ref,
+                        type_eq.actual,
+                    ),
+                    span: expr.span,
+                });
+
+                Ok((type_eq.expected, translation_node))
+            }),
+            _ => Err(()),
+        }
+    }
+
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, ExprRef) {
         self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
-    }
-}
-
-fn translate_if_possible<'m>(
-    ctx: &mut CheckExprContext<'m>,
-    expr: &Expr,
-    typed_expr_ref: ExprRef,
-    type_eq: TypeEquation<'m>,
-) -> Result<(TypeRef<'m>, ExprRef), ()> {
-    match (type_eq.actual, type_eq.expected) {
-        (Type::Domain(_), Type::Domain(_)) => {
-            let translation_node = ctx.expressions.add(TypedExpr {
-                ty: type_eq.expected,
-                kind: TypedExprKind::Translate(typed_expr_ref, type_eq.actual),
-                span: expr.span,
-            });
-            Ok((type_eq.expected, translation_node))
-        }
-        (Type::Array(actual_item), Type::Array(expected_item)) => {
-            let (_, translate_ref) = translate_if_possible(
-                ctx,
-                expr,
-                typed_expr_ref,
-                TypeEquation {
-                    actual: actual_item,
-                    expected: expected_item,
-                },
-            )?;
-            let translation_node = ctx.expressions.add(TypedExpr {
-                ty: type_eq.expected,
-                kind: TypedExprKind::SequenceMap(translate_ref, type_eq.actual),
-                span: expr.span,
-            });
-
-            Ok((type_eq.expected, translation_node))
-        }
-        _ => Err(()),
     }
 }

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use ontol_runtime::value::PropertyId;
 
 use crate::{
-    typed_expr::{ExprRef, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
+    typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable},
     SourceSpan,
 };
 
@@ -167,8 +167,8 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
             TypedExprKind::Constant(c) => f
                 .debug_tuple(&self.header(&format!("Constant({c})"), resolved))
                 .finish()?,
-            TypedExprKind::Variable(SyntaxVar(v)) => f
-                .debug_tuple(&self.header(&format!("Variable({v})"), resolved))
+            TypedExprKind::Variable(SyntaxVar(v, BindDepth(d))) => f
+                .debug_tuple(&self.header(&format!("Variable({v} d={d})"), resolved))
                 .finish()?,
             TypedExprKind::VariableRef(var_ref) => f
                 .debug_tuple(&self.header("VarRef", resolved))
@@ -178,9 +178,11 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .debug_tuple(&self.header("Translate", resolved))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
-            TypedExprKind::SequenceMap(expr_ref, _) => f
+            TypedExprKind::SequenceMap(expr_ref, var, body, _) => f
                 .debug_tuple(&self.header("SequenceMap", resolved))
                 .field(&self.child(*expr_ref, None))
+                .field(&var)
+                .field(&self.child(*body, None))
                 .finish()?,
         };
 

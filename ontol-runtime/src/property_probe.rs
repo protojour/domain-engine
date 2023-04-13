@@ -144,10 +144,6 @@ impl Stack for PropStack {
         self.stack.push(Props::Set(FnvHashSet::default()));
     }
 
-    fn push_sequence(&mut self, _: DefId) {
-        self.stack.push(Props::Set(FnvHashSet::default()));
-    }
-
     fn push_unit(&mut self) {
         self.stack.push(Props::Set(FnvHashSet::default()));
     }

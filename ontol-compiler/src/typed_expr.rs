@@ -11,7 +11,18 @@ use smallvec::SmallVec;
 use crate::{types::TypeRef, SourceSpan};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct SyntaxVar(pub u32);
+pub struct BindDepth(pub u16);
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SyntaxVar(pub u16, pub BindDepth);
+
+impl Debug for SyntaxVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = &self.0;
+        let depth = &self.1 .0;
+        write!(f, "SyntaxVar({var} d={depth})")
+    }
+}
 
 /// An expression with type information attached
 #[derive(Clone, Debug)]
@@ -40,8 +51,11 @@ pub enum TypedExprKind<'m> {
     Constant(i64),
     /// A translation from one type to another
     Translate(ExprRef, TypeRef<'m>),
-    /// A mapping operation on an array
-    SequenceMap(ExprRef, TypeRef<'m>),
+    /// A mapping operation on an array.
+    /// The first expression is the array.
+    /// The syntax var is the iterated value.
+    /// The second expression is the body.
+    SequenceMap(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
 }
 
 /// A reference to a typed expression.

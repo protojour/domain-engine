@@ -12,6 +12,7 @@ use super::{
     ProcBuilder, ProcTable,
 };
 
+#[allow(unused)]
 pub(super) enum DebugDirection {
     Forward,
     Backward,
@@ -58,12 +59,12 @@ fn codegen_translate(
     // for easier readability:
     match direction {
         DebugDirection::Forward => debug!(
-            "(forward) codegen reductions: {:#?} expansions: {:#?}",
+            "(forward) codegen\nreductions: {:#?}\nexpansions: {:#?}",
             equation.debug_tree(from, &equation.reductions),
             equation.debug_tree(to, &equation.expansions),
         ),
         DebugDirection::Backward => debug!(
-            "(backward) codegen expansions: {:#?} reductions: {:#?}",
+            "(backward) codegen\nexpansions: {:#?}\nreductions: {:#?}",
             equation.debug_tree(from, &equation.expansions),
             equation.debug_tree(to, &equation.reductions),
         ),

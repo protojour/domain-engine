@@ -7,8 +7,13 @@ use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::{
-    codegen::{ir::Terminator, proc_builder::Block, translate::VarFlowTracker, Codegen},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
+    codegen::{
+        ir::{Ir, Terminator},
+        proc_builder::Block,
+        translate::VarFlowTracker,
+        Codegen,
+    },
+    typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
@@ -23,8 +28,8 @@ pub(super) fn codegen_map_obj_origin(
 ) -> ProcBuilder {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
-    debug!("origin attrs: {origin_attrs:#?}");
-    debug!("reductions: {:?}", equation.reductions.debug_table());
+    // debug!("origin attrs: {origin_attrs:#?}");
+    // debug!("reductions: {:?}", equation.reductions.debug_table());
 
     let mut origin_properties: Vec<_> = origin_attrs
         .iter()
@@ -47,11 +52,11 @@ pub(super) fn codegen_map_obj_origin(
 
     if !origin_properties.is_empty() {
         // must start with SyntaxVar(0)
-        assert!(origin_properties[0].1 == SyntaxVar(0));
+        assert!(origin_properties[0].1 == SyntaxVar(0, BindDepth(0)));
     }
 
-    #[derive(Default)]
     struct MapCodegen {
+        origin_properties: Vec<(PropertyId, SyntaxVar)>,
         var_tracker: VarFlowTracker,
     }
 
@@ -65,11 +70,15 @@ pub(super) fn codegen_map_obj_origin(
         ) {
             self.var_tracker.count_use(var);
 
+            let origin_property = self.origin_properties[var.0 as usize];
+
+            builder.ir_push(1, Ir::LoadAttr(Local(0), origin_property.0), *span, block);
+
             // Make Clone(Local(v + 2)) represent use of the syntax variable.
             // this will be rewritten later:
             // BUG: This is stupid, don't try to encode an intermediate representation
             // inside the next instruction set
-            builder.push_stack(1, (OpCode::Clone(Local(var.0 + 2)), *span), block);
+            builder.push_stack_old(1, (OpCode::Clone(Local(var.0 + 2)), *span), block);
 
             // insert a clone of the current stack position, this can be optimized away later..
             // let stack_size = builder.stack_size;
@@ -77,7 +86,10 @@ pub(super) fn codegen_map_obj_origin(
         }
     }
 
-    let mut map_codegen = MapCodegen::default();
+    let mut map_codegen = MapCodegen {
+        origin_properties,
+        var_tracker: Default::default(),
+    };
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Terminator::Return(Local(1)), span);
 
@@ -86,7 +98,7 @@ pub(super) fn codegen_map_obj_origin(
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
-            builder.push_stack(
+            builder.push_stack_old(
                 1,
                 (
                     OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
@@ -95,9 +107,17 @@ pub(super) fn codegen_map_obj_origin(
                 &mut block,
             );
 
+            builder.ir_push(
+                1,
+                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                span,
+                &mut block,
+            );
+
             for (property_id, expr_ref) in dest_attrs {
                 map_codegen.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-                builder.pop_stack(
+                builder.ir_pop(1, Ir::PutUnitAttr(Local(1), *property_id), span, &mut block);
+                builder.pop_stack_old(
                     1,
                     (OpCode::PutUnitAttr(Local(1), *property_id), span),
                     &mut block,
@@ -120,8 +140,9 @@ pub(super) fn codegen_map_obj_origin(
         .fold(smallvec![], |mut opcodes, opcode| {
             match opcode {
                 (OpCode::Clone(Local(pos)), span) if pos >= 2 => {
-                    let syntax_var = SyntaxVar(pos - 2);
+                    let syntax_var = SyntaxVar(pos - 2_u16, BindDepth(0));
                     let state = map_codegen.var_tracker.do_use(syntax_var);
+                    let origin_properties = &map_codegen.origin_properties;
                     let origin_property = origin_properties[syntax_var.0 as usize];
 
                     match (state.use_count, state.reused) {
@@ -136,7 +157,7 @@ pub(super) fn codegen_map_obj_origin(
                                 .push((OpCode::TakeAttrValue(Local(0), origin_property.0), span));
                             var_stack_state.stack.push(syntax_var);
                             opcodes.push((
-                                OpCode::Clone(Local(2 + var_stack_state.stack.len() as u32 - 1)),
+                                OpCode::Clone(Local(2 + var_stack_state.stack.len() as u16 - 1)),
                                 span,
                             ));
                         }
@@ -147,7 +168,7 @@ pub(super) fn codegen_map_obj_origin(
                                 opcodes.push((
                                     OpCode::Swap(
                                         Local(2 + index),
-                                        Local(2 + var_stack_state.stack.len() as u32 - 1),
+                                        Local(2 + var_stack_state.stack.len() as u16 - 1),
                                     ),
                                     span,
                                 ));
@@ -157,7 +178,7 @@ pub(super) fn codegen_map_obj_origin(
                         (_, true) => {
                             // not first, and not last use
                             let index = var_stack_state.find(syntax_var);
-                            opcodes.push((OpCode::Clone(Local(2 + index as u32)), span));
+                            opcodes.push((OpCode::Clone(Local(2 + index as u16)), span));
                         }
                     }
                 }
@@ -181,7 +202,7 @@ struct VarStackState {
 }
 
 impl VarStackState {
-    fn swap_to_top(&mut self, var: SyntaxVar) -> Option<u32> {
+    fn swap_to_top(&mut self, var: SyntaxVar) -> Option<u16> {
         let top = *self.stack.last().unwrap();
         if top == var {
             None
@@ -189,7 +210,7 @@ impl VarStackState {
             let index = self.find(var);
             let last = self.stack.len() - 1;
             self.stack.swap(index, last);
-            Some(index as u32)
+            Some(index as u16)
         }
     }
 

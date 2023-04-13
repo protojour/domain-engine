@@ -9,7 +9,7 @@ use crate::{
         proc_builder::SpannedOpCodes, translate::VarFlowTracker, Block, Codegen, ProcBuilder,
         Terminator,
     },
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
+    typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
@@ -39,7 +39,7 @@ pub(super) fn codegen_value_obj_origin(
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
             self.var_tracker.count_use(var);
-            builder.push_stack(1, (OpCode::Clone(self.input_local), *span), block);
+            builder.push_stack_old(1, (OpCode::Clone(self.input_local), *span), block);
         }
     }
 
@@ -85,7 +85,11 @@ pub(super) fn codegen_value_obj_origin(
                     // Keep cloning until the last use of the variable,
                     // which must pop it off the stack. (i.e. keep the clone instruction).
                     // else: drop clone instruction. Stack should only contain the return value.
-                    value_codegen.var_tracker.do_use(SyntaxVar(0)).use_count > 1
+                    value_codegen
+                        .var_tracker
+                        .do_use(SyntaxVar(0, BindDepth(0)))
+                        .use_count
+                        > 1
                 }
                 _ => true,
             }

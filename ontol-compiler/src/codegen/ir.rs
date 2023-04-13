@@ -4,26 +4,29 @@ use ontol_runtime::{
     DefId,
 };
 
-#[derive(Clone, Copy)]
+use crate::SourceSpan;
+
+#[derive(Clone, Copy, Debug)]
 pub struct BlockIndex(pub u32);
 
+pub struct Instr(pub Ir, pub SourceSpan);
+
+#[derive(Debug)]
 #[allow(unused)]
 pub enum Ir {
     Call(Procedure),
     CallBuiltin(BuiltinProc, DefId),
-    Clone(Local),
     Remove(Local),
     Swap(Local, Local),
-    ForEach(Local, Local, BlockIndex),
-    TakeAttrValue(Local, PropertyId),
+    Iter(Local, Local, BlockIndex),
+    LoadAttr(Local, PropertyId),
     PutUnitAttr(Local, PropertyId),
     AppendAttr(Local),
-    PushConstant(i64, DefId),
-    PushUnit,
-    PushSequence(DefId),
+    Constant(i64, DefId),
+    Unit,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Terminator {
     Return(Local),
     Goto(BlockIndex, u32),

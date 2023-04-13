@@ -1,15 +1,16 @@
-use ontol_runtime::proc::{AddressOffset, Local, NParams, OpCode};
+use ontol_runtime::proc::{Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::SourceSpan;
 
-use super::ir::{BlockIndex, Ir, Terminator};
+use super::ir::{BlockIndex, Instr, Ir, Terminator};
 
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: SmallVec<[Block; 8]>,
-    pub stack_size: u32,
+    pub stack_size: u16,
+    pub depth: u16,
 }
 
 impl ProcBuilder {
@@ -17,7 +18,8 @@ impl ProcBuilder {
         Self {
             n_params,
             blocks: Default::default(),
-            stack_size: n_params.0 as u32,
+            stack_size: n_params.0 as u16,
+            depth: n_params.0 as u16,
         }
     }
 
@@ -39,26 +41,48 @@ impl ProcBuilder {
         }
     }
 
-    pub fn commit(&mut self, block: Block) {
-        let index = block.index;
-        self.blocks[index.0 as usize].opcodes = block.opcodes;
+    pub fn top(&self) -> Local {
+        Local(self.depth - 1)
     }
 
-    pub fn push_stack(
+    pub fn commit(&mut self, block: Block) -> BlockIndex {
+        let index = block.index;
+        self.blocks[index.0 as usize].ir = block.ir;
+        index
+    }
+
+    pub fn ir_push(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) -> Local {
+        let local = Local(self.depth);
+        self.depth += n;
+        block.ir.push(Instr(ir, span));
+        local
+    }
+
+    pub fn ir_pop(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) {
+        self.depth += n;
+        block.ir.push(Instr(ir, span));
+    }
+
+    pub fn push_stack_old(
         &mut self,
-        n: u32,
-        spanned_opcode: (OpCode, SourceSpan),
-        block: &mut Block,
+        n: u16,
+        _spanned_opcode: (OpCode, SourceSpan),
+        _block: &mut Block,
     ) -> Local {
         let local = self.stack_size;
         self.stack_size += n;
-        block.opcodes.push(spanned_opcode);
+        // block.opcodes.push(spanned_opcode);
         Local(local)
     }
 
-    pub fn pop_stack(&mut self, n: u32, spanned_opcode: (OpCode, SourceSpan), block: &mut Block) {
+    pub fn pop_stack_old(
+        &mut self,
+        n: u16,
+        _spanned_opcode: (OpCode, SourceSpan),
+        _block: &mut Block,
+    ) {
         self.stack_size -= n;
-        block.opcodes.push(spanned_opcode);
+        // block.opcodes.push(spanned_opcode);
     }
 
     pub fn build(mut self) -> SpannedOpCodes {
@@ -70,25 +94,35 @@ impl ProcBuilder {
             block_addresses.push(block_addr);
 
             // account for the terminator:
-            block_addr += block.opcodes.len() as u32 + 1;
+            block_addr += block.ir.len() as u32 + 1;
         }
 
         // update addresses
         for block in &mut self.blocks {
-            for (opcode, _) in &mut block.opcodes {
-                // Important: Handle all opcodes with AddressOffset
-                match opcode {
-                    OpCode::Goto(addr_offset) => {
-                        addr_offset.0 = block_addresses[addr_offset.0 as usize];
-                    }
-                    OpCode::ForEach(_, _, addr_offset) => {
-                        addr_offset.0 = block_addresses[addr_offset.0 as usize];
-                    }
-                    _ => {}
+            for Instr(ir, _) in &mut block.ir {
+                // Important: Handle all instructions with AddressOffset
+                if let Ir::Iter(_, _, addr_offset) = ir {
+                    addr_offset.0 = block_addresses[addr_offset.0 as usize];
                 }
             }
         }
 
+        let mut index = 0;
+        debug!("Proc:");
+        for (block_index, block) in self.blocks.iter().enumerate() {
+            debug!("  Block {block_index}:");
+
+            for Instr(ir, _) in &block.ir {
+                debug!("    {index}: {ir:?}");
+                index += 1;
+            }
+
+            debug!("    {index}: {:?}", block.terminator);
+
+            index += 1;
+        }
+
+        /*
         let mut output = smallvec![];
         for block in self.blocks {
             for spanned_opcode in block.opcodes {
@@ -119,13 +153,16 @@ impl ProcBuilder {
         );
 
         output
+        */
+
+        smallvec![]
     }
 }
 
 pub struct Block {
     pub index: BlockIndex,
     pub opcodes: SmallVec<[(OpCode, SourceSpan); 32]>,
-    pub ir: SmallVec<[(Ir, SourceSpan); 32]>,
+    pub ir: SmallVec<[Instr; 32]>,
     pub terminator: Terminator,
     pub terminator_span: SourceSpan,
 }
