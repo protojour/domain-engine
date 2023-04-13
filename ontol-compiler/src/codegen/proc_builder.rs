@@ -4,6 +4,8 @@ use tracing::debug;
 
 use crate::SourceSpan;
 
+use super::ir::{BlockIndex, Ir, Terminator};
+
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: SmallVec<[Block; 8]>,
@@ -20,16 +22,18 @@ impl ProcBuilder {
     }
 
     pub fn new_block(&mut self, terminator: Terminator, span: SourceSpan) -> Block {
-        let address = self.blocks.len() as u32;
+        let index = BlockIndex(self.blocks.len() as u32);
         self.blocks.push(Block {
-            index: address,
+            index,
             opcodes: Default::default(),
+            ir: Default::default(),
             terminator: terminator.clone(),
             terminator_span: span,
         });
         Block {
-            index: address,
+            index,
             opcodes: Default::default(),
+            ir: Default::default(),
             terminator,
             terminator_span: span,
         }
@@ -37,7 +41,7 @@ impl ProcBuilder {
 
     pub fn commit(&mut self, block: Block) {
         let index = block.index;
-        self.blocks[index as usize].opcodes = block.opcodes;
+        self.blocks[index.0 as usize].opcodes = block.opcodes;
     }
 
     pub fn push_stack(
@@ -64,9 +68,9 @@ impl ProcBuilder {
         let mut block_addr = 0;
         for block in &self.blocks {
             block_addresses.push(block_addr);
-            block_addr += block.opcodes.len() as u32;
+
             // account for the terminator:
-            block_addr += 1;
+            block_addr += block.opcodes.len() as u32 + 1;
         }
 
         // update addresses
@@ -95,8 +99,10 @@ impl ProcBuilder {
             match block.terminator {
                 Terminator::Return(Local(0)) => output.push((OpCode::Return0, span)),
                 Terminator::Return(local) => output.push((OpCode::Return(local), span)),
-                Terminator::Goto { block, offset } => output.push((
-                    OpCode::Goto(AddressOffset(block_addresses[block as usize] + offset)),
+                Terminator::Goto(block_index, offset) => output.push((
+                    OpCode::Goto(AddressOffset(
+                        block_addresses[block_index.0 as usize] + offset,
+                    )),
                     span,
                 )),
             }
@@ -116,15 +122,10 @@ impl ProcBuilder {
     }
 }
 
-#[derive(Clone)]
-pub enum Terminator {
-    Return(Local),
-    Goto { block: u32, offset: u32 },
-}
-
 pub struct Block {
-    pub index: u32,
+    pub index: BlockIndex,
     pub opcodes: SmallVec<[(OpCode, SourceSpan); 32]>,
+    pub ir: SmallVec<[(Ir, SourceSpan); 32]>,
     pub terminator: Terminator,
     pub terminator_span: SourceSpan,
 }

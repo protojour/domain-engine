@@ -8,6 +8,7 @@ use ontol_runtime::{
 
 mod equation;
 mod equation_solver;
+mod ir;
 mod link;
 mod map_obj;
 mod proc_builder;
@@ -24,8 +25,9 @@ use crate::{
 
 use self::{
     equation::TypedExprEquation,
+    ir::Terminator,
     link::{link, LinkResult},
-    proc_builder::{Block, ProcBuilder, Terminator},
+    proc_builder::{Block, ProcBuilder},
     translate::{codegen_translate_solve, DebugDirection},
 };
 
@@ -151,13 +153,9 @@ trait Codegen {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     builder.stack_size += 2;
 
-                    let mut map_block = builder.new_block(
-                        Terminator::Goto {
-                            block: block.index,
-                            offset: for_each_offset as u32,
-                        },
-                        span,
-                    );
+                    let mut map_block = builder
+                        .new_block(Terminator::Goto(block.index, for_each_offset as u32), span);
+
                     let index = map_block.index;
                     self.codegen_expr(proc_table, builder, &mut map_block, equation, *expr_ref);
 
@@ -170,7 +168,7 @@ trait Codegen {
                 };
 
                 block.opcodes.push((
-                    OpCode::ForEach(input_seq, iterator, AddressOffset(for_each_body_index)),
+                    OpCode::ForEach(input_seq, iterator, AddressOffset(for_each_body_index.0)),
                     span,
                 ));
                 builder.pop_stack(1, (OpCode::Remove(iterator), span), block);

@@ -7,11 +7,7 @@ use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::{
-    codegen::{
-        proc_builder::{Block, Terminator},
-        translate::VarFlowTracker,
-        Codegen,
-    },
+    codegen::{ir::Terminator, proc_builder::Block, translate::VarFlowTracker, Codegen},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
