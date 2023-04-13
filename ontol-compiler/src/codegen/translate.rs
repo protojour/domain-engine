@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     equation::TypedExprEquation, find_translation_key, value_obj::codegen_value_obj_origin,
-    ProcTable, UnlinkedProc,
+    ProcBuilder, ProcTable,
 };
 
 pub(super) enum DebugDirection {
@@ -52,7 +52,7 @@ fn codegen_translate(
     (from, to): (ExprRef, ExprRef),
     to_def: DefId,
     direction: DebugDirection,
-) -> UnlinkedProc {
+) -> ProcBuilder {
     let (_, from_expr, _) = equation.resolve_expr(&equation.reductions, from);
 
     // for easier readability:

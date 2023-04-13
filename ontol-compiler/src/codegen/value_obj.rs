@@ -5,19 +5,22 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    codegen::{translate::VarFlowTracker, Block, Codegen, ProcBuilder, SpannedOpCodes, Terminator},
+    codegen::{
+        proc_builder::SpannedOpCodes, translate::VarFlowTracker, Block, Codegen, ProcBuilder,
+        Terminator,
+    },
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
-use super::{equation::TypedExprEquation, ProcTable, UnlinkedProc};
+use super::{equation::TypedExprEquation, ProcTable};
 
 pub(super) fn codegen_value_obj_origin(
     proc_table: &mut ProcTable,
     equation: &TypedExprEquation,
     to: ExprRef,
     to_def: DefId,
-) -> UnlinkedProc {
+) -> ProcBuilder {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     struct ValueCodegen {
@@ -93,5 +96,5 @@ pub(super) fn codegen_value_obj_origin(
 
     builder.commit(block);
 
-    UnlinkedProc::new(builder)
+    builder
 }

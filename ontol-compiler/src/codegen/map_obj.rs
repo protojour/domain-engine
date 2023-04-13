@@ -7,12 +7,16 @@ use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::{
-    codegen::{translate::VarFlowTracker, Block, Codegen, ProcBuilder, Terminator},
+    codegen::{
+        proc_builder::{Block, Terminator},
+        translate::VarFlowTracker,
+        Codegen,
+    },
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
 
-use super::{equation::TypedExprEquation, ProcTable, UnlinkedProc};
+use super::{equation::TypedExprEquation, proc_builder::ProcBuilder, ProcTable};
 
 /// Generate code originating from a map obj destructuring
 pub(super) fn codegen_map_obj_origin(
@@ -20,7 +24,7 @@ pub(super) fn codegen_map_obj_origin(
     equation: &TypedExprEquation,
     to: ExprRef,
     origin_attrs: &IndexMap<PropertyId, ExprRef>,
-) -> UnlinkedProc {
+) -> ProcBuilder {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     debug!("origin attrs: {origin_attrs:#?}");
@@ -172,7 +176,7 @@ pub(super) fn codegen_map_obj_origin(
 
     builder.commit(block);
 
-    UnlinkedProc::new(builder)
+    builder
 }
 
 #[derive(Default)]
