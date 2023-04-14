@@ -17,6 +17,8 @@ pub enum Ir {
     Call(Procedure),
     CallBuiltin(BuiltinProc, DefId),
     Remove(Local),
+    /// Clone a local and put top of stack
+    Clone(Local),
     Swap(Local, Local),
     Iter(Local, Local, BlockIndex),
     LoadAttr(Local, PropertyId),

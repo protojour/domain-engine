@@ -45,6 +45,10 @@ impl ProcBuilder {
         Local(self.depth - 1)
     }
 
+    pub fn top_plus(&self, plus: u16) -> Local {
+        Local(self.depth - 1 + plus)
+    }
+
     pub fn commit(&mut self, block: Block) -> BlockIndex {
         let index = block.index;
         self.blocks[index.0 as usize].ir = block.ir;
@@ -110,7 +114,7 @@ impl ProcBuilder {
         let mut index = 0;
         debug!("Proc:");
         for (block_index, block) in self.blocks.iter().enumerate() {
-            debug!("  Block {block_index}:");
+            debug!("  BlockIndex({block_index}):");
 
             for Instr(ir, _) in &block.ir {
                 debug!("    {index}: {ir:?}");

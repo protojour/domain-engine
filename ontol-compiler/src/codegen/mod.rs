@@ -8,6 +8,7 @@ use ontol_runtime::{
 
 mod equation;
 mod equation_solver;
+mod generator;
 mod ir;
 mod link;
 mod map_obj;
@@ -15,6 +16,7 @@ mod proc_builder;
 mod translate;
 mod value_obj;
 
+use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
@@ -85,174 +87,6 @@ impl ProcTable {
 
 pub(super) struct TranslateCall {
     pub translation: (DefId, DefId),
-}
-
-trait Codegen {
-    fn codegen_variable(
-        &mut self,
-        builder: &mut ProcBuilder,
-        block: &mut Block,
-        var: SyntaxVar,
-        span: &SourceSpan,
-    );
-
-    fn codegen_expr(
-        &mut self,
-        proc_table: &mut ProcTable,
-        builder: &mut ProcBuilder,
-        block: &mut Block,
-        equation: &TypedExprEquation,
-        expr_id: ExprRef,
-    ) {
-        let (_, expr, span) = equation.resolve_expr(&equation.expansions, expr_id);
-        match &expr.kind {
-            TypedExprKind::Call(proc, params) => {
-                for param in params.iter() {
-                    self.codegen_expr(proc_table, builder, block, equation, *param);
-                }
-
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-
-                // New
-                builder.ir_push(1, Ir::CallBuiltin(*proc, return_def_id), span, block);
-
-                // Old
-                builder.push_stack_old(1, (OpCode::CallBuiltin(*proc, return_def_id), span), block);
-            }
-            TypedExprKind::Constant(k) => {
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-
-                // New
-                builder.ir_push(1, Ir::Constant(*k, return_def_id), span, block);
-
-                // Old
-                builder.push_stack_old(1, (OpCode::PushConstant(*k, return_def_id), span), block);
-            }
-            TypedExprKind::Variable(var) => {
-                self.codegen_variable(builder, block, *var, &span);
-            }
-            TypedExprKind::VariableRef(_) => panic!(),
-            TypedExprKind::Translate(param_id, from_ty) => {
-                self.codegen_expr(proc_table, builder, block, equation, *param_id);
-
-                debug!(
-                    "translate from {from_ty:?} to {:?}, span = {span:?}",
-                    expr.ty
-                );
-                let from = find_translation_key(from_ty).unwrap();
-                let to = find_translation_key(&expr.ty).unwrap();
-
-                let proc = Procedure {
-                    address: proc_table.gen_translate_addr(from, to),
-                    n_params: NParams(1),
-                };
-
-                // New
-                builder.ir_push(0, Ir::Call(proc), span, block);
-
-                // Old
-                block.opcodes.push((OpCode::Call(proc), span));
-            }
-            TypedExprKind::SequenceMap(expr_ref, _iter_var, body, _) => {
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-                let output_seq = builder.ir_push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
-                    span,
-                    block,
-                );
-
-                self.codegen_expr(proc_table, builder, block, equation, *expr_ref);
-                let input_seq = builder.top();
-
-                let iterator = builder.ir_push(1, Ir::Constant(0, DefId::unit()), span, block);
-
-                let for_each_offset = block.ir.len();
-
-                let for_each_body_index = {
-                    // inside the for-each body there are two items on the stack, value (top), then rel_params
-                    builder.depth += 2;
-
-                    let mut map_block = builder
-                        .new_block(Terminator::Goto(block.index, for_each_offset as u32), span);
-
-                    self.codegen_expr(proc_table, builder, &mut map_block, equation, *body);
-
-                    // still two items on the stack: append to original sequence
-                    // for now, rel_params are untranslated
-                    builder.ir_pop(2, Ir::AppendAttr(output_seq), span, &mut map_block);
-
-                    builder.commit(map_block)
-                };
-
-                builder.ir_pop(
-                    0,
-                    Ir::Iter(input_seq, iterator, for_each_body_index),
-                    span,
-                    block,
-                );
-                builder.ir_pop(1, Ir::Remove(iterator), span, block);
-
-                // Old
-                /*
-                {
-                    let return_def_id = expr.ty.get_single_def_id().unwrap();
-                    let input_seq = Local(builder.stack_size - 1);
-                    let output_seq =
-                        builder.push_stack(1, (OpCode::PushSequence(return_def_id), span), block);
-                    let iterator = builder.push_stack(
-                        1,
-                        (OpCode::PushConstant(0, DefId::unit()), span),
-                        block,
-                    );
-
-                    let for_each_offset = block.opcodes.len();
-
-                    let for_each_body_index = {
-                        // inside the for-each body there are two items on the stack, value (top), then rel_params
-                        builder.stack_size += 2;
-
-                        let mut map_block = builder.new_block(
-                            Terminator::Goto(block.index, for_each_offset as u32),
-                            span,
-                            BlockKind::Op,
-                        );
-
-                        let index = map_block.index;
-                        self.codegen_expr(proc_table, builder, &mut map_block, equation, *expr_ref);
-
-                        // still two items on the stack: append to original sequence
-                        // for now, rel_params are untranslated
-                        builder.pop_stack(
-                            2,
-                            (OpCode::AppendAttr(output_seq), span),
-                            &mut map_block,
-                        );
-
-                        builder.commit(map_block);
-                        index
-                    };
-
-                    block.opcodes.push((
-                        OpCode::ForEach(input_seq, iterator, AddressOffset(for_each_body_index.0)),
-                        span,
-                    ));
-
-                    builder.pop_stack(1, (OpCode::Remove(iterator), span), block);
-                }
-                */
-            }
-            TypedExprKind::ValueObjPattern(_) => {
-                todo!()
-            }
-            TypedExprKind::MapObjPattern(_) => {
-                todo!()
-            }
-            TypedExprKind::Unit => {
-                todo!()
-            }
-        }
-    }
 }
 
 fn find_translation_key(ty: &TypeRef) -> Option<DefId> {

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use indexmap::IndexMap;
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams, OpCode},
@@ -8,10 +10,10 @@ use tracing::debug;
 
 use crate::{
     codegen::{
+        generator::{CodeGenerator, CodegenVariable},
         ir::{Ir, Terminator},
         proc_builder::Block,
         translate::VarFlowTracker,
-        Codegen,
     },
     typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
@@ -60,7 +62,7 @@ pub(super) fn codegen_map_obj_origin(
         var_tracker: VarFlowTracker,
     }
 
-    impl Codegen for MapCodegen {
+    impl CodegenVariable for Rc<RefCell<MapCodegen>> {
         fn codegen_variable(
             &mut self,
             builder: &mut ProcBuilder,
@@ -68,9 +70,10 @@ pub(super) fn codegen_map_obj_origin(
             var: SyntaxVar,
             span: &SourceSpan,
         ) {
-            self.var_tracker.count_use(var);
+            let mut this = self.borrow_mut();
+            this.var_tracker.count_use(var);
 
-            let origin_property = self.origin_properties[var.0 as usize];
+            let origin_property = this.origin_properties[var.0 as usize];
 
             builder.ir_push(1, Ir::LoadAttr(Local(0), origin_property.0), *span, block);
 
@@ -86,51 +89,62 @@ pub(super) fn codegen_map_obj_origin(
         }
     }
 
-    let mut map_codegen = MapCodegen {
+    let map_codegen = Rc::new(RefCell::new(MapCodegen {
         origin_properties,
         var_tracker: Default::default(),
-    };
+    }));
+
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Terminator::Return(Local(1)), span);
 
-    match &to_expr.kind {
-        TypedExprKind::MapObjPattern(dest_attrs) => {
-            let return_def_id = to_expr.ty.get_single_def_id().unwrap();
+    CodeGenerator::default().enter_bind_level(map_codegen.clone(), |generator| {
+        match &to_expr.kind {
+            TypedExprKind::MapObjPattern(dest_attrs) => {
+                let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
-            // Local(1), this is the return value:
-            builder.push_stack_old(
-                1,
-                (
-                    OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                    span,
-                ),
-                &mut block,
-            );
-
-            builder.ir_push(
-                1,
-                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                span,
-                &mut block,
-            );
-
-            for (property_id, expr_ref) in dest_attrs {
-                map_codegen.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-                builder.ir_pop(1, Ir::PutUnitAttr(Local(1), *property_id), span, &mut block);
-                builder.pop_stack_old(
+                // Local(1), this is the return value:
+                builder.push_stack_old(
                     1,
-                    (OpCode::PutUnitAttr(Local(1), *property_id), span),
+                    (
+                        OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                        span,
+                    ),
                     &mut block,
                 );
+
+                builder.ir_push(
+                    1,
+                    Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                    span,
+                    &mut block,
+                );
+
+                for (property_id, expr_ref) in dest_attrs {
+                    generator.codegen_expr(
+                        proc_table,
+                        &mut builder,
+                        &mut block,
+                        equation,
+                        *expr_ref,
+                    );
+                    builder.ir_pop(1, Ir::PutUnitAttr(Local(1), *property_id), span, &mut block);
+                    builder.pop_stack_old(
+                        1,
+                        (OpCode::PutUnitAttr(Local(1), *property_id), span),
+                        &mut block,
+                    );
+                }
+            }
+            TypedExprKind::ValueObjPattern(expr_ref) => {
+                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
+            }
+            kind => {
+                todo!("to: {kind:?}");
             }
         }
-        TypedExprKind::ValueObjPattern(expr_ref) => {
-            map_codegen.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-        }
-        kind => {
-            todo!("to: {kind:?}");
-        }
-    }
+    });
+
+    let mut map_codegen_mut = map_codegen.borrow_mut();
 
     // post-process
     let mut var_stack_state = VarStackState::default();
@@ -141,8 +155,8 @@ pub(super) fn codegen_map_obj_origin(
             match opcode {
                 (OpCode::Clone(Local(pos)), span) if pos >= 2 => {
                     let syntax_var = SyntaxVar(pos - 2_u16, BindDepth(0));
-                    let state = map_codegen.var_tracker.do_use(syntax_var);
-                    let origin_properties = &map_codegen.origin_properties;
+                    let state = map_codegen_mut.var_tracker.do_use(syntax_var);
+                    let origin_properties = &map_codegen_mut.origin_properties;
                     let origin_property = origin_properties[syntax_var.0 as usize];
 
                     match (state.use_count, state.reused) {

@@ -107,7 +107,7 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn for_each(&mut self, seq: Local, index: Local) -> bool {
+    fn iter(&mut self, seq: Local, index: Local) -> bool {
         let i = *self.int_local_mut(index) as usize;
         let seq = self.sequence_local_mut(seq);
 
