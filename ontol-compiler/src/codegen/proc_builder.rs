@@ -1,4 +1,4 @@
-use ontol_runtime::proc::{Local, NParams, OpCode};
+use ontol_runtime::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
@@ -79,17 +79,7 @@ impl ProcBuilder {
         Local(local)
     }
 
-    pub fn pop_stack_old(
-        &mut self,
-        n: u16,
-        _spanned_opcode: (OpCode, SourceSpan),
-        _block: &mut Block,
-    ) {
-        self.stack_size -= n;
-        // block.opcodes.push(spanned_opcode);
-    }
-
-    pub fn build(mut self) -> SpannedOpCodes {
+    pub fn build(self) -> SpannedOpCodes {
         let mut block_addresses: SmallVec<[u32; 8]> = smallvec![];
 
         // compute addresses
@@ -99,16 +89,6 @@ impl ProcBuilder {
 
             // account for the terminator:
             block_addr += block.ir.len() as u32 + 1;
-        }
-
-        // update addresses
-        for block in &mut self.blocks {
-            for Instr(ir, _) in &mut block.ir {
-                // Important: Handle all instructions with AddressOffset
-                if let Ir::Iter(_, _, addr_offset) = ir {
-                    addr_offset.0 = block_addresses[addr_offset.0 as usize];
-                }
-            }
         }
 
         let mut index = 0;
@@ -126,11 +106,26 @@ impl ProcBuilder {
             index += 1;
         }
 
-        /*
         let mut output = smallvec![];
+
         for block in self.blocks {
-            for spanned_opcode in block.opcodes {
-                output.push(spanned_opcode);
+            for Instr(ir, span) in block.ir {
+                let opcode = match ir {
+                    Ir::Call(proc) => OpCode::Call(proc),
+                    Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
+                    Ir::Remove(local) => OpCode::Remove(local),
+                    Ir::Clone(local) => OpCode::Clone(local),
+                    Ir::Iter(seq, counter, block_index) => OpCode::Iter(
+                        seq,
+                        counter,
+                        AddressOffset(block_addresses[block_index.0 as usize]),
+                    ),
+                    Ir::TakeAttr2(local, property_id) => OpCode::TakeAttr2(local, property_id),
+                    Ir::PutAttrValue(local, property_id) => OpCode::PutUnitAttr(local, property_id),
+                    Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
+                    Ir::Constant(value, def_id) => OpCode::PushConstant(value, def_id),
+                };
+                output.push((opcode, span));
             }
 
             let span = block.terminator_span;
@@ -157,9 +152,6 @@ impl ProcBuilder {
         );
 
         output
-        */
-
-        smallvec![]
     }
 }
 

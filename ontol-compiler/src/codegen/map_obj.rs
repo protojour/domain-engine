@@ -30,6 +30,9 @@ pub(super) fn codegen_map_obj_origin(
 ) -> ProcBuilder {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
+    // always start at 0 (for now), there are no recursive map_objs (yet)
+    let input_local = 0;
+
     // debug!("origin attrs: {origin_attrs:#?}");
     // debug!("reductions: {:?}", equation.reductions.debug_table());
 
@@ -60,6 +63,7 @@ pub(super) fn codegen_map_obj_origin(
     struct MapCodegen {
         origin_properties: Vec<(PropertyId, SyntaxVar)>,
         var_tracker: VarFlowTracker,
+        origin_local: u16,
     }
 
     impl CodegenVariable for Rc<RefCell<MapCodegen>> {
@@ -73,51 +77,47 @@ pub(super) fn codegen_map_obj_origin(
             let mut this = self.borrow_mut();
             this.var_tracker.count_use(var);
 
-            let origin_property = this.origin_properties[var.0 as usize];
+            let origin_local = this.origin_local;
 
-            builder.ir_push(1, Ir::LoadAttr(Local(0), origin_property.0), *span, block);
+            // To find the value local, we refer to the first local resulting from TakeAttr2,
+            // after the definition of the return value
+            let value_local = (origin_local + 2) + (var.0 * 2) + 1;
 
-            // Make Clone(Local(v + 2)) represent use of the syntax variable.
-            // this will be rewritten later:
-            // BUG: This is stupid, don't try to encode an intermediate representation
-            // inside the next instruction set
-            builder.push_stack_old(1, (OpCode::Clone(Local(var.0 + 2)), *span), block);
-
-            // insert a clone of the current stack position, this can be optimized away later..
-            // let stack_size = builder.stack_size;
-            // builder.push_stack(1, (OpCode::Clone(Local(stack_size - 1)), *span), block);
+            builder.ir_push(1, Ir::Clone(Local(value_local)), *span, block);
         }
     }
 
     let map_codegen = Rc::new(RefCell::new(MapCodegen {
         origin_properties,
         var_tracker: Default::default(),
+        origin_local: input_local,
     }));
 
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Terminator::Return(Local(1)), span);
 
     CodeGenerator::default().enter_bind_level(map_codegen.clone(), |generator| {
+        let origin_local = map_codegen.borrow().origin_local;
         match &to_expr.kind {
             TypedExprKind::MapObjPattern(dest_attrs) => {
                 let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
                 // Local(1), this is the return value:
-                builder.push_stack_old(
-                    1,
-                    (
-                        OpCode::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                        span,
-                    ),
-                    &mut block,
-                );
-
                 builder.ir_push(
                     1,
                     Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
                     span,
                     &mut block,
                 );
+
+                for (property_id, _) in &map_codegen.borrow().origin_properties {
+                    builder.ir_push(
+                        2,
+                        Ir::TakeAttr2(Local(origin_local), *property_id),
+                        span,
+                        &mut block,
+                    );
+                }
 
                 for (property_id, expr_ref) in dest_attrs {
                     generator.codegen_expr(
@@ -127,15 +127,24 @@ pub(super) fn codegen_map_obj_origin(
                         equation,
                         *expr_ref,
                     );
-                    builder.ir_pop(1, Ir::PutUnitAttr(Local(1), *property_id), span, &mut block);
-                    builder.pop_stack_old(
+                    builder.ir_pop(
                         1,
-                        (OpCode::PutUnitAttr(Local(1), *property_id), span),
+                        Ir::PutAttrValue(Local(1), *property_id),
+                        span,
                         &mut block,
                     );
                 }
             }
             TypedExprKind::ValueObjPattern(expr_ref) => {
+                // FIXME: Code duplication (above)
+                for (property_id, _) in &map_codegen.borrow().origin_properties {
+                    builder.ir_push(
+                        2,
+                        Ir::TakeAttr2(Local(origin_local), *property_id),
+                        span,
+                        &mut block,
+                    );
+                }
                 generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
             }
             kind => {
@@ -147,61 +156,65 @@ pub(super) fn codegen_map_obj_origin(
     let mut map_codegen_mut = map_codegen.borrow_mut();
 
     // post-process
-    let mut var_stack_state = VarStackState::default();
-    block.opcodes = block
-        .opcodes
-        .into_iter()
-        .fold(smallvec![], |mut opcodes, opcode| {
-            match opcode {
-                (OpCode::Clone(Local(pos)), span) if pos >= 2 => {
-                    let syntax_var = SyntaxVar(pos - 2_u16, BindDepth(0));
-                    let state = map_codegen_mut.var_tracker.do_use(syntax_var);
-                    let origin_properties = &map_codegen_mut.origin_properties;
-                    let origin_property = origin_properties[syntax_var.0 as usize];
+    if false {
+        let mut var_stack_state = VarStackState::default();
+        block.opcodes = block
+            .opcodes
+            .into_iter()
+            .fold(smallvec![], |mut opcodes, opcode| {
+                match opcode {
+                    (OpCode::Clone(Local(pos)), span) if pos >= 2 => {
+                        let syntax_var = SyntaxVar(pos - 2_u16, BindDepth(0));
+                        let state = map_codegen_mut.var_tracker.do_use(syntax_var);
+                        let origin_properties = &map_codegen_mut.origin_properties;
+                        let origin_property = origin_properties[syntax_var.0 as usize];
 
-                    match (state.use_count, state.reused) {
-                        (1, false) => {
-                            // no need to clone
-                            opcodes
-                                .push((OpCode::TakeAttrValue(Local(0), origin_property.0), span));
-                        }
-                        (_, false) => {
-                            // first use, must clone
-                            opcodes
-                                .push((OpCode::TakeAttrValue(Local(0), origin_property.0), span));
-                            var_stack_state.stack.push(syntax_var);
-                            opcodes.push((
-                                OpCode::Clone(Local(2 + var_stack_state.stack.len() as u16 - 1)),
-                                span,
-                            ));
-                        }
-                        (1, true) => {
-                            // last use
-                            if let Some(index) = var_stack_state.swap_to_top(syntax_var) {
-                                // swap to top
+                        match (state.use_count, state.reused) {
+                            (1, false) => {
+                                // no need to clone
+                                opcodes
+                                    .push((OpCode::TakeAttr2(Local(0), origin_property.0), span));
+                            }
+                            (_, false) => {
+                                // first use, must clone
+                                opcodes
+                                    .push((OpCode::TakeAttr2(Local(0), origin_property.0), span));
+                                var_stack_state.stack.push(syntax_var);
                                 opcodes.push((
-                                    OpCode::Swap(
-                                        Local(2 + index),
-                                        Local(2 + var_stack_state.stack.len() as u16 - 1),
-                                    ),
+                                    OpCode::Clone(Local(
+                                        2 + var_stack_state.stack.len() as u16 - 1,
+                                    )),
                                     span,
                                 ));
                             }
-                            var_stack_state.stack.pop();
-                        }
-                        (_, true) => {
-                            // not first, and not last use
-                            let index = var_stack_state.find(syntax_var);
-                            opcodes.push((OpCode::Clone(Local(2 + index as u16)), span));
+                            (1, true) => {
+                                // last use
+                                if let Some(index) = var_stack_state.swap_to_top(syntax_var) {
+                                    // swap to top
+                                    opcodes.push((
+                                        OpCode::Swap(
+                                            Local(2 + index),
+                                            Local(2 + var_stack_state.stack.len() as u16 - 1),
+                                        ),
+                                        span,
+                                    ));
+                                }
+                                var_stack_state.stack.pop();
+                            }
+                            (_, true) => {
+                                // not first, and not last use
+                                let index = var_stack_state.find(syntax_var);
+                                opcodes.push((OpCode::Clone(Local(2 + index as u16)), span));
+                            }
                         }
                     }
+                    _ => {
+                        opcodes.push(opcode);
+                    }
                 }
-                _ => {
-                    opcodes.push(opcode);
-                }
-            }
-            opcodes
-        });
+                opcodes
+            });
+    }
 
     debug!("{:#?}", block.opcodes);
 

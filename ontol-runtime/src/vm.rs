@@ -45,11 +45,11 @@ pub trait Stack {
     fn remove(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
     fn iter(&mut self, seq: Local, index: Local) -> bool;
-    fn take_attr_value(&mut self, source: Local, key: PropertyId);
+    fn take_map_attr2(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
+    fn take_seq_attr2(&mut self, local: Local, index: usize);
     fn push_constant(&mut self, k: i64, result_type: DefId);
-    fn push_unit(&mut self);
-    fn append_attr(&mut self, seq: Local);
+    fn append_attr2(&mut self, seq: Local);
 }
 
 impl<'l> AbstractVm<'l> {
@@ -117,8 +117,8 @@ impl<'l> AbstractVm<'l> {
                     stack.swap(*a, *b);
                     self.program_counter += 1;
                 }
-                OpCode::TakeAttrValue(source, property_id) => {
-                    stack.take_attr_value(*source, *property_id);
+                OpCode::TakeAttr2(source, property_id) => {
+                    stack.take_map_attr2(*source, *property_id);
                     self.program_counter += 1;
                 }
                 OpCode::PutUnitAttr(target, property_id) => {
@@ -129,10 +129,6 @@ impl<'l> AbstractVm<'l> {
                     stack.push_constant(*k, *result_type);
                     self.program_counter += 1;
                 }
-                OpCode::PushUnit => {
-                    stack.push_unit();
-                    self.program_counter += 1;
-                }
                 OpCode::Iter(seq, index, offset) => {
                     if stack.iter(*seq, *index) {
                         self.program_counter = self.proc_address + offset.0 as usize;
@@ -140,8 +136,8 @@ impl<'l> AbstractVm<'l> {
                         self.program_counter += 1;
                     }
                 }
-                OpCode::AppendAttr(seq) => {
-                    stack.append_attr(*seq);
+                OpCode::AppendAttr2(seq) => {
+                    stack.append_attr2(*seq);
                     self.program_counter += 1;
                 }
             }

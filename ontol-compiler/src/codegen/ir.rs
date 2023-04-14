@@ -19,13 +19,12 @@ pub enum Ir {
     Remove(Local),
     /// Clone a local and put top of stack
     Clone(Local),
-    Swap(Local, Local),
     Iter(Local, Local, BlockIndex),
-    LoadAttr(Local, PropertyId),
-    PutUnitAttr(Local, PropertyId),
-    AppendAttr(Local),
+    /// Take attribute and push two values on the stack: value(top), rel_params
+    TakeAttr2(Local, PropertyId),
+    PutAttrValue(Local, PropertyId),
+    AppendAttr2(Local),
     Constant(i64, DefId),
-    Unit,
 }
 
 #[derive(Clone, Debug)]

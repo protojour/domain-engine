@@ -127,9 +127,10 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn take_attr_value(&mut self, source: Local, key: PropertyId) {
+    fn take_map_attr2(&mut self, source: Local, key: PropertyId) {
         let map = self.map_local_mut(source);
         let attribute = map.remove(&key).expect("Attribute not found");
+        self.stack.push(attribute.rel_params);
         self.stack.push(attribute.value);
     }
 
@@ -141,17 +142,21 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
+    fn take_seq_attr2(&mut self, local: Local, index: usize) {
+        let seq = self.sequence_local_mut(local);
+        let mut attribute = Attribute::with_unit_params(Value::unit());
+        std::mem::swap(&mut seq[index], &mut attribute);
+        self.stack.push(attribute.rel_params);
+        self.stack.push(attribute.value);
+    }
+
+    #[inline(always)]
     fn push_constant(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
     }
 
-    #[inline(always)]
-    fn push_unit(&mut self) {
-        self.stack.push(Value::unit());
-    }
-
-    fn append_attr(&mut self, seq: Local) {
-        let [rel_params, value]: [Value; 2] = self.pop_n();
+    fn append_attr2(&mut self, seq: Local) {
+        let [value, rel_params]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq);
 
         seq.push(Attribute { value, rel_params });
@@ -183,6 +188,7 @@ impl ValueStack {
             }
             BuiltinProc::NewMap => Data::Map([].into()),
             BuiltinProc::NewSeq => Data::Sequence(vec![]),
+            BuiltinProc::NewUnit => Data::Unit,
         }
     }
 
@@ -243,7 +249,8 @@ impl VmDebug<ValueStack> for Tracer {
             stack
                 .stack
                 .iter()
-                .map(|value| format!("{value:?}"))
+                .enumerate()
+                .map(|(index, value)| format!("Local({index}): {value:?}"))
                 .collect::<Vec<_>>()
         );
         trace!("{:?}", vm.pending_opcode());
@@ -274,9 +281,9 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(42)),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(1)))),
+                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(3)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
                 OpCode::Return(Local(1)),
             ],
@@ -345,11 +352,11 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(1)))),
+                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::Call(double),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(2)))),
-                OpCode::TakeAttrValue(Local(0), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(3)))),
                 OpCode::Call(add_then_double),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(5)))),
                 OpCode::Return(Local(1)),
@@ -414,9 +421,9 @@ mod tests {
                 OpCode::PushConstant(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
                 // add rel params
-                OpCode::PushUnit,
+                OpCode::CallBuiltin(BuiltinProc::NewUnit, def_id(0)),
                 // pop (rel_params, value), append to sequence
-                OpCode::AppendAttr(Local(1)),
+                OpCode::AppendAttr2(Local(1)),
                 OpCode::Goto(AddressOffset(2)),
             ],
         );

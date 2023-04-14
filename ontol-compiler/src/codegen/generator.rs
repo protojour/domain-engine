@@ -64,18 +64,11 @@ impl CodeGenerator {
 
                 // New
                 builder.ir_push(1, Ir::CallBuiltin(*proc, return_def_id), span, block);
-
-                // Old
-                builder.push_stack_old(1, (OpCode::CallBuiltin(*proc, return_def_id), span), block);
             }
             TypedExprKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                // New
                 builder.ir_push(1, Ir::Constant(*k, return_def_id), span, block);
-
-                // Old
-                builder.push_stack_old(1, (OpCode::PushConstant(*k, return_def_id), span), block);
             }
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(builder, block, *var, &span);
@@ -119,12 +112,12 @@ impl CodeGenerator {
 
                 let for_each_offset = block.ir.len();
 
-                let value_local = builder.top_plus(1);
-                let rel_params_local = builder.top_plus(2);
+                let rel_params_local = builder.top_plus(1);
+                let value_local = builder.top_plus(2);
                 let codegen_iter = CodegenIter {
                     iter_var: *iter_var,
-                    value_local,
                     rel_params_local,
+                    value_local,
                 };
 
                 let for_each_body_index = self.enter_bind_level(codegen_iter, |zelf| {
@@ -136,11 +129,14 @@ impl CodeGenerator {
 
                     zelf.codegen_expr(proc_table, builder, &mut map_block, equation, *body);
 
+                    builder.ir_push(1, Ir::Clone(rel_params_local), span, &mut map_block);
+
                     // still two items on the stack: append to original sequence
                     // for now, rel_params are untranslated
-                    builder.ir_pop(0, Ir::AppendAttr(output_seq), span, &mut map_block);
-                    builder.ir_pop(1, Ir::Remove(rel_params_local), span, &mut map_block);
+                    builder.ir_pop(0, Ir::AppendAttr2(output_seq), span, &mut map_block);
+
                     builder.ir_pop(1, Ir::Remove(value_local), span, &mut map_block);
+                    builder.ir_pop(1, Ir::Remove(rel_params_local), span, &mut map_block);
 
                     builder.commit(map_block)
                 });
@@ -182,8 +178,8 @@ impl CodegenVariable for CodeGenerator {
 
 struct CodegenIter {
     iter_var: SyntaxVar,
-    value_local: Local,
     rel_params_local: Local,
+    value_local: Local,
 }
 
 impl CodegenVariable for CodegenIter {

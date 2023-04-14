@@ -67,17 +67,14 @@ pub enum OpCode {
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),
-    /// Take an attribute from local map, and put its value on the top of the stack.
-    /// Discards the attribute edge.
-    TakeAttrValue(Local, PropertyId),
+    /// Take attribute and push two values on the stack: value(top), rel_params
+    TakeAttr2(Local, PropertyId),
     /// Pop value from stack, and move it into the specified local map.
     PutUnitAttr(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
-    AppendAttr(Local),
+    AppendAttr2(Local),
     /// Push a constant to the stack.
     PushConstant(i64, DefId),
-    /// Push a unit value to the stack.
-    PushUnit,
 }
 
 /// A reference to a local on the value stack during procedure execution.
@@ -94,4 +91,5 @@ pub enum BuiltinProc {
     Append,
     NewMap,
     NewSeq,
+    NewUnit,
 }
