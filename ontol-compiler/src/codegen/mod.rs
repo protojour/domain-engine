@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Address, BuiltinProc, Lib, NParams, OpCode, Procedure},
+    proc::{Address, Lib, Procedure},
     DefId,
 };
 
@@ -16,18 +16,17 @@ mod proc_builder;
 mod translate;
 mod value_obj;
 
-use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use crate::{
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind, TypedExprTable},
+    typed_expr::{ExprRef, TypedExprTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
 use self::{
     equation::TypedExprEquation,
-    ir::{Ir, Terminator},
+    ir::Terminator,
     link::{link, LinkResult},
     proc_builder::{Block, ProcBuilder},
     translate::{codegen_translate_solve, DebugDirection},

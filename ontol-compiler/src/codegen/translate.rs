@@ -94,6 +94,7 @@ impl VarFlowTracker {
     }
 
     /// actually use the variable. Returns previous state.
+    #[allow(unused)]
     pub fn do_use(&mut self, var: SyntaxVar) -> VarFlowState {
         let stored_state = self.states.entry(var).or_default();
         let clone = stored_state.clone();

@@ -208,8 +208,7 @@ fn test_map_translate_array_item() {
             &env,
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }] }),
-            // FIXME: actually implement the mapping:
-            json!({ "bars": [] }),
+            json!({ "bars": [{ "b": "42" }] }),
         );
     });
 }

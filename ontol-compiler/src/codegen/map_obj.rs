@@ -2,11 +2,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams, OpCode},
+    proc::{BuiltinProc, Local, NParams},
     value::PropertyId,
 };
-use smallvec::{smallvec, SmallVec};
-use tracing::debug;
 
 use crate::{
     codegen::{
@@ -153,101 +151,7 @@ pub(super) fn codegen_map_obj_origin(
         }
     });
 
-    let mut map_codegen_mut = map_codegen.borrow_mut();
-
-    // post-process
-    if false {
-        let mut var_stack_state = VarStackState::default();
-        block.opcodes = block
-            .opcodes
-            .into_iter()
-            .fold(smallvec![], |mut opcodes, opcode| {
-                match opcode {
-                    (OpCode::Clone(Local(pos)), span) if pos >= 2 => {
-                        let syntax_var = SyntaxVar(pos - 2_u16, BindDepth(0));
-                        let state = map_codegen_mut.var_tracker.do_use(syntax_var);
-                        let origin_properties = &map_codegen_mut.origin_properties;
-                        let origin_property = origin_properties[syntax_var.0 as usize];
-
-                        match (state.use_count, state.reused) {
-                            (1, false) => {
-                                // no need to clone
-                                opcodes
-                                    .push((OpCode::TakeAttr2(Local(0), origin_property.0), span));
-                            }
-                            (_, false) => {
-                                // first use, must clone
-                                opcodes
-                                    .push((OpCode::TakeAttr2(Local(0), origin_property.0), span));
-                                var_stack_state.stack.push(syntax_var);
-                                opcodes.push((
-                                    OpCode::Clone(Local(
-                                        2 + var_stack_state.stack.len() as u16 - 1,
-                                    )),
-                                    span,
-                                ));
-                            }
-                            (1, true) => {
-                                // last use
-                                if let Some(index) = var_stack_state.swap_to_top(syntax_var) {
-                                    // swap to top
-                                    opcodes.push((
-                                        OpCode::Swap(
-                                            Local(2 + index),
-                                            Local(2 + var_stack_state.stack.len() as u16 - 1),
-                                        ),
-                                        span,
-                                    ));
-                                }
-                                var_stack_state.stack.pop();
-                            }
-                            (_, true) => {
-                                // not first, and not last use
-                                let index = var_stack_state.find(syntax_var);
-                                opcodes.push((OpCode::Clone(Local(2 + index as u16)), span));
-                            }
-                        }
-                    }
-                    _ => {
-                        opcodes.push(opcode);
-                    }
-                }
-                opcodes
-            });
-    }
-
-    debug!("{:#?}", block.opcodes);
-
     builder.commit(block);
 
     builder
-}
-
-#[derive(Default)]
-struct VarStackState {
-    stack: SmallVec<[SyntaxVar; 8]>,
-}
-
-impl VarStackState {
-    fn swap_to_top(&mut self, var: SyntaxVar) -> Option<u16> {
-        let top = *self.stack.last().unwrap();
-        if top == var {
-            None
-        } else {
-            let index = self.find(var);
-            let last = self.stack.len() - 1;
-            self.stack.swap(index, last);
-            Some(index as u16)
-        }
-    }
-
-    fn find(&self, var: SyntaxVar) -> usize {
-        let (index, _) = self
-            .stack
-            .iter()
-            .enumerate()
-            .find(|(_, stack_var)| **stack_var == var)
-            .unwrap();
-        index
-    }
 }

@@ -4,12 +4,8 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::SourceSpan;
-
 #[derive(Clone, Copy, Debug)]
 pub struct BlockIndex(pub u32);
-
-pub struct Instr(pub Ir, pub SourceSpan);
 
 #[derive(Debug)]
 #[allow(unused)]

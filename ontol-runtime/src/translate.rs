@@ -156,9 +156,8 @@ impl Stack for ValueStack {
     }
 
     fn append_attr2(&mut self, seq: Local) {
-        let [value, rel_params]: [Value; 2] = self.pop_n();
+        let [rel_params, value]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq);
-
         seq.push(Attribute { value, rel_params });
     }
 }

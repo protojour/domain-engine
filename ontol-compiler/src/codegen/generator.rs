@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams, OpCode, Procedure},
+    proc::{BuiltinProc, Local, NParams, Procedure},
     DefId,
 };
 use smallvec::SmallVec;
@@ -89,11 +89,7 @@ impl CodeGenerator {
                     n_params: NParams(1),
                 };
 
-                // New
                 builder.ir_push(0, Ir::Call(proc), span, block);
-
-                // Old
-                block.opcodes.push((OpCode::Call(proc), span));
             }
             TypedExprKind::SequenceMap(expr_ref, iter_var, body, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
@@ -148,6 +144,7 @@ impl CodeGenerator {
                     block,
                 );
                 builder.ir_pop(1, Ir::Remove(counter), span, block);
+                builder.ir_pop(1, Ir::Remove(input_seq), span, block);
             }
             TypedExprKind::ValueObjPattern(_) => {
                 todo!()
@@ -176,6 +173,7 @@ impl CodegenVariable for CodeGenerator {
     }
 }
 
+#[allow(unused)]
 struct CodegenIter {
     iter_var: SyntaxVar,
     rel_params_local: Local,

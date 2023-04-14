@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::SourceSpan;
 
-use super::ir::{BlockIndex, Instr, Ir, Terminator};
+use super::ir::{BlockIndex, Ir, Terminator};
 
 pub struct ProcBuilder {
     pub n_params: NParams,
@@ -27,14 +27,12 @@ impl ProcBuilder {
         let index = BlockIndex(self.blocks.len() as u32);
         self.blocks.push(Block {
             index,
-            opcodes: Default::default(),
             ir: Default::default(),
             terminator: terminator.clone(),
             terminator_span: span,
         });
         Block {
             index,
-            opcodes: Default::default(),
             ir: Default::default(),
             terminator,
             terminator_span: span,
@@ -58,25 +56,13 @@ impl ProcBuilder {
     pub fn ir_push(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) -> Local {
         let local = Local(self.depth);
         self.depth += n;
-        block.ir.push(Instr(ir, span));
+        block.ir.push((ir, span));
         local
     }
 
     pub fn ir_pop(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) {
         self.depth += n;
-        block.ir.push(Instr(ir, span));
-    }
-
-    pub fn push_stack_old(
-        &mut self,
-        n: u16,
-        _spanned_opcode: (OpCode, SourceSpan),
-        _block: &mut Block,
-    ) -> Local {
-        let local = self.stack_size;
-        self.stack_size += n;
-        // block.opcodes.push(spanned_opcode);
-        Local(local)
+        block.ir.push((ir, span));
     }
 
     pub fn build(self) -> SpannedOpCodes {
@@ -96,7 +82,7 @@ impl ProcBuilder {
         for (block_index, block) in self.blocks.iter().enumerate() {
             debug!("  BlockIndex({block_index}):");
 
-            for Instr(ir, _) in &block.ir {
+            for (ir, _) in &block.ir {
                 debug!("    {index}: {ir:?}");
                 index += 1;
             }
@@ -109,7 +95,7 @@ impl ProcBuilder {
         let mut output = smallvec![];
 
         for block in self.blocks {
-            for Instr(ir, span) in block.ir {
+            for (ir, span) in block.ir {
                 let opcode = match ir {
                     Ir::Call(proc) => OpCode::Call(proc),
                     Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
@@ -157,8 +143,7 @@ impl ProcBuilder {
 
 pub struct Block {
     pub index: BlockIndex,
-    pub opcodes: SmallVec<[(OpCode, SourceSpan); 32]>,
-    pub ir: SmallVec<[Instr; 32]>,
+    pub ir: SmallVec<[(Ir, SourceSpan); 32]>,
     pub terminator: Terminator,
     pub terminator_span: SourceSpan,
 }
