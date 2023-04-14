@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
+    mapping_vm::MappingVm,
     proc::{Lib, Procedure},
     property_probe::PropertyProbe,
     serde::{
@@ -14,7 +15,6 @@ use crate::{
     },
     string_pattern::StringPattern,
     string_types::StringLikeType,
-    translate::Translator,
     DefId, PackageId, RelationId,
 };
 
@@ -45,8 +45,8 @@ impl Env {
         }
     }
 
-    pub fn new_translator(&self) -> Translator<'_> {
-        Translator::new(&self.lib)
+    pub fn new_translator(&self) -> MappingVm<'_> {
+        MappingVm::new(&self.lib)
     }
 
     pub fn new_property_probe(&self) -> PropertyProbe<'_> {

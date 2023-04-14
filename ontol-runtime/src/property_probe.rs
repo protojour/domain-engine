@@ -123,7 +123,7 @@ impl Stack for PropStack {
             .swap(local0_pos + a.0 as usize, local0_pos + b.0 as usize);
     }
 
-    fn iter(&mut self, _seq: Local, _index: Local) -> bool {
+    fn iter_next(&mut self, _seq: Local, _index: Local) -> bool {
         false
     }
 

@@ -12,12 +12,12 @@ use crate::{
 };
 
 /// Virtual machine for executing ONTOL procedures
-pub struct Translator<'l> {
+pub struct MappingVm<'l> {
     abstract_vm: AbstractVm<'l>,
     value_stack: ValueStack,
 }
 
-impl<'l> Translator<'l> {
+impl<'l> MappingVm<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             abstract_vm: AbstractVm::new(lib),
@@ -107,7 +107,7 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn iter(&mut self, seq: Local, index: Local) -> bool {
+    fn iter_next(&mut self, seq: Local, index: Local) -> bool {
         let i = *self.int_local_mut(index) as usize;
         let seq = self.sequence_local_mut(seq);
 
@@ -288,7 +288,7 @@ mod tests {
             ],
         );
 
-        let mut vm = Translator::new(&lib);
+        let mut vm = MappingVm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::new(
@@ -362,7 +362,7 @@ mod tests {
             ],
         );
 
-        let mut vm = Translator::new(&lib);
+        let mut vm = MappingVm::new(&lib);
         let output = vm.trace_eval(
             translate,
             [Value::new(
@@ -427,7 +427,7 @@ mod tests {
             ],
         );
 
-        let mut vm = Translator::new(&lib);
+        let mut vm = MappingVm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::new(

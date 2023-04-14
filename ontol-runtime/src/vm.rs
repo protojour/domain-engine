@@ -44,7 +44,7 @@ pub trait Stack {
     fn clone(&mut self, source: Local);
     fn remove(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
-    fn iter(&mut self, seq: Local, index: Local) -> bool;
+    fn iter_next(&mut self, seq: Local, index: Local) -> bool;
     fn take_map_attr2(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
     fn take_seq_attr2(&mut self, local: Local, index: usize);
@@ -130,7 +130,7 @@ impl<'l> AbstractVm<'l> {
                     self.program_counter += 1;
                 }
                 OpCode::Iter(seq, index, offset) => {
-                    if stack.iter(*seq, *index) {
+                    if stack.iter_next(*seq, *index) {
                         self.program_counter = self.proc_address + offset.0 as usize;
                     } else {
                         self.program_counter += 1;

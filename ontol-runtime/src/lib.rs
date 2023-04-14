@@ -8,6 +8,7 @@ pub mod discriminator;
 pub mod env;
 pub mod format_utils;
 pub mod json_schema;
+pub mod mapping_vm;
 pub mod proc;
 pub mod property_probe;
 pub mod query;
@@ -15,7 +16,6 @@ pub mod query_translate;
 pub mod serde;
 pub mod string_pattern;
 pub mod string_types;
-pub mod translate;
 pub mod value;
 
 mod vm;
