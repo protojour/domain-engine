@@ -2,7 +2,11 @@
 
 use std::sync::Arc;
 
-use domain_engine_juniper::{create_graphql_schema, juniper, GqlContext, Schema};
+use domain_engine_juniper::{
+    create_graphql_schema,
+    juniper::{self, serde::Serialize},
+    GqlContext, Schema,
+};
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
@@ -71,7 +75,11 @@ impl WasmGraphqlSchema {
             });
         }
 
-        Ok(serde_wasm_bindgen::to_value(&value)?)
+        Ok(value.serialize(
+            &serde_wasm_bindgen::Serializer::new()
+                .serialize_maps_as_objects(true)
+                .serialize_missing_as_null(true),
+        )?)
     }
 }
 
