@@ -169,6 +169,75 @@ impl Attribute {
     }
 }
 
+pub struct ValueDebug<'v>(pub &'v Value);
+
+impl<'v> Display for ValueDebug<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = &self.0;
+        match &value.data {
+            Data::Unit => write!(f, "U"),
+            Data::Int(i) => write!(f, "int({i})"),
+            Data::Float(n) => write!(f, "flt({n})"),
+            Data::Rational(r) => write!(f, "rat({r})"),
+            Data::String(s) => write!(f, "'{s}'"),
+            Data::Uuid(u) => write!(f, "uuid({u})"),
+            Data::ChronoDateTime(dt) => write!(f, "datetime({dt})"),
+            Data::ChronoDate(d) => write!(f, "date({d})"),
+            Data::ChronoTime(t) => write!(f, "time({t})"),
+            Data::Map(m) => {
+                write!(f, "{{")?;
+                let mut iter = m.iter().peekable();
+                while let Some((prop, attr)) = iter.next() {
+                    match prop.role {
+                        Role::Subject => write!(f, "subj")?,
+                        Role::Object => write!(f, "obj")?,
+                    }
+
+                    write!(
+                        f,
+                        "({}, {}): {}",
+                        prop.relation_id.0 .0 .0,
+                        prop.relation_id.0 .1,
+                        AttrDebug(attr),
+                    )?;
+
+                    if iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Data::Sequence(s) => {
+                write!(f, "[")?;
+                let mut iter = s.iter().peekable();
+                while let Some(attr) = iter.next() {
+                    write!(f, "{}", AttrDebug(attr),)?;
+
+                    if iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+        }
+    }
+}
+
+struct AttrDebug<'a>(&'a Attribute);
+
+impl<'a> Display for AttrDebug<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let attr = &self.0;
+        write!(f, "{}", ValueDebug(&attr.value))?;
+
+        if !attr.rel_params.is_unit() {
+            write!(f, "~{}", ValueDebug(&attr.rel_params))?;
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, HashMap};

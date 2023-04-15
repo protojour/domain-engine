@@ -1,12 +1,12 @@
 use std::{array, collections::BTreeMap};
 
 use smartstring::alias::String;
-use tracing::trace;
+use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
     proc::{BuiltinProc, Lib, Local, Procedure},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, PropertyId, Value, ValueDebug},
     vm::{AbstractVm, Stack, VmDebug},
     DefId,
 };
@@ -243,15 +243,11 @@ struct Tracer;
 
 impl VmDebug<ValueStack> for Tracer {
     fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
-        trace!(
-            "   -> {:#?}",
-            stack
-                .stack
-                .iter()
-                .enumerate()
-                .map(|(index, value)| format!("Local({index}): {value:?}"))
-                .collect::<Vec<_>>()
-        );
+        if tracing::enabled!(Level::TRACE) {
+            for (index, value) in stack.stack.iter().skip(stack.local0_pos).enumerate() {
+                trace!("    Local({index}): {}", ValueDebug(value));
+            }
+        }
         trace!("{:?}", vm.pending_opcode());
     }
 }
