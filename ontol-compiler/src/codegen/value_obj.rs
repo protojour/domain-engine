@@ -47,37 +47,38 @@ pub(super) fn codegen_value_obj_origin(
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(span);
 
-    CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
-        TypedExprKind::ValueObjPattern(expr_ref) => {
-            generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-            block.terminator = Some(Terminator::Return(builder.top()));
-        }
-        TypedExprKind::MapObjPattern(dest_attrs) => {
-            builder.push(
-                1,
-                Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
-                span,
-                &mut block,
-            );
-
-            for (property_id, node) in dest_attrs {
-                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
+    let terminator =
+        CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
+            TypedExprKind::ValueObjPattern(expr_ref) => {
+                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
+                Terminator::Return(builder.top())
+            }
+            TypedExprKind::MapObjPattern(dest_attrs) => {
                 builder.push(
-                    -1,
-                    Ir::PutAttrValue(Local(1), *property_id),
+                    1,
+                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
                     span,
                     &mut block,
                 );
+
+                for (property_id, node) in dest_attrs {
+                    generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
+                    builder.push(
+                        -1,
+                        Ir::PutAttrValue(Local(1), *property_id),
+                        span,
+                        &mut block,
+                    );
+                }
+
+                Terminator::Return(builder.top())
             }
+            kind => {
+                todo!("target: {kind:?}");
+            }
+        });
 
-            block.terminator = Some(Terminator::Return(builder.top()));
-        }
-        kind => {
-            todo!("target: {kind:?}");
-        }
-    });
-
-    builder.commit(block);
+    builder.commit(block, terminator);
 
     builder
 }

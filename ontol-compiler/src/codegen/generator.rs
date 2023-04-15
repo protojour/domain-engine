@@ -139,10 +139,10 @@ impl CodeGenerator {
                     builder.push(-1, Ir::Remove(value_local), span, &mut map_block);
                     builder.push(-1, Ir::Remove(rel_params_local), span, &mut map_block);
 
-                    map_block.terminator =
-                        Some(Terminator::Goto(block.index, for_each_offset as u32));
-
-                    builder.commit(map_block)
+                    builder.commit(
+                        map_block,
+                        Terminator::Goto(block.index, for_each_offset as u32),
+                    )
                 });
 
                 builder.push(

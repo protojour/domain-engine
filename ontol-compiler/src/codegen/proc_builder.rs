@@ -45,10 +45,10 @@ impl ProcBuilder {
         Local(self.depth as u16 - 1 + plus)
     }
 
-    pub fn commit(&mut self, block: Block) -> BlockIndex {
+    pub fn commit(&mut self, block: Block, terminator: Terminator) -> BlockIndex {
         let index = block.index;
         self.blocks[index.0 as usize].ir = block.ir;
-        self.blocks[index.0 as usize].terminator = block.terminator;
+        self.blocks[index.0 as usize].terminator = Some(terminator);
         index
     }
 

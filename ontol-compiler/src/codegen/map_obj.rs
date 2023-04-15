@@ -77,7 +77,7 @@ pub(super) fn codegen_map_obj_origin(
 
     let mut builder = ProcBuilder::new(NParams(1));
 
-    let block = match &to_expr.kind {
+    let (block, terminator) = match &to_expr.kind {
         TypedExprKind::MapObjPattern(dest_attrs) => {
             let mut block = builder.new_block(span);
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
@@ -120,12 +120,10 @@ pub(super) fn codegen_map_obj_origin(
                             &mut block,
                         );
                     }
+
+                    (block, Terminator::Return(Local(1)))
                 },
-            );
-
-            block.terminator = Some(Terminator::Return(Local(1)));
-
-            block
+            )
         }
         TypedExprKind::ValueObjPattern(expr_ref) => {
             let mut block = builder.new_block(span);
@@ -152,18 +150,16 @@ pub(super) fn codegen_map_obj_origin(
                         equation,
                         *expr_ref,
                     );
-                    block.terminator = Some(Terminator::Return(builder.top()));
+                    (block, Terminator::Return(builder.top()))
                 },
-            );
-
-            block
+            )
         }
         kind => {
             todo!("to: {kind:?}");
         }
     };
 
-    builder.commit(block);
+    builder.commit(block, terminator);
 
     builder
 }
