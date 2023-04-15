@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::SourceSpan;
 
-use super::ir::{BlockIndex, Ir, Terminator};
+use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
 pub struct ProcBuilder {
     pub n_params: NParams,
@@ -97,6 +97,7 @@ impl ProcBuilder {
                     Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
                     Ir::Remove(local) => OpCode::Remove(local),
                     Ir::Clone(local) => OpCode::Clone(local),
+                    Ir::Take(local) => OpCode::Take(local),
                     Ir::Iter(seq, counter, block_index) => OpCode::Iter(
                         seq,
                         counter,
@@ -116,7 +117,7 @@ impl ProcBuilder {
                 Some(Terminator::Return(local)) => output.push((OpCode::Return(local), span)),
                 Some(Terminator::Goto(block_index, offset)) => output.push((
                     OpCode::Goto(AddressOffset(
-                        block_addresses[block_index.0 as usize] + offset,
+                        block_addresses[block_index.0 as usize] + offset.0,
                     )),
                     span,
                 )),
@@ -139,10 +140,20 @@ impl ProcBuilder {
 }
 
 pub struct Block {
-    pub index: BlockIndex,
-    pub ir: SmallVec<[(Ir, SourceSpan); 32]>,
-    pub terminator: Option<Terminator>,
-    pub terminator_span: SourceSpan,
+    index: BlockIndex,
+    ir: SmallVec<[(Ir, SourceSpan); 32]>,
+    terminator: Option<Terminator>,
+    terminator_span: SourceSpan,
+}
+
+impl Block {
+    pub fn index(&self) -> BlockIndex {
+        self.index
+    }
+
+    pub fn current_offset(&self) -> BlockOffset {
+        BlockOffset(self.ir.len() as u32)
+    }
 }
 
 pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;

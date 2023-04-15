@@ -7,6 +7,9 @@ use ontol_runtime::{
 #[derive(Clone, Copy, Debug)]
 pub struct BlockIndex(pub u32);
 
+#[derive(Clone, Copy, Debug)]
+pub struct BlockOffset(pub u32);
+
 #[derive(Debug)]
 #[allow(unused)]
 pub enum Ir {
@@ -15,6 +18,7 @@ pub enum Ir {
     Remove(Local),
     /// Clone a local and put top of stack
     Clone(Local),
+    Take(Local),
     Iter(Local, Local, BlockIndex),
     /// Take attribute and push two values on the stack: value(top), rel_params
     TakeAttr2(Local, PropertyId),
@@ -26,5 +30,5 @@ pub enum Ir {
 #[derive(Clone, Debug)]
 pub enum Terminator {
     Return(Local),
-    Goto(BlockIndex, u32),
+    Goto(BlockIndex, BlockOffset),
 }

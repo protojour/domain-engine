@@ -112,7 +112,7 @@ impl CodeGenerator {
 
                 let counter = builder.push(1, Ir::Constant(0, DefId::unit()), span, block);
 
-                let for_each_offset = block.ir.len();
+                let for_each_offset = block.current_offset();
 
                 let rel_params_local = builder.top_plus(1);
                 let value_local = builder.top_plus(2);
@@ -139,10 +139,7 @@ impl CodeGenerator {
                     builder.push(-1, Ir::Remove(value_local), span, &mut map_block);
                     builder.push(-1, Ir::Remove(rel_params_local), span, &mut map_block);
 
-                    builder.commit(
-                        map_block,
-                        Terminator::Goto(block.index, for_each_offset as u32),
-                    )
+                    builder.commit(map_block, Terminator::Goto(block.index(), for_each_offset))
                 });
 
                 builder.push(
