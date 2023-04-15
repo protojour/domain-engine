@@ -56,7 +56,6 @@ impl CloneToBumpOptimizer {
                             BlockKind::Linear => {
                                 // A reference to a local in the parent block
                                 self.count_use(local.0 as usize);
-                                panic!();
                             }
                             BlockKind::Looping => {
                                 self.set_multi(local.0 as usize);
