@@ -7,6 +7,7 @@ use crate::{
     codegen::{
         generator::{CodeGenerator, CodegenVariable},
         ir::Ir,
+        proc_builder::Stack,
         Block, ProcBuilder, Terminator,
     },
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
@@ -37,7 +38,7 @@ pub(super) fn codegen_value_obj_origin(
         ) {
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
-            builder.push(1, Ir::Clone(self.input_local), *span, block);
+            builder.gen(block, Ir::Clone(self.input_local), Stack(1), *span);
         }
     }
 
@@ -45,7 +46,7 @@ pub(super) fn codegen_value_obj_origin(
         input_local: Local(0),
     };
     let mut builder = ProcBuilder::new(NParams(1));
-    let mut block = builder.new_block(span);
+    let mut block = builder.new_block(Stack(1), span);
 
     let terminator =
         CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
@@ -54,20 +55,20 @@ pub(super) fn codegen_value_obj_origin(
                 Terminator::Return(builder.top())
             }
             TypedExprKind::MapObjPattern(dest_attrs) => {
-                builder.push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
-                    span,
+                builder.gen(
                     &mut block,
+                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
+                    Stack(1),
+                    span,
                 );
 
                 for (property_id, node) in dest_attrs {
                     generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
-                    builder.push(
-                        -1,
-                        Ir::PutAttrValue(Local(1), *property_id),
-                        span,
+                    builder.gen(
                         &mut block,
+                        Ir::PutAttrValue(Local(1), *property_id),
+                        Stack(-1),
+                        span,
                     );
                 }
 

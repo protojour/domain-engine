@@ -6,10 +6,13 @@ use crate::SourceSpan;
 
 use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
+/// How an instruction influences the size of the stack
+pub struct Stack(pub i32);
+
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: SmallVec<[Block; 8]>,
-    pub depth: i32,
+    pub stack_size: i32,
 }
 
 impl ProcBuilder {
@@ -17,20 +20,29 @@ impl ProcBuilder {
         Self {
             n_params,
             blocks: Default::default(),
-            depth: n_params.0 as i32,
+            stack_size: 0,
         }
     }
 
-    pub fn new_block(&mut self, span: SourceSpan) -> Block {
+    /// Generate a new block, the stack_delta is the number of locals
+    /// implicitly pushed as the block is transitioned to
+    /// For the first block, this is the number of parameters.
+    /// This block "owns" these locals, and they are allowed to be cleared before the block ends.
+    pub fn new_block(&mut self, stack_delta: Stack, span: SourceSpan) -> Block {
+        let stack_start = self.stack_size as u32;
+        self.stack_size += stack_delta.0;
+
         let index = BlockIndex(self.blocks.len() as u32);
         self.blocks.push(Block {
             index,
+            stack_start,
             ir: Default::default(),
             terminator: None,
             terminator_span: span,
         });
         Block {
             index,
+            stack_start,
             ir: Default::default(),
             terminator: None,
             terminator_span: span,
@@ -38,11 +50,11 @@ impl ProcBuilder {
     }
 
     pub fn top(&self) -> Local {
-        Local(self.depth as u16 - 1)
+        Local(self.stack_size as u16 - 1)
     }
 
     pub fn top_plus(&self, plus: u16) -> Local {
-        Local(self.depth as u16 - 1 + plus)
+        Local(self.stack_size as u16 - 1 + plus)
     }
 
     pub fn commit(&mut self, block: Block, terminator: Terminator) -> BlockIndex {
@@ -52,9 +64,16 @@ impl ProcBuilder {
         index
     }
 
-    pub fn push(&mut self, stack_delta: i32, ir: Ir, span: SourceSpan, block: &mut Block) -> Local {
-        let local = Local(self.depth as u16);
-        self.depth += stack_delta;
+    /// Generate one instruction in the given block
+    pub fn gen(
+        &mut self,
+        block: &mut Block,
+        ir: Ir,
+        stack_delta: Stack,
+        span: SourceSpan,
+    ) -> Local {
+        let local = Local(self.stack_size as u16);
+        self.stack_size += stack_delta.0;
         block.ir.push((ir, span));
         local
     }
@@ -139,8 +158,10 @@ impl ProcBuilder {
     }
 }
 
+#[allow(unused)]
 pub struct Block {
     index: BlockIndex,
+    stack_start: u32,
     ir: SmallVec<[(Ir, SourceSpan); 32]>,
     terminator: Option<Terminator>,
     terminator_span: SourceSpan,

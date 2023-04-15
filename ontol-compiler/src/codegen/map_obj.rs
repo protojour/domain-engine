@@ -8,7 +8,7 @@ use crate::{
     codegen::{
         generator::{CodeGenerator, CodegenVariable},
         ir::{Ir, Terminator},
-        proc_builder::Block,
+        proc_builder::{Block, Stack},
     },
     typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
@@ -71,32 +71,32 @@ pub(super) fn codegen_map_obj_origin(
             // after the definition of the return value
             let value_local = self.attr_start + (var.0 * 2) + 1;
 
-            builder.push(1, Ir::Clone(Local(value_local)), *span, block);
+            builder.gen(block, Ir::Clone(Local(value_local)), Stack(1), *span);
         }
     }
 
     let mut builder = ProcBuilder::new(NParams(1));
+    let mut block = builder.new_block(Stack(1), span);
 
     let (block, terminator) = match &to_expr.kind {
         TypedExprKind::MapObjPattern(dest_attrs) => {
-            let mut block = builder.new_block(span);
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
-            builder.push(
-                1,
-                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                span,
+            builder.gen(
                 &mut block,
+                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                Stack(1),
+                span,
             );
 
             // unpack attributes
             for (property_id, _) in &origin_properties {
-                builder.push(
-                    2,
-                    Ir::TakeAttr2(Local(input_local), *property_id),
-                    span,
+                builder.gen(
                     &mut block,
+                    Ir::TakeAttr2(Local(input_local), *property_id),
+                    Stack(2),
+                    span,
                 );
             }
 
@@ -113,11 +113,11 @@ pub(super) fn codegen_map_obj_origin(
                             equation,
                             *expr_ref,
                         );
-                        builder.push(
-                            -1,
-                            Ir::PutAttrValue(Local(1), *property_id),
-                            span,
+                        builder.gen(
                             &mut block,
+                            Ir::PutAttrValue(Local(1), *property_id),
+                            Stack(-1),
+                            span,
                         );
                     }
 
@@ -126,15 +126,13 @@ pub(super) fn codegen_map_obj_origin(
             )
         }
         TypedExprKind::ValueObjPattern(expr_ref) => {
-            let mut block = builder.new_block(span);
-
             // unpack attributes
             for (property_id, _) in &origin_properties {
-                builder.push(
-                    2,
-                    Ir::TakeAttr2(Local(input_local), *property_id),
-                    span,
+                builder.gen(
                     &mut block,
+                    Ir::TakeAttr2(Local(input_local), *property_id),
+                    Stack(2),
+                    span,
                 );
             }
 

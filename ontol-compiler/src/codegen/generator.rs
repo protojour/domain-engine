@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::{
-    codegen::find_translation_key,
+    codegen::{find_translation_key, proc_builder::Stack},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
@@ -56,7 +56,7 @@ impl CodeGenerator {
         let (_, expr, span) = equation.resolve_expr(&equation.expansions, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
-                let stack_delta = -(params.len() as i32) + 1;
+                let stack_delta = Stack(-(params.len() as i32) + 1);
 
                 for param in params.iter() {
                     self.codegen_expr(proc_table, builder, block, equation, *param);
@@ -64,17 +64,17 @@ impl CodeGenerator {
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                builder.push(
-                    stack_delta,
-                    Ir::CallBuiltin(*proc, return_def_id),
-                    span,
+                builder.gen(
                     block,
+                    Ir::CallBuiltin(*proc, return_def_id),
+                    stack_delta,
+                    span,
                 );
             }
             TypedExprKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                builder.push(1, Ir::Constant(*k, return_def_id), span, block);
+                builder.gen(block, Ir::Constant(*k, return_def_id), Stack(1), span);
             }
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(builder, block, *var, &span);
@@ -95,22 +95,22 @@ impl CodeGenerator {
                     n_params: NParams(1),
                 };
 
-                builder.push(0, Ir::Call(proc), span, block);
+                builder.gen(block, Ir::Call(proc), Stack(0), span);
             }
             TypedExprKind::SequenceMap(expr_ref, iter_var, body, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
-                let output_seq = builder.push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
-                    span,
+                let output_seq = builder.gen(
                     block,
+                    Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
+                    Stack(1),
+                    span,
                 );
 
                 // Input sequence:
                 self.codegen_expr(proc_table, builder, block, equation, *expr_ref);
                 let input_seq = builder.top();
 
-                let counter = builder.push(1, Ir::Constant(0, DefId::unit()), span, block);
+                let counter = builder.gen(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
 
                 let for_each_offset = block.current_offset();
 
@@ -124,32 +124,27 @@ impl CodeGenerator {
 
                 let for_each_body_index = self.enter_bind_level(codegen_iter, |zelf| {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
-                    builder.depth += 2;
+                    let mut block2 = builder.new_block(Stack(2), span);
 
-                    let mut map_block = builder.new_block(span);
-
-                    zelf.codegen_expr(proc_table, builder, &mut map_block, equation, *body);
-
-                    builder.push(1, Ir::Clone(rel_params_local), span, &mut map_block);
-
+                    zelf.codegen_expr(proc_table, builder, &mut block2, equation, *body);
+                    builder.gen(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
                     // still two items on the stack: append to original sequence
                     // for now, rel_params are untranslated
-                    builder.push(-2, Ir::AppendAttr2(output_seq), span, &mut map_block);
+                    builder.gen(&mut block2, Ir::AppendAttr2(output_seq), Stack(-2), span);
+                    builder.gen(&mut block2, Ir::Remove(value_local), Stack(-1), span);
+                    builder.gen(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
 
-                    builder.push(-1, Ir::Remove(value_local), span, &mut map_block);
-                    builder.push(-1, Ir::Remove(rel_params_local), span, &mut map_block);
-
-                    builder.commit(map_block, Terminator::Goto(block.index(), for_each_offset))
+                    builder.commit(block2, Terminator::Goto(block.index(), for_each_offset))
                 });
 
-                builder.push(
-                    0,
-                    Ir::Iter(input_seq, counter, for_each_body_index),
-                    span,
+                builder.gen(
                     block,
+                    Ir::Iter(input_seq, counter, for_each_body_index),
+                    Stack(0),
+                    span,
                 );
-                builder.push(-1, Ir::Remove(counter), span, block);
-                builder.push(-1, Ir::Remove(input_seq), span, block);
+                builder.gen(block, Ir::Remove(counter), Stack(-1), span);
+                builder.gen(block, Ir::Remove(input_seq), Stack(-1), span);
             }
             TypedExprKind::ValueObjPattern(_) => {
                 todo!()
@@ -194,6 +189,6 @@ impl CodegenVariable for CodegenIter {
         span: &SourceSpan,
     ) {
         assert!(var == self.iter_var);
-        builder.push(1, Ir::Clone(self.value_local), *span, block);
+        builder.gen(block, Ir::Clone(self.value_local), Stack(1), *span);
     }
 }
