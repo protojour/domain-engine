@@ -56,19 +56,25 @@ impl CodeGenerator {
         let (_, expr, span) = equation.resolve_expr(&equation.expansions, expr_id);
         match &expr.kind {
             TypedExprKind::Call(proc, params) => {
+                let stack_delta = -(params.len() as i32) + 1;
+
                 for param in params.iter() {
                     self.codegen_expr(proc_table, builder, block, equation, *param);
                 }
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                // New
-                builder.ir_push(1, Ir::CallBuiltin(*proc, return_def_id), span, block);
+                builder.push(
+                    stack_delta,
+                    Ir::CallBuiltin(*proc, return_def_id),
+                    span,
+                    block,
+                );
             }
             TypedExprKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                builder.ir_push(1, Ir::Constant(*k, return_def_id), span, block);
+                builder.push(1, Ir::Constant(*k, return_def_id), span, block);
             }
             TypedExprKind::Variable(var) => {
                 self.codegen_variable(builder, block, *var, &span);
@@ -89,11 +95,11 @@ impl CodeGenerator {
                     n_params: NParams(1),
                 };
 
-                builder.ir_push(0, Ir::Call(proc), span, block);
+                builder.push(0, Ir::Call(proc), span, block);
             }
             TypedExprKind::SequenceMap(expr_ref, iter_var, body, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
-                let output_seq = builder.ir_push(
+                let output_seq = builder.push(
                     1,
                     Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
                     span,
@@ -104,7 +110,7 @@ impl CodeGenerator {
                 self.codegen_expr(proc_table, builder, block, equation, *expr_ref);
                 let input_seq = builder.top();
 
-                let counter = builder.ir_push(1, Ir::Constant(0, DefId::unit()), span, block);
+                let counter = builder.push(1, Ir::Constant(0, DefId::unit()), span, block);
 
                 let for_each_offset = block.ir.len();
 
@@ -125,26 +131,26 @@ impl CodeGenerator {
 
                     zelf.codegen_expr(proc_table, builder, &mut map_block, equation, *body);
 
-                    builder.ir_push(1, Ir::Clone(rel_params_local), span, &mut map_block);
+                    builder.push(1, Ir::Clone(rel_params_local), span, &mut map_block);
 
                     // still two items on the stack: append to original sequence
                     // for now, rel_params are untranslated
-                    builder.ir_pop(0, Ir::AppendAttr2(output_seq), span, &mut map_block);
+                    builder.push(-2, Ir::AppendAttr2(output_seq), span, &mut map_block);
 
-                    builder.ir_pop(1, Ir::Remove(value_local), span, &mut map_block);
-                    builder.ir_pop(1, Ir::Remove(rel_params_local), span, &mut map_block);
+                    builder.push(-1, Ir::Remove(value_local), span, &mut map_block);
+                    builder.push(-1, Ir::Remove(rel_params_local), span, &mut map_block);
 
                     builder.commit(map_block)
                 });
 
-                builder.ir_pop(
+                builder.push(
                     0,
                     Ir::Iter(input_seq, counter, for_each_body_index),
                     span,
                     block,
                 );
-                builder.ir_pop(1, Ir::Remove(counter), span, block);
-                builder.ir_pop(1, Ir::Remove(input_seq), span, block);
+                builder.push(-1, Ir::Remove(counter), span, block);
+                builder.push(-1, Ir::Remove(input_seq), span, block);
             }
             TypedExprKind::ValueObjPattern(_) => {
                 todo!()
@@ -189,6 +195,6 @@ impl CodegenVariable for CodegenIter {
         span: &SourceSpan,
     ) {
         assert!(var == self.iter_var);
-        builder.ir_push(1, Ir::Clone(self.value_local), *span, block);
+        builder.push(1, Ir::Clone(self.value_local), *span, block);
     }
 }

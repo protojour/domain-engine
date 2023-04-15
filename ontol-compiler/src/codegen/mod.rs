@@ -19,7 +19,7 @@ mod value_obj;
 use tracing::{debug, warn};
 
 use crate::{
-    typed_expr::{ExprRef, TypedExprTable},
+    typed_expr::{ExprRef, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -127,17 +127,25 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     DebugDirection::Forward,
                 );
 
+                if equation
+                    .expressions
+                    .0
+                    .iter()
+                    .any(|expr| matches!(&expr.kind, TypedExprKind::SequenceMap(..)))
+                {
+                    warn!("BUG: Skipping backward gen for SequenceMap");
+                    continue;
+                }
+
                 equation.reset();
 
                 // b -> a
-                /*
                 codegen_translate_solve(
                     &mut proc_table,
                     &mut equation,
                     (map_task.node_b, map_task.node_a),
                     DebugDirection::Backward,
                 );
-                */
             }
         }
     }

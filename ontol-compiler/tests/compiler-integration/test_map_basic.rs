@@ -105,7 +105,7 @@ fn test_temperature() {
 }
 
 #[test]
-fn test_map_value_to_map() {
+fn test_map_value_to_map_no_func() {
     "
     pub type one
     pub type two

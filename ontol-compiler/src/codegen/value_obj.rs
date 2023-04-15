@@ -44,7 +44,7 @@ pub(super) fn codegen_value_obj_origin(
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
             this.var_tracker.count_use(var);
-            builder.ir_push(1, Ir::Clone(this.input_local), *span, block);
+            builder.push(1, Ir::Clone(this.input_local), *span, block);
         }
     }
 
@@ -54,44 +54,53 @@ pub(super) fn codegen_value_obj_origin(
     }));
     let mut builder = ProcBuilder::new(NParams(1));
 
-    let block = CodeGenerator::default().enter_bind_level(value_codegen.clone(), |generator| {
-        match &to_expr.kind {
-            TypedExprKind::ValueObjPattern(expr_ref) => {
-                let mut block = builder.new_block(Terminator::Return(Local(0)), span);
-                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-                block
-            }
-            TypedExprKind::MapObjPattern(dest_attrs) => {
-                let mut block = builder.new_block(Terminator::Return(Local(1)), span);
-                builder.ir_push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
-                    span,
-                    &mut block,
-                );
-
-                // the input value is not a map, so it will be consumed.
-                // Therefore it must be top of the stack:
-                // block.opcodes.push((OpCode::Swap(Local(0), Local(1)), span));
-                value_codegen.borrow_mut().input_local = Local(1);
-
-                for (property_id, node) in dest_attrs {
-                    generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
-                    builder.ir_pop(
+    let block =
+        CodeGenerator::default().enter_bind_level(
+            value_codegen.clone(),
+            |generator| match &to_expr.kind {
+                TypedExprKind::ValueObjPattern(expr_ref) => {
+                    let mut block = builder.new_block(Terminator::Return(Local(0)), span);
+                    generator.codegen_expr(
+                        proc_table,
+                        &mut builder,
+                        &mut block,
+                        equation,
+                        *expr_ref,
+                    );
+                    block
+                }
+                TypedExprKind::MapObjPattern(dest_attrs) => {
+                    let mut block = builder.new_block(Terminator::Return(Local(1)), span);
+                    builder.push(
                         1,
-                        Ir::PutAttrValue(Local(1), *property_id),
+                        Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
                         span,
                         &mut block,
                     );
-                }
 
-                block
-            }
-            kind => {
-                todo!("target: {kind:?}");
-            }
-        }
-    });
+                    for (property_id, node) in dest_attrs {
+                        generator.codegen_expr(
+                            proc_table,
+                            &mut builder,
+                            &mut block,
+                            equation,
+                            *node,
+                        );
+                        builder.push(
+                            -1,
+                            Ir::PutAttrValue(Local(1), *property_id),
+                            span,
+                            &mut block,
+                        );
+                    }
+
+                    block
+                }
+                kind => {
+                    todo!("target: {kind:?}");
+                }
+            },
+        );
 
     /*
     block.opcodes = block

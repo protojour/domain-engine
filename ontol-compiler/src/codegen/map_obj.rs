@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use indexmap::IndexMap;
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams},
@@ -11,7 +9,6 @@ use crate::{
         generator::{CodeGenerator, CodegenVariable},
         ir::{Ir, Terminator},
         proc_builder::Block,
-        translate::VarFlowTracker,
     },
     typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
@@ -59,12 +56,10 @@ pub(super) fn codegen_map_obj_origin(
     }
 
     struct MapCodegen {
-        origin_properties: Vec<(PropertyId, SyntaxVar)>,
-        var_tracker: VarFlowTracker,
-        origin_local: u16,
+        attr_start: u16,
     }
 
-    impl CodegenVariable for Rc<RefCell<MapCodegen>> {
+    impl CodegenVariable for MapCodegen {
         fn codegen_variable(
             &mut self,
             builder: &mut ProcBuilder,
@@ -72,52 +67,82 @@ pub(super) fn codegen_map_obj_origin(
             var: SyntaxVar,
             span: &SourceSpan,
         ) {
-            let mut this = self.borrow_mut();
-            this.var_tracker.count_use(var);
-
-            let origin_local = this.origin_local;
-
             // To find the value local, we refer to the first local resulting from TakeAttr2,
             // after the definition of the return value
-            let value_local = (origin_local + 2) + (var.0 * 2) + 1;
+            let value_local = self.attr_start + (var.0 * 2) + 1;
 
-            builder.ir_push(1, Ir::Clone(Local(value_local)), *span, block);
+            builder.push(1, Ir::Clone(Local(value_local)), *span, block);
         }
     }
 
-    let map_codegen = Rc::new(RefCell::new(MapCodegen {
-        origin_properties,
-        var_tracker: Default::default(),
-        origin_local: input_local,
-    }));
-
     let mut builder = ProcBuilder::new(NParams(1));
-    let mut block = builder.new_block(Terminator::Return(Local(1)), span);
 
-    CodeGenerator::default().enter_bind_level(map_codegen.clone(), |generator| {
-        let origin_local = map_codegen.borrow().origin_local;
-        match &to_expr.kind {
-            TypedExprKind::MapObjPattern(dest_attrs) => {
-                let return_def_id = to_expr.ty.get_single_def_id().unwrap();
+    let block = match &to_expr.kind {
+        TypedExprKind::MapObjPattern(dest_attrs) => {
+            let mut block = builder.new_block(Terminator::Return(Local(1)), span);
+            let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
-                // Local(1), this is the return value:
-                builder.ir_push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+            // Local(1), this is the return value:
+            builder.push(
+                1,
+                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
+                span,
+                &mut block,
+            );
+
+            // unpack attributes
+            for (property_id, _) in &origin_properties {
+                builder.push(
+                    2,
+                    Ir::TakeAttr2(Local(input_local), *property_id),
                     span,
                     &mut block,
                 );
+            }
 
-                for (property_id, _) in &map_codegen.borrow().origin_properties {
-                    builder.ir_push(
-                        2,
-                        Ir::TakeAttr2(Local(origin_local), *property_id),
-                        span,
-                        &mut block,
-                    );
-                }
+            CodeGenerator::default().enter_bind_level(
+                MapCodegen {
+                    attr_start: input_local + 2,
+                },
+                |generator| {
+                    for (property_id, expr_ref) in dest_attrs {
+                        generator.codegen_expr(
+                            proc_table,
+                            &mut builder,
+                            &mut block,
+                            equation,
+                            *expr_ref,
+                        );
+                        builder.push(
+                            -1,
+                            Ir::PutAttrValue(Local(1), *property_id),
+                            span,
+                            &mut block,
+                        );
+                    }
+                },
+            );
 
-                for (property_id, expr_ref) in dest_attrs {
+            block
+        }
+        TypedExprKind::ValueObjPattern(expr_ref) => {
+            let mut block = builder.new_block(Terminator::Return(Local(0)), span);
+
+            // unpack attributes
+            for (property_id, _) in &origin_properties {
+                builder.push(
+                    2,
+                    Ir::TakeAttr2(Local(input_local), *property_id),
+                    span,
+                    &mut block,
+                );
+            }
+
+            CodeGenerator::default().enter_bind_level(
+                MapCodegen {
+                    attr_start: input_local + 1,
+                },
+                |generator| {
                     generator.codegen_expr(
                         proc_table,
                         &mut builder,
@@ -125,31 +150,16 @@ pub(super) fn codegen_map_obj_origin(
                         equation,
                         *expr_ref,
                     );
-                    builder.ir_pop(
-                        1,
-                        Ir::PutAttrValue(Local(1), *property_id),
-                        span,
-                        &mut block,
-                    );
-                }
-            }
-            TypedExprKind::ValueObjPattern(expr_ref) => {
-                // FIXME: Code duplication (above)
-                for (property_id, _) in &map_codegen.borrow().origin_properties {
-                    builder.ir_push(
-                        2,
-                        Ir::TakeAttr2(Local(origin_local), *property_id),
-                        span,
-                        &mut block,
-                    );
-                }
-                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-            }
-            kind => {
-                todo!("to: {kind:?}");
-            }
+                    block.terminator = Terminator::Return(builder.top());
+                },
+            );
+
+            block
         }
-    });
+        kind => {
+            todo!("to: {kind:?}");
+        }
+    };
 
     builder.commit(block);
 

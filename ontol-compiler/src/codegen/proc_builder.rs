@@ -9,8 +9,7 @@ use super::ir::{BlockIndex, Ir, Terminator};
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: SmallVec<[Block; 8]>,
-    pub stack_size: u16,
-    pub depth: u16,
+    pub depth: i32,
 }
 
 impl ProcBuilder {
@@ -18,8 +17,7 @@ impl ProcBuilder {
         Self {
             n_params,
             blocks: Default::default(),
-            stack_size: n_params.0 as u16,
-            depth: n_params.0 as u16,
+            depth: n_params.0 as i32,
         }
     }
 
@@ -40,29 +38,25 @@ impl ProcBuilder {
     }
 
     pub fn top(&self) -> Local {
-        Local(self.depth - 1)
+        Local(self.depth as u16 - 1)
     }
 
     pub fn top_plus(&self, plus: u16) -> Local {
-        Local(self.depth - 1 + plus)
+        Local(self.depth as u16 - 1 + plus)
     }
 
     pub fn commit(&mut self, block: Block) -> BlockIndex {
         let index = block.index;
         self.blocks[index.0 as usize].ir = block.ir;
+        self.blocks[index.0 as usize].terminator = block.terminator;
         index
     }
 
-    pub fn ir_push(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) -> Local {
-        let local = Local(self.depth);
-        self.depth += n;
+    pub fn push(&mut self, stack_delta: i32, ir: Ir, span: SourceSpan, block: &mut Block) -> Local {
+        let local = Local(self.depth as u16);
+        self.depth += stack_delta;
         block.ir.push((ir, span));
         local
-    }
-
-    pub fn ir_pop(&mut self, n: u16, ir: Ir, span: SourceSpan, block: &mut Block) {
-        self.depth += n;
-        block.ir.push((ir, span));
     }
 
     pub fn build(self) -> SpannedOpCodes {
@@ -78,7 +72,7 @@ impl ProcBuilder {
         }
 
         let mut index = 0;
-        debug!("Proc:");
+        debug!("Proc ({:?}):", self.n_params);
         for (block_index, block) in self.blocks.iter().enumerate() {
             debug!("  BlockIndex({block_index}):");
 
@@ -87,10 +81,12 @@ impl ProcBuilder {
                 index += 1;
             }
 
-            debug!("    {index}: {:?}", block.terminator);
+            debug!("    T: {:?}", block.terminator);
 
             index += 1;
         }
+
+        // assert_eq!(0, self.depth);
 
         let mut output = smallvec![];
 
