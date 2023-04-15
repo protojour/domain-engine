@@ -112,7 +112,7 @@ impl Stack for PropStack {
         self.stack.push(value);
     }
 
-    fn take(&mut self, source: Local) {
+    fn bump(&mut self, source: Local) {
         self.stack.push(Props::Set(Default::default()));
         let stack_len = self.stack.len();
         self.stack

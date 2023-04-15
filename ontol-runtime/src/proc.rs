@@ -61,7 +61,7 @@ pub enum OpCode {
     /// Clone a specific local, putting its clone on the top of the stack.
     Clone(Local),
     /// Take a local, replace with unit, and put on top of stack
-    Take(Local),
+    Bump(Local),
     /// Remove a local from the stack, making the stack shorter.
     Remove(Local),
     /// Iterate all items in #0, #1 is the counter.

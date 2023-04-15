@@ -134,7 +134,7 @@ impl CodeGenerator {
                     builder.gen(&mut block2, Ir::Remove(value_local), Stack(-1), span);
                     builder.gen(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
 
-                    builder.commit(block2, Terminator::Goto(block.index(), for_each_offset))
+                    builder.commit(block2, Terminator::PopGoto(block.index(), for_each_offset))
                 });
 
                 builder.gen(

@@ -4,7 +4,7 @@ use ontol_runtime::{
     DefId,
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct BlockIndex(pub u32);
 
 #[derive(Clone, Copy, Debug)]
@@ -18,7 +18,8 @@ pub enum Ir {
     Remove(Local),
     /// Clone a local and put top of stack
     Clone(Local),
-    Take(Local),
+    /// Bump some local to top, leaving Unit behind
+    Bump(Local),
     Iter(Local, Local, BlockIndex),
     /// Take attribute and push two values on the stack: value(top), rel_params
     TakeAttr2(Local, PropertyId),
@@ -29,6 +30,8 @@ pub enum Ir {
 
 #[derive(Clone, Debug)]
 pub enum Terminator {
+    /// The procedure returns a specific local
     Return(Local),
-    Goto(BlockIndex, BlockOffset),
+    /// All the block locals are popped and control resumes at the parent block
+    PopGoto(BlockIndex, BlockOffset),
 }

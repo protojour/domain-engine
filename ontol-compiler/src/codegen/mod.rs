@@ -12,6 +12,7 @@ mod generator;
 mod ir;
 mod link;
 mod map_obj;
+mod optimize;
 mod proc_builder;
 mod translate;
 mod value_obj;

@@ -42,7 +42,7 @@ pub trait Stack {
     fn truncate(&mut self, n_locals: usize);
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
-    fn take(&mut self, source: Local);
+    fn bump(&mut self, source: Local);
     fn remove(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
@@ -110,8 +110,8 @@ impl<'l> AbstractVm<'l> {
                     stack.clone(*source);
                     self.program_counter += 1;
                 }
-                OpCode::Take(source) => {
-                    stack.clone(*source);
+                OpCode::Bump(source) => {
+                    stack.bump(*source);
                     self.program_counter += 1;
                 }
                 OpCode::Remove(local) => {

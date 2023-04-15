@@ -94,7 +94,7 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn take(&mut self, source: Local) {
+    fn bump(&mut self, source: Local) {
         self.stack.push(Value::unit());
         let stack_len = self.stack.len();
         self.stack

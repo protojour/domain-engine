@@ -2,7 +2,7 @@ use ontol_runtime::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
-use crate::SourceSpan;
+use crate::{codegen::optimize::optimize, SourceSpan};
 
 use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
@@ -78,7 +78,7 @@ impl ProcBuilder {
         local
     }
 
-    pub fn build(self) -> SpannedOpCodes {
+    pub fn build(mut self) -> SpannedOpCodes {
         let mut block_addresses: SmallVec<[u32; 8]> = smallvec![];
 
         // compute addresses
@@ -105,6 +105,8 @@ impl ProcBuilder {
             index += 1;
         }
 
+        optimize(&mut self);
+
         // assert_eq!(0, self.depth);
 
         let mut output = smallvec![];
@@ -116,7 +118,7 @@ impl ProcBuilder {
                     Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
                     Ir::Remove(local) => OpCode::Remove(local),
                     Ir::Clone(local) => OpCode::Clone(local),
-                    Ir::Take(local) => OpCode::Take(local),
+                    Ir::Bump(local) => OpCode::Bump(local),
                     Ir::Iter(seq, counter, block_index) => OpCode::Iter(
                         seq,
                         counter,
@@ -134,7 +136,7 @@ impl ProcBuilder {
             match block.terminator {
                 Some(Terminator::Return(Local(0))) => output.push((OpCode::Return0, span)),
                 Some(Terminator::Return(local)) => output.push((OpCode::Return(local), span)),
-                Some(Terminator::Goto(block_index, offset)) => output.push((
+                Some(Terminator::PopGoto(block_index, offset)) => output.push((
                     OpCode::Goto(AddressOffset(
                         block_addresses[block_index.0 as usize] + offset.0,
                     )),
@@ -172,8 +174,20 @@ impl Block {
         self.index
     }
 
+    pub fn stack_start(&self) -> u32 {
+        self.stack_start
+    }
+
     pub fn current_offset(&self) -> BlockOffset {
         BlockOffset(self.ir.len() as u32)
+    }
+
+    pub fn ir_mut(&mut self) -> &mut SmallVec<[(Ir, SourceSpan); 32]> {
+        &mut self.ir
+    }
+
+    pub fn terminator(&self) -> Option<&Terminator> {
+        self.terminator.as_ref()
     }
 }
 
