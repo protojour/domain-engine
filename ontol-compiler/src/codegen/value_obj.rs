@@ -1,16 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
-
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams},
     DefId,
 };
-use tracing::debug;
 
 use crate::{
     codegen::{
         generator::{CodeGenerator, CodegenVariable},
         ir::Ir,
-        translate::VarFlowTracker,
         Block, ProcBuilder, Terminator,
     },
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
@@ -29,10 +25,9 @@ pub(super) fn codegen_value_obj_origin(
 
     struct ValueCodegen {
         input_local: Local,
-        var_tracker: VarFlowTracker,
     }
 
-    impl CodegenVariable for Rc<RefCell<ValueCodegen>> {
+    impl CodegenVariable for ValueCodegen {
         fn codegen_variable(
             &mut self,
             builder: &mut ProcBuilder,
@@ -40,76 +35,47 @@ pub(super) fn codegen_value_obj_origin(
             var: SyntaxVar,
             span: &SourceSpan,
         ) {
-            let mut this = self.borrow_mut();
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
-            this.var_tracker.count_use(var);
-            builder.push(1, Ir::Clone(this.input_local), *span, block);
+            builder.push(1, Ir::Clone(self.input_local), *span, block);
         }
     }
 
-    let value_codegen = Rc::new(RefCell::new(ValueCodegen {
+    let value_codegen = ValueCodegen {
         input_local: Local(0),
-        var_tracker: Default::default(),
-    }));
+    };
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(span);
 
-    CodeGenerator::default().enter_bind_level(value_codegen.clone(), |generator| {
-        match &to_expr.kind {
-            TypedExprKind::ValueObjPattern(expr_ref) => {
-                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-                block.terminator = Some(Terminator::Return(builder.top()));
-            }
-            TypedExprKind::MapObjPattern(dest_attrs) => {
+    CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
+        TypedExprKind::ValueObjPattern(expr_ref) => {
+            generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
+            block.terminator = Some(Terminator::Return(builder.top()));
+        }
+        TypedExprKind::MapObjPattern(dest_attrs) => {
+            builder.push(
+                1,
+                Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
+                span,
+                &mut block,
+            );
+
+            for (property_id, node) in dest_attrs {
+                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
                 builder.push(
-                    1,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
+                    -1,
+                    Ir::PutAttrValue(Local(1), *property_id),
                     span,
                     &mut block,
                 );
-
-                for (property_id, node) in dest_attrs {
-                    generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
-                    builder.push(
-                        -1,
-                        Ir::PutAttrValue(Local(1), *property_id),
-                        span,
-                        &mut block,
-                    );
-                }
-
-                block.terminator = Some(Terminator::Return(builder.top()));
             }
-            kind => {
-                todo!("target: {kind:?}");
-            }
+
+            block.terminator = Some(Terminator::Return(builder.top()));
+        }
+        kind => {
+            todo!("target: {kind:?}");
         }
     });
-
-    /*
-    block.opcodes = block
-        .opcodes
-        .into_iter()
-        .filter(|op| {
-            match op {
-                (OpCode::Clone(local), _) if *local == value_codegen_mut.input_local => {
-                    // Keep cloning until the last use of the variable,
-                    // which must pop it off the stack. (i.e. keep the clone instruction).
-                    // else: drop clone instruction. Stack should only contain the return value.
-                    value_codegen_mut
-                        .var_tracker
-                        .do_use(SyntaxVar(0, BindDepth(0)))
-                        .use_count
-                        > 1
-                }
-                _ => true,
-            }
-        })
-        .collect::<SpannedOpCodes>();
-    */
-
-    debug!("{:#?}", block.ir);
 
     builder.commit(block);
 

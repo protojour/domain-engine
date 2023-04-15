@@ -1,10 +1,9 @@
-use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use tracing::{debug, warn};
 
 use crate::{
     codegen::map_obj::codegen_map_obj_origin,
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
+    typed_expr::{ExprRef, TypedExprKind},
 };
 
 use super::{
@@ -79,33 +78,4 @@ fn codegen_translate(
         }
         other => panic!("unable to generate translation: {other:?}"),
     }
-}
-
-#[derive(Default)]
-pub struct VarFlowTracker {
-    // for determining whether to clone
-    states: FnvHashMap<SyntaxVar, VarFlowState>,
-}
-
-impl VarFlowTracker {
-    /// count usages when building up the full state
-    pub fn count_use(&mut self, var: SyntaxVar) {
-        self.states.entry(var).or_default().use_count += 1;
-    }
-
-    /// actually use the variable. Returns previous state.
-    #[allow(unused)]
-    pub fn do_use(&mut self, var: SyntaxVar) -> VarFlowState {
-        let stored_state = self.states.entry(var).or_default();
-        let clone = stored_state.clone();
-        stored_state.use_count -= 1;
-        stored_state.reused = true;
-        clone
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct VarFlowState {
-    pub use_count: usize,
-    pub reused: bool,
 }

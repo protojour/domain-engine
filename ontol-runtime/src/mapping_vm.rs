@@ -155,6 +155,7 @@ impl Stack for ValueStack {
         self.stack.push(Value::new(Data::Int(k), result_type));
     }
 
+    #[inline(always)]
     fn append_attr2(&mut self, seq: Local) {
         let [rel_params, value]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq);
@@ -201,6 +202,7 @@ impl ValueStack {
         &mut self.stack[self.local0_pos + local.0 as usize]
     }
 
+    #[inline(always)]
     fn int_local_mut(&mut self, local: Local) -> &mut i64 {
         match &mut self.local_mut(local).data {
             Data::Int(int) => int,
@@ -208,6 +210,7 @@ impl ValueStack {
         }
     }
 
+    #[inline(always)]
     fn map_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
         match &mut self.local_mut(local).data {
             Data::Map(map) => map,
@@ -215,6 +218,7 @@ impl ValueStack {
         }
     }
 
+    #[inline(always)]
     fn sequence_local_mut(&mut self, local: Local) -> &mut Vec<Attribute> {
         match &mut self.local_mut(local).data {
             Data::Sequence(seq) => seq,
