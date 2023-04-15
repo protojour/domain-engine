@@ -48,22 +48,22 @@ pub struct NParams(pub u8);
 /// ONTOL opcode.
 #[derive(DebugExtras)]
 pub enum OpCode {
-    /// Go to address, relative to start_address
-    Goto(AddressOffset),
-    /// Call a procedure. Its arguments must be top of the value stack.
-    Call(Procedure),
     /// Return a specific local
     Return(Local),
     /// Optimization: Return Local(0)
     Return0,
+    /// Go to address, relative to start_address
+    Goto(AddressOffset),
+    /// Call a procedure. Its arguments must be top of the value stack.
+    Call(Procedure),
     /// Call a builtin procedure
     CallBuiltin(BuiltinProc, DefId),
     /// Clone a specific local, putting its clone on the top of the stack.
     Clone(Local),
+    /// Take a local, replace with unit, and put on top of stack
+    Take(Local),
     /// Remove a local from the stack, making the stack shorter.
     Remove(Local),
-    /// Swap the position of two locals.
-    Swap(Local, Local),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),

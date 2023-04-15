@@ -112,6 +112,13 @@ impl Stack for PropStack {
         self.stack.push(value);
     }
 
+    fn take(&mut self, source: Local) {
+        self.stack.push(Props::Set(Default::default()));
+        let stack_len = self.stack.len();
+        self.stack
+            .swap(self.local0_pos + source.0 as usize, stack_len - 1);
+    }
+
     fn remove(&mut self, local: Local) {
         let local0_pos = self.local0_pos;
         self.stack.remove(local0_pos + local.0 as usize);

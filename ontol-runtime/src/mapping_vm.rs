@@ -94,6 +94,14 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
+    fn take(&mut self, source: Local) {
+        self.stack.push(Value::unit());
+        let stack_len = self.stack.len();
+        self.stack
+            .swap(self.local0_pos + source.0 as usize, stack_len - 1);
+    }
+
+    #[inline(always)]
     fn remove(&mut self, local: Local) {
         let stack_pos = self.local0_pos;
         self.stack.remove(stack_pos + local.0 as usize);
