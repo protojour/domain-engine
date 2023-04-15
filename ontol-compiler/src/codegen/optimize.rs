@@ -81,22 +81,16 @@ impl CloneToBumpOptimizer {
 
         // optimize (Clone => Take):
         for (ir, _) in block.ir_mut() {
-            match ir {
-                Ir::Clone(local) => {
-                    let usage = self.usage_mut(local.0 as usize);
-                    if matches!(usage, LocalUsage::Once) {
-                        *ir = Ir::Bump(*local);
-                    }
+            if let Ir::Clone(local) = ir {
+                let usage = self.usage_mut(local.0 as usize);
+                if matches!(usage, LocalUsage::Once) {
+                    *ir = Ir::Bump(*local);
                 }
-                _ => {}
             }
         }
 
-        match block.terminator() {
-            Some(Terminator::PopGoto(..)) => {
-                self.truncate(stack_start);
-            }
-            _ => {}
+        if let Some(Terminator::PopGoto(..)) = block.terminator() {
+            self.truncate(stack_start);
         }
     }
 
