@@ -126,8 +126,7 @@ impl CodeGenerator {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     builder.depth += 2;
 
-                    let mut map_block = builder
-                        .new_block(Terminator::Goto(block.index, for_each_offset as u32), span);
+                    let mut map_block = builder.new_block(span);
 
                     zelf.codegen_expr(proc_table, builder, &mut map_block, equation, *body);
 
@@ -139,6 +138,9 @@ impl CodeGenerator {
 
                     builder.push(-1, Ir::Remove(value_local), span, &mut map_block);
                     builder.push(-1, Ir::Remove(rel_params_local), span, &mut map_block);
+
+                    map_block.terminator =
+                        Some(Terminator::Goto(block.index, for_each_offset as u32));
 
                     builder.commit(map_block)
                 });

@@ -347,11 +347,16 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
+                // 2, 3:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::Call(double),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                // 3, 4:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                // 5, 6:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::Clone(Local(4)),
+                // pop(6, 7):
                 OpCode::Call(add_then_double),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(5)))),
                 OpCode::Return(Local(1)),

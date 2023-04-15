@@ -403,7 +403,7 @@ fn recursive_entity_union() {
 
 #[test]
 // BUG:
-#[should_panic = "index out of bounds: the len is 3 but the index is 3"]
+// #[should_panic = "index out of bounds: the len is 3 but the index is 3"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
@@ -422,20 +422,20 @@ fn artist_etc_routing() {
                         rel 'plays': p
                     }
                     ai.artist {
-                        rel 'ID': id
+                        rel 'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
                         rel 'name': n
-                        rel 'plays': p // ERROR type mismatch: expected `instrument[]`, found `instrument[]`
+                        rel 'plays': p // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                 }
 
                 map (id t p n) {
                     gsu.synth {
-                        rel 'instrument-id': id
+                        rel 'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
                         rel 'type': t
                         rel 'polyphony': p
                     }
                     ai.instrument {
-                        rel 'ID': id
+                        rel 'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
                         rel 'name': n
                     }
                 }

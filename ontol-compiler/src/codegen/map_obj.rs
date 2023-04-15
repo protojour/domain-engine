@@ -79,7 +79,7 @@ pub(super) fn codegen_map_obj_origin(
 
     let block = match &to_expr.kind {
         TypedExprKind::MapObjPattern(dest_attrs) => {
-            let mut block = builder.new_block(Terminator::Return(Local(1)), span);
+            let mut block = builder.new_block(span);
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
@@ -123,10 +123,12 @@ pub(super) fn codegen_map_obj_origin(
                 },
             );
 
+            block.terminator = Some(Terminator::Return(Local(1)));
+
             block
         }
         TypedExprKind::ValueObjPattern(expr_ref) => {
-            let mut block = builder.new_block(Terminator::Return(Local(0)), span);
+            let mut block = builder.new_block(span);
 
             // unpack attributes
             for (property_id, _) in &origin_properties {
@@ -150,7 +152,7 @@ pub(super) fn codegen_map_obj_origin(
                         equation,
                         *expr_ref,
                     );
-                    block.terminator = Terminator::Return(builder.top());
+                    block.terminator = Some(Terminator::Return(builder.top()));
                 },
             );
 

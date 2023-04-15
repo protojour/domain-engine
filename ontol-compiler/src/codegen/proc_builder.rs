@@ -21,18 +21,18 @@ impl ProcBuilder {
         }
     }
 
-    pub fn new_block(&mut self, terminator: Terminator, span: SourceSpan) -> Block {
+    pub fn new_block(&mut self, span: SourceSpan) -> Block {
         let index = BlockIndex(self.blocks.len() as u32);
         self.blocks.push(Block {
             index,
             ir: Default::default(),
-            terminator: terminator.clone(),
+            terminator: None,
             terminator_span: span,
         });
         Block {
             index,
             ir: Default::default(),
-            terminator,
+            terminator: None,
             terminator_span: span,
         }
     }
@@ -112,14 +112,15 @@ impl ProcBuilder {
 
             let span = block.terminator_span;
             match block.terminator {
-                Terminator::Return(Local(0)) => output.push((OpCode::Return0, span)),
-                Terminator::Return(local) => output.push((OpCode::Return(local), span)),
-                Terminator::Goto(block_index, offset) => output.push((
+                Some(Terminator::Return(Local(0))) => output.push((OpCode::Return0, span)),
+                Some(Terminator::Return(local)) => output.push((OpCode::Return(local), span)),
+                Some(Terminator::Goto(block_index, offset)) => output.push((
                     OpCode::Goto(AddressOffset(
                         block_addresses[block_index.0 as usize] + offset,
                     )),
                     span,
                 )),
+                None => panic!("Block has no terminator!"),
             }
         }
 
@@ -140,7 +141,7 @@ impl ProcBuilder {
 pub struct Block {
     pub index: BlockIndex,
     pub ir: SmallVec<[(Ir, SourceSpan); 32]>,
-    pub terminator: Terminator,
+    pub terminator: Option<Terminator>,
     pub terminator_span: SourceSpan,
 }
 
