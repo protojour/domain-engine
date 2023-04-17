@@ -23,7 +23,7 @@ use super::{
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
     processor::SerdeProcessor,
-    MapOperator, SerdeOperatorId,
+    SerdeOperatorId, StructOperator,
 };
 
 enum MapKey {
@@ -43,10 +43,10 @@ pub(super) struct MatcherVisitor<'e, M> {
     matcher: M,
 }
 
-struct MapTypeVisitor<'e> {
+struct StructVisitor<'e> {
     processor: SerdeProcessor<'e>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
-    map_op: &'e MapOperator,
+    struct_op: &'e StructOperator,
     rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
@@ -204,10 +204,10 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 //deserializer.deserialize_map()
                 todo!()
             }
-            SerdeOperator::Map(map_op) => deserializer.deserialize_map(MapTypeVisitor {
+            SerdeOperator::Struct(struct_op) => deserializer.deserialize_map(StructVisitor {
                 processor: self,
                 buffered_attrs: Default::default(),
-                map_op,
+                struct_op,
                 rel_params_operator_id: self.rel_params_operator_id,
             }),
         }
@@ -362,10 +362,10 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         // delegate to the real map visitor
         match map_match.kind {
-            MapMatchKind::MapType(map_op) => MapTypeVisitor {
+            MapMatchKind::StructType(struct_op) => StructVisitor {
                 processor: self.processor,
                 buffered_attrs,
-                map_op,
+                struct_op,
                 rel_params_operator_id: map_match.rel_params_operator_id,
             }
             .visit_map(map),
@@ -394,21 +394,21 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 }
 
-impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
+impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "type `{}`", self.map_op.typename)
+        write!(f, "type `{}`", self.struct_op.typename)
     }
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-        let type_def_id = self.map_op.def_variant.def_id;
+        let type_def_id = self.struct_op.def_variant.def_id;
         let deserialized_map = deserialize_map(
             self.processor,
             map,
             self.buffered_attrs,
-            &self.map_op.properties,
-            self.map_op.n_mandatory_properties,
+            &self.struct_op.properties,
+            self.struct_op.n_mandatory_properties,
             SpecialOperatorIds {
                 rel_params: self.rel_params_operator_id,
                 id: None,

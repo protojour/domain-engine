@@ -8,7 +8,7 @@ use smartstring::alias::String;
 
 use crate::env::TypeInfo;
 use crate::serde::operator::{
-    MapOperator, SequenceRange, SerdeOperator, SerdeOperatorId, UnionOperator,
+    SequenceRange, SerdeOperator, SerdeOperatorId, StructOperator, UnionOperator,
 };
 use crate::serde::processor::ProcessorMode;
 use crate::{
@@ -351,17 +351,22 @@ fn serialize_schema_inline<S: Serializer>(
         SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
             panic!("BUG: Id not handled here")
         }
-        SerdeOperator::Map(map_op) => {
+        SerdeOperator::Struct(struct_op) => {
             map.serialize_entry("type", "object")?;
             map.serialize_entry(
                 "properties",
                 &MapProperties {
                     ctx: ctx.with_rel_params(None),
-                    map_type: map_op,
+                    map_type: struct_op,
                 },
             )?;
-            if map_op.n_mandatory_properties > 0 {
-                map.serialize_entry("required", &RequiredMapProperties { map_type: map_op })?;
+            if struct_op.n_mandatory_properties > 0 {
+                map.serialize_entry(
+                    "required",
+                    &RequiredMapProperties {
+                        map_type: struct_op,
+                    },
+                )?;
             }
             // map.serialize_entry("additionalProperties", &false)?;
         }
@@ -429,8 +434,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::PrimaryId(name, id_operator_id) => self
                 .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
                 .serialize(serializer),
-            SerdeOperator::Map(map_op) => self
-                .compose(self.ctx.ref_link(map_op.def_variant))
+            SerdeOperator::Struct(struct_op) => self
+                .compose(self.ctx.ref_link(struct_op.def_variant))
                 .serialize(serializer),
         }
     }
@@ -551,7 +556,7 @@ impl<'e> Serialize for ArrayItemsRefLinks<'e> {
 // properties in { "type": "object", "properties": _ }
 struct MapProperties<'e> {
     ctx: SchemaCtx<'e>,
-    map_type: &'e MapOperator,
+    map_type: &'e StructOperator,
 }
 
 impl<'e> Serialize for MapProperties<'e> {
@@ -575,7 +580,7 @@ impl<'e> Serialize for MapProperties<'e> {
 
 // ["a", "b"] in { "type": "object", "required": _ }
 struct RequiredMapProperties<'e> {
-    map_type: &'e MapOperator,
+    map_type: &'e StructOperator,
 }
 
 impl<'e> Serialize for RequiredMapProperties<'e> {
@@ -711,10 +716,10 @@ impl SchemaGraphBuilder {
                 // id is not represented in the graph
                 self.visit(*id_operator_id, env);
             }
-            SerdeOperator::Map(map_op) => {
-                self.add_to_graph(map_op.def_variant, operator_id);
+            SerdeOperator::Struct(struct_op) => {
+                self.add_to_graph(struct_op.def_variant, operator_id);
 
-                for (_, property) in &map_op.properties {
+                for (_, property) in &struct_op.properties {
                     self.visit(property.value_operator_id, env);
                     if let Some(operator_id) = &property.rel_params_operator_id {
                         self.visit(*operator_id, env);

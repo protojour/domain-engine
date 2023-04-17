@@ -209,14 +209,18 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
     // debug!("    classify operator: {operator:?}");
 
     match operator {
-        SerdeOperator::Map(map_op) => {
-            let type_info = env.get_type_info(map_op.def_variant.def_id);
+        SerdeOperator::Struct(struct_op) => {
+            let type_info = env.get_type_info(struct_op.def_variant.def_id);
             let node_classification = if type_info.entity_info.is_some() {
                 NodeClassification::Entity
             } else {
                 NodeClassification::Node
             };
-            TypeClassification::Type(node_classification, map_op.def_variant.def_id, operator_id)
+            TypeClassification::Type(
+                node_classification,
+                struct_op.def_variant.def_id,
+                operator_id,
+            )
         }
         SerdeOperator::Union(union_op) => {
             match union_op.variants(ProcessorMode::Select, ProcessorLevel::Child) {

@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     serde::operator::{
-        ConstructorSequenceOperator, MapOperator, RelationSequenceOperator, SequenceRange,
-        SerdeOperator, SerdeOperatorId, SerdeProperty, UnionOperator, ValueOperator,
+        ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
+        SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
         ValueUnionVariant,
     },
     serde::SerdeKey,
@@ -120,7 +120,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let first_id = self.get_serde_operator_id(iterator.next()?.clone())?;
 
                 let mut intersected_map = self
-                    .find_unambiguous_map_operator(first_id)
+                    .find_unambiguous_struct_operator(first_id)
                     .unwrap_or_else(|operator| {
                         panic!("Initial map not found for intersection: {operator:?}")
                     })
@@ -129,7 +129,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 for next_key in iterator {
                     let next_id = self.get_serde_operator_id(next_key.clone()).unwrap();
 
-                    if let Ok(next_map_type) = self.find_unambiguous_map_operator(next_id) {
+                    if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
@@ -140,7 +140,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    SerdeOperator::Map(intersected_map),
+                    SerdeOperator::Struct(intersected_map),
                 ))
             }
             SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
@@ -188,20 +188,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn find_unambiguous_map_operator(
+    fn find_unambiguous_struct_operator(
         &self,
         id: SerdeOperatorId,
-    ) -> Result<&MapOperator, &SerdeOperator> {
+    ) -> Result<&StructOperator, &SerdeOperator> {
         let operator = &self.operators_by_id[id.0 as usize];
         match operator {
-            SerdeOperator::Map(map_op) => Ok(map_op),
+            SerdeOperator::Struct(struct_op) => Ok(struct_op),
             SerdeOperator::Union(union_op) => {
                 let mut map_count = 0;
                 let mut result = Err(operator);
 
                 for discriminator in union_op.unfiltered_variants() {
                     if let Ok(map_type) =
-                        self.find_unambiguous_map_operator(discriminator.operator_id)
+                        self.find_unambiguous_struct_operator(discriminator.operator_id)
                     {
                         result = Ok(map_type);
                         map_count += 1;
@@ -218,7 +218,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
             SerdeOperator::ValueType(value_op) => {
-                self.find_unambiguous_map_operator(value_op.inner_operator_id)
+                self.find_unambiguous_struct_operator(value_op.inner_operator_id)
             }
             _ => Err(operator),
         }
@@ -349,7 +349,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (None, DataModifier::NONE) => {
                 return Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::Map(MapOperator {
+                    SerdeOperator::Struct(StructOperator {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
@@ -392,7 +392,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     } else {
                         // just the inherent properties are requested.
                         // Don't build a union
-                        self.create_map_operator(def_variant, typename, properties)
+                        self.create_struct_operator(def_variant, typename, properties)
                     },
                 ))
             }
@@ -538,7 +538,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),
-                self.create_map_operator(def_variant, typename, properties),
+                self.create_struct_operator(def_variant, typename, properties),
             ))
         }
     }
@@ -599,7 +599,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let operator_id = self.alloc_operator_id(&def_variant);
             Some(OperatorAllocation::Allocated(
                 operator_id,
-                self.create_map_operator(def_variant, typename, properties),
+                self.create_struct_operator(def_variant, typename, properties),
             ))
         } else {
             let (relationship_id, _, cardinality) = items[0];
@@ -685,7 +685,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         SerdeOperator::Union(UnionOperator::new(typename.into(), def_variant, variants))
     }
 
-    fn create_map_operator(
+    fn create_struct_operator(
         &mut self,
         def_variant: DefVariant,
         typename: &str,
@@ -758,7 +758,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         };
 
-        SerdeOperator::Map(MapOperator {
+        SerdeOperator::Struct(StructOperator {
             typename: typename.into(),
             def_variant,
             properties: serde_properties,

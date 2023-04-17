@@ -3,7 +3,7 @@ use ontol_runtime::{
     env::{Env, TypeInfo},
     serde::{
         operator::{
-            FilteredVariants, MapOperator, SerdeOperator, SerdeOperatorId, SerdeProperty,
+            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator,
             ValueOperator,
         },
         processor::{ProcessorLevel, ProcessorMode},
@@ -123,15 +123,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                 if let Some(rel_params) = rel_params {
                     let rel_def_id = match self.env.get_serde_operator(rel_params) {
-                        SerdeOperator::Map(map_op) => {
-                            self.register_map_op_fields(
-                                map_op,
+                        SerdeOperator::Struct(struct_op) => {
+                            self.register_struct_op_fields(
+                                struct_op,
                                 &mut fields,
                                 &FieldKind::EdgeProperty,
                                 &mut field_namespace,
                             );
 
-                            map_op.def_variant.def_id
+                            struct_op.def_variant.def_id
                         }
                         SerdeOperator::ValueType(value_op) => {
                             self.register_value_op_fields(
@@ -303,7 +303,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     },
                 )
             }
-            SerdeOperator::Map(map_op) => {
+            SerdeOperator::Struct(struct_op) => {
                 let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
                 NewType::Indexed(
                     type_index,
@@ -311,7 +311,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         typename: self.namespace.typename(type_info),
                         input_typename: Some(self.namespace.input(type_info)),
                         partial_input_typename: Some(self.namespace.partial_input(type_info)),
-                        kind: self.make_map_op_type_kind(type_info, map_op),
+                        kind: self.make_struct_op_type_kind(type_info, struct_op),
                     },
                 )
             }
@@ -338,7 +338,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
-            | SerdeOperator::Map(_)
+            | SerdeOperator::Struct(_)
             | SerdeOperator::RelationSequence(_)
             | SerdeOperator::ConstructorSequence(_) => panic!("not a native scalar"),
         };
@@ -355,12 +355,16 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::ValueType(inner_value_op) => {
                 self.make_value_op_type_kind(type_info, inner_value_op)
             }
-            SerdeOperator::Map(map_op) => self.make_map_op_type_kind(type_info, map_op),
+            SerdeOperator::Struct(struct_op) => self.make_struct_op_type_kind(type_info, struct_op),
             other => panic!("Unsupported: {other:?}"),
         }
     }
 
-    fn make_map_op_type_kind(&mut self, type_info: &TypeInfo, map_op: &MapOperator) -> TypeKind {
+    fn make_struct_op_type_kind(
+        &mut self,
+        type_info: &TypeInfo,
+        struct_op: &StructOperator,
+    ) -> TypeKind {
         let operator_id = type_info.operator_id.unwrap();
         let mut fields = IndexMap::default();
 
@@ -384,8 +388,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
             }
         }
 
-        self.register_map_op_fields(
-            map_op,
+        self.register_struct_op_fields(
+            struct_op,
             &mut fields,
             &FieldKind::Property,
             &mut Namespace::new(),
@@ -412,9 +416,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
         field_namespace: &mut Namespace,
     ) {
         match self.env.get_serde_operator(value_op.inner_operator_id) {
-            SerdeOperator::Map(map_op) => {
-                self.register_map_op_fields(
-                    map_op,
+            SerdeOperator::Struct(struct_op) => {
+                self.register_struct_op_fields(
+                    struct_op,
                     fields,
                     make_property_field_kind,
                     field_namespace,
@@ -430,19 +434,19 @@ impl<'a> VirtualSchemaBuilder<'a> {
         }
     }
 
-    fn register_map_op_fields(
+    fn register_struct_op_fields(
         &mut self,
-        map_op: &MapOperator,
+        struct_op: &StructOperator,
         fields: &mut IndexMap<String, FieldData>,
         make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
         field_namespace: &mut Namespace,
     ) {
-        for (property_name, property) in &map_op.properties {
+        for (property_name, property) in &struct_op.properties {
             match self.env.get_serde_operator(property.value_operator_id) {
-                SerdeOperator::Map(property_map_op) => {
+                SerdeOperator::Struct(property_struct_op) => {
                     fields.insert(
                         field_namespace.unique_literal(property_name),
-                        self.unit_def_field_data(property, property_map_op.def_variant.def_id),
+                        self.unit_def_field_data(property, property_struct_op.def_variant.def_id),
                     );
                 }
                 SerdeOperator::Union(union_op) => {

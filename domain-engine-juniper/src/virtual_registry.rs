@@ -84,13 +84,13 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         let serde_operator = self.virtual_schema.env().get_serde_operator(operator_id);
 
         match serde_operator {
-            SerdeOperator::Map(map_op) => {
+            SerdeOperator::Struct(struct_op) => {
                 let opt = match typing_purpose {
                     TypingPurpose::PartialInput => Optionality::Optional,
                     _ => Optionality::Mandatory,
                 };
 
-                for (name, property) in &map_op.properties {
+                for (name, property) in &struct_op.properties {
                     output.push(self.get_operator_argument(
                         name,
                         property.value_operator_id,
@@ -204,7 +204,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::PrimaryId(..) => {
                 panic!()
             }
-            SerdeOperator::Map(_map_op) => {
+            SerdeOperator::Struct(_struct_op) => {
                 // self.register_def_argument(name, map_type.def_variant.def_id)
                 todo!()
             }

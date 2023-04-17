@@ -53,7 +53,7 @@ pub enum SerdeOperator {
     PrimaryId(String, SerdeOperatorId),
 
     /// A type with many properties
-    Map(MapOperator),
+    Struct(StructOperator),
 }
 
 #[derive(Debug)]
@@ -186,7 +186,7 @@ pub struct ValueUnionVariant {
 }
 
 #[derive(Clone, Debug)]
-pub struct MapOperator {
+pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,

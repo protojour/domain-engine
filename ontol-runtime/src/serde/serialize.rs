@@ -15,7 +15,7 @@ use crate::{
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator},
     processor::SerdeProcessor,
-    MapOperator, EDGE_PROPERTY,
+    StructOperator, EDGE_PROPERTY,
 };
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
@@ -109,7 +109,9 @@ impl<'e> SerdeProcessor<'e> {
 
                 map.end()
             }
-            SerdeOperator::Map(map_op) => self.serialize_map(map_op, rel_params, value, serializer),
+            SerdeOperator::Struct(struct_op) => {
+                self.serialize_struct(struct_op, rel_params, value, serializer)
+            }
         }
     }
 }
@@ -158,9 +160,9 @@ impl<'e> SerdeProcessor<'e> {
         seq.end()
     }
 
-    fn serialize_map<S: Serializer>(
+    fn serialize_struct<S: Serializer>(
         &self,
-        map_op: &MapOperator,
+        struct_op: &StructOperator,
         rel_params: Option<&Value>,
         value: &Value,
         serializer: S,
@@ -172,7 +174,7 @@ impl<'e> SerdeProcessor<'e> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
-        for (name, serde_prop) in &map_op.properties {
+        for (name, serde_prop) in &struct_op.properties {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
@@ -181,7 +183,7 @@ impl<'e> SerdeProcessor<'e> {
                     } else {
                         panic!(
                             "While serializing value {:?} with `{}`, property `{}` was not found",
-                            value, map_op.typename, name
+                            value, struct_op.typename, name
                         )
                     }
                 }

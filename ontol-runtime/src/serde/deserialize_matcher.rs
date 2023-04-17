@@ -13,7 +13,7 @@ use crate::{
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
     processor::{ProcessorLevel, ProcessorMode},
-    MapOperator, SerdeOperatorId,
+    SerdeOperatorId, StructOperator,
 };
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
@@ -476,7 +476,7 @@ pub struct MapMatch<'e> {
 
 #[derive(Debug)]
 pub enum MapMatchKind<'e> {
-    MapType(&'e MapOperator),
+    StructType(&'e StructOperator),
     IdType(&'e str, SerdeOperatorId),
 }
 
@@ -512,8 +512,8 @@ impl<'e> MapMatcher<'e> {
             .find(|variant| match_fn(&variant.discriminator.discriminant))
             .map(
                 |variant| match self.env.get_serde_operator(variant.operator_id) {
-                    SerdeOperator::Map(map_op) => {
-                        MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
+                    SerdeOperator::Struct(struct_op) => {
+                        MapMatchResult::Match(self.new_match(MapMatchKind::StructType(struct_op)))
                     }
                     SerdeOperator::PrimaryId(name, operator_id) => MapMatchResult::Match(
                         self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
@@ -550,8 +550,10 @@ impl<'e> MapMatcher<'e> {
                 Discriminant::MapFallback
             ) {
                 match self.env.get_serde_operator(variant.operator_id) {
-                    SerdeOperator::Map(map_op) => {
-                        return MapMatchResult::Match(self.new_match(MapMatchKind::MapType(map_op)))
+                    SerdeOperator::Struct(struct_op) => {
+                        return MapMatchResult::Match(
+                            self.new_match(MapMatchKind::StructType(struct_op)),
+                        )
                     }
                     SerdeOperator::PrimaryId(name, operator_id) => {
                         return MapMatchResult::Match(

@@ -105,7 +105,7 @@ impl<'e> SerdeProcessor<'e> {
                     None
                 }
             },
-            SerdeOperator::Map(map_op) => map_op
+            SerdeOperator::Struct(struct_op) => struct_op
                 .properties
                 .get(prop)
                 .map(|serde_property| serde_property.property_id),
@@ -168,7 +168,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::ValueType(value_op) => Backticks(&value_op.typename).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
             SerdeOperator::PrimaryId(..) => write!(f, "id"),
-            SerdeOperator::Map(map_op) => Backticks(&map_op.typename).fmt(f),
+            SerdeOperator::Struct(struct_op) => Backticks(&struct_op.typename).fmt(f),
         }
     }
 }
