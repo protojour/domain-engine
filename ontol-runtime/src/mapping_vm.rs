@@ -136,7 +136,7 @@ impl Stack for ValueStack {
 
     #[inline(always)]
     fn take_map_attr2(&mut self, source: Local, key: PropertyId) {
-        let map = self.map_local_mut(source);
+        let map = self.struct_local_mut(source);
         let attribute = map.remove(&key).expect("Attribute not found");
         self.stack.push(attribute.rel_params);
         self.stack.push(attribute.value);
@@ -145,7 +145,7 @@ impl Stack for ValueStack {
     #[inline(always)]
     fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
-        let map = self.map_local_mut(target);
+        let map = self.struct_local_mut(target);
         map.insert(key, Attribute::with_unit_params(value));
     }
 
@@ -194,7 +194,7 @@ impl ValueStack {
                 let [b, a]: [String; 2] = self.pop_n();
                 Data::String(a + b)
             }
-            BuiltinProc::NewMap => Data::Map([].into()),
+            BuiltinProc::NewMap => Data::Struct([].into()),
             BuiltinProc::NewSeq => Data::Sequence(vec![]),
             BuiltinProc::NewUnit => Data::Unit,
         }
@@ -219,9 +219,9 @@ impl ValueStack {
     }
 
     #[inline(always)]
-    fn map_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
+    fn struct_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
         match &mut self.local_mut(local).data {
-            Data::Map(map) => map,
+            Data::Struct(attrs) => attrs,
             _ => panic!("Value at {local:?} is not a map"),
         }
     }
@@ -300,7 +300,7 @@ mod tests {
         let output = vm.trace_eval(
             proc,
             [Value::new(
-                Data::Map(
+                Data::Struct(
                     [
                         (
                             PropertyId::subject(RelationId(def_id(1))),
@@ -323,10 +323,10 @@ mod tests {
             )],
         );
 
-        let Data::Map(map) = output.data else {
+        let Data::Struct(attrs) = output.data else {
             panic!();
         };
-        let properties = map.keys().cloned().collect::<FnvHashSet<_>>();
+        let properties = attrs.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
             FnvHashSet::from_iter([
                 PropertyId::subject(RelationId(def_id(3))),
@@ -379,7 +379,7 @@ mod tests {
         let output = vm.trace_eval(
             translate,
             [Value::new(
-                Data::Map(
+                Data::Struct(
                     [
                         (
                             PropertyId::subject(RelationId(def_id(1))),
@@ -400,13 +400,13 @@ mod tests {
             )],
         );
 
-        let Data::Map(mut map) = output.data else {
+        let Data::Struct(mut attrs) = output.data else {
             panic!();
         };
-        let Data::Int(a) = map.remove(&PropertyId::subject(RelationId(def_id(4)))).unwrap().value.data else {
+        let Data::Int(a) = attrs.remove(&PropertyId::subject(RelationId(def_id(4)))).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = map.remove(&PropertyId::subject(RelationId(def_id(5)))).unwrap().value.data else {
+        let Data::Int(b) = attrs.remove(&PropertyId::subject(RelationId(def_id(5)))).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);

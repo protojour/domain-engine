@@ -199,7 +199,7 @@ impl<'v> AttributeType<'v> {
                     .unwrap(),
                 executor,
             ),
-            (FieldKind::Node, Data::Map(_)) => resolve_virtual_schema_field(
+            (FieldKind::Node, Data::Struct(_)) => resolve_virtual_schema_field(
                 self,
                 virtual_schema
                     .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
@@ -211,13 +211,13 @@ impl<'v> AttributeType<'v> {
                     property_id: Some(property_id),
                     ..
                 },
-                Data::Map(map),
+                Data::Struct(attrs),
             ) => {
                 let type_info = virtual_schema
                     .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
-                match map.get(property_id) {
+                match attrs.get(property_id) {
                     Some(attribute) => resolve_virtual_schema_field(
                         AttributeType { attr: attribute },
                         type_info,
@@ -237,26 +237,26 @@ impl<'v> AttributeType<'v> {
                     }
                 }
             }
-            (FieldKind::Property(property_data), Data::Map(map)) => {
+            (FieldKind::Property(property_data), Data::Struct(attrs)) => {
                 debug!("lookup property {field_name}");
                 Self::resolve_property(
-                    map,
+                    attrs,
                     property_data.property_id,
                     field_type,
                     virtual_schema,
                     executor,
                 )
             }
-            (FieldKind::Id(id_property_data), Data::Map(map)) => Self::resolve_property(
-                map,
+            (FieldKind::Id(id_property_data), Data::Struct(attrs)) => Self::resolve_property(
+                attrs,
                 PropertyId::subject(id_property_data.relation_id),
                 field_type,
                 virtual_schema,
                 executor,
             ),
             (FieldKind::EdgeProperty(property_data), _) => match &self.attr.rel_params.data {
-                Data::Map(rel_map) => Self::resolve_property(
-                    rel_map,
+                Data::Struct(rel_attrs) => Self::resolve_property(
+                    rel_attrs,
                     property_data.property_id,
                     field_type,
                     virtual_schema,

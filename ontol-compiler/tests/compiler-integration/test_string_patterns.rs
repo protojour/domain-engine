@@ -49,7 +49,7 @@ fn uuid_in_string_constructor_pattern() {
 
         assert_matches!(
             foo.deserialize_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::Map(map)) if map.len() == 1
+            Ok(Data::Struct(attrs)) if attrs.len() == 1
         );
         assert_json_io_matches!(
             foo,
@@ -85,7 +85,7 @@ fn test_string_pattern_constructor_union() {
         let foobar = TypeBinding::new(&env, "foobar");
         assert_matches!(
             foobar.deserialize_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::Map(map)) if map.len() == 1
+            Ok(Data::Struct(attrs)) if attrs.len() == 1
         );
         assert_json_io_matches!(foobar, json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));
         assert_json_io_matches!(foobar, json!("bar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"));

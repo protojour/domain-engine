@@ -20,7 +20,7 @@ fn deserialize_empty_type() {
         );
         assert_matches!(
             foo.deserialize_data(json!({})),
-            Ok(Data::Map(attrs)) if attrs.is_empty()
+            Ok(Data::Struct(attrs)) if attrs.is_empty()
         );
     });
 }
@@ -78,7 +78,7 @@ fn deserialize_object_properties() {
         let obj = TypeBinding::new(&env, "obj");
         assert_matches!(
             obj.deserialize_data(json!({ "a": "hei", "b": 42 })),
-            Ok(Data::Map(_))
+            Ok(Data::Struct(_))
         );
 
         assert_error_msg!(
@@ -116,7 +116,7 @@ fn deserialize_nested() {
                 },
                 "y": "b"
             })),
-            Ok(Data::Map(a)) if a.len() == 2
+            Ok(Data::Struct(a)) if a.len() == 2
         );
     });
 }
@@ -280,15 +280,15 @@ fn deserialize_map_union() {
         let union = TypeBinding::new(&env, "union");
         assert_matches!(
             union.deserialize_data_variant(json!({ "variant": "foo" })),
-            Ok(Data::Map(map)) if map.len() == 1
+            Ok(Data::Struct(attrs)) if attrs.len() == 1
         );
         assert_matches!(
             union.deserialize_data_variant(json!({ "variant": "bar", "prop": 42 })),
-            Ok(Data::Map(map)) if map.len() == 2
+            Ok(Data::Struct(attrs)) if attrs.len() == 2
         );
         assert_matches!(
             union.deserialize_data_variant(json!({ "prop": 42, "variant": "bar" })),
-            Ok(Data::Map(map)) if map.len() == 2
+            Ok(Data::Struct(attrs)) if attrs.len() == 2
         );
         assert_error_msg!(
             union.deserialize_data_variant(json!("junk")),

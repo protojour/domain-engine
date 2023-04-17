@@ -166,7 +166,7 @@ impl<'e> SerdeProcessor<'e> {
         serializer: S,
     ) -> Res<S> {
         let attributes = match &value.data {
-            Data::Map(attributes) => attributes,
+            Data::Struct(attributes) => attributes,
             other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
         };
 

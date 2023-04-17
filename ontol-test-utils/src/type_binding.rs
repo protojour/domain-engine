@@ -118,7 +118,7 @@ impl<'e> TypeBinding<'e> {
         let value = self.deserialize_value(json)?;
         assert_eq!(value.type_def_id, self.type_info.def_id);
         match value.data {
-            Data::Map(map) => Ok(map),
+            Data::Struct(attrs) => Ok(attrs),
             other => panic!("not a map: {other:?}"),
         }
     }
@@ -252,13 +252,13 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
                 self.value = value;
             }
             (
-                Data::Map(map_a),
+                Data::Struct(attrs_a),
                 Value {
-                    data: Data::Map(map_b),
+                    data: Data::Struct(attrs_b),
                     ..
                 },
             ) => {
-                map_a.extend(map_b);
+                attrs_a.extend(attrs_b);
             }
             (a, b) => panic!("Unable to merge {a:?} and {b:?}"),
         }
@@ -291,10 +291,10 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
 
     fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {
         match &mut self.value.data {
-            Data::Map(map) => {
-                map.insert(property_id, attribute);
+            Data::Struct(attrs) => {
+                attrs.insert(property_id, attribute);
             }
-            Data::Unit => self.value.data = Data::Map([(property_id, attribute)].into()),
+            Data::Unit => self.value.data = Data::Struct([(property_id, attribute)].into()),
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")
             }

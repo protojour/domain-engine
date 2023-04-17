@@ -34,7 +34,7 @@ impl StringPattern {
             let captures = self.regex.captures(input).ok_or(ParseError(smart_format!(
                 "regular expression did not match"
             )))?;
-            let mut properties = BTreeMap::new();
+            let mut attrs = BTreeMap::new();
 
             for part in &self.constant_parts {
                 match part {
@@ -67,12 +67,12 @@ impl StringPattern {
                                 ))
                             })?;
 
-                        properties.insert(property.property_id, attribute);
+                        attrs.insert(property.property_id, attribute);
                     }
                 }
             }
 
-            Ok(Data::Map(properties))
+            Ok(Data::Struct(attrs))
         }
     }
 }
@@ -104,9 +104,9 @@ impl<'a> Display for FormatPattern<'a> {
                     StringPatternConstantPart::Property(StringPatternProperty {
                         property_id, ..
                     }),
-                    Data::Map(map),
+                    Data::Struct(attrs),
                 ) => {
-                    let attribute = map.get(property_id).unwrap();
+                    let attribute = attrs.get(property_id).unwrap();
                     write!(f, "{}", FormatStringData(&attribute.value.data))?;
                 }
                 (StringPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,

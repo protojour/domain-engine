@@ -416,7 +416,7 @@ impl<'e, 'de> Visitor<'de> for MapTypeVisitor<'e> {
         )?;
         Ok(Attribute {
             value: Value {
-                data: Data::Map(deserialized_map.attributes),
+                data: Data::Struct(deserialized_map.attributes),
                 type_def_id,
             },
             rel_params: deserialized_map.rel_params,

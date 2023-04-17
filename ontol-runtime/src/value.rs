@@ -45,7 +45,7 @@ impl Value {
 
     pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute> {
         match &self.data {
-            Data::Map(map) => map.get(&property_id),
+            Data::Struct(map) => map.get(&property_id),
             _ => None,
         }
     }
@@ -82,7 +82,7 @@ pub enum Data {
     ChronoTime(chrono::NaiveTime),
 
     /// A collection of attributes keyed by property.
-    Map(BTreeMap<PropertyId, Attribute>),
+    Struct(BTreeMap<PropertyId, Attribute>),
 
     /// A sequence of attributes.
     ///
@@ -184,7 +184,7 @@ impl<'v> Display for ValueDebug<'v> {
             Data::ChronoDateTime(dt) => write!(f, "datetime({dt})"),
             Data::ChronoDate(d) => write!(f, "date({d})"),
             Data::ChronoTime(t) => write!(f, "time({t})"),
-            Data::Map(m) => {
+            Data::Struct(m) => {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {
