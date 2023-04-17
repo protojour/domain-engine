@@ -3,7 +3,7 @@ use serde_json::json;
 use test_log::test;
 use tracing::debug;
 
-fn assert_translate(
+fn assert_domain_map(
     test_env: &TestEnv,
     translation: (&str, &str),
     input: serde_json::Value,
@@ -50,13 +50,13 @@ fn test_map_simple() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(
+        assert_domain_map(
             &env,
             ("foo", "bar"),
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("bar", "foo"),
             json!({ "b": "my_value"}),
@@ -78,8 +78,8 @@ fn test_meters() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(&env, ("meters", "millimeters"), json!(5), json!(5000));
-        assert_translate(&env, ("millimeters", "meters"), json!(5000), json!(5));
+        assert_domain_map(&env, ("meters", "millimeters"), json!(5), json!(5000));
+        assert_domain_map(&env, ("millimeters", "meters"), json!(5000), json!(5));
     });
 }
 
@@ -99,8 +99,8 @@ fn test_temperature() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(&env, ("celsius", "fahrenheit"), json!(10), json!(50));
-        assert_translate(&env, ("fahrenheit", "celsius"), json!(50), json!(10));
+        assert_domain_map(&env, ("celsius", "fahrenheit"), json!(10), json!(50));
+        assert_domain_map(&env, ("fahrenheit", "celsius"), json!(50), json!(10));
     });
 }
 
@@ -119,8 +119,8 @@ fn test_map_value_to_map_no_func() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(&env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
-        assert_translate(&env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
+        assert_domain_map(&env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
+        assert_domain_map(&env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
     });
 }
 
@@ -139,8 +139,8 @@ fn test_map_value_to_map_func() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(&env, ("one", "two"), json!(2), json!({ "a": 4 }));
-        assert_translate(&env, ("two", "one"), json!({ "a": 4 }), json!(2));
+        assert_domain_map(&env, ("one", "two"), json!(2), json!({ "a": 4 }));
+        assert_domain_map(&env, ("two", "one"), json!({ "a": 4 }), json!(2));
     });
 }
 
@@ -161,13 +161,13 @@ fn test_map_matching_array() {
     }
     "
     .compile_ok(|env| {
-        assert_translate(
+        assert_domain_map(
             &env,
             ("foo", "bar"),
             json!({ "a": [42] }),
             json!({ "b": [42] }),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("bar", "foo"),
             json!({ "b": [42] }),
@@ -176,7 +176,8 @@ fn test_map_matching_array() {
     });
 }
 
-const TRANSLATE_ARRAY: &str = "
+// map call inside array
+const DEEP_ARRAY: &str = "
 type foo { rel _ 'f': string }
 type bar { rel _ 'b': string }
 pub type foos { rel _ ['foos']: foo }
@@ -201,15 +202,15 @@ map (x) {
 ";
 
 #[test]
-fn test_map_translate_array_item_empty() {
-    TRANSLATE_ARRAY.compile_ok(|env| {
-        assert_translate(
+fn test_map_deep_array_item_empty() {
+    DEEP_ARRAY.compile_ok(|env| {
+        assert_domain_map(
             &env,
             ("foos", "bars"),
             json!({ "foos": [] }),
             json!({ "bars": [] }),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("bars", "foos"),
             json!({ "bars": [] }),
@@ -219,15 +220,15 @@ fn test_map_translate_array_item_empty() {
 }
 
 #[test]
-fn test_map_translate_array_item_one() {
-    TRANSLATE_ARRAY.compile_ok(|env| {
-        assert_translate(
+fn test_map_deep_array_item_one() {
+    DEEP_ARRAY.compile_ok(|env| {
+        assert_domain_map(
             &env,
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }] }),
             json!({ "bars": [{ "b": "42" }] }),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("bars", "foos"),
             json!({ "bars": [{ "b": "42" }] }),
@@ -237,15 +238,15 @@ fn test_map_translate_array_item_one() {
 }
 
 #[test]
-fn test_map_translate_array_item_many() {
-    TRANSLATE_ARRAY.compile_ok(|env| {
-        assert_translate(
+fn test_map_deep_array_item_many() {
+    DEEP_ARRAY.compile_ok(|env| {
+        assert_domain_map(
             &env,
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
             json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("bars", "foos"),
             json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
@@ -256,7 +257,7 @@ fn test_map_translate_array_item_many() {
 
 #[test]
 fn test_map_complex_flow() {
-    // FIXME: This should be a one-way translation.
+    // FIXME: This should be a one-way mapping.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
@@ -286,14 +287,14 @@ fn test_map_complex_flow() {
     }
     "
     .compile_ok(|test_env| {
-        assert_translate(
+        assert_domain_map(
             &test_env,
             ("one", "two"),
             json!({ "a": "A", "b": "B" }),
             json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
         );
 
-        // FIXME: Property probe does not make completely sense for this translation:
+        // FIXME: Property probe does not make completely sense for this mapping:
         let domain = test_env.env.find_domain(test_env.root_package).unwrap();
         let mut property_probe = test_env.env.new_property_probe();
         let property_map = property_probe
@@ -350,13 +351,13 @@ fn test_map_delegation() {
         ),
     ])
     .compile_ok(|env| {
-        assert_translate(
+        assert_domain_map(
             &env,
             ("car", "vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
         );
-        assert_translate(
+        assert_domain_map(
             &env,
             ("vehicle", "car"),
             json!({ "length": 2000 }),
