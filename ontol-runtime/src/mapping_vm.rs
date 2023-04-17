@@ -282,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn translate_map() {
+    fn map_struct() {
         let mut lib = Lib::default();
         let proc = lib.append_procedure(
             NParams(1),
@@ -355,7 +355,7 @@ mod tests {
                 OpCode::Return0,
             ],
         );
-        let translate = lib.append_procedure(
+        let mapping_proc = lib.append_procedure(
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
@@ -377,7 +377,7 @@ mod tests {
 
         let mut vm = MappingVm::new(&lib);
         let output = vm.trace_eval(
-            translate,
+            mapping_proc,
             [Value::new(
                 Data::Struct(
                     [

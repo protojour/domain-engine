@@ -154,7 +154,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             TypedExprKind::Variable(_) => Ok(Substitution::Variable(expr_ref)),
             TypedExprKind::VariableRef(var_ref) => Ok(Substitution::Variable(*var_ref)),
             TypedExprKind::Constant(_) => Ok(Substitution::Constant),
-            TypedExprKind::Translate(param_ref, param_ty) => {
+            TypedExprKind::MapValue(param_ref, param_ty) => {
                 let param_ty = *param_ty;
                 let param_ref = match self.reduce_expr_inner(*param_ref, indent.inc())? {
                     Substitution::Variable(var_ref) => var_ref,
@@ -170,29 +170,27 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                     expr.span, param_ref.0
                 );
 
-                // invert translation:
-                let (inverted_translation_ref, _) = self.add_expr(
+                // invert mappping:
+                let (inverted_map_ref, _) = self.add_expr(
                     TypedExpr {
-                        kind: TypedExprKind::Translate(cloned_param_id, expr.ty),
+                        kind: TypedExprKind::MapValue(cloned_param_id, expr.ty),
                         ty: param_ty,
                         span: cloned_param_span,
                     },
                     indent,
                 );
 
-                // remove the translation call from the reductions
+                // remove the map call from the reductions
                 self.reductions[expr_ref] = param_ref;
-                // add inverted translation call to the expansions
-                self.expansions[param_ref] = inverted_translation_ref;
+                // add inverted map call to the expansions
+                self.expansions[param_ref] = inverted_map_ref;
 
                 debug!("{indent}reduction subst: {expr_ref:?}->{param_ref:?}");
-                debug!(
-                    "{indent}expansion subst: {param_ref:?}->{inverted_translation_ref:?} (new!)"
-                );
+                debug!("{indent}expansion subst: {param_ref:?}->{inverted_map_ref:?} (new!)");
 
                 Ok(Substitution::Variable(param_ref))
             }
-            TypedExprKind::SequenceMap(seq_ref, iter_var_ref, item_ref, item_ty) => {
+            TypedExprKind::MapSequence(seq_ref, iter_var_ref, item_ref, item_ty) => {
                 let seq_ref = *seq_ref;
                 let iter_var_ref = *iter_var_ref;
                 let item_ref = *item_ref;
@@ -212,7 +210,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 let expr = &self.expressions[expr_ref];
                 let (inverted_map_ref, _) = self.add_expr(
                     TypedExpr {
-                        kind: TypedExprKind::SequenceMap(
+                        kind: TypedExprKind::MapSequence(
                             cloned_seq_var,
                             iter_var_ref,
                             item_ref,

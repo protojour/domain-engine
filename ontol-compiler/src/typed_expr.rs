@@ -49,13 +49,14 @@ pub enum TypedExprKind<'m> {
     VariableRef(ExprRef),
     /// A constant/literal expression
     Constant(i64),
-    /// A translation from one type to another
-    Translate(ExprRef, TypeRef<'m>),
-    /// A mapping operation on an array.
+    /// A mapping from one type to another.
+    /// Normally translates into a procedure call.
+    MapValue(ExprRef, TypeRef<'m>),
+    /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
     /// The second expression is the item/body.
-    SequenceMap(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
+    MapSequence(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
 }
 
 /// A reference to a typed expression.

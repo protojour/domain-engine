@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::{
-    codegen::{find_translation_key, proc_builder::Stack},
+    codegen::{find_mapping_key, proc_builder::Stack},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
@@ -80,24 +80,24 @@ impl CodeGenerator {
                 self.codegen_variable(builder, block, *var, &span);
             }
             TypedExprKind::VariableRef(_) => panic!(),
-            TypedExprKind::Translate(param_id, from_ty) => {
+            TypedExprKind::MapValue(param_id, from_ty) => {
                 self.codegen_expr(proc_table, builder, block, equation, *param_id);
 
                 debug!(
-                    "translate from {from_ty:?} to {:?}, span = {span:?}",
+                    "map value from {from_ty:?} to {:?}, span = {span:?}",
                     expr.ty
                 );
-                let from = find_translation_key(from_ty).unwrap();
-                let to = find_translation_key(&expr.ty).unwrap();
+                let from = find_mapping_key(from_ty).unwrap();
+                let to = find_mapping_key(&expr.ty).unwrap();
 
                 let proc = Procedure {
-                    address: proc_table.gen_translate_addr(from, to),
+                    address: proc_table.gen_mapping_addr(from, to),
                     n_params: NParams(1),
                 };
 
                 builder.gen(block, Ir::Call(proc), Stack(0), span);
             }
-            TypedExprKind::SequenceMap(expr_ref, iter_var, body, _) => {
+            TypedExprKind::MapSequence(expr_ref, iter_var, body, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = builder.gen(
                     block,
@@ -129,7 +129,7 @@ impl CodeGenerator {
                     zelf.codegen_expr(proc_table, builder, &mut block2, equation, *body);
                     builder.gen(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
                     // still two items on the stack: append to original sequence
-                    // for now, rel_params are untranslated
+                    // for now, rel_params is not mapped
                     builder.gen(&mut block2, Ir::AppendAttr2(output_seq), Stack(-2), span);
                     builder.gen(&mut block2, Ir::Remove(value_local), Stack(-1), span);
                     builder.gen(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);

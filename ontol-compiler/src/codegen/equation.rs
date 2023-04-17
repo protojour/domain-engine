@@ -178,11 +178,11 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .debug_tuple(&self.header("VarRef"))
                 .field(&self.child(*var_ref, None))
                 .finish()?,
-            TypedExprKind::Translate(expr_ref, _) => f
+            TypedExprKind::MapValue(expr_ref, _) => f
                 .debug_tuple(&self.header("Translate"))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
-            TypedExprKind::SequenceMap(expr_ref, var, body, _) => f
+            TypedExprKind::MapSequence(expr_ref, var, body, _) => f
                 .debug_tuple(&self.header("SequenceMap"))
                 .field(&self.child(*expr_ref, None))
                 .field(&var)

@@ -5,28 +5,28 @@ use tracing::debug;
 
 fn assert_domain_map(
     test_env: &TestEnv,
-    translation: (&str, &str),
+    mapping: (&str, &str),
     input: serde_json::Value,
     expected: serde_json::Value,
 ) {
-    let input_binding = TypeBinding::new(test_env, translation.0);
-    let output_binding = TypeBinding::new(test_env, translation.1);
+    let input_binding = TypeBinding::new(test_env, mapping.0);
+    let output_binding = TypeBinding::new(test_env, mapping.1);
 
     let value = input_binding.deserialize_value(input).unwrap();
 
-    let procedure = match test_env.env.get_translator(
+    let procedure = match test_env.env.get_mapping_procedure(
         input_binding.type_info.def_id,
         output_binding.type_info.def_id,
     ) {
         Some(procedure) => procedure,
         None => panic!(
-            "No translator found for ({:?}, {:?})",
+            "No mapping procedure found for ({:?}, {:?})",
             input_binding.type_info.def_id, output_binding.type_info.def_id
         ),
     };
 
-    let mut translator = test_env.env.new_translator();
-    let value = translator.trace_eval(procedure, [value]);
+    let mut mapper = test_env.env.new_mapper();
+    let value = mapper.trace_eval(procedure, [value]);
 
     let output_json = output_binding.serialize_json(&value);
 

@@ -38,7 +38,7 @@ use self::{
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
     pub result_lib: Lib,
-    pub result_translations: FnvHashMap<(DefId, DefId), Procedure>,
+    pub result_map_procs: FnvHashMap<(DefId, DefId), Procedure>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -71,30 +71,30 @@ pub struct MapCodegenTask<'m> {
 #[derive(Default)]
 pub(super) struct ProcTable {
     pub procedures: FnvHashMap<(DefId, DefId), ProcBuilder>,
-    pub translate_calls: Vec<TranslateCall>,
+    pub map_calls: Vec<MapCall>,
 }
 
 impl ProcTable {
-    /// Allocate a temporary procedure address for a translate call.
+    /// Allocate a temporary procedure address for a map call.
     /// This will be resolved to final "physical" ID in the link phase.
-    fn gen_translate_addr(&mut self, from: DefId, to: DefId) -> Address {
-        let address = Address(self.translate_calls.len() as u32);
-        self.translate_calls.push(TranslateCall {
-            translation: (from, to),
+    fn gen_mapping_addr(&mut self, from: DefId, to: DefId) -> Address {
+        let address = Address(self.map_calls.len() as u32);
+        self.map_calls.push(MapCall {
+            mapping: (from, to),
         });
         address
     }
 }
 
-pub(super) struct TranslateCall {
-    pub translation: (DefId, DefId),
+pub(super) struct MapCall {
+    pub mapping: (DefId, DefId),
 }
 
-fn find_translation_key(ty: &TypeRef) -> Option<DefId> {
+fn find_mapping_key(ty: &TypeRef) -> Option<DefId> {
     match ty {
         Type::Domain(def_id) => Some(*def_id),
         other => {
-            warn!("unable to get translation key: {other:?}");
+            warn!("unable to get mapping key: {other:?}");
             None
         }
     }
@@ -142,10 +142,10 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         }
     }
 
-    let LinkResult { lib, translations } = link(compiler, &mut proc_table);
+    let LinkResult { lib, map_procs } = link(compiler, &mut proc_table);
 
     compiler.codegen_tasks.result_lib = lib;
-    compiler.codegen_tasks.result_translations = translations;
+    compiler.codegen_tasks.result_map_procs = map_procs;
 }
 
 #[allow(unused)]
@@ -166,8 +166,8 @@ fn codegen_map_solve(
         panic!("TODO: could not solve: {error:?}");
     });
 
-    let from_def = find_translation_key(&equation.expressions[from].ty);
-    let to_def = find_translation_key(&equation.expressions[to].ty);
+    let from_def = find_mapping_key(&equation.expressions[from].ty);
+    let to_def = find_mapping_key(&equation.expressions[to].ty);
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
@@ -177,7 +177,7 @@ fn codegen_map_solve(
             true
         }
         other => {
-            warn!("unable to save translation: key = {other:?}");
+            warn!("unable to save mapping: key = {other:?}");
             false
         }
     }
@@ -216,6 +216,6 @@ fn codegen_map(
         TypedExprKind::StructPattern(attributes) => {
             codegen_struct_pattern_origin(proc_table, equation, to, attributes)
         }
-        other => panic!("unable to generate translation: {other:?}"),
+        other => panic!("unable to generate mapping: {other:?}"),
     }
 }

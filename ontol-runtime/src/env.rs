@@ -20,7 +20,7 @@ use crate::{
 
 /// Runtime environment
 pub struct Env {
-    pub(crate) translations: FnvHashMap<(DefId, DefId), Procedure>,
+    pub(crate) mapping_procs: FnvHashMap<(DefId, DefId), Procedure>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
@@ -34,7 +34,7 @@ impl Env {
     pub fn builder() -> EnvBuilder {
         EnvBuilder {
             env: Self {
-                translations: Default::default(),
+                mapping_procs: Default::default(),
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
                 domains: Default::default(),
@@ -45,7 +45,7 @@ impl Env {
         }
     }
 
-    pub fn new_translator(&self) -> MappingVm<'_> {
+    pub fn new_mapper(&self) -> MappingVm<'_> {
         MappingVm::new(&self.lib)
     }
 
@@ -70,8 +70,8 @@ impl Env {
         self.domains.get(&package_id)
     }
 
-    pub fn get_translator(&self, from: DefId, to: DefId) -> Option<Procedure> {
-        self.translations.get(&(from, to)).cloned()
+    pub fn get_mapping_procedure(&self, from: DefId, to: DefId) -> Option<Procedure> {
+        self.mapping_procs.get(&(from, to)).cloned()
     }
 
     pub fn new_serde_processor(
@@ -171,8 +171,8 @@ impl EnvBuilder {
         self
     }
 
-    pub fn translations(mut self, translations: FnvHashMap<(DefId, DefId), Procedure>) -> Self {
-        self.env.translations = translations;
+    pub fn mapping_procs(mut self, mapping_procs: FnvHashMap<(DefId, DefId), Procedure>) -> Self {
+        self.env.mapping_procs = mapping_procs;
         self
     }
 

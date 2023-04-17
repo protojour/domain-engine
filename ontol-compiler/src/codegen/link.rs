@@ -11,11 +11,11 @@ use super::ProcTable;
 
 pub struct LinkResult {
     pub lib: Lib,
-    pub translations: FnvHashMap<(DefId, DefId), Procedure>,
+    pub map_procs: FnvHashMap<(DefId, DefId), Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut translations: FnvHashMap<(DefId, DefId), Procedure> = Default::default();
+    let mut mapping_procs: FnvHashMap<(DefId, DefId), Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
     let mut spans: Vec<SourceSpan> = vec![];
@@ -27,24 +27,24 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
-        translations.insert((from, to), procedure);
+        mapping_procs.insert((from, to), procedure);
     }
 
     // correct "call" opcodes to point to correct address
     for (index, opcode) in lib.opcodes.iter_mut().enumerate() {
         if let OpCode::Call(call_procedure) = opcode {
-            let translate_call = &proc_table.translate_calls[call_procedure.address.0 as usize];
+            let map_call = &proc_table.map_calls[call_procedure.address.0 as usize];
 
-            match translations.get(&translate_call.translation) {
-                Some(translation_procedure) => {
-                    call_procedure.address = translation_procedure.address;
+            match mapping_procs.get(&map_call.mapping) {
+                Some(mapping_proc) => {
+                    call_procedure.address = mapping_proc.address;
                 }
                 None => {
                     call_procedure.address = Address(0);
                     compiler.push_error(
                         CompileError::CannotConvertMissingEquation {
-                            input: format_def(compiler, translate_call.translation.0),
-                            output: format_def(compiler, translate_call.translation.1),
+                            input: format_def(compiler, map_call.mapping.0),
+                            output: format_def(compiler, map_call.mapping.1),
                         }
                         .spanned(&spans[index]),
                     );
@@ -53,7 +53,10 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         }
     }
 
-    LinkResult { lib, translations }
+    LinkResult {
+        lib,
+        map_procs: mapping_procs,
+    }
 }
 
 fn format_def(compiler: &Compiler, def_id: DefId) -> String {

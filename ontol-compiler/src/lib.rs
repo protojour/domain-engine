@@ -245,7 +245,7 @@ impl<'m> Compiler<'m> {
 
         builder
             .lib(self.codegen_tasks.result_lib)
-            .translations(self.codegen_tasks.result_translations)
+            .mapping_procs(self.codegen_tasks.result_map_procs)
             .serde_operators(serde_operators, serde_operators_per_def)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
