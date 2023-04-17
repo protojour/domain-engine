@@ -10,8 +10,8 @@ use crate::ast::{
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, Expression, MapAttribute, MapAttributeRel, MapStatement, MapType,
-        RelStatement, RelType, Relation, Statement, Type, TypeStatement,
+        BinaryOp, Cardinality, Expression, MapPattern, MapPatternAttr, MapPatternAttrRel,
+        MapStatement, RelStatement, RelType, Relation, Statement, Type, TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -231,25 +231,25 @@ fn map_statement() -> impl AstParser<MapStatement> {
         })
 }
 
-fn map_type() -> impl AstParser<MapType> {
+fn map_type() -> impl AstParser<MapPattern> {
     spanned(path())
         .then(
             map_attribute()
                 .repeated()
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(path, attributes)| MapType { path, attributes })
+        .map(|(path, attributes)| MapPattern { path, attributes })
 }
 
-fn map_attribute() -> impl AstParser<MapAttribute> {
-    let variable = expression().map(MapAttribute::Expr);
+fn map_attribute() -> impl AstParser<MapPatternAttr> {
+    let variable = expression().map(MapPatternAttr::Expr);
     let rel = keyword(Token::Rel)
         .then(spanned(ty()))
         .then_ignore(colon())
         .then(expression().or_not())
         .map_with_span(|((kw, relation), object), span| {
-            MapAttribute::Rel((
-                MapAttributeRel {
+            MapPatternAttr::Rel((
+                MapPatternAttrRel {
                     kw,
                     subject: None,
                     relation,

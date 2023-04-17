@@ -102,24 +102,24 @@ pub struct RelChain {
 pub struct MapStatement {
     pub kw: Span,
     pub variables: Vec<Spanned<String>>,
-    pub first: Spanned<MapType>,
-    pub second: Spanned<MapType>,
+    pub first: Spanned<MapPattern>,
+    pub second: Spanned<MapPattern>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MapType {
+pub struct MapPattern {
     pub path: Spanned<Path>,
-    pub attributes: Vec<MapAttribute>,
+    pub attributes: Vec<MapPatternAttr>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum MapAttribute {
+pub enum MapPatternAttr {
     Expr(Spanned<Expression>),
-    Rel(Spanned<MapAttributeRel>),
+    Rel(Spanned<MapPatternAttrRel>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MapAttributeRel {
+pub struct MapPatternAttrRel {
     pub kw: Span,
     pub subject: Option<Spanned<Expression>>,
     pub relation: Spanned<Type>,

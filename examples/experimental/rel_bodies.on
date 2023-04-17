@@ -47,8 +47,8 @@ rel a [route] b {
         foo {
             rel 'foo': x
             rel 'geo' {
-                rel :: 'how_much' h
-
+                rel 'how_much' h
+            }: {
                 rel 'coordinates': {
                     rel 'x': x
                 }

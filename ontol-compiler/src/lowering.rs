@@ -566,7 +566,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_map_type_to_struct(
         &mut self,
-        (map_type, span): (ast::MapType, Span),
+        (map_type, span): (ast::MapPattern, Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
         let type_def_id = self.lookup_path(&map_type.path.0, &map_type.path.1)?;
@@ -574,7 +574,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .attributes
             .into_iter()
             .map(|map_attr| match map_attr {
-                ast::MapAttribute::Expr((expr, expr_span)) => {
+                ast::MapPatternAttr::Expr((expr, expr_span)) => {
                     let key = (
                         DefReference {
                             def_id: DefId::unit(),
@@ -586,8 +586,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                     Ok((key, expr))
                 }
-                ast::MapAttribute::Rel((
-                    ast::MapAttributeRel {
+                ast::MapPatternAttr::Rel((
+                    ast::MapPatternAttrRel {
                         subject,
                         relation,
                         object,
