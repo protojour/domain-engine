@@ -176,34 +176,51 @@ fn test_map_matching_array() {
     });
 }
 
-#[test]
-// BUG: There are big codegen problems, missing good intermediate representations
-// #[should_panic = "Value at Local(1) is not a sequence"]
-fn test_map_translate_array_item() {
-    "
-    type foo { rel _ 'f': string }
-    type bar { rel _ 'b': string }
-    pub type foos { rel _ ['foos']: foo }
-    pub type bars { rel _ ['bars']: bar }
+const TRANSLATE_ARRAY: &str = "
+type foo { rel _ 'f': string }
+type bar { rel _ 'b': string }
+pub type foos { rel _ ['foos']: foo }
+pub type bars { rel _ ['bars']: bar }
 
-    map (x) {
-        foos {
-            rel 'foos': x
-        }
-        bars {
-            rel 'bars': x
-        }
+map (x) {
+    foos {
+        rel 'foos': x
     }
-    map (x) {
-        foo {
-            rel 'f': x
-        }
-        bar {
-            rel 'b': x
-        }
+    bars {
+        rel 'bars': x
     }
-    "
-    .compile_ok(|env| {
+}
+map (x) {
+    foo {
+        rel 'f': x
+    }
+    bar {
+        rel 'b': x
+    }
+}
+";
+
+#[test]
+fn test_map_translate_array_item_empty() {
+    TRANSLATE_ARRAY.compile_ok(|env| {
+        assert_translate(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [] }),
+            json!({ "bars": [] }),
+        );
+        assert_translate(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [] }),
+            json!({ "foos": [] }),
+        );
+    });
+}
+
+#[test]
+fn test_map_translate_array_item_one() {
+    TRANSLATE_ARRAY.compile_ok(|env| {
         assert_translate(
             &env,
             ("foos", "bars"),
@@ -215,6 +232,24 @@ fn test_map_translate_array_item() {
             ("bars", "foos"),
             json!({ "bars": [{ "b": "42" }] }),
             json!({ "foos": [{ "f": "42" }] }),
+        );
+    });
+}
+
+#[test]
+fn test_map_translate_array_item_many() {
+    TRANSLATE_ARRAY.compile_ok(|env| {
+        assert_translate(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
+            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+        );
+        assert_translate(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
         );
     });
 }

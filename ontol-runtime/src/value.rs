@@ -175,7 +175,7 @@ impl<'v> Display for ValueDebug<'v> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = &self.0;
         match &value.data {
-            Data::Unit => write!(f, "U"),
+            Data::Unit => write!(f, "#u"),
             Data::Int(i) => write!(f, "int({i})"),
             Data::Float(n) => write!(f, "flt({n})"),
             Data::Rational(r) => write!(f, "rat({r})"),
