@@ -19,7 +19,7 @@ pub enum ExprKind {
     /// Function call
     Call(DefId, Box<[Expr]>),
     /// Object constructor
-    Obj(TypePath, Box<[(ObjKey, Expr)]>),
+    Struct(TypePath, Box<[(ObjKey, Expr)]>),
     Variable(ExprId),
     Constant(i64),
 }

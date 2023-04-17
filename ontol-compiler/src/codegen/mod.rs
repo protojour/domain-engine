@@ -11,15 +11,17 @@ mod equation_solver;
 mod generator;
 mod ir;
 mod link;
-mod map_obj;
 mod optimize;
 mod proc_builder;
-mod value_obj;
+mod struct_pattern;
+mod value_pattern;
 
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{map_obj::codegen_map_obj_origin, value_obj::codegen_value_obj_origin},
+    codegen::{
+        struct_pattern::codegen_struct_pattern_origin, value_pattern::codegen_value_pattern_origin,
+    },
     typed_expr::{ExprRef, TypedExprKind, TypedExprTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
@@ -208,11 +210,11 @@ fn codegen_map(
     }
 
     match &from_expr.kind {
-        TypedExprKind::ValueObjPattern(_) => {
-            codegen_value_obj_origin(proc_table, equation, to, to_def)
+        TypedExprKind::ValuePattern(_) => {
+            codegen_value_pattern_origin(proc_table, equation, to, to_def)
         }
-        TypedExprKind::MapObjPattern(attributes) => {
-            codegen_map_obj_origin(proc_table, equation, to, attributes)
+        TypedExprKind::StructPattern(attributes) => {
+            codegen_struct_pattern_origin(proc_table, equation, to, attributes)
         }
         other => panic!("unable to generate translation: {other:?}"),
     }

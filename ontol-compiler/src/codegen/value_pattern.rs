@@ -16,7 +16,7 @@ use crate::{
 
 use super::{equation::TypedExprEquation, ProcTable};
 
-pub(super) fn codegen_value_obj_origin(
+pub(super) fn codegen_value_pattern_origin(
     proc_table: &mut ProcTable,
     equation: &TypedExprEquation,
     to: ExprRef,
@@ -50,11 +50,11 @@ pub(super) fn codegen_value_obj_origin(
 
     let terminator =
         CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
-            TypedExprKind::ValueObjPattern(expr_ref) => {
+            TypedExprKind::ValuePattern(expr_ref) => {
                 generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
                 Terminator::Return(builder.top())
             }
-            TypedExprKind::MapObjPattern(dest_attrs) => {
+            TypedExprKind::StructPattern(dest_attrs) => {
                 builder.gen(
                     &mut block,
                     Ir::CallBuiltin(BuiltinProc::NewMap, to_def),

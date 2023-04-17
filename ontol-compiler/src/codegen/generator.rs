@@ -146,10 +146,10 @@ impl CodeGenerator {
                 builder.gen(block, Ir::Remove(counter), Stack(-1), span);
                 builder.gen(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            TypedExprKind::ValueObjPattern(_) => {
+            TypedExprKind::ValuePattern(_) => {
                 todo!()
             }
-            TypedExprKind::MapObjPattern(_) => {
+            TypedExprKind::StructPattern(_) => {
                 todo!()
             }
             TypedExprKind::Unit => {

@@ -16,8 +16,8 @@ use crate::{
 
 use super::{equation::TypedExprEquation, proc_builder::ProcBuilder, ProcTable};
 
-/// Generate code originating from a map obj destructuring
-pub(super) fn codegen_map_obj_origin(
+/// Generate code originating from a struct destructuring
+pub(super) fn codegen_struct_pattern_origin(
     proc_table: &mut ProcTable,
     equation: &TypedExprEquation,
     to: ExprRef,
@@ -25,7 +25,7 @@ pub(super) fn codegen_map_obj_origin(
 ) -> ProcBuilder {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
-    // always start at 0 (for now), there are no recursive map_objs (yet)
+    // always start at 0 (for now), there are no recursive structs (yet)
     let input_local = 0;
 
     // debug!("origin attrs: {origin_attrs:#?}");
@@ -79,7 +79,7 @@ pub(super) fn codegen_map_obj_origin(
     let mut block = builder.new_block(Stack(1), span);
 
     let (block, terminator) = match &to_expr.kind {
-        TypedExprKind::MapObjPattern(dest_attrs) => {
+        TypedExprKind::StructPattern(dest_attrs) => {
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
@@ -125,7 +125,7 @@ pub(super) fn codegen_map_obj_origin(
                 },
             )
         }
-        TypedExprKind::ValueObjPattern(expr_ref) => {
+        TypedExprKind::ValuePattern(expr_ref) => {
             // unpack attributes
             for (property_id, _) in &origin_properties {
                 builder.gen(

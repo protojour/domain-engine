@@ -157,11 +157,11 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 }
                 tup.finish()?
             }
-            TypedExprKind::ValueObjPattern(expr_ref) => f
+            TypedExprKind::ValuePattern(expr_ref) => f
                 .debug_tuple(&self.header("ValueObj"))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
-            TypedExprKind::MapObjPattern(attributes) => {
+            TypedExprKind::StructPattern(attributes) => {
                 let mut tup = f.debug_tuple(&self.header("MapObj"));
                 for (property_id, expr_ref) in attributes {
                     tup.field(&self.child(*expr_ref, Some(*property_id)));

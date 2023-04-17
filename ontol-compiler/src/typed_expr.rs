@@ -39,10 +39,10 @@ pub enum TypedExprKind<'m> {
     Unit,
     /// Call to a built-in procedure
     Call(BuiltinProc, SmallVec<[ExprRef; 2]>),
-    /// A value object (object with one anonymous property/attribute)
-    ValueObjPattern(ExprRef),
-    /// A map object pattern
-    MapObjPattern(IndexMap<PropertyId, ExprRef>),
+    /// A value pattern ("object" with one anonymous property/attribute)
+    ValuePattern(ExprRef),
+    /// A struct pattern, containing destructuring of properties
+    StructPattern(IndexMap<PropertyId, ExprRef>),
     /// A variable definition
     Variable(SyntaxVar),
     /// A variable reference (usage site)

@@ -129,8 +129,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                let first = self.lower_map_type_to_obj(first, &mut var_table)?;
-                let second = self.lower_map_type_to_obj(second, &mut var_table)?;
+                let first = self.lower_map_type_to_struct(first, &mut var_table)?;
+                let second = self.lower_map_type_to_struct(second, &mut var_table)?;
 
                 Ok([self.define(
                     DefKind::Mapping(Variables(variables.into()), first, second),
@@ -564,7 +564,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lower_map_type_to_obj(
+    fn lower_map_type_to_struct(
         &mut self,
         (map_type, span): (ast::MapType, Span),
         var_table: &mut ExprVarTable,
@@ -609,7 +609,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .collect::<Result<_, _>>()?;
 
         let expr = self.expr(
-            ExprKind::Obj(
+            ExprKind::Struct(
                 TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&map_type.path.1),

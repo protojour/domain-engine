@@ -107,7 +107,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => self.expr_error(CompileError::NotCallable, &expr.span),
                 }
             }
-            ExprKind::Obj(type_path, attributes) => {
+            ExprKind::Struct(type_path, attributes) => {
                 let domain_type = self.check_def(type_path.def_id);
                 let subject_id = match domain_type {
                     Type::Domain(subject_id) => subject_id,
@@ -215,7 +215,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                 ctx.expressions.add(TypedExpr {
                                     ty: domain_type,
-                                    kind: TypedExprKind::MapObjPattern(typed_properties),
+                                    kind: TypedExprKind::StructPattern(typed_properties),
                                     span: expr.span,
                                 })
                             }
@@ -245,7 +245,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             ctx.expressions.add(TypedExpr {
                                 ty: domain_type,
-                                kind: TypedExprKind::ValueObjPattern(typed_expr_ref),
+                                kind: TypedExprKind::ValuePattern(typed_expr_ref),
                                 span: expr.span,
                             })
                         }

@@ -140,10 +140,10 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 self.reduce_call(expr_ref, *proc, param_refs, indent)
             }
-            TypedExprKind::ValueObjPattern(value_node) => {
+            TypedExprKind::ValuePattern(value_node) => {
                 self.reduce_expr_inner(*value_node, indent.inc())
             }
-            TypedExprKind::MapObjPattern(property_map) => {
+            TypedExprKind::StructPattern(property_map) => {
                 let expr_refs: Vec<_> =
                     property_map.iter().map(|(_, expr_ref)| *expr_ref).collect();
                 for expr_ref in expr_refs {
