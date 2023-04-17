@@ -256,6 +256,54 @@ fn test_map_deep_array_item_many() {
 }
 
 #[test]
+fn test_deep_structural_map() {
+    "
+    pub type foo
+    type foo_inner
+
+    with foo {
+        rel _ 'a': string
+        rel _ 'inner': foo2
+    }
+    with foo_inner {
+        rel _ 'b': string
+        rel _ 'c': string
+    }
+
+    pub type bar
+    type bar_inner
+
+    with bar {
+        rel _ 'a': string
+        rel _ 'b': string
+        rel _ 'inner': bar_inner
+    }
+
+    with bar_inner {
+        rel _ 'c': string
+    }
+
+    map (a b c) {
+        foo {
+            rel 'a': a
+            rel 'inner': { // ERROR parse error: found `{`, expected one of `(`, `}`, `rel`
+                rel 'b': b
+                rel 'c': c
+            }
+        }
+        bar {
+            rel 'a': a
+            rel 'b': b
+            rel 'inner': {
+                rel 'c': c
+            }
+        }
+    }
+    "
+    .compile_fail()
+}
+
+#[test]
 fn test_map_complex_flow() {
     // FIXME: This should be a one-way mapping.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.
