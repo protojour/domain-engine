@@ -39,6 +39,15 @@ impl SubstitutionTable {
         }
     }
 
+    pub fn resolve_once(&self, expr_ref: ExprRef) -> Option<ExprRef> {
+        let entry = self.0[expr_ref.0 as usize];
+        if entry == expr_ref {
+            return None;
+        }
+
+        Some(entry)
+    }
+
     /// Reset all substitutions to original state
     pub fn reset(&mut self, size: usize) {
         self.0.truncate(size);
@@ -117,6 +126,11 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
         expr_ref: ExprRef,
         indent: Indent,
     ) -> Result<Substitution, SolveError> {
+        debug!(
+            "{indent}(enter) reduce expr {:?}",
+            self.expressions[expr_ref].kind
+        );
+
         match &self.expressions[expr_ref].kind {
             TypedExprKind::Call(proc, params) => {
                 let param_refs = params
@@ -130,7 +144,8 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 self.reduce_expr_inner(*value_node, indent.inc())
             }
             TypedExprKind::MapObjPattern(property_map) => {
-                let expr_refs: Vec<_> = property_map.iter().map(|(_, node)| *node).collect();
+                let expr_refs: Vec<_> =
+                    property_map.iter().map(|(_, expr_ref)| *expr_ref).collect();
                 for expr_ref in expr_refs {
                     self.reduce_expr_inner(expr_ref, indent.inc())?;
                 }
@@ -142,56 +157,82 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             TypedExprKind::Translate(param_ref, param_ty) => {
                 let param_ty = *param_ty;
                 let param_ref = match self.reduce_expr_inner(*param_ref, indent.inc())? {
-                    Substitution::Variable(var_id) => var_id,
+                    Substitution::Variable(var_ref) => var_ref,
                     Substitution::Constant => return Ok(Substitution::Constant),
                 };
 
-                let (cloned_param_id, cloned_param) = self.clone_expr(param_ref);
+                let (cloned_param_id, cloned_param) = self.clone_expr(param_ref, indent);
                 let cloned_param_span = cloned_param.span;
                 let expr = &self.expressions[expr_ref];
 
                 debug!(
-                    "substitute TypedExprKind::Call with span {:?}, param_id: {:?}",
+                    "{indent}substitute TypedExprKind::Call with span {:?}, param_id: {:?}",
                     expr.span, param_ref.0
                 );
 
                 // invert translation:
-                let (inverted_translation_id, _) = self.add_expr(TypedExpr {
-                    kind: TypedExprKind::Translate(cloned_param_id, expr.ty),
-                    ty: param_ty,
-                    span: cloned_param_span,
-                });
+                let (inverted_translation_ref, _) = self.add_expr(
+                    TypedExpr {
+                        kind: TypedExprKind::Translate(cloned_param_id, expr.ty),
+                        ty: param_ty,
+                        span: cloned_param_span,
+                    },
+                    indent,
+                );
 
                 // remove the translation call from the reductions
                 self.reductions[expr_ref] = param_ref;
                 // add inverted translation call to the expansions
-                self.expansions[param_ref] = inverted_translation_id;
+                self.expansions[param_ref] = inverted_translation_ref;
 
-                Ok(Substitution::Variable(cloned_param_id))
+                debug!("{indent}reduction subst: {expr_ref:?}->{param_ref:?}");
+                debug!(
+                    "{indent}expansion subst: {param_ref:?}->{inverted_translation_ref:?} (new!)"
+                );
+
+                Ok(Substitution::Variable(param_ref))
             }
-            TypedExprKind::SequenceMap(expr_node, iter_var, _body_node, param_ty) => {
-                let iter_var = *iter_var;
-                let param_ty = *param_ty;
-                let param_ref = match self.reduce_expr_inner(*expr_node, indent.inc())? {
+            TypedExprKind::SequenceMap(seq_ref, iter_var_ref, item_ref, item_ty) => {
+                let seq_ref = *seq_ref;
+                let iter_var_ref = *iter_var_ref;
+                let item_ref = *item_ref;
+                let item_ty = *item_ty;
+
+                let item_ref = match self.reduce_expr_inner(item_ref, indent.inc())? {
                     Substitution::Variable(var_id) => var_id,
                     Substitution::Constant => return Ok(Substitution::Constant),
                 };
 
-                let (cloned_param_id, cloned_param) = self.clone_expr(param_ref);
-                let cloned_param_span = cloned_param.span;
+                // Escape recursive expansion of the sequence reference:
+                let seq_var = self.reductions.resolve(seq_ref);
+                let (cloned_seq_var, _) = self.clone_expr(seq_var, indent);
+
+                // let (cloned_item_id, cloned_item) = self.clone_expr(item_ref);
+                // let cloned_item_span = cloned_item.span;
                 let expr = &self.expressions[expr_ref];
-                let (inverted_map_id, _) = self.add_expr(TypedExpr {
-                    kind: TypedExprKind::SequenceMap(expr_ref, iter_var, cloned_param_id, expr.ty),
-                    ty: param_ty,
-                    span: cloned_param_span,
-                });
+                let (inverted_map_ref, _) = self.add_expr(
+                    TypedExpr {
+                        kind: TypedExprKind::SequenceMap(
+                            cloned_seq_var,
+                            iter_var_ref,
+                            item_ref,
+                            item_ty,
+                        ),
+                        ty: expr.ty,
+                        span: expr.span,
+                    },
+                    indent,
+                );
 
                 // remove the map call from the reductions
-                self.reductions[expr_ref] = param_ref;
+                self.reductions[expr_ref] = seq_ref;
                 // add inverted map call to the expansions
-                self.expansions[param_ref] = inverted_map_id;
+                self.expansions[seq_var] = inverted_map_ref;
 
-                Ok(Substitution::Variable(cloned_param_id))
+                debug!("{indent}reduction subst: {expr_ref:?}->{seq_ref:?}");
+                debug!("{indent}expansion subst: {seq_ref:?}->{inverted_map_ref:?} (new!)");
+
+                Ok(Substitution::Variable(inverted_map_ref))
             }
             kind => Err(SolveError::UnhandledExpr(smart_format!("{kind:?}"))),
         }
@@ -257,7 +298,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             // e.g. if the expr `:v` gets rewritten to `(* :v 2)`,
             // we only want to do this once.
             // The left `:v` cannot be the same node as the right `:v`.
-            let (cloned_var_ref, _) = self.clone_expr(param_var_ref);
+            let (cloned_var_ref, _) = self.clone_expr(param_var_ref, indent);
             cloned_params[var_index] = cloned_var_ref;
 
             let target_expr = TypedExpr {
@@ -265,7 +306,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 ty: expr_ty,
                 span,
             };
-            let (target_expr_ref, _) = self.add_expr(target_expr);
+            let (target_expr_ref, _) = self.add_expr(target_expr, indent);
 
             // substitutions
             self.reductions[expr_ref] = param_var_ref;
@@ -280,17 +321,21 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
         Err(SolveError::NoRulesMatchedCall)
     }
 
-    fn add_expr(&mut self, expr: TypedExpr<'m>) -> (ExprRef, &TypedExpr<'m>) {
-        let id = ExprRef(self.expressions.0.len() as u32);
+    fn clone_expr(&mut self, expr_ref: ExprRef, indent: Indent) -> (ExprRef, &TypedExpr<'m>) {
+        let expr = &self.expressions[expr_ref];
+        self.add_expr(expr.clone(), indent)
+    }
+
+    fn add_expr(&mut self, expr: TypedExpr<'m>, indent: Indent) -> (ExprRef, &TypedExpr<'m>) {
+        let expr_ref = ExprRef(self.expressions.0.len() as u32);
         self.expressions.0.push(expr);
         self.reductions.push();
         self.expansions.push();
-        (id, &self.expressions[id])
-    }
-
-    fn clone_expr(&mut self, expr_ref: ExprRef) -> (ExprRef, &TypedExpr<'m>) {
-        let expr = &self.expressions[expr_ref];
-        self.add_expr(expr.clone())
+        debug!(
+            "{indent}add_expr: {expr_ref:?} => {:?}",
+            self.expressions[expr_ref]
+        );
+        (expr_ref, &self.expressions[expr_ref])
     }
 }
 

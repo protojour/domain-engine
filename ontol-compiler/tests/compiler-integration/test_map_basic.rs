@@ -210,6 +210,12 @@ fn test_map_translate_array_item() {
             json!({ "foos": [{ "f": "42" }] }),
             json!({ "bars": [{ "b": "42" }] }),
         );
+        assert_translate(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [{ "b": "42" }] }),
+            json!({ "foos": [{ "f": "42" }] }),
+        );
     });
 }
 

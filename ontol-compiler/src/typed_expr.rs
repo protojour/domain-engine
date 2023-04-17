@@ -54,7 +54,7 @@ pub enum TypedExprKind<'m> {
     /// A mapping operation on an array.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
-    /// The second expression is the body.
+    /// The second expression is the item/body.
     SequenceMap(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
 }
 

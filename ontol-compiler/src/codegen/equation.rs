@@ -113,19 +113,23 @@ impl<'a, 'm> DebugTree<'a, 'm> {
         }
     }
 
-    fn header(&self, name: &str, resolved: ExprRef) -> String {
+    fn header(&self, name: &str) -> String {
         use std::fmt::Write;
         let mut s = String::new();
 
-        if self.expr_ref != resolved {
-            write!(&mut s, "{{{}->{}}}", self.expr_ref.0, resolved.0).unwrap();
-        } else {
-            write!(&mut s, "{{{}}}", self.expr_ref.0).unwrap();
+        {
+            let mut expr_ref = self.expr_ref;
+            write!(&mut s, "{{{}", expr_ref.0).unwrap();
+            while let Some(next) = self.substitutions.resolve_once(expr_ref) {
+                write!(&mut s, "->{}", next.0).unwrap();
+                expr_ref = next;
+            }
+            write!(&mut s, "}} ").unwrap();
         }
 
         if let Some(property_id) = &self.property_id {
             let def_id = &property_id.relation_id.0;
-            write!(&mut s, " (rel {}, {}) ", def_id.0 .0, def_id.1).unwrap();
+            write!(&mut s, "(rel {}, {}) ", def_id.0 .0, def_id.1).unwrap();
         }
 
         write!(&mut s, "{}", name).unwrap();
@@ -140,46 +144,46 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
             return write!(f, "[ERROR depth exceeded]");
         }
 
-        let (resolved, expr, _) = self
+        let (_, expr, _) = self
             .equation
             .resolve_expr(self.substitutions, self.expr_ref);
 
         match &expr.kind {
-            TypedExprKind::Unit => f.debug_tuple(&self.header("Unit", resolved)).finish()?,
+            TypedExprKind::Unit => f.debug_tuple(&self.header("Unit")).finish()?,
             TypedExprKind::Call(proc, params) => {
-                let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}"), resolved));
+                let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}")));
                 for param in params {
                     tup.field(&self.child(*param, None));
                 }
                 tup.finish()?
             }
             TypedExprKind::ValueObjPattern(expr_ref) => f
-                .debug_tuple(&self.header("ValueObj", resolved))
+                .debug_tuple(&self.header("ValueObj"))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
             TypedExprKind::MapObjPattern(attributes) => {
-                let mut tup = f.debug_tuple(&self.header("MapObj", resolved));
+                let mut tup = f.debug_tuple(&self.header("MapObj"));
                 for (property_id, expr_ref) in attributes {
                     tup.field(&self.child(*expr_ref, Some(*property_id)));
                 }
                 tup.finish()?;
             }
             TypedExprKind::Constant(c) => f
-                .debug_tuple(&self.header(&format!("Constant({c})"), resolved))
+                .debug_tuple(&self.header(&format!("Constant({c})")))
                 .finish()?,
             TypedExprKind::Variable(SyntaxVar(v, BindDepth(d))) => f
-                .debug_tuple(&self.header(&format!("Variable({v} d={d})"), resolved))
+                .debug_tuple(&self.header(&format!("Variable({v} d={d})")))
                 .finish()?,
             TypedExprKind::VariableRef(var_ref) => f
-                .debug_tuple(&self.header("VarRef", resolved))
+                .debug_tuple(&self.header("VarRef"))
                 .field(&self.child(*var_ref, None))
                 .finish()?,
             TypedExprKind::Translate(expr_ref, _) => f
-                .debug_tuple(&self.header("Translate", resolved))
+                .debug_tuple(&self.header("Translate"))
                 .field(&self.child(*expr_ref, None))
                 .finish()?,
             TypedExprKind::SequenceMap(expr_ref, var, body, _) => f
-                .debug_tuple(&self.header("SequenceMap", resolved))
+                .debug_tuple(&self.header("SequenceMap"))
                 .field(&self.child(*expr_ref, None))
                 .field(&var)
                 .field(&self.child(*body, None))

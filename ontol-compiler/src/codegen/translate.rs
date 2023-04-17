@@ -55,6 +55,9 @@ fn codegen_translate(
 ) -> ProcBuilder {
     let (_, from_expr, _) = equation.resolve_expr(&equation.reductions, from);
 
+    debug!("expansions: {:?}", equation.expansions.debug_table());
+    debug!("reductions: {:?}", equation.reductions.debug_table());
+
     // for easier readability:
     match direction {
         DebugDirection::Forward => debug!(
@@ -64,8 +67,8 @@ fn codegen_translate(
         ),
         DebugDirection::Backward => debug!(
             "(backward) codegen\nexpansions: {:#?}\nreductions: {:#?}",
-            equation.debug_tree(from, &equation.expansions),
-            equation.debug_tree(to, &equation.reductions),
+            equation.debug_tree(to, &equation.expansions),
+            equation.debug_tree(from, &equation.reductions),
         ),
     }
 
