@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Address, Lib, Procedure},
+    proc::{Address, Lib, NParams, Procedure},
     DefId,
 };
 
@@ -19,10 +19,8 @@ mod value_pattern;
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{
-        struct_pattern::codegen_struct_pattern_origin, value_pattern::codegen_value_pattern_origin,
-    },
-    typed_expr::{ExprRef, TypedExprKind, TypedExprTable},
+    codegen::{generator::CodeGenerator, proc_builder::Stack},
+    typed_expr::{ExprRef, TypedExprTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -171,7 +169,7 @@ fn codegen_map_solve(
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
-            let procedure = codegen_map(proc_table, equation, (from, to), to_def, direction);
+            let procedure = codegen_map(proc_table, equation, (from, to), direction);
 
             proc_table.procedures.insert((from_def, to_def), procedure);
             true
@@ -187,11 +185,8 @@ fn codegen_map(
     proc_table: &mut ProcTable,
     equation: &TypedExprEquation,
     (from, to): (ExprRef, ExprRef),
-    to_def: DefId,
     direction: DebugDirection,
 ) -> ProcBuilder {
-    let (_, from_expr, _) = equation.resolve_expr(&equation.reductions, from);
-
     debug!("expansions: {:?}", equation.expansions.debug_table());
     debug!("reductions: {:?}", equation.reductions.debug_table());
 
@@ -209,13 +204,16 @@ fn codegen_map(
         ),
     }
 
-    match &from_expr.kind {
-        TypedExprKind::ValuePattern(_) => {
-            codegen_value_pattern_origin(proc_table, equation, to, to_def)
-        }
-        TypedExprKind::StructPattern(attributes) => {
-            codegen_struct_pattern_origin(proc_table, equation, to, attributes)
-        }
-        other => panic!("unable to generate mapping: {other:?}"),
-    }
+    let (_, _, span) = equation.resolve_expr(&equation.expansions, to);
+
+    let mut builder = ProcBuilder::new(NParams(1));
+    let mut generator = CodeGenerator::default();
+    let mut block = builder.new_block(Stack(1), span);
+
+    let terminator =
+        generator.codegen_pattern(proc_table, &mut builder, &mut block, equation, from, to);
+
+    builder.commit(block, terminator);
+
+    builder
 }

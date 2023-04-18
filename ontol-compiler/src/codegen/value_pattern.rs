@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams},
+    proc::{BuiltinProc, Local},
     DefId,
 };
 
@@ -17,11 +17,14 @@ use crate::{
 use super::{equation::TypedExprEquation, ProcTable};
 
 pub(super) fn codegen_value_pattern_origin(
+    generator: &mut CodeGenerator,
     proc_table: &mut ProcTable,
+    builder: &mut ProcBuilder,
+    block: &mut Block,
     equation: &TypedExprEquation,
     to: ExprRef,
     to_def: DefId,
-) -> ProcBuilder {
+) -> Terminator {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     struct ValueCodegen {
@@ -45,41 +48,34 @@ pub(super) fn codegen_value_pattern_origin(
     let value_codegen = ValueCodegen {
         input_local: Local(0),
     };
-    let mut builder = ProcBuilder::new(NParams(1));
-    let mut block = builder.new_block(Stack(1), span);
 
-    let terminator =
-        CodeGenerator::default().enter_bind_level(value_codegen, |generator| match &to_expr.kind {
-            TypedExprKind::ValuePattern(expr_ref) => {
-                generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *expr_ref);
-                Terminator::Return(builder.top())
-            }
-            TypedExprKind::StructPattern(dest_attrs) => {
+    generator.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
+        TypedExprKind::ValuePattern(expr_ref) => {
+            generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
+            Terminator::Return(builder.top())
+        }
+        TypedExprKind::StructPattern(dest_attrs) => {
+            builder.gen(
+                block,
+                Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
+                Stack(1),
+                span,
+            );
+
+            for (property_id, node) in dest_attrs {
+                generator.codegen_expr(proc_table, builder, block, equation, *node);
                 builder.gen(
-                    &mut block,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
-                    Stack(1),
+                    block,
+                    Ir::PutAttrValue(Local(1), *property_id),
+                    Stack(-1),
                     span,
                 );
-
-                for (property_id, node) in dest_attrs {
-                    generator.codegen_expr(proc_table, &mut builder, &mut block, equation, *node);
-                    builder.gen(
-                        &mut block,
-                        Ir::PutAttrValue(Local(1), *property_id),
-                        Stack(-1),
-                        span,
-                    );
-                }
-
-                Terminator::Return(builder.top())
             }
-            kind => {
-                todo!("target: {kind:?}");
-            }
-        });
 
-    builder.commit(block, terminator);
-
-    builder
+            Terminator::Return(builder.top())
+        }
+        kind => {
+            todo!("target: {kind:?}");
+        }
+    })
 }

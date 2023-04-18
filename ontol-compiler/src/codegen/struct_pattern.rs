@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams},
+    proc::{BuiltinProc, Local},
     value::PropertyId,
 };
 
@@ -18,11 +18,14 @@ use super::{equation::TypedExprEquation, proc_builder::ProcBuilder, ProcTable};
 
 /// Generate code originating from a struct destructuring
 pub(super) fn codegen_struct_pattern_origin(
+    generator: &mut CodeGenerator,
     proc_table: &mut ProcTable,
+    builder: &mut ProcBuilder,
+    block: &mut Block,
     equation: &TypedExprEquation,
     to: ExprRef,
     origin_attrs: &IndexMap<PropertyId, ExprRef>,
-) -> ProcBuilder {
+) -> Terminator {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     // always start at 0 (for now), there are no recursive structs (yet)
@@ -75,16 +78,13 @@ pub(super) fn codegen_struct_pattern_origin(
         }
     }
 
-    let mut builder = ProcBuilder::new(NParams(1));
-    let mut block = builder.new_block(Stack(1), span);
-
-    let (block, terminator) = match &to_expr.kind {
+    match &to_expr.kind {
         TypedExprKind::StructPattern(dest_attrs) => {
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
             builder.gen(
-                &mut block,
+                block,
                 Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
                 Stack(1),
                 span,
@@ -93,35 +93,29 @@ pub(super) fn codegen_struct_pattern_origin(
             // unpack attributes
             for (property_id, _) in &origin_properties {
                 builder.gen(
-                    &mut block,
+                    block,
                     Ir::TakeAttr2(Local(input_local), *property_id),
                     Stack(2),
                     span,
                 );
             }
 
-            CodeGenerator::default().enter_bind_level(
+            generator.enter_bind_level(
                 MapCodegen {
                     attr_start: input_local + 2,
                 },
                 |generator| {
                     for (property_id, expr_ref) in dest_attrs {
-                        generator.codegen_expr(
-                            proc_table,
-                            &mut builder,
-                            &mut block,
-                            equation,
-                            *expr_ref,
-                        );
+                        generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
                         builder.gen(
-                            &mut block,
+                            block,
                             Ir::PutAttrValue(Local(1), *property_id),
                             Stack(-1),
                             span,
                         );
                     }
 
-                    (block, Terminator::Return(Local(1)))
+                    Terminator::Return(Local(1))
                 },
             )
         }
@@ -129,35 +123,25 @@ pub(super) fn codegen_struct_pattern_origin(
             // unpack attributes
             for (property_id, _) in &origin_properties {
                 builder.gen(
-                    &mut block,
+                    block,
                     Ir::TakeAttr2(Local(input_local), *property_id),
                     Stack(2),
                     span,
                 );
             }
 
-            CodeGenerator::default().enter_bind_level(
+            generator.enter_bind_level(
                 MapCodegen {
                     attr_start: input_local + 1,
                 },
                 |generator| {
-                    generator.codegen_expr(
-                        proc_table,
-                        &mut builder,
-                        &mut block,
-                        equation,
-                        *expr_ref,
-                    );
-                    (block, Terminator::Return(builder.top()))
+                    generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
+                    Terminator::Return(builder.top())
                 },
             )
         }
         kind => {
             todo!("to: {kind:?}");
         }
-    };
-
-    builder.commit(block, terminator);
-
-    builder
+    }
 }

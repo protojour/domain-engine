@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::{
-    codegen::{find_mapping_key, proc_builder::Stack},
+    codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
 };
@@ -15,6 +15,7 @@ use super::{
     equation::TypedExprEquation,
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
+    struct_pattern::codegen_struct_pattern_origin,
     ProcTable,
 };
 
@@ -43,6 +44,32 @@ impl CodeGenerator {
         let result = f(self);
         self.var_stack.pop();
         result
+    }
+
+    pub fn codegen_pattern(
+        &mut self,
+        proc_table: &mut ProcTable,
+        builder: &mut ProcBuilder,
+        block: &mut Block,
+        equation: &TypedExprEquation,
+        source: ExprRef,
+        target: ExprRef,
+    ) -> Terminator {
+        let (_, source_pattern, _) = equation.resolve_expr(&equation.reductions, source);
+
+        match &source_pattern.kind {
+            TypedExprKind::ValuePattern(_) => {
+                let to_def = find_mapping_key(&equation.expressions[target].ty).unwrap();
+
+                codegen_value_pattern_origin(
+                    self, proc_table, builder, block, equation, target, to_def,
+                )
+            }
+            TypedExprKind::StructPattern(attributes) => codegen_struct_pattern_origin(
+                self, proc_table, builder, block, equation, target, attributes,
+            ),
+            other => panic!("unable to generate mapping for pattern: {other:?}"),
+        }
     }
 
     pub fn codegen_expr(
