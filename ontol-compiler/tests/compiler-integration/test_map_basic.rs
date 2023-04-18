@@ -256,6 +256,7 @@ fn test_map_deep_array_item_many() {
 }
 
 #[test]
+#[should_panic = "BUG: Serialize expected map attributes"]
 fn test_deep_structural_map() {
     "
     pub type foo
@@ -300,7 +301,14 @@ fn test_deep_structural_map() {
         }
     }
     "
-    .compile_fail()
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("foo", "bar"),
+            json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
+            json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
+        );
+    });
 }
 
 #[test]
