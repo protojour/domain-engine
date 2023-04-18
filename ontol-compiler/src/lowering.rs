@@ -5,7 +5,7 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span, Spanned};
-use ontol_runtime::{smart_format, DefId, DefParamId, RelationId};
+use ontol_runtime::{DefId, DefParamId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -129,8 +129,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                let first = self.lower_struct_pattern(first, &mut var_table)?;
-                let second = self.lower_struct_pattern(second, &mut var_table)?;
+                let first = self.lower_struct_pattern_root(first, &mut var_table)?;
+                let second = self.lower_struct_pattern_root(second, &mut var_table)?;
 
                 Ok([self.define(
                     DefKind::Mapping(Variables(variables.into()), first, second),
@@ -564,11 +564,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
+    fn lower_struct_pattern_root(
+        &mut self,
+        ast: (ast::StructPattern, Span),
+        var_table: &mut ExprVarTable,
+    ) -> Res<ExprId> {
+        let expr = self.lower_struct_pattern(ast, var_table)?;
+
+        let expr_id = self.compiler.defs.alloc_expr_id();
+        self.compiler.expressions.insert(expr_id, expr);
+
+        Ok(expr_id)
+    }
+
     fn lower_struct_pattern(
         &mut self,
         (struct_pat, span): (ast::StructPattern, Span),
         var_table: &mut ExprVarTable,
-    ) -> Res<ExprId> {
+    ) -> Res<Expr> {
         let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
         let attributes = struct_pat
             .attributes
@@ -596,20 +609,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 )) => {
                     let def = self.resolve_type_reference(relation.0, &relation.1)?;
 
-                    match object {
-                        ast::Pattern::Expr((expr_pat, _)) => self
-                            .lower_expr((expr_pat, object_span), var_table)
-                            .map(|expr| ((def, self.src.span(&relation.1)), expr)),
-                        ast::Pattern::Struct(_) => Err((
-                            CompileError::TODO(smart_format!("Recursive struct")),
-                            object_span,
-                        )),
-                    }
+                    let inner_expr = match object {
+                        ast::Pattern::Expr((expr_pat, _)) => {
+                            self.lower_expr((expr_pat, object_span), var_table)
+                        }
+                        ast::Pattern::Struct(inner) => self.lower_struct_pattern(inner, var_table),
+                    };
+
+                    inner_expr.map(|expr| ((def, self.src.span(&relation.1)), expr))
                 }
             })
             .collect::<Result<_, _>>()?;
 
-        let expr = self.expr(
+        Ok(self.expr(
             ExprKind::Struct(
                 TypePath {
                     def_id: type_def_id,
@@ -618,11 +630,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 attributes,
             ),
             &span,
-        );
-        let expr_id = self.compiler.defs.alloc_expr_id();
-        self.compiler.expressions.insert(expr_id, expr);
-
-        Ok(expr_id)
+        ))
     }
 
     fn lower_expr(

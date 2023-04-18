@@ -256,6 +256,7 @@ fn test_map_deep_array_item_many() {
 }
 
 #[test]
+#[should_panic = "not a variable, but StructPattern"]
 fn test_deep_structural_map() {
     "
     pub type foo
