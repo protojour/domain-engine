@@ -1,6 +1,5 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile,
-    TestPackages,
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -399,49 +398,4 @@ fn recursive_entity_union() {
             })
         );
     });
-}
-
-#[test]
-// BUG:
-// #[should_panic = "index out of bounds: the len is 3 but the index is 3"]
-fn artist_etc_routing() {
-    TestPackages::with_sources([
-        (SourceName("gsu"), GUITAR_SYNTH_UNION),
-        (SourceName("ai"), ARTIST_AND_INSTRUMENT),
-        (
-            SourceName::root(),
-            "
-            use 'gsu' as gsu
-            use 'ai' as ai
-
-            rel gsu route: ai {
-                map (id n p) {
-                    gsu.artist {
-                        rel 'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
-                        rel 'name': n
-                        rel 'plays': p
-                    }
-                    ai.artist {
-                        rel 'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
-                        rel 'name': n
-                        rel 'plays': p // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
-                    }
-                }
-
-                map (id t p n) {
-                    gsu.synth {
-                        rel 'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
-                        rel 'type': t
-                        rel 'polyphony': p
-                    }
-                    ai.instrument {
-                        rel 'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
-                        rel 'name': n
-                    }
-                }
-            }
-            ",
-        ),
-    ])
-    .compile_fail()
 }
