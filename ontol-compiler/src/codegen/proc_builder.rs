@@ -57,6 +57,10 @@ impl ProcBuilder {
         Local(self.stack_size as u16 - 1 + plus)
     }
 
+    pub fn top_minus(&self, minus: u16) -> Local {
+        Local(self.stack_size as u16 - 1 - minus)
+    }
+
     pub fn commit(&mut self, block: Block, terminator: Terminator) -> BlockIndex {
         let index = block.index;
         self.blocks[index.0 as usize].ir = block.ir;

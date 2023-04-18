@@ -3,7 +3,7 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::SmallVec;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
@@ -191,7 +191,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 todo!()
             }
             TypedExprKind::StructPattern(_) => {
-                todo!()
+                error!("FIXME: Generate struct");
             }
             TypedExprKind::Unit => {
                 todo!()
