@@ -139,6 +139,7 @@ impl Stack for PropStack {
     fn take_map_attr2(&mut self, source: Local, key: PropertyId) {
         let map = self.get_map_mut(source);
         let set = map.remove(&key).unwrap();
+        self.stack.push(Props::Set(FnvHashSet::default()));
         self.stack.push(Props::Set(set));
     }
 
