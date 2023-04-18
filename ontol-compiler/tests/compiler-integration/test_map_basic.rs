@@ -263,7 +263,7 @@ fn test_deep_structural_map() {
 
     with foo {
         rel _ 'a': string
-        rel _ 'inner': foo2
+        rel _ 'inner': foo_inner
     }
     with foo_inner {
         rel _ 'b': string
@@ -286,7 +286,7 @@ fn test_deep_structural_map() {
     map (a b c) {
         foo {
             rel 'a': a
-            rel 'inner': { // ERROR parse error: found `{`, expected one of `(`, `}`, `rel`
+            rel 'inner': foo_inner { // ERROR TODO: Recursive struct
                 rel 'b': b
                 rel 'c': c
             }
@@ -294,7 +294,7 @@ fn test_deep_structural_map() {
         bar {
             rel 'a': a
             rel 'b': b
-            rel 'inner': {
+            rel 'inner': bar_inner {
                 rel 'c': c
             }
         }

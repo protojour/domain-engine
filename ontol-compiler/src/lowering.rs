@@ -5,7 +5,7 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span, Spanned};
-use ontol_runtime::{DefId, DefParamId, RelationId};
+use ontol_runtime::{smart_format, DefId, DefParamId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -129,8 +129,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                let first = self.lower_map_type_to_struct(first, &mut var_table)?;
-                let second = self.lower_map_type_to_struct(second, &mut var_table)?;
+                let first = self.lower_struct_pattern(first, &mut var_table)?;
+                let second = self.lower_struct_pattern(second, &mut var_table)?;
 
                 Ok([self.define(
                     DefKind::Mapping(Variables(variables.into()), first, second),
@@ -564,17 +564,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lower_map_type_to_struct(
+    fn lower_struct_pattern(
         &mut self,
-        (map_type, span): (ast::MapPattern, Span),
+        (struct_pat, span): (ast::StructPattern, Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
-        let type_def_id = self.lookup_path(&map_type.path.0, &map_type.path.1)?;
-        let attributes = map_type
+        let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
+        let attributes = struct_pat
             .attributes
             .into_iter()
-            .map(|map_attr| match map_attr {
-                ast::MapPatternAttr::Expr((expr, expr_span)) => {
+            .map(|struct_attr| match struct_attr {
+                ast::StructPatternAttr::Expr((expr, expr_span)) => {
                     let key = (
                         DefReference {
                             def_id: DefId::unit(),
@@ -586,24 +586,25 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                     Ok((key, expr))
                 }
-                ast::MapPatternAttr::Rel((
-                    ast::MapPatternAttrRel {
-                        subject,
+                ast::StructPatternAttr::Rel((
+                    ast::StructPatternAttrRel {
                         relation,
-                        object,
+                        object: (object, object_span),
                         ..
                     },
                     _span,
                 )) => {
-                    // FIXME: For now:
-                    assert!(subject.is_none());
-
-                    let (object, object_span) = object.unwrap();
-
                     let def = self.resolve_type_reference(relation.0, &relation.1)?;
 
-                    self.lower_expr((object, object_span), var_table)
-                        .map(|expr| ((def, self.src.span(&relation.1)), expr))
+                    match object {
+                        ast::Pattern::Expr((expr_pat, _)) => self
+                            .lower_expr((expr_pat, object_span), var_table)
+                            .map(|expr| ((def, self.src.span(&relation.1)), expr)),
+                        ast::Pattern::Struct(_) => Err((
+                            CompileError::TODO(smart_format!("Recursive struct")),
+                            object_span,
+                        )),
+                    }
                 }
             })
             .collect::<Result<_, _>>()?;
@@ -612,7 +613,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ExprKind::Struct(
                 TypePath {
                     def_id: type_def_id,
-                    span: self.src.span(&map_type.path.1),
+                    span: self.src.span(&struct_pat.path.1),
                 },
                 attributes,
             ),
@@ -626,17 +627,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_expr(
         &mut self,
-        (ast_expr, span): (ast::Expression, Span),
+        (expr_pat, span): (ast::ExprPattern, Span),
         var_table: &ExprVarTable,
     ) -> Res<Expr> {
-        match ast_expr {
-            ast::Expression::NumberLiteral(int) => {
+        match expr_pat {
+            ast::ExprPattern::NumberLiteral(int) => {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
                 Ok(self.expr(ExprKind::Constant(int), &span))
             }
-            ast::Expression::Binary(left, op, right) => {
+            ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
                     ast::BinaryOp::Add => "+",
                     ast::BinaryOp::Sub => "-",
@@ -651,7 +652,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }
-            ast::Expression::Variable(var_ident) => {
+            ast::ExprPattern::Variable(var_ident) => {
                 let id = var_table
                     .get_var_id(var_ident.as_str())
                     .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;

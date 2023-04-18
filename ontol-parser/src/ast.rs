@@ -102,28 +102,50 @@ pub struct RelChain {
 pub struct MapStatement {
     pub kw: Span,
     pub variables: Vec<Spanned<String>>,
-    pub first: Spanned<MapPattern>,
-    pub second: Spanned<MapPattern>,
+    pub first: Spanned<StructPattern>,
+    pub second: Spanned<StructPattern>,
+}
+
+/**
+ * A pattern is either `struct {}` or leaf expr.
+ * An expr cannot contain another struct pattern.
+ */
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Pattern {
+    Expr(Spanned<ExprPattern>),
+    Struct(Spanned<StructPattern>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MapPattern {
+pub struct StructPattern {
     pub path: Spanned<Path>,
-    pub attributes: Vec<MapPatternAttr>,
+    pub attributes: Vec<StructPatternAttr>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum MapPatternAttr {
-    Expr(Spanned<Expression>),
-    Rel(Spanned<MapPatternAttrRel>),
+pub enum StructPatternAttr {
+    Expr(Spanned<ExprPattern>),
+    Rel(Spanned<StructPatternAttrRel>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MapPatternAttrRel {
+pub struct StructPatternAttrRel {
     pub kw: Span,
-    pub subject: Option<Spanned<Expression>>,
     pub relation: Spanned<Type>,
-    pub object: Option<Spanned<Expression>>,
+    pub relation_struct: Option<Spanned<StructPattern>>,
+    pub object: Spanned<Pattern>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum ExprPattern {
+    Variable(String),
+    NumberLiteral(String),
+    StringLiteral(String),
+    Binary(
+        Box<Spanned<ExprPattern>>,
+        BinaryOp,
+        Box<Spanned<ExprPattern>>,
+    ),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -133,16 +155,6 @@ pub enum Type {
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Expression {
-    Variable(String),
-    Path(Path),
-    NumberLiteral(String),
-    StringLiteral(String),
-    Binary(Box<Spanned<Expression>>, BinaryOp, Box<Spanned<Expression>>),
-    // Call(Spanned<String>, Vec<Spanned<Expr>>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

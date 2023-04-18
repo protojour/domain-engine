@@ -4,14 +4,15 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    FmtStatement, Path, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement,
+    ExprPattern, FmtStatement, Path, Pattern, StructPattern, StructPatternAttr,
+    StructPatternAttrRel, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement,
     Visibility, WithStatement,
 };
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, Expression, MapPattern, MapPatternAttr, MapPatternAttrRel,
-        MapStatement, RelStatement, RelType, Relation, Statement, Type, TypeStatement,
+        BinaryOp, Cardinality, MapStatement, RelStatement, RelType, Relation, Statement, Type,
+        TypeStatement,
     },
     lexer::Token,
     Span, Spanned,
@@ -219,8 +220,8 @@ fn map_statement() -> impl AstParser<MapStatement> {
                 .delimited_by(open('('), close(')')),
         )
         .then(
-            spanned(map_type())
-                .then(spanned(map_type()))
+            spanned(struct_pattern(pattern()))
+                .then(spanned(struct_pattern(pattern())))
                 .delimited_by(open('{'), close('}')),
         )
         .map(|((kw, variables), (first, second))| MapStatement {
@@ -231,28 +232,39 @@ fn map_statement() -> impl AstParser<MapStatement> {
         })
 }
 
-fn map_type() -> impl AstParser<MapPattern> {
+fn pattern() -> impl AstParser<Pattern> {
+    recursive(|pattern| {
+        spanned(struct_pattern(pattern))
+            .map(Pattern::Struct)
+            .or(expr_pattern().map(Pattern::Expr))
+    })
+}
+
+fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<StructPattern> {
     spanned(path())
         .then(
-            map_attribute()
+            struct_pattern_attr(pattern)
                 .repeated()
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(path, attributes)| MapPattern { path, attributes })
+        .map(|(path, attributes)| StructPattern { path, attributes })
+        .labelled("struct pattern")
 }
 
-fn map_attribute() -> impl AstParser<MapPatternAttr> {
-    let variable = expression().map(MapPatternAttr::Expr);
+fn struct_pattern_attr(
+    pattern: impl AstParser<Pattern> + Clone,
+) -> impl AstParser<StructPatternAttr> {
+    let variable = expr_pattern().map(StructPatternAttr::Expr);
     let rel = keyword(Token::Rel)
         .then(spanned(ty()))
         .then_ignore(colon())
-        .then(expression().or_not())
+        .then(spanned(pattern))
         .map_with_span(|((kw, relation), object), span| {
-            MapPatternAttr::Rel((
-                MapPatternAttrRel {
+            StructPatternAttr::Rel((
+                StructPatternAttrRel {
                     kw,
-                    subject: None,
                     relation,
+                    relation_struct: None,
                     object,
                 },
                 span,
@@ -262,13 +274,12 @@ fn map_attribute() -> impl AstParser<MapPatternAttr> {
     variable.or(rel)
 }
 
-/// Expression parser
-fn expression() -> impl AstParser<Spanned<Expression>> {
-    recursive(|expr| {
-        let variable = variable().map(Expression::Variable);
-        let number_literal = number_literal().map(Expression::NumberLiteral);
-        let string_literal = string_literal().map(Expression::StringLiteral);
-        let group = expr.delimited_by(open('('), close(')'));
+fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
+    recursive(|expr_pattern| {
+        let variable = variable().map(ExprPattern::Variable);
+        let number_literal = number_literal().map(ExprPattern::NumberLiteral);
+        let string_literal = string_literal().map(ExprPattern::StringLiteral);
+        let group = expr_pattern.delimited_by(open('('), close(')'));
 
         let atom = spanned(variable)
             .or(spanned(number_literal))
@@ -291,7 +302,7 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
                 .foldl(|left, (op, right)| {
                     let span = left.1.start..right.1.end;
                     (
-                        Expression::Binary(Box::new(left), op, Box::new(right)),
+                        ExprPattern::Binary(Box::new(left), op, Box::new(right)),
                         span,
                     )
                 });
@@ -303,11 +314,12 @@ fn expression() -> impl AstParser<Spanned<Expression>> {
             .foldl(|left, (op, right)| {
                 let span = left.1.start..right.1.end;
                 (
-                    Expression::Binary(Box::new(left), op, Box::new(right)),
+                    ExprPattern::Binary(Box::new(left), op, Box::new(right)),
                     span,
                 )
             })
     })
+    .labelled("expression pattern")
 }
 
 fn spanned_ty_or_underscore() -> impl AstParser<Spanned<Option<Type>>> {
