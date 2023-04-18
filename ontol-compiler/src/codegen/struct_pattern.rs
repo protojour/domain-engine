@@ -14,13 +14,11 @@ use crate::{
     SourceSpan,
 };
 
-use super::{equation::TypedExprEquation, proc_builder::ProcBuilder, ProcTable};
+use super::{equation::TypedExprEquation, proc_builder::ProcBuilder};
 
 /// Generate code originating from a struct destructuring
 pub(super) fn codegen_struct_pattern_origin(
-    generator: &mut CodeGenerator,
-    proc_table: &mut ProcTable,
-    builder: &mut ProcBuilder,
+    gen: &mut CodeGenerator,
     block: &mut Block,
     equation: &TypedExprEquation,
     to: ExprRef,
@@ -74,7 +72,7 @@ pub(super) fn codegen_struct_pattern_origin(
             // after the definition of the return value
             let value_local = self.attr_start + (var.0 * 2) + 1;
 
-            builder.gen(block, Ir::Clone(Local(value_local)), Stack(1), *span);
+            builder.push(block, Ir::Clone(Local(value_local)), Stack(1), *span);
         }
     }
 
@@ -83,7 +81,7 @@ pub(super) fn codegen_struct_pattern_origin(
             let return_def_id = to_expr.ty.get_single_def_id().unwrap();
 
             // Local(1), this is the return value:
-            builder.gen(
+            gen.builder.push(
                 block,
                 Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
                 Stack(1),
@@ -92,7 +90,7 @@ pub(super) fn codegen_struct_pattern_origin(
 
             // unpack attributes
             for (property_id, _) in &origin_properties {
-                builder.gen(
+                gen.builder.push(
                     block,
                     Ir::TakeAttr2(Local(input_local), *property_id),
                     Stack(2),
@@ -100,14 +98,14 @@ pub(super) fn codegen_struct_pattern_origin(
                 );
             }
 
-            generator.enter_bind_level(
+            gen.enter_bind_level(
                 MapCodegen {
                     attr_start: input_local + 2,
                 },
                 |generator| {
                     for (property_id, expr_ref) in dest_attrs {
-                        generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
-                        builder.gen(
+                        generator.codegen_expr(block, equation, *expr_ref);
+                        generator.builder.push(
                             block,
                             Ir::PutAttrValue(Local(1), *property_id),
                             Stack(-1),
@@ -122,7 +120,7 @@ pub(super) fn codegen_struct_pattern_origin(
         TypedExprKind::ValuePattern(expr_ref) => {
             // unpack attributes
             for (property_id, _) in &origin_properties {
-                builder.gen(
+                gen.builder.push(
                     block,
                     Ir::TakeAttr2(Local(input_local), *property_id),
                     Stack(2),
@@ -130,13 +128,13 @@ pub(super) fn codegen_struct_pattern_origin(
                 );
             }
 
-            generator.enter_bind_level(
+            gen.enter_bind_level(
                 MapCodegen {
                     attr_start: input_local + 1,
                 },
                 |generator| {
-                    generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
-                    Terminator::Return(builder.top())
+                    generator.codegen_expr(block, equation, *expr_ref);
+                    Terminator::Return(generator.builder.top())
                 },
             )
         }

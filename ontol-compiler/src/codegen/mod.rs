@@ -207,11 +207,10 @@ fn codegen_map(
     let (_, _, span) = equation.resolve_expr(&equation.expansions, to);
 
     let mut builder = ProcBuilder::new(NParams(1));
-    let mut generator = CodeGenerator::default();
     let mut block = builder.new_block(Stack(1), span);
+    let mut generator = CodeGenerator::new(proc_table, &mut builder);
 
-    let terminator =
-        generator.codegen_pattern(proc_table, &mut builder, &mut block, equation, from, to);
+    let terminator = generator.codegen_pattern(&mut block, equation, from, to);
 
     builder.commit(block, terminator);
 

@@ -14,12 +14,10 @@ use crate::{
     SourceSpan,
 };
 
-use super::{equation::TypedExprEquation, ProcTable};
+use super::equation::TypedExprEquation;
 
 pub(super) fn codegen_value_pattern_origin(
-    generator: &mut CodeGenerator,
-    proc_table: &mut ProcTable,
-    builder: &mut ProcBuilder,
+    gen: &mut CodeGenerator,
     block: &mut Block,
     equation: &TypedExprEquation,
     to: ExprRef,
@@ -41,7 +39,7 @@ pub(super) fn codegen_value_pattern_origin(
         ) {
             // There should only be one origin variable (but can flow into several slots)
             assert!(var.0 == 0);
-            builder.gen(block, Ir::Clone(self.input_local), Stack(1), *span);
+            builder.push(block, Ir::Clone(self.input_local), Stack(1), *span);
         }
     }
 
@@ -49,13 +47,13 @@ pub(super) fn codegen_value_pattern_origin(
         input_local: Local(0),
     };
 
-    generator.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
+    gen.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
         TypedExprKind::ValuePattern(expr_ref) => {
-            generator.codegen_expr(proc_table, builder, block, equation, *expr_ref);
-            Terminator::Return(builder.top())
+            generator.codegen_expr(block, equation, *expr_ref);
+            Terminator::Return(generator.builder.top())
         }
         TypedExprKind::StructPattern(dest_attrs) => {
-            builder.gen(
+            generator.builder.push(
                 block,
                 Ir::CallBuiltin(BuiltinProc::NewMap, to_def),
                 Stack(1),
@@ -63,8 +61,8 @@ pub(super) fn codegen_value_pattern_origin(
             );
 
             for (property_id, node) in dest_attrs {
-                generator.codegen_expr(proc_table, builder, block, equation, *node);
-                builder.gen(
+                generator.codegen_expr(block, equation, *node);
+                generator.builder.push(
                     block,
                     Ir::PutAttrValue(Local(1), *property_id),
                     Stack(-1),
@@ -72,7 +70,7 @@ pub(super) fn codegen_value_pattern_origin(
                 );
             }
 
-            Terminator::Return(builder.top())
+            Terminator::Return(generator.builder.top())
         }
         kind => {
             todo!("target: {kind:?}");

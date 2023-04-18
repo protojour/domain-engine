@@ -65,7 +65,7 @@ impl ProcBuilder {
     }
 
     /// Generate one instruction in the given block
-    pub fn gen(
+    pub fn push(
         &mut self,
         block: &mut Block,
         ir: Ir,
