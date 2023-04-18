@@ -8,7 +8,7 @@ use crate::{
         generator::{CodeGenerator, CodegenVariable},
         ir::Ir,
         proc_builder::Stack,
-        Block, ProcBuilder, Terminator,
+        Block, ProcBuilder,
     },
     typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
     SourceSpan,
@@ -22,7 +22,7 @@ pub(super) fn codegen_value_pattern_origin(
     equation: &TypedExprEquation,
     to: ExprRef,
     to_def: DefId,
-) -> Terminator {
+) {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     struct ValueCodegen {
@@ -50,7 +50,6 @@ pub(super) fn codegen_value_pattern_origin(
     gen.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
         TypedExprKind::ValuePattern(expr_ref) => {
             generator.codegen_expr(block, equation, *expr_ref);
-            Terminator::Return(generator.builder.top())
         }
         TypedExprKind::StructPattern(dest_attrs) => {
             generator.builder.push(
@@ -69,8 +68,6 @@ pub(super) fn codegen_value_pattern_origin(
                     span,
                 );
             }
-
-            Terminator::Return(generator.builder.top())
         }
         kind => {
             todo!("target: {kind:?}");

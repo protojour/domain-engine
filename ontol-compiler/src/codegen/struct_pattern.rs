@@ -1,13 +1,10 @@
 use indexmap::IndexMap;
-use ontol_runtime::{
-    proc::{BuiltinProc, Local},
-    value::PropertyId,
-};
+use ontol_runtime::{proc::Local, value::PropertyId};
 
 use crate::{
     codegen::{
         generator::{CodeGenerator, CodegenVariable},
-        ir::{Ir, Terminator},
+        ir::Ir,
         proc_builder::{Block, Stack},
     },
     typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
@@ -36,7 +33,7 @@ pub(super) fn codegen_struct_pattern_origin(
     equation: &TypedExprEquation,
     to: ExprRef,
     origin_attrs: &IndexMap<PropertyId, ExprRef>,
-) -> Terminator {
+) {
     let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
 
     // always start at 0 (for now), there are no recursive structs (yet)
@@ -72,52 +69,19 @@ pub(super) fn codegen_struct_pattern_origin(
         }
     }
 
+    generate_prop_unpack(gen, block, Local(input_local), &unpack_props, span);
+
+    let map_codegen = MapCodegen {
+        attr_start: input_local + 1,
+    };
+
     match &to_expr.kind {
-        TypedExprKind::StructPattern(dest_attrs) => {
-            let return_def_id = to_expr.ty.get_single_def_id().unwrap();
-
-            // Local(1), this is the return value:
-            gen.builder.push(
-                block,
-                Ir::CallBuiltin(BuiltinProc::NewMap, return_def_id),
-                Stack(1),
-                span,
-            );
-
-            generate_prop_unpack(gen, block, Local(input_local), &unpack_props, span);
-
-            gen.enter_bind_level(
-                MapCodegen {
-                    attr_start: input_local + 2,
-                },
-                |generator| {
-                    for (property_id, expr_ref) in dest_attrs {
-                        generator.codegen_expr(block, equation, *expr_ref);
-                        generator.builder.push(
-                            block,
-                            Ir::PutAttrValue(Local(1), *property_id),
-                            Stack(-1),
-                            span,
-                        );
-                    }
-
-                    Terminator::Return(Local(1))
-                },
-            )
-        }
-        TypedExprKind::ValuePattern(expr_ref) => {
-            generate_prop_unpack(gen, block, Local(input_local), &unpack_props, span);
-
-            gen.enter_bind_level(
-                MapCodegen {
-                    attr_start: input_local + 1,
-                },
-                |generator| {
-                    generator.codegen_expr(block, equation, *expr_ref);
-                    Terminator::Return(generator.builder.top())
-                },
-            )
-        }
+        TypedExprKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
+            generator.codegen_expr(block, equation, to);
+        }),
+        TypedExprKind::ValuePattern(expr_ref) => gen.enter_bind_level(map_codegen, |generator| {
+            generator.codegen_expr(block, equation, *expr_ref);
+        }),
         kind => {
             todo!("to: {kind:?}");
         }

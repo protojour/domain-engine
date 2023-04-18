@@ -256,7 +256,6 @@ fn test_map_deep_array_item_many() {
 }
 
 #[test]
-#[should_panic = "BUG: Serialize expected map attributes"]
 fn test_deep_structural_map() {
     "
     pub type foo
@@ -287,7 +286,7 @@ fn test_deep_structural_map() {
     map (a b c) {
         foo {
             rel 'a': a
-            rel 'inner': foo_inner { // ERROR TODO: Recursive struct
+            rel 'inner': foo_inner {
                 rel 'b': b
                 rel 'c': c
             }

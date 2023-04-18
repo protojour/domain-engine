@@ -3,7 +3,7 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::SmallVec;
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
@@ -62,7 +62,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         equation: &TypedExprEquation,
         source: ExprRef,
         target: ExprRef,
-    ) -> Terminator {
+    ) {
         let (_, source_pattern, _) = equation.resolve_expr(&equation.reductions, source);
 
         match &source_pattern.kind {
@@ -71,8 +71,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 codegen_value_pattern_origin(self, block, equation, target, to_def)
             }
-            TypedExprKind::StructPattern(attributes) => {
-                codegen_struct_pattern_origin(self, block, equation, target, attributes)
+            TypedExprKind::StructPattern(attrs) => {
+                codegen_struct_pattern_origin(self, block, equation, target, attrs)
             }
             other => panic!("unable to generate mapping for pattern: {other:?}"),
         }
@@ -190,8 +190,24 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
             TypedExprKind::ValuePattern(_) => {
                 todo!()
             }
-            TypedExprKind::StructPattern(_) => {
-                error!("FIXME: Generate struct");
+            TypedExprKind::StructPattern(attrs) => {
+                let def_id = find_mapping_key(&equation.expressions[expr_id].ty).unwrap();
+                let local = self.builder.push(
+                    block,
+                    Ir::CallBuiltin(BuiltinProc::NewMap, def_id),
+                    Stack(1),
+                    span,
+                );
+
+                for (property_id, expr_ref) in attrs {
+                    self.codegen_expr(block, equation, *expr_ref);
+                    self.builder.push(
+                        block,
+                        Ir::PutAttrValue(local, *property_id),
+                        Stack(-1),
+                        span,
+                    );
+                }
             }
             TypedExprKind::Unit => {
                 todo!()

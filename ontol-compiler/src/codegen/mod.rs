@@ -210,9 +210,9 @@ fn codegen_map(
     let mut block = builder.new_block(Stack(1), span);
     let mut generator = CodeGenerator::new(proc_table, &mut builder);
 
-    let terminator = generator.codegen_pattern(&mut block, equation, from, to);
+    generator.codegen_pattern(&mut block, equation, from, to);
 
-    builder.commit(block, terminator);
+    builder.commit(block, Terminator::Return(builder.top()));
 
     builder
 }
