@@ -192,7 +192,7 @@ fn transform_regex(ast: &regex_syntax::ast::Ast) -> Option<regex_syntax::ast::As
     use regex_syntax::ast::*;
     match ast {
         Ast::Group(Group { span, kind: _, ast }) => Some(Ast::Group(Group {
-            span: span.clone(),
+            span: *span,
             kind: GroupKind::NonCapturing(Flags {
                 span: Span::new(Position::new(0, 0, 0), Position::new(0, 0, 0)),
                 items: vec![],
@@ -214,11 +214,11 @@ fn transform_regex(ast: &regex_syntax::ast::Ast) -> Option<regex_syntax::ast::As
         })),
         Ast::Alternation(Alternation { span, asts }) => Some(Ast::Alternation(Alternation {
             span: *span,
-            asts: asts.iter().filter_map(|ast| transform_regex(ast)).collect(),
+            asts: asts.iter().filter_map(transform_regex).collect(),
         })),
         Ast::Concat(Concat { span, asts }) => Some(Ast::Concat(Concat {
             span: *span,
-            asts: asts.iter().filter_map(|ast| transform_regex(ast)).collect(),
+            asts: asts.iter().filter_map(transform_regex).collect(),
         })),
         other => Some(other.clone()),
     }
