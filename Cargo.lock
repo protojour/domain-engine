@@ -391,6 +391,7 @@ dependencies = [
  "domain-engine-juniper",
  "ontol-compiler",
  "ontol-runtime",
+ "serde",
  "serde-wasm-bindgen",
  "unimock",
  "wasm-bindgen",

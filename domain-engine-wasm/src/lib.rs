@@ -2,21 +2,17 @@
 
 use std::sync::Arc;
 
-use domain_engine_juniper::{
-    create_graphql_schema,
-    juniper::{self, serde::Serialize},
-    GqlContext, Schema,
-};
+use graphql::WasmGraphqlSchema;
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{env::Env, PackageId};
-use unimock::Unimock;
 use wasm_bindgen::prelude::*;
 use wasm_error::WasmError;
 
+pub mod graphql;
 pub mod wasm_error;
 
 #[wasm_bindgen]
@@ -28,58 +24,7 @@ pub struct WasmEnv {
 #[wasm_bindgen]
 impl WasmEnv {
     pub fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
-        let schema = create_graphql_schema(self.package_id, self.env.clone())?;
-        Ok(WasmGraphqlSchema {
-            env: self.env.clone(),
-            schema,
-        })
-    }
-}
-
-#[wasm_bindgen]
-pub struct WasmGraphqlSchema {
-    env: Arc<Env>,
-    schema: Schema,
-}
-
-#[wasm_bindgen]
-impl WasmGraphqlSchema {
-    pub async fn execute(
-        &self,
-        document: String,
-        operation_name: Option<String>,
-        variables: JsValue,
-    ) -> Result<JsValue, WasmError> {
-        let gql_context = GqlContext {
-            engine_api: Arc::new(Unimock::new(())),
-        };
-
-        let juniper_variables = serde_wasm_bindgen::from_value(variables)?;
-
-        let (value, execution_errors) = juniper::execute(
-            &document,
-            operation_name.as_deref(),
-            &self.schema,
-            &juniper_variables,
-            &gql_context,
-        )
-        .await?;
-
-        if !execution_errors.is_empty() {
-            return Err(WasmError {
-                msg: execution_errors
-                    .into_iter()
-                    .map(|error| format!("{error:?}"))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            });
-        }
-
-        Ok(value.serialize(
-            &serde_wasm_bindgen::Serializer::new()
-                .serialize_maps_as_objects(true)
-                .serialize_missing_as_null(true),
-        )?)
+        WasmGraphqlSchema::create(self.env.clone(), self.package_id)
     }
 }
 

@@ -13,6 +13,7 @@ doctest = false
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 domain-engine-juniper.path = "../domain-engine-juniper"
+serde.workspace = true
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
