@@ -77,7 +77,7 @@ impl Env {
     pub fn mapper_procs(&self) -> impl Iterator<Item = ((DefId, DefId), Procedure)> + '_ {
         self.mapper_proc_table
             .iter()
-            .map(|(key, value)| (*key, value.clone()))
+            .map(|(key, proc)| (*key, *proc))
     }
 
     pub fn get_mapper_proc(&self, from: DefId, to: DefId) -> Option<Procedure> {
