@@ -32,16 +32,19 @@ pub fn uuid() -> Hir {
         })
     }
 
-    Hir::concat(vec![
-        repeat_exact(hex.clone(), 8),
-        opt_dash.clone(),
-        repeat_exact(hex.clone(), 4),
-        opt_dash.clone(),
-        repeat_exact(hex.clone(), 4),
-        opt_dash.clone(),
-        repeat_exact(hex.clone(), 4),
-        opt_dash,
-        repeat_exact(hex, 12),
+    Hir::alternation(vec![
+        repeat_exact(hex.clone(), 32),
+        Hir::concat(vec![
+            repeat_exact(hex.clone(), 8),
+            opt_dash.clone(),
+            repeat_exact(hex.clone(), 4),
+            opt_dash.clone(),
+            repeat_exact(hex.clone(), 4),
+            opt_dash.clone(),
+            repeat_exact(hex.clone(), 4),
+            opt_dash,
+            repeat_exact(hex, 12),
+        ]),
     ])
 }
 

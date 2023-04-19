@@ -63,7 +63,7 @@ fn uuid_in_string_constructor_pattern() {
         );
         assert_error_msg!(
             foo.deserialize_data(json!("foo")),
-            r#"invalid type: string "foo", expected string matching /\Afoo/([0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 5"#
+            r#"invalid type: string "foo", expected string matching /\Afoo/([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{4}\-?[0-9A-Fa-f]{12})\z/ at line 1 column 5"#
         );
     });
 }

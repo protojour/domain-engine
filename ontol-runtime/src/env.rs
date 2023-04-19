@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use regex::Regex;
 use smartstring::alias::String;
 
 use crate::{
@@ -63,9 +62,8 @@ impl Env {
         }
     }
 
-    pub fn get_string_pattern_regex(&self, def_id: DefId) -> Option<&Regex> {
-        let string_pattern = self.string_patterns.get(&def_id)?;
-        Some(&string_pattern.regex)
+    pub fn get_string_pattern(&self, def_id: DefId) -> Option<&StringPattern> {
+        self.string_patterns.get(&def_id)
     }
 
     pub fn domain_count(&self) -> usize {

@@ -11,6 +11,7 @@ use ontol_runtime::{
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use tracing::debug;
 
 const MAX_REPEAT: u32 = 128;
 
@@ -89,12 +90,40 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::StringConstant(s, def_id) => {
                 Value::new(Data::String(s.clone()), *def_id)
             }
-            SerdeOperator::StringPattern(def_id)
-            | SerdeOperator::CapturingStringPattern(def_id) => {
-                let regex = self.env.get_string_pattern_regex(*def_id).unwrap();
-                let rand_regex = rand_regex::Regex::compile(regex.as_str(), MAX_REPEAT).unwrap();
+            SerdeOperator::StringPattern(def_id) => {
+                let pattern = self.env.get_string_pattern(*def_id).unwrap();
+                let rand_regex =
+                    rand_regex::Regex::compile(pattern.regex.as_str(), MAX_REPEAT).unwrap();
                 let string: std::string::String = self.rng.sample(&rand_regex);
                 Value::new(Data::String(string.into()), *def_id)
+            }
+            SerdeOperator::CapturingStringPattern(def_id) => {
+                let string_pattern = self.env.get_string_pattern(*def_id).unwrap();
+                let mut parser = regex_syntax::ast::parse::Parser::new();
+
+                if let Some(ast) =
+                    transform_regex(&parser.parse(string_pattern.regex.as_str()).unwrap())
+                {
+                    let ast_string = ast.to_string();
+                    let hir = regex_syntax::hir::translate::Translator::new()
+                        .translate(&ast_string, &ast)
+                        .unwrap();
+                    let regex_string = hir.to_string();
+
+                    debug!("fake for regex: {regex_string}");
+
+                    let rand_regex = rand_regex::Regex::compile(&regex_string, MAX_REPEAT).unwrap();
+
+                    let string: std::string::String = self.rng.sample(&rand_regex);
+
+                    let data = string_pattern
+                        .try_capturing_match(&string, self.env)
+                        .unwrap();
+
+                    Value::new(data, *def_id)
+                } else {
+                    panic!()
+                }
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 let variant = &seq_op.ranges[0];
@@ -134,8 +163,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
                 }
             }
-            SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
-                todo!()
+            SerdeOperator::PrimaryId(_name, inner_operator_id) => {
+                return self.fake_attribute(processor.narrow(*inner_operator_id))
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = BTreeMap::default();
@@ -156,5 +185,41 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         };
 
         Attribute { value, rel_params }
+    }
+}
+
+fn transform_regex(ast: &regex_syntax::ast::Ast) -> Option<regex_syntax::ast::Ast> {
+    use regex_syntax::ast::*;
+    match ast {
+        Ast::Group(Group { span, kind: _, ast }) => Some(Ast::Group(Group {
+            span: span.clone(),
+            kind: GroupKind::NonCapturing(Flags {
+                span: Span::new(Position::new(0, 0, 0), Position::new(0, 0, 0)),
+                items: vec![],
+            }),
+            ast: ast.clone(),
+        })),
+        // Anchors are not supported by rand_regex
+        Ast::Assertion(_) => None,
+        Ast::Repetition(Repetition {
+            span,
+            op,
+            greedy,
+            ast,
+        }) => Some(Ast::Repetition(Repetition {
+            span: *span,
+            op: op.clone(),
+            greedy: *greedy,
+            ast: Box::new(transform_regex(ast)?),
+        })),
+        Ast::Alternation(Alternation { span, asts }) => Some(Ast::Alternation(Alternation {
+            span: *span,
+            asts: asts.iter().filter_map(|ast| transform_regex(ast)).collect(),
+        })),
+        Ast::Concat(Concat { span, asts }) => Some(Ast::Concat(Concat {
+            span: *span,
+            asts: asts.iter().filter_map(|ast| transform_regex(ast)).collect(),
+        })),
+        other => Some(other.clone()),
     }
 }
