@@ -933,6 +933,7 @@ name = "ontol-faker"
 version = "0.1.0"
 dependencies = [
  "fake",
+ "getrandom",
  "ontol-runtime",
  "rand",
  "rand_regex",

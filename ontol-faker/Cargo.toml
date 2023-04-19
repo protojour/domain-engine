@@ -8,6 +8,9 @@ edition = "2021"
 [lib]
 doctest = false
 
+[features]
+js = ["getrandom/js"]
+
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
@@ -16,5 +19,6 @@ fake = { version = "2", features = ["uuid", "chrono", "bigdecimal_rs"] }
 rand = { version = "0.8", features = ["std_rng"] }
 rand_regex = "0.15"
 regex-syntax = "0.6"
+getrandom = { version = "0.2" }
 
 [dev-dependencies]
