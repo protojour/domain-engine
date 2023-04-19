@@ -113,43 +113,6 @@ impl WasmTypeInfo {
             env: self.env.clone(),
         }
     }
-
-    pub(crate) fn value_from_js(
-        &self,
-        js_value: JsValue,
-        format: JsonFormat,
-    ) -> Result<Value, WasmError> {
-        self.env
-            .new_serde_processor(
-                operator_id(&self.inner)?,
-                None,
-                format.to_processor_mode(),
-                ProcessorLevel::Root,
-            )
-            .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
-            .map(|attr| attr.value)
-            .map_err(|err| WasmError {
-                msg: format!("Deserialization failed: {err}"),
-            })
-    }
-
-    pub(crate) fn value_to_js(
-        &self,
-        value: &Value,
-        format: JsonFormat,
-    ) -> Result<JsValue, WasmError> {
-        self.env
-            .new_serde_processor(
-                operator_id(&self.inner)?,
-                None,
-                format.to_processor_mode(),
-                ProcessorLevel::Root,
-            )
-            .serialize_value(value, None, &js_serializer())
-            .map_err(|err| WasmError {
-                msg: format!("Serialization failed: {err}"),
-            })
-    }
 }
 
 #[wasm_bindgen]
