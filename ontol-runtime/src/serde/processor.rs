@@ -27,7 +27,7 @@ pub enum ProcessorLevel {
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
     /// The operator used for (de)serializing this value
-    pub(crate) value_operator: &'e SerdeOperator,
+    pub value_operator: &'e SerdeOperator,
 
     /// The edge properties used for (de)serializing the _edge data_
     /// related to this value when it's associated with a "parent value" through a relation.
@@ -35,7 +35,7 @@ pub struct SerdeProcessor<'e> {
     /// Generally, non-unit edge data can only be represented on a relation between two map types.
     /// The parent (often the subject) map has an attribute that is another child map.
     /// The edge data would be injected in the child map as the `_edge` property.
-    pub(crate) rel_params_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_operator_id: Option<SerdeOperatorId>,
 
     /// The environment, via which new SerdeOperators can be created.
     pub(crate) env: &'e Env,
@@ -45,6 +45,10 @@ pub struct SerdeProcessor<'e> {
 }
 
 impl<'e> SerdeProcessor<'e> {
+    pub fn level(&self) -> ProcessorLevel {
+        self.level
+    }
+
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
         self.env.new_serde_processor(

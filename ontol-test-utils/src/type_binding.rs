@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use jsonschema::JSONSchema;
+use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
@@ -75,6 +76,10 @@ impl<'e> TypeBinding<'e> {
             value: Value::unit(),
         }
         .data(data)
+    }
+
+    pub fn new_fake(&self, processor_mode: ProcessorMode) -> Value {
+        new_constant_fake(self.env, self.type_info.def_id, processor_mode).unwrap()
     }
 
     pub fn entity_builder(

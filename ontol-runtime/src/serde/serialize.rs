@@ -28,7 +28,8 @@ impl<'e> SerdeProcessor<'e> {
         rel_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
-        debug!("serializing {:?}", self.value_operator);
+        debug!("serializing op={:#?}", self.value_operator);
+        debug!("serializing value={:#?}", value);
         match self.value_operator {
             SerdeOperator::Unit => {
                 cast_ref::<()>(value);

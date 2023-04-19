@@ -94,6 +94,15 @@ pub enum Data {
     Sequence(Vec<Attribute>),
 }
 
+impl Data {
+    pub fn new_rational_i64(numer: i64, denom: i16) -> Self {
+        Self::Rational(Box::new(num::rational::BigRational::new(
+            numer.into(),
+            denom.into(),
+        )))
+    }
+}
+
 pub struct FormatStringData<'d>(pub &'d Data);
 
 impl<'d> Display for FormatStringData<'d> {
