@@ -14,7 +14,7 @@ fn assert_domain_map(
 
     let value = input_binding.deserialize_value(input).unwrap();
 
-    let procedure = match test_env.env.get_mapping_procedure(
+    let procedure = match test_env.env.get_mapper_proc(
         input_binding.type_info.def_id,
         output_binding.type_info.def_id,
     ) {

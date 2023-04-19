@@ -20,7 +20,7 @@ use crate::{
 
 /// Runtime environment
 pub struct Env {
-    pub(crate) mapping_procs: FnvHashMap<(DefId, DefId), Procedure>,
+    pub(crate) mapper_proc_table: FnvHashMap<(DefId, DefId), Procedure>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
@@ -34,7 +34,7 @@ impl Env {
     pub fn builder() -> EnvBuilder {
         EnvBuilder {
             env: Self {
-                mapping_procs: Default::default(),
+                mapper_proc_table: Default::default(),
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
                 domains: Default::default(),
@@ -74,8 +74,14 @@ impl Env {
         self.domains.get(&package_id)
     }
 
-    pub fn get_mapping_procedure(&self, from: DefId, to: DefId) -> Option<Procedure> {
-        self.mapping_procs.get(&(from, to)).cloned()
+    pub fn mapper_procs(&self) -> impl Iterator<Item = ((DefId, DefId), Procedure)> + '_ {
+        self.mapper_proc_table
+            .iter()
+            .map(|(key, value)| (*key, value.clone()))
+    }
+
+    pub fn get_mapper_proc(&self, from: DefId, to: DefId) -> Option<Procedure> {
+        self.mapper_proc_table.get(&(from, to)).cloned()
     }
 
     pub fn new_serde_processor(
@@ -180,7 +186,7 @@ impl EnvBuilder {
     }
 
     pub fn mapping_procs(mut self, mapping_procs: FnvHashMap<(DefId, DefId), Procedure>) -> Self {
-        self.env.mapping_procs = mapping_procs;
+        self.env.mapper_proc_table = mapping_procs;
         self
     }
 

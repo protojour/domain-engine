@@ -3,12 +3,13 @@ use std::sync::Arc;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     env::{Env, TypeInfo},
+    proc::Procedure,
     serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
     value::Value,
-    PackageId,
+    DefId, PackageId,
 };
 use serde::de::DeserializeSeed;
 use wasm_bindgen::prelude::*;
@@ -74,20 +75,42 @@ impl WasmTypeInfo {
         }
     }
 
-    pub fn fake_create_json(&self, format: JsonFormat) -> Result<JsValue, WasmError> {
-        let fake_value =
-            new_constant_fake(&self.env, self.inner.def_id, ProcessorMode::Create).unwrap();
-
-        self.value_to_js(&fake_value, format)
+    pub fn domain(&self) -> Option<WasmDomain> {
+        let package_id = self.inner.def_id.package_id();
+        self.env.find_domain(package_id).map(|_| WasmDomain {
+            package_id,
+            env: self.env.clone(),
+        })
     }
 
-    pub(crate) fn operator_id(&self) -> Result<SerdeOperatorId, WasmError> {
-        if let Some(operator_id) = self.inner.operator_id {
-            Ok(operator_id)
-        } else {
-            Err(WasmError {
-                msg: format!("The type `{}` cannot be serialized", self.name()),
-            })
+    pub fn new_value(&self, js_value: JsValue, format: JsonFormat) -> Result<WasmValue, WasmError> {
+        let value = self
+            .env
+            .new_serde_processor(
+                operator_id(&self.inner)?,
+                None,
+                format.to_processor_mode(),
+                ProcessorLevel::Root,
+            )
+            .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
+            .map(|attr| attr.value)
+            .map_err(|err| WasmError {
+                msg: format!("Deserialization failed: {err}"),
+            })?;
+
+        Ok(WasmValue {
+            value,
+            env: self.env.clone(),
+        })
+    }
+
+    pub fn fake_value(&self, format: JsonFormat) -> WasmValue {
+        let fake_value =
+            new_constant_fake(&self.env, self.inner.def_id, format.to_processor_mode()).unwrap();
+
+        WasmValue {
+            value: fake_value,
+            env: self.env.clone(),
         }
     }
 
@@ -98,7 +121,7 @@ impl WasmTypeInfo {
     ) -> Result<Value, WasmError> {
         self.env
             .new_serde_processor(
-                self.operator_id()?,
+                operator_id(&self.inner)?,
                 None,
                 format.to_processor_mode(),
                 ProcessorLevel::Root,
@@ -117,7 +140,7 @@ impl WasmTypeInfo {
     ) -> Result<JsValue, WasmError> {
         self.env
             .new_serde_processor(
-                self.operator_id()?,
+                operator_id(&self.inner)?,
                 None,
                 format.to_processor_mode(),
                 ProcessorLevel::Root,
@@ -126,5 +149,82 @@ impl WasmTypeInfo {
             .map_err(|err| WasmError {
                 msg: format!("Serialization failed: {err}"),
             })
+    }
+}
+
+#[wasm_bindgen]
+pub struct WasmValue {
+    value: Value,
+    env: Arc<Env>,
+}
+
+#[wasm_bindgen]
+impl WasmValue {
+    pub fn as_js(&self, format: JsonFormat) -> Result<JsValue, WasmError> {
+        let type_info = self.env.get_type_info(self.value.type_def_id);
+
+        self.env
+            .new_serde_processor(
+                operator_id(type_info)?,
+                None,
+                format.to_processor_mode(),
+                ProcessorLevel::Root,
+            )
+            .serialize_value(&self.value, None, &js_serializer())
+            .map_err(|err| WasmError {
+                msg: format!("Serialization failed: {err}"),
+            })
+    }
+}
+
+#[wasm_bindgen]
+pub struct WasmMapper {
+    pub(crate) from: DefId,
+    pub(crate) to: DefId,
+    pub(crate) procedure: Procedure,
+    pub(crate) env: Arc<Env>,
+}
+
+#[wasm_bindgen]
+impl WasmMapper {
+    pub fn from(&self) -> WasmTypeInfo {
+        let type_info = self.env.get_type_info(self.from);
+        WasmTypeInfo {
+            inner: type_info.clone(),
+            env: self.env.clone(),
+        }
+    }
+
+    pub fn to(&self) -> WasmTypeInfo {
+        let type_info = self.env.get_type_info(self.to);
+        WasmTypeInfo {
+            inner: type_info.clone(),
+            env: self.env.clone(),
+        }
+    }
+
+    pub fn map(&self, input: &WasmValue) -> Result<WasmValue, WasmError> {
+        let proc = self.env.get_mapper_proc(self.from, self.to).unwrap();
+        let mut mapper = self.env.new_mapper();
+
+        let output = mapper.eval(proc, [input.value.clone()]);
+
+        Ok(WasmValue {
+            value: output,
+            env: self.env.clone(),
+        })
+    }
+}
+
+pub(crate) fn operator_id(type_info: &TypeInfo) -> Result<SerdeOperatorId, WasmError> {
+    if let Some(operator_id) = type_info.operator_id {
+        Ok(operator_id)
+    } else {
+        Err(WasmError {
+            msg: format!(
+                "The type `{}` cannot be serialized",
+                type_info.name.as_deref().unwrap_or("")
+            ),
+        })
     }
 }

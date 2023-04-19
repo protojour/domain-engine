@@ -33,7 +33,7 @@ impl<'l> PropertyProbe<'l> {
         let serde_operator = &env.get_serde_operator(dest_serde_operator_id);
 
         let mapping_proc = env
-            .mapping_procs
+            .mapper_proc_table
             .get(&(destination.def_id, origin.def_id))?;
 
         match serde_operator {

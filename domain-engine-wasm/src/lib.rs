@@ -9,7 +9,7 @@ use ontol_compiler::{
 };
 use ontol_runtime::{env::Env, PackageId};
 use wasm_bindgen::prelude::*;
-use wasm_domain::WasmDomain;
+use wasm_domain::{WasmDomain, WasmMapper};
 use wasm_error::WasmError;
 use wasm_graphql::WasmGraphqlSchema;
 
@@ -36,6 +36,19 @@ impl WasmEnv {
             .domains()
             .map(|(package_id, _domain)| WasmDomain {
                 package_id: *package_id,
+                env: self.env.clone(),
+            })
+            .map(JsValue::from)
+            .collect()
+    }
+
+    pub fn mappers(&self) -> Vec<JsValue> {
+        self.env
+            .mapper_procs()
+            .map(|((from, to), procedure)| WasmMapper {
+                from,
+                to,
+                procedure,
                 env: self.env.clone(),
             })
             .map(JsValue::from)
