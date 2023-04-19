@@ -18,11 +18,7 @@ pub fn uuid() -> Hir {
         ClassUnicodeRange::new('a', 'f'),
         ClassUnicodeRange::new('A', 'F'),
     ])));
-    let opt_dash = Hir::repetition(Repetition {
-        kind: RepetitionKind::ZeroOrOne,
-        greedy: true,
-        hir: Box::new(Hir::literal(Literal::Unicode('-'))),
-    });
+    let dash = Hir::literal(Literal::Unicode('-'));
 
     fn repeat_exact(hir: Hir, n: u32) -> Hir {
         Hir::repetition(Repetition {
@@ -36,13 +32,13 @@ pub fn uuid() -> Hir {
         repeat_exact(hex.clone(), 32),
         Hir::concat(vec![
             repeat_exact(hex.clone(), 8),
-            opt_dash.clone(),
+            dash.clone(),
             repeat_exact(hex.clone(), 4),
-            opt_dash.clone(),
+            dash.clone(),
             repeat_exact(hex.clone(), 4),
-            opt_dash.clone(),
+            dash.clone(),
             repeat_exact(hex.clone(), 4),
-            opt_dash,
+            dash,
             repeat_exact(hex, 12),
         ]),
     ])
