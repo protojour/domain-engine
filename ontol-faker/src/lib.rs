@@ -14,11 +14,16 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_REPEAT: u32 = 128;
 
+#[derive(Debug)]
+pub enum Error {
+    NoSerializationInfo,
+}
+
 pub fn new_constant_fake(
     env: &Env,
     def_id: DefId,
     processor_mode: ProcessorMode,
-) -> Result<Value, ()> {
+) -> Result<Value, Error> {
     let seed = [
         1, 0, 0, 0, 23, 0, 0, 0, 200, 1, 0, 0, 210, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0,
@@ -39,9 +44,9 @@ struct FakeGenerator<'a, R: Rng> {
 }
 
 impl<'a, R: Rng> FakeGenerator<'a, R> {
-    pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, ()> {
+    pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
         let type_info = self.env.get_type_info(def_id);
-        let operator_id = type_info.operator_id.ok_or(())?;
+        let operator_id = type_info.operator_id.ok_or(Error::NoSerializationInfo)?;
 
         Ok(self
             .fake_attribute(self.env.new_serde_processor(
