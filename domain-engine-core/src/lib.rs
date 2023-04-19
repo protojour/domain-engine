@@ -47,7 +47,7 @@ impl EngineAPI for Engine {
     }
 
     async fn query_entities(&self, _query: EntityQuery) -> Result<Vec<Attribute>, DomainError> {
-        let _ = self.env.domain_count();
+        let _ = self.env.domains().count();
         Ok(vec![])
     }
 

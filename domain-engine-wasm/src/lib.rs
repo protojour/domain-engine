@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use graphql::WasmGraphqlSchema;
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
@@ -10,10 +9,15 @@ use ontol_compiler::{
 };
 use ontol_runtime::{env::Env, PackageId};
 use wasm_bindgen::prelude::*;
+use wasm_domain::WasmDomain;
 use wasm_error::WasmError;
+use wasm_graphql::WasmGraphqlSchema;
 
-pub mod graphql;
+pub mod wasm_domain;
 pub mod wasm_error;
+pub mod wasm_graphql;
+
+mod wasm_util;
 
 #[wasm_bindgen]
 pub struct WasmEnv {
@@ -25,6 +29,17 @@ pub struct WasmEnv {
 impl WasmEnv {
     pub fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
         WasmGraphqlSchema::create(self.env.clone(), self.package_id)
+    }
+
+    pub fn domains(&self) -> Vec<JsValue> {
+        self.env
+            .domains()
+            .map(|(package_id, _domain)| WasmDomain {
+                package_id: *package_id,
+                env: self.env.clone(),
+            })
+            .map(JsValue::from)
+            .collect()
     }
 }
 
@@ -77,13 +92,6 @@ pub fn compile_ontol_domain(ontol_source: String) -> Result<WasmEnv, WasmError> 
             msg: "Did not find package".to_string(),
         }),
     }
-}
-
-#[wasm_bindgen]
-pub fn test_run_compiler() {
-    let mem = Mem::default();
-    let compiler = Compiler::new(&mem, Default::default());
-    let _env = compiler.into_env();
 }
 
 #[cfg(test)]

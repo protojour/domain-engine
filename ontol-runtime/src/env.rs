@@ -66,8 +66,8 @@ impl Env {
         self.string_patterns.get(&def_id)
     }
 
-    pub fn domain_count(&self) -> usize {
-        self.domains.len()
+    pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
+        self.domains.iter()
     }
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
@@ -111,6 +111,10 @@ pub struct Domain {
 impl Domain {
     pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
         &self.info[def_id.1 as usize]
+    }
+
+    pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
+        self.info.iter()
     }
 
     pub fn add_type(&mut self, type_info: TypeInfo) {

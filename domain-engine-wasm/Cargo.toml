@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
+ontol-faker.path = "../ontol-faker"
 domain-engine-juniper.path = "../domain-engine-juniper"
 serde.workspace = true
 wasm-bindgen = "0.2"

@@ -6,7 +6,7 @@ use serde::Serialize;
 use unimock::Unimock;
 use wasm_bindgen::prelude::*;
 
-use crate::wasm_error::WasmError;
+use crate::{wasm_error::WasmError, wasm_util::js_serializer};
 
 #[wasm_bindgen]
 pub struct WasmGraphqlSchema {
@@ -52,10 +52,6 @@ impl WasmGraphqlSchema {
             });
         }
 
-        Ok(value.serialize(
-            &serde_wasm_bindgen::Serializer::new()
-                .serialize_maps_as_objects(true)
-                .serialize_missing_as_null(true),
-        )?)
+        Ok(value.serialize(&js_serializer())?)
     }
 }
