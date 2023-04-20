@@ -214,11 +214,7 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
 
 fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
-        .then(
-            spanned(variable())
-                .repeated()
-                .delimited_by(open('('), close(')')),
-        )
+        .then(spanned(variable()).repeated())
         .then(
             spanned(struct_pattern(pattern()))
                 .then(spanned(struct_pattern(pattern())))
@@ -552,7 +548,7 @@ mod tests {
     #[test]
     fn parse_map() {
         let source = "
-        map (x y) {
+        map x y {
             foo { x }
             bar {
                 rel 'foo': x
@@ -560,7 +556,7 @@ mod tests {
         }
 
         // comment
-        map (x y) {
+        map x y {
             foo { x + 1 }
             bar {
                 rel 'foo': (x / 3) + 4

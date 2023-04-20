@@ -58,7 +58,7 @@ fn test_map_invert() {
             use 'work' as work
             use 'dev' as dev
 
-            map (p_id p_name tech_id tech_name) {
+            map p_id p_name tech_id tech_name {
                 work.worker {
                     rel 'ID': p_id
                     rel 'name': p_name
@@ -94,7 +94,7 @@ fn artist_etc_routing() {
             use 'ai' as ai
 
             rel gsu route: ai {
-                map (id n p) {
+                map id n p {
                     gsu.artist {
                         rel 'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
                         rel 'name': n
@@ -107,7 +107,7 @@ fn artist_etc_routing() {
                     }
                 }
 
-                map (id t p n) {
+                map id t p n {
                     gsu.synth {
                         rel 'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
                         rel 'type': t

@@ -40,7 +40,7 @@ fn test_map_simple() {
     pub type bar
     rel foo 'f': string
     rel bar 'b': string
-    map (x) {
+    map x {
         foo {
             rel 'f': x
         }
@@ -72,7 +72,7 @@ fn test_meters() {
     pub type millimeters
     rel meters is: int
     rel millimeters is: int
-    map (x) {
+    map x {
         meters { x / 1000 }
         millimeters { x }
     }
@@ -93,7 +93,7 @@ fn test_temperature() {
         rel _ is: int
     }
 
-    map (x) {
+    map x {
         celsius { x }
         fahrenheit { x * 9 / 5 + 32 }
     }
@@ -111,7 +111,7 @@ fn test_map_value_to_map_no_func() {
     pub type two
     rel one is: string
     rel two 'a': string
-    map (x) {
+    map x {
         one { x }
         two {
             rel 'a': x
@@ -131,7 +131,7 @@ fn test_map_value_to_map_func() {
     pub type two
     rel one is: int
     rel two 'a': int
-    map (x) {
+    map x {
         one { x }
         two {
             rel 'a': x * 2
@@ -151,7 +151,7 @@ fn test_map_matching_array() {
     pub type bar
     rel foo ['a']: int
     rel bar ['b']: int
-    map (x) {
+    map x {
         foo {
             rel 'a': x
         }
@@ -183,7 +183,7 @@ type bar { rel _ 'b': string }
 pub type foos { rel _ ['foos']: foo }
 pub type bars { rel _ ['bars']: bar }
 
-map (x) {
+map x {
     foos {
         rel 'foos': x
     }
@@ -191,7 +191,7 @@ map (x) {
         rel 'bars': x
     }
 }
-map (x) {
+map x {
     foo {
         rel 'f': x
     }
@@ -283,7 +283,7 @@ fn test_deep_structural_map() {
         rel _ 'c': string
     }
 
-    map (a b c) {
+    map a b c {
         foo {
             rel 'a': a
             rel 'inner': foo_inner {
@@ -328,7 +328,7 @@ fn test_map_complex_flow() {
         rel _ 'd': string
     }
 
-    map (x y) {
+    map x y {
         one {
             rel 'a': x
             rel 'b': y
@@ -378,7 +378,7 @@ fn test_map_delegation() {
                 rel _ 'length': si.millimeters
             }
 
-            map (l) {
+            map l {
                 car {
                     rel 'length': l
                 }
@@ -398,7 +398,7 @@ fn test_map_delegation() {
                 rel _ is: int
             }
 
-            map (m) {
+            map m {
                 meters { m }
                 millimeters { m * 1000 }
             }
