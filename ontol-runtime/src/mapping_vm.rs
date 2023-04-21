@@ -462,4 +462,81 @@ mod tests {
 
         assert_eq!(vec![2, 4], output);
     }
+
+    #[test]
+    fn flat_map_object() {
+        let mut lib = Lib::default();
+
+        let prop_a = PropertyId::subject(RelationId(def_id(0)));
+        let prop_b = PropertyId::subject(RelationId(def_id(1)));
+
+        let proc = lib.append_procedure(
+            NParams(1),
+            [
+                // a -> Local(2):
+                OpCode::TakeAttr2(Local(0), prop_a),
+                // [b] -> Local(4):
+                OpCode::TakeAttr2(Local(0), prop_b),
+                // counter -> Local(5):
+                OpCode::PushConstant(0, def_id(0)),
+                // output -> Local(6):
+                OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
+                OpCode::Iter(Local(4), Local(5), AddressOffset(6)),
+                OpCode::Return(Local(6)),
+                // Loop
+                // New object -> Local(9)
+                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
+                OpCode::Clone(Local(2)),
+                OpCode::PutUnitAttr(Local(9), prop_a),
+                OpCode::Bump(Local(8)),
+                OpCode::PutUnitAttr(Local(9), prop_b),
+                OpCode::Bump(Local(7)),
+                OpCode::AppendAttr2(Local(6)),
+                OpCode::Remove(Local(8)),
+                OpCode::Remove(Local(7)),
+                OpCode::Goto(AddressOffset(4)),
+            ],
+        );
+
+        let mut vm = MappingVm::new(&lib);
+        let output = vm.trace_eval(
+            proc,
+            [Value::new(
+                Data::Struct(
+                    [
+                        (
+                            prop_a,
+                            Attribute::with_unit_params(Value::new(
+                                Data::String("a".into()),
+                                def_id(0),
+                            )),
+                        ),
+                        (
+                            prop_b,
+                            Attribute::with_unit_params(Value::new(
+                                Data::Sequence(vec![
+                                    Attribute::with_unit_params(Value::new(
+                                        Data::String("b0".into()),
+                                        def_id(0),
+                                    )),
+                                    Attribute::with_unit_params(Value::new(
+                                        Data::String("b1".into()),
+                                        def_id(0),
+                                    )),
+                                ]),
+                                def_id(0),
+                            )),
+                        ),
+                    ]
+                    .into(),
+                ),
+                def_id(0),
+            )],
+        );
+
+        assert_eq!(
+            "[{subj(0, 0): 'a', subj(0, 1): 'b0'}, {subj(0, 0): 'a', subj(0, 1): 'b1'}]",
+            format!("{}", ValueDebug(&output))
+        );
+    }
 }
