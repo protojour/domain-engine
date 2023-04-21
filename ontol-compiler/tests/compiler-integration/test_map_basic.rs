@@ -311,12 +311,13 @@ fn test_deep_structural_map() {
 }
 
 #[test]
-#[should_panic = "reduced property"]
+// BUG:
+#[should_panic = "No mapping procedure found for (DefId(1, 1), DefId(1, 3))"]
 fn test_map_copy_to_seq() {
     "
-    type foo
+    pub type foo
     type foo_inner
-    type bar
+    pub type bar
 
     with foo {
         rel _ 'a': string
@@ -337,13 +338,20 @@ fn test_map_copy_to_seq() {
                 rel 'b': b
             }]
         }
-        bar {
+        [bar {
             rel 'a': a
             rel 'b': b
-        }
+        }]
     }
     "
-    .compile_fail();
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("foo", "bar"),
+            json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
+            json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B2" }]),
+        );
+    });
 }
 
 #[test]

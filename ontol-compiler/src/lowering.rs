@@ -569,12 +569,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         (unit_or_seq, span): (ast::UnitOrSeq<ast::StructPattern>, Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
-        let ast_pattern = match unit_or_seq {
-            ast::UnitOrSeq::Unit(ast) => ast,
-            _ => panic!(),
+        let expr = match unit_or_seq {
+            ast::UnitOrSeq::Unit(ast) => self.lower_struct_pattern((ast, span), var_table)?,
+            ast::UnitOrSeq::Seq(ast) => {
+                let inner = self.lower_struct_pattern((ast, span.clone()), var_table)?;
+                self.expr(ExprKind::Seq(Box::new(inner)), &span)
+            }
         };
-
-        let expr = self.lower_struct_pattern((ast_pattern, span), var_table)?;
 
         let expr_id = self.compiler.defs.alloc_expr_id();
         self.compiler.expressions.insert(expr_id, expr);

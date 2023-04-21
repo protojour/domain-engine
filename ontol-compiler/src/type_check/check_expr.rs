@@ -3,7 +3,7 @@ use std::ops::Deref;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     compiler_queries::GetPropertyMeta,
@@ -119,27 +119,37 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             //         ),
             //     ),
             // )
-            ExprKind::Seq(inner) => ctx.enter_bind_level(|ctx| {
-                warn!("FIXME: Check Seq");
-                let (inner_ty, inner_ref) = self.check_expr(inner, ctx);
+            ExprKind::Seq(inner) => {
+                debug!("Yo");
 
-                let array_ty = self.types.intern(Type::Array(inner_ty));
+                ctx.enter_bind_level(|ctx| {
+                    /*
+                    let ty = self
+                        .types
+                        .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
+                    */
 
-                let iter_var = ctx.syntax_var(0);
-                let _iter_ref = ctx.expressions.add(TypedExpr {
-                    ty: self.types.intern(Type::Tautology),
-                    kind: TypedExprKind::Variable(iter_var),
-                    span: expr.span,
-                });
+                    warn!("FIXME: Check Seq");
+                    let (inner_ty, inner_ref) = self.check_expr(inner, ctx);
 
-                let map_sequence_ref = ctx.expressions.add(TypedExpr {
-                    ty: array_ty,
-                    kind: TypedExprKind::MapSequence(inner_ref, iter_var, inner_ref, inner_ty),
-                    span: expr.span,
-                });
+                    let array_ty = self.types.intern(Type::Array(inner_ty));
 
-                (array_ty, map_sequence_ref)
-            }),
+                    let iter_var = ctx.syntax_var(0);
+                    let _iter_ref = ctx.expressions.add(TypedExpr {
+                        ty: self.types.intern(Type::Tautology),
+                        kind: TypedExprKind::Variable(iter_var),
+                        span: expr.span,
+                    });
+
+                    let map_sequence_ref = ctx.expressions.add(TypedExpr {
+                        ty: array_ty,
+                        kind: TypedExprKind::MapSequence(inner_ref, iter_var, inner_ref, inner_ty),
+                        span: expr.span,
+                    });
+
+                    (array_ty, map_sequence_ref)
+                })
+            }
             ExprKind::Constant(k) => {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (

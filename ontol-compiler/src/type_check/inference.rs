@@ -56,11 +56,11 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
                 }
             }
             (Self::Known(ty), Self::Unknown) => {
-                accept_inference(ty)?;
+                accept_unification(ty)?;
                 Ok(value1.clone())
             }
             (Self::Unknown, Self::Known(ty)) => {
-                accept_inference(ty)?;
+                accept_unification(ty)?;
                 Ok(value2.clone())
             }
             (Self::Unknown, Self::Unknown) => Ok(Self::Unknown),
@@ -68,7 +68,7 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
     }
 }
 
-fn accept_inference<'m>(_ty: &Type<'m>) -> Result<(), TypeError<'m>> {
+fn accept_unification<'m>(_ty: &Type<'m>) -> Result<(), TypeError<'m>> {
     Ok(())
     /*
     match ty {
