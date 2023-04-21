@@ -566,10 +566,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_struct_pattern_root(
         &mut self,
-        ast: (ast::StructPattern, Span),
+        (unit_or_seq, span): (ast::UnitOrSeq<ast::StructPattern>, Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
-        let expr = self.lower_struct_pattern(ast, var_table)?;
+        let ast_pattern = match unit_or_seq {
+            ast::UnitOrSeq::Unit(ast) => ast,
+            _ => panic!(),
+        };
+
+        let expr = self.lower_struct_pattern((ast_pattern, span), var_table)?;
 
         let expr_id = self.compiler.defs.alloc_expr_id();
         self.compiler.expressions.insert(expr_id, expr);
@@ -595,7 +600,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         },
                         self.src.span(&expr_span),
                     );
-                    let expr = self.lower_expr((expr, expr_span), var_table)?;
+                    let expr = self.lower_expr_pattern((expr, expr_span), var_table)?;
 
                     Ok((key, expr))
                 }
@@ -609,12 +614,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 )) => {
                     let def = self.resolve_type_reference(relation.0, &relation.1)?;
 
-                    let inner_expr = match object {
-                        ast::Pattern::Expr((expr_pat, _)) => {
-                            self.lower_expr((expr_pat, object_span), var_table)
-                        }
-                        ast::Pattern::Struct(inner) => self.lower_struct_pattern(inner, var_table),
-                    };
+                    let inner_expr = self.lower_pattern((object, object_span), var_table);
 
                     inner_expr.map(|expr| ((def, self.src.span(&relation.1)), expr))
                 }
@@ -633,7 +633,30 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ))
     }
 
-    fn lower_expr(
+    fn lower_pattern(
+        &mut self,
+        (pattern, span): (ast::Pattern, Span),
+        var_table: &mut ExprVarTable,
+    ) -> Res<Expr> {
+        match pattern {
+            ast::Pattern::Expr((ast::UnitOrSeq::Unit(expr_pat), _)) => {
+                self.lower_expr_pattern((expr_pat, span), var_table)
+            }
+            ast::Pattern::Expr((ast::UnitOrSeq::Seq(expr_pat), _)) => {
+                let inner = self.lower_expr_pattern((expr_pat, span.clone()), var_table)?;
+                Ok(self.expr(ExprKind::Seq(Box::new(inner)), &span))
+            }
+            ast::Pattern::Struct((ast::UnitOrSeq::Unit(struct_pat), span)) => {
+                self.lower_struct_pattern((struct_pat, span), var_table)
+            }
+            ast::Pattern::Struct((ast::UnitOrSeq::Seq(struct_pat), span)) => {
+                let inner = self.lower_struct_pattern((struct_pat, span.clone()), var_table)?;
+                Ok(self.expr(ExprKind::Seq(Box::new(inner)), &span))
+            }
+        }
+    }
+
+    fn lower_expr_pattern(
         &mut self,
         (expr_pat, span): (ast::ExprPattern, Span),
         var_table: &ExprVarTable,
@@ -655,8 +678,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let def_id = self.lookup_ident(fn_ident, &span)?;
 
-                let left = self.lower_expr(*left, var_table)?;
-                let right = self.lower_expr(*right, var_table)?;
+                let left = self.lower_expr_pattern(*left, var_table)?;
+                let right = self.lower_expr_pattern(*right, var_table)?;
 
                 Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }

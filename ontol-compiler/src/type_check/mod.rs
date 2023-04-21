@@ -24,6 +24,7 @@ mod check_relationship;
 #[derive(Debug)]
 pub enum TypeError<'m> {
     Mismatch(TypeEquation<'m>),
+    MustBeSequence,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -63,6 +64,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     "{}",
                     FormatType(equation.expected, self.defs, self.primitives)
                 ),
+            },
+            TypeError::MustBeSequence => CompileError::TypeMismatch {
+                actual: smart_format!("Not sequence"),
+                expected: smart_format!("[]"),
             },
         };
         self.error(compile_error, span)

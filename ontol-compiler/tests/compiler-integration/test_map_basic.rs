@@ -311,6 +311,42 @@ fn test_deep_structural_map() {
 }
 
 #[test]
+#[should_panic = "reduced property"]
+fn test_map_copy_to_seq() {
+    "
+    type foo
+    type foo_inner
+    type bar
+
+    with foo {
+        rel _ 'a': string
+        rel _ ['inner']: foo_inner
+    }
+    with foo_inner {
+        rel _ 'b': string
+    }
+    with bar {
+        rel _ 'a': string
+        rel _ 'b': string
+    }
+
+    map a b {
+        foo {
+            rel 'a': a
+            rel 'inner': [foo_inner {
+                rel 'b': b
+            }]
+        }
+        bar {
+            rel 'a': a
+            rel 'b': b
+        }
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn test_map_complex_flow() {
     // FIXME: This should be a one-way mapping.
     // there is no way two variables (e.g. `two.a` and `two.c`) can flow back into the same slot without data loss.

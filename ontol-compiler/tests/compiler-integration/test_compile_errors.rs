@@ -336,8 +336,8 @@ fn map_array_mismatch() {
             rel 'b': y
         }
         bar {
-            rel 'a': x // ERROR type mismatch: expected `string`, found `string[]`
-            rel 'b': y // ERROR type mismatch: expected `int[]`, found `string[]`
+            rel 'a': x // ERROR type mismatch: expected `string`, found `[string]`
+            rel 'b': y // ERROR type mismatch: expected `[int]`, found `[string]`
         }
     }
     "

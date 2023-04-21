@@ -7,9 +7,9 @@ use tracing::warn;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, Def, DefKind, DefReference, PropertyCardinality, ValueCardinality},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind},
+    expr::{Expr, ExprId, ExprKind, TypePath},
     mem::Intern,
     relation::Constructor,
     typed_expr::{
@@ -41,7 +41,7 @@ impl<'m> CheckExprContext<'m> {
         }
     }
 
-    pub fn new_bind_level<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    pub fn enter_bind_level<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         self.bind_depth.0 += 1;
         let ret = f(self);
         self.bind_depth.0 -= 1;
@@ -108,164 +108,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             ExprKind::Struct(type_path, attributes) => {
-                let domain_type = self.check_def(type_path.def_id);
-                let subject_id = match domain_type {
-                    Type::Domain(subject_id) => subject_id,
-                    _ => return self.expr_error(CompileError::DomainTypeExpected, &type_path.span),
-                };
-
-                let properties = self.relations.properties_by_type(type_path.def_id);
-
-                let typed_expr_ref = match properties.map(|props| &props.constructor) {
-                    Some(Constructor::Struct) | None => {
-                        match properties.and_then(|props| props.map.as_ref()) {
-                            Some(property_set) => {
-                                struct MatchProperty {
-                                    relation_id: RelationId,
-                                    cardinality: Cardinality,
-                                    object_def: DefId,
-                                    used: bool,
-                                }
-                                let mut match_properties = property_set
-                                    .iter()
-                                    .filter_map(|(property_id, _cardinality)| {
-                                        match property_id.role {
-                                            Role::Subject => {
-                                                let (relationship, relation) = self
-                                                    .property_meta_by_subject(
-                                                        *subject_id,
-                                                        property_id.relation_id,
-                                                    )
-                                                    .expect("BUG: problem getting property meta");
-                                                let property_name = relation
-                                                    .subject_prop(self.defs)
-                                                    .expect("BUG: Expected named subject property");
-
-                                                Some((
-                                                    property_name,
-                                                    MatchProperty {
-                                                        relation_id: property_id.relation_id,
-                                                        cardinality: relationship
-                                                            .subject_cardinality,
-                                                        object_def: relationship.object.0.def_id,
-                                                        used: false,
-                                                    },
-                                                ))
-                                            }
-                                            Role::Object => None,
-                                        }
-                                    })
-                                    .collect::<IndexMap<_, _>>();
-
-                                let mut typed_properties = IndexMap::new();
-
-                                for ((def, prop_span), value) in attributes.iter() {
-                                    let attr_prop = match self.defs.get_def_kind(def.def_id) {
-                                        Some(DefKind::StringLiteral(lit)) => lit,
-                                        _ => {
-                                            self.error(
-                                                CompileError::NamedPropertyExpected,
-                                                prop_span,
-                                            );
-                                            continue;
-                                        }
-                                    };
-                                    let match_property = match match_properties.get_mut(attr_prop) {
-                                        Some(match_properties) => match_properties,
-                                        None => {
-                                            self.error(CompileError::UnknownProperty, prop_span);
-                                            continue;
-                                        }
-                                    };
-                                    if match_property.used {
-                                        self.error(CompileError::DuplicateProperty, prop_span);
-                                        continue;
-                                    }
-                                    match_property.used = true;
-
-                                    let object_ty = self.check_def(match_property.object_def);
-                                    let object_ty = match match_property.cardinality {
-                                        (PropertyCardinality::Mandatory, ValueCardinality::One) => {
-                                            object_ty
-                                        }
-                                        (PropertyCardinality::Optional, ValueCardinality::One) => {
-                                            self.types.intern(Type::Option(object_ty))
-                                        }
-                                        (_, ValueCardinality::Many) => {
-                                            self.types.intern(Type::Array(object_ty))
-                                        }
-                                    };
-                                    let (_, typed_expr_ref) =
-                                        self.check_expr_expect(value, object_ty, ctx);
-
-                                    typed_properties.insert(
-                                        PropertyId::subject(match_property.relation_id),
-                                        typed_expr_ref,
-                                    );
-                                }
-
-                                for (prop_name, match_property) in match_properties.into_iter() {
-                                    if !match_property.used {
-                                        self.error(
-                                            CompileError::MissingProperty(prop_name.into()),
-                                            &expr.span,
-                                        );
-                                    }
-                                }
-
-                                ctx.expressions.add(TypedExpr {
-                                    ty: domain_type,
-                                    kind: TypedExprKind::StructPattern(typed_properties),
-                                    span: expr.span,
-                                })
-                            }
-                            None => {
-                                if !attributes.is_empty() {
-                                    return self.expr_error(
-                                        CompileError::NoPropertiesExpected,
-                                        &expr.span,
-                                    );
-                                }
-                                ctx.expressions.add(TypedExpr {
-                                    kind: TypedExprKind::Unit,
-                                    ty: domain_type,
-                                    span: expr.span,
-                                })
-                            }
-                        }
-                    }
-                    Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
-                        [((def, _), value)] if def.def_id == DefId::unit() => {
-                            let (relationship, _) = self
-                                .get_relationship_meta(*relationship_id)
-                                .expect("BUG: problem getting anonymous property meta");
-
-                            let object_ty = self.check_def(relationship.object.0.def_id);
-                            let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
-
-                            ctx.expressions.add(TypedExpr {
-                                ty: domain_type,
-                                kind: TypedExprKind::ValuePattern(typed_expr_ref),
-                                span: expr.span,
-                            })
-                        }
-                        _ => {
-                            return self
-                                .expr_error(CompileError::AnonymousPropertyExpected, &expr.span)
-                        }
-                    },
-                    Some(Constructor::Intersection(_)) => {
-                        todo!()
-                    }
-                    Some(Constructor::Union(_property_set)) => {
-                        return self.expr_error(CompileError::CannotMapUnion, &expr.span)
-                    }
-                    Some(Constructor::Sequence(_)) => todo!(),
-                    Some(Constructor::StringFmt(_)) => todo!(),
-                };
-
-                (domain_type, typed_expr_ref)
+                self.check_struct(expr, type_path, attributes, ctx)
             }
+            // right: {7} StructPattern(
+            //     {6} (rel 1, 11) SequenceMap(
+            //         {3->0} Variable(0 d=0),
+            //         SyntaxVar(0 d=1),
+            //         {5} Translate(
+            //             {4} Variable(0 d=1),
+            //         ),
+            //     ),
+            // )
+            ExprKind::Seq(inner) => ctx.enter_bind_level(|ctx| {
+                warn!("FIXME: Check Seq");
+                let (inner_ty, inner_ref) = self.check_expr(inner, ctx);
+
+                let array_ty = self.types.intern(Type::Array(inner_ty));
+
+                let iter_var = ctx.syntax_var(0);
+                let _iter_ref = ctx.expressions.add(TypedExpr {
+                    ty: self.types.intern(Type::Tautology),
+                    kind: TypedExprKind::Variable(iter_var),
+                    span: expr.span,
+                });
+
+                let map_sequence_ref = ctx.expressions.add(TypedExpr {
+                    ty: array_ty,
+                    kind: TypedExprKind::MapSequence(inner_ref, iter_var, inner_ref, inner_ty),
+                    span: expr.span,
+                });
+
+                (array_ty, map_sequence_ref)
+            }),
             ExprKind::Constant(k) => {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (
@@ -298,6 +172,159 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
+    fn check_struct(
+        &mut self,
+        expr: &Expr,
+        type_path: &TypePath,
+        attributes: &[((DefReference, SourceSpan), Expr)],
+        ctx: &mut CheckExprContext<'m>,
+    ) -> (TypeRef<'m>, ExprRef) {
+        let domain_type = self.check_def(type_path.def_id);
+        let subject_id = match domain_type {
+            Type::Domain(subject_id) => subject_id,
+            _ => return self.expr_error(CompileError::DomainTypeExpected, &type_path.span),
+        };
+
+        let properties = self.relations.properties_by_type(type_path.def_id);
+
+        let typed_expr_ref = match properties.map(|props| &props.constructor) {
+            Some(Constructor::Struct) | None => {
+                match properties.and_then(|props| props.map.as_ref()) {
+                    Some(property_set) => {
+                        struct MatchProperty {
+                            relation_id: RelationId,
+                            cardinality: Cardinality,
+                            object_def: DefId,
+                            used: bool,
+                        }
+                        let mut match_properties = property_set
+                            .iter()
+                            .filter_map(|(property_id, _cardinality)| match property_id.role {
+                                Role::Subject => {
+                                    let (relationship, relation) = self
+                                        .property_meta_by_subject(
+                                            *subject_id,
+                                            property_id.relation_id,
+                                        )
+                                        .expect("BUG: problem getting property meta");
+                                    let property_name = relation
+                                        .subject_prop(self.defs)
+                                        .expect("BUG: Expected named subject property");
+
+                                    Some((
+                                        property_name,
+                                        MatchProperty {
+                                            relation_id: property_id.relation_id,
+                                            cardinality: relationship.subject_cardinality,
+                                            object_def: relationship.object.0.def_id,
+                                            used: false,
+                                        },
+                                    ))
+                                }
+                                Role::Object => None,
+                            })
+                            .collect::<IndexMap<_, _>>();
+
+                        let mut typed_properties = IndexMap::new();
+
+                        for ((def, prop_span), expr) in attributes.iter() {
+                            let attr_prop = match self.defs.get_def_kind(def.def_id) {
+                                Some(DefKind::StringLiteral(lit)) => lit,
+                                _ => {
+                                    self.error(CompileError::NamedPropertyExpected, prop_span);
+                                    continue;
+                                }
+                            };
+                            let match_property = match match_properties.get_mut(attr_prop) {
+                                Some(match_properties) => match_properties,
+                                None => {
+                                    self.error(CompileError::UnknownProperty, prop_span);
+                                    continue;
+                                }
+                            };
+                            if match_property.used {
+                                self.error(CompileError::DuplicateProperty, prop_span);
+                                continue;
+                            }
+                            match_property.used = true;
+
+                            let object_ty = self.check_def(match_property.object_def);
+                            let object_ty = match match_property.cardinality {
+                                (PropertyCardinality::Mandatory, ValueCardinality::One) => {
+                                    object_ty
+                                }
+                                (PropertyCardinality::Optional, ValueCardinality::One) => {
+                                    self.types.intern(Type::Option(object_ty))
+                                }
+                                (_, ValueCardinality::Many) => {
+                                    self.types.intern(Type::Array(object_ty))
+                                }
+                            };
+                            let (_, typed_expr_ref) = self.check_expr_expect(expr, object_ty, ctx);
+
+                            typed_properties.insert(
+                                PropertyId::subject(match_property.relation_id),
+                                typed_expr_ref,
+                            );
+                        }
+
+                        for (prop_name, match_property) in match_properties.into_iter() {
+                            if !match_property.used {
+                                self.error(
+                                    CompileError::MissingProperty(prop_name.into()),
+                                    &expr.span,
+                                );
+                            }
+                        }
+
+                        ctx.expressions.add(TypedExpr {
+                            ty: domain_type,
+                            kind: TypedExprKind::StructPattern(typed_properties),
+                            span: expr.span,
+                        })
+                    }
+                    None => {
+                        if !attributes.is_empty() {
+                            return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
+                        }
+                        ctx.expressions.add(TypedExpr {
+                            kind: TypedExprKind::Unit,
+                            ty: domain_type,
+                            span: expr.span,
+                        })
+                    }
+                }
+            }
+            Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
+                [((def, _), value)] if def.def_id == DefId::unit() => {
+                    let (relationship, _) = self
+                        .get_relationship_meta(*relationship_id)
+                        .expect("BUG: problem getting anonymous property meta");
+
+                    let object_ty = self.check_def(relationship.object.0.def_id);
+                    let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
+
+                    ctx.expressions.add(TypedExpr {
+                        ty: domain_type,
+                        kind: TypedExprKind::ValuePattern(typed_expr_ref),
+                        span: expr.span,
+                    })
+                }
+                _ => return self.expr_error(CompileError::AnonymousPropertyExpected, &expr.span),
+            },
+            Some(Constructor::Intersection(_)) => {
+                todo!()
+            }
+            Some(Constructor::Union(_property_set)) => {
+                return self.expr_error(CompileError::CannotMapUnion, &expr.span)
+            }
+            Some(Constructor::Sequence(_)) => todo!(),
+            Some(Constructor::StringFmt(_)) => todo!(),
+        };
+
+        (domain_type, typed_expr_ref)
+    }
+
     fn check_expr_expect(
         &mut self,
         expr: &Expr,
@@ -312,21 +339,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("FIXME: equate variable with variable?");
             }
             (Type::Infer(type_var), expected) => {
-                if let Err(TypeError::Mismatch(type_eq)) = ctx
+                match ctx
                     .inference
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(expected))
                 {
-                    self.map_if_possible(ctx, expr, typed_expr_ref, type_eq)
+                    Ok(_) => {
+                        warn!("TODO: resolve var?");
+                        (ty, typed_expr_ref)
+                    }
+                    Err(TypeError::Mismatch(type_eq)) => self
+                        .map_if_possible(ctx, expr, typed_expr_ref, type_eq)
                         .unwrap_or_else(|_| {
                             (
                                 self.type_error(TypeError::Mismatch(type_eq), &expr.span),
                                 ERROR_NODE,
                             )
-                        })
-                } else {
-                    warn!("TODO: resolve var?");
-                    (ty, typed_expr_ref)
+                        }),
+                    Err(err) => (self.type_error(err, &expr.span), ERROR_NODE),
                 }
             }
             (ty, expected) if ty != expected => {
@@ -365,7 +395,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 });
                 Ok((type_eq.expected, map_node))
             }
-            (Type::Array(actual_item), Type::Array(expected_item)) => ctx.new_bind_level(|ctx| {
+            (Type::Array(actual_item), Type::Array(expected_item)) => ctx.enter_bind_level(|ctx| {
                 let iter_var = ctx.syntax_var(0);
                 let iter_ref = ctx.expressions.add(TypedExpr {
                     ty: self.types.intern(Type::Tautology),

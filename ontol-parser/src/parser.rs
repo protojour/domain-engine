@@ -5,8 +5,8 @@ use smartstring::alias::String;
 
 use crate::ast::{
     ExprPattern, FmtStatement, Path, Pattern, StructPattern, StructPatternAttr,
-    StructPatternAttrRel, TypeParam, TypeParamPattern, TypeParamPatternBinding, UseStatement,
-    Visibility, WithStatement,
+    StructPatternAttrRel, TypeParam, TypeParamPattern, TypeParamPatternBinding, UnitOrSeq,
+    UseStatement, Visibility, WithStatement,
 };
 
 use super::{
@@ -212,12 +212,18 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         })
 }
 
+fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<UnitOrSeq<T>> {
+    inner.clone().map(|unit| UnitOrSeq::Unit(unit)).or(inner
+        .delimited_by(open('['), close(']'))
+        .map(|seq| UnitOrSeq::Seq(seq)))
+}
+
 fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
         .then(spanned(variable()).repeated())
         .then(
-            spanned(struct_pattern(pattern()))
-                .then(spanned(struct_pattern(pattern())))
+            spanned(with_unit_or_seq(struct_pattern(pattern())))
+                .then(spanned(with_unit_or_seq(struct_pattern(pattern()))))
                 .delimited_by(open('{'), close('}')),
         )
         .map(|((kw, variables), (first, second))| MapStatement {
@@ -230,9 +236,12 @@ fn map_statement() -> impl AstParser<MapStatement> {
 
 fn pattern() -> impl AstParser<Pattern> {
     recursive(|pattern| {
-        spanned(struct_pattern(pattern))
+        spanned(with_unit_or_seq(struct_pattern(pattern)))
             .map(Pattern::Struct)
-            .or(expr_pattern().map(Pattern::Expr))
+            .or(with_unit_or_seq(expr_pattern()).map(|expr| match expr {
+                UnitOrSeq::Unit((u, span)) => Pattern::Expr((UnitOrSeq::Unit(u), span)),
+                UnitOrSeq::Seq((s, span)) => Pattern::Expr((UnitOrSeq::Seq(s), span)),
+            }))
     })
 }
 

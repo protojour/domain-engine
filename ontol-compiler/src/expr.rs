@@ -20,6 +20,8 @@ pub enum ExprKind {
     Call(DefId, Box<[Expr]>),
     /// Object constructor
     Struct(TypePath, Box<[(ObjKey, Expr)]>),
+    /// [expr]
+    Seq(Box<Expr>),
     Variable(ExprId),
     Constant(i64),
 }

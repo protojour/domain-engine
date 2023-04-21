@@ -2,7 +2,10 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use fnv::FnvHashMap;
 
-use crate::{expr::ExprId, types::TypeRef};
+use crate::{
+    expr::ExprId,
+    types::{Type, TypeRef},
+};
 
 use super::{TypeEquation, TypeError};
 
@@ -52,11 +55,28 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
                     }))
                 }
             }
-            (Self::Known(_), Self::Unknown) => Ok(value1.clone()),
-            (Self::Unknown, Self::Known(_)) => Ok(value2.clone()),
+            (Self::Known(ty), Self::Unknown) => {
+                accept_inference(ty)?;
+                Ok(value1.clone())
+            }
+            (Self::Unknown, Self::Known(ty)) => {
+                accept_inference(ty)?;
+                Ok(value2.clone())
+            }
             (Self::Unknown, Self::Unknown) => Ok(Self::Unknown),
         }
     }
+}
+
+fn accept_inference<'m>(_ty: &Type<'m>) -> Result<(), TypeError<'m>> {
+    Ok(())
+    /*
+    match ty {
+        // FIXME: A variable should not be inferred to array, that must be explicit
+        Type::Array(_) => Err(TypeError::MustBeSequence),
+        _ => Ok(()),
+    }
+    */
 }
 
 pub struct Inference<'m> {

@@ -190,7 +190,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Uuid(_) => write!(f, "uuid"),
             Type::DateTime(_) => write!(f, "datetime"),
             Type::Array(ty) => {
-                write!(f, "{}[]", FormatType(ty, defs, primitives))
+                write!(f, "[{}]", FormatType(ty, defs, primitives))
             }
             Type::Option(ty) => {
                 write!(f, "{}?", FormatType(ty, defs, primitives))

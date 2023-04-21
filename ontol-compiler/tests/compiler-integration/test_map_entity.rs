@@ -62,7 +62,7 @@ fn test_map_invert() {
                 work.worker {
                     rel 'ID': p_id
                     rel 'name': p_name
-                    rel 'technologies': work.technology { // ERROR type mismatch: expected `technology[]`, found `technology`
+                    rel 'technologies': work.technology { // ERROR type mismatch: expected `[technology]`, found `technology`
                         rel 'ID': tech_id
                         rel 'name': tech_name
                     }
@@ -70,7 +70,7 @@ fn test_map_invert() {
                 dev.language {
                     rel 'id': tech_id
                     rel 'name': tech_name
-                    rel 'developers': dev.developer { // ERROR type mismatch: expected `developer[]`, found `developer`
+                    rel 'developers': dev.developer { // ERROR type mismatch: expected `[developer]`, found `developer`
                         rel 'id': p_id
                         rel 'name': p_name
                     }
