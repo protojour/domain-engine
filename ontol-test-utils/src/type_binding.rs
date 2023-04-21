@@ -232,7 +232,7 @@ impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Value {
 
 impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Attribute {
     fn from(b: ValueBuilder<'t, 'e>) -> Attribute {
-        b.to_unit_attribute()
+        b.to_unit_attr()
     }
 }
 
@@ -242,12 +242,12 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
         self.merge_attribute(property_id, attribute)
     }
 
-    pub fn to_unit_attribute(self) -> Attribute {
-        self.value.to_attribute(Value::unit())
+    pub fn to_unit_attr(self) -> Attribute {
+        self.value.to_unit_attr()
     }
 
-    pub fn to_attribute(self, rel_params: impl Into<Value>) -> Attribute {
-        self.value.to_attribute(rel_params.into())
+    pub fn to_attr(self, rel_params: impl Into<Value>) -> Attribute {
+        self.value.to_attr(rel_params.into())
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
@@ -318,6 +318,6 @@ impl ToSequence for Vec<Attribute> {
             data: Data::Sequence(self),
             type_def_id: ty.type_info.def_id,
         }
-        .to_attribute(Value::unit())
+        .to_attr(Value::unit())
     }
 }

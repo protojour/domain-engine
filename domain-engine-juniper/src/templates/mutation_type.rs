@@ -1,5 +1,4 @@
 use juniper::LookAheadMethods;
-use ontol_runtime::value::Attribute;
 use tracing::debug;
 
 use crate::{
@@ -69,7 +68,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
 
                     resolve_virtual_schema_field(
                         AttributeType {
-                            attr: &Attribute::with_unit_params(value),
+                            attr: &value.into(),
                         },
                         virtual_schema
                             .indexed_type_info_by_unit(

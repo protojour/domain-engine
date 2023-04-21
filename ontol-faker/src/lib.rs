@@ -129,10 +129,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 let variant = &seq_op.ranges[0];
                 let attr = self.fake_attribute(processor.narrow(variant.operator_id));
 
-                return Attribute::with_unit_params(Value::new(
-                    Data::Sequence([attr].into()),
-                    seq_op.def_variant.def_id,
-                ));
+                return Value::new(Data::Sequence([attr].into()), seq_op.def_variant.def_id).into();
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut seq = vec![];

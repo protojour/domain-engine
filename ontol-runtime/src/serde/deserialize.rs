@@ -222,21 +222,19 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 
     fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
-        let value = self
+        Ok(self
             .matcher
             .match_unit()
-            .map_err(|_| Error::invalid_type(Unexpected::Unit, &self))?;
-
-        Ok(Attribute::with_unit_params(value))
+            .map_err(|_| Error::invalid_type(Unexpected::Unit, &self))?
+            .into())
     }
 
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
-        let value = self
+        Ok(self
             .matcher
             .match_bool(v)
-            .map_err(|_| Error::invalid_type(Unexpected::Bool(v), &self))?;
-
-        Ok(Attribute::with_unit_params(value))
+            .map_err(|_| Error::invalid_type(Unexpected::Bool(v), &self))?
+            .into())
     }
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
@@ -245,13 +243,14 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             .match_u64(v)
             .map_err(|_| Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
-        Ok(Attribute::with_unit_params(Value {
+        Ok(Value {
             data: Data::Int(
                 v.try_into()
                     .map_err(|_| Error::custom("u64 overflow".to_string()))?,
             ),
             type_def_id,
-        }))
+        }
+        .into())
     }
 
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
@@ -260,19 +259,19 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             .match_i64(v)
             .map_err(|_| Error::invalid_type(Unexpected::Signed(v), &self))?;
 
-        Ok(Attribute::with_unit_params(Value {
+        Ok(Value {
             data: Data::Int(v),
             type_def_id,
-        }))
+        }
+        .into())
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        let value = self
+        Ok(self
             .matcher
             .match_str(v)
-            .map_err(|_| Error::invalid_type(Unexpected::Str(v), &self))?;
-
-        Ok(Attribute::with_unit_params(value))
+            .map_err(|_| Error::invalid_type(Unexpected::Str(v), &self))?
+            .into())
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -292,10 +291,11 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(Attribute::with_unit_params(Value {
+                    return Ok(Value {
                         data: Data::Sequence(output),
                         type_def_id: sequence_matcher.type_def_id,
-                    }));
+                    }
+                    .into());
                 }
             };
 
@@ -304,12 +304,14 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                     output.push(attribute);
                 }
                 None => {
-                    return match sequence_matcher.match_seq_end() {
-                        Ok(_) => Ok(Attribute::with_unit_params(Value {
+                    return if sequence_matcher.match_seq_end().is_ok() {
+                        Ok(Value {
                             data: Data::Sequence(output),
                             type_def_id: sequence_matcher.type_def_id,
-                        })),
-                        Err(_) => Err(Error::invalid_length(output.len(), &self)),
+                        }
+                        .into())
+                    } else {
+                        Err(Error::invalid_length(output.len(), &self))
                     };
                 }
             }

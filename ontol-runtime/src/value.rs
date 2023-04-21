@@ -54,10 +54,19 @@ impl Value {
         self.get_attribute(property_id).map(|attr| &attr.value)
     }
 
-    pub fn to_attribute(self, rel_params: Value) -> Attribute {
+    #[inline]
+    pub const fn to_attr(self, rel_params: Value) -> Attribute {
         Attribute {
             value: self,
             rel_params,
+        }
+    }
+
+    #[inline]
+    pub const fn to_unit_attr(self) -> Attribute {
+        Attribute {
+            value: self,
+            rel_params: Value::unit(),
         }
     }
 
@@ -167,10 +176,8 @@ pub struct Attribute {
     pub rel_params: Value,
 }
 
-impl Attribute {
-    /// Create an attribute with a unit edge
-    #[inline]
-    pub const fn with_unit_params(value: Value) -> Self {
+impl From<Value> for Attribute {
+    fn from(value: Value) -> Self {
         Self {
             value,
             rel_params: Value::unit(),
@@ -285,7 +292,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert(
             RelationId(DefId(PackageId(0), 666)),
-            Attribute::with_unit_params(Value::new(Data::Int(42), DefId(PackageId(0), 42))),
+            Value::new(Data::Int(42), DefId(PackageId(0), 42)).to_unit_attr(),
         );
     }
 }

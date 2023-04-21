@@ -122,7 +122,7 @@ impl Stack for ValueStack {
         if seq.len() <= i {
             false
         } else {
-            let mut attr = Attribute::with_unit_params(Value::unit());
+            let mut attr = Value::unit().to_unit_attr();
             std::mem::swap(&mut seq[i], &mut attr);
 
             self.stack.push(attr.rel_params);
@@ -146,13 +146,13 @@ impl Stack for ValueStack {
     fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
         let map = self.struct_local_mut(target);
-        map.insert(key, Attribute::with_unit_params(value));
+        map.insert(key, value.to_unit_attr());
     }
 
     #[inline(always)]
     fn take_seq_attr2(&mut self, local: Local, index: usize) {
         let seq = self.sequence_local_mut(local);
-        let mut attribute = Attribute::with_unit_params(Value::unit());
+        let mut attribute = Value::unit().to_unit_attr();
         std::mem::swap(&mut seq[index], &mut attribute);
         self.stack.push(attribute.rel_params);
         self.stack.push(attribute.value);
@@ -271,7 +271,7 @@ mod tests {
 
     use crate::{
         proc::{AddressOffset, NParams, OpCode},
-        value::{Attribute, Value},
+        value::Value,
         DefId, PackageId, RelationId,
     };
 
@@ -304,17 +304,11 @@ mod tests {
                     [
                         (
                             PropertyId::subject(RelationId(def_id(1))),
-                            Attribute::with_unit_params(Value::new(
-                                Data::String("foo".into()),
-                                def_id(0),
-                            )),
+                            Value::new(Data::String("foo".into()), def_id(0)).into(),
                         ),
                         (
                             PropertyId::subject(RelationId(def_id(2))),
-                            Attribute::with_unit_params(Value::new(
-                                Data::String("bar".into()),
-                                def_id(0),
-                            )),
+                            Value::new(Data::String("bar".into()), def_id(0)).into(),
                         ),
                     ]
                     .into(),
@@ -383,15 +377,15 @@ mod tests {
                     [
                         (
                             PropertyId::subject(RelationId(def_id(1))),
-                            Attribute::with_unit_params(Value::new(Data::Int(333), def_id(0))),
+                            Value::new(Data::Int(333), def_id(0)).into(),
                         ),
                         (
                             PropertyId::subject(RelationId(def_id(2))),
-                            Attribute::with_unit_params(Value::new(Data::Int(10), def_id(0))),
+                            Value::new(Data::Int(10), def_id(0)).into(),
                         ),
                         (
                             PropertyId::subject(RelationId(def_id(3))),
-                            Attribute::with_unit_params(Value::new(Data::Int(11), def_id(0))),
+                            Value::new(Data::Int(11), def_id(0)).into(),
                         ),
                     ]
                     .into(),
@@ -445,8 +439,8 @@ mod tests {
             proc,
             [Value::new(
                 Data::Sequence(vec![
-                    Attribute::with_unit_params(Value::new(Data::Int(1), def_id(0))),
-                    Attribute::with_unit_params(Value::new(Data::Int(2), def_id(0))),
+                    Value::new(Data::Int(1), def_id(0)).into(),
+                    Value::new(Data::Int(2), def_id(0)).into(),
                 ]),
                 def_id(0),
             )],
@@ -506,26 +500,18 @@ mod tests {
                     [
                         (
                             prop_a,
-                            Attribute::with_unit_params(Value::new(
-                                Data::String("a".into()),
-                                def_id(0),
-                            )),
+                            Value::new(Data::String("a".into()), def_id(0)).into(),
                         ),
                         (
                             prop_b,
-                            Attribute::with_unit_params(Value::new(
+                            Value::new(
                                 Data::Sequence(vec![
-                                    Attribute::with_unit_params(Value::new(
-                                        Data::String("b0".into()),
-                                        def_id(0),
-                                    )),
-                                    Attribute::with_unit_params(Value::new(
-                                        Data::String("b1".into()),
-                                        def_id(0),
-                                    )),
+                                    Value::new(Data::String("b0".into()), def_id(0)).into(),
+                                    Value::new(Data::String("b1".into()), def_id(0)).into(),
                                 ]),
                                 def_id(0),
-                            )),
+                            )
+                            .into(),
                         ),
                     ]
                     .into(),

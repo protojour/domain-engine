@@ -107,7 +107,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                         "name": "Guitar",
                     }),
                 )
-                .to_attribute(plays.value_builder(json!({ "how_much": "A lot" })))]
+                .to_attr(plays.value_builder(json!({ "how_much": "A lot" })))]
             .to_sequence_attribute(&instrument),
         )
         .into();
