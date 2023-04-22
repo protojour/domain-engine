@@ -1,21 +1,21 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Address, Lib, OpCode, Procedure},
-    smart_format, DefId,
+    smart_format,
 };
 use smartstring::alias::String;
 
 use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
 
-use super::ProcTable;
+use super::{MapKey, ProcTable};
 
 pub struct LinkResult {
     pub lib: Lib,
-    pub map_procs: FnvHashMap<(DefId, DefId), Procedure>,
+    pub map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut mapping_procs: FnvHashMap<(DefId, DefId), Procedure> = Default::default();
+    let mut mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
     let mut spans: Vec<SourceSpan> = vec![];
@@ -43,8 +43,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     call_procedure.address = Address(0);
                     compiler.push_error(
                         CompileError::CannotConvertMissingEquation {
-                            input: format_def(compiler, map_call.mapping.0),
-                            output: format_def(compiler, map_call.mapping.1),
+                            input: format_map_key(compiler, map_call.mapping.0),
+                            output: format_map_key(compiler, map_call.mapping.1),
                         }
                         .spanned(&spans[index]),
                     );
@@ -59,8 +59,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 }
 
-fn format_def(compiler: &Compiler, def_id: DefId) -> String {
-    let ty = compiler.def_types.map.get(&def_id).unwrap();
+fn format_map_key(compiler: &Compiler, map_key: MapKey) -> String {
+    let ty = compiler.def_types.map.get(&map_key.def_id).unwrap();
 
     smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }

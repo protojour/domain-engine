@@ -67,9 +67,9 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
         match &source_pattern.kind {
             TypedExprKind::ValuePattern(_) => {
-                let to_def = find_mapping_key(&equation.expressions[target].ty).unwrap();
+                let to_def = &equation.expressions[target].ty.get_single_def_id().unwrap();
 
-                codegen_value_pattern_origin(self, block, equation, target, to_def)
+                codegen_value_pattern_origin(self, block, equation, target, *to_def)
             }
             TypedExprKind::StructPattern(attrs) => {
                 codegen_struct_pattern_origin(self, block, equation, target, attrs)
@@ -191,10 +191,13 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 todo!()
             }
             TypedExprKind::StructPattern(attrs) => {
-                let def_id = find_mapping_key(&equation.expressions[expr_id].ty).unwrap();
+                let def_id = &equation.expressions[expr_id]
+                    .ty
+                    .get_single_def_id()
+                    .unwrap();
                 let local = self.builder.push(
                     block,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, def_id),
+                    Ir::CallBuiltin(BuiltinProc::NewMap, *def_id),
                     Stack(1),
                     span,
                 );

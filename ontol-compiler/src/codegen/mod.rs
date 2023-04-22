@@ -36,7 +36,7 @@ use self::{
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
     pub result_lib: Lib,
-    pub result_map_procs: FnvHashMap<(DefId, DefId), Procedure>,
+    pub result_map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -66,16 +66,21 @@ pub struct MapCodegenTask<'m> {
     pub span: SourceSpan,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct MapKey {
+    pub def_id: DefId,
+}
+
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub procedures: FnvHashMap<(DefId, DefId), ProcBuilder>,
+    pub procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
     pub map_calls: Vec<MapCall>,
 }
 
 impl ProcTable {
     /// Allocate a temporary procedure address for a map call.
     /// This will be resolved to final "physical" ID in the link phase.
-    fn gen_mapping_addr(&mut self, from: DefId, to: DefId) -> Address {
+    fn gen_mapping_addr(&mut self, from: MapKey, to: MapKey) -> Address {
         let address = Address(self.map_calls.len() as u32);
         self.map_calls.push(MapCall {
             mapping: (from, to),
@@ -85,12 +90,12 @@ impl ProcTable {
 }
 
 pub(super) struct MapCall {
-    pub mapping: (DefId, DefId),
+    pub mapping: (MapKey, MapKey),
 }
 
-fn find_mapping_key(ty: &TypeRef) -> Option<DefId> {
+fn find_mapping_key(ty: &TypeRef) -> Option<MapKey> {
     match ty {
-        Type::Domain(def_id) => Some(*def_id),
+        Type::Domain(def_id) => Some(MapKey { def_id: *def_id }),
         other => {
             warn!("unable to get mapping key: {other:?}");
             None
