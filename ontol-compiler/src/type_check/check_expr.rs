@@ -57,12 +57,20 @@ impl<'m> CheckExprContext<'m> {
         self.bind_depth
     }
 
-    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        self.bind_depth.0 += 1;
+    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self, SyntaxVar) -> T) -> T {
+        // There is a unique bind depth for the aggregation variable:
+        let aggregation_var = SyntaxVar(0, BindDepth(self.bind_depth.0 + 1));
+
+        self.bind_depth.0 += 2;
         self.syntax_var_allocations.push(0);
-        let ret = f(self);
-        self.bind_depth.0 -= 1;
+        self.syntax_var_allocations.push(0);
+
+        let ret = f(self, aggregation_var);
+
+        self.bind_depth.0 -= 2;
         self.syntax_var_allocations.pop();
+        self.syntax_var_allocations.pop();
+
         ret
     }
 
@@ -74,10 +82,6 @@ impl<'m> CheckExprContext<'m> {
         let syntax_var = SyntaxVar(*alloc, self.bind_depth);
         *alloc += 1;
         syntax_var
-    }
-
-    pub fn syntax_var(&self, id: u16) -> SyntaxVar {
-        SyntaxVar(id, self.bind_depth)
     }
 }
 
@@ -188,62 +192,41 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Seq(aggr_id, inner) => {
                 debug!("Seq(aggr_id = {aggr_id:?})");
 
-                let aggr_inner_ty_var = self
+                // The variables outside the aggregation refer to the aggregated object (an array).
+                let seq_inner_ty_var = self
                     .types
                     .intern(Type::Infer(ctx.inference.new_type_variable(*aggr_id)));
-                let array_ty = self.types.intern(Type::Array(aggr_inner_ty_var));
+                let array_ty = self.types.intern(Type::Array(seq_inner_ty_var));
 
-                let aggr_ref = ctx
+                let seq_ref = ctx
                     .aggr_variables
                     .get(aggr_id)
-                    .expect("aggregation variable not found");
-                let aggr_variable_ref = ctx.expressions.add(TypedExpr {
+                    .expect("aggregated reference not found");
+                let seq_variable_ref = ctx.expressions.add(TypedExpr {
                     ty: array_ty,
-                    kind: TypedExprKind::VariableRef(*aggr_ref),
+                    kind: TypedExprKind::VariableRef(*seq_ref),
                     span: expr.span,
                 });
 
-                // The iterated sequence is an anonymous variable:
-                // let seq_var_ref = ctx.expressions.add(TypedExpr {
-                //     ty: self.types.intern(Type::Tautology),
-                //     kind: TypedExprKind::SequenceVariable,
-                //     span: expr.span,
-                // });
+                ctx.enter_aggregation(|ctx, aggr_var| {
+                    // The inner variables represent each element being aggregated
+                    let (element_ty, element_ref) = self.check_expr(inner, ctx);
 
-                ctx.enter_aggregation(|ctx| {
-                    // The iterated sequence is an anonymous variable:
-                    // let var_ref = ctx.expressions.add(TypedExpr {
-                    //     ty: self.types.intern(Type::Tautology),
-                    //     kind: TypedExprKind::Variable(ctx.syntax_var(index as u16)),
-                    //     span: expr.span,
-                    // });
-                    // ctx.bound_variables.insert(*variable_expr_id, var_ref);
+                    let array_ty = self.types.intern(Type::Array(element_ty));
 
-                    /*
-                    let ty = self
-                        .types
-                        .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
-                    */
-
-                    warn!("FIXME: Check Seq");
-                    let (inner_ty, inner_ref) = self.check_expr(inner, ctx);
-
-                    let array_ty = self.types.intern(Type::Array(inner_ty));
-
-                    let iter_var = ctx.syntax_var(0);
                     let _iter_ref = ctx.expressions.add(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(iter_var),
+                        kind: TypedExprKind::Variable(aggr_var),
                         span: expr.span,
                     });
 
                     let map_sequence_ref = ctx.expressions.add(TypedExpr {
                         ty: array_ty,
                         kind: TypedExprKind::MapSequence(
-                            aggr_variable_ref,
-                            iter_var,
-                            inner_ref,
-                            inner_ty,
+                            seq_variable_ref,
+                            aggr_var,
+                            element_ref,
+                            element_ty,
                         ),
                         span: expr.span,
                     });
@@ -507,8 +490,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Ok((type_eq.expected, map_node))
             }
             (Type::Array(actual_item), Type::Array(expected_item)) => {
-                ctx.enter_aggregation(|ctx| {
-                    let iter_var = ctx.syntax_var(0);
+                ctx.enter_aggregation(|ctx, iter_var| {
                     let iter_ref = ctx.expressions.add(TypedExpr {
                         ty: self.types.intern(Type::Tautology),
                         kind: TypedExprKind::Variable(iter_var),

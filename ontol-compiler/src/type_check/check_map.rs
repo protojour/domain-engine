@@ -113,7 +113,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
 
                     let result =
-                        ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx| {
+                        ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
                             self.aggr_group_map_variables(
                                 inner,
                                 variables,
@@ -130,7 +130,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 } else {
                     let outer_bind_depth = ctx.current_bind_depth();
 
-                    ctx.enter_aggregation::<Result<(), AggrGroupError>>(|ctx| {
+                    ctx.enter_aggregation::<Result<(), AggrGroupError>>(|ctx, _| {
                         let inner_aggr_group = self
                             .aggr_group_map_variables(inner, variables, None, ctx, first_arm)
                             .unwrap();
