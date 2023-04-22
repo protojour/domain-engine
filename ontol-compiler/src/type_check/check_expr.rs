@@ -108,10 +108,6 @@ impl AggregationForest {
         }
     }
 
-    pub fn find_parent_or_self(&self, aggr: ExprRef) -> ExprRef {
-        *self.map.get(&aggr).unwrap()
-    }
-
     pub fn find_root(&self, mut aggr: ExprRef) -> ExprRef {
         loop {
             let parent = self.map.get(&aggr).unwrap();
