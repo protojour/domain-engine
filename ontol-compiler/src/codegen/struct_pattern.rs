@@ -82,6 +82,9 @@ pub(super) fn codegen_struct_pattern_origin(
         TypedExprKind::ValuePattern(expr_ref) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, *expr_ref);
         }),
+        TypedExprKind::MapSequenceBalanced(..) => gen.enter_bind_level(map_codegen, |generator| {
+            generator.codegen_expr(block, equation, to);
+        }),
         kind => {
             todo!("to: {kind:?}");
         }

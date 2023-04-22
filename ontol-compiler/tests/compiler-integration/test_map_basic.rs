@@ -368,7 +368,7 @@ fn test_deep_structural_map() {
 
 #[test]
 // BUG:
-#[should_panic = "not a variable, but MapSequence"]
+#[should_panic = "index out of bounds: the len is 2 but the index is 2"]
 fn test_flat_map1() {
     "
     pub type foo

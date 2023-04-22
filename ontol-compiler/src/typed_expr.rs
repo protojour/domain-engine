@@ -56,6 +56,7 @@ pub enum TypedExprKind<'m> {
     /// The first expression is the array.
     /// The syntax var is the iterated value.
     /// The second expression is the item/body.
+    MapSequenceBalanced(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
     MapSequence(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
 }
 

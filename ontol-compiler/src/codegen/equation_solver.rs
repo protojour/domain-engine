@@ -96,7 +96,7 @@ pub enum SolveError {
 
 pub enum Substitution {
     Variable(ExprRef),
-    Constant,
+    Constant(ExprRef),
 }
 
 pub struct EquationSolver<'t, 'm> {
@@ -149,16 +149,16 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 for expr_ref in expr_refs {
                     self.reduce_expr_inner(expr_ref, indent.inc())?;
                 }
-                Ok(Substitution::Constant)
+                Ok(Substitution::Constant(expr_ref))
             }
             TypedExprKind::Variable(_) => Ok(Substitution::Variable(expr_ref)),
             TypedExprKind::VariableRef(var_ref) => Ok(Substitution::Variable(*var_ref)),
-            TypedExprKind::Constant(_) => Ok(Substitution::Constant),
+            TypedExprKind::Constant(_) => Ok(Substitution::Constant(expr_ref)),
             TypedExprKind::MapValue(param_ref, param_ty) => {
                 let param_ty = *param_ty;
                 let param_ref = match self.reduce_expr_inner(*param_ref, indent.inc())? {
                     Substitution::Variable(var_ref) => var_ref,
-                    Substitution::Constant => return Ok(Substitution::Constant),
+                    Substitution::Constant(const_ref) => const_ref,
                 };
 
                 let (cloned_param_id, cloned_param) = self.clone_expr(param_ref, indent);
@@ -190,20 +190,37 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(param_ref))
             }
+            TypedExprKind::MapSequenceBalanced(seq_ref, _iter_var_ref, item_ref, _item_ty) => {
+                let seq_ref = *seq_ref;
+                let item_ref = *item_ref;
+                self.reduce_expr_inner(seq_ref, indent.inc())?;
+                self.reduce_expr_inner(item_ref, indent.inc())?;
+
+                // Just a reduction
+                self.reductions[expr_ref] = seq_ref;
+
+                Ok(Substitution::Constant(expr_ref))
+            }
             TypedExprKind::MapSequence(seq_ref, iter_var_ref, item_ref, item_ty) => {
                 let seq_ref = *seq_ref;
                 let iter_var_ref = *iter_var_ref;
                 let item_ref = *item_ref;
                 let item_ty = *item_ty;
 
+                let item_ref_copy = item_ref;
+
                 let item_ref = match self.reduce_expr_inner(item_ref, indent.inc())? {
-                    Substitution::Variable(var_id) => var_id,
-                    Substitution::Constant => return Ok(Substitution::Constant),
+                    Substitution::Variable(var_ref) => var_ref,
+                    Substitution::Constant(const_ref) => const_ref,
                 };
+
+                debug!("{indent}MapSequence item_ref(before -> after): {item_ref_copy:?}->{item_ref:?}");
 
                 // Escape recursive expansion of the sequence reference:
                 let seq_var = self.reductions.resolve(seq_ref);
                 let (cloned_seq_var, _) = self.clone_expr(seq_var, indent);
+
+                debug!("{indent}seq_ref->seq_var: {seq_ref:?}->{seq_var:?}");
 
                 // let (cloned_item_id, cloned_item) = self.clone_expr(item_ref);
                 // let cloned_item_span = cloned_item.span;
@@ -228,7 +245,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 self.expansions[seq_var] = inverted_map_ref;
 
                 debug!("{indent}reduction subst: {expr_ref:?}->{seq_ref:?}");
-                debug!("{indent}expansion subst: {seq_ref:?}->{inverted_map_ref:?} (new!)");
+                debug!("{indent}expansion subst: {seq_var:?}->{inverted_map_ref:?} (new!)");
 
                 Ok(Substitution::Variable(inverted_map_ref))
             }
@@ -254,7 +271,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                     }
                     param_var_ref = Some((rewritten_node, index));
                 }
-                Substitution::Constant => {}
+                Substitution::Constant(_) => {}
             }
         }
 
@@ -264,7 +281,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             Some(rewritten) => rewritten,
             None => {
                 debug!("{indent}proc {proc:?} was constant");
-                return Ok(Substitution::Constant);
+                return Ok(Substitution::Constant(expr_ref));
             }
         };
 

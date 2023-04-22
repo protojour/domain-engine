@@ -129,7 +129,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            TypedExprKind::MapSequence(expr_ref, iter_var, body, _) => {
+            TypedExprKind::MapSequence(expr_ref, iter_var, body, _)
+            | TypedExprKind::MapSequenceBalanced(expr_ref, iter_var, body, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
                     block,
@@ -220,6 +221,10 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
     fn codegen_variable(&mut self, block: &mut Block, var: SyntaxVar, span: &SourceSpan) {
         let bind_depth = var.1;
+        debug!(
+            "bind_depth: {bind_depth:?} var_stack len: {}",
+            self.var_stack.len()
+        );
         let generator = &mut self.var_stack[bind_depth.0 as usize];
         generator.codegen_variable(self.builder, block, var, span);
     }

@@ -222,7 +222,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let map_sequence_ref = ctx.expressions.add(TypedExpr {
                         ty: array_ty,
-                        kind: TypedExprKind::MapSequence(
+                        kind: TypedExprKind::MapSequenceBalanced(
                             seq_variable_ref,
                             aggr_var,
                             element_ref,
