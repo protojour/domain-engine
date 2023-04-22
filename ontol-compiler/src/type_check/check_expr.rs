@@ -27,8 +27,17 @@ use super::{
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
     pub expressions: TypedExprTable<'m>,
-    pub bound_variables: FnvHashMap<ExprId, ExprRef>,
+    pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
+    pub aggr_variables: FnvHashMap<ExprId, ExprRef>,
+    pub aggr_forest: AggregationForest,
     bind_depth: BindDepth,
+    syntax_var_allocations: Vec<u16>,
+}
+
+pub struct BoundVariable {
+    pub syntax_var: SyntaxVar,
+    pub expr_ref: ExprRef,
+    pub aggr_group: Option<AggregationGroup>,
 }
 
 impl<'m> CheckExprContext<'m> {
@@ -37,19 +46,80 @@ impl<'m> CheckExprContext<'m> {
             inference: Inference::new(),
             expressions: TypedExprTable::default(),
             bound_variables: Default::default(),
+            aggr_variables: Default::default(),
+            aggr_forest: Default::default(),
             bind_depth: BindDepth(0),
+            syntax_var_allocations: vec![0],
         }
     }
 
-    pub fn enter_bind_level<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    pub fn current_bind_depth(&self) -> BindDepth {
+        self.bind_depth
+    }
+
+    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         self.bind_depth.0 += 1;
+        self.syntax_var_allocations.push(0);
         let ret = f(self);
         self.bind_depth.0 -= 1;
+        self.syntax_var_allocations.pop();
         ret
+    }
+
+    pub fn alloc_syntax_var(&mut self) -> SyntaxVar {
+        let alloc = self
+            .syntax_var_allocations
+            .get_mut(self.bind_depth.0 as usize)
+            .unwrap();
+        let syntax_var = SyntaxVar(*alloc, self.bind_depth);
+        *alloc += 1;
+        syntax_var
     }
 
     pub fn syntax_var(&self, id: u16) -> SyntaxVar {
         SyntaxVar(id, self.bind_depth)
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct AggregationGroup {
+    pub expr_ref: ExprRef,
+    pub bind_depth: BindDepth,
+}
+
+/// Tracks which aggregations are children of other aggregations
+#[derive(Default)]
+pub struct AggregationForest {
+    /// if the map is self-referential, that means a root
+    map: FnvHashMap<ExprRef, ExprRef>,
+}
+
+impl AggregationForest {
+    pub fn insert(&mut self, aggr: ExprRef, parent: Option<ExprRef>) {
+        self.map.insert(aggr, parent.unwrap_or(aggr));
+    }
+
+    pub fn find_parent(&self, aggr: ExprRef) -> Option<ExprRef> {
+        let parent = self.map.get(&aggr).unwrap();
+        if parent == &aggr {
+            None
+        } else {
+            Some(*parent)
+        }
+    }
+
+    pub fn find_parent_or_self(&self, aggr: ExprRef) -> ExprRef {
+        *self.map.get(&aggr).unwrap()
+    }
+
+    pub fn find_root(&self, mut aggr: ExprRef) -> ExprRef {
+        loop {
+            let parent = self.map.get(&aggr).unwrap();
+            if parent == &aggr {
+                return aggr;
+            }
+            aggr = *parent;
+        }
     }
 }
 
@@ -119,10 +189,40 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             //         ),
             //     ),
             // )
-            ExprKind::Seq(inner) => {
-                debug!("Yo");
+            ExprKind::Seq(aggr_id, inner) => {
+                debug!("Seq(aggr_id = {aggr_id:?})");
 
-                ctx.enter_bind_level(|ctx| {
+                let aggr_inner_ty_var = self
+                    .types
+                    .intern(Type::Infer(ctx.inference.new_type_variable(*aggr_id)));
+                let array_ty = self.types.intern(Type::Array(aggr_inner_ty_var));
+
+                let aggr_ref = ctx
+                    .aggr_variables
+                    .get(aggr_id)
+                    .expect("aggregation variable not found");
+                let aggr_variable_ref = ctx.expressions.add(TypedExpr {
+                    ty: array_ty,
+                    kind: TypedExprKind::VariableRef(*aggr_ref),
+                    span: expr.span,
+                });
+
+                // The iterated sequence is an anonymous variable:
+                // let seq_var_ref = ctx.expressions.add(TypedExpr {
+                //     ty: self.types.intern(Type::Tautology),
+                //     kind: TypedExprKind::SequenceVariable,
+                //     span: expr.span,
+                // });
+
+                ctx.enter_aggregation(|ctx| {
+                    // The iterated sequence is an anonymous variable:
+                    // let var_ref = ctx.expressions.add(TypedExpr {
+                    //     ty: self.types.intern(Type::Tautology),
+                    //     kind: TypedExprKind::Variable(ctx.syntax_var(index as u16)),
+                    //     span: expr.span,
+                    // });
+                    // ctx.bound_variables.insert(*variable_expr_id, var_ref);
+
                     /*
                     let ty = self
                         .types
@@ -143,7 +243,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let map_sequence_ref = ctx.expressions.add(TypedExpr {
                         ty: array_ty,
-                        kind: TypedExprKind::MapSequence(inner_ref, iter_var, inner_ref, inner_ty),
+                        kind: TypedExprKind::MapSequence(
+                            aggr_variable_ref,
+                            iter_var,
+                            inner_ref,
+                            inner_ty,
+                        ),
                         span: expr.span,
                     });
 
@@ -165,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self
                     .types
                     .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
-                let var_ref = ctx
+                let bound_variable = ctx
                     .bound_variables
                     .get(expr_id)
                     .expect("variable not found");
@@ -174,7 +279,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ty,
                     ctx.expressions.add(TypedExpr {
                         ty,
-                        kind: TypedExprKind::VariableRef(*var_ref),
+                        kind: TypedExprKind::VariableRef(bound_variable.expr_ref),
                         span: expr.span,
                     }),
                 )
@@ -405,36 +510,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 });
                 Ok((type_eq.expected, map_node))
             }
-            (Type::Array(actual_item), Type::Array(expected_item)) => ctx.enter_bind_level(|ctx| {
-                let iter_var = ctx.syntax_var(0);
-                let iter_ref = ctx.expressions.add(TypedExpr {
-                    ty: self.types.intern(Type::Tautology),
-                    kind: TypedExprKind::Variable(iter_var),
-                    span: expr.span,
-                });
+            (Type::Array(actual_item), Type::Array(expected_item)) => {
+                ctx.enter_aggregation(|ctx| {
+                    let iter_var = ctx.syntax_var(0);
+                    let iter_ref = ctx.expressions.add(TypedExpr {
+                        ty: self.types.intern(Type::Tautology),
+                        kind: TypedExprKind::Variable(iter_var),
+                        span: expr.span,
+                    });
 
-                let (_, map_expr_ref) = self.map_if_possible(
-                    ctx,
-                    expr,
-                    iter_ref,
-                    TypeEquation {
-                        actual: actual_item,
-                        expected: expected_item,
-                    },
-                )?;
-                let map_sequence_node = ctx.expressions.add(TypedExpr {
-                    ty: type_eq.expected,
-                    kind: TypedExprKind::MapSequence(
-                        typed_expr_ref,
-                        iter_var,
-                        map_expr_ref,
-                        type_eq.actual,
-                    ),
-                    span: expr.span,
-                });
+                    let (_, map_expr_ref) = self.map_if_possible(
+                        ctx,
+                        expr,
+                        iter_ref,
+                        TypeEquation {
+                            actual: actual_item,
+                            expected: expected_item,
+                        },
+                    )?;
+                    let map_sequence_node = ctx.expressions.add(TypedExpr {
+                        ty: type_eq.expected,
+                        kind: TypedExprKind::MapSequence(
+                            typed_expr_ref,
+                            iter_var,
+                            map_expr_ref,
+                            type_eq.actual,
+                        ),
+                        span: expr.span,
+                    });
 
-                Ok((type_eq.expected, map_sequence_node))
-            }),
+                    Ok((type_eq.expected, map_sequence_node))
+                })
+            }
             _ => Err(()),
         }
     }

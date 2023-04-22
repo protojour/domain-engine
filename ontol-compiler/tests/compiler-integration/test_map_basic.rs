@@ -312,7 +312,7 @@ fn test_deep_structural_map() {
 
 #[test]
 // BUG:
-#[should_panic = "No mapping procedure found for (DefId(1, 1), DefId(1, 3))"]
+// #[should_panic = "No mapping procedure found for (DefId(1, 1), DefId(1, 3))"]
 fn test_flat_map1() {
     "
     pub type foo

@@ -62,7 +62,7 @@ pub enum TypedExprKind<'m> {
 /// A reference to a typed expression.
 ///
 /// This reference is tied to a `TypedExprTable` and is not globally valid.
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub struct ExprRef(pub u32);
 
 pub const ERROR_NODE: ExprRef = ExprRef(u32::MAX);

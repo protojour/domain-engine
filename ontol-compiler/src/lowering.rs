@@ -572,8 +572,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let expr = match unit_or_seq {
             ast::UnitOrSeq::Unit(ast) => self.lower_struct_pattern((ast, span), var_table)?,
             ast::UnitOrSeq::Seq(ast) => {
+                let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_struct_pattern((ast, span.clone()), var_table)?;
-                self.expr(ExprKind::Seq(Box::new(inner)), &span)
+                self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span)
             }
         };
 
@@ -644,15 +645,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.lower_expr_pattern((expr_pat, span), var_table)
             }
             ast::Pattern::Expr((ast::UnitOrSeq::Seq(expr_pat), _)) => {
+                let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_expr_pattern((expr_pat, span.clone()), var_table)?;
-                Ok(self.expr(ExprKind::Seq(Box::new(inner)), &span))
+                Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
             }
             ast::Pattern::Struct((ast::UnitOrSeq::Unit(struct_pat), span)) => {
                 self.lower_struct_pattern((struct_pat, span), var_table)
             }
             ast::Pattern::Struct((ast::UnitOrSeq::Seq(struct_pat), span)) => {
+                let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_struct_pattern((struct_pat, span.clone()), var_table)?;
-                Ok(self.expr(ExprKind::Seq(Box::new(inner)), &span))
+                Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
             }
         }
     }
@@ -858,6 +861,7 @@ enum ImplicitRelationId {
 #[derive(Default)]
 struct ExprVarTable {
     variables: HashMap<String, ExprId>,
+    aggregation_counter: u32,
 }
 
 impl ExprVarTable {
@@ -866,6 +870,12 @@ impl ExprVarTable {
             .variables
             .entry(ident)
             .or_insert_with(|| compiler.defs.alloc_expr_id())
+    }
+
+    fn new_aggregation_group(&mut self) -> ExprId {
+        let id = ExprId(self.aggregation_counter);
+        self.aggregation_counter += 1;
+        id
     }
 
     fn get_var_id(&self, ident: &str) -> Option<ExprId> {
