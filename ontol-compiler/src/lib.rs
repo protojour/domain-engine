@@ -245,13 +245,7 @@ impl<'m> Compiler<'m> {
 
         builder
             .lib(self.codegen_tasks.result_lib)
-            .mapping_procs(
-                self.codegen_tasks
-                    .result_map_procs
-                    .into_iter()
-                    .map(|((from, to), proc)| ((from.def_id, to.def_id), proc))
-                    .collect(),
-            )
+            .mapping_procs(self.codegen_tasks.result_map_procs)
             .serde_operators(serde_operators, serde_operators_per_def)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)

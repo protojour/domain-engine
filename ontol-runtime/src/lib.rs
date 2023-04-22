@@ -51,6 +51,21 @@ impl DefId {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct MapKey {
+    pub def_id: DefId,
+    pub seq: bool,
+}
+
+impl From<DefId> for MapKey {
+    fn from(value: DefId) -> Self {
+        Self {
+            def_id: value,
+            seq: false,
+        }
+    }
+}
+
 bitflags::bitflags! {
     /// Modifier for (de)serializers.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

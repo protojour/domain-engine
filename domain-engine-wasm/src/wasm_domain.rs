@@ -9,7 +9,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     value::Value,
-    DefId, PackageId,
+    MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
 use wasm_bindgen::prelude::*;
@@ -142,8 +142,8 @@ impl WasmValue {
 
 #[wasm_bindgen]
 pub struct WasmMapper {
-    pub(crate) from: DefId,
-    pub(crate) to: DefId,
+    pub(crate) from: MapKey,
+    pub(crate) to: MapKey,
     pub(crate) procedure: Procedure,
     pub(crate) env: Arc<Env>,
 }
@@ -151,7 +151,7 @@ pub struct WasmMapper {
 #[wasm_bindgen]
 impl WasmMapper {
     pub fn from(&self) -> WasmTypeInfo {
-        let type_info = self.env.get_type_info(self.from);
+        let type_info = self.env.get_type_info(self.from.def_id);
         WasmTypeInfo {
             inner: type_info.clone(),
             env: self.env.clone(),
@@ -159,7 +159,7 @@ impl WasmMapper {
     }
 
     pub fn to(&self) -> WasmTypeInfo {
-        let type_info = self.env.get_type_info(self.to);
+        let type_info = self.env.get_type_info(self.to.def_id);
         WasmTypeInfo {
             inner: type_info.clone(),
             env: self.env.clone(),

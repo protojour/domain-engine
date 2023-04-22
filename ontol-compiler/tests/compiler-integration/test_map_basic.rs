@@ -1,22 +1,78 @@
+use ontol_runtime::MapKey;
 use ontol_test_utils::{type_binding::TypeBinding, SourceName, TestCompile, TestEnv, TestPackages};
 use serde_json::json;
 use test_log::test;
 use tracing::debug;
 
+trait IntoKey: Sized {
+    fn into_key(self) -> Key;
+    fn unit(self) -> Key {
+        self.into_key()
+    }
+    fn seq(self) -> Key {
+        self.into_key()
+    }
+}
+
+impl IntoKey for &'static str {
+    fn into_key(self) -> Key {
+        self.unit()
+    }
+
+    fn unit(self) -> Key {
+        Key::Unit(self)
+    }
+
+    fn seq(self) -> Key {
+        Key::Seq(self)
+    }
+}
+
+impl IntoKey for Key {
+    fn into_key(self) -> Key {
+        self
+    }
+}
+
+enum Key {
+    Unit(&'static str),
+    Seq(&'static str),
+}
+
+impl Key {
+    fn typename(&self) -> &'static str {
+        match self {
+            Self::Unit(t) => t,
+            Self::Seq(t) => t,
+        }
+    }
+}
+
 fn assert_domain_map(
     test_env: &TestEnv,
-    mapping: (&str, &str),
+    (from, to): (impl IntoKey, impl IntoKey),
     input: serde_json::Value,
     expected: serde_json::Value,
 ) {
-    let input_binding = TypeBinding::new(test_env, mapping.0);
-    let output_binding = TypeBinding::new(test_env, mapping.1);
+    let from = from.into_key();
+    let to = to.into_key();
+
+    let input_binding = TypeBinding::new(test_env, from.typename());
+    let output_binding = TypeBinding::new(test_env, to.typename());
 
     let value = input_binding.deserialize_value(input).unwrap();
 
+    fn get_map_key(key: Key, binding: &TypeBinding) -> MapKey {
+        let seq = matches!(key, Key::Seq(_));
+        MapKey {
+            def_id: binding.type_info.def_id,
+            seq,
+        }
+    }
+
     let procedure = match test_env.env.get_mapper_proc(
-        input_binding.type_info.def_id,
-        output_binding.type_info.def_id,
+        get_map_key(from, &input_binding),
+        get_map_key(to, &output_binding),
     ) {
         Some(procedure) => procedure,
         None => panic!(
@@ -312,7 +368,7 @@ fn test_deep_structural_map() {
 
 #[test]
 // BUG:
-#[should_panic = "No mapping procedure found for (DefId(1, 1), DefId(1, 3))"]
+#[should_panic = "not a variable, but MapSequence"]
 fn test_flat_map1() {
     "
     pub type foo

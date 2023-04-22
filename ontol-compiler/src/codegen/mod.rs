@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Address, Lib, NParams, Procedure},
-    DefId,
+    MapKey,
 };
 
 mod equation;
@@ -66,11 +66,6 @@ pub struct MapCodegenTask<'m> {
     pub span: SourceSpan,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct MapKey {
-    pub def_id: DefId,
-}
-
 #[derive(Default)]
 pub(super) struct ProcTable {
     pub procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
@@ -95,7 +90,14 @@ pub(super) struct MapCall {
 
 fn find_mapping_key(ty: &TypeRef) -> Option<MapKey> {
     match ty {
-        Type::Domain(def_id) => Some(MapKey { def_id: *def_id }),
+        Type::Domain(def_id) => Some(MapKey {
+            def_id: *def_id,
+            seq: false,
+        }),
+        Type::Array(element) => {
+            let def_id = element.get_single_def_id()?;
+            Some(MapKey { def_id, seq: true })
+        }
         other => {
             warn!("unable to get mapping key: {other:?}");
             None

@@ -34,7 +34,7 @@ impl<'l> PropertyProbe<'l> {
 
         let mapping_proc = env
             .mapper_proc_table
-            .get(&(destination.def_id, origin.def_id))?;
+            .get(&(destination.def_id.into(), origin.def_id.into()))?;
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {

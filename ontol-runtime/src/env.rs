@@ -15,12 +15,12 @@ use crate::{
     },
     string_pattern::StringPattern,
     string_types::StringLikeType,
-    DefId, PackageId, RelationId,
+    DefId, MapKey, PackageId, RelationId,
 };
 
 /// Runtime environment
 pub struct Env {
-    pub(crate) mapper_proc_table: FnvHashMap<(DefId, DefId), Procedure>,
+    pub(crate) mapper_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
@@ -74,13 +74,13 @@ impl Env {
         self.domains.get(&package_id)
     }
 
-    pub fn mapper_procs(&self) -> impl Iterator<Item = ((DefId, DefId), Procedure)> + '_ {
+    pub fn mapper_procs(&self) -> impl Iterator<Item = ((MapKey, MapKey), Procedure)> + '_ {
         self.mapper_proc_table
             .iter()
             .map(|(key, proc)| (*key, *proc))
     }
 
-    pub fn get_mapper_proc(&self, from: DefId, to: DefId) -> Option<Procedure> {
+    pub fn get_mapper_proc(&self, from: MapKey, to: MapKey) -> Option<Procedure> {
         self.mapper_proc_table.get(&(from, to)).cloned()
     }
 
@@ -185,7 +185,7 @@ impl EnvBuilder {
         self
     }
 
-    pub fn mapping_procs(mut self, mapping_procs: FnvHashMap<(DefId, DefId), Procedure>) -> Self {
+    pub fn mapping_procs(mut self, mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure>) -> Self {
         self.env.mapper_proc_table = mapping_procs;
         self
     }
