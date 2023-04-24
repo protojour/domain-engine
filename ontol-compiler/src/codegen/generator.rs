@@ -8,6 +8,7 @@ use tracing::debug;
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
     hir_node::{CodeDirection, HirBody, HirIdx, HirKind, HirVariable},
+    types::Type,
     SourceSpan,
 };
 
@@ -126,7 +127,38 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            HirKind::Aggr(_, _) => {}
+            HirKind::Aggr(seq_idx, body_idx) => {
+                let return_def_id = expr.ty.get_single_def_id().unwrap();
+                let output = match expr.ty {
+                    Type::Array(_) => self.builder.push(
+                        block,
+                        Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
+                        Stack(1),
+                        span,
+                    ),
+                    _ => todo!("Aggregate to other types than array"),
+                };
+
+                // Input sequence:
+                self.codegen_expr(block, equation, *seq_idx);
+
+                let counter =
+                    self.builder
+                        .push(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
+
+                let iter_offset = block.current_offset();
+
+                let rel_params_local = self.builder.top_plus(1);
+                let value_local = self.builder.top_plus(2);
+
+                /*
+                let codegen_iter = CodegenIter {
+                    iter_var: *iter_var,
+                    rel_params_local,
+                    value_local,
+                };
+                */
+            }
             HirKind::MapSequence(seq_idx, iter_var, body_idx, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
@@ -144,7 +176,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     self.builder
                         .push(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
 
-                let for_each_offset = block.current_offset();
+                let iter_offset = block.current_offset();
 
                 let rel_params_local = self.builder.top_plus(1);
                 let value_local = self.builder.top_plus(2);
@@ -171,7 +203,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                         .push(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
 
                     gen.builder
-                        .commit(block2, Terminator::PopGoto(block.index(), for_each_offset))
+                        .commit(block2, Terminator::PopGoto(block.index(), iter_offset))
                 });
 
                 self.builder.push(
