@@ -5,9 +5,9 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::ir_node::{IrKind, IrNode, IrNodeId, IrNodeTable};
+use crate::hir_node::{HirIdx, HirKind, HirNode, HirNodeTable};
 
-use super::equation::IrNodeEquation;
+use super::equation::HirEquation;
 
 /// A substitution table tracks rewrites of node indices.
 ///
@@ -18,17 +18,17 @@ use super::equation::IrNodeEquation;
 ///
 /// Be careful not to introduce circular rewrites.
 #[derive(Default, Debug)]
-pub struct SubstitutionTable(SmallVec<[IrNodeId; 32]>);
+pub struct SubstitutionTable(SmallVec<[HirIdx; 32]>);
 
 impl SubstitutionTable {
     #[inline]
     pub fn push(&mut self) {
-        let id = IrNodeId(self.0.len() as u32);
+        let id = HirIdx(self.0.len() as u32);
         self.0.push(id);
     }
 
     /// Recursively resolve any node to its final substituted form.
-    pub fn resolve(&self, mut node_id: IrNodeId) -> IrNodeId {
+    pub fn resolve(&self, mut node_id: HirIdx) -> HirIdx {
         loop {
             let entry = self.0[node_id.0 as usize];
             if entry == node_id {
@@ -39,7 +39,7 @@ impl SubstitutionTable {
         }
     }
 
-    pub fn resolve_once(&self, node_id: IrNodeId) -> Option<IrNodeId> {
+    pub fn resolve_once(&self, node_id: HirIdx) -> Option<HirIdx> {
         let entry = self.0[node_id.0 as usize];
         if entry == node_id {
             return None;
@@ -60,7 +60,7 @@ impl SubstitutionTable {
     pub fn debug_table(&self) -> Vec<(u32, u32)> {
         let mut out = vec![];
         for i in 0..self.0.len() {
-            let source = IrNodeId(i as u32);
+            let source = HirIdx(i as u32);
             let resolved = self.resolve(source);
             if resolved != source {
                 out.push((source.0, resolved.0));
@@ -71,16 +71,16 @@ impl SubstitutionTable {
     }
 }
 
-impl Index<IrNodeId> for SubstitutionTable {
-    type Output = IrNodeId;
+impl Index<HirIdx> for SubstitutionTable {
+    type Output = HirIdx;
 
-    fn index(&self, index: IrNodeId) -> &Self::Output {
+    fn index(&self, index: HirIdx) -> &Self::Output {
         &self.0[index.0 as usize]
     }
 }
 
-impl IndexMut<IrNodeId> for SubstitutionTable {
-    fn index_mut(&mut self, index: IrNodeId) -> &mut Self::Output {
+impl IndexMut<HirIdx> for SubstitutionTable {
+    fn index_mut(&mut self, index: HirIdx) -> &mut Self::Output {
         &mut self.0[index.0 as usize]
     }
 }
@@ -95,13 +95,13 @@ pub enum SolveError {
 }
 
 pub enum Substitution {
-    Variable(IrNodeId),
-    Constant(IrNodeId),
+    Variable(HirIdx),
+    Constant(HirIdx),
 }
 
 pub struct EquationSolver<'t, 'm> {
     /// The set of nodes that will be rewritten
-    nodes: &'t mut IrNodeTable<'m>,
+    nodes: &'t mut HirNodeTable<'m>,
     /// substitutions for the reduced side
     reductions: &'t mut SubstitutionTable,
     /// substitutions for the expanded side
@@ -109,7 +109,7 @@ pub struct EquationSolver<'t, 'm> {
 }
 
 impl<'t, 'm> EquationSolver<'t, 'm> {
-    pub fn new(equation: &'t mut IrNodeEquation<'m>) -> Self {
+    pub fn new(equation: &'t mut HirEquation<'m>) -> Self {
         Self {
             nodes: &mut equation.nodes,
             reductions: &mut equation.reductions,
@@ -117,59 +117,59 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
         }
     }
 
-    pub fn reduce_node(&mut self, node_id: IrNodeId) -> Result<Substitution, SolveError> {
+    pub fn reduce_node(&mut self, node_id: HirIdx) -> Result<Substitution, SolveError> {
         self.reduce_node_inner(node_id, Indent::default())
     }
 
     fn reduce_node_inner(
         &mut self,
-        node_id: IrNodeId,
+        idx: HirIdx,
         indent: Indent,
     ) -> Result<Substitution, SolveError> {
-        debug!("{indent}(enter) reduce node {:?}", self.nodes[node_id].kind);
+        debug!("{indent}(enter) reduce node {:?}", self.nodes[idx].kind);
 
-        match &self.nodes[node_id].kind {
-            IrKind::Unit => todo!(),
-            IrKind::Call(proc, params) => {
-                let param_ids = params
+        match &self.nodes[idx].kind {
+            HirKind::Unit => todo!(),
+            HirKind::Call(proc, params) => {
+                let param_idxs = params
                     .into_iter()
-                    .map(|param_id| self.reductions.resolve(*param_id))
+                    .map(|param_idx| self.reductions.resolve(*param_idx))
                     .collect();
 
-                self.reduce_call(node_id, *proc, param_ids, indent)
+                self.reduce_call(idx, *proc, param_idxs, indent)
             }
-            IrKind::ValuePattern(value_node) => self.reduce_node_inner(*value_node, indent.inc()),
-            IrKind::StructPattern(property_map) => {
-                let prop_node_ids: Vec<_> =
-                    property_map.iter().map(|(_, node_id)| *node_id).collect();
-                for prop_node_id in prop_node_ids {
-                    self.reduce_node_inner(prop_node_id, indent.inc())?;
+            HirKind::ValuePattern(value_idx) => self.reduce_node_inner(*value_idx, indent.inc()),
+            HirKind::StructPattern(property_map) => {
+                let prop_node_idxs: Vec<_> =
+                    property_map.iter().map(|(_, node_idx)| *node_idx).collect();
+                for prop_node_idx in prop_node_idxs {
+                    self.reduce_node_inner(prop_node_idx, indent.inc())?;
                 }
-                Ok(Substitution::Constant(node_id))
+                Ok(Substitution::Constant(idx))
             }
-            IrKind::Variable(_) => Ok(Substitution::Variable(node_id)),
-            IrKind::VariableRef(var_id) => Ok(Substitution::Variable(*var_id)),
-            IrKind::Constant(_) => Ok(Substitution::Constant(node_id)),
-            IrKind::MapCall(param_id, param_ty) => {
+            HirKind::Variable(_) => Ok(Substitution::Variable(idx)),
+            HirKind::VariableRef(var_idx) => Ok(Substitution::Variable(*var_idx)),
+            HirKind::Constant(_) => Ok(Substitution::Constant(idx)),
+            HirKind::MapCall(param_idx, param_ty) => {
                 let param_ty = *param_ty;
-                let param_id = match self.reduce_node_inner(*param_id, indent.inc())? {
-                    Substitution::Variable(var_id) => var_id,
-                    Substitution::Constant(const_id) => const_id,
+                let param_idx = match self.reduce_node_inner(*param_idx, indent.inc())? {
+                    Substitution::Variable(idx) => idx,
+                    Substitution::Constant(idx) => idx,
                 };
 
-                let (cloned_param_id, cloned_param) = self.clone_node(param_id, indent);
+                let (cloned_param_id, cloned_param) = self.clone_node(param_idx, indent);
                 let cloned_param_span = cloned_param.span;
-                let node = &self.nodes[node_id];
+                let node = &self.nodes[idx];
 
                 debug!(
                     "{indent}substitute IrKind::MapCall with span {:?}, param_id: {:?}",
-                    node.span, param_id.0
+                    node.span, param_idx.0
                 );
 
                 // invert mappping:
-                let (inverted_map_id, _) = self.add_node(
-                    IrNode {
-                        kind: IrKind::MapCall(cloned_param_id, node.ty),
+                let (inverted_map_idx, _) = self.add_node(
+                    HirNode {
+                        kind: HirKind::MapCall(cloned_param_id, node.ty),
                         ty: param_ty,
                         span: cloned_param_span,
                     },
@@ -177,45 +177,45 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 );
 
                 // remove the map call from the reductions
-                self.reductions[node_id] = param_id;
+                self.reductions[idx] = param_idx;
                 // add inverted map call to the expansions
-                self.expansions[param_id] = inverted_map_id;
+                self.expansions[param_idx] = inverted_map_idx;
 
-                debug!("{indent}reduction subst: {node_id:?}->{param_id:?}");
-                debug!("{indent}expansion subst: {param_id:?}->{inverted_map_id:?} (new!)");
+                debug!("{indent}reduction subst: {idx:?}->{param_idx:?}");
+                debug!("{indent}expansion subst: {param_idx:?}->{inverted_map_idx:?} (new!)");
 
-                Ok(Substitution::Variable(param_id))
+                Ok(Substitution::Variable(param_idx))
             }
-            IrKind::Aggr(_) => Ok(Substitution::Constant(node_id)),
-            IrKind::MapSequence(seq_id, iter_var_id, elem_id, item_ty) => {
-                let seq_id = *seq_id;
-                let iter_var_id = *iter_var_id;
-                let elem_id = *elem_id;
+            HirKind::Aggr(_) => Ok(Substitution::Constant(idx)),
+            HirKind::MapSequence(seq_idx, iter_var, elem_idx, item_ty) => {
+                let seq_idx = *seq_idx;
+                let iter_var = *iter_var;
+                let elem_idx = *elem_idx;
                 let item_ty = *item_ty;
 
-                let elem_id_copy = elem_id;
+                let elem_idx_copy = elem_idx;
 
-                let elem_id = match self.reduce_node_inner(elem_id, indent.inc())? {
-                    Substitution::Variable(var_id) => var_id,
-                    Substitution::Constant(const_id) => const_id,
+                let elem_idx = match self.reduce_node_inner(elem_idx, indent.inc())? {
+                    Substitution::Variable(idx) => idx,
+                    Substitution::Constant(idx) => idx,
                 };
 
                 debug!(
-                    "{indent}MapSequence elem_id(before -> after): {elem_id_copy:?}->{elem_id:?}"
+                    "{indent}MapSequence elem_id(before -> after): {elem_idx_copy:?}->{elem_idx:?}"
                 );
 
                 // Escape recursive expansion of the sequence reference:
-                let seq_var = self.reductions.resolve(seq_id);
+                let seq_var = self.reductions.resolve(seq_idx);
                 let (cloned_seq_var, _) = self.clone_node(seq_var, indent);
 
-                debug!("{indent}seq_id->seq_var: {seq_id:?}->{seq_var:?}");
+                debug!("{indent}seq_id->seq_var: {seq_idx:?}->{seq_var:?}");
 
                 // let (cloned_item_id, cloned_item) = self.clone_node(elem_id);
                 // let cloned_item_span = cloned_item.span;
-                let node = &self.nodes[node_id];
-                let (inverted_map_id, _) = self.add_node(
-                    IrNode {
-                        kind: IrKind::MapSequence(cloned_seq_var, iter_var_id, elem_id, item_ty),
+                let node = &self.nodes[idx];
+                let (inverted_map_idx, _) = self.add_node(
+                    HirNode {
+                        kind: HirKind::MapSequence(cloned_seq_var, iter_var, elem_idx, item_ty),
                         ty: node.ty,
                         span: node.span,
                     },
@@ -223,35 +223,35 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 );
 
                 // remove the map call from the reductions
-                self.reductions[node_id] = seq_id;
+                self.reductions[idx] = seq_idx;
                 // add inverted map call to the expansions
-                self.expansions[seq_var] = inverted_map_id;
+                self.expansions[seq_var] = inverted_map_idx;
 
-                debug!("{indent}reduction subst: {node_id:?}->{seq_id:?}");
-                debug!("{indent}expansion subst: {seq_var:?}->{inverted_map_id:?} (new!)");
+                debug!("{indent}reduction subst: {idx:?}->{seq_idx:?}");
+                debug!("{indent}expansion subst: {seq_var:?}->{inverted_map_idx:?} (new!)");
 
-                Ok(Substitution::Variable(inverted_map_id))
+                Ok(Substitution::Variable(inverted_map_idx))
             }
         }
     }
 
     fn reduce_call(
         &mut self,
-        node_id: IrNodeId,
+        idx: HirIdx,
         proc: BuiltinProc,
-        params: SmallVec<[IrNodeId; 4]>,
+        params: SmallVec<[HirIdx; 4]>,
         indent: Indent,
     ) -> Result<Substitution, SolveError> {
         let params_len = params.len();
-        let mut param_var_id = None;
+        let mut param_var_idx = None;
 
-        for (index, param_id) in params.iter().enumerate() {
-            match self.reduce_node_inner(*param_id, indent.inc())? {
+        for (index, param_idx) in params.iter().enumerate() {
+            match self.reduce_node_inner(*param_idx, indent.inc())? {
                 Substitution::Variable(rewritten_node) => {
-                    if param_var_id.is_some() {
+                    if param_var_idx.is_some() {
                         return Err(SolveError::MultipleVariablesInCall);
                     }
-                    param_var_id = Some((rewritten_node, index));
+                    param_var_idx = Some((rewritten_node, index));
                 }
                 Substitution::Constant(_) => {}
             }
@@ -259,15 +259,15 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
         debug!("{indent}reduce proc {proc:?}");
 
-        let (param_var_id, var_index) = match param_var_id {
+        let (param_var_idx, var_index) = match param_var_idx {
             Some(rewritten) => rewritten,
             None => {
                 debug!("{indent}proc {proc:?} was constant");
-                return Ok(Substitution::Constant(node_id));
+                return Ok(Substitution::Constant(idx));
             }
         };
 
-        let node = &self.nodes[node_id];
+        let node = &self.nodes[idx];
         let span = node.span;
 
         for rule in &rules::RULES {
@@ -275,9 +275,9 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 continue;
             }
 
-            for (_index, (param_id, _rule_param)) in params.iter().zip(rule.0.params()).enumerate()
+            for (_index, (param_idx, _rule_param)) in params.iter().zip(rule.0.params()).enumerate()
             {
-                let _param_node = &self.nodes[*param_id];
+                let _param_node = &self.nodes[*param_idx];
                 // TODO: Check constraints
             }
 
@@ -295,41 +295,41 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             // e.g. if the node `:v` gets rewritten to `(* :v 2)`,
             // we only want to do this once.
             // The left `:v` cannot be the same node as the right `:v`.
-            let (cloned_var_id, _) = self.clone_node(param_var_id, indent);
-            cloned_params[var_index] = cloned_var_id;
+            let (cloned_var_idx, _) = self.clone_node(param_var_idx, indent);
+            cloned_params[var_index] = cloned_var_idx;
 
-            let target_node = IrNode {
-                kind: IrKind::Call(rule.1.proc(), cloned_params.into()),
+            let target_node = HirNode {
+                kind: HirKind::Call(rule.1.proc(), cloned_params.into()),
                 ty: node_ty,
                 span,
             };
-            let (target_node_id, _) = self.add_node(target_node, indent);
+            let (target_node_idx, _) = self.add_node(target_node, indent);
 
             // substitutions
-            self.reductions[node_id] = param_var_id;
-            self.expansions[param_var_id] = target_node_id;
+            self.reductions[idx] = param_var_idx;
+            self.expansions[param_var_idx] = target_node_idx;
 
-            debug!("{indent}reduction subst: {node_id:?}->{param_var_id:?}");
-            debug!("{indent}expansion subst: {param_var_id:?}->{target_node_id:?} (new!)");
+            debug!("{indent}reduction subst: {idx:?}->{param_var_idx:?}");
+            debug!("{indent}expansion subst: {param_var_idx:?}->{target_node_idx:?} (new!)");
 
-            return Ok(Substitution::Variable(cloned_var_id));
+            return Ok(Substitution::Variable(cloned_var_idx));
         }
 
         Err(SolveError::NoRulesMatchedCall)
     }
 
-    fn clone_node(&mut self, node_id: IrNodeId, indent: Indent) -> (IrNodeId, &IrNode<'m>) {
-        let node = &self.nodes[node_id];
+    fn clone_node(&mut self, idx: HirIdx, indent: Indent) -> (HirIdx, &HirNode<'m>) {
+        let node = &self.nodes[idx];
         self.add_node(node.clone(), indent)
     }
 
-    fn add_node(&mut self, node: IrNode<'m>, indent: Indent) -> (IrNodeId, &IrNode<'m>) {
-        let node_id = IrNodeId(self.nodes.0.len() as u32);
+    fn add_node(&mut self, node: HirNode<'m>, indent: Indent) -> (HirIdx, &HirNode<'m>) {
+        let idx = HirIdx(self.nodes.0.len() as u32);
         self.nodes.0.push(node);
         self.reductions.push();
         self.expansions.push();
-        debug!("{indent}add_node: {node_id:?} => {:?}", self.nodes[node_id]);
-        (node_id, &self.nodes[node_id])
+        debug!("{indent}add_node: {idx:?} => {:?}", self.nodes[idx]);
+        (idx, &self.nodes[idx])
     }
 }
 
@@ -395,8 +395,8 @@ mod tests {
     use tracing::info;
 
     use crate::{
-        codegen::equation::IrNodeEquation,
-        ir_node::{BindDepth, IrKind, IrNode, IrNodeTable, SyntaxVar},
+        codegen::equation::HirEquation,
+        hir_node::{BindDepth, HirKind, HirNode, HirNodeTable, HirVariable},
         mem::{Intern, Mem},
         types::Type,
         Compiler, SourceSpan, Sources,
@@ -408,29 +408,29 @@ mod tests {
         let mut compiler = Compiler::new(&mem, Sources::default()).with_core();
         let int = compiler.types.intern(Type::Int(DefId(PackageId(0), 42)));
 
-        let mut table = IrNodeTable::default();
-        let var = table.add(IrNode {
-            kind: IrKind::Variable(SyntaxVar(42, BindDepth(0))),
+        let mut table = HirNodeTable::default();
+        let var = table.add(HirNode {
+            kind: HirKind::Variable(HirVariable(42, BindDepth(0))),
             ty: int,
             span: SourceSpan::none(),
         });
-        let var_ref = table.add(IrNode {
-            kind: IrKind::VariableRef(var),
+        let var_ref = table.add(HirNode {
+            kind: HirKind::VariableRef(var),
             ty: int,
             span: SourceSpan::none(),
         });
-        let constant = table.add(IrNode {
-            kind: IrKind::Constant(1000),
+        let constant = table.add(HirNode {
+            kind: HirKind::Constant(1000),
             ty: int,
             span: SourceSpan::none(),
         });
-        let call = table.add(IrNode {
-            kind: IrKind::Call(BuiltinProc::Mul, [var_ref, constant].into()),
+        let call = table.add(HirNode {
+            kind: HirKind::Call(BuiltinProc::Mul, [var_ref, constant].into()),
             ty: int,
             span: SourceSpan::none(),
         });
 
-        let mut eq = IrNodeEquation::new(table);
+        let mut eq = HirEquation::new(table);
         eq.solver().reduce_node(call).unwrap();
 
         info!("source: {:#?}", eq.debug_tree(call, &eq.reductions));

@@ -7,14 +7,14 @@ use crate::{
         ir::Ir,
         proc_builder::{Block, Stack},
     },
-    ir_node::{BindDepth, IrKind, IrNodeId, SyntaxVar},
+    hir_node::{BindDepth, HirIdx, HirKind, HirVariable},
     SourceSpan,
 };
 
-use super::{equation::IrNodeEquation, proc_builder::ProcBuilder};
+use super::{equation::HirEquation, proc_builder::ProcBuilder};
 
 struct UnpackProp {
-    var: SyntaxVar,
+    var: HirVariable,
     kind: UnpackKind,
 }
 
@@ -30,9 +30,9 @@ enum UnpackKind {
 pub(super) fn codegen_struct_pattern_origin(
     gen: &mut CodeGenerator,
     block: &mut Block,
-    equation: &IrNodeEquation,
-    to: IrNodeId,
-    origin_attrs: &IndexMap<PropertyId, IrNodeId>,
+    equation: &HirEquation,
+    to: HirIdx,
+    origin_attrs: &IndexMap<PropertyId, HirIdx>,
 ) {
     let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
 
@@ -46,7 +46,7 @@ pub(super) fn codegen_struct_pattern_origin(
 
     if !unpack_props.is_empty() {
         // must start with SyntaxVar(0)
-        assert!(unpack_props[0].var == SyntaxVar(0, BindDepth(0)));
+        assert!(unpack_props[0].var == HirVariable(0, BindDepth(0)));
     }
 
     struct MapCodegen {
@@ -58,7 +58,7 @@ pub(super) fn codegen_struct_pattern_origin(
             &mut self,
             builder: &mut ProcBuilder,
             block: &mut Block,
-            var: SyntaxVar,
+            var: HirVariable,
             span: &SourceSpan,
         ) {
             // To find the value local, we refer to the first local resulting from TakeAttr2,
@@ -76,10 +76,10 @@ pub(super) fn codegen_struct_pattern_origin(
     };
 
     match &to_expr.kind {
-        IrKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
+        HirKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, to);
         }),
-        IrKind::ValuePattern(node_id) => gen.enter_bind_level(map_codegen, |generator| {
+        HirKind::ValuePattern(node_id) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, *node_id);
         }),
         kind => {
@@ -88,19 +88,16 @@ pub(super) fn codegen_struct_pattern_origin(
     }
 }
 
-fn analyze_unpack(
-    equation: &IrNodeEquation,
-    attrs: &IndexMap<PropertyId, IrNodeId>,
-) -> Vec<UnpackProp> {
+fn analyze_unpack(equation: &HirEquation, attrs: &IndexMap<PropertyId, HirIdx>) -> Vec<UnpackProp> {
     let mut destr: Vec<_> = attrs
         .iter()
         .filter_map(|(prop_id, node_id)| {
             match &equation.resolve_node(&equation.reductions, *node_id).1.kind {
-                IrKind::Variable(var) => Some(UnpackProp {
+                HirKind::Variable(var) => Some(UnpackProp {
                     var: *var,
                     kind: UnpackKind::Leaf(*prop_id),
                 }),
-                IrKind::StructPattern(inner_attrs) => {
+                HirKind::StructPattern(inner_attrs) => {
                     let unpack_props = analyze_unpack(equation, inner_attrs);
                     let first = unpack_props.first()?;
 
@@ -158,7 +155,7 @@ fn generate_prop_unpack(
 
                 // Remove the struct from the stack..
                 // FIXME: This is inefficient, should instead just keep it on the stack,
-                // but then SyntaxVar no longer has a linear relationship with which Local to use,
+                // but then HirVariable no longer has a linear relationship with which Local to use,
                 // so a lookup table must be used instead
                 gen.builder
                     .push(block, Ir::Remove(struct_local), Stack(-1), span);

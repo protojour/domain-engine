@@ -34,7 +34,7 @@ mod compiler_queries;
 mod core;
 mod def;
 mod expr;
-mod ir_node;
+mod hir_node;
 mod lowering;
 mod namespace;
 mod patterns;

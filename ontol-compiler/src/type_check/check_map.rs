@@ -9,7 +9,7 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
-    ir_node::{BindDepth, BodyId, IrKind, IrNode},
+    hir_node::{BindDepth, HirBodyIdx, HirKind, HirNode},
     mem::Intern,
     type_check::check_expr::Arm,
     types::{Type, TypeRef},
@@ -178,9 +178,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     // Register variable
                     let syntax_var = ctx.alloc_syntax_var();
-                    let var_id = ctx.nodes.add(IrNode {
+                    let var_id = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: IrKind::Variable(syntax_var),
+                        kind: HirKind::Variable(syntax_var),
                         span: *variable_span,
                     });
 
@@ -223,7 +223,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 struct FirstArm(bool);
 
 struct AggrGroupSet {
-    set: FnvHashSet<Option<BodyId>>,
+    set: FnvHashSet<Option<HirBodyIdx>>,
     tallest_depth: u16,
 }
 
@@ -232,7 +232,7 @@ pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
-    TooManyLeaves(Vec<BodyId>),
+    TooManyLeaves(Vec<HirBodyIdx>),
 }
 
 impl AggrGroupSet {
@@ -260,13 +260,13 @@ impl AggrGroupSet {
         self,
         ctx: &CheckExprContext,
         max_depth: BindDepth,
-    ) -> Result<BodyId, AggrGroupError> {
+    ) -> Result<HirBodyIdx, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {
             return Err(AggrGroupError::DepthExceeded);
         }
 
-        let mut roots: FnvHashSet<BodyId> = Default::default();
-        let mut parents: FnvHashSet<BodyId> = Default::default();
+        let mut roots: FnvHashSet<HirBodyIdx> = Default::default();
+        let mut parents: FnvHashSet<HirBodyIdx> = Default::default();
 
         for group in self.set.iter().flatten() {
             roots.insert(ctx.aggr_forest.find_root(*group));

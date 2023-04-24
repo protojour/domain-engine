@@ -10,17 +10,17 @@ use crate::{
         proc_builder::Stack,
         Block, ProcBuilder,
     },
-    ir_node::{IrKind, IrNodeId, SyntaxVar},
+    hir_node::{HirIdx, HirKind, HirVariable},
     SourceSpan,
 };
 
-use super::equation::IrNodeEquation;
+use super::equation::HirEquation;
 
 pub(super) fn codegen_value_pattern_origin(
     gen: &mut CodeGenerator,
     block: &mut Block,
-    equation: &IrNodeEquation,
-    to: IrNodeId,
+    equation: &HirEquation,
+    to: HirIdx,
     to_def: DefId,
 ) {
     let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
@@ -34,7 +34,7 @@ pub(super) fn codegen_value_pattern_origin(
             &mut self,
             builder: &mut ProcBuilder,
             block: &mut Block,
-            var: SyntaxVar,
+            var: HirVariable,
             span: &SourceSpan,
         ) {
             // There should only be one origin variable (but can flow into several slots)
@@ -48,10 +48,10 @@ pub(super) fn codegen_value_pattern_origin(
     };
 
     gen.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
-        IrKind::ValuePattern(node_id) => {
+        HirKind::ValuePattern(node_id) => {
             generator.codegen_expr(block, equation, *node_id);
         }
-        IrKind::StructPattern(dest_attrs) => {
+        HirKind::StructPattern(dest_attrs) => {
             generator.builder.push(
                 block,
                 Ir::CallBuiltin(BuiltinProc::NewMap, to_def),

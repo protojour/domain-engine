@@ -10,8 +10,9 @@ use crate::{
     def::{Cardinality, Def, DefKind, DefReference, PropertyCardinality, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
-    ir_node::{
-        BindDepth, Body, BodyId, IrKind, IrNode, IrNodeId, IrNodeTable, SyntaxVar, ERROR_NODE,
+    hir_node::{
+        BindDepth, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode, HirNodeTable, HirVariable,
+        ERROR_NODE,
     },
     mem::Intern,
     relation::Constructor,
@@ -26,10 +27,10 @@ use super::{
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<Body>,
-    pub nodes: IrNodeTable<'m>,
+    pub bodies: Vec<HirBody>,
+    pub nodes: HirNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
-    pub aggr_body_map: FnvHashMap<ExprId, BodyId>,
+    pub aggr_body_map: FnvHashMap<ExprId, HirBodyIdx>,
 
     pub aggr_forest: AggregationForest,
 
@@ -45,7 +46,7 @@ impl<'m> CheckExprContext<'m> {
         Self {
             inference: Inference::new(),
             bodies: Default::default(),
-            nodes: IrNodeTable::default(),
+            nodes: HirNodeTable::default(),
             bound_variables: Default::default(),
             aggr_body_map: Default::default(),
             aggr_forest: Default::default(),
@@ -60,9 +61,9 @@ impl<'m> CheckExprContext<'m> {
         self.bind_depth
     }
 
-    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self, SyntaxVar) -> T) -> T {
+    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self, HirVariable) -> T) -> T {
         // There is a unique bind depth for the aggregation variable:
-        let aggregation_var = SyntaxVar(0, BindDepth(self.bind_depth.0 + 1));
+        let aggregation_var = HirVariable(0, BindDepth(self.bind_depth.0 + 1));
 
         self.bind_depth.0 += 2;
         self.syntax_var_allocations.push(0);
@@ -77,37 +78,37 @@ impl<'m> CheckExprContext<'m> {
         ret
     }
 
-    pub fn alloc_map_body_id(&mut self) -> BodyId {
+    pub fn alloc_map_body_id(&mut self) -> HirBodyIdx {
         let next = self.body_id_counter;
         self.body_id_counter += 1;
-        self.bodies.push(Body::default());
-        BodyId(next)
+        self.bodies.push(HirBody::default());
+        HirBodyIdx(next)
     }
 
-    pub fn map_body_mut(&mut self, id: BodyId) -> &mut Body {
+    pub fn map_body_mut(&mut self, id: HirBodyIdx) -> &mut HirBody {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
-    pub fn alloc_syntax_var(&mut self) -> SyntaxVar {
+    pub fn alloc_syntax_var(&mut self) -> HirVariable {
         let alloc = self
             .syntax_var_allocations
             .get_mut(self.bind_depth.0 as usize)
             .unwrap();
-        let syntax_var = SyntaxVar(*alloc, self.bind_depth);
+        let syntax_var = HirVariable(*alloc, self.bind_depth);
         *alloc += 1;
         syntax_var
     }
 }
 
 pub struct BoundVariable {
-    pub syntax_var: SyntaxVar,
-    pub node_id: IrNodeId,
+    pub syntax_var: HirVariable,
+    pub node_id: HirIdx,
     pub aggr_group: Option<AggregationGroup>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AggregationGroup {
-    pub body_id: BodyId,
+    pub body_id: HirBodyIdx,
     pub bind_depth: BindDepth,
 }
 
@@ -115,15 +116,15 @@ pub struct AggregationGroup {
 #[derive(Default)]
 pub struct AggregationForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<BodyId, BodyId>,
+    map: FnvHashMap<HirBodyIdx, HirBodyIdx>,
 }
 
 impl AggregationForest {
-    pub fn insert(&mut self, aggr: BodyId, parent: Option<BodyId>) {
+    pub fn insert(&mut self, aggr: HirBodyIdx, parent: Option<HirBodyIdx>) {
         self.map.insert(aggr, parent.unwrap_or(aggr));
     }
 
-    pub fn find_parent(&self, aggr: BodyId) -> Option<BodyId> {
+    pub fn find_parent(&self, aggr: HirBodyIdx) -> Option<HirBodyIdx> {
         let parent = self.map.get(&aggr).unwrap();
         if parent == &aggr {
             None
@@ -132,7 +133,7 @@ impl AggregationForest {
         }
     }
 
-    pub fn find_root(&self, mut aggr: BodyId) -> BodyId {
+    pub fn find_root(&self, mut aggr: HirBodyIdx) -> HirBodyIdx {
         loop {
             let parent = self.map.get(&aggr).unwrap();
             if parent == &aggr {
@@ -160,18 +161,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr_id: ExprId,
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, IrNodeId) {
+    ) -> (TypeRef<'m>, HirIdx) {
         match self.expressions.get(&expr_id) {
             Some(expr) => self.check_expr(expr, ctx),
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    fn check_expr(
-        &mut self,
-        expr: &Expr,
-        ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, IrNodeId) {
+    fn check_expr(&mut self, expr: &Expr, ctx: &mut CheckExprContext<'m>) -> (TypeRef<'m>, HirIdx) {
         match &expr.kind {
             ExprKind::Call(def_id, args) => {
                 match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
@@ -198,8 +195,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             param_node_ids.push(node_id);
                         }
 
-                        let call_id = ctx.nodes.add(IrNode {
-                            kind: IrKind::Call(*proc, param_node_ids.into()),
+                        let call_id = ctx.nodes.add(HirNode {
+                            kind: HirKind::Call(*proc, param_node_ids.into()),
                             ty: output,
                             span: expr.span,
                         });
@@ -230,9 +227,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
 
-                let aggr_node_id = ctx.nodes.add(IrNode {
+                let aggr_node_id = ctx.nodes.add(HirNode {
                     ty: array_ty,
-                    kind: IrKind::Aggr(aggr_body_id),
+                    kind: HirKind::Aggr(aggr_body_id),
                     span: expr.span,
                 });
                 (array_ty, aggr_node_id)
@@ -241,9 +238,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (
                     ty,
-                    ctx.nodes.add(IrNode {
+                    ctx.nodes.add(HirNode {
                         ty,
-                        kind: IrKind::Constant(*k),
+                        kind: HirKind::Constant(*k),
                         span: expr.span,
                     }),
                 )
@@ -259,9 +256,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 (
                     ty,
-                    ctx.nodes.add(IrNode {
+                    ctx.nodes.add(HirNode {
                         ty,
-                        kind: IrKind::VariableRef(bound_variable.node_id),
+                        kind: HirKind::VariableRef(bound_variable.node_id),
                         span: expr.span,
                     }),
                 )
@@ -275,7 +272,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         type_path: &TypePath,
         attributes: &[((DefReference, SourceSpan), Expr)],
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, IrNodeId) {
+    ) -> (TypeRef<'m>, HirIdx) {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
             Type::Domain(subject_id) => subject_id,
@@ -372,9 +369,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        ctx.nodes.add(IrNode {
+                        ctx.nodes.add(HirNode {
                             ty: domain_type,
-                            kind: IrKind::StructPattern(typed_properties),
+                            kind: HirKind::StructPattern(typed_properties),
                             span: expr.span,
                         })
                     }
@@ -382,8 +379,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if !attributes.is_empty() {
                             return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
                         }
-                        ctx.nodes.add(IrNode {
-                            kind: IrKind::Unit,
+                        ctx.nodes.add(HirNode {
+                            kind: HirKind::Unit,
                             ty: domain_type,
                             span: expr.span,
                         })
@@ -399,9 +396,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let object_ty = self.check_def(relationship.object.0.def_id);
                     let node_id = self.check_expr_expect(value, object_ty, ctx).1;
 
-                    ctx.nodes.add(IrNode {
+                    ctx.nodes.add(HirNode {
                         ty: domain_type,
-                        kind: IrKind::ValuePattern(node_id),
+                        kind: HirKind::ValuePattern(node_id),
                         span: expr.span,
                     })
                 }
@@ -425,7 +422,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr: &Expr,
         expected: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, IrNodeId) {
+    ) -> (TypeRef<'m>, HirIdx) {
         let (ty, node_id) = self.check_expr(expr, ctx);
         match (ty, expected) {
             (Type::Error, _) => (ty, ERROR_NODE),
@@ -478,23 +475,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         ctx: &mut CheckExprContext<'m>,
         expr: &Expr,
-        node_id: IrNodeId,
+        node_id: HirIdx,
         type_eq: TypeEquation<'m>,
-    ) -> Result<(TypeRef<'m>, IrNodeId), ()> {
+    ) -> Result<(TypeRef<'m>, HirIdx), ()> {
         match (type_eq.actual, type_eq.expected) {
             (Type::Domain(_), Type::Domain(_)) => {
-                let map_node = ctx.nodes.add(IrNode {
+                let map_node = ctx.nodes.add(HirNode {
                     ty: type_eq.expected,
-                    kind: IrKind::MapCall(node_id, type_eq.actual),
+                    kind: HirKind::MapCall(node_id, type_eq.actual),
                     span: expr.span,
                 });
                 Ok((type_eq.expected, map_node))
             }
             (Type::Array(actual_item), Type::Array(expected_item)) => {
                 ctx.enter_aggregation(|ctx, iter_var| {
-                    let iter_id = ctx.nodes.add(IrNode {
+                    let iter_id = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: IrKind::Variable(iter_var),
+                        kind: HirKind::Variable(iter_var),
                         span: expr.span,
                     });
 
@@ -507,9 +504,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             expected: expected_item,
                         },
                     )?;
-                    let map_sequence_node = ctx.nodes.add(IrNode {
+                    let map_sequence_node = ctx.nodes.add(HirNode {
                         ty: type_eq.expected,
-                        kind: IrKind::MapSequence(node_id, iter_var, map_node_id, type_eq.actual),
+                        kind: HirKind::MapSequence(node_id, iter_var, map_node_id, type_eq.actual),
                         span: expr.span,
                     });
 
@@ -520,7 +517,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, IrNodeId) {
+    fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, HirIdx) {
         self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
     }

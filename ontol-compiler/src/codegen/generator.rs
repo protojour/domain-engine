@@ -7,12 +7,12 @@ use tracing::debug;
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
-    ir_node::{Body, CodeDirection, IrKind, IrNodeId, SyntaxVar},
+    hir_node::{CodeDirection, HirBody, HirIdx, HirKind, HirVariable},
     SourceSpan,
 };
 
 use super::{
-    equation::IrNodeEquation,
+    equation::HirEquation,
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
     struct_pattern::codegen_struct_pattern_origin,
@@ -24,7 +24,7 @@ pub(super) trait CodegenVariable: 'static {
         &mut self,
         builder: &mut ProcBuilder,
         block: &mut Block,
-        var: SyntaxVar,
+        var: HirVariable,
         span: &SourceSpan,
     );
 }
@@ -62,17 +62,17 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         result
     }
 
-    pub fn codegen_body(&mut self, block: &mut Block, equation: &IrNodeEquation, body: &Body) {
+    pub fn codegen_body(&mut self, block: &mut Block, equation: &HirEquation, body: &HirBody) {
         let (bindings_id, output_id) = body.order(self.direction);
         let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, bindings_id);
 
         match &source_pattern.kind {
-            IrKind::ValuePattern(_) => {
+            HirKind::ValuePattern(_) => {
                 let to_def = &equation.nodes[output_id].ty.get_single_def_id().unwrap();
 
                 codegen_value_pattern_origin(self, block, equation, output_id, *to_def)
             }
-            IrKind::StructPattern(attrs) => {
+            HirKind::StructPattern(attrs) => {
                 codegen_struct_pattern_origin(self, block, equation, output_id, attrs)
             }
             other => panic!("unable to generate mapping for pattern: {other:?}"),
@@ -80,15 +80,10 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
     }
 
     // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
-    pub fn codegen_expr(
-        &mut self,
-        block: &mut Block,
-        equation: &IrNodeEquation,
-        node_id: IrNodeId,
-    ) {
+    pub fn codegen_expr(&mut self, block: &mut Block, equation: &HirEquation, node_id: HirIdx) {
         let (_, expr, span) = equation.resolve_node(&equation.expansions, node_id);
         match &expr.kind {
-            IrKind::Call(proc, params) => {
+            HirKind::Call(proc, params) => {
                 let stack_delta = Stack(-(params.len() as i32) + 1);
 
                 for param in params.iter() {
@@ -104,17 +99,17 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     span,
                 );
             }
-            IrKind::Constant(k) => {
+            HirKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
                 self.builder
                     .push(block, Ir::Constant(*k, return_def_id), Stack(1), span);
             }
-            IrKind::Variable(var) => {
+            HirKind::Variable(var) => {
                 self.codegen_variable(block, *var, &span);
             }
-            IrKind::VariableRef(_) => panic!(),
-            IrKind::MapCall(param_id, from_ty) => {
+            HirKind::VariableRef(_) => panic!(),
+            HirKind::MapCall(param_id, from_ty) => {
                 self.codegen_expr(block, equation, *param_id);
 
                 debug!(
@@ -131,8 +126,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            IrKind::Aggr(_) => todo!(),
-            IrKind::MapSequence(seq_id, iter_var, body_id, _) => {
+            HirKind::Aggr(_) => todo!(),
+            HirKind::MapSequence(seq_id, iter_var, body_id, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
                     block,
@@ -190,10 +185,10 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 self.builder
                     .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            IrKind::ValuePattern(_) => {
+            HirKind::ValuePattern(_) => {
                 todo!()
             }
-            IrKind::StructPattern(attrs) => {
+            HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_id].ty.get_single_def_id().unwrap();
                 let local = self.builder.push(
                     block,
@@ -212,13 +207,13 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     );
                 }
             }
-            IrKind::Unit => {
+            HirKind::Unit => {
                 todo!()
             }
         }
     }
 
-    fn codegen_variable(&mut self, block: &mut Block, var: SyntaxVar, span: &SourceSpan) {
+    fn codegen_variable(&mut self, block: &mut Block, var: HirVariable, span: &SourceSpan) {
         let bind_depth = var.1;
         debug!(
             "bind_depth: {bind_depth:?} var_stack len: {}",
@@ -231,7 +226,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
 #[allow(unused)]
 struct CodegenIter {
-    iter_var: SyntaxVar,
+    iter_var: HirVariable,
     rel_params_local: Local,
     value_local: Local,
 }
@@ -241,7 +236,7 @@ impl CodegenVariable for CodegenIter {
         &mut self,
         builder: &mut ProcBuilder,
         block: &mut Block,
-        var: SyntaxVar,
+        var: HirVariable,
         span: &SourceSpan,
     ) {
         assert!(var == self.iter_var);

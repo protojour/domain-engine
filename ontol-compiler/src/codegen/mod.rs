@@ -20,13 +20,13 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    ir_node::{Body, CodeDirection, IrNodeTable},
+    hir_node::{CodeDirection, HirBody, HirNodeTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
 use self::{
-    equation::IrNodeEquation,
+    equation::HirEquation,
     ir::Terminator,
     link::{link, LinkResult},
     proc_builder::{Block, ProcBuilder},
@@ -60,8 +60,8 @@ pub enum CodegenTask<'m> {
 
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
-    pub nodes: IrNodeTable<'m>,
-    pub bodies: Vec<Body>,
+    pub nodes: HirNodeTable<'m>,
+    pub bodies: Vec<HirBody>,
     pub span: SourceSpan,
 }
 
@@ -114,7 +114,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         match task {
             CodegenTask::Map(map_task) => {
                 let bodies = map_task.bodies;
-                let mut equation = IrNodeEquation::new(map_task.nodes);
+                let mut equation = HirEquation::new(map_task.nodes);
 
                 for (index, node) in equation.nodes.0.iter().enumerate() {
                     debug!("{{{index}}}: {node:?}");
@@ -122,7 +122,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
                 for (index, body) in bodies.iter().enumerate() {
                     debug!(
-                        "BodyId({index}) equation before solve:\n first: {:#?}\nsecond: {:#?}",
+                        "HirBodyIdx({index}) equation before solve:\n=={:#?}\n=={:#?}",
                         equation.debug_tree(body.first, &equation.reductions),
                         equation.debug_tree(body.second, &equation.expansions),
                     );
@@ -155,8 +155,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
 fn codegen_map_solve(
     proc_table: &mut ProcTable,
-    equation: &mut IrNodeEquation,
-    bodies: &[Body],
+    equation: &mut HirEquation,
+    bodies: &[HirBody],
     direction: CodeDirection,
 ) -> bool {
     let mut solver = equation.solver();
@@ -174,12 +174,12 @@ fn codegen_map_solve(
         let (from, to) = body.order(direction);
         match direction {
             CodeDirection::Forward => debug!(
-                "BodyId({index}) (forward) codegen\nreductions: {:#?}\nexpansions: {:#?}",
+                "HirBodyIdx({index}) forward solved:\n<={:#?}\n=>{:#?}",
                 equation.debug_tree(from, &equation.reductions),
                 equation.debug_tree(to, &equation.expansions),
             ),
             CodeDirection::Backward => debug!(
-                "BodyId({index}) (backward codegen\nexpansions: {:#?}\nreductions: {:#?}",
+                "HirBodyIdx({index}) backward solved:\n=>{:#?}\n<={:#?}",
                 equation.debug_tree(to, &equation.expansions),
                 equation.debug_tree(from, &equation.reductions),
             ),
