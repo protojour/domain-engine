@@ -10,7 +10,9 @@ use crate::{
     def::{Cardinality, Def, DefKind, DefReference, PropertyCardinality, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
-    ir_node::{BindDepth, IrKind, IrNode, IrNodeId, IrNodeTable, SyntaxVar, ERROR_NODE},
+    ir_node::{
+        BindDepth, IrKind, IrNode, IrNodeId, IrNodeTable, MapBody, MapBodyId, SyntaxVar, ERROR_NODE,
+    },
     mem::Intern,
     relation::Constructor,
     types::{Type, TypeRef},
@@ -24,28 +26,33 @@ use super::{
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
+    pub bodies: Vec<MapBody>,
     pub nodes: IrNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
-    /// Maps an aggregate expression to a unique aggregation
-    pub aggr_map: FnvHashMap<ExprId, IrNodeId>,
+    pub aggr_body_map: FnvHashMap<ExprId, MapBodyId>,
+
     pub aggr_forest: AggregationForest,
+
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
     syntax_var_allocations: Vec<u16>,
+    body_id_counter: u32,
 }
 
 impl<'m> CheckExprContext<'m> {
     pub fn new() -> Self {
         Self {
             inference: Inference::new(),
+            bodies: Default::default(),
             nodes: IrNodeTable::default(),
             bound_variables: Default::default(),
-            aggr_map: Default::default(),
+            aggr_body_map: Default::default(),
             aggr_forest: Default::default(),
             arm: Arm::First,
             bind_depth: BindDepth(0),
             syntax_var_allocations: vec![0],
+            body_id_counter: 0,
         }
     }
 
@@ -70,6 +77,17 @@ impl<'m> CheckExprContext<'m> {
         ret
     }
 
+    pub fn alloc_map_body_id(&mut self) -> MapBodyId {
+        let next = self.body_id_counter;
+        self.body_id_counter += 1;
+        self.bodies.push(MapBody::default());
+        MapBodyId(next)
+    }
+
+    pub fn map_body_mut(&mut self, id: MapBodyId) -> &mut MapBody {
+        self.bodies.get_mut(id.0 as usize).unwrap()
+    }
+
     pub fn alloc_syntax_var(&mut self) -> SyntaxVar {
         let alloc = self
             .syntax_var_allocations
@@ -89,7 +107,7 @@ pub struct BoundVariable {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AggregationGroup {
-    pub node_id: IrNodeId,
+    pub body_id: MapBodyId,
     pub bind_depth: BindDepth,
 }
 
@@ -97,15 +115,15 @@ pub struct AggregationGroup {
 #[derive(Default)]
 pub struct AggregationForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<IrNodeId, IrNodeId>,
+    map: FnvHashMap<MapBodyId, MapBodyId>,
 }
 
 impl AggregationForest {
-    pub fn insert(&mut self, aggr: IrNodeId, parent: Option<IrNodeId>) {
+    pub fn insert(&mut self, aggr: MapBodyId, parent: Option<MapBodyId>) {
         self.map.insert(aggr, parent.unwrap_or(aggr));
     }
 
-    pub fn find_parent(&self, aggr: IrNodeId) -> Option<IrNodeId> {
+    pub fn find_parent(&self, aggr: MapBodyId) -> Option<MapBodyId> {
         let parent = self.map.get(&aggr).unwrap();
         if parent == &aggr {
             None
@@ -114,7 +132,7 @@ impl AggregationForest {
         }
     }
 
-    pub fn find_root(&self, mut aggr: IrNodeId) -> IrNodeId {
+    pub fn find_root(&self, mut aggr: MapBodyId) -> MapBodyId {
         loop {
             let parent = self.map.get(&aggr).unwrap();
             if parent == &aggr {
@@ -195,49 +213,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_struct(expr, type_path, attributes, ctx)
             }
             ExprKind::Seq(aggr_expr_id, inner) => {
-                debug!("Seq(aggr_expr_id = {aggr_expr_id:?})");
-
                 // The variables outside the aggregation refer to the aggregated object (an array).
-                let seq_inner_ty_var = self
-                    .types
-                    .intern(Type::Infer(ctx.inference.new_type_variable(*aggr_expr_id)));
-                let array_ty = self.types.intern(Type::Array(seq_inner_ty_var));
+                let aggr_body_id = *ctx.aggr_body_map.get(aggr_expr_id).unwrap();
 
-                let seq_id = ctx
-                    .aggr_map
-                    .get(aggr_expr_id)
-                    .expect("aggregated reference not found");
-                let seq_variable_id = ctx.nodes.add(IrNode {
+                debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_id:?}");
+
+                let (element_ty, element_node_id) = self.check_expr(inner, ctx);
+                let array_ty = self.types.intern(Type::Array(element_ty));
+
+                match ctx.arm {
+                    Arm::First => {
+                        ctx.map_body_mut(aggr_body_id).first = element_node_id;
+                    }
+                    Arm::Second => {
+                        ctx.map_body_mut(aggr_body_id).second = element_node_id;
+                    }
+                }
+
+                let aggr_node_id = ctx.nodes.add(IrNode {
                     ty: array_ty,
-                    kind: IrKind::VariableRef(*seq_id),
+                    kind: IrKind::Aggr(aggr_body_id),
                     span: expr.span,
                 });
-
-                ctx.enter_aggregation(|ctx, aggr_var| {
-                    // The inner variables represent each element being aggregated
-                    let (element_ty, element_id) = self.check_expr(inner, ctx);
-
-                    let array_ty = self.types.intern(Type::Array(element_ty));
-
-                    let _iter_id = ctx.nodes.add(IrNode {
-                        ty: self.types.intern(Type::Tautology),
-                        kind: IrKind::Variable(aggr_var),
-                        span: expr.span,
-                    });
-
-                    let map_sequence_id = ctx.nodes.add(IrNode {
-                        ty: array_ty,
-                        kind: IrKind::MapSequenceBalanced(
-                            seq_variable_id,
-                            aggr_var,
-                            element_id,
-                            element_ty,
-                        ),
-                        span: expr.span,
-                    });
-
-                    (array_ty, map_sequence_id)
-                })
+                (array_ty, aggr_node_id)
             }
             ExprKind::Constant(k) => {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();

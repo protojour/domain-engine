@@ -180,14 +180,11 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .debug_tuple(&self.header("MapCall"))
                 .field(&self.child(*node_id, None))
                 .finish()?,
+            IrKind::Aggr(body_id) => f
+                .debug_tuple(&self.header(&format!("Aggr({body_id:?})")))
+                .finish()?,
             IrKind::MapSequence(node_id, var, body, _) => f
                 .debug_tuple(&self.header("MapSequence"))
-                .field(&self.child(*node_id, None))
-                .field(&var)
-                .field(&self.child(*body, None))
-                .finish()?,
-            IrKind::MapSequenceBalanced(node_id, var, body, _) => f
-                .debug_tuple(&self.header("MapSequenceBalanced"))
                 .field(&self.child(*node_id, None))
                 .field(&var)
                 .field(&self.child(*body, None))

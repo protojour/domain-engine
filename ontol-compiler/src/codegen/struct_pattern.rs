@@ -82,9 +82,6 @@ pub(super) fn codegen_struct_pattern_origin(
         IrKind::ValuePattern(node_id) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, *node_id);
         }),
-        IrKind::MapSequenceBalanced(..) => gen.enter_bind_level(map_codegen, |generator| {
-            generator.codegen_expr(block, equation, to);
-        }),
         kind => {
             todo!("to: {kind:?}");
         }

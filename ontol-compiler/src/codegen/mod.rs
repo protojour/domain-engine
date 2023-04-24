@@ -20,7 +20,7 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    ir_node::{IrNodeId, IrNodeTable},
+    ir_node::{IrNodeId, IrNodeTable, MapBody},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -61,8 +61,7 @@ pub enum CodegenTask<'m> {
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
     pub nodes: IrNodeTable<'m>,
-    pub node_a: IrNodeId,
-    pub node_b: IrNodeId,
+    pub bodies: Vec<MapBody>,
     pub span: SourceSpan,
 }
 
@@ -115,32 +114,37 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         match task {
             CodegenTask::Map(map_task) => {
                 let mut equation = IrNodeEquation::new(map_task.nodes);
+                let bodies = map_task.bodies;
 
                 for (index, node) in equation.nodes.0.iter().enumerate() {
                     debug!("{{{index}}}: {node:?}");
                 }
 
-                debug!(
-                    "equation before solve:\n left: {:#?}\nright: {:#?}",
-                    equation.debug_tree(map_task.node_a, &equation.reductions),
-                    equation.debug_tree(map_task.node_b, &equation.expansions),
-                );
+                for (index, body) in bodies.iter().enumerate() {
+                    debug!(
+                        "BodyId({index}) equation before solve:\n first: {:#?}\nsecond: {:#?}",
+                        equation.debug_tree(body.first, &equation.reductions),
+                        equation.debug_tree(body.second, &equation.expansions),
+                    );
+                }
 
-                // a -> b
+                let root_body = bodies.first().unwrap();
+
+                // first -> second
                 codegen_map_solve(
                     &mut proc_table,
                     &mut equation,
-                    (map_task.node_a, map_task.node_b),
+                    (root_body.first, root_body.second),
                     DebugDirection::Forward,
                 );
 
                 equation.reset();
 
-                // b -> a
+                // second -> first
                 codegen_map_solve(
                     &mut proc_table,
                     &mut equation,
-                    (map_task.node_b, map_task.node_a),
+                    (root_body.second, root_body.first),
                     DebugDirection::Backward,
                 );
             }

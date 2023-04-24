@@ -185,17 +185,6 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(param_id))
             }
-            IrKind::MapSequenceBalanced(seq_id, _iter_var_id, elem_id, _item_ty) => {
-                let seq_id = *seq_id;
-                let elem_id = *elem_id;
-                self.reduce_node_inner(seq_id, indent.inc())?;
-                self.reduce_node_inner(elem_id, indent.inc())?;
-
-                // Just a reduction
-                self.reductions[node_id] = seq_id;
-
-                Ok(Substitution::Constant(node_id))
-            }
             IrKind::MapSequence(seq_id, iter_var_id, elem_id, item_ty) => {
                 let seq_id = *seq_id;
                 let iter_var_id = *iter_var_id;

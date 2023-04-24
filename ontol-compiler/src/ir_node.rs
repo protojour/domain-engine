@@ -33,7 +33,7 @@ pub struct IrNode<'m> {
     pub span: SourceSpan,
 }
 
-/// The 'kind' of a typed expression
+/// The different kinds of nodes.
 #[derive(Clone, Debug)]
 pub enum IrKind<'m> {
     /// An expression with no information
@@ -53,11 +53,11 @@ pub enum IrKind<'m> {
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
     MapCall(IrNodeId, TypeRef<'m>),
+    Aggr(MapBodyId),
     /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
     /// The second expression is the item/body.
-    MapSequenceBalanced(IrNodeId, SyntaxVar, IrNodeId, TypeRef<'m>),
     MapSequence(IrNodeId, SyntaxVar, IrNodeId, TypeRef<'m>),
 }
 
@@ -68,6 +68,25 @@ pub enum IrKind<'m> {
 pub struct IrNodeId(pub u32);
 
 pub const ERROR_NODE: IrNodeId = IrNodeId(u32::MAX);
+
+/// A reference to an aggregation body
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct MapBodyId(pub u32);
+
+#[derive(Debug)]
+pub struct MapBody {
+    pub first: IrNodeId,
+    pub second: IrNodeId,
+}
+
+impl Default for MapBody {
+    fn default() -> Self {
+        Self {
+            first: ERROR_NODE,
+            second: ERROR_NODE,
+        }
+    }
+}
 
 #[derive(Default, Debug)]
 pub struct IrNodeTable<'m>(pub(super) Vec<IrNode<'m>>);

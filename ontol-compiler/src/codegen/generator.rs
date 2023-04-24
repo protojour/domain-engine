@@ -130,8 +130,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            IrKind::MapSequence(seq_id, iter_var, body_id, _)
-            | IrKind::MapSequenceBalanced(seq_id, iter_var, body_id, _) => {
+            IrKind::Aggr(_) => todo!(),
+            IrKind::MapSequence(seq_id, iter_var, body_id, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
                     block,
