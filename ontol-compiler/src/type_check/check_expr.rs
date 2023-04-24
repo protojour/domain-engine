@@ -30,14 +30,10 @@ pub struct CheckExprContext<'m> {
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
     pub aggr_variables: FnvHashMap<ExprId, ExprRef>,
     pub aggr_forest: AggregationForest,
+    /// Which Arm is currently processed in a map statement:
+    pub arm: Arm,
     bind_depth: BindDepth,
     syntax_var_allocations: Vec<u16>,
-}
-
-pub struct BoundVariable {
-    pub syntax_var: SyntaxVar,
-    pub expr_ref: ExprRef,
-    pub aggr_group: Option<AggregationGroup>,
 }
 
 impl<'m> CheckExprContext<'m> {
@@ -48,6 +44,7 @@ impl<'m> CheckExprContext<'m> {
             bound_variables: Default::default(),
             aggr_variables: Default::default(),
             aggr_forest: Default::default(),
+            arm: Arm::First,
             bind_depth: BindDepth(0),
             syntax_var_allocations: vec![0],
         }
@@ -85,6 +82,12 @@ impl<'m> CheckExprContext<'m> {
     }
 }
 
+pub struct BoundVariable {
+    pub syntax_var: SyntaxVar,
+    pub expr_ref: ExprRef,
+    pub aggr_group: Option<AggregationGroup>,
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AggregationGroup {
     pub expr_ref: ExprRef,
@@ -120,6 +123,18 @@ impl AggregationForest {
             }
             aggr = *parent;
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Arm {
+    First,
+    Second,
+}
+
+impl Arm {
+    pub fn is_first(&self) -> bool {
+        matches!(self, Self::First)
     }
 }
 
@@ -180,15 +195,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Struct(type_path, attributes) => {
                 self.check_struct(expr, type_path, attributes, ctx)
             }
-            // right: {7} StructPattern(
-            //     {6} (rel 1, 11) SequenceMap(
-            //         {3->0} Variable(0 d=0),
-            //         SyntaxVar(0 d=1),
-            //         {5} Translate(
-            //             {4} Variable(0 d=1),
-            //         ),
-            //     ),
-            // )
             ExprKind::Seq(aggr_id, inner) => {
                 debug!("Seq(aggr_id = {aggr_id:?})");
 
@@ -484,7 +490,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (Type::Domain(_), Type::Domain(_)) => {
                 let map_node = ctx.expressions.add(TypedExpr {
                     ty: type_eq.expected,
-                    kind: TypedExprKind::MapValue(typed_expr_ref, type_eq.actual),
+                    kind: TypedExprKind::MapCall(typed_expr_ref, type_eq.actual),
                     span: expr.span,
                 });
                 Ok((type_eq.expected, map_node))

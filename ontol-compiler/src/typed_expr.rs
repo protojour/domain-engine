@@ -51,7 +51,7 @@ pub enum TypedExprKind<'m> {
     Constant(i64),
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
-    MapValue(ExprRef, TypeRef<'m>),
+    MapCall(ExprRef, TypeRef<'m>),
     /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.

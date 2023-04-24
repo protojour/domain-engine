@@ -112,7 +112,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 self.codegen_variable(block, *var, &span);
             }
             TypedExprKind::VariableRef(_) => panic!(),
-            TypedExprKind::MapValue(param_id, from_ty) => {
+            TypedExprKind::MapCall(param_id, from_ty) => {
                 self.codegen_expr(block, equation, *param_id);
 
                 debug!(

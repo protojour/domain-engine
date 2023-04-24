@@ -10,6 +10,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
     mem::Intern,
+    type_check::check_expr::Arm,
     typed_expr::{BindDepth, ExprRef, TypedExpr, TypedExprKind},
     types::{Type, TypeRef},
 };
@@ -30,25 +31,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut ctx = CheckExprContext::new();
 
         debug!("FIRST ARM START");
+        ctx.arm = Arm::First;
         let _ = self.aggr_group_map_variables(
             self.expressions.get(&first_id).unwrap(),
             variables,
             None,
             &mut ctx,
-            FirstArm(true),
         )?;
         debug!("SECOND ARM START");
+        ctx.arm = Arm::Second;
         let _ = self.aggr_group_map_variables(
             self.expressions.get(&second_id).unwrap(),
             variables,
             None,
             &mut ctx,
-            FirstArm(false),
         )?;
 
         debug!("ctx aggregation variables {:?}", ctx.aggr_variables);
 
+        ctx.arm = Arm::First;
         let (_, node_a) = self.check_expr_id(first_id, &mut ctx);
+        ctx.arm = Arm::Second;
         let (_, node_b) = self.check_expr_id(second_id, &mut ctx);
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
@@ -67,7 +70,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         variables: &Variables,
         parent_aggr_group: Option<AggregationGroup>,
         ctx: &mut CheckExprContext<'m>,
-        first_arm: FirstArm,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
@@ -79,7 +81,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         variables,
                         parent_aggr_group,
                         ctx,
-                        first_arm,
                     )?);
                 }
             }
@@ -90,12 +91,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         variables,
                         parent_aggr_group,
                         ctx,
-                        first_arm,
                     )?);
                 }
             }
             ExprKind::Seq(aggr_id, inner) => {
-                if first_arm.0 {
+                if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register variable
@@ -122,7 +122,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     bind_depth: ctx.current_bind_depth(),
                                 }),
                                 ctx,
-                                first_arm,
                             )
                         });
 
@@ -132,7 +131,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     ctx.enter_aggregation::<Result<(), AggrGroupError>>(|ctx, _| {
                         let inner_aggr_group = self
-                            .aggr_group_map_variables(inner, variables, None, ctx, first_arm)
+                            .aggr_group_map_variables(inner, variables, None, ctx)
                             .unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
@@ -165,7 +164,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Variable(expr_id) => {
                 if let Some(bound_variable) = ctx.bound_variables.get(&expr_id) {
                     // Variable is used more than once
-                    if first_arm.0 {
+                    if ctx.arm.is_first() {
                         if bound_variable.aggr_group != parent_aggr_group {
                             self.error(
                                 CompileError::TODO(smart_format!("Incompatible aggregation group")),
@@ -192,7 +191,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         span: *variable_span,
                     });
 
-                    if first_arm.0 {
+                    if ctx.arm.is_first() {
                         ctx.bound_variables.insert(
                             *variable_expr_id,
                             BoundVariable {

@@ -154,7 +154,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
             TypedExprKind::Variable(_) => Ok(Substitution::Variable(expr_ref)),
             TypedExprKind::VariableRef(var_ref) => Ok(Substitution::Variable(*var_ref)),
             TypedExprKind::Constant(_) => Ok(Substitution::Constant(expr_ref)),
-            TypedExprKind::MapValue(param_ref, param_ty) => {
+            TypedExprKind::MapCall(param_ref, param_ty) => {
                 let param_ty = *param_ty;
                 let param_ref = match self.reduce_expr_inner(*param_ref, indent.inc())? {
                     Substitution::Variable(var_ref) => var_ref,
@@ -173,7 +173,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
                 // invert mappping:
                 let (inverted_map_ref, _) = self.add_expr(
                     TypedExpr {
-                        kind: TypedExprKind::MapValue(cloned_param_id, expr.ty),
+                        kind: TypedExprKind::MapCall(cloned_param_id, expr.ty),
                         ty: param_ty,
                         span: cloned_param_span,
                     },
