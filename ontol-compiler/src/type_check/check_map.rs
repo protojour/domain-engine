@@ -55,7 +55,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let (_, node_b) = self.check_expr_id(second_id, &mut ctx);
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            expressions: ctx.nodes,
+            nodes: ctx.nodes,
             node_a,
             node_b,
             span: def.span,

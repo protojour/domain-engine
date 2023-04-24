@@ -60,7 +60,7 @@ pub enum CodegenTask<'m> {
 
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
-    pub expressions: IrNodeTable<'m>,
+    pub nodes: IrNodeTable<'m>,
     pub node_a: IrNodeId,
     pub node_b: IrNodeId,
     pub span: SourceSpan,
@@ -114,10 +114,10 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Map(map_task) => {
-                let mut equation = IrNodeEquation::new(map_task.expressions);
+                let mut equation = IrNodeEquation::new(map_task.nodes);
 
-                for (index, expr) in equation.nodes.0.iter().enumerate() {
-                    debug!("{{{index}}}: {expr:?}");
+                for (index, node) in equation.nodes.0.iter().enumerate() {
+                    debug!("{{{index}}}: {node:?}");
                 }
 
                 debug!(
@@ -217,7 +217,7 @@ fn codegen_map(
     let mut block = builder.new_block(Stack(1), span);
     let mut generator = CodeGenerator::new(proc_table, &mut builder);
 
-    generator.codegen_pattern(&mut block, equation, from, to);
+    generator.codegen_node(&mut block, equation, from, to);
 
     builder.commit(block, Terminator::Return(builder.top()));
 

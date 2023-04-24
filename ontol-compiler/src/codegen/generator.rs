@@ -56,7 +56,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         result
     }
 
-    pub fn codegen_pattern(
+    pub fn codegen_node(
         &mut self,
         block: &mut Block,
         equation: &IrNodeEquation,
@@ -78,6 +78,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         }
     }
 
+    // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
     pub fn codegen_expr(
         &mut self,
         block: &mut Block,
