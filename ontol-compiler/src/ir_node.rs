@@ -53,7 +53,7 @@ pub enum IrKind<'m> {
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
     MapCall(IrNodeId, TypeRef<'m>),
-    Aggr(MapBodyId),
+    Aggr(BodyId),
     /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
@@ -71,21 +71,43 @@ pub const ERROR_NODE: IrNodeId = IrNodeId(u32::MAX);
 
 /// A reference to an aggregation body
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct MapBodyId(pub u32);
+pub struct BodyId(pub u32);
 
 #[derive(Debug)]
-pub struct MapBody {
+pub struct Body {
     pub first: IrNodeId,
     pub second: IrNodeId,
 }
 
-impl Default for MapBody {
+impl Body {
+    pub fn order(&self, direction: CodeDirection) -> (IrNodeId, IrNodeId) {
+        match direction {
+            CodeDirection::Forward => (self.first, self.second),
+            CodeDirection::Backward => (self.second, self.first),
+        }
+    }
+
+    pub fn bindings_node(&self, direction: CodeDirection) -> IrNodeId {
+        match direction {
+            CodeDirection::Forward => self.first,
+            CodeDirection::Backward => self.second,
+        }
+    }
+}
+
+impl Default for Body {
     fn default() -> Self {
         Self {
             first: ERROR_NODE,
             second: ERROR_NODE,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+pub enum CodeDirection {
+    Forward,
+    Backward,
 }
 
 #[derive(Default, Debug)]

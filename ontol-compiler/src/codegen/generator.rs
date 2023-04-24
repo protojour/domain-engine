@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
-    ir_node::{IrKind, IrNodeId, SyntaxVar},
+    ir_node::{Body, CodeDirection, IrKind, IrNodeId, SyntaxVar},
     SourceSpan,
 };
 
@@ -32,15 +32,21 @@ pub(super) trait CodegenVariable: 'static {
 pub(super) struct CodeGenerator<'t, 'b> {
     proc_table: &'t mut ProcTable,
     pub builder: &'b mut ProcBuilder,
+    direction: CodeDirection,
 
     var_stack: SmallVec<[Box<dyn CodegenVariable>; 3]>,
 }
 
 impl<'t, 'b> CodeGenerator<'t, 'b> {
-    pub fn new(proc_table: &'t mut ProcTable, builder: &'b mut ProcBuilder) -> Self {
+    pub fn new(
+        proc_table: &'t mut ProcTable,
+        builder: &'b mut ProcBuilder,
+        direction: CodeDirection,
+    ) -> Self {
         Self {
             proc_table,
             builder,
+            direction,
             var_stack: Default::default(),
         }
     }
@@ -56,23 +62,18 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         result
     }
 
-    pub fn codegen_node(
-        &mut self,
-        block: &mut Block,
-        equation: &IrNodeEquation,
-        source: IrNodeId,
-        target: IrNodeId,
-    ) {
-        let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, source);
+    pub fn codegen_body(&mut self, block: &mut Block, equation: &IrNodeEquation, body: &Body) {
+        let (bindings_id, output_id) = body.order(self.direction);
+        let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, bindings_id);
 
         match &source_pattern.kind {
             IrKind::ValuePattern(_) => {
-                let to_def = &equation.nodes[target].ty.get_single_def_id().unwrap();
+                let to_def = &equation.nodes[output_id].ty.get_single_def_id().unwrap();
 
-                codegen_value_pattern_origin(self, block, equation, target, *to_def)
+                codegen_value_pattern_origin(self, block, equation, output_id, *to_def)
             }
             IrKind::StructPattern(attrs) => {
-                codegen_struct_pattern_origin(self, block, equation, target, attrs)
+                codegen_struct_pattern_origin(self, block, equation, output_id, attrs)
             }
             other => panic!("unable to generate mapping for pattern: {other:?}"),
         }

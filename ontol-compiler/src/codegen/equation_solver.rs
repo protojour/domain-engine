@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use ontol_runtime::{format_utils::Indent, proc::BuiltinProc, smart_format};
+use ontol_runtime::{format_utils::Indent, proc::BuiltinProc};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -129,6 +129,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
         debug!("{indent}(enter) reduce node {:?}", self.nodes[node_id].kind);
 
         match &self.nodes[node_id].kind {
+            IrKind::Unit => todo!(),
             IrKind::Call(proc, params) => {
                 let param_ids = params
                     .into_iter()
@@ -185,6 +186,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(param_id))
             }
+            IrKind::Aggr(_) => Ok(Substitution::Constant(node_id)),
             IrKind::MapSequence(seq_id, iter_var_id, elem_id, item_ty) => {
                 let seq_id = *seq_id;
                 let iter_var_id = *iter_var_id;
@@ -230,7 +232,6 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(inverted_map_id))
             }
-            kind => Err(SolveError::UnhandledNode(smart_format!("{kind:?}"))),
         }
     }
 

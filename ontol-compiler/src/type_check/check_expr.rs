@@ -11,7 +11,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     ir_node::{
-        BindDepth, IrKind, IrNode, IrNodeId, IrNodeTable, MapBody, MapBodyId, SyntaxVar, ERROR_NODE,
+        BindDepth, Body, BodyId, IrKind, IrNode, IrNodeId, IrNodeTable, SyntaxVar, ERROR_NODE,
     },
     mem::Intern,
     relation::Constructor,
@@ -26,10 +26,10 @@ use super::{
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<MapBody>,
+    pub bodies: Vec<Body>,
     pub nodes: IrNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
-    pub aggr_body_map: FnvHashMap<ExprId, MapBodyId>,
+    pub aggr_body_map: FnvHashMap<ExprId, BodyId>,
 
     pub aggr_forest: AggregationForest,
 
@@ -77,14 +77,14 @@ impl<'m> CheckExprContext<'m> {
         ret
     }
 
-    pub fn alloc_map_body_id(&mut self) -> MapBodyId {
+    pub fn alloc_map_body_id(&mut self) -> BodyId {
         let next = self.body_id_counter;
         self.body_id_counter += 1;
-        self.bodies.push(MapBody::default());
-        MapBodyId(next)
+        self.bodies.push(Body::default());
+        BodyId(next)
     }
 
-    pub fn map_body_mut(&mut self, id: MapBodyId) -> &mut MapBody {
+    pub fn map_body_mut(&mut self, id: BodyId) -> &mut Body {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
@@ -107,7 +107,7 @@ pub struct BoundVariable {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AggregationGroup {
-    pub body_id: MapBodyId,
+    pub body_id: BodyId,
     pub bind_depth: BindDepth,
 }
 
@@ -115,15 +115,15 @@ pub struct AggregationGroup {
 #[derive(Default)]
 pub struct AggregationForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<MapBodyId, MapBodyId>,
+    map: FnvHashMap<BodyId, BodyId>,
 }
 
 impl AggregationForest {
-    pub fn insert(&mut self, aggr: MapBodyId, parent: Option<MapBodyId>) {
+    pub fn insert(&mut self, aggr: BodyId, parent: Option<BodyId>) {
         self.map.insert(aggr, parent.unwrap_or(aggr));
     }
 
-    pub fn find_parent(&self, aggr: MapBodyId) -> Option<MapBodyId> {
+    pub fn find_parent(&self, aggr: BodyId) -> Option<BodyId> {
         let parent = self.map.get(&aggr).unwrap();
         if parent == &aggr {
             None
@@ -132,7 +132,7 @@ impl AggregationForest {
         }
     }
 
-    pub fn find_root(&self, mut aggr: MapBodyId) -> MapBodyId {
+    pub fn find_root(&self, mut aggr: BodyId) -> BodyId {
         loop {
             let parent = self.map.get(&aggr).unwrap();
             if parent == &aggr {

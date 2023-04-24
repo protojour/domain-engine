@@ -9,7 +9,7 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
-    ir_node::{BindDepth, IrKind, IrNode, MapBodyId},
+    ir_node::{BindDepth, BodyId, IrKind, IrNode},
     mem::Intern,
     type_check::check_expr::Arm,
     types::{Type, TypeRef},
@@ -223,7 +223,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 struct FirstArm(bool);
 
 struct AggrGroupSet {
-    set: FnvHashSet<Option<MapBodyId>>,
+    set: FnvHashSet<Option<BodyId>>,
     tallest_depth: u16,
 }
 
@@ -232,7 +232,7 @@ pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
-    TooManyLeaves(Vec<MapBodyId>),
+    TooManyLeaves(Vec<BodyId>),
 }
 
 impl AggrGroupSet {
@@ -260,13 +260,13 @@ impl AggrGroupSet {
         self,
         ctx: &CheckExprContext,
         max_depth: BindDepth,
-    ) -> Result<MapBodyId, AggrGroupError> {
+    ) -> Result<BodyId, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {
             return Err(AggrGroupError::DepthExceeded);
         }
 
-        let mut roots: FnvHashSet<MapBodyId> = Default::default();
-        let mut parents: FnvHashSet<MapBodyId> = Default::default();
+        let mut roots: FnvHashSet<BodyId> = Default::default();
+        let mut parents: FnvHashSet<BodyId> = Default::default();
 
         for group in self.set.iter().flatten() {
             roots.insert(ctx.aggr_forest.find_root(*group));

@@ -20,7 +20,7 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    ir_node::{IrNodeId, IrNodeTable, MapBody},
+    ir_node::{Body, CodeDirection, IrNodeTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -61,7 +61,7 @@ pub enum CodegenTask<'m> {
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
     pub nodes: IrNodeTable<'m>,
-    pub bodies: Vec<MapBody>,
+    pub bodies: Vec<Body>,
     pub span: SourceSpan,
 }
 
@@ -113,8 +113,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Map(map_task) => {
-                let mut equation = IrNodeEquation::new(map_task.nodes);
                 let bodies = map_task.bodies;
+                let mut equation = IrNodeEquation::new(map_task.nodes);
 
                 for (index, node) in equation.nodes.0.iter().enumerate() {
                     debug!("{{{index}}}: {node:?}");
@@ -128,24 +128,20 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     );
                 }
 
-                let root_body = bodies.first().unwrap();
-
-                // first -> second
                 codegen_map_solve(
                     &mut proc_table,
                     &mut equation,
-                    (root_body.first, root_body.second),
-                    DebugDirection::Forward,
+                    &bodies,
+                    CodeDirection::Forward,
                 );
 
                 equation.reset();
 
-                // second -> first
                 codegen_map_solve(
                     &mut proc_table,
                     &mut equation,
-                    (root_body.second, root_body.first),
-                    DebugDirection::Backward,
+                    &bodies,
+                    CodeDirection::Backward,
                 );
             }
         }
@@ -157,32 +153,58 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_map_procs = map_procs;
 }
 
-#[allow(unused)]
-pub(super) enum DebugDirection {
-    Forward,
-    Backward,
-}
-
 fn codegen_map_solve(
     proc_table: &mut ProcTable,
     equation: &mut IrNodeEquation,
-    (from, to): (IrNodeId, IrNodeId),
-    direction: DebugDirection,
+    bodies: &[Body],
+    direction: CodeDirection,
 ) -> bool {
-    // solve equation
     let mut solver = equation.solver();
-    solver.reduce_node(from).unwrap_or_else(|error| {
-        panic!("TODO: could not solve: {error:?}");
-    });
+
+    // solve equation(s)
+    for body in bodies {
+        solver
+            .reduce_node(body.bindings_node(direction))
+            .unwrap_or_else(|error| {
+                panic!("TODO: could not solve: {error:?}");
+            });
+    }
+
+    for (index, body) in bodies.iter().enumerate() {
+        let (from, to) = body.order(direction);
+        match direction {
+            CodeDirection::Forward => debug!(
+                "BodyId({index}) (forward) codegen\nreductions: {:#?}\nexpansions: {:#?}",
+                equation.debug_tree(from, &equation.reductions),
+                equation.debug_tree(to, &equation.expansions),
+            ),
+            CodeDirection::Backward => debug!(
+                "BodyId({index}) (backward codegen\nexpansions: {:#?}\nreductions: {:#?}",
+                equation.debug_tree(to, &equation.expansions),
+                equation.debug_tree(from, &equation.reductions),
+            ),
+        }
+    }
+
+    let root_body = bodies.first().unwrap();
+    let (from, to) = root_body.order(direction);
 
     let from_def = find_mapping_key(&equation.nodes[from].ty);
     let to_def = find_mapping_key(&equation.nodes[to].ty);
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
-            let procedure = codegen_map(proc_table, equation, (from, to), direction);
+            let (_, _, span) = equation.resolve_node(&equation.expansions, to);
 
-            proc_table.procedures.insert((from_def, to_def), procedure);
+            let mut builder = ProcBuilder::new(NParams(1));
+            let mut block = builder.new_block(Stack(1), span);
+            let mut generator = CodeGenerator::new(proc_table, &mut builder, direction);
+
+            generator.codegen_body(&mut block, equation, root_body);
+
+            builder.commit(block, Terminator::Return(builder.top()));
+
+            proc_table.procedures.insert((from_def, to_def), builder);
             true
         }
         other => {
@@ -190,40 +212,4 @@ fn codegen_map_solve(
             false
         }
     }
-}
-
-fn codegen_map(
-    proc_table: &mut ProcTable,
-    equation: &IrNodeEquation,
-    (from, to): (IrNodeId, IrNodeId),
-    direction: DebugDirection,
-) -> ProcBuilder {
-    debug!("expansions: {:?}", equation.expansions.debug_table());
-    debug!("reductions: {:?}", equation.reductions.debug_table());
-
-    // for easier readability:
-    match direction {
-        DebugDirection::Forward => debug!(
-            "(forward) codegen\nreductions: {:#?}\nexpansions: {:#?}",
-            equation.debug_tree(from, &equation.reductions),
-            equation.debug_tree(to, &equation.expansions),
-        ),
-        DebugDirection::Backward => debug!(
-            "(backward) codegen\nexpansions: {:#?}\nreductions: {:#?}",
-            equation.debug_tree(to, &equation.expansions),
-            equation.debug_tree(from, &equation.reductions),
-        ),
-    }
-
-    let (_, _, span) = equation.resolve_node(&equation.expansions, to);
-
-    let mut builder = ProcBuilder::new(NParams(1));
-    let mut block = builder.new_block(Stack(1), span);
-    let mut generator = CodeGenerator::new(proc_table, &mut builder);
-
-    generator.codegen_node(&mut block, equation, from, to);
-
-    builder.commit(block, Terminator::Return(builder.top()));
-
-    builder
 }
