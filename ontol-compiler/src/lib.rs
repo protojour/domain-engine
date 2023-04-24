@@ -34,6 +34,7 @@ mod compiler_queries;
 mod core;
 mod def;
 mod expr;
+mod ir_node;
 mod lowering;
 mod namespace;
 mod patterns;
@@ -44,7 +45,6 @@ mod sequence;
 mod source;
 mod strings;
 mod type_check;
-mod typed_expr;
 mod types;
 
 #[derive(Debug)]

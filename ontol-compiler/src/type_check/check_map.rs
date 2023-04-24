@@ -9,9 +9,9 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
+    ir_node::{BindDepth, IrKind, IrNode, IrNodeId},
     mem::Intern,
     type_check::check_expr::Arm,
-    typed_expr::{BindDepth, ExprRef, TypedExpr, TypedExprKind},
     types::{Type, TypeRef},
 };
 
@@ -47,7 +47,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut ctx,
         )?;
 
-        debug!("ctx aggregation variables {:?}", ctx.aggr_variables);
+        debug!("ctx aggregation variables {:?}", ctx.aggr_map);
 
         ctx.arm = Arm::First;
         let (_, node_a) = self.check_expr_id(first_id, &mut ctx);
@@ -55,7 +55,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let (_, node_b) = self.check_expr_id(second_id, &mut ctx);
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            expressions: ctx.expressions,
+            expressions: ctx.nodes,
             node_a,
             node_b,
             span: def.span,
@@ -94,23 +94,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     )?);
                 }
             }
-            ExprKind::Seq(aggr_id, inner) => {
+            ExprKind::Seq(expr_id, inner) => {
                 if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register variable
                     let aggr_syntax_var = ctx.alloc_syntax_var();
-                    let aggr_var_ref = ctx.expressions.add(TypedExpr {
+                    let aggr_var_id = ctx.nodes.add(IrNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(aggr_syntax_var),
+                        kind: IrKind::Variable(aggr_syntax_var),
                         span: expr.span,
                     });
-                    debug!("first arm seq: aggr_id={aggr_id:?}");
-                    ctx.aggr_variables.insert(*aggr_id, aggr_var_ref);
-                    ctx.aggr_forest.insert(
-                        aggr_var_ref,
-                        parent_aggr_group.map(|parent| parent.expr_ref),
-                    );
+                    debug!("first arm seq: expr_id={expr_id:?}");
+                    ctx.aggr_map.insert(*expr_id, aggr_var_id);
+                    ctx.aggr_forest
+                        .insert(aggr_var_id, parent_aggr_group.map(|parent| parent.node_id));
 
                     let result =
                         ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
@@ -118,7 +116,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 inner,
                                 variables,
                                 Some(AggregationGroup {
-                                    expr_ref: aggr_var_ref,
+                                    node_id: aggr_var_id,
                                     bind_depth: ctx.current_bind_depth(),
                                 }),
                                 ctx,
@@ -135,12 +133,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
-                            Ok(aggr_var_ref) => {
-                                ctx.aggr_variables.insert(*aggr_id, aggr_var_ref);
+                            Ok(aggr_var_id) => {
+                                ctx.aggr_map.insert(*expr_id, aggr_var_id);
 
-                                group_set.add(ctx.aggr_forest.find_parent(aggr_var_ref).map(
-                                    |expr_ref| AggregationGroup {
-                                        expr_ref,
+                                group_set.add(ctx.aggr_forest.find_parent(aggr_var_id).map(
+                                    |node_id| AggregationGroup {
+                                        node_id,
                                         bind_depth: outer_bind_depth,
                                     },
                                 ));
@@ -185,9 +183,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     // Register variable
                     let syntax_var = ctx.alloc_syntax_var();
-                    let var_ref = ctx.expressions.add(TypedExpr {
+                    let var_id = ctx.nodes.add(IrNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(syntax_var),
+                        kind: IrKind::Variable(syntax_var),
                         span: *variable_span,
                     });
 
@@ -196,7 +194,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             *variable_expr_id,
                             BoundVariable {
                                 syntax_var,
-                                expr_ref: var_ref,
+                                node_id: var_id,
                                 aggr_group: parent_aggr_group,
                             },
                         );
@@ -210,7 +208,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Entry::Vacant(vac) => {
                                 vac.insert(BoundVariable {
                                     syntax_var,
-                                    expr_ref: var_ref,
+                                    node_id: var_id,
                                     aggr_group: parent_aggr_group,
                                 });
                                 group_set.add(parent_aggr_group);
@@ -230,7 +228,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 struct FirstArm(bool);
 
 struct AggrGroupSet {
-    set: FnvHashSet<Option<ExprRef>>,
+    set: FnvHashSet<Option<IrNodeId>>,
     tallest_depth: u16,
 }
 
@@ -239,7 +237,7 @@ pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
-    TooManyLeaves(Vec<ExprRef>),
+    TooManyLeaves(Vec<IrNodeId>),
 }
 
 impl AggrGroupSet {
@@ -256,7 +254,7 @@ impl AggrGroupSet {
     }
 
     fn add(&mut self, aggr_group: Option<AggregationGroup>) {
-        self.set.insert(aggr_group.map(|group| group.expr_ref));
+        self.set.insert(aggr_group.map(|group| group.node_id));
         if let Some(group) = aggr_group {
             self.tallest_depth = core::cmp::max(self.tallest_depth, group.bind_depth.0)
         }
@@ -267,13 +265,13 @@ impl AggrGroupSet {
         self,
         ctx: &CheckExprContext,
         max_depth: BindDepth,
-    ) -> Result<ExprRef, AggrGroupError> {
+    ) -> Result<IrNodeId, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {
             return Err(AggrGroupError::DepthExceeded);
         }
 
-        let mut roots: FnvHashSet<ExprRef> = Default::default();
-        let mut parents: FnvHashSet<ExprRef> = Default::default();
+        let mut roots: FnvHashSet<IrNodeId> = Default::default();
+        let mut parents: FnvHashSet<IrNodeId> = Default::default();
 
         for group in &self.set {
             if let Some(aggr_group) = group {
@@ -293,7 +291,7 @@ impl AggrGroupSet {
                     .set
                     .iter()
                     .filter_map(|opt| *opt)
-                    .filter(|expr_ref| !parents.contains(expr_ref))
+                    .filter(|node_id| !parents.contains(node_id))
                     .collect::<Vec<_>>();
 
                 match leaves.len() {

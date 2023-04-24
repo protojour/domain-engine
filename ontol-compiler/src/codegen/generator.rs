@@ -7,12 +7,12 @@ use tracing::debug;
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
+    ir_node::{IrKind, IrNodeId, SyntaxVar},
     SourceSpan,
 };
 
 use super::{
-    equation::TypedExprEquation,
+    equation::IrNodeEquation,
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
     struct_pattern::codegen_struct_pattern_origin,
@@ -59,19 +59,19 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
     pub fn codegen_pattern(
         &mut self,
         block: &mut Block,
-        equation: &TypedExprEquation,
-        source: ExprRef,
-        target: ExprRef,
+        equation: &IrNodeEquation,
+        source: IrNodeId,
+        target: IrNodeId,
     ) {
-        let (_, source_pattern, _) = equation.resolve_expr(&equation.reductions, source);
+        let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, source);
 
         match &source_pattern.kind {
-            TypedExprKind::ValuePattern(_) => {
-                let to_def = &equation.expressions[target].ty.get_single_def_id().unwrap();
+            IrKind::ValuePattern(_) => {
+                let to_def = &equation.nodes[target].ty.get_single_def_id().unwrap();
 
                 codegen_value_pattern_origin(self, block, equation, target, *to_def)
             }
-            TypedExprKind::StructPattern(attrs) => {
+            IrKind::StructPattern(attrs) => {
                 codegen_struct_pattern_origin(self, block, equation, target, attrs)
             }
             other => panic!("unable to generate mapping for pattern: {other:?}"),
@@ -81,12 +81,12 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
     pub fn codegen_expr(
         &mut self,
         block: &mut Block,
-        equation: &TypedExprEquation,
-        expr_id: ExprRef,
+        equation: &IrNodeEquation,
+        node_id: IrNodeId,
     ) {
-        let (_, expr, span) = equation.resolve_expr(&equation.expansions, expr_id);
+        let (_, expr, span) = equation.resolve_node(&equation.expansions, node_id);
         match &expr.kind {
-            TypedExprKind::Call(proc, params) => {
+            IrKind::Call(proc, params) => {
                 let stack_delta = Stack(-(params.len() as i32) + 1);
 
                 for param in params.iter() {
@@ -102,17 +102,17 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     span,
                 );
             }
-            TypedExprKind::Constant(k) => {
+            IrKind::Constant(k) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
                 self.builder
                     .push(block, Ir::Constant(*k, return_def_id), Stack(1), span);
             }
-            TypedExprKind::Variable(var) => {
+            IrKind::Variable(var) => {
                 self.codegen_variable(block, *var, &span);
             }
-            TypedExprKind::VariableRef(_) => panic!(),
-            TypedExprKind::MapCall(param_id, from_ty) => {
+            IrKind::VariableRef(_) => panic!(),
+            IrKind::MapCall(param_id, from_ty) => {
                 self.codegen_expr(block, equation, *param_id);
 
                 debug!(
@@ -129,8 +129,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            TypedExprKind::MapSequence(expr_ref, iter_var, body, _)
-            | TypedExprKind::MapSequenceBalanced(expr_ref, iter_var, body, _) => {
+            IrKind::MapSequence(seq_id, iter_var, body_id, _)
+            | IrKind::MapSequenceBalanced(seq_id, iter_var, body_id, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
                     block,
@@ -140,7 +140,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 );
 
                 // Input sequence:
-                self.codegen_expr(block, equation, *expr_ref);
+                self.codegen_expr(block, equation, *seq_id);
                 let input_seq = self.builder.top();
 
                 let counter =
@@ -161,7 +161,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     let mut block2 = gen.builder.new_block(Stack(2), span);
 
-                    gen.codegen_expr(&mut block2, equation, *body);
+                    gen.codegen_expr(&mut block2, equation, *body_id);
                     gen.builder
                         .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
                     // still two items on the stack: append to original sequence
@@ -188,14 +188,11 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 self.builder
                     .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            TypedExprKind::ValuePattern(_) => {
+            IrKind::ValuePattern(_) => {
                 todo!()
             }
-            TypedExprKind::StructPattern(attrs) => {
-                let def_id = &equation.expressions[expr_id]
-                    .ty
-                    .get_single_def_id()
-                    .unwrap();
+            IrKind::StructPattern(attrs) => {
+                let def_id = &equation.nodes[node_id].ty.get_single_def_id().unwrap();
                 let local = self.builder.push(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewMap, *def_id),
@@ -203,8 +200,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     span,
                 );
 
-                for (property_id, expr_ref) in attrs {
-                    self.codegen_expr(block, equation, *expr_ref);
+                for (property_id, node_id) in attrs {
+                    self.codegen_expr(block, equation, *node_id);
                     self.builder.push(
                         block,
                         Ir::PutAttrValue(local, *property_id),
@@ -213,7 +210,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     );
                 }
             }
-            TypedExprKind::Unit => {
+            IrKind::Unit => {
                 todo!()
             }
         }

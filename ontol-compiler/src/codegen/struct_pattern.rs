@@ -7,11 +7,11 @@ use crate::{
         ir::Ir,
         proc_builder::{Block, Stack},
     },
-    typed_expr::{BindDepth, ExprRef, SyntaxVar, TypedExprKind},
+    ir_node::{BindDepth, IrKind, IrNodeId, SyntaxVar},
     SourceSpan,
 };
 
-use super::{equation::TypedExprEquation, proc_builder::ProcBuilder};
+use super::{equation::IrNodeEquation, proc_builder::ProcBuilder};
 
 struct UnpackProp {
     var: SyntaxVar,
@@ -30,11 +30,11 @@ enum UnpackKind {
 pub(super) fn codegen_struct_pattern_origin(
     gen: &mut CodeGenerator,
     block: &mut Block,
-    equation: &TypedExprEquation,
-    to: ExprRef,
-    origin_attrs: &IndexMap<PropertyId, ExprRef>,
+    equation: &IrNodeEquation,
+    to: IrNodeId,
+    origin_attrs: &IndexMap<PropertyId, IrNodeId>,
 ) {
-    let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
+    let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
 
     // always start at 0 (for now), there are no recursive structs (yet)
     let input_local = 0;
@@ -76,13 +76,13 @@ pub(super) fn codegen_struct_pattern_origin(
     };
 
     match &to_expr.kind {
-        TypedExprKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
+        IrKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, to);
         }),
-        TypedExprKind::ValuePattern(expr_ref) => gen.enter_bind_level(map_codegen, |generator| {
-            generator.codegen_expr(block, equation, *expr_ref);
+        IrKind::ValuePattern(node_id) => gen.enter_bind_level(map_codegen, |generator| {
+            generator.codegen_expr(block, equation, *node_id);
         }),
-        TypedExprKind::MapSequenceBalanced(..) => gen.enter_bind_level(map_codegen, |generator| {
+        IrKind::MapSequenceBalanced(..) => gen.enter_bind_level(map_codegen, |generator| {
             generator.codegen_expr(block, equation, to);
         }),
         kind => {
@@ -92,22 +92,18 @@ pub(super) fn codegen_struct_pattern_origin(
 }
 
 fn analyze_unpack(
-    equation: &TypedExprEquation,
-    attrs: &IndexMap<PropertyId, ExprRef>,
+    equation: &IrNodeEquation,
+    attrs: &IndexMap<PropertyId, IrNodeId>,
 ) -> Vec<UnpackProp> {
     let mut destr: Vec<_> = attrs
         .iter()
-        .filter_map(|(prop_id, expr_ref)| {
-            match &equation
-                .resolve_expr(&equation.reductions, *expr_ref)
-                .1
-                .kind
-            {
-                TypedExprKind::Variable(var) => Some(UnpackProp {
+        .filter_map(|(prop_id, node_id)| {
+            match &equation.resolve_node(&equation.reductions, *node_id).1.kind {
+                IrKind::Variable(var) => Some(UnpackProp {
                     var: *var,
                     kind: UnpackKind::Leaf(*prop_id),
                 }),
-                TypedExprKind::StructPattern(inner_attrs) => {
+                IrKind::StructPattern(inner_attrs) => {
                     let unpack_props = analyze_unpack(equation, inner_attrs);
                     let first = unpack_props.first()?;
 
@@ -120,9 +116,7 @@ fn analyze_unpack(
                     })
                 }
                 other => {
-                    panic!(
-                        "reduced property {prop_id:?} {expr_ref:?} not a variable, but {other:?}"
-                    )
+                    panic!("reduced property {prop_id:?} {node_id:?} not a variable, but {other:?}")
                 }
             }
         })

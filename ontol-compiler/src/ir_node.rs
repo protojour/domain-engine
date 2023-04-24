@@ -24,65 +24,66 @@ impl Debug for SyntaxVar {
     }
 }
 
-/// An expression with type information attached
+/// An "code" node with complete type information attached.
+/// Ir means Intermediate Representation.
 #[derive(Clone, Debug)]
-pub struct TypedExpr<'m> {
-    pub kind: TypedExprKind<'m>,
+pub struct IrNode<'m> {
+    pub kind: IrKind<'m>,
     pub ty: TypeRef<'m>,
     pub span: SourceSpan,
 }
 
 /// The 'kind' of a typed expression
 #[derive(Clone, Debug)]
-pub enum TypedExprKind<'m> {
+pub enum IrKind<'m> {
     /// An expression with no information
     Unit,
     /// Call to a built-in procedure
-    Call(BuiltinProc, SmallVec<[ExprRef; 2]>),
+    Call(BuiltinProc, SmallVec<[IrNodeId; 2]>),
     /// A value pattern ("object" with one anonymous property/attribute)
-    ValuePattern(ExprRef),
+    ValuePattern(IrNodeId),
     /// A struct pattern, containing destructuring of properties
-    StructPattern(IndexMap<PropertyId, ExprRef>),
+    StructPattern(IndexMap<PropertyId, IrNodeId>),
     /// A variable definition
     Variable(SyntaxVar),
     /// A variable reference (usage site)
-    VariableRef(ExprRef),
+    VariableRef(IrNodeId),
     /// A constant/literal expression
     Constant(i64),
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
-    MapCall(ExprRef, TypeRef<'m>),
+    MapCall(IrNodeId, TypeRef<'m>),
     /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
     /// The second expression is the item/body.
-    MapSequenceBalanced(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
-    MapSequence(ExprRef, SyntaxVar, ExprRef, TypeRef<'m>),
+    MapSequenceBalanced(IrNodeId, SyntaxVar, IrNodeId, TypeRef<'m>),
+    MapSequence(IrNodeId, SyntaxVar, IrNodeId, TypeRef<'m>),
 }
 
 /// A reference to a typed expression.
 ///
 /// This reference is tied to a `TypedExprTable` and is not globally valid.
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
-pub struct ExprRef(pub u32);
+pub struct IrNodeId(pub u32);
 
-pub const ERROR_NODE: ExprRef = ExprRef(u32::MAX);
+pub const ERROR_NODE: IrNodeId = IrNodeId(u32::MAX);
 
 #[derive(Default, Debug)]
-pub struct TypedExprTable<'m>(pub(super) Vec<TypedExpr<'m>>);
+pub struct IrNodeTable<'m>(pub(super) Vec<IrNode<'m>>);
 
-impl<'m> TypedExprTable<'m> {
-    pub fn add(&mut self, expr: TypedExpr<'m>) -> ExprRef {
-        let id = ExprRef(self.0.len() as u32);
+impl<'m> IrNodeTable<'m> {
+    pub fn add(&mut self, expr: IrNode<'m>) -> IrNodeId {
+        let id = IrNodeId(self.0.len() as u32);
         self.0.push(expr);
         id
     }
 }
 
-impl<'m> Index<ExprRef> for TypedExprTable<'m> {
-    type Output = TypedExpr<'m>;
+impl<'m> Index<IrNodeId> for IrNodeTable<'m> {
+    type Output = IrNode<'m>;
 
-    fn index(&self, index: ExprRef) -> &Self::Output {
+    fn index(&self, index: IrNodeId) -> &Self::Output {
         &self.0[index.0 as usize]
     }
 }

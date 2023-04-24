@@ -20,13 +20,13 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    typed_expr::{ExprRef, TypedExprTable},
+    ir_node::{IrNodeId, IrNodeTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
 use self::{
-    equation::TypedExprEquation,
+    equation::IrNodeEquation,
     ir::Terminator,
     link::{link, LinkResult},
     proc_builder::{Block, ProcBuilder},
@@ -60,9 +60,9 @@ pub enum CodegenTask<'m> {
 
 #[derive(Debug)]
 pub struct MapCodegenTask<'m> {
-    pub expressions: TypedExprTable<'m>,
-    pub node_a: ExprRef,
-    pub node_b: ExprRef,
+    pub expressions: IrNodeTable<'m>,
+    pub node_a: IrNodeId,
+    pub node_b: IrNodeId,
     pub span: SourceSpan,
 }
 
@@ -114,9 +114,9 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Map(map_task) => {
-                let mut equation = TypedExprEquation::new(map_task.expressions);
+                let mut equation = IrNodeEquation::new(map_task.expressions);
 
-                for (index, expr) in equation.expressions.0.iter().enumerate() {
+                for (index, expr) in equation.nodes.0.iter().enumerate() {
                     debug!("{{{index}}}: {expr:?}");
                 }
 
@@ -161,18 +161,18 @@ pub(super) enum DebugDirection {
 
 fn codegen_map_solve(
     proc_table: &mut ProcTable,
-    equation: &mut TypedExprEquation,
-    (from, to): (ExprRef, ExprRef),
+    equation: &mut IrNodeEquation,
+    (from, to): (IrNodeId, IrNodeId),
     direction: DebugDirection,
 ) -> bool {
     // solve equation
     let mut solver = equation.solver();
-    solver.reduce_expr(from).unwrap_or_else(|error| {
+    solver.reduce_node(from).unwrap_or_else(|error| {
         panic!("TODO: could not solve: {error:?}");
     });
 
-    let from_def = find_mapping_key(&equation.expressions[from].ty);
-    let to_def = find_mapping_key(&equation.expressions[to].ty);
+    let from_def = find_mapping_key(&equation.nodes[from].ty);
+    let to_def = find_mapping_key(&equation.nodes[to].ty);
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
@@ -190,8 +190,8 @@ fn codegen_map_solve(
 
 fn codegen_map(
     proc_table: &mut ProcTable,
-    equation: &TypedExprEquation,
-    (from, to): (ExprRef, ExprRef),
+    equation: &IrNodeEquation,
+    (from, to): (IrNodeId, IrNodeId),
     direction: DebugDirection,
 ) -> ProcBuilder {
     debug!("expansions: {:?}", equation.expansions.debug_table());
@@ -211,7 +211,7 @@ fn codegen_map(
         ),
     }
 
-    let (_, _, span) = equation.resolve_expr(&equation.expansions, to);
+    let (_, _, span) = equation.resolve_node(&equation.expansions, to);
 
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Stack(1), span);

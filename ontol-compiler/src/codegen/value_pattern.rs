@@ -10,20 +10,20 @@ use crate::{
         proc_builder::Stack,
         Block, ProcBuilder,
     },
-    typed_expr::{ExprRef, SyntaxVar, TypedExprKind},
+    ir_node::{IrKind, IrNodeId, SyntaxVar},
     SourceSpan,
 };
 
-use super::equation::TypedExprEquation;
+use super::equation::IrNodeEquation;
 
 pub(super) fn codegen_value_pattern_origin(
     gen: &mut CodeGenerator,
     block: &mut Block,
-    equation: &TypedExprEquation,
-    to: ExprRef,
+    equation: &IrNodeEquation,
+    to: IrNodeId,
     to_def: DefId,
 ) {
-    let (_, to_expr, span) = equation.resolve_expr(&equation.expansions, to);
+    let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
 
     struct ValueCodegen {
         input_local: Local,
@@ -48,10 +48,10 @@ pub(super) fn codegen_value_pattern_origin(
     };
 
     gen.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
-        TypedExprKind::ValuePattern(expr_ref) => {
-            generator.codegen_expr(block, equation, *expr_ref);
+        IrKind::ValuePattern(node_id) => {
+            generator.codegen_expr(block, equation, *node_id);
         }
-        TypedExprKind::StructPattern(dest_attrs) => {
+        IrKind::StructPattern(dest_attrs) => {
             generator.builder.push(
                 block,
                 Ir::CallBuiltin(BuiltinProc::NewMap, to_def),

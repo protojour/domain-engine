@@ -10,11 +10,9 @@ use crate::{
     def::{Cardinality, Def, DefKind, DefReference, PropertyCardinality, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
+    ir_node::{BindDepth, IrKind, IrNode, IrNodeId, IrNodeTable, SyntaxVar, ERROR_NODE},
     mem::Intern,
     relation::Constructor,
-    typed_expr::{
-        BindDepth, ExprRef, SyntaxVar, TypedExpr, TypedExprKind, TypedExprTable, ERROR_NODE,
-    },
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -26,9 +24,10 @@ use super::{
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub expressions: TypedExprTable<'m>,
+    pub nodes: IrNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
-    pub aggr_variables: FnvHashMap<ExprId, ExprRef>,
+    /// Maps an aggregate expression to a unique aggregation
+    pub aggr_map: FnvHashMap<ExprId, IrNodeId>,
     pub aggr_forest: AggregationForest,
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
@@ -40,9 +39,9 @@ impl<'m> CheckExprContext<'m> {
     pub fn new() -> Self {
         Self {
             inference: Inference::new(),
-            expressions: TypedExprTable::default(),
+            nodes: IrNodeTable::default(),
             bound_variables: Default::default(),
-            aggr_variables: Default::default(),
+            aggr_map: Default::default(),
             aggr_forest: Default::default(),
             arm: Arm::First,
             bind_depth: BindDepth(0),
@@ -84,13 +83,13 @@ impl<'m> CheckExprContext<'m> {
 
 pub struct BoundVariable {
     pub syntax_var: SyntaxVar,
-    pub expr_ref: ExprRef,
+    pub node_id: IrNodeId,
     pub aggr_group: Option<AggregationGroup>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AggregationGroup {
-    pub expr_ref: ExprRef,
+    pub node_id: IrNodeId,
     pub bind_depth: BindDepth,
 }
 
@@ -98,15 +97,15 @@ pub struct AggregationGroup {
 #[derive(Default)]
 pub struct AggregationForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<ExprRef, ExprRef>,
+    map: FnvHashMap<IrNodeId, IrNodeId>,
 }
 
 impl AggregationForest {
-    pub fn insert(&mut self, aggr: ExprRef, parent: Option<ExprRef>) {
+    pub fn insert(&mut self, aggr: IrNodeId, parent: Option<IrNodeId>) {
         self.map.insert(aggr, parent.unwrap_or(aggr));
     }
 
-    pub fn find_parent(&self, aggr: ExprRef) -> Option<ExprRef> {
+    pub fn find_parent(&self, aggr: IrNodeId) -> Option<IrNodeId> {
         let parent = self.map.get(&aggr).unwrap();
         if parent == &aggr {
             None
@@ -115,7 +114,7 @@ impl AggregationForest {
         }
     }
 
-    pub fn find_root(&self, mut aggr: ExprRef) -> ExprRef {
+    pub fn find_root(&self, mut aggr: IrNodeId) -> IrNodeId {
         loop {
             let parent = self.map.get(&aggr).unwrap();
             if parent == &aggr {
@@ -143,7 +142,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr_id: ExprId,
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, ExprRef) {
+    ) -> (TypeRef<'m>, IrNodeId) {
         match self.expressions.get(&expr_id) {
             Some(expr) => self.check_expr(expr, ctx),
             None => panic!("Expression {expr_id:?} not found"),
@@ -154,7 +153,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr: &Expr,
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, ExprRef) {
+    ) -> (TypeRef<'m>, IrNodeId) {
         match &expr.kind {
             ExprKind::Call(def_id, args) => {
                 match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
@@ -175,19 +174,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                         }
 
-                        let mut param_expr_refs = vec![];
+                        let mut param_node_ids = vec![];
                         for (arg, param_ty) in args.iter().zip(*params) {
-                            let (_, typed_expr_ref) = self.check_expr_expect(arg, param_ty, ctx);
-                            param_expr_refs.push(typed_expr_ref);
+                            let (_, node_id) = self.check_expr_expect(arg, param_ty, ctx);
+                            param_node_ids.push(node_id);
                         }
 
-                        let call_expr_ref = ctx.expressions.add(TypedExpr {
-                            kind: TypedExprKind::Call(*proc, param_expr_refs.into()),
+                        let call_id = ctx.nodes.add(IrNode {
+                            kind: IrKind::Call(*proc, param_node_ids.into()),
                             ty: output,
                             span: expr.span,
                         });
 
-                        (*output, call_expr_ref)
+                        (*output, call_id)
                     }
                     _ => self.expr_error(CompileError::NotCallable, &expr.span),
                 }
@@ -195,58 +194,58 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Struct(type_path, attributes) => {
                 self.check_struct(expr, type_path, attributes, ctx)
             }
-            ExprKind::Seq(aggr_id, inner) => {
-                debug!("Seq(aggr_id = {aggr_id:?})");
+            ExprKind::Seq(aggr_expr_id, inner) => {
+                debug!("Seq(aggr_expr_id = {aggr_expr_id:?})");
 
                 // The variables outside the aggregation refer to the aggregated object (an array).
                 let seq_inner_ty_var = self
                     .types
-                    .intern(Type::Infer(ctx.inference.new_type_variable(*aggr_id)));
+                    .intern(Type::Infer(ctx.inference.new_type_variable(*aggr_expr_id)));
                 let array_ty = self.types.intern(Type::Array(seq_inner_ty_var));
 
-                let seq_ref = ctx
-                    .aggr_variables
-                    .get(aggr_id)
+                let seq_id = ctx
+                    .aggr_map
+                    .get(aggr_expr_id)
                     .expect("aggregated reference not found");
-                let seq_variable_ref = ctx.expressions.add(TypedExpr {
+                let seq_variable_id = ctx.nodes.add(IrNode {
                     ty: array_ty,
-                    kind: TypedExprKind::VariableRef(*seq_ref),
+                    kind: IrKind::VariableRef(*seq_id),
                     span: expr.span,
                 });
 
                 ctx.enter_aggregation(|ctx, aggr_var| {
                     // The inner variables represent each element being aggregated
-                    let (element_ty, element_ref) = self.check_expr(inner, ctx);
+                    let (element_ty, element_id) = self.check_expr(inner, ctx);
 
                     let array_ty = self.types.intern(Type::Array(element_ty));
 
-                    let _iter_ref = ctx.expressions.add(TypedExpr {
+                    let _iter_id = ctx.nodes.add(IrNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(aggr_var),
+                        kind: IrKind::Variable(aggr_var),
                         span: expr.span,
                     });
 
-                    let map_sequence_ref = ctx.expressions.add(TypedExpr {
+                    let map_sequence_id = ctx.nodes.add(IrNode {
                         ty: array_ty,
-                        kind: TypedExprKind::MapSequenceBalanced(
-                            seq_variable_ref,
+                        kind: IrKind::MapSequenceBalanced(
+                            seq_variable_id,
                             aggr_var,
-                            element_ref,
+                            element_id,
                             element_ty,
                         ),
                         span: expr.span,
                     });
 
-                    (array_ty, map_sequence_ref)
+                    (array_ty, map_sequence_id)
                 })
             }
             ExprKind::Constant(k) => {
                 let ty = self.def_types.map.get(&self.primitives.int).unwrap();
                 (
                     ty,
-                    ctx.expressions.add(TypedExpr {
+                    ctx.nodes.add(IrNode {
                         ty,
-                        kind: TypedExprKind::Constant(*k),
+                        kind: IrKind::Constant(*k),
                         span: expr.span,
                     }),
                 )
@@ -262,9 +261,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 (
                     ty,
-                    ctx.expressions.add(TypedExpr {
+                    ctx.nodes.add(IrNode {
                         ty,
-                        kind: TypedExprKind::VariableRef(bound_variable.expr_ref),
+                        kind: IrKind::VariableRef(bound_variable.node_id),
                         span: expr.span,
                     }),
                 )
@@ -278,7 +277,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         type_path: &TypePath,
         attributes: &[((DefReference, SourceSpan), Expr)],
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, ExprRef) {
+    ) -> (TypeRef<'m>, IrNodeId) {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
             Type::Domain(subject_id) => subject_id,
@@ -287,7 +286,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let properties = self.relations.properties_by_type(type_path.def_id);
 
-        let typed_expr_ref = match properties.map(|props| &props.constructor) {
+        let node_id = match properties.map(|props| &props.constructor) {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.map.as_ref()) {
                     Some(property_set) => {
@@ -360,12 +359,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     self.types.intern(Type::Array(object_ty))
                                 }
                             };
-                            let (_, typed_expr_ref) = self.check_expr_expect(expr, object_ty, ctx);
+                            let (_, node_id) = self.check_expr_expect(expr, object_ty, ctx);
 
-                            typed_properties.insert(
-                                PropertyId::subject(match_property.relation_id),
-                                typed_expr_ref,
-                            );
+                            typed_properties
+                                .insert(PropertyId::subject(match_property.relation_id), node_id);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -377,9 +374,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        ctx.expressions.add(TypedExpr {
+                        ctx.nodes.add(IrNode {
                             ty: domain_type,
-                            kind: TypedExprKind::StructPattern(typed_properties),
+                            kind: IrKind::StructPattern(typed_properties),
                             span: expr.span,
                         })
                     }
@@ -387,8 +384,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if !attributes.is_empty() {
                             return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
                         }
-                        ctx.expressions.add(TypedExpr {
-                            kind: TypedExprKind::Unit,
+                        ctx.nodes.add(IrNode {
+                            kind: IrKind::Unit,
                             ty: domain_type,
                             span: expr.span,
                         })
@@ -402,11 +399,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .expect("BUG: problem getting anonymous property meta");
 
                     let object_ty = self.check_def(relationship.object.0.def_id);
-                    let typed_expr_ref = self.check_expr_expect(value, object_ty, ctx).1;
+                    let node_id = self.check_expr_expect(value, object_ty, ctx).1;
 
-                    ctx.expressions.add(TypedExpr {
+                    ctx.nodes.add(IrNode {
                         ty: domain_type,
-                        kind: TypedExprKind::ValuePattern(typed_expr_ref),
+                        kind: IrKind::ValuePattern(node_id),
                         span: expr.span,
                     })
                 }
@@ -422,7 +419,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::StringFmt(_)) => todo!(),
         };
 
-        (domain_type, typed_expr_ref)
+        (domain_type, node_id)
     }
 
     fn check_expr_expect(
@@ -430,8 +427,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr: &Expr,
         expected: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, ExprRef) {
-        let (ty, typed_expr_ref) = self.check_expr(expr, ctx);
+    ) -> (TypeRef<'m>, IrNodeId) {
+        let (ty, node_id) = self.check_expr(expr, ctx);
         match (ty, expected) {
             (Type::Error, _) => (ty, ERROR_NODE),
             (_, Type::Error) => (expected, ERROR_NODE),
@@ -446,10 +443,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 {
                     Ok(_) => {
                         warn!("TODO: resolve var?");
-                        (ty, typed_expr_ref)
+                        (ty, node_id)
                     }
                     Err(TypeError::Mismatch(type_eq)) => self
-                        .map_if_possible(ctx, expr, typed_expr_ref, type_eq)
+                        .map_if_possible(ctx, expr, node_id, type_eq)
                         .unwrap_or_else(|_| {
                             (
                                 self.type_error(TypeError::Mismatch(type_eq), &expr.span),
@@ -464,7 +461,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     actual: ty,
                     expected,
                 };
-                self.map_if_possible(ctx, expr, typed_expr_ref, type_eq)
+                self.map_if_possible(ctx, expr, node_id, type_eq)
                     .unwrap_or_else(|_| {
                         (
                             self.type_error(TypeError::Mismatch(type_eq), &expr.span),
@@ -474,7 +471,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ => {
                 // Ok
-                (ty, typed_expr_ref)
+                (ty, node_id)
             }
         }
     }
@@ -483,43 +480,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         ctx: &mut CheckExprContext<'m>,
         expr: &Expr,
-        typed_expr_ref: ExprRef,
+        node_id: IrNodeId,
         type_eq: TypeEquation<'m>,
-    ) -> Result<(TypeRef<'m>, ExprRef), ()> {
+    ) -> Result<(TypeRef<'m>, IrNodeId), ()> {
         match (type_eq.actual, type_eq.expected) {
             (Type::Domain(_), Type::Domain(_)) => {
-                let map_node = ctx.expressions.add(TypedExpr {
+                let map_node = ctx.nodes.add(IrNode {
                     ty: type_eq.expected,
-                    kind: TypedExprKind::MapCall(typed_expr_ref, type_eq.actual),
+                    kind: IrKind::MapCall(node_id, type_eq.actual),
                     span: expr.span,
                 });
                 Ok((type_eq.expected, map_node))
             }
             (Type::Array(actual_item), Type::Array(expected_item)) => {
                 ctx.enter_aggregation(|ctx, iter_var| {
-                    let iter_ref = ctx.expressions.add(TypedExpr {
+                    let iter_id = ctx.nodes.add(IrNode {
                         ty: self.types.intern(Type::Tautology),
-                        kind: TypedExprKind::Variable(iter_var),
+                        kind: IrKind::Variable(iter_var),
                         span: expr.span,
                     });
 
-                    let (_, map_expr_ref) = self.map_if_possible(
+                    let (_, map_node_id) = self.map_if_possible(
                         ctx,
                         expr,
-                        iter_ref,
+                        iter_id,
                         TypeEquation {
                             actual: actual_item,
                             expected: expected_item,
                         },
                     )?;
-                    let map_sequence_node = ctx.expressions.add(TypedExpr {
+                    let map_sequence_node = ctx.nodes.add(IrNode {
                         ty: type_eq.expected,
-                        kind: TypedExprKind::MapSequence(
-                            typed_expr_ref,
-                            iter_var,
-                            map_expr_ref,
-                            type_eq.actual,
-                        ),
+                        kind: IrKind::MapSequence(node_id, iter_var, map_node_id, type_eq.actual),
                         span: expr.span,
                     });
 
@@ -530,7 +522,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, ExprRef) {
+    fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, IrNodeId) {
         self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
     }
