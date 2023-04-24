@@ -160,15 +160,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             ExprKind::Variable(expr_id) => {
-                if let Some(bound_variable) = ctx.bound_variables.get(&expr_id) {
+                if let Some(bound_variable) = ctx.bound_variables.get(expr_id) {
                     // Variable is used more than once
-                    if ctx.arm.is_first() {
-                        if bound_variable.aggr_group != parent_aggr_group {
-                            self.error(
-                                CompileError::TODO(smart_format!("Incompatible aggregation group")),
-                                &expr.span,
-                            );
-                        }
+                    if ctx.arm.is_first() && bound_variable.aggr_group != parent_aggr_group {
+                        self.error(
+                            CompileError::TODO(smart_format!("Incompatible aggregation group")),
+                            &expr.span,
+                        );
                     }
 
                     debug!("Join existing bound variable");
@@ -273,12 +271,10 @@ impl AggrGroupSet {
         let mut roots: FnvHashSet<IrNodeId> = Default::default();
         let mut parents: FnvHashSet<IrNodeId> = Default::default();
 
-        for group in &self.set {
-            if let Some(aggr_group) = group {
-                roots.insert(ctx.aggr_forest.find_root(*aggr_group));
-                if let Some(parent) = ctx.aggr_forest.find_parent(*aggr_group) {
-                    parents.insert(parent);
-                }
+        for group in self.set.iter().flatten() {
+            roots.insert(ctx.aggr_forest.find_root(*group));
+            if let Some(parent) = ctx.aggr_forest.find_parent(*group) {
+                parents.insert(parent);
             }
         }
 
