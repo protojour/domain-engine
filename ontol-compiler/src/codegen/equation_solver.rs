@@ -186,7 +186,11 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Variable(param_idx))
             }
-            HirKind::Aggr(_) => Ok(Substitution::Constant(idx)),
+            HirKind::Aggr(aggr_var_idx, _body_idx) => {
+                self.reductions[idx] = *aggr_var_idx;
+
+                Ok(Substitution::Constant(idx))
+            }
             HirKind::MapSequence(seq_idx, iter_var, elem_idx, item_ty) => {
                 let seq_idx = *seq_idx;
                 let iter_var = *iter_var;

@@ -182,8 +182,10 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .debug_tuple(&self.header("MapCall"))
                 .field(&self.child(*node_id, None))
                 .finish()?,
-            HirKind::Aggr(body_id) => f
-                .debug_tuple(&self.header(&format!("Aggr({body_id:?})")))
+            HirKind::Aggr(var_idx, body_id) => f
+                .debug_tuple(&self.header("Aggr"))
+                .field(&self.child(*var_idx, None))
+                .field(body_id)
                 .finish()?,
             HirKind::MapSequence(node_id, var, body, _) => f
                 .debug_tuple(&self.header("MapSequence"))

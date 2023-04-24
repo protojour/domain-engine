@@ -53,7 +53,7 @@ pub enum HirKind<'m> {
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
     MapCall(HirIdx, TypeRef<'m>),
-    Aggr(HirBodyIdx),
+    Aggr(HirIdx, HirBodyIdx),
     /// A mapping operation on a sequence.
     /// The first expression is the array.
     /// The syntax var is the iterated value.
@@ -70,8 +70,14 @@ pub struct HirIdx(pub u32);
 pub const ERROR_NODE: HirIdx = HirIdx(u32::MAX);
 
 /// A reference to an aggregation body
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct HirBodyIdx(pub u32);
+
+impl Debug for HirBodyIdx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HirBodyIdx({})", self.0)
+    }
+}
 
 #[derive(Debug)]
 pub struct HirBody {

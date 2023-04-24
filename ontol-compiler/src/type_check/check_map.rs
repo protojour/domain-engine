@@ -107,6 +107,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx.aggr_forest
                         .insert(aggr_body_id, parent_aggr_group.map(|parent| parent.body_id));
 
+                    // Register aggregation variable
+                    let aggr_var = ctx.alloc_hir_variable();
+                    let aggr_var_idx = ctx.nodes.add(HirNode {
+                        ty: self.types.intern(Type::Tautology),
+                        kind: HirKind::Variable(aggr_var),
+                        span: expr.span,
+                    });
+                    ctx.aggr_variables.insert(aggr_body_id, aggr_var_idx);
+
                     let result =
                         ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
                             self.aggr_group_map_variables(
@@ -177,7 +186,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .unwrap();
 
                     // Register variable
-                    let syntax_var = ctx.alloc_syntax_var();
+                    let syntax_var = ctx.alloc_hir_variable();
                     let var_id = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
                         kind: HirKind::Variable(syntax_var),

@@ -30,6 +30,7 @@ pub struct CheckExprContext<'m> {
     pub bodies: Vec<HirBody>,
     pub nodes: HirNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
+    pub aggr_variables: FnvHashMap<HirBodyIdx, HirIdx>,
     pub aggr_body_map: FnvHashMap<ExprId, HirBodyIdx>,
 
     pub aggr_forest: AggregationForest,
@@ -37,7 +38,7 @@ pub struct CheckExprContext<'m> {
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
-    syntax_var_allocations: Vec<u16>,
+    hir_var_allocations: Vec<u16>,
     body_id_counter: u32,
 }
 
@@ -48,11 +49,12 @@ impl<'m> CheckExprContext<'m> {
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
             bound_variables: Default::default(),
+            aggr_variables: Default::default(),
             aggr_body_map: Default::default(),
             aggr_forest: Default::default(),
             arm: Arm::First,
             bind_depth: BindDepth(0),
-            syntax_var_allocations: vec![0],
+            hir_var_allocations: vec![0],
             body_id_counter: 0,
         }
     }
@@ -66,14 +68,14 @@ impl<'m> CheckExprContext<'m> {
         let aggregation_var = HirVariable(0, BindDepth(self.bind_depth.0 + 1));
 
         self.bind_depth.0 += 2;
-        self.syntax_var_allocations.push(0);
-        self.syntax_var_allocations.push(0);
+        self.hir_var_allocations.push(0);
+        self.hir_var_allocations.push(0);
 
         let ret = f(self, aggregation_var);
 
         self.bind_depth.0 -= 2;
-        self.syntax_var_allocations.pop();
-        self.syntax_var_allocations.pop();
+        self.hir_var_allocations.pop();
+        self.hir_var_allocations.pop();
 
         ret
     }
@@ -89,14 +91,14 @@ impl<'m> CheckExprContext<'m> {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
-    pub fn alloc_syntax_var(&mut self) -> HirVariable {
+    pub fn alloc_hir_variable(&mut self) -> HirVariable {
         let alloc = self
-            .syntax_var_allocations
+            .hir_var_allocations
             .get_mut(self.bind_depth.0 as usize)
             .unwrap();
-        let syntax_var = HirVariable(*alloc, self.bind_depth);
+        let hir_var = HirVariable(*alloc, self.bind_depth);
         *alloc += 1;
-        syntax_var
+        hir_var
     }
 }
 
@@ -211,25 +213,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             ExprKind::Seq(aggr_expr_id, inner) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
-                let aggr_body_id = *ctx.aggr_body_map.get(aggr_expr_id).unwrap();
+                let aggr_body_idx = *ctx.aggr_body_map.get(aggr_expr_id).unwrap();
 
-                debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_id:?}");
+                debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_idx:?}");
 
                 let (element_ty, element_node_id) = self.check_expr(inner, ctx);
                 let array_ty = self.types.intern(Type::Array(element_ty));
 
                 match ctx.arm {
                     Arm::First => {
-                        ctx.map_body_mut(aggr_body_id).first = element_node_id;
+                        ctx.map_body_mut(aggr_body_idx).first = element_node_id;
                     }
                     Arm::Second => {
-                        ctx.map_body_mut(aggr_body_id).second = element_node_id;
+                        ctx.map_body_mut(aggr_body_idx).second = element_node_id;
                     }
                 }
 
+                let aggr_variable = ctx
+                    .aggr_variables
+                    .get(&aggr_body_idx)
+                    .expect("No aggregation variable");
+
                 let aggr_node_id = ctx.nodes.add(HirNode {
                     ty: array_ty,
-                    kind: HirKind::Aggr(aggr_body_id),
+                    kind: HirKind::Aggr(*aggr_variable, aggr_body_idx),
                     span: expr.span,
                 });
                 (array_ty, aggr_node_id)

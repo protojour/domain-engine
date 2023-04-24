@@ -80,8 +80,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
     }
 
     // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
-    pub fn codegen_expr(&mut self, block: &mut Block, equation: &HirEquation, node_id: HirIdx) {
-        let (_, expr, span) = equation.resolve_node(&equation.expansions, node_id);
+    pub fn codegen_expr(&mut self, block: &mut Block, equation: &HirEquation, node_idx: HirIdx) {
+        let (_, expr, span) = equation.resolve_node(&equation.expansions, node_idx);
         match &expr.kind {
             HirKind::Call(proc, params) => {
                 let stack_delta = Stack(-(params.len() as i32) + 1);
@@ -126,8 +126,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
-            HirKind::Aggr(_) => todo!(),
-            HirKind::MapSequence(seq_id, iter_var, body_id, _) => {
+            HirKind::Aggr(_, _) => {}
+            HirKind::MapSequence(seq_idx, iter_var, body_idx, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
                 let output_seq = self.builder.push(
                     block,
@@ -137,7 +137,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 );
 
                 // Input sequence:
-                self.codegen_expr(block, equation, *seq_id);
+                self.codegen_expr(block, equation, *seq_idx);
                 let input_seq = self.builder.top();
 
                 let counter =
@@ -158,7 +158,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     let mut block2 = gen.builder.new_block(Stack(2), span);
 
-                    gen.codegen_expr(&mut block2, equation, *body_id);
+                    gen.codegen_expr(&mut block2, equation, *body_idx);
                     gen.builder
                         .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
                     // still two items on the stack: append to original sequence
@@ -189,7 +189,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 todo!()
             }
             HirKind::StructPattern(attrs) => {
-                let def_id = &equation.nodes[node_id].ty.get_single_def_id().unwrap();
+                let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();
                 let local = self.builder.push(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewMap, *def_id),
