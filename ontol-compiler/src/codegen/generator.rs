@@ -8,7 +8,7 @@ use tracing::{debug, error};
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack},
-    hir_node::{CodeDirection, HirBody, HirIdx, HirKind, HirVariable},
+    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode, HirVariable},
     types::Type,
     SourceSpan,
 };
@@ -26,23 +26,26 @@ pub struct Scope {
     pub in_scope: FnvHashMap<HirVariable, Local>,
 }
 
-pub(super) struct CodeGenerator<'t, 'b> {
-    proc_table: &'t mut ProcTable,
-    pub builder: &'b mut ProcBuilder,
+pub(super) struct CodeGenerator<'a> {
+    proc_table: &'a mut ProcTable,
+    pub builder: &'a mut ProcBuilder,
+    bodies: &'a [HirBody],
     direction: CodeDirection,
 
     scope_stack: SmallVec<[Scope; 3]>,
 }
 
-impl<'t, 'b> CodeGenerator<'t, 'b> {
+impl<'a> CodeGenerator<'a> {
     pub fn new(
-        proc_table: &'t mut ProcTable,
-        builder: &'b mut ProcBuilder,
+        proc_table: &'a mut ProcTable,
+        builder: &'a mut ProcBuilder,
+        bodies: &'a [HirBody],
         direction: CodeDirection,
     ) -> Self {
         Self {
             proc_table,
             builder,
+            bodies,
             direction,
             scope_stack: Default::default(),
         }
@@ -56,26 +59,50 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         result
     }
 
-    pub fn codegen_body(&mut self, block: &mut Block, equation: &HirEquation, body: &HirBody) {
-        let (bindings_id, output_id) = body.order(self.direction);
-        let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, bindings_id);
+    pub fn codegen_body(
+        &mut self,
+        block: &mut Block,
+        equation: &HirEquation,
+        body_idx: HirBodyIdx,
+    ) {
+        let body = &self.bodies[body_idx.0 as usize];
+        let (pattern_idx, expr_idx) = body.order(self.direction);
+        let (_, pattern, _) = equation.resolve_node(&equation.reductions, pattern_idx);
 
-        let scope = match &source_pattern.kind {
-            HirKind::StructPattern(attrs) => {
-                codegen_struct_pattern_scope(self, block, equation, output_id, attrs)
-            }
+        let scope = self.codegen_scope(block, equation, pattern);
+        self.enter_scope(scope, |gen| gen.codegen_expr(block, equation, expr_idx))
+    }
+
+    fn codegen_scope(
+        &mut self,
+        block: &mut Block,
+        equation: &HirEquation,
+        pattern: &HirNode,
+    ) -> Scope {
+        match &pattern.kind {
+            HirKind::StructPattern(attrs) => codegen_struct_pattern_scope(
+                self,
+                block,
+                equation,
+                self.builder.top(),
+                attrs,
+                pattern.span,
+            ),
             HirKind::ValuePattern(_) => {
                 let mut scope = Scope::default();
                 scope
                     .in_scope
                     // FIXME, this won't always be variable 0
-                    .insert(HirVariable(0), Local(0));
+                    .insert(HirVariable(0), self.builder.top());
+                scope
+            }
+            HirKind::Variable(var) => {
+                let mut scope = Scope::default();
+                scope.in_scope.insert(*var, self.builder.top());
                 scope
             }
             other => panic!("unable to generate scope for pattern: {other:?}"),
-        };
-
-        self.enter_scope(scope, |gen| gen.codegen_expr(block, equation, output_id))
+        }
     }
 
     // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
@@ -140,6 +167,8 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 // Input sequence:
                 self.codegen_expr(block, equation, *seq_idx);
 
+                let input_seq = self.builder.top();
+
                 let counter =
                     self.builder
                         .push(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
@@ -149,13 +178,38 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 let rel_params_local = self.builder.top_plus(1);
                 let value_local = self.builder.top_plus(2);
 
-                /*
-                let codegen_iter = CodegenIter {
-                    iter_var: *iter_var,
-                    rel_params_local,
-                    value_local,
+                let for_each_body_index = {
+                    let mut block2 = self.builder.new_block(Stack(2), span);
+
+                    self.codegen_body(&mut block2, equation, *body_idx);
+
+                    self.builder
+                        .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
+
+                    // still two items on the stack: append to original sequence
+                    // for now, rel_params is not mapped
+                    // FIXME: This is only correct for sequence generation:
+                    self.builder
+                        .push(&mut block2, Ir::AppendAttr2(output), Stack(-2), span);
+                    self.builder
+                        .push(&mut block2, Ir::Remove(value_local), Stack(-1), span);
+                    self.builder
+                        .push(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
+
+                    self.builder
+                        .commit(block2, Terminator::PopGoto(block.index(), iter_offset))
                 };
-                */
+
+                self.builder.push(
+                    block,
+                    Ir::Iter(input_seq, counter, for_each_body_index),
+                    Stack(0),
+                    span,
+                );
+                self.builder
+                    .push(block, Ir::Remove(counter), Stack(-1), span);
+                self.builder
+                    .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
             HirKind::MapSequence(seq_idx, iter_var, body_idx, _) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();

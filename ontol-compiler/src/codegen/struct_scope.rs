@@ -31,31 +31,14 @@ pub(super) fn codegen_struct_pattern_scope(
     gen: &mut CodeGenerator,
     block: &mut Block,
     equation: &HirEquation,
-    to: HirIdx,
+    struct_local: Local,
     origin_attrs: &IndexMap<PropertyId, HirIdx>,
+    span: SourceSpan,
 ) -> Scope {
-    let (_, _, span) = equation.resolve_node(&equation.expansions, to);
-
-    // always start at 0 (for now), there are no recursive structs (yet)
-    let input_local = 0;
-
     let unpack_props = analyze_unpack(equation, origin_attrs);
 
-    if !unpack_props.is_empty() {
-        // must start with SyntaxVar(0)
-        assert!(unpack_props[0].var == HirVariable(0));
-    }
-
     let mut scope = Scope::default();
-    define_locals(
-        gen,
-        block,
-        Local(input_local),
-        &unpack_props,
-        &mut scope,
-        span,
-    );
-
+    define_locals(gen, block, struct_local, &unpack_props, &mut scope, span);
     scope
 }
 

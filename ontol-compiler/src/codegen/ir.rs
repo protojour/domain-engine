@@ -15,6 +15,7 @@ pub struct BlockOffset(pub u32);
 pub enum Ir {
     Call(Procedure),
     CallBuiltin(BuiltinProc, DefId),
+    PopUntil(Local),
     Remove(Local),
     /// Clone a local and put top of stack
     Clone(Local),

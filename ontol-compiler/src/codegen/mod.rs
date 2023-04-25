@@ -19,7 +19,7 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    hir_node::{CodeDirection, HirBody, HirNodeTable},
+    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirNodeTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -28,7 +28,7 @@ use self::{
     equation::HirEquation,
     ir::Terminator,
     link::{link, LinkResult},
-    proc_builder::{Block, ProcBuilder},
+    proc_builder::ProcBuilder,
 };
 
 #[derive(Default)]
@@ -197,9 +197,9 @@ fn codegen_map_solve(
 
             let mut builder = ProcBuilder::new(NParams(1));
             let mut block = builder.new_block(Stack(1), span);
-            let mut generator = CodeGenerator::new(proc_table, &mut builder, direction);
+            let mut generator = CodeGenerator::new(proc_table, &mut builder, bodies, direction);
 
-            generator.codegen_body(&mut block, equation, root_body);
+            generator.codegen_body(&mut block, equation, HirBodyIdx(0));
 
             builder.commit(block, Terminator::Return(builder.top()));
 
