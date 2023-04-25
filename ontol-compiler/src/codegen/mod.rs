@@ -14,7 +14,6 @@ mod link;
 mod optimize;
 mod proc_builder;
 mod struct_scope;
-mod value_pattern;
 
 use tracing::{debug, warn};
 

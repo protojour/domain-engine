@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 use tracing::{debug, error};
 
 use crate::{
-    codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
+    codegen::{find_mapping_key, proc_builder::Stack},
     hir_node::{CodeDirection, HirBody, HirIdx, HirKind, HirVariable},
     types::Type,
     SourceSpan,
@@ -60,19 +60,22 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         let (bindings_id, output_id) = body.order(self.direction);
         let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, bindings_id);
 
-        match &source_pattern.kind {
+        let scope = match &source_pattern.kind {
             HirKind::StructPattern(attrs) => {
-                let scope = codegen_struct_pattern_scope(self, block, equation, output_id, attrs);
-
-                self.enter_scope(scope, |gen| gen.codegen_expr(block, equation, output_id))
+                codegen_struct_pattern_scope(self, block, equation, output_id, attrs)
             }
             HirKind::ValuePattern(_) => {
-                let to_def = &equation.nodes[output_id].ty.get_single_def_id().unwrap();
-
-                codegen_value_pattern_origin(self, block, equation, output_id, *to_def)
+                let mut scope = Scope::default();
+                scope
+                    .in_scope
+                    // FIXME, this won't always be variable 0
+                    .insert(HirVariable(0), Local(0));
+                scope
             }
-            other => panic!("unable to generate mapping for pattern: {other:?}"),
-        }
+            other => panic!("unable to generate scope for pattern: {other:?}"),
+        };
+
+        self.enter_scope(scope, |gen| gen.codegen_expr(block, equation, output_id))
     }
 
     // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
