@@ -186,14 +186,26 @@ impl<'e> TypeBinding<'e> {
     }
 
     pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
-        self.serialize_json(&Value::new(data.clone(), self.type_info.def_id))
+        self.serialize_identity_json(&Value::new(data.clone(), self.type_info.def_id))
     }
 
-    pub fn serialize_json(&self, value: &Value) -> serde_json::Value {
+    pub fn serialize_identity_json(&self, value: &Value) -> serde_json::Value {
+        self.serialize_json(value, false)
+    }
+
+    pub fn serialize_dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
+        self.serialize_json(value, true)
+    }
+
+    fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.env
             .new_serde_processor(
-                self.serde_operator_id(),
+                if dynamic_seq {
+                    self.env.dynamic_sequence_operator_id()
+                } else {
+                    self.serde_operator_id()
+                },
                 None,
                 ProcessorMode::Create,
                 ProcessorLevel::Root,

@@ -125,6 +125,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     panic!()
                 }
             }
+            SerdeOperator::DynamicSequence => {
+                return Value::new(Data::Sequence([].into()), DefId::unit()).into();
+            }
             SerdeOperator::RelationSequence(seq_op) => {
                 let variant = &seq_op.ranges[0];
                 let attr = self.fake_attribute(processor.narrow(variant.operator_id));

@@ -46,9 +46,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         (self.operators_by_id, self.operators_by_key)
     }
 
-    pub fn get_serde_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
-        let operator_id = self.get_serde_operator_id(key)?;
-        Some(&self.operators_by_id[operator_id.0 as usize])
+    pub fn make_dynamic_sequence_operator(&mut self) -> SerdeOperatorId {
+        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
+        self.operators_by_id.push(SerdeOperator::DynamicSequence);
+        operator_id
     }
 
     pub fn get_serde_operator_id(&mut self, key: SerdeKey) -> Option<SerdeOperatorId> {
@@ -70,6 +71,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             None => None,
         }
+    }
+
+    pub fn get_serde_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
+        let operator_id = self.get_serde_operator_id(key)?;
+        Some(&self.operators_by_id[operator_id.0 as usize])
     }
 
     fn get_property_operator(

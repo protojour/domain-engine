@@ -143,6 +143,9 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
                 write!(f, "`string_pattern`")
             }
+            SerdeOperator::DynamicSequence => {
+                write!(f, "[?..]")
+            }
             SerdeOperator::RelationSequence(seq_op) => {
                 write!(f, "[{}..]", self.narrow(seq_op.ranges[0].operator_id))
             }

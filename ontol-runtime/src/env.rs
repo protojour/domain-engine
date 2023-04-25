@@ -28,6 +28,7 @@ pub struct Env {
     lib: Lib,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
+    dynamic_sequence_operator_id: SerdeOperatorId,
 }
 
 impl Env {
@@ -41,6 +42,7 @@ impl Env {
                 lib: Lib::default(),
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
+                dynamic_sequence_operator_id: SerdeOperatorId(u32::MAX),
             },
         }
     }
@@ -102,6 +104,10 @@ impl Env {
 
     pub fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
         &self.serde_operators[operator_id.0 as usize]
+    }
+
+    pub fn dynamic_sequence_operator_id(&self) -> SerdeOperatorId {
+        self.dynamic_sequence_operator_id
     }
 }
 
@@ -197,6 +203,14 @@ impl EnvBuilder {
     ) -> Self {
         self.env.serde_operators = operators;
         self.env.serde_operators_per_def = per_def;
+        self
+    }
+
+    pub fn dynamic_sequence_operator_id(
+        mut self,
+        dynamic_sequence_operator_id: SerdeOperatorId,
+    ) -> Self {
+        self.env.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
         self
     }
 

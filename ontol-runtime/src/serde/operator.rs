@@ -35,6 +35,11 @@ pub enum SerdeOperator {
     /// Deserializes into a Map if there are capture groups:
     CapturingStringPattern(DefId),
 
+    /// Special operator for serialization, can serialize a sequence of anything,
+    /// by using dynamic lookup.
+    /// Does not support deserialization.
+    DynamicSequence,
+
     /// A sequence representing a relationship between one subject and many objects.
     /// This is simple and does not support any tuples.
     RelationSequence(RelationSequenceOperator),

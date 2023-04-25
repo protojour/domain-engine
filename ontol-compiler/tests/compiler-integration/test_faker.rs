@@ -19,7 +19,7 @@ fn test_fake_primitives() {
         let foo = TypeBinding::new(&test_env, "foo");
 
         assert_eq!(
-            foo.serialize_json(&foo.new_fake(ProcessorMode::Create)),
+            foo.serialize_identity_json(&foo.new_fake(ProcessorMode::Create)),
             json!({
                 "s": "Patricia McClure",
                 "i": -1732221745,
@@ -34,7 +34,7 @@ fn test_fake_geojson() {
         let geometry = TypeBinding::new(&test_env, "Geometry");
 
         assert_eq!(
-            geometry.serialize_json(&geometry.new_fake(ProcessorMode::Create)),
+            geometry.serialize_identity_json(&geometry.new_fake(ProcessorMode::Create)),
             json!({
                 "type": "Polygon",
                 "coordinates": [
@@ -55,7 +55,7 @@ fn test_fake_guitar_synth() {
         let artist = TypeBinding::new(&test_env, "artist");
 
         assert_eq!(
-            artist.serialize_json(&artist.new_fake(ProcessorMode::Create)),
+            artist.serialize_identity_json(&artist.new_fake(ProcessorMode::Create)),
             json!({
                 "name": "Demarco Price",
                 "plays": [

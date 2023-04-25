@@ -62,7 +62,7 @@ fn assert_domain_map(
 
     let value = input_binding.deserialize_value(input).unwrap();
 
-    fn get_map_key(key: Key, binding: &TypeBinding) -> MapKey {
+    fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
         let seq = matches!(key, Key::Seq(_));
         MapKey {
             def_id: binding.type_info.def_id,
@@ -71,8 +71,8 @@ fn assert_domain_map(
     }
 
     let procedure = match test_env.env.get_mapper_proc(
-        get_map_key(from, &input_binding),
-        get_map_key(to, &output_binding),
+        get_map_key(&from, &input_binding),
+        get_map_key(&to, &output_binding),
     ) {
         Some(procedure) => procedure,
         None => panic!(
@@ -84,7 +84,10 @@ fn assert_domain_map(
     let mut mapper = test_env.env.new_mapper();
     let value = mapper.trace_eval(procedure, [value]);
 
-    let output_json = output_binding.serialize_json(&value);
+    let output_json = match &to {
+        Key::Unit(_) => output_binding.serialize_identity_json(&value),
+        Key::Seq(_) => output_binding.serialize_dynamic_sequence_json(&value),
+    };
 
     assert_eq!(expected, output_json);
 }
@@ -403,7 +406,7 @@ fn test_flat_map1() {
             &test_env,
             ("foo", "bar".seq()),
             json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
-            json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B2" }]),
+            json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B1" }]),
         );
     });
 }

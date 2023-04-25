@@ -64,6 +64,9 @@ impl<'e> SerdeProcessor<'e> {
                 .unwrap();
                 serializer.serialize_str(&buf)
             }
+            SerdeOperator::DynamicSequence => {
+                self.serialize_dynamic_sequence(cast_ref::<Vec<_>>(value), serializer)
+            }
             SerdeOperator::RelationSequence(seq_op) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
@@ -153,6 +156,30 @@ impl<'e> SerdeProcessor<'e> {
                         rel_params: attribute.rel_params.filter_non_unit(),
                         processor: self.narrow(range.operator_id),
                     })?;
+                }
+            }
+        }
+
+        seq.end()
+    }
+
+    fn serialize_dynamic_sequence<S: Serializer>(
+        &self,
+        elements: &[Attribute],
+        serializer: S,
+    ) -> Res<S> {
+        let mut seq = serializer.serialize_seq(Some(elements.len()))?;
+
+        for attr in elements {
+            let def_id = attr.value.type_def_id;
+            match self.env.get_type_info(def_id).operator_id {
+                Some(operator_id) => seq.serialize_element(&Proxy {
+                    value: &attr.value,
+                    rel_params: None,
+                    processor: self.narrow(operator_id),
+                })?,
+                None => {
+                    panic!("No processor found for {def_id:?}");
                 }
             }
         }

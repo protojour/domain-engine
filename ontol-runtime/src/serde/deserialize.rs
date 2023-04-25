@@ -158,6 +158,9 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
+            SerdeOperator::DynamicSequence => {
+                Err(Error::custom("Cannot deserialize dynamic sequence"))
+            }
             SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
                 SequenceMatcher::new(
                     &seq_op.ranges,

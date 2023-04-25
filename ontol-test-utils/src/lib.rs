@@ -40,7 +40,7 @@ macro_rules! assert_json_io_matches {
             Err(err) => panic!("deserialize failed: {err}"),
         };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = $binding.serialize_json(&value);
+        let output = $binding.serialize_identity_json(&value);
 
         pretty_assertions::assert_eq!($expected_output, output);
     };

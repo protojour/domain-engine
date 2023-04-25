@@ -339,6 +339,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::ValueType(_)
             | SerdeOperator::Union(_)
             | SerdeOperator::Struct(_)
+            | SerdeOperator::DynamicSequence
             | SerdeOperator::RelationSequence(_)
             | SerdeOperator::ConstructorSequence(_) => panic!("not a native scalar"),
         };

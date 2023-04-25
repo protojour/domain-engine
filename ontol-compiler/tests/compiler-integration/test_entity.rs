@@ -152,7 +152,7 @@ fn artist_and_instrument_id_as_relation_object() {
 
         // The value of the `plays` attribute is an `artist-id`
         assert_eq!(
-            instrument_id.serialize_json(&plays_attributes[0].value),
+            instrument_id.serialize_identity_json(&plays_attributes[0].value),
             json!(example_id)
         );
 

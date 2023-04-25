@@ -84,7 +84,6 @@ fn test_map_invert() {
 }
 
 #[test]
-#[should_panic = "not in scope"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
@@ -111,12 +110,12 @@ fn artist_etc_routing() {
 
                 map id t p n {
                     gsu.synth {
-                        rel 'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
+                        rel 'instrument-id': id
                         rel 'type': t
                         rel 'polyphony': p
                     }
                     ai.instrument {
-                        rel 'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
+                        rel 'ID': id
                         rel 'name': n
                     }
                 }

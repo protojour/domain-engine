@@ -162,6 +162,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::CapturingStringPattern(_) => {
                 self.get_native_argument::<String>(name, opt)
             }
+            SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
                 let type_index = self
                     .virtual_schema

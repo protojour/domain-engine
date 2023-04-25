@@ -170,6 +170,8 @@ impl<'m> Compiler<'m> {
 
         let mut builder = Env::builder();
 
+        let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
+
         // For now, create serde operators for every domain
         for package_id in package_ids {
             let mut domain = Domain::default();
@@ -247,6 +249,7 @@ impl<'m> Compiler<'m> {
             .lib(self.codegen_tasks.result_lib)
             .mapping_procs(self.codegen_tasks.result_map_procs)
             .serde_operators(serde_operators, serde_operators_per_def)
+            .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()
