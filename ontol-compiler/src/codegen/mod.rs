@@ -15,7 +15,7 @@ mod optimize;
 mod proc_builder;
 mod struct_scope;
 
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
@@ -199,12 +199,18 @@ fn codegen_map_solve(
             let mut block = builder.new_block(Stack(1), span);
             let mut generator = CodeGenerator::new(proc_table, &mut builder, bodies, direction);
 
-            generator.codegen_body(&mut block, equation, HirBodyIdx(0));
+            match generator.codegen_body(&mut block, equation, HirBodyIdx(0)) {
+                Ok(()) => {
+                    builder.commit(block, Terminator::Return(builder.top()));
 
-            builder.commit(block, Terminator::Return(builder.top()));
-
-            proc_table.procedures.insert((from_def, to_def), builder);
-            true
+                    proc_table.procedures.insert((from_def, to_def), builder);
+                    true
+                }
+                Err(e) => {
+                    error!("Codegen problem, ignoring this (for now): {e:?}");
+                    false
+                }
+            }
         }
         other => {
             warn!("unable to save mapping: key = {other:?}");

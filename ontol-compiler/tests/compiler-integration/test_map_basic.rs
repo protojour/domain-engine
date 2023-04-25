@@ -403,7 +403,7 @@ fn test_flat_map1() {
     .compile_ok(|test_env| {
         assert_domain_map(
             &test_env,
-            ("foo", "bar"),
+            ("foo", "bar".seq()),
             json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
             json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B2" }]),
         );

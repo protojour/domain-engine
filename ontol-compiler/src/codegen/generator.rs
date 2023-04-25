@@ -21,6 +21,13 @@ use super::{
     ProcTable,
 };
 
+#[derive(Debug)]
+pub enum CodegenError {
+    InvalidScoping(HirVariable),
+}
+
+pub type CodegenResult<T> = Result<T, CodegenError>;
+
 #[derive(Default)]
 pub struct Scope {
     pub in_scope: FnvHashMap<HirVariable, Local>,
@@ -64,7 +71,7 @@ impl<'a> CodeGenerator<'a> {
         block: &mut Block,
         equation: &HirEquation,
         body_idx: HirBodyIdx,
-    ) {
+    ) -> CodegenResult<()> {
         let body = &self.bodies[body_idx.0 as usize];
         let (pattern_idx, expr_idx) = body.order(self.direction);
         let (_, pattern, _) = equation.resolve_node(&equation.reductions, pattern_idx);
@@ -106,14 +113,19 @@ impl<'a> CodeGenerator<'a> {
     }
 
     // Generate a node interpreted as an expression, i.e. a computation producing one or many values.
-    pub fn codegen_expr(&mut self, block: &mut Block, equation: &HirEquation, node_idx: HirIdx) {
+    pub fn codegen_expr(
+        &mut self,
+        block: &mut Block,
+        equation: &HirEquation,
+        node_idx: HirIdx,
+    ) -> CodegenResult<()> {
         let (_, expr, span) = equation.resolve_node(&equation.expansions, node_idx);
         match &expr.kind {
             HirKind::Call(proc, params) => {
                 let stack_delta = Stack(-(params.len() as i32) + 1);
 
                 for param in params.iter() {
-                    self.codegen_expr(block, equation, *param);
+                    self.codegen_expr(block, equation, *param)?;
                 }
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
@@ -132,11 +144,11 @@ impl<'a> CodeGenerator<'a> {
                     .push(block, Ir::Constant(*k, return_def_id), Stack(1), span);
             }
             HirKind::Variable(var) => {
-                self.codegen_variable(block, *var, &span);
+                self.codegen_variable(block, *var, &span)?;
             }
             HirKind::VariableRef(_) => panic!(),
             HirKind::MapCall(param_id, from_ty) => {
-                self.codegen_expr(block, equation, *param_id);
+                self.codegen_expr(block, equation, *param_id)?;
 
                 debug!(
                     "map value from {from_ty:?} to {:?}, span = {span:?}",
@@ -165,7 +177,7 @@ impl<'a> CodeGenerator<'a> {
                 };
 
                 // Input sequence:
-                self.codegen_expr(block, equation, *seq_idx);
+                self.codegen_expr(block, equation, *seq_idx)?;
 
                 let input_seq = self.builder.top();
 
@@ -181,7 +193,7 @@ impl<'a> CodeGenerator<'a> {
                 let for_each_body_index = {
                     let mut block2 = self.builder.new_block(Stack(2), span);
 
-                    self.codegen_body(&mut block2, equation, *body_idx);
+                    self.codegen_body(&mut block2, equation, *body_idx)?;
 
                     self.builder
                         .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
@@ -221,7 +233,7 @@ impl<'a> CodeGenerator<'a> {
                 );
 
                 // Input sequence:
-                self.codegen_expr(block, equation, *seq_idx);
+                self.codegen_expr(block, equation, *seq_idx)?;
                 let input_seq = self.builder.top();
 
                 let counter =
@@ -240,7 +252,7 @@ impl<'a> CodeGenerator<'a> {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     let mut block2 = gen.builder.new_block(Stack(2), span);
 
-                    gen.codegen_expr(&mut block2, equation, *body_idx);
+                    gen.codegen_expr(&mut block2, equation, *body_idx)?;
                     gen.builder
                         .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
                     // still two items on the stack: append to original sequence
@@ -252,9 +264,10 @@ impl<'a> CodeGenerator<'a> {
                     gen.builder
                         .push(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
 
-                    gen.builder
-                        .commit(block2, Terminator::PopGoto(block.index(), iter_offset))
-                });
+                    Ok(gen
+                        .builder
+                        .commit(block2, Terminator::PopGoto(block.index(), iter_offset)))
+                })?;
 
                 self.builder.push(
                     block,
@@ -267,7 +280,7 @@ impl<'a> CodeGenerator<'a> {
                 self.builder
                     .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx),
+            HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx)?,
             HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();
                 let local = self.builder.push(
@@ -278,7 +291,7 @@ impl<'a> CodeGenerator<'a> {
                 );
 
                 for (property_id, node_id) in attrs {
-                    self.codegen_expr(block, equation, *node_id);
+                    self.codegen_expr(block, equation, *node_id)?;
                     self.builder.push(
                         block,
                         Ir::PutAttrValue(local, *property_id),
@@ -291,13 +304,20 @@ impl<'a> CodeGenerator<'a> {
                 todo!()
             }
         }
+
+        Ok(())
     }
 
-    fn codegen_variable(&mut self, block: &mut Block, var: HirVariable, span: &SourceSpan) {
+    fn codegen_variable(
+        &mut self,
+        block: &mut Block,
+        var: HirVariable,
+        span: &SourceSpan,
+    ) -> CodegenResult<()> {
         for scope in self.scope_stack.iter().rev() {
             if let Some(local) = scope.in_scope.get(&var) {
                 self.builder.push(block, Ir::Clone(*local), Stack(1), *span);
-                return;
+                return Ok(());
             }
         }
 
@@ -305,6 +325,6 @@ impl<'a> CodeGenerator<'a> {
             error!("scope: {:?}", scope.in_scope);
         }
 
-        panic!("{var:?} not in scope!");
+        Err(CodegenError::InvalidScoping(var))
     }
 }
