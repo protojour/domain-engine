@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
@@ -11,8 +9,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, TypePath},
     hir_node::{
-        BindDepth, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode, HirNodeTable, HirVariable,
-        ERROR_NODE,
+        BindDepth, HirBodyIdx, HirIdx, HirKind, HirNode, HirNodeTable, HirVariable, ERROR_NODE,
     },
     mem::Intern,
     relation::Constructor,
@@ -25,9 +22,15 @@ use super::{
     TypeCheck, TypeEquation,
 };
 
+#[derive(Default)]
+pub struct ExprBody {
+    pub first: Option<Expr>,
+    pub second: Option<Expr>,
+}
+
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<HirBody>,
+    pub bodies: Vec<ExprBody>,
     pub nodes: HirNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
     pub aggr_variables: FnvHashMap<HirBodyIdx, HirIdx>,
@@ -77,11 +80,11 @@ impl<'m> CheckExprContext<'m> {
     pub fn alloc_map_body_id(&mut self) -> HirBodyIdx {
         let next = self.body_id_counter;
         self.body_id_counter += 1;
-        self.bodies.push(HirBody::default());
+        self.bodies.push(ExprBody::default());
         HirBodyIdx(next)
     }
 
-    pub fn map_body_mut(&mut self, id: HirBodyIdx) -> &mut HirBody {
+    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut ExprBody {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
@@ -150,21 +153,21 @@ impl Arm {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn check_expr_id(
-        &mut self,
-        expr_id: ExprId,
-        ctx: &mut CheckExprContext<'m>,
-    ) -> (TypeRef<'m>, HirIdx) {
-        match self.expressions.get(&expr_id) {
-            Some(expr) => self.check_expr(expr, ctx),
+    pub(super) fn consume_expr(&mut self, expr_id: ExprId) -> Expr {
+        match self.expressions.remove(&expr_id) {
+            Some(expr) => expr,
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    fn check_expr(&mut self, expr: &Expr, ctx: &mut CheckExprContext<'m>) -> (TypeRef<'m>, HirIdx) {
-        match &expr.kind {
+    pub(super) fn check_expr(
+        &mut self,
+        expr: Expr,
+        ctx: &mut CheckExprContext<'m>,
+    ) -> (TypeRef<'m>, HirIdx) {
+        match expr.kind {
             ExprKind::Call(def_id, args) => {
-                match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
+                match (self.defs.map.get(&def_id), self.def_types.map.get(&def_id)) {
                     (
                         Some(Def {
                             kind: DefKind::CoreFn(proc),
@@ -183,7 +186,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         let mut param_node_ids = vec![];
-                        for (arg, param_ty) in args.iter().zip(*params) {
+                        for (arg, param_ty) in args.into_vec().into_iter().zip(*params) {
                             let (_, node_id) = self.check_expr_expect(arg, param_ty, ctx);
                             param_node_ids.push(node_id);
                         }
@@ -200,23 +203,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             ExprKind::Struct(type_path, attributes) => {
-                self.check_struct(expr, type_path, attributes, ctx)
+                self.check_struct(type_path, attributes, expr.span, ctx)
             }
             ExprKind::Seq(aggr_expr_id, inner) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
-                let aggr_body_idx = *ctx.aggr_body_map.get(aggr_expr_id).unwrap();
+                let aggr_body_idx = *ctx.aggr_body_map.get(&aggr_expr_id).unwrap();
 
                 debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_idx:?}");
 
-                let (element_ty, element_node_id) = self.check_expr(inner, ctx);
-                let array_ty = self.types.intern(Type::Array(element_ty));
+                // let (element_ty, element_node_id) = self.check_expr(*inner, ctx);
+                let inner_ty = self.types.intern(Type::Tautology);
+                let array_ty = self.types.intern(Type::Array(inner_ty));
 
                 match ctx.arm {
                     Arm::First => {
-                        ctx.map_body_mut(aggr_body_idx).first = element_node_id;
+                        ctx.expr_body_mut(aggr_body_idx).first = Some(*inner);
                     }
                     Arm::Second => {
-                        ctx.map_body_mut(aggr_body_idx).second = element_node_id;
+                        ctx.expr_body_mut(aggr_body_idx).second = Some(*inner);
                     }
                 }
 
@@ -238,7 +242,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ty,
                     ctx.nodes.add(HirNode {
                         ty,
-                        kind: HirKind::Constant(*k),
+                        kind: HirKind::Constant(k),
                         span: expr.span,
                     }),
                 )
@@ -246,11 +250,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ExprKind::Variable(expr_id) => {
                 let ty = self
                     .types
-                    .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
+                    .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
 
                 let bound_variable = ctx
                     .bound_variables
-                    .get(expr_id)
+                    .get(&expr_id)
                     .expect("variable not found");
 
                 (
@@ -267,9 +271,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_struct(
         &mut self,
-        expr: &Expr,
-        type_path: &TypePath,
-        attributes: &[((DefReference, SourceSpan), Expr)],
+        type_path: TypePath,
+        attributes: Box<[((DefReference, SourceSpan), Expr)]>,
+        span: SourceSpan,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         let domain_type = self.check_def(type_path.def_id);
@@ -320,23 +324,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let mut typed_properties = IndexMap::new();
 
-                        for ((def, prop_span), expr) in attributes.iter() {
+                        for ((def, prop_span), expr) in attributes.into_vec().into_iter() {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                 Some(DefKind::StringLiteral(lit)) => lit,
                                 _ => {
-                                    self.error(CompileError::NamedPropertyExpected, prop_span);
+                                    self.error(CompileError::NamedPropertyExpected, &prop_span);
                                     continue;
                                 }
                             };
                             let match_property = match match_properties.get_mut(attr_prop) {
                                 Some(match_properties) => match_properties,
                                 None => {
-                                    self.error(CompileError::UnknownProperty, prop_span);
+                                    self.error(CompileError::UnknownProperty, &prop_span);
                                     continue;
                                 }
                             };
                             if match_property.used {
-                                self.error(CompileError::DuplicateProperty, prop_span);
+                                self.error(CompileError::DuplicateProperty, &prop_span);
                                 continue;
                             }
                             match_property.used = true;
@@ -361,53 +365,53 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for (prop_name, match_property) in match_properties.into_iter() {
                             if !match_property.used {
-                                self.error(
-                                    CompileError::MissingProperty(prop_name.into()),
-                                    &expr.span,
-                                );
+                                self.error(CompileError::MissingProperty(prop_name.into()), &span);
                             }
                         }
 
                         ctx.nodes.add(HirNode {
                             ty: domain_type,
                             kind: HirKind::StructPattern(typed_properties),
-                            span: expr.span,
+                            span,
                         })
                     }
                     None => {
                         if !attributes.is_empty() {
-                            return self.expr_error(CompileError::NoPropertiesExpected, &expr.span);
+                            return self.expr_error(CompileError::NoPropertiesExpected, &span);
                         }
                         ctx.nodes.add(HirNode {
                             kind: HirKind::Unit,
                             ty: domain_type,
-                            span: expr.span,
+                            span,
                         })
                     }
                 }
             }
-            Some(Constructor::Value(relationship_id, _, _)) => match attributes.deref() {
-                [((def, _), value)] if def.def_id == DefId::unit() => {
-                    let (relationship, _) = self
-                        .get_relationship_meta(*relationship_id)
-                        .expect("BUG: problem getting anonymous property meta");
+            Some(Constructor::Value(relationship_id, _, _)) => {
+                let mut attributes = attributes.into_vec().into_iter();
+                match attributes.next() {
+                    Some(((def, _), value)) if def.def_id == DefId::unit() => {
+                        let (relationship, _) = self
+                            .get_relationship_meta(*relationship_id)
+                            .expect("BUG: problem getting anonymous property meta");
 
-                    let object_ty = self.check_def(relationship.object.0.def_id);
-                    let node_id = self.check_expr_expect(value, object_ty, ctx).1;
+                        let object_ty = self.check_def(relationship.object.0.def_id);
+                        let node_id = self.check_expr_expect(value, object_ty, ctx).1;
 
-                    ctx.nodes.add(HirNode {
-                        ty: domain_type,
-                        kind: HirKind::ValuePattern(node_id),
-                        span: expr.span,
-                    })
+                        ctx.nodes.add(HirNode {
+                            ty: domain_type,
+                            kind: HirKind::ValuePattern(node_id),
+                            span,
+                        })
+                    }
+                    _ => return self.expr_error(CompileError::AnonymousPropertyExpected, &span),
                 }
-                _ => return self.expr_error(CompileError::AnonymousPropertyExpected, &expr.span),
-            },
+            }
             Some(Constructor::Intersection(_)) => {
                 todo!()
             }
             Some(Constructor::Union(_property_set)) => {
-                return self.expr_error(CompileError::CannotMapUnion, &expr.span)
+                return self.expr_error(CompileError::CannotMapUnion, &span)
             }
             Some(Constructor::Sequence(_)) => todo!(),
             Some(Constructor::StringFmt(_)) => todo!(),
@@ -418,10 +422,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_expr_expect(
         &mut self,
-        expr: &Expr,
+        expr: Expr,
         expected: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
+        let span = expr.span;
         let (ty, node_idx) = self.check_expr(expr, ctx);
         let inferred_ty = InferBestEffort {
             types: self.types,
@@ -450,24 +455,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match infer_expect.infer_rec(inferred_ty, expected) {
             Ok(ty) => (ty, node_idx),
             Err(type_error) => self
-                .map_if_possible(ctx, expr, node_idx, type_eq)
-                .unwrap_or_else(|_| (self.type_error(type_error, &expr.span), ERROR_NODE)),
+                .map_if_possible(ctx, node_idx, type_eq, &span)
+                .unwrap_or_else(|_| (self.type_error(type_error, &span), ERROR_NODE)),
         }
     }
 
     fn map_if_possible(
         &mut self,
         ctx: &mut CheckExprContext<'m>,
-        expr: &Expr,
         node_idx: HirIdx,
         type_eq: TypeEquation<'m>,
+        span: &SourceSpan,
     ) -> Result<(TypeRef<'m>, HirIdx), ()> {
         match (type_eq.actual, type_eq.expected) {
             (Type::Domain(_), Type::Domain(_)) => {
                 let map_node = ctx.nodes.add(HirNode {
                     ty: type_eq.expected,
                     kind: HirKind::MapCall(node_idx, type_eq.actual),
-                    span: expr.span,
+                    span: *span,
                 });
                 Ok((type_eq.expected, map_node))
             }
@@ -484,6 +489,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
 fn write_back_types<'m>(node_idx: HirIdx, ty: TypeRef<'m>, ctx: &mut CheckExprContext<'m>) {
     ctx.nodes[node_idx].ty = ty;
+    /*
     match (&ctx.nodes[node_idx].kind, ty) {
         (HirKind::Aggr(_, body_idx), Type::Array(elem_ty)) => {
             let body = &ctx.bodies[body_idx.0 as usize];
@@ -496,4 +502,5 @@ fn write_back_types<'m>(node_idx: HirIdx, ty: TypeRef<'m>, ctx: &mut CheckExprCo
         }
         _ => {}
     }
+    */
 }

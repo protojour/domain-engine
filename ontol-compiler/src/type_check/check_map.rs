@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
 
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -9,10 +9,11 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind},
-    hir_node::{BindDepth, HirBodyIdx, HirKind, HirNode},
+    hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode},
     mem::Intern,
     type_check::check_expr::Arm,
-    types::{Type, TypeRef},
+    types::{Type, TypeRef, Types},
+    CompileErrors, SourceSpan,
 };
 
 use super::{
@@ -31,43 +32,71 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut ctx = CheckExprContext::new();
         let root_body_id = ctx.alloc_map_body_id();
 
-        debug!("FIRST ARM START");
-        ctx.arm = Arm::First;
-        let _ = self.aggr_group_map_variables(
-            self.expressions.get(&first_id).unwrap(),
-            variables,
-            None,
-            &mut ctx,
-        )?;
-        debug!("SECOND ARM START");
-        ctx.arm = Arm::Second;
-        let _ = self.aggr_group_map_variables(
-            self.expressions.get(&second_id).unwrap(),
-            variables,
-            None,
-            &mut ctx,
-        )?;
+        {
+            let mut map_check = MapCheck {
+                types: self.types,
+                errors: self.errors,
+                expressions: self.expressions,
+            };
+            debug!("FIRST ARM START");
+            ctx.arm = Arm::First;
+            let _ = map_check.aggr_group_map_variables(
+                map_check.expressions.get(&first_id).unwrap(),
+                variables,
+                None,
+                &mut ctx,
+            )?;
+            debug!("SECOND ARM START");
+            ctx.arm = Arm::Second;
+            let _ = map_check.aggr_group_map_variables(
+                map_check.expressions.get(&second_id).unwrap(),
+                variables,
+                None,
+                &mut ctx,
+            )?;
+        }
 
-        ctx.arm = Arm::First;
-        let (_, node_a) = self.check_expr_id(first_id, &mut ctx);
-        ctx.arm = Arm::Second;
-        let (_, node_b) = self.check_expr_id(second_id, &mut ctx);
+        let mut root_body = ctx.expr_body_mut(root_body_id);
+        root_body.first = Some(self.consume_expr(first_id));
+        root_body.second = Some(self.consume_expr(second_id));
 
-        for body in ctx.bodies.iter_mut().skip(1) {}
+        let bodies_len = ctx.bodies.len() as u32;
+        let mut bodies = vec![];
 
-        let root_body = ctx.map_body_mut(root_body_id);
-        root_body.first = node_a;
-        root_body.second = node_b;
+        for body_index in 0..bodies_len {
+            let expr_body = ctx.expr_body_mut(HirBodyIdx(body_index));
+            let first_expr = expr_body.first.take().unwrap_or_else(|| {
+                panic!("No first expr in {body_index}");
+            });
+            let second_expr = expr_body.second.take().unwrap_or_else(|| {
+                panic!("No second expr in {body_index}");
+            });
+
+            ctx.arm = Arm::First;
+            let (_, first) = self.check_expr(first_expr, &mut ctx);
+            ctx.arm = Arm::Second;
+            let (_, second) = self.check_expr(second_expr, &mut ctx);
+
+            bodies.push(HirBody { first, second });
+        }
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
             nodes: ctx.nodes,
-            bodies: ctx.bodies,
+            bodies,
             span: def.span,
         }));
 
         Ok(self.types.intern(Type::Tautology))
     }
+}
 
+pub struct MapCheck<'c, 'm> {
+    types: &'c mut Types<'m>,
+    errors: &'c mut CompileErrors,
+    expressions: &'c FnvHashMap<ExprId, Expr>,
+}
+
+impl<'c, 'm> MapCheck<'c, 'm> {
     fn aggr_group_map_variables(
         &mut self,
         expr: &Expr,
@@ -227,6 +256,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         Ok(group_set)
+    }
+
+    fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
+        self.errors.push(error.spanned(span));
+        self.types.intern(Type::Error)
     }
 }
 

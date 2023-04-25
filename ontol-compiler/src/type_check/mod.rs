@@ -46,7 +46,7 @@ pub struct TypeCheck<'c, 'm> {
     relations: &'c mut Relations,
     errors: &'c mut CompileErrors,
     codegen_tasks: &'c mut CodegenTasks<'m>,
-    expressions: &'c FnvHashMap<ExprId, Expr>,
+    expressions: &'c mut FnvHashMap<ExprId, Expr>,
     defs: &'c Defs<'m>,
     primitives: &'c Primitives,
 }
@@ -108,7 +108,7 @@ impl<'m> Compiler<'m> {
             def_types: &mut self.def_types,
             relations: &mut self.relations,
             codegen_tasks: &mut self.codegen_tasks,
-            expressions: &self.expressions,
+            expressions: &mut self.expressions,
             defs: &self.defs,
             primitives: &self.primitives,
         }
