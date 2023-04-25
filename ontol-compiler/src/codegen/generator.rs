@@ -17,7 +17,7 @@ use super::{
     equation::HirEquation,
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
-    struct_pattern::codegen_struct_pattern_origin,
+    struct_scope::codegen_struct_pattern_scope,
     ProcTable,
 };
 
@@ -61,13 +61,15 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
         let (_, source_pattern, _) = equation.resolve_node(&equation.reductions, bindings_id);
 
         match &source_pattern.kind {
+            HirKind::StructPattern(attrs) => {
+                let scope = codegen_struct_pattern_scope(self, block, equation, output_id, attrs);
+
+                self.enter_scope(scope, |gen| gen.codegen_expr(block, equation, output_id))
+            }
             HirKind::ValuePattern(_) => {
                 let to_def = &equation.nodes[output_id].ty.get_single_def_id().unwrap();
 
                 codegen_value_pattern_origin(self, block, equation, output_id, *to_def)
-            }
-            HirKind::StructPattern(attrs) => {
-                codegen_struct_pattern_origin(self, block, equation, output_id, attrs)
             }
             other => panic!("unable to generate mapping for pattern: {other:?}"),
         }
@@ -208,9 +210,7 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
                 self.builder
                     .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            HirKind::ValuePattern(_) => {
-                todo!()
-            }
+            HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx),
             HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();
                 let local = self.builder.push(

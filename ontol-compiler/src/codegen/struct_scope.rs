@@ -27,20 +27,17 @@ enum UnpackKind {
 }
 
 /// Generate code originating from a struct destructuring
-pub(super) fn codegen_struct_pattern_origin(
+pub(super) fn codegen_struct_pattern_scope(
     gen: &mut CodeGenerator,
     block: &mut Block,
     equation: &HirEquation,
     to: HirIdx,
     origin_attrs: &IndexMap<PropertyId, HirIdx>,
-) {
-    let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
+) -> Scope {
+    let (_, _, span) = equation.resolve_node(&equation.expansions, to);
 
     // always start at 0 (for now), there are no recursive structs (yet)
     let input_local = 0;
-
-    // debug!("origin attrs: {origin_attrs:#?}");
-    // debug!("reductions: {:?}", equation.reductions.debug_table());
 
     let unpack_props = analyze_unpack(equation, origin_attrs);
 
@@ -59,13 +56,7 @@ pub(super) fn codegen_struct_pattern_origin(
         span,
     );
 
-    gen.enter_scope(scope, |generator| match &to_expr.kind {
-        HirKind::StructPattern(_) => generator.codegen_expr(block, equation, to),
-        HirKind::ValuePattern(node_id) => generator.codegen_expr(block, equation, *node_id),
-        kind => {
-            todo!("to: {kind:?}");
-        }
-    })
+    scope
 }
 
 fn analyze_unpack(equation: &HirEquation, attrs: &IndexMap<PropertyId, HirIdx>) -> Vec<UnpackProp> {
