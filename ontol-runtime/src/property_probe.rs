@@ -126,6 +126,10 @@ impl Stack for PropStack {
         self.stack.remove(local0_pos + local.0 as usize);
     }
 
+    fn pop_until(&mut self, local: Local) {
+        self.stack.truncate(self.local0_pos + local.0 as usize + 1);
+    }
+
     fn swap(&mut self, a: Local, b: Local) {
         let local0_pos = self.local0_pos;
         self.stack

@@ -64,6 +64,8 @@ pub enum OpCode {
     Bump(Local),
     /// Remove a local from the stack, making the stack shorter.
     Remove(Local),
+    /// Pop all at top of stack, until (not including) the given local
+    PopUntil(Local),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),

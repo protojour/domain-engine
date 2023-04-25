@@ -108,6 +108,11 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
+    fn pop_until(&mut self, local: Local) {
+        self.stack.truncate(self.local0_pos + local.0 as usize + 1);
+    }
+
+    #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
         let stack_pos = self.local0_pos;
         self.stack

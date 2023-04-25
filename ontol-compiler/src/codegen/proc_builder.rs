@@ -121,7 +121,7 @@ impl ProcBuilder {
                 let opcode = match ir {
                     Ir::Call(proc) => OpCode::Call(proc),
                     Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
-                    Ir::PopUntil(_) => todo!(),
+                    Ir::PopUntil(local) => OpCode::PopUntil(local),
                     Ir::Remove(local) => OpCode::Remove(local),
                     Ir::Clone(local) => OpCode::Clone(local),
                     Ir::Bump(local) => OpCode::Bump(local),

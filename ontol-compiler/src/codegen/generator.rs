@@ -188,7 +188,6 @@ impl<'a> CodeGenerator<'a> {
                 let iter_offset = block.current_offset();
 
                 let rel_params_local = self.builder.top_plus(1);
-                let value_local = self.builder.top_plus(2);
 
                 let for_each_body_index = {
                     let mut block2 = self.builder.new_block(Stack(2), span);
@@ -203,10 +202,11 @@ impl<'a> CodeGenerator<'a> {
                     // FIXME: This is only correct for sequence generation:
                     self.builder
                         .push(&mut block2, Ir::AppendAttr2(output), Stack(-2), span);
+
+                    let stack_pop = Stack(counter.0 as i32 - self.builder.top().0 as i32);
+
                     self.builder
-                        .push(&mut block2, Ir::Remove(value_local), Stack(-1), span);
-                    self.builder
-                        .push(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
+                        .push(&mut block2, Ir::PopUntil(counter), stack_pop, span);
 
                     self.builder
                         .commit(block2, Terminator::PopGoto(block.index(), iter_offset))

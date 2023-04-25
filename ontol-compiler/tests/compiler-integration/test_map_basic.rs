@@ -367,8 +367,6 @@ fn test_deep_structural_map() {
 }
 
 #[test]
-// BUG:
-#[should_panic = "HirVariable(0) not in scope!"]
 fn test_flat_map1() {
     "
     pub type foo

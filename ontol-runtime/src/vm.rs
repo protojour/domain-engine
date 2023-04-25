@@ -44,6 +44,7 @@ pub trait Stack {
     fn clone(&mut self, source: Local);
     fn bump(&mut self, source: Local);
     fn remove(&mut self, local: Local);
+    fn pop_until(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
     fn take_map_attr2(&mut self, source: Local, key: PropertyId);
@@ -116,6 +117,10 @@ impl<'l> AbstractVm<'l> {
                 }
                 OpCode::Remove(local) => {
                     stack.remove(*local);
+                    self.program_counter += 1;
+                }
+                OpCode::PopUntil(local) => {
+                    stack.pop_until(*local);
                     self.program_counter += 1;
                 }
                 OpCode::TakeAttr2(source, property_id) => {
