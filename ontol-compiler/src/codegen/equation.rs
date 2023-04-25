@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use ontol_runtime::value::PropertyId;
 
 use crate::{
-    hir_node::{BindDepth, HirIdx, HirKind, HirNode, HirNodeTable, HirVariable},
+    hir_node::{HirIdx, HirKind, HirNode, HirNodeTable, HirVariable},
     SourceSpan,
 };
 
@@ -171,8 +171,8 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
             HirKind::Constant(c) => f
                 .debug_tuple(&self.header(&format!("Constant({c})")))
                 .finish()?,
-            HirKind::Variable(HirVariable(v, BindDepth(d))) => f
-                .debug_tuple(&self.header(&format!("Variable({v} d={d})")))
+            HirKind::Variable(HirVariable(v)) => f
+                .debug_tuple(&self.header(&format!("Variable({v})")))
                 .finish()?,
             HirKind::VariableRef(var_id) => f
                 .debug_tuple(&self.header("VarRef"))

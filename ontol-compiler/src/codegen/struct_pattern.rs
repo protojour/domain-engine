@@ -7,7 +7,7 @@ use crate::{
         ir::Ir,
         proc_builder::{Block, Stack},
     },
-    hir_node::{BindDepth, HirIdx, HirKind, HirVariable},
+    hir_node::{HirIdx, HirKind, HirVariable},
     SourceSpan,
 };
 
@@ -46,7 +46,7 @@ pub(super) fn codegen_struct_pattern_origin(
 
     if !unpack_props.is_empty() {
         // must start with SyntaxVar(0)
-        assert!(unpack_props[0].var == HirVariable(0, BindDepth(0)));
+        assert!(unpack_props[0].var == HirVariable(0));
     }
 
     let mut scope = Scope::default();

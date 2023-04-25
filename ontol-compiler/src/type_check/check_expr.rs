@@ -65,17 +65,11 @@ impl<'m> CheckExprContext<'m> {
 
     pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self, HirVariable) -> T) -> T {
         // There is a unique bind depth for the aggregation variable:
-        let aggregation_var = HirVariable(0, BindDepth(self.bind_depth.0 + 1));
+        let aggregation_var = self.alloc_hir_variable();
 
-        self.bind_depth.0 += 2;
-        self.hir_var_allocations.push(0);
-        self.hir_var_allocations.push(0);
-
+        self.bind_depth.0 += 1;
         let ret = f(self, aggregation_var);
-
-        self.bind_depth.0 -= 2;
-        self.hir_var_allocations.pop();
-        self.hir_var_allocations.pop();
+        self.bind_depth.0 -= 1;
 
         ret
     }
@@ -92,11 +86,8 @@ impl<'m> CheckExprContext<'m> {
     }
 
     pub fn alloc_hir_variable(&mut self) -> HirVariable {
-        let alloc = self
-            .hir_var_allocations
-            .get_mut(self.bind_depth.0 as usize)
-            .unwrap();
-        let hir_var = HirVariable(*alloc, self.bind_depth);
+        let alloc = self.hir_var_allocations.get_mut(0).unwrap();
+        let hir_var = HirVariable(*alloc);
         *alloc += 1;
         hir_var
     }

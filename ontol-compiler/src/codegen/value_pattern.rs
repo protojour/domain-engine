@@ -10,7 +10,7 @@ use crate::{
         proc_builder::Stack,
         Block,
     },
-    hir_node::{BindDepth, HirIdx, HirKind, HirVariable},
+    hir_node::{HirIdx, HirKind, HirVariable},
 };
 
 use super::equation::HirEquation;
@@ -28,7 +28,7 @@ pub(super) fn codegen_value_pattern_origin(
     scope
         .in_scope
         // FIXME, this won't always be variable 0
-        .insert(HirVariable(0, BindDepth(0)), Local(0));
+        .insert(HirVariable(0), Local(0));
 
     gen.enter_scope(scope, |generator| match &to_expr.kind {
         HirKind::ValuePattern(node_id) => {

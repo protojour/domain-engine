@@ -14,13 +14,12 @@ use crate::{types::TypeRef, SourceSpan};
 pub struct BindDepth(pub u16);
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct HirVariable(pub u16, pub BindDepth);
+pub struct HirVariable(pub u16);
 
 impl Debug for HirVariable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let var = &self.0;
-        let depth = &self.1 .0;
-        write!(f, "HirVariable({var} d={depth})")
+        write!(f, "HirVariable({var})")
     }
 }
 
