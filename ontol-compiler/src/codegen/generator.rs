@@ -1,9 +1,10 @@
+use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{BuiltinProc, Local, NParams, Procedure},
     DefId,
 };
 use smallvec::SmallVec;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack, value_pattern::codegen_value_pattern_origin},
@@ -20,14 +21,9 @@ use super::{
     ProcTable,
 };
 
-pub(super) trait CodegenVariable: 'static {
-    fn codegen_variable(
-        &mut self,
-        builder: &mut ProcBuilder,
-        block: &mut Block,
-        var: HirVariable,
-        span: &SourceSpan,
-    );
+#[derive(Default)]
+pub struct Scope {
+    pub in_scope: FnvHashMap<HirVariable, Local>,
 }
 
 pub(super) struct CodeGenerator<'t, 'b> {
@@ -35,7 +31,7 @@ pub(super) struct CodeGenerator<'t, 'b> {
     pub builder: &'b mut ProcBuilder,
     direction: CodeDirection,
 
-    var_stack: SmallVec<[Box<dyn CodegenVariable>; 3]>,
+    scope_stack: SmallVec<[Scope; 3]>,
 }
 
 impl<'t, 'b> CodeGenerator<'t, 'b> {
@@ -48,18 +44,15 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
             proc_table,
             builder,
             direction,
-            var_stack: Default::default(),
+            scope_stack: Default::default(),
         }
     }
 
-    pub fn enter_bind_level<T>(
-        &mut self,
-        bind_level_codegen: impl CodegenVariable,
-        f: impl FnOnce(&mut Self) -> T,
-    ) -> T {
-        self.var_stack.push(Box::new(bind_level_codegen));
+    pub fn enter_scope<T>(&mut self, scope: Scope, f: impl FnOnce(&mut Self) -> T) -> T {
+        debug!("enter scope: {:?}", scope.in_scope);
+        self.scope_stack.push(scope);
         let result = f(self);
-        self.var_stack.pop();
+        self.scope_stack.pop();
         result
     }
 
@@ -180,13 +173,11 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
 
                 let rel_params_local = self.builder.top_plus(1);
                 let value_local = self.builder.top_plus(2);
-                let codegen_iter = CodegenIter {
-                    iter_var: *iter_var,
-                    rel_params_local,
-                    value_local,
-                };
 
-                let for_each_body_index = self.enter_bind_level(codegen_iter, |gen| {
+                let mut scope = Scope::default();
+                scope.in_scope.insert(*iter_var, value_local);
+
+                let for_each_body_index = self.enter_scope(scope, |gen| {
                     // inside the for-each body there are two items on the stack, value (top), then rel_params
                     let mut block2 = gen.builder.new_block(Stack(2), span);
 
@@ -246,32 +237,17 @@ impl<'t, 'b> CodeGenerator<'t, 'b> {
     }
 
     fn codegen_variable(&mut self, block: &mut Block, var: HirVariable, span: &SourceSpan) {
-        let bind_depth = var.1;
-        debug!(
-            "bind_depth: {bind_depth:?} var_stack len: {}",
-            self.var_stack.len()
-        );
-        let generator = &mut self.var_stack[bind_depth.0 as usize];
-        generator.codegen_variable(self.builder, block, var, span);
-    }
-}
+        for scope in self.scope_stack.iter().rev() {
+            if let Some(local) = scope.in_scope.get(&var) {
+                self.builder.push(block, Ir::Clone(*local), Stack(1), *span);
+                return;
+            }
+        }
 
-#[allow(unused)]
-struct CodegenIter {
-    iter_var: HirVariable,
-    rel_params_local: Local,
-    value_local: Local,
-}
+        for scope in &self.scope_stack {
+            error!("scope: {:?}", scope.in_scope);
+        }
 
-impl CodegenVariable for CodegenIter {
-    fn codegen_variable(
-        &mut self,
-        builder: &mut ProcBuilder,
-        block: &mut Block,
-        var: HirVariable,
-        span: &SourceSpan,
-    ) {
-        assert!(var == self.iter_var);
-        builder.push(block, Ir::Clone(self.value_local), Stack(1), *span);
+        panic!("{var:?} not in scope!");
     }
 }

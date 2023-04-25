@@ -3,7 +3,7 @@ use ontol_runtime::{proc::Local, value::PropertyId};
 
 use crate::{
     codegen::{
-        generator::{CodeGenerator, CodegenVariable},
+        generator::CodeGenerator,
         ir::Ir,
         proc_builder::{Block, Stack},
     },
@@ -11,7 +11,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::{equation::HirEquation, proc_builder::ProcBuilder};
+use super::{equation::HirEquation, generator::Scope};
 
 struct UnpackProp {
     var: HirVariable,
@@ -49,43 +49,23 @@ pub(super) fn codegen_struct_pattern_origin(
         assert!(unpack_props[0].var == HirVariable(0, BindDepth(0)));
     }
 
-    struct MapCodegen {
-        attr_start: u16,
-    }
+    let mut scope = Scope::default();
+    define_locals(
+        gen,
+        block,
+        Local(input_local),
+        &unpack_props,
+        &mut scope,
+        span,
+    );
 
-    impl CodegenVariable for MapCodegen {
-        fn codegen_variable(
-            &mut self,
-            builder: &mut ProcBuilder,
-            block: &mut Block,
-            var: HirVariable,
-            span: &SourceSpan,
-        ) {
-            // To find the value local, we refer to the first local resulting from TakeAttr2,
-            // after the definition of the return value
-            let value_local = self.attr_start + (var.0 * 2) + 1;
-
-            builder.push(block, Ir::Clone(Local(value_local)), Stack(1), *span);
-        }
-    }
-
-    generate_prop_unpack(gen, block, Local(input_local), &unpack_props, span);
-
-    let map_codegen = MapCodegen {
-        attr_start: input_local + 1,
-    };
-
-    match &to_expr.kind {
-        HirKind::StructPattern(_) => gen.enter_bind_level(map_codegen, |generator| {
-            generator.codegen_expr(block, equation, to);
-        }),
-        HirKind::ValuePattern(node_id) => gen.enter_bind_level(map_codegen, |generator| {
-            generator.codegen_expr(block, equation, *node_id);
-        }),
+    gen.enter_scope(scope, |generator| match &to_expr.kind {
+        HirKind::StructPattern(_) => generator.codegen_expr(block, equation, to),
+        HirKind::ValuePattern(node_id) => generator.codegen_expr(block, equation, *node_id),
         kind => {
             todo!("to: {kind:?}");
         }
-    }
+    })
 }
 
 fn analyze_unpack(equation: &HirEquation, attrs: &IndexMap<PropertyId, HirIdx>) -> Vec<UnpackProp> {
@@ -120,11 +100,12 @@ fn analyze_unpack(equation: &HirEquation, attrs: &IndexMap<PropertyId, HirIdx>) 
     destr
 }
 
-fn generate_prop_unpack(
+fn define_locals(
     gen: &mut CodeGenerator,
     block: &mut Block,
     source_local: Local,
     unpack_props: &[UnpackProp],
+    scope: &mut Scope,
     span: SourceSpan,
 ) {
     for unpack_prop in unpack_props {
@@ -136,6 +117,7 @@ fn generate_prop_unpack(
                     Stack(2),
                     span,
                 );
+                scope.in_scope.insert(unpack_prop.var, gen.builder.top());
             }
             UnpackKind::Struct {
                 property_id,
@@ -149,18 +131,8 @@ fn generate_prop_unpack(
                 );
 
                 let struct_local = gen.builder.top();
-                let rel_params_local = gen.builder.top_minus(1);
 
-                generate_prop_unpack(gen, block, struct_local, inner_unpack_props, span);
-
-                // Remove the struct from the stack..
-                // FIXME: This is inefficient, should instead just keep it on the stack,
-                // but then HirVariable no longer has a linear relationship with which Local to use,
-                // so a lookup table must be used instead
-                gen.builder
-                    .push(block, Ir::Remove(struct_local), Stack(-1), span);
-                gen.builder
-                    .push(block, Ir::Remove(rel_params_local), Stack(-1), span);
+                define_locals(gen, block, struct_local, inner_unpack_props, scope, span);
             }
         }
     }

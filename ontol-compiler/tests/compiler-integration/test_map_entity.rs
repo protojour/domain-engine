@@ -1,4 +1,5 @@
 use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use test_log::test;
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
@@ -83,6 +84,7 @@ fn test_map_invert() {
 }
 
 #[test]
+#[should_panic = "not in scope"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),

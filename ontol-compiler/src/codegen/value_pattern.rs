@@ -5,13 +5,12 @@ use ontol_runtime::{
 
 use crate::{
     codegen::{
-        generator::{CodeGenerator, CodegenVariable},
+        generator::{CodeGenerator, Scope},
         ir::Ir,
         proc_builder::Stack,
-        Block, ProcBuilder,
+        Block,
     },
-    hir_node::{HirIdx, HirKind, HirVariable},
-    SourceSpan,
+    hir_node::{BindDepth, HirIdx, HirKind, HirVariable},
 };
 
 use super::equation::HirEquation;
@@ -25,29 +24,13 @@ pub(super) fn codegen_value_pattern_origin(
 ) {
     let (_, to_expr, span) = equation.resolve_node(&equation.expansions, to);
 
-    struct ValueCodegen {
-        input_local: Local,
-    }
+    let mut scope = Scope::default();
+    scope
+        .in_scope
+        // FIXME, this won't always be variable 0
+        .insert(HirVariable(0, BindDepth(0)), Local(0));
 
-    impl CodegenVariable for ValueCodegen {
-        fn codegen_variable(
-            &mut self,
-            builder: &mut ProcBuilder,
-            block: &mut Block,
-            var: HirVariable,
-            span: &SourceSpan,
-        ) {
-            // There should only be one origin variable (but can flow into several slots)
-            assert!(var.0 == 0);
-            builder.push(block, Ir::Clone(self.input_local), Stack(1), *span);
-        }
-    }
-
-    let value_codegen = ValueCodegen {
-        input_local: Local(0),
-    };
-
-    gen.enter_bind_level(value_codegen, |generator| match &to_expr.kind {
+    gen.enter_scope(scope, |generator| match &to_expr.kind {
         HirKind::ValuePattern(node_id) => {
             generator.codegen_expr(block, equation, *node_id);
         }
