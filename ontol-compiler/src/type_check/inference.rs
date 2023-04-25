@@ -158,7 +158,7 @@ impl<'c, 'm> InferRec<'m> for InferBestEffort<'c, 'm> {
                         .inference
                         .eq_relations
                         .unify_var_value(var, UnifyValue::Known(expected))
-                        .unwrap();
+                        .unwrap_or_else(|err| panic!("infer {var:?} => {rhs:?} error: {err:?}"));
 
                     Ok(expected)
                 }

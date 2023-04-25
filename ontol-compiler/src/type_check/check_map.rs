@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
 
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashSet;
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -8,7 +8,7 @@ use crate::{
     codegen::{CodegenTask, MapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind},
+    expr::{Expr, ExprId, ExprKind, Expressions},
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode},
     mem::Intern,
     type_check::check_expr::Arm,
@@ -41,7 +41,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("FIRST ARM START");
             ctx.arm = Arm::First;
             let _ = map_check.aggr_group_map_variables(
-                map_check.expressions.get(&first_id).unwrap(),
+                map_check.expressions.map.get(&first_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,
@@ -49,7 +49,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("SECOND ARM START");
             ctx.arm = Arm::Second;
             let _ = map_check.aggr_group_map_variables(
-                map_check.expressions.get(&second_id).unwrap(),
+                map_check.expressions.map.get(&second_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,
@@ -57,25 +57,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         let mut root_body = ctx.expr_body_mut(root_body_id);
-        root_body.first = Some(self.consume_expr(first_id));
-        root_body.second = Some(self.consume_expr(second_id));
+        root_body.first = Some((first_id, self.consume_expr(first_id)));
+        root_body.second = Some((second_id, self.consume_expr(second_id)));
 
         let bodies_len = ctx.bodies.len() as u32;
         let mut bodies = vec![];
 
+        // FIXME: This algorithm is no good..
+        // There is no guarantee that the bodies will be traversed in the correct order,
+        // they get "initialized" inside check_expr.
+        // Instead, check_expr has to notify which bodies are "done" and can be processed next.
         for body_index in 0..bodies_len {
             let expr_body = ctx.expr_body_mut(HirBodyIdx(body_index));
-            let first_expr = expr_body.first.take().unwrap_or_else(|| {
+            let (_, first_expr) = expr_body.first.take().unwrap_or_else(|| {
                 panic!("No first expr in {body_index}");
             });
-            let second_expr = expr_body.second.take().unwrap_or_else(|| {
+            let (_, second_expr) = expr_body.second.take().unwrap_or_else(|| {
                 panic!("No second expr in {body_index}");
             });
 
             ctx.arm = Arm::First;
-            let (_, first) = self.check_expr(first_expr, &mut ctx);
+            let (first_ty, first) = self.check_expr(first_expr, &mut ctx);
             ctx.arm = Arm::Second;
-            let (_, second) = self.check_expr(second_expr, &mut ctx);
+            let (second_ty, second) = self.check_expr(second_expr, &mut ctx);
 
             bodies.push(HirBody { first, second });
         }
@@ -93,7 +97,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 pub struct MapCheck<'c, 'm> {
     types: &'c mut Types<'m>,
     errors: &'c mut CompileErrors,
-    expressions: &'c FnvHashMap<ExprId, Expr>,
+    expressions: &'c Expressions,
 }
 
 impl<'c, 'm> MapCheck<'c, 'm> {

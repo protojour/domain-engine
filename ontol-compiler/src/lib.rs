@@ -4,8 +4,7 @@ use def::{DefKind, Defs, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
-use expr::{Expr, ExprId};
-use fnv::FnvHashMap;
+use expr::Expressions;
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
@@ -56,7 +55,7 @@ pub struct Compiler<'m> {
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
     pub(crate) primitives: Primitives,
-    pub(crate) expressions: FnvHashMap<ExprId, Expr>,
+    pub(crate) expressions: Expressions,
 
     pub(crate) strings: Strings<'m>,
     pub(crate) types: Types<'m>,
@@ -75,14 +74,14 @@ impl<'m> Compiler<'m> {
         let primitives = Primitives::new(&mut defs);
 
         Self {
-            packages: Default::default(),
             sources,
-            strings: Strings::new(mem),
-            types: Types::new(mem),
+            packages: Default::default(),
             namespaces: Default::default(),
             defs,
             primitives,
             expressions: Default::default(),
+            strings: Strings::new(mem),
+            types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
             patterns: Patterns::default(),

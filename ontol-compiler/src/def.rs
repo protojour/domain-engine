@@ -192,7 +192,6 @@ pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
     def_id_allocators: FnvHashMap<PackageId, u16>,
     next_def_param: DefParamId,
-    next_expr_id: ExprId,
     pub(crate) map: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
@@ -205,7 +204,6 @@ impl<'m> Defs<'m> {
         Self {
             mem,
             def_id_allocators: Default::default(),
-            next_expr_id: ExprId(0),
             next_def_param: DefParamId(0),
             map: Default::default(),
             string_literals: Default::default(),
@@ -257,12 +255,6 @@ impl<'m> Defs<'m> {
         *idx += 1;
 
         def_id
-    }
-
-    pub fn alloc_expr_id(&mut self) -> ExprId {
-        let id = self.next_expr_id;
-        self.next_expr_id.0 += 1;
-        id
     }
 
     pub fn alloc_def_param_id(&mut self) -> DefParamId {

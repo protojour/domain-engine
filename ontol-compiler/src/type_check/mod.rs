@@ -1,11 +1,10 @@
-use fnv::FnvHashMap;
 use ontol_runtime::smart_format;
 
 use crate::{
     codegen::CodegenTasks,
     def::Defs,
     error::CompileError,
-    expr::{Expr, ExprId},
+    expr::Expressions,
     mem::Intern,
     primitive::Primitives,
     relation::Relations,
@@ -46,7 +45,7 @@ pub struct TypeCheck<'c, 'm> {
     relations: &'c mut Relations,
     errors: &'c mut CompileErrors,
     codegen_tasks: &'c mut CodegenTasks<'m>,
-    expressions: &'c mut FnvHashMap<ExprId, Expr>,
+    expressions: &'c mut Expressions,
     defs: &'c Defs<'m>,
     primitives: &'c Primitives,
 }

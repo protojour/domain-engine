@@ -578,8 +578,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        let expr_id = self.compiler.defs.alloc_expr_id();
-        self.compiler.expressions.insert(expr_id, expr);
+        let expr_id = self.compiler.expressions.alloc_expr_id();
+        self.compiler.expressions.map.insert(expr_id, expr);
 
         Ok(expr_id)
     }
@@ -869,7 +869,7 @@ impl ExprVarTable {
         *self
             .variables
             .entry(ident)
-            .or_insert_with(|| compiler.defs.alloc_expr_id())
+            .or_insert_with(|| compiler.expressions.alloc_expr_id())
     }
 
     fn new_aggregation_group(&mut self) -> ExprId {

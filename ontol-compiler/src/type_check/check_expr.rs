@@ -24,8 +24,8 @@ use super::{
 
 #[derive(Default)]
 pub struct ExprBody {
-    pub first: Option<Expr>,
-    pub second: Option<Expr>,
+    pub first: Option<(ExprId, Expr)>,
+    pub second: Option<(ExprId, Expr)>,
 }
 
 pub struct CheckExprContext<'m> {
@@ -154,7 +154,7 @@ impl Arm {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn consume_expr(&mut self, expr_id: ExprId) -> Expr {
-        match self.expressions.remove(&expr_id) {
+        match self.expressions.map.remove(&expr_id) {
             Some(expr) => expr,
             None => panic!("Expression {expr_id:?} not found"),
         }
@@ -211,16 +211,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_idx:?}");
 
-                // let (element_ty, element_node_id) = self.check_expr(*inner, ctx);
-                let inner_ty = self.types.intern(Type::Tautology);
-                let array_ty = self.types.intern(Type::Array(inner_ty));
+                // This expression id is used as an inference variable
+                let expr_id = self.expressions.alloc_expr_id();
+                let array_ty = {
+                    let inner_ty = self
+                        .types
+                        .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
 
-                match ctx.arm {
-                    Arm::First => {
-                        ctx.expr_body_mut(aggr_body_idx).first = Some(*inner);
-                    }
-                    Arm::Second => {
-                        ctx.expr_body_mut(aggr_body_idx).second = Some(*inner);
+                    self.types.intern(Type::Array(inner_ty))
+                };
+
+                {
+                    let arm = ctx.arm;
+                    let expr_body = ctx.expr_body_mut(aggr_body_idx);
+
+                    match arm {
+                        Arm::First => {
+                            expr_body.first = Some((expr_id, *inner));
+                        }
+                        Arm::Second => {
+                            expr_body.second = Some((expr_id, *inner));
+                        }
                     }
                 }
 
