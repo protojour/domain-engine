@@ -4,10 +4,11 @@ use fnv::FnvHashMap;
 
 use crate::{
     expr::ExprId,
-    types::{Type, TypeRef},
+    mem::Intern,
+    types::{Type, TypeRef, Types},
 };
 
-use super::{TypeEquation, TypeError};
+use super::{check_expr::CheckExprContext, TypeEquation, TypeError};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeVar<'m>(pub u32, PhantomData<&'m ()>);
@@ -68,15 +69,12 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
     }
 }
 
-fn accept_unification<'m>(_ty: &Type<'m>) -> Result<(), TypeError<'m>> {
-    Ok(())
-    /*
+fn accept_unification<'m>(ty: &Type<'m>) -> Result<(), TypeError<'m>> {
     match ty {
         // FIXME: A variable should not be inferred to array, that must be explicit
         Type::Array(_) => Err(TypeError::MustBeSequence),
         _ => Ok(()),
     }
-    */
 }
 
 pub struct Inference<'m> {
@@ -102,5 +100,122 @@ impl<'m> Inference<'m> {
         var_equations.push(type_var);
 
         type_var
+    }
+}
+
+pub trait InferRec<'m> {
+    type Error;
+
+    fn infer_error(&mut self) -> Result<TypeRef<'m>, Self::Error>;
+    fn infer_var(&mut self, var: TypeVar<'m>, rhs: TypeRef<'m>)
+        -> Result<TypeRef<'m>, Self::Error>;
+    fn infer_leaf(&mut self, a: TypeRef<'m>, b: TypeRef<'m>) -> Result<TypeRef<'m>, Self::Error>;
+    fn intern(&mut self, ty: Type<'m>) -> TypeRef<'m>;
+
+    fn infer_rec(
+        &mut self,
+        ty: TypeRef<'m>,
+        expected: TypeRef<'m>,
+    ) -> Result<TypeRef<'m>, Self::Error> {
+        match (ty, expected) {
+            (Type::Error, _) => self.infer_error(),
+            (_, Type::Error) => self.infer_error(),
+            (Type::Infer(var), expected) => self.infer_var(*var, expected),
+            (Type::Array(a), Type::Array(b)) => {
+                self.infer_rec(a, b).map(|a| self.intern(Type::Array(a)))
+            }
+            (Type::Option(a), Type::Option(b)) => {
+                self.infer_rec(a, b).map(|a| self.intern(Type::Option(a)))
+            }
+            (ty, expected) => self.infer_leaf(ty, expected),
+        }
+    }
+}
+
+pub struct InferBestEffort<'c, 'm> {
+    pub types: &'c mut Types<'m>,
+    pub ctx: &'c mut CheckExprContext<'m>,
+}
+
+impl<'c, 'm> InferRec<'m> for InferBestEffort<'c, 'm> {
+    type Error = ();
+
+    fn infer_error(&mut self) -> Result<TypeRef<'m>, Self::Error> {
+        Ok(self.types.intern(Type::Error))
+    }
+
+    fn infer_var(
+        &mut self,
+        var: TypeVar<'m>,
+        rhs: TypeRef<'m>,
+    ) -> Result<TypeRef<'m>, Self::Error> {
+        match rhs {
+            Type::Infer(_) => Ok(self.types.intern(Type::Infer(var))),
+            expected => match self.ctx.inference.eq_relations.probe_value(var) {
+                UnifyValue::Known(ty) => Ok(ty),
+                UnifyValue::Unknown => {
+                    self.ctx
+                        .inference
+                        .eq_relations
+                        .unify_var_value(var, UnifyValue::Known(expected))
+                        .unwrap();
+
+                    Ok(expected)
+                }
+            },
+        }
+    }
+
+    fn infer_leaf(&mut self, a: TypeRef<'m>, _: TypeRef<'m>) -> Result<TypeRef<'m>, Self::Error> {
+        Ok(a)
+    }
+
+    fn intern(&mut self, ty: Type<'m>) -> TypeRef<'m> {
+        self.types.intern(ty)
+    }
+}
+
+pub struct InferExpect<'c, 'm> {
+    pub types: &'c mut Types<'m>,
+    pub ctx: &'c mut CheckExprContext<'m>,
+    pub type_eq: TypeEquation<'m>,
+}
+
+impl<'c, 'm> InferRec<'m> for InferExpect<'c, 'm> {
+    type Error = TypeError<'m>;
+
+    fn infer_error(&mut self) -> Result<TypeRef<'m>, Self::Error> {
+        Err(TypeError::Propagated)
+    }
+
+    fn infer_var(
+        &mut self,
+        var: TypeVar<'m>,
+        expected: TypeRef<'m>,
+    ) -> Result<TypeRef<'m>, Self::Error> {
+        match expected {
+            Type::Infer(_) => Err(TypeError::NotEnoughInformation),
+            expected => match self
+                .ctx
+                .inference
+                .eq_relations
+                .unify_var_value(var, UnifyValue::Known(expected))
+            {
+                Ok(_) => Ok(expected),
+                Err(_) => Err(TypeError::Mismatch(self.type_eq)),
+            },
+        }
+    }
+
+    fn infer_leaf(&mut self, a: TypeRef<'m>, b: TypeRef<'m>) -> Result<TypeRef<'m>, Self::Error> {
+        if a == b {
+            Ok(a)
+        } else {
+            Err(TypeError::Mismatch(self.type_eq))
+        }
+    }
+
+    fn intern(&mut self, ty: Type<'m>) -> TypeRef<'m> {
+        self.types.intern(ty)
     }
 }

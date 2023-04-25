@@ -277,7 +277,7 @@ fn map_duplicate_unknown_property() {
 }
 
 #[test]
-fn map_type_mismatch() {
+fn map_type_mismatch_simple() {
     "
     type foo
     type bar

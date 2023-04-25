@@ -3,7 +3,7 @@ use std::ops::Deref;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
@@ -21,8 +21,8 @@ use crate::{
 };
 
 use super::{
-    inference::{Inference, UnifyValue},
-    TypeCheck, TypeEquation, TypeError,
+    inference::{InferBestEffort, InferExpect, InferRec, Inference},
+    TypeCheck, TypeEquation,
 };
 
 pub struct CheckExprContext<'m> {
@@ -247,6 +247,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self
                     .types
                     .intern(Type::Infer(ctx.inference.new_type_variable(*expr_id)));
+
                 let bound_variable = ctx
                     .bound_variables
                     .get(expr_id)
@@ -421,51 +422,36 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expected: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
-        let (ty, node_id) = self.check_expr(expr, ctx);
-        match (ty, expected) {
-            (Type::Error, _) => (ty, ERROR_NODE),
-            (_, Type::Error) => (expected, ERROR_NODE),
-            (Type::Infer(..), Type::Infer(..)) => {
-                panic!("FIXME: equate variable with variable?");
-            }
-            (Type::Infer(type_var), expected) => {
-                match ctx
-                    .inference
-                    .eq_relations
-                    .unify_var_value(*type_var, UnifyValue::Known(expected))
-                {
-                    Ok(_) => {
-                        warn!("TODO: resolve var?");
-                        (ty, node_id)
-                    }
-                    Err(TypeError::Mismatch(type_eq)) => self
-                        .map_if_possible(ctx, expr, node_id, type_eq)
-                        .unwrap_or_else(|_| {
-                            (
-                                self.type_error(TypeError::Mismatch(type_eq), &expr.span),
-                                ERROR_NODE,
-                            )
-                        }),
-                    Err(err) => (self.type_error(err, &expr.span), ERROR_NODE),
-                }
-            }
-            (ty, expected) if ty != expected => {
-                let type_eq = TypeEquation {
-                    actual: ty,
-                    expected,
-                };
-                self.map_if_possible(ctx, expr, node_id, type_eq)
-                    .unwrap_or_else(|_| {
-                        (
-                            self.type_error(TypeError::Mismatch(type_eq), &expr.span),
-                            ERROR_NODE,
-                        )
-                    })
-            }
-            _ => {
-                // Ok
-                (ty, node_id)
-            }
+        let (ty, node_idx) = self.check_expr(expr, ctx);
+        let inferred_ty = InferBestEffort {
+            types: self.types,
+            ctx,
+        }
+        .infer_rec(ty, expected)
+        .unwrap();
+
+        write_back_types(node_idx, inferred_ty, ctx);
+
+        debug!(
+            "Infer best effort: {ty:?} => {inferred_ty:?} node_id: {node_idx:?} node: {:?}",
+            ctx.nodes[node_idx]
+        );
+
+        let type_eq = TypeEquation {
+            actual: inferred_ty,
+            expected,
+        };
+        let mut infer_expect = InferExpect {
+            types: self.types,
+            ctx,
+            type_eq,
+        };
+
+        match infer_expect.infer_rec(inferred_ty, expected) {
+            Ok(ty) => (ty, node_idx),
+            Err(type_error) => self
+                .map_if_possible(ctx, expr, node_idx, type_eq)
+                .unwrap_or_else(|_| (self.type_error(type_error, &expr.span), ERROR_NODE)),
         }
     }
 
@@ -473,44 +459,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         ctx: &mut CheckExprContext<'m>,
         expr: &Expr,
-        node_id: HirIdx,
+        node_idx: HirIdx,
         type_eq: TypeEquation<'m>,
     ) -> Result<(TypeRef<'m>, HirIdx), ()> {
         match (type_eq.actual, type_eq.expected) {
             (Type::Domain(_), Type::Domain(_)) => {
                 let map_node = ctx.nodes.add(HirNode {
                     ty: type_eq.expected,
-                    kind: HirKind::MapCall(node_id, type_eq.actual),
+                    kind: HirKind::MapCall(node_idx, type_eq.actual),
                     span: expr.span,
                 });
                 Ok((type_eq.expected, map_node))
             }
-            (Type::Array(actual_item), Type::Array(expected_item)) => {
-                ctx.enter_aggregation(|ctx, iter_var| {
-                    let iter_id = ctx.nodes.add(HirNode {
-                        ty: self.types.intern(Type::Tautology),
-                        kind: HirKind::Variable(iter_var),
-                        span: expr.span,
-                    });
-
-                    let (_, map_node_id) = self.map_if_possible(
-                        ctx,
-                        expr,
-                        iter_id,
-                        TypeEquation {
-                            actual: actual_item,
-                            expected: expected_item,
-                        },
-                    )?;
-                    let map_sequence_node = ctx.nodes.add(HirNode {
-                        ty: type_eq.expected,
-                        kind: HirKind::MapSequence(node_id, iter_var, map_node_id, type_eq.actual),
-                        span: expr.span,
-                    });
-
-                    Ok((type_eq.expected, map_sequence_node))
-                })
-            }
+            (Type::Array(_), Type::Array(_)) => Ok((type_eq.actual, node_idx)),
             _ => Err(()),
         }
     }
@@ -518,5 +479,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, HirIdx) {
         self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
+    }
+}
+
+fn write_back_types<'m>(node_idx: HirIdx, ty: TypeRef<'m>, ctx: &mut CheckExprContext<'m>) {
+    ctx.nodes[node_idx].ty = ty;
+    match (&ctx.nodes[node_idx].kind, ty) {
+        (HirKind::Aggr(_, body_idx), Type::Array(elem_ty)) => {
+            let body = &ctx.bodies[body_idx.0 as usize];
+            let elem_index = match ctx.arm {
+                Arm::First => body.first,
+                Arm::Second => body.second,
+            };
+
+            write_back_types(elem_index, elem_ty, ctx)
+        }
+        _ => {}
     }
 }

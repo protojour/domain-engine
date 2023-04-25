@@ -244,10 +244,10 @@ pub type bars { rel _ ['bars']: bar }
 
 map x {
     foos {
-        rel 'foos': x
+        rel 'foos': [x]
     }
     bars {
-        rel 'bars': x
+        rel 'bars': [x]
     }
 }
 map x {

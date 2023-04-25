@@ -53,6 +53,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx.arm = Arm::Second;
         let (_, node_b) = self.check_expr_id(second_id, &mut ctx);
 
+        for body in ctx.bodies.iter_mut().skip(1) {}
+
         let root_body = ctx.map_body_mut(root_body_id);
         root_body.first = node_a;
         root_body.second = node_b;

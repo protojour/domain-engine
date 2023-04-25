@@ -26,6 +26,9 @@ mod check_relationship;
 pub enum TypeError<'m> {
     Mismatch(TypeEquation<'m>),
     MustBeSequence,
+    NotEnoughInformation,
+    // Another error is the cause of this error
+    Propagated,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -55,23 +58,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
-        let compile_error = match error {
-            TypeError::Mismatch(equation) => CompileError::TypeMismatch {
-                actual: smart_format!(
-                    "{}",
-                    FormatType(equation.actual, self.defs, self.primitives)
-                ),
-                expected: smart_format!(
-                    "{}",
-                    FormatType(equation.expected, self.defs, self.primitives)
-                ),
-            },
-            TypeError::MustBeSequence => CompileError::TypeMismatch {
-                actual: smart_format!("Not sequence"),
-                expected: smart_format!("[]"),
-            },
-        };
-        self.error(compile_error, span)
+        match error {
+            TypeError::Mismatch(equation) => self.error(
+                CompileError::TypeMismatch {
+                    actual: smart_format!(
+                        "{}",
+                        FormatType(equation.actual, self.defs, self.primitives)
+                    ),
+                    expected: smart_format!(
+                        "{}",
+                        FormatType(equation.expected, self.defs, self.primitives)
+                    ),
+                },
+                span,
+            ),
+            TypeError::MustBeSequence => self.error(
+                CompileError::TypeMismatch {
+                    actual: smart_format!("Not sequence"),
+                    expected: smart_format!("[]"),
+                },
+                span,
+            ),
+            TypeError::NotEnoughInformation => self.error(
+                CompileError::TODO(smart_format!("Not enough information to infer type")),
+                span,
+            ),
+            TypeError::Propagated => self.types.intern(Type::Error),
+        }
     }
 }
 

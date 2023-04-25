@@ -165,7 +165,9 @@ impl<'a> CodeGenerator<'a> {
                 self.builder.push(block, Ir::Call(proc), Stack(0), span);
             }
             HirKind::Aggr(seq_idx, body_idx) => {
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
+                let return_def_id = expr.ty.get_single_def_id().unwrap_or_else(|| {
+                    panic!("No def id found in {:?}", expr.ty);
+                });
                 let output = match expr.ty {
                     Type::Array(_) => self.builder.push(
                         block,

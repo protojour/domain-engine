@@ -2,7 +2,10 @@
 //!
 //! These data structures are emitted from the type check stage, and used in the codegen stage.
 
-use std::{fmt::Debug, ops::Index};
+use std::{
+    fmt::Debug,
+    ops::{Index, IndexMut},
+};
 
 use indexmap::IndexMap;
 use ontol_runtime::{proc::BuiltinProc, value::PropertyId};
@@ -131,5 +134,11 @@ impl<'m> Index<HirIdx> for HirNodeTable<'m> {
 
     fn index(&self, index: HirIdx) -> &Self::Output {
         &self.0[index.0 as usize]
+    }
+}
+
+impl<'m> IndexMut<HirIdx> for HirNodeTable<'m> {
+    fn index_mut(&mut self, index: HirIdx) -> &mut Self::Output {
+        &mut self.0[index.0 as usize]
     }
 }
