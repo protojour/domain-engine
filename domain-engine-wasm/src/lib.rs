@@ -60,6 +60,8 @@ const ONTOL_ROOT: &str = "ontol_root.on";
 
 #[wasm_bindgen]
 pub fn compile_ontol_domain(ontol_source: String) -> Result<WasmEnv, WasmError> {
+    console_error_panic_hook::set_once();
+
     let mut sources = Sources::default();
     let mut source_code_registry = SourceCodeRegistry::default();
     let mut package_graph_builder = PackageGraphBuilder::new(ONTOL_ROOT.into());
