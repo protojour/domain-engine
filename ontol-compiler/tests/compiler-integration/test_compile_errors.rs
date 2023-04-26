@@ -332,12 +332,12 @@ fn map_array_mismatch() {
 
     map x y {
         foo {
-            rel 'a': x
-            rel 'b': y
+            rel 'a': x // ERROR [string] variable must be enclosed in []
+            rel 'b': y // ERROR [string] variable must be enclosed in []
         }
         bar {
-            rel 'a': x // ERROR type mismatch: expected `string`, found `[string]`
-            rel 'b': y // ERROR type mismatch: expected `[int]`, found `[string]`
+            rel 'a': x
+            rel 'b': y // ERROR [int] variable must be enclosed in []
         }
     }
     "
@@ -352,10 +352,10 @@ fn array_map_without_brackets() {
 
     map x {
         foo {
-            rel 'a': x
+            rel 'a': x // ERROR [string] variable must be enclosed in []
         }
         bar {
-            rel 'b': x
+            rel 'b': x // ERROR [string] variable must be enclosed in []
         }
     }
     "

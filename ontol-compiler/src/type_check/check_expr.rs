@@ -270,8 +270,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let elem_ty = match expected_ty {
                     Some(Type::Array(elem_ty)) => elem_ty,
-                    Some(_) => {
-                        self.type_error(TypeError::MustBeSequence, &expr.span);
+                    Some(other_ty) => {
+                        self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
                         self.types.intern(Type::Error)
                     }
                     None => self
@@ -340,38 +340,48 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .get(&expr_id)
                     .expect("variable not found");
 
-                if let Some(expected_ty) = expected_ty {
-                    let variable_ref = ctx.nodes.add(HirNode {
-                        ty: expected_ty,
-                        kind: HirKind::VariableRef(bound_variable.node_id),
-                        span: expr.span,
-                    });
+                match expected_ty {
+                    Some(Type::Array(elem_ty)) => (
+                        self.type_error(
+                            TypeError::VariableMustBeSequenceEnclosed(elem_ty),
+                            &expr.span,
+                        ),
+                        ERROR_NODE,
+                    ),
+                    Some(expected_ty) => {
+                        let variable_ref = ctx.nodes.add(HirNode {
+                            ty: expected_ty,
+                            kind: HirKind::VariableRef(bound_variable.node_id),
+                            span: expr.span,
+                        });
 
-                    match ctx
-                        .inference
-                        .eq_relations
-                        .unify_var_value(type_var, UnifyValue::Known(expected_ty))
-                    {
-                        // Variables are the same type, no mapping necessary:
-                        Ok(_) => (expected_ty, variable_ref),
-                        // Need to map:
-                        Err(err @ TypeError::Mismatch(type_eq)) => {
-                            match (&type_eq.actual, &type_eq.expected) {
-                                (Type::Domain(_), Type::Domain(_)) => (
-                                    expected_ty,
-                                    ctx.nodes.add(HirNode {
-                                        ty: expected_ty,
-                                        kind: HirKind::MapCall(variable_ref, type_eq.actual),
-                                        span: expr.span,
-                                    }),
-                                ),
-                                _ => (self.type_error(err, &expr.span), ERROR_NODE),
+                        match ctx
+                            .inference
+                            .eq_relations
+                            .unify_var_value(type_var, UnifyValue::Known(expected_ty))
+                        {
+                            // Variables are the same type, no mapping necessary:
+                            Ok(_) => (expected_ty, variable_ref),
+                            // Need to map:
+                            Err(err @ TypeError::Mismatch(type_eq)) => {
+                                match (&type_eq.actual, &type_eq.expected) {
+                                    (Type::Domain(_), Type::Domain(_)) => (
+                                        expected_ty,
+                                        ctx.nodes.add(HirNode {
+                                            ty: expected_ty,
+                                            kind: HirKind::MapCall(variable_ref, type_eq.actual),
+                                            span: expr.span,
+                                        }),
+                                    ),
+                                    _ => (self.type_error(err, &expr.span), ERROR_NODE),
+                                }
                             }
+                            Err(err) => todo!("Report unification error: {err:?}"),
                         }
-                        Err(err) => todo!("Report unification error: {err:?}"),
                     }
-                } else {
-                    todo!("Variable without expected type")
+                    None => {
+                        todo!()
+                    }
                 }
             }
             (kind, ty) => self.expr_error(

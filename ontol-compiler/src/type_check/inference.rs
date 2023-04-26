@@ -56,24 +56,10 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
                     }))
                 }
             }
-            (Self::Known(ty), Self::Unknown) => {
-                accept_unification(ty)?;
-                Ok(value1.clone())
-            }
-            (Self::Unknown, Self::Known(ty)) => {
-                accept_unification(ty)?;
-                Ok(value2.clone())
-            }
+            (Self::Known(_), Self::Unknown) => Ok(value1.clone()),
+            (Self::Unknown, Self::Known(_)) => Ok(value2.clone()),
             (Self::Unknown, Self::Unknown) => Ok(Self::Unknown),
         }
-    }
-}
-
-fn accept_unification<'m>(ty: &Type<'m>) -> Result<(), TypeError<'m>> {
-    match ty {
-        // FIXME: A variable should not be inferred to array, that must be explicit
-        // Type::Array(_) => Err(TypeError::MustBeSequence),
-        _ => Ok(()),
     }
 }
 

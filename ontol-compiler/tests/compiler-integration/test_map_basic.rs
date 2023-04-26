@@ -212,10 +212,10 @@ fn test_map_matching_array() {
     rel bar ['b']: int
     map x {
         foo {
-            rel 'a': x
+            rel 'a': [x]
         }
         bar {
-            rel 'b': x
+            rel 'b': [x]
         }
     }
     "

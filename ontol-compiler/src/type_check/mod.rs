@@ -24,7 +24,8 @@ mod check_relationship;
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {
     Mismatch(TypeEquation<'m>),
-    MustBeSequence,
+    MustBeSequence(TypeRef<'m>),
+    VariableMustBeSequenceEnclosed(TypeRef<'m>),
     NotEnoughInformation,
     // Another error is the cause of this error
     Propagated,
@@ -71,11 +72,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 span,
             ),
-            TypeError::MustBeSequence => self.error(
+            TypeError::MustBeSequence(ty) => self.error(
                 CompileError::TypeMismatch {
-                    actual: smart_format!("Not sequence"),
-                    expected: smart_format!("[]"),
+                    actual: smart_format!("{}", FormatType(ty, self.defs, self.primitives)),
+                    expected: smart_format!("[{}]", FormatType(ty, self.defs, self.primitives)),
                 },
+                span,
+            ),
+            TypeError::VariableMustBeSequenceEnclosed(ty) => self.error(
+                CompileError::VariableMustBeSequenceEnclosed(smart_format!(
+                    "{}",
+                    FormatType(ty, self.defs, self.primitives)
+                )),
                 span,
             ),
             TypeError::NotEnoughInformation => self.error(
