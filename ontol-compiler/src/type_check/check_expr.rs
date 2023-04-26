@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    inference::{InferBestEffort, InferExpect, InferRec, Inference, UnifyValue},
+    inference::{Inference, UnifyValue},
     TypeCheck, TypeEquation, TypeError,
 };
 
@@ -175,7 +175,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         root: ExprRoot<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
-        let (ty, hir_idx) = self.check_expr(root.expr, root.expected_ty, ctx);
+        let (ty, hir_idx) = self.check_expr(
+            root.expr,
+            // Don't pass inference types as the expected type:
+            match root.expected_ty {
+                Some(Type::Infer(_)) => None,
+                Some(other) => Some(other),
+                None => None,
+            },
+            ctx,
+        );
 
         // Save typing result for the final type unification:
         match ty {
@@ -236,8 +245,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => self.expr_error(CompileError::NotCallable, &expr.span),
                 }
             }
-            (ExprKind::Struct(type_path, attributes), _expected_ty) => {
-                self.check_struct(type_path, attributes, expr.span, ctx)
+            (ExprKind::Struct(type_path, attributes), expected_ty) => {
+                let (ty, hir_idx) = self.check_struct(type_path, attributes, expr.span, ctx);
+                match expected_ty {
+                    Some(Type::Domain(_)) => (ty, hir_idx),
+                    Some(expected_ty) => (
+                        self.type_error(
+                            TypeError::Mismatch(TypeEquation {
+                                actual: ty,
+                                expected: expected_ty,
+                            }),
+                            &expr.span,
+                        ),
+                        hir_idx,
+                    ),
+                    _ => (ty, hir_idx),
+                }
             }
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
@@ -248,10 +271,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let elem_ty = match expected_ty {
                     Some(Type::Array(elem_ty)) => elem_ty,
                     Some(_) => {
-                        return self.expr_error(
-                            CompileError::TODO(smart_format!("Must be a sequence")),
-                            &expr.span,
-                        )
+                        self.type_error(TypeError::MustBeSequence, &expr.span);
+                        self.types.intern(Type::Error)
                     }
                     None => self
                         .types
@@ -514,81 +535,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expected_ty: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
-        let span = expr.span;
-        let (ty, node_idx) = self.check_expr(expr, Some(expected_ty), ctx);
-        let inferred_ty = InferBestEffort {
-            types: self.types,
-            eq_relations: &mut ctx.inference.eq_relations,
-        }
-        .infer_rec(ty, expected_ty)
-        .unwrap();
-
-        write_back_types(node_idx, inferred_ty, ctx);
-
-        debug!(
-            "Infer best effort: {ty:?} => {inferred_ty:?} node_id: {node_idx:?} node: {:?}",
-            ctx.nodes[node_idx]
-        );
-
-        let type_eq = TypeEquation {
-            actual: inferred_ty,
-            expected: expected_ty,
-        };
-        let mut infer_expect = InferExpect {
-            types: self.types,
-            eq_relations: &mut ctx.inference.eq_relations,
-            type_eq,
-        };
-
-        match infer_expect.infer_rec(inferred_ty, expected_ty) {
-            Ok(ty) => (ty, node_idx),
-            Err(type_error) => self
-                .map_if_possible(ctx, node_idx, type_eq, &span)
-                .unwrap_or_else(|_| (self.type_error(type_error, &span), ERROR_NODE)),
-        }
-    }
-
-    fn map_if_possible(
-        &mut self,
-        ctx: &mut CheckExprContext<'m>,
-        node_idx: HirIdx,
-        type_eq: TypeEquation<'m>,
-        span: &SourceSpan,
-    ) -> Result<(TypeRef<'m>, HirIdx), ()> {
-        match (type_eq.actual, type_eq.expected) {
-            (Type::Domain(_), Type::Domain(_)) => {
-                let map_node = ctx.nodes.add(HirNode {
-                    ty: type_eq.expected,
-                    kind: HirKind::MapCall(node_idx, type_eq.actual),
-                    span: *span,
-                });
-                Ok((type_eq.expected, map_node))
-            }
-            (Type::Array(_), Type::Array(_)) => Ok((type_eq.actual, node_idx)),
-            _ => Err(()),
-        }
+        self.check_expr(expr, Some(expected_ty), ctx)
     }
 
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, HirIdx) {
         self.errors.push(error.spanned(span));
         (self.types.intern(Type::Error), ERROR_NODE)
     }
-}
-
-fn write_back_types<'m>(node_idx: HirIdx, ty: TypeRef<'m>, ctx: &mut CheckExprContext<'m>) {
-    ctx.nodes[node_idx].ty = ty;
-    /*
-    match (&ctx.nodes[node_idx].kind, ty) {
-        (HirKind::Aggr(_, body_idx), Type::Array(elem_ty)) => {
-            let body = &ctx.bodies[body_idx.0 as usize];
-            let elem_index = match ctx.arm {
-                Arm::First => body.first,
-                Arm::Second => body.second,
-            };
-
-            write_back_types(elem_index, elem_ty, ctx)
-        }
-        _ => {}
-    }
-    */
 }
