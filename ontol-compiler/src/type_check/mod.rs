@@ -21,7 +21,7 @@ mod check_expr;
 mod check_map;
 mod check_relationship;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {
     Mismatch(TypeEquation<'m>),
     MustBeSequence,

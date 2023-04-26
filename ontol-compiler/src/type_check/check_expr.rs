@@ -355,14 +355,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         // Variables are the same type, no mapping necessary:
                         Ok(_) => (expected_ty, variable_ref),
                         // Need to map:
-                        Err(TypeError::Mismatch(type_eq)) => (
-                            expected_ty,
-                            ctx.nodes.add(HirNode {
-                                ty: expected_ty,
-                                kind: HirKind::MapCall(variable_ref, type_eq.actual),
-                                span: expr.span,
-                            }),
-                        ),
+                        Err(err @ TypeError::Mismatch(type_eq)) => {
+                            match (&type_eq.actual, &type_eq.expected) {
+                                (Type::Domain(_), Type::Domain(_)) => (
+                                    expected_ty,
+                                    ctx.nodes.add(HirNode {
+                                        ty: expected_ty,
+                                        kind: HirKind::MapCall(variable_ref, type_eq.actual),
+                                        span: expr.span,
+                                    }),
+                                ),
+                                _ => (self.type_error(err, &expr.span), ERROR_NODE),
+                            }
+                        }
                         Err(err) => todo!("Report unification error: {err:?}"),
                     }
                 } else {

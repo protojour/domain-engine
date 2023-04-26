@@ -345,6 +345,24 @@ fn map_array_mismatch() {
 }
 
 #[test]
+fn array_map_without_brackets() {
+    "
+    type foo { rel _ ['a']: string }
+    type bar { rel _ ['b']: string }
+
+    map x {
+        foo {
+            rel 'a': x
+        }
+        bar {
+            rel 'b': x
+        }
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn union_in_named_relationship() {
     "
     type foo
