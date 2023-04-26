@@ -56,11 +56,6 @@ pub enum HirKind<'m> {
     /// Normally translates into a procedure call.
     MapCall(HirIdx, TypeRef<'m>),
     Aggr(HirIdx, HirBodyIdx),
-    /// A mapping operation on a sequence.
-    /// The first expression is the array.
-    /// The syntax var is the iterated value.
-    /// The second expression is the item/body.
-    MapSequence(HirIdx, HirVariable, HirIdx, TypeRef<'m>),
 }
 
 /// An index/reference to a typed HirNode.

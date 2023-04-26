@@ -225,63 +225,6 @@ impl<'a> CodeGenerator<'a> {
                 self.builder
                     .push(block, Ir::Remove(input_seq), Stack(-1), span);
             }
-            HirKind::MapSequence(seq_idx, iter_var, body_idx, _) => {
-                let return_def_id = expr.ty.get_single_def_id().unwrap();
-                let output_seq = self.builder.push(
-                    block,
-                    Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
-                    Stack(1),
-                    span,
-                );
-
-                // Input sequence:
-                self.codegen_expr(block, equation, *seq_idx)?;
-                let input_seq = self.builder.top();
-
-                let counter =
-                    self.builder
-                        .push(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
-
-                let iter_offset = block.current_offset();
-
-                let rel_params_local = self.builder.top_plus(1);
-                let value_local = self.builder.top_plus(2);
-
-                let mut scope = Scope::default();
-                scope.in_scope.insert(*iter_var, value_local);
-
-                let for_each_body_index = self.enter_scope(scope, |gen| {
-                    // inside the for-each body there are two items on the stack, value (top), then rel_params
-                    let mut block2 = gen.builder.new_block(Stack(2), span);
-
-                    gen.codegen_expr(&mut block2, equation, *body_idx)?;
-                    gen.builder
-                        .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
-                    // still two items on the stack: append to original sequence
-                    // for now, rel_params is not mapped
-                    gen.builder
-                        .push(&mut block2, Ir::AppendAttr2(output_seq), Stack(-2), span);
-                    gen.builder
-                        .push(&mut block2, Ir::Remove(value_local), Stack(-1), span);
-                    gen.builder
-                        .push(&mut block2, Ir::Remove(rel_params_local), Stack(-1), span);
-
-                    Ok(gen
-                        .builder
-                        .commit(block2, Terminator::PopGoto(block.index(), iter_offset)))
-                })?;
-
-                self.builder.push(
-                    block,
-                    Ir::Iter(input_seq, counter, for_each_body_index),
-                    Stack(0),
-                    span,
-                );
-                self.builder
-                    .push(block, Ir::Remove(counter), Stack(-1), span);
-                self.builder
-                    .push(block, Ir::Remove(input_seq), Stack(-1), span);
-            }
             HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx)?,
             HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();

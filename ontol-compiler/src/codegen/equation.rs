@@ -187,12 +187,6 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .field(&self.child(*var_idx, None))
                 .field(body_id)
                 .finish()?,
-            HirKind::MapSequence(node_id, var, body, _) => f
-                .debug_tuple(&self.header("MapSequence"))
-                .field(&self.child(*node_id, None))
-                .field(&var)
-                .field(&self.child(*body, None))
-                .finish()?,
         };
 
         Ok(())

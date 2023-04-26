@@ -9,7 +9,7 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
-    hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode},
+    hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
     type_check::check_expr::Arm,
     types::{Type, TypeRef, Types},
@@ -57,8 +57,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         let mut root_body = ctx.expr_body_mut(root_body_id);
-        root_body.first = Some((first_id, self.consume_expr(first_id)));
-        root_body.second = Some((second_id, self.consume_expr(second_id)));
+        root_body.first = Some(self.consume_expr(first_id));
+        root_body.second = Some(self.consume_expr(second_id));
 
         let bodies_len = ctx.bodies.len() as u32;
         let mut bodies = vec![];
@@ -69,19 +69,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Instead, check_expr has to notify which bodies are "done" and can be processed next.
         for body_index in 0..bodies_len {
             let expr_body = ctx.expr_body_mut(HirBodyIdx(body_index));
-            let (_, first_expr) = expr_body.first.take().unwrap_or_else(|| {
-                panic!("No first expr in {body_index}");
-            });
-            let (_, second_expr) = expr_body.second.take().unwrap_or_else(|| {
-                panic!("No second expr in {body_index}");
-            });
+            let first_root = expr_body.first.take();
+            let second_root = expr_body.second.take();
 
-            ctx.arm = Arm::First;
-            let (first_ty, first) = self.check_expr(first_expr, &mut ctx);
-            ctx.arm = Arm::Second;
-            let (second_ty, second) = self.check_expr(second_expr, &mut ctx);
+            // If these are not Some, an error should have been raised
+            if let (Some(first_root), Some(second_root)) = (first_root, second_root) {
+                ctx.arm = Arm::First;
+                let (_first_ty, first) = self.check_expr_root(first_root, &mut ctx);
+                ctx.arm = Arm::Second;
+                let (_second_ty, second) = self.check_expr_root(second_root, &mut ctx);
 
-            bodies.push(HirBody { first, second });
+                // pad the vector
+                bodies.resize_with(body_index as usize + 1, || HirBody {
+                    first: ERROR_NODE,
+                    second: ERROR_NODE,
+                });
+
+                bodies[body_index as usize] = HirBody { first, second };
+            }
         }
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {

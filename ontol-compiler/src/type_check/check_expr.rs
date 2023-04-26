@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use tracing::debug;
 
 use crate::{
@@ -18,19 +18,25 @@ use crate::{
 };
 
 use super::{
-    inference::{InferBestEffort, InferExpect, InferRec, Inference},
-    TypeCheck, TypeEquation,
+    inference::{InferBestEffort, InferExpect, InferRec, Inference, UnifyValue},
+    TypeCheck, TypeEquation, TypeError,
 };
 
 #[derive(Default)]
-pub struct ExprBody {
-    pub first: Option<(ExprId, Expr)>,
-    pub second: Option<(ExprId, Expr)>,
+pub struct ExprBody<'m> {
+    pub first: Option<ExprRoot<'m>>,
+    pub second: Option<ExprRoot<'m>>,
+}
+
+pub struct ExprRoot<'m> {
+    pub id: ExprId,
+    pub expr: Expr,
+    pub expected_ty: Option<TypeRef<'m>>,
 }
 
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<ExprBody>,
+    pub bodies: Vec<ExprBody<'m>>,
     pub nodes: HirNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
     pub aggr_variables: FnvHashMap<HirBodyIdx, HirIdx>,
@@ -84,7 +90,7 @@ impl<'m> CheckExprContext<'m> {
         HirBodyIdx(next)
     }
 
-    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut ExprBody {
+    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut ExprBody<'m> {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
@@ -153,20 +159,33 @@ impl Arm {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn consume_expr(&mut self, expr_id: ExprId) -> Expr {
+    pub(super) fn consume_expr(&mut self, expr_id: ExprId) -> ExprRoot<'m> {
         match self.expressions.map.remove(&expr_id) {
-            Some(expr) => expr,
+            Some(expr) => ExprRoot {
+                id: expr_id,
+                expr,
+                expected_ty: None,
+            },
             None => panic!("Expression {expr_id:?} not found"),
         }
     }
 
-    pub(super) fn check_expr(
+    pub(super) fn check_expr_root(
         &mut self,
-        expr: Expr,
+        root: ExprRoot<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
-        match expr.kind {
-            ExprKind::Call(def_id, args) => {
+        self.check_expr(root.expr, root.expected_ty, ctx)
+    }
+
+    fn check_expr(
+        &mut self,
+        expr: Expr,
+        expected_ty: Option<TypeRef<'m>>,
+        ctx: &mut CheckExprContext<'m>,
+    ) -> (TypeRef<'m>, HirIdx) {
+        match (expr.kind, expected_ty) {
+            (ExprKind::Call(def_id, args), Some(_expected_output)) => {
                 match (self.defs.map.get(&def_id), self.def_types.map.get(&def_id)) {
                     (
                         Some(Def {
@@ -202,10 +221,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => self.expr_error(CompileError::NotCallable, &expr.span),
                 }
             }
-            ExprKind::Struct(type_path, attributes) => {
+            (ExprKind::Struct(type_path, attributes), _expected_ty) => {
                 self.check_struct(type_path, attributes, expr.span, ctx)
             }
-            ExprKind::Seq(aggr_expr_id, inner) => {
+            (ExprKind::Seq(aggr_expr_id, inner), Some(Type::Array(expected_elem_ty))) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
                 let aggr_body_idx = *ctx.aggr_body_map.get(&aggr_expr_id).unwrap();
 
@@ -220,6 +239,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     self.types.intern(Type::Array(inner_ty))
                 };
+                let expr_root = ExprRoot {
+                    id: expr_id,
+                    expr: *inner,
+                    expected_ty: Some(expected_elem_ty),
+                };
 
                 {
                     let arm = ctx.arm;
@@ -227,10 +251,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     match arm {
                         Arm::First => {
-                            expr_body.first = Some((expr_id, *inner));
+                            expr_body.first = Some(expr_root);
                         }
                         Arm::Second => {
-                            expr_body.second = Some((expr_id, *inner));
+                            expr_body.second = Some(expr_root);
                         }
                     }
                 }
@@ -247,36 +271,65 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 });
                 (array_ty, aggr_node_id)
             }
-            ExprKind::Constant(k) => {
-                let ty = self.def_types.map.get(&self.primitives.int).unwrap();
-                (
-                    ty,
-                    ctx.nodes.add(HirNode {
-                        ty,
-                        kind: HirKind::Constant(k),
-                        span: expr.span,
-                    }),
-                )
+            (ExprKind::Constant(k), Some(expected_ty)) => {
+                if matches!(expected_ty, Type::Int(_)) {
+                    (
+                        expected_ty,
+                        ctx.nodes.add(HirNode {
+                            ty: expected_ty,
+                            kind: HirKind::Constant(k),
+                            span: expr.span,
+                        }),
+                    )
+                } else {
+                    self.expr_error(
+                        CompileError::TODO(smart_format!("Expected integer type")),
+                        &expr.span,
+                    )
+                }
             }
-            ExprKind::Variable(expr_id) => {
-                let ty = self
-                    .types
-                    .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
-
+            (ExprKind::Variable(expr_id), expected_ty) => {
+                let type_var = ctx.inference.new_type_variable(expr_id);
                 let bound_variable = ctx
                     .bound_variables
                     .get(&expr_id)
                     .expect("variable not found");
 
-                (
-                    ty,
-                    ctx.nodes.add(HirNode {
-                        ty,
+                if let Some(expected_ty) = expected_ty {
+                    let variable_ref = ctx.nodes.add(HirNode {
+                        ty: expected_ty,
                         kind: HirKind::VariableRef(bound_variable.node_id),
                         span: expr.span,
-                    }),
-                )
+                    });
+
+                    match ctx
+                        .inference
+                        .eq_relations
+                        .unify_var_value(type_var, UnifyValue::Known(expected_ty))
+                    {
+                        // Variables are the same type, no mapping necessary:
+                        Ok(_) => (expected_ty, variable_ref),
+                        // Need to map:
+                        Err(TypeError::Mismatch(type_eq)) => (
+                            expected_ty,
+                            ctx.nodes.add(HirNode {
+                                ty: expected_ty,
+                                kind: HirKind::MapCall(variable_ref, type_eq.actual),
+                                span: expr.span,
+                            }),
+                        ),
+                        Err(err) => todo!("Report unification error: {err:?}"),
+                    }
+                } else {
+                    todo!("Variable without expected type")
+                }
             }
+            (kind, ty) => self.expr_error(
+                CompileError::TODO(smart_format!(
+                    "Not enough type information for {kind:?}, expected_ty = {ty:?}"
+                )),
+                &expr.span,
+            ),
         }
     }
 
@@ -434,16 +487,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_expr_expect(
         &mut self,
         expr: Expr,
-        expected: TypeRef<'m>,
+        expected_ty: TypeRef<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         let span = expr.span;
-        let (ty, node_idx) = self.check_expr(expr, ctx);
+        let (ty, node_idx) = self.check_expr(expr, Some(expected_ty), ctx);
         let inferred_ty = InferBestEffort {
             types: self.types,
             ctx,
         }
-        .infer_rec(ty, expected)
+        .infer_rec(ty, expected_ty)
         .unwrap();
 
         write_back_types(node_idx, inferred_ty, ctx);
@@ -455,7 +508,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let type_eq = TypeEquation {
             actual: inferred_ty,
-            expected,
+            expected: expected_ty,
         };
         let mut infer_expect = InferExpect {
             types: self.types,
@@ -463,7 +516,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             type_eq,
         };
 
-        match infer_expect.infer_rec(inferred_ty, expected) {
+        match infer_expect.infer_rec(inferred_ty, expected_ty) {
             Ok(ty) => (ty, node_idx),
             Err(type_error) => self
                 .map_if_possible(ctx, node_idx, type_eq, &span)

@@ -191,51 +191,6 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Constant(idx))
             }
-            HirKind::MapSequence(seq_idx, iter_var, elem_idx, item_ty) => {
-                let seq_idx = *seq_idx;
-                let iter_var = *iter_var;
-                let elem_idx = *elem_idx;
-                let item_ty = *item_ty;
-
-                let elem_idx_copy = elem_idx;
-
-                let elem_idx = match self.reduce_node_inner(elem_idx, indent.inc())? {
-                    Substitution::Variable(idx) => idx,
-                    Substitution::Constant(idx) => idx,
-                };
-
-                debug!(
-                    "{indent}MapSequence elem_id(before -> after): {elem_idx_copy:?}->{elem_idx:?}"
-                );
-
-                // Escape recursive expansion of the sequence reference:
-                let seq_var = self.reductions.resolve(seq_idx);
-                let (cloned_seq_var, _) = self.clone_node(seq_var, indent);
-
-                debug!("{indent}seq_id->seq_var: {seq_idx:?}->{seq_var:?}");
-
-                // let (cloned_item_id, cloned_item) = self.clone_node(elem_id);
-                // let cloned_item_span = cloned_item.span;
-                let node = &self.nodes[idx];
-                let (inverted_map_idx, _) = self.add_node(
-                    HirNode {
-                        kind: HirKind::MapSequence(cloned_seq_var, iter_var, elem_idx, item_ty),
-                        ty: node.ty,
-                        span: node.span,
-                    },
-                    indent,
-                );
-
-                // remove the map call from the reductions
-                self.reductions[idx] = seq_idx;
-                // add inverted map call to the expansions
-                self.expansions[seq_var] = inverted_map_idx;
-
-                debug!("{indent}reduction subst: {idx:?}->{seq_idx:?}");
-                debug!("{indent}expansion subst: {seq_var:?}->{inverted_map_idx:?} (new!)");
-
-                Ok(Substitution::Variable(inverted_map_idx))
-            }
         }
     }
 

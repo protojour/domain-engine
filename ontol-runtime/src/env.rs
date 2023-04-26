@@ -141,15 +141,13 @@ impl Domain {
         let index = type_info.def_id.1 as usize;
 
         // pad the vector
-        while self.info.len() < index + 1 {
-            self.info.push(TypeInfo {
-                def_id: DefId(type_info.def_id.0, self.info.len() as u16),
-                public: false,
-                name: None,
-                entity_info: None,
-                operator_id: None,
-            });
-        }
+        self.info.resize_with(index + 1, || TypeInfo {
+            def_id: DefId(type_info.def_id.0, 0),
+            public: false,
+            name: None,
+            entity_info: None,
+            operator_id: None,
+        });
 
         self.info[index] = type_info;
     }
