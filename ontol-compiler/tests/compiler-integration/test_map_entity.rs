@@ -99,12 +99,12 @@ fn artist_etc_routing() {
                     gsu.artist {
                         rel 'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
                         rel 'name': n
-                        rel 'plays': p
+                        rel 'plays': p // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                     ai.artist {
                         rel 'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
                         rel 'name': n
-                        rel 'plays': p // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        rel 'plays': p // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                 }
 

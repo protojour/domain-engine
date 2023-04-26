@@ -21,7 +21,7 @@ pub enum ExprKind {
     Call(DefId, Box<[Expr]>),
     /// Object constructor
     Struct(TypePath, Box<[(ObjKey, Expr)]>),
-    /// [expr]
+    /// Expression enclosed in sequence brackets: `[expr]`
     Seq(ExprId, Box<Expr>),
     Variable(ExprId),
     Constant(i64),

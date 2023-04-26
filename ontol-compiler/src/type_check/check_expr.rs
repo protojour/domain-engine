@@ -175,7 +175,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         root: ExprRoot<'m>,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
-        self.check_expr(root.expr, root.expected_ty, ctx)
+        let (ty, hir_idx) = self.check_expr(root.expr, root.expected_ty, ctx);
+
+        // Save typing result for the final type unification:
+        match ty {
+            Type::Error | Type::Infer(_) => {}
+            _ => {
+                let type_var = ctx.inference.new_type_variable(root.id);
+                debug!("Check expr root type result: {ty:?}");
+                ctx.inference
+                    .eq_relations
+                    .unify_var_value(type_var, UnifyValue::Known(ty))
+                    .unwrap();
+            }
+        }
+
+        (ty, hir_idx)
     }
 
     fn check_expr(
@@ -224,25 +239,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Struct(type_path, attributes), _expected_ty) => {
                 self.check_struct(type_path, attributes, expr.span, ctx)
             }
-            (ExprKind::Seq(aggr_expr_id, inner), Some(Type::Array(expected_elem_ty))) => {
+            (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
                 let aggr_body_idx = *ctx.aggr_body_map.get(&aggr_expr_id).unwrap();
+
+                let expr_id = self.expressions.alloc_expr_id();
+
+                let elem_ty = match expected_ty {
+                    Some(Type::Array(elem_ty)) => elem_ty,
+                    Some(_) => {
+                        return self.expr_error(
+                            CompileError::TODO(smart_format!("Must be a sequence")),
+                            &expr.span,
+                        )
+                    }
+                    None => self
+                        .types
+                        .intern(Type::Infer(ctx.inference.new_type_variable(expr_id))),
+                };
 
                 debug!("Seq(aggr_expr_id = {aggr_expr_id:?}) body_id={aggr_body_idx:?}");
 
                 // This expression id is used as an inference variable
-                let expr_id = self.expressions.alloc_expr_id();
-                let array_ty = {
-                    let inner_ty = self
-                        .types
-                        .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
-
-                    self.types.intern(Type::Array(inner_ty))
-                };
                 let expr_root = ExprRoot {
                     id: expr_id,
                     expr: *inner,
-                    expected_ty: Some(expected_elem_ty),
+                    expected_ty: Some(elem_ty),
                 };
 
                 {
@@ -263,6 +285,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .aggr_variables
                     .get(&aggr_body_idx)
                     .expect("No aggregation variable");
+
+                let array_ty = self.types.intern(Type::Array(elem_ty));
 
                 let aggr_node_id = ctx.nodes.add(HirNode {
                     ty: array_ty,
@@ -494,7 +518,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let (ty, node_idx) = self.check_expr(expr, Some(expected_ty), ctx);
         let inferred_ty = InferBestEffort {
             types: self.types,
-            ctx,
+            eq_relations: &mut ctx.inference.eq_relations,
         }
         .infer_rec(ty, expected_ty)
         .unwrap();
@@ -512,7 +536,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
         let mut infer_expect = InferExpect {
             types: self.types,
-            ctx,
+            eq_relations: &mut ctx.inference.eq_relations,
             type_eq,
         };
 

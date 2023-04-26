@@ -8,7 +8,7 @@ use crate::{
     types::{Type, TypeRef, Types},
 };
 
-use super::{check_expr::CheckExprContext, TypeEquation, TypeError};
+use super::{TypeEquation, TypeError};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeVar<'m>(pub u32, PhantomData<&'m ()>);
@@ -72,7 +72,7 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
 fn accept_unification<'m>(ty: &Type<'m>) -> Result<(), TypeError<'m>> {
     match ty {
         // FIXME: A variable should not be inferred to array, that must be explicit
-        Type::Array(_) => Err(TypeError::MustBeSequence),
+        // Type::Array(_) => Err(TypeError::MustBeSequence),
         _ => Ok(()),
     }
 }
@@ -100,6 +100,30 @@ impl<'m> Inference<'m> {
         var_equations.push(type_var);
 
         type_var
+    }
+}
+
+pub struct Infer<'c, 'm> {
+    pub types: &'c mut Types<'m>,
+    pub eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
+}
+
+impl<'c, 'm> Infer<'c, 'm> {
+    pub fn infer_recursive(&mut self, ty: TypeRef<'m>) -> Result<TypeRef<'m>, TypeError<'m>> {
+        match ty {
+            Type::Error => Err(TypeError::Propagated),
+            Type::Infer(var) => match self.eq_relations.probe_value(*var) {
+                UnifyValue::Known(ty) => Ok(ty),
+                UnifyValue::Unknown => Err(TypeError::NotEnoughInformation),
+            },
+            Type::Array(elem) => self
+                .infer_recursive(elem)
+                .map(|elem| self.types.intern(Type::Array(elem))),
+            Type::Option(item) => self
+                .infer_recursive(item)
+                .map(|item| self.types.intern(Type::Option(item))),
+            ty => Ok(ty),
+        }
     }
 }
 
@@ -134,7 +158,7 @@ pub trait InferRec<'m> {
 
 pub struct InferBestEffort<'c, 'm> {
     pub types: &'c mut Types<'m>,
-    pub ctx: &'c mut CheckExprContext<'m>,
+    pub eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
 }
 
 impl<'c, 'm> InferRec<'m> for InferBestEffort<'c, 'm> {
@@ -151,12 +175,10 @@ impl<'c, 'm> InferRec<'m> for InferBestEffort<'c, 'm> {
     ) -> Result<TypeRef<'m>, Self::Error> {
         match rhs {
             Type::Infer(_) => Ok(self.types.intern(Type::Infer(var))),
-            expected => match self.ctx.inference.eq_relations.probe_value(var) {
+            expected => match self.eq_relations.probe_value(var) {
                 UnifyValue::Known(ty) => Ok(ty),
                 UnifyValue::Unknown => {
-                    self.ctx
-                        .inference
-                        .eq_relations
+                    self.eq_relations
                         .unify_var_value(var, UnifyValue::Known(expected))
                         .unwrap_or_else(|err| panic!("infer {var:?} => {rhs:?} error: {err:?}"));
 
@@ -177,7 +199,7 @@ impl<'c, 'm> InferRec<'m> for InferBestEffort<'c, 'm> {
 
 pub struct InferExpect<'c, 'm> {
     pub types: &'c mut Types<'m>,
-    pub ctx: &'c mut CheckExprContext<'m>,
+    pub eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
     pub type_eq: TypeEquation<'m>,
 }
 
@@ -196,8 +218,6 @@ impl<'c, 'm> InferRec<'m> for InferExpect<'c, 'm> {
         match expected {
             Type::Infer(_) => Err(TypeError::NotEnoughInformation),
             expected => match self
-                .ctx
-                .inference
                 .eq_relations
                 .unify_var_value(var, UnifyValue::Known(expected))
             {

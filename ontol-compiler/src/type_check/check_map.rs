@@ -18,7 +18,8 @@ use crate::{
 
 use super::{
     check_expr::{AggregationGroup, BoundVariable, CheckExprContext},
-    TypeCheck,
+    inference::Infer,
+    TypeCheck, TypeError,
 };
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -68,6 +69,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // they get "initialized" inside check_expr.
         // Instead, check_expr has to notify which bodies are "done" and can be processed next.
         for body_index in 0..bodies_len {
+            debug!("Check body {body_index}");
+
             let expr_body = ctx.expr_body_mut(HirBodyIdx(body_index));
             let first_root = expr_body.first.take();
             let second_root = expr_body.second.take();
@@ -86,6 +89,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 });
 
                 bodies[body_index as usize] = HirBody { first, second };
+            }
+        }
+
+        // Type inference:
+        for node in &mut ctx.nodes.0 {
+            let mut infer = Infer {
+                types: self.types,
+                eq_relations: &mut ctx.inference.eq_relations,
+            };
+
+            match infer.infer_recursive(node.ty) {
+                Ok(ty) => node.ty = ty,
+                Err(TypeError::Propagated) => {}
+                Err(TypeError::NotEnoughInformation) => {
+                    self.error(
+                        CompileError::TODO(smart_format!("Not enough type information")),
+                        &node.span,
+                    );
+                }
+                _ => panic!("Unexpected inference error"),
             }
         }
 
