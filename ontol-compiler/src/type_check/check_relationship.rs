@@ -2,7 +2,10 @@ use ontol_runtime::{value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, DefReference, PropertyCardinality, Relation, RelationKind, Relationship},
+    def::{
+        BuiltinRelationKind, Def, DefKind, DefReference, PropertyCardinality, Relation,
+        RelationKind, Relationship,
+    },
     error::CompileError,
     mem::Intern,
     patterns::StringPatternSegment,
@@ -76,7 +79,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def(object.0.def_id);
 
         match &relation.1.kind {
-            RelationKind::Is => {
+            RelationKind::Builtin(BuiltinRelationKind::Is) => {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -131,7 +134,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
             }
-            RelationKind::Identifies => {
+            RelationKind::Builtin(BuiltinRelationKind::Identifies) => {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -159,7 +162,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            RelationKind::Indexed => {
+            RelationKind::Builtin(BuiltinRelationKind::Indexed) => {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -222,9 +225,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             RelationKind::FmtTransition(_) => return subject_ty,
-            RelationKind::Route => {
+            RelationKind::Builtin(BuiltinRelationKind::Route) => {
                 self.check_package_data_type(subject_ty, &subject.1);
                 self.check_package_data_type(object_ty, &object.1);
+            }
+            RelationKind::Builtin(BuiltinRelationKind::Doc | BuiltinRelationKind::Example) => {
+                return subject_ty
             }
         };
 

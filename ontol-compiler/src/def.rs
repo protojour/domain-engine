@@ -133,10 +133,17 @@ impl<'m> Relation<'m> {
 pub enum RelationKind {
     Named(DefReference),
     FmtTransition(DefReference),
+    Builtin(BuiltinRelationKind),
+}
+
+#[derive(Clone, Debug)]
+pub enum BuiltinRelationKind {
     Is,
     Identifies,
     Indexed,
     Route,
+    Doc,
+    Example,
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
@@ -276,6 +283,18 @@ impl<'m> Defs<'m> {
         );
 
         def_id
+    }
+
+    pub fn add_builtin_relation(&mut self, kind: BuiltinRelationKind) -> DefId {
+        self.add_def(
+            DefKind::Relation(Relation {
+                kind: RelationKind::Builtin(kind),
+                subject_prop: None,
+                object_prop: None,
+            }),
+            CORE_PKG,
+            SourceSpan::none(),
+        )
     }
 
     pub fn def_string_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {

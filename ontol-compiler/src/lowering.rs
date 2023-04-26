@@ -240,29 +240,29 @@ impl<'s, 'm> Lowering<'s, 'm> {
             object_cardinality,
         } = ast_relation;
 
-        let (kind, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
+        let (key, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
             match relation_ty {
                 ast::RelType::Type((ty, span)) => {
-                    let def = self.resolve_type_reference(ty, &span)?;
+                    let def_ref = self.resolve_type_reference(ty, &span)?;
 
-                    match self.compiler.defs.get_def_kind(def.def_id) {
+                    match self.compiler.defs.get_def_kind(def_ref.def_id) {
                         Some(DefKind::StringLiteral(_)) => {
-                            (RelationKind::Named(def), span.clone(), None)
+                            (RelationKey::Named(def_ref), span.clone(), None)
                         }
-                        Some(DefKind::Relation(relation)) => {
-                            (relation.kind.clone(), span.clone(), None)
+                        Some(DefKind::Relation(_relation)) => {
+                            (RelationKey::Builtin(def_ref.def_id), span.clone(), None)
                         }
                         _ => return Err((CompileError::InvalidRelationType, span)),
                     }
                 }
-                ast::RelType::IntRange((range, span)) => (RelationKind::Indexed, span, Some(range)),
+                ast::RelType::IntRange((range, span)) => (RelationKey::Indexed, span, Some(range)),
             };
 
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(&kind) {
-            ImplicitRelationId::New(relation_id) => {
+        let relation_id = match self.define_relation_if_undefined(key) {
+            ImplicitRelationId::New(kind, relation_id) => {
                 let object_prop =
                     object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
 
@@ -416,11 +416,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         span: Span,
     ) -> Res<DefId> {
         let transition_def = self.resolve_type_reference(transition.0, &transition.1)?;
-        let kind = RelationKind::FmtTransition(transition_def);
+        let relation_key = RelationKey::FmtTransition(transition_def);
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(&kind) {
-            ImplicitRelationId::New(relation_id) => {
+        let relation_id = match self.define_relation_if_undefined(relation_key) {
+            ImplicitRelationId::New(kind, relation_id) => {
                 self.set_def_kind(
                     relation_id.0,
                     DefKind::Relation(Relation {
@@ -813,27 +813,33 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, kind: &RelationKind) -> ImplicitRelationId {
-        match kind {
-            RelationKind::Named(def) | RelationKind::FmtTransition(def) => {
-                match self.compiler.relations.relations.entry(def.def_id) {
-                    Entry::Vacant(vacant) => ImplicitRelationId::New(*vacant.insert(RelationId(
-                        self.compiler.defs.alloc_def_id(self.src.package_id),
-                    ))),
+    fn define_relation_if_undefined(&mut self, key: RelationKey) -> ImplicitRelationId {
+        match key {
+            RelationKey::Named(def_ref) => {
+                match self.compiler.relations.relations.entry(def_ref.def_id) {
+                    Entry::Vacant(vacant) => ImplicitRelationId::New(
+                        RelationKind::Named(def_ref),
+                        *vacant.insert(RelationId(
+                            self.compiler.defs.alloc_def_id(self.src.package_id),
+                        )),
+                    ),
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationKind::Is => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.is_relation))
+            RelationKey::FmtTransition(def_ref) => {
+                match self.compiler.relations.relations.entry(def_ref.def_id) {
+                    Entry::Vacant(vacant) => ImplicitRelationId::New(
+                        RelationKind::FmtTransition(def_ref),
+                        *vacant.insert(RelationId(
+                            self.compiler.defs.alloc_def_id(self.src.package_id),
+                        )),
+                    ),
+                    Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
+                }
             }
-            RelationKind::Identifies => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.identifies_relation))
-            }
-            RelationKind::Indexed => {
+            RelationKey::Builtin(def_id) => ImplicitRelationId::Reused(RelationId(def_id)),
+            RelationKey::Indexed => {
                 ImplicitRelationId::Reused(RelationId(self.compiler.primitives.indexed_relation))
-            }
-            RelationKind::Route => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.route_relation))
             }
         }
     }
@@ -878,6 +884,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 }
 
+enum RelationKey {
+    Named(DefReference),
+    FmtTransition(DefReference),
+    Builtin(DefId),
+    Indexed,
+}
+
 #[derive(Clone)]
 enum BlockContext<'a> {
     NoContext,
@@ -885,7 +898,7 @@ enum BlockContext<'a> {
 }
 
 enum ImplicitRelationId {
-    New(RelationId),
+    New(RelationKind, RelationId),
     Reused(RelationId),
 }
 
