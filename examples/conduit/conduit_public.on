@@ -1,0 +1,63 @@
+type email { rel _ is: string }
+type username { rel _ is: string }
+type ArticleSlug { rel _ is: string }
+type CommentId { rel _ is: int }
+
+pub type User {
+    rel email identifies: _
+    rel _ 'email': email
+    rel _ 'username': string
+    rel _ 'bio': string
+    rel _ 'image'?: string
+}
+
+pub type Profile {
+    rel username identifies: _
+    rel _ 'username': username
+    rel _ 'bio': string
+    rel _ 'image'?: string
+    rel _ 'following': bool
+}
+
+pub type Article {
+    rel ArticleSlug identifies: _
+    rel _ 'slug': ArticleSlug
+    rel _ 'title': string
+    rel _ 'description': string
+    rel _ ['tagList']:  string
+    rel _ 'createdAt': datetime
+    rel _ 'updatedAt': datetime
+    rel _ 'favorited': bool
+    rel _ 'favoritesCount': int
+    rel _ 'author': Profile
+}
+
+pub type Comment {
+    rel CommentId identifies: _
+    rel _ 'id': CommentId
+    rel _ 'createdAt': datetime
+    rel _ 'updatedAt': datetime
+    rel _ 'body': string
+    rel _ 'author': Profile
+}
+
+pub type SingleArticle {
+    rel _ 'article': Article
+}
+
+pub type MultipleArticles {
+    rel _ ['articles']: Article
+    rel _ 'articlesCount': int
+}
+
+pub type SingleComment {
+    rel _ 'comment': Comment
+}
+
+pub type MultipleComments {
+    rel _ ['comments']: Comment
+}
+
+pub type Tags {
+    rel _ ['tags']: string
+}

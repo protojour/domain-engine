@@ -1,4 +1,5 @@
 mod test_compile_errors;
+mod test_conduit;
 mod test_deserialize;
 mod test_entity;
 mod test_faker;
