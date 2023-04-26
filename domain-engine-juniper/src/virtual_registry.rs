@@ -202,12 +202,26 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                         .arg::<Option<IndexedInputValue>>(name, &type_info),
                 }
             }
+            SerdeOperator::Struct(struct_op) => {
+                let type_index = self
+                    .virtual_schema
+                    .type_index_by_def(struct_op.def_variant.def_id, QueryLevel::Node)
+                    .expect("No struct found");
+                let type_info = self
+                    .virtual_schema
+                    .indexed_type_info(type_index, TypingPurpose::Input);
+
+                match opt {
+                    Optionality::Mandatory => {
+                        self.registry.arg::<IndexedInputValue>(name, &type_info)
+                    }
+                    Optionality::Optional => self
+                        .registry
+                        .arg::<Option<IndexedInputValue>>(name, &type_info),
+                }
+            }
             SerdeOperator::PrimaryId(..) => {
                 panic!()
-            }
-            SerdeOperator::Struct(_struct_op) => {
-                // self.register_def_argument(name, map_type.def_variant.def_id)
-                todo!()
             }
         }
     }

@@ -275,7 +275,7 @@ impl<'v> AttributeType<'v> {
         property_id: PropertyId,
         type_ref: TypeRef,
         virtual_schema: &Arc<VirtualSchema>,
-        _executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
+        executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let attribute = match map.get(&property_id) {
             Some(attribute) => attribute,
@@ -283,9 +283,11 @@ impl<'v> AttributeType<'v> {
         };
 
         match virtual_schema.lookup_type_index(type_ref.unit) {
-            Ok(_type_index) => {
-                panic!("type_index property. TODO: resolve using IndexedType")
-            }
+            Ok(type_index) => resolve_virtual_schema_field(
+                AttributeType { attr: attribute },
+                virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
+                executor,
+            ),
             Err(scalar_ref) => {
                 let scalar = virtual_schema
                     .env()

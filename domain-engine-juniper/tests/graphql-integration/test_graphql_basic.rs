@@ -86,6 +86,80 @@ async fn test_graphql_basic_schema() {
 }
 
 #[test(tokio::test)]
+async fn test_inner_struct() {
+    let (env, schema) = "
+    pub type foo_id { fmt '' => string => _ }
+    type inner {
+        rel _ 'prop': string
+    }
+    pub type foo {
+        rel foo_id identifies: _
+        rel _ 'inner': inner
+    }
+    "
+    .compile_schema();
+
+    let foo = TypeBinding::new(&env, "foo");
+    let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
+
+    {
+        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
+        assert_eq!(
+            "{
+            fooList {
+                edges {
+                    node {
+                        inner {
+                            prop
+                        }
+                    }
+                }
+            }
+        }"
+            .exec(&schema, &ctx)
+            .await,
+            Ok(graphql_value!({
+                "fooList": {
+                    "edges": [],
+                },
+            })),
+        );
+    }
+
+    {
+        let ctx = mock_gql_context(
+            EngineAPIMock::create_entity
+                .next_call(matching!(_, _))
+                .returns(Ok(entity.into())),
+        );
+        assert_eq!(
+            r#"mutation {
+                createfoo(
+                    input: {
+                        inner: {
+                            prop: "yo"
+                        }
+                    }
+                ) {
+                    inner {
+                        prop
+                    }
+                }
+            }"#
+            .exec(&schema, &ctx)
+            .await,
+            Ok(graphql_value!({
+                "createfoo": {
+                    "inner": {
+                        "prop": "yo"
+                    }
+                }
+            })),
+        );
+    }
+}
+
+#[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
     let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
     let artist = TypeBinding::new(&env, "artist");

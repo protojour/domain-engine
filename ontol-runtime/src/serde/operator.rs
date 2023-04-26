@@ -54,11 +54,11 @@ pub enum SerdeOperator {
     /// A type with multiple anonymous properties, equivalent to a union of types
     Union(UnionOperator),
 
-    /// A map with one property: A primary id
-    PrimaryId(String, SerdeOperatorId),
-
     /// A type with many properties
     Struct(StructOperator),
+
+    /// A map with one property: A primary id
+    PrimaryId(String, SerdeOperatorId),
 }
 
 #[derive(Debug)]
