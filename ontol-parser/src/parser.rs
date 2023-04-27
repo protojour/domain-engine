@@ -120,22 +120,47 @@ fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
     doc_comments()
         .then(keyword(Token::Rel))
         // subject
-        .then(spanned_ty_or_underscore())
+        .then(with_unit_or_seq(spanned_ty_or_underscore()))
         // relation
         .then(relation())
         // object
-        .then(spanned_ty_or_underscore())
+        .then(with_unit_or_seq(spanned_ty_or_underscore()))
         .then(spanned(ctx_block).or_not())
         .map(
-            |(((((docs, kw), subject), relation), object), ctx_block)| RelStatement {
+            |(
+                ((((docs, kw), (obj_unit_or_seq, subject)), relation), (subj_unit_or_seq, object)),
+                ctx_block,
+            )| RelStatement {
                 docs,
                 kw,
                 subject,
-                relation,
+                relation: Relation {
+                    subject_cardinality: compose_cardinality(
+                        relation.subject_cardinality,
+                        subj_unit_or_seq,
+                    ),
+                    object_cardinality: compose_cardinality(
+                        relation.object_cardinality,
+                        obj_unit_or_seq,
+                    ),
+                    ..relation
+                },
                 object,
                 ctx_block,
             },
         )
+}
+
+fn compose_cardinality(
+    cardinality: Option<Cardinality>,
+    unit_or_seq: UnitOrSeq,
+) -> Option<Cardinality> {
+    match (cardinality, unit_or_seq) {
+        (None, UnitOrSeq::Unit) => None,
+        (None, UnitOrSeq::Seq) => Some(Cardinality::Many),
+        (Some(_), UnitOrSeq::Unit) => Some(Cardinality::Optional),
+        (Some(_), UnitOrSeq::Seq) => Some(Cardinality::OptionalMany),
+    }
 }
 
 fn relation() -> impl AstParser<Relation> {
@@ -145,51 +170,29 @@ fn relation() -> impl AstParser<Relation> {
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
     // type
-    with_cardinality(rel_ty)
+    rel_ty
+        .then(sigil('?').or_not())
         .then_ignore(colon())
         // object prop and cardinality
         .then(
             colon()
-                .ignore_then(with_cardinality(spanned(string_literal())))
+                .ignore_then(spanned(string_literal()).then(sigil('?').or_not()))
                 .or_not(),
         )
-        .map(|((ty, subject_cardinality), object)| {
+        .map(|((ty, subject_optional), object)| {
             let (object_prop_ident, object_cardinality) = match object {
-                Some((prop, cardinality)) => (Some(prop), cardinality),
+                Some((prop, object_optional)) => {
+                    (Some(prop), object_optional.map(|_| Cardinality::Optional))
+                }
                 None => (None, None),
             };
 
             Relation {
                 ty,
-                subject_cardinality,
+                subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
                 object_prop_ident,
                 object_cardinality,
             }
-        })
-}
-
-/// parse `inner`, `[inner]`, `inner?` or `[inner]?`
-fn with_cardinality<T>(
-    inner: impl AstParser<T> + Clone,
-) -> impl AstParser<(T, Option<Cardinality>)> {
-    struct Many(bool);
-    struct Optional(bool);
-
-    inner
-        .clone()
-        .map(|item| (item, Many(false)))
-        .or(inner
-            .delimited_by(open('['), close(']'))
-            .map(|item| (item, Many(true))))
-        .then(sigil('?').or_not().map(|q| Optional(q.is_some())))
-        .map(|((item, many), optional)| {
-            let cardinality = match (many, optional) {
-                (Many(true), Optional(true)) => Some(Cardinality::OptionalMany),
-                (Many(true), Optional(false)) => Some(Cardinality::Many),
-                (Many(false), Optional(true)) => Some(Cardinality::Optional),
-                (Many(false), Optional(false)) => None,
-            };
-            (item, cardinality)
         })
 }
 
@@ -212,10 +215,10 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         })
 }
 
-fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<UnitOrSeq<T>> {
-    inner.clone().map(|unit| UnitOrSeq::Unit(unit)).or(inner
+fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(UnitOrSeq, T)> {
+    inner.clone().map(|unit| (UnitOrSeq::Unit, unit)).or(inner
         .delimited_by(open('['), close(']'))
-        .map(|seq| UnitOrSeq::Seq(seq)))
+        .map(|seq| (UnitOrSeq::Seq, seq)))
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {
@@ -238,10 +241,8 @@ fn pattern() -> impl AstParser<Pattern> {
     recursive(|pattern| {
         spanned(with_unit_or_seq(struct_pattern(pattern)))
             .map(Pattern::Struct)
-            .or(with_unit_or_seq(expr_pattern()).map(|expr| match expr {
-                UnitOrSeq::Unit((u, span)) => Pattern::Expr((UnitOrSeq::Unit(u), span)),
-                UnitOrSeq::Seq((s, span)) => Pattern::Expr((UnitOrSeq::Seq(s), span)),
-            }))
+            .or(with_unit_or_seq(expr_pattern())
+                .map(|(unit_or_seq, (expr, span))| Pattern::Expr(((unit_or_seq, expr), span))))
     })
 }
 

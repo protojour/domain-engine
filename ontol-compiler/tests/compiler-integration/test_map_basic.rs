@@ -263,8 +263,8 @@ fn test_map_matching_array() {
     "
     pub type foo
     pub type bar
-    rel foo ['a']: int
-    rel bar ['b']: int
+    rel foo 'a': [int]
+    rel bar 'b': [int]
     map x {
         foo {
             rel 'a': [x]
@@ -294,8 +294,8 @@ fn test_map_matching_array() {
 const MAP_IN_ARRAY: &str = "
 type foo { rel _ 'f': string }
 type bar { rel _ 'b': string }
-pub type foos { rel _ ['foos']: foo }
-pub type bars { rel _ ['bars']: bar }
+pub type foos { rel _ 'foos': [foo] }
+pub type bars { rel _ 'bars': [bar] }
 
 map x {
     foos {
@@ -380,12 +380,12 @@ fn test_aggr_cross_parallel() {
     }
 
     pub type foos {
-        rel _ ['f1']: foo
-        rel _ ['f2']: foo
+        rel _ 'f1': [foo]
+        rel _ 'f2': [foo]
     }
     pub type bars {
-        rel _ ['b1']: bar
-        rel _ ['b2']: bar
+        rel _ 'b1': [bar]
+        rel _ 'b2': [bar]
     }
     map a b {
         foos {
@@ -419,20 +419,20 @@ fn test_aggr_multi_level() {
     }
 
     pub type f0 {
-        rel _ ['a']: foo
-        rel _ ['b']: foo
+        rel _ 'a': [foo]
+        rel _ 'b': [foo]
     }
     pub type f1 {
-        rel _ ['a']: f0
-        rel _ ['b']: f0
+        rel _ 'a': [f0]
+        rel _ 'b': [f0]
     }
     pub type b0 {
-        rel _ ['a']: bar
-        rel _ ['b']: bar
+        rel _ 'a': [bar]
+        rel _ 'b': [bar]
     }
     pub type b1 {
-        rel _ ['a']: b0
-        rel _ ['b']: b0
+        rel _ 'a': [b0]
+        rel _ 'b': [b0]
     }
     map v0 v1 v2 v3 {
         f1 {
@@ -476,7 +476,7 @@ fn test_flat_map1() {
 
     with foo {
         rel _ 'a': string
-        rel _ ['inner']: foo_inner
+        rel _ 'inner': [foo_inner]
     }
     with foo_inner {
         rel _ 'b': string

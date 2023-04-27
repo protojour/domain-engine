@@ -24,7 +24,7 @@ pub type Article {
     rel _ 'slug': ArticleSlug
     rel _ 'title': string
     rel _ 'description': string
-    rel _ ['tagList']:  string
+    rel _ 'tagList':  [string]
     rel _ 'createdAt': datetime
     rel _ 'updatedAt': datetime
     rel _ 'favorited': bool
@@ -46,7 +46,7 @@ pub type SingleArticle {
 }
 
 pub type MultipleArticles {
-    rel _ ['articles']: Article
+    rel _ 'articles': [Article]
     rel _ 'articlesCount': int
 }
 
@@ -55,9 +55,9 @@ pub type SingleComment {
 }
 
 pub type MultipleComments {
-    rel _ ['comments']: Comment
+    rel _ 'comments': [Comment]
 }
 
 pub type Tags {
-    rel _ ['tags']: string
+    rel _ 'tags': [string]
 }

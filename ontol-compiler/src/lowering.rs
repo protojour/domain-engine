@@ -566,12 +566,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_struct_pattern_root(
         &mut self,
-        (unit_or_seq, span): (ast::UnitOrSeq<ast::StructPattern>, Span),
+        ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::StructPattern), Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
         let expr = match unit_or_seq {
-            ast::UnitOrSeq::Unit(ast) => self.lower_struct_pattern((ast, span), var_table)?,
-            ast::UnitOrSeq::Seq(ast) => {
+            ast::UnitOrSeq::Unit => self.lower_struct_pattern((ast, span), var_table)?,
+            ast::UnitOrSeq::Seq => {
                 let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_struct_pattern((ast, span.clone()), var_table)?;
                 self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span)
@@ -641,18 +641,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
         match pattern {
-            ast::Pattern::Expr((ast::UnitOrSeq::Unit(expr_pat), _)) => {
+            ast::Pattern::Expr(((ast::UnitOrSeq::Unit, expr_pat), _)) => {
                 self.lower_expr_pattern((expr_pat, span), var_table)
             }
-            ast::Pattern::Expr((ast::UnitOrSeq::Seq(expr_pat), _)) => {
+            ast::Pattern::Expr(((ast::UnitOrSeq::Seq, expr_pat), _)) => {
                 let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_expr_pattern((expr_pat, span.clone()), var_table)?;
                 Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
             }
-            ast::Pattern::Struct((ast::UnitOrSeq::Unit(struct_pat), span)) => {
+            ast::Pattern::Struct(((ast::UnitOrSeq::Unit, struct_pat), span)) => {
                 self.lower_struct_pattern((struct_pat, span), var_table)
             }
-            ast::Pattern::Struct((ast::UnitOrSeq::Seq(struct_pat), span)) => {
+            ast::Pattern::Struct(((ast::UnitOrSeq::Seq, struct_pat), span)) => {
                 let seq_id = var_table.new_aggregation_group();
                 let inner = self.lower_struct_pattern((struct_pat, span.clone()), var_table)?;
                 Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))

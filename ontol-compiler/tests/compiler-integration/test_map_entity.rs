@@ -16,7 +16,7 @@ with worker {
     rel worker_id identifies: _
     rel _ 'name': string
     
-    rel _ ['technologies']: technology
+    rel _ 'technologies': [technology]
 }
 
 with technology {
@@ -38,7 +38,7 @@ with language {
     rel lang_id identifies: _
 
     rel _ 'name': string
-    rel _ ['developers']: developer
+    rel _ 'developers': [developer]
 }
 
 with developer {

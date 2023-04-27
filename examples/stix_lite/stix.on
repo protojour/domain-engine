@@ -95,7 +95,7 @@ type granular-marking {
     /// The `marking-definition` referenced in the **marking_ref** property is applied to the content selected by the selectors in this list.
     ///
     /// The [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code specified by the lang property is applied to the content selected by the selectors in this list.
-    rel _ ['selectors']: string
+    rel _ 'selectors': [string]
 }
 
 type kill-chain-phase {
@@ -161,7 +161,7 @@ type stix_domain_relationship_object {
     /// Where an object has a specific property defined in the specification for characterizing subtypes of that object, the labels property **MUST NOT** be used for that purpose.
     ///
     /// For example, the Malware SDO has a property **malware_types** that contains a list of Malware subtypes (dropper, RAT, etc.). In this example, the labels property cannot be used to describe these Malware subtypes.
-    rel _ ['labels']?: string
+    rel _ 'labels'?: [string]
 
     /// The **confidence** property identifies the confidence that the creator has in the correctness of their data.
     /// The confidence value **MUST** be a number in the range of 0-100.
@@ -182,7 +182,7 @@ type stix_domain_relationship_object {
 
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
-    rel _ ['external_references']?: external-reference
+    rel _ 'external_references'?: [external-reference]
 }
 
 type stix_markings_object {
@@ -192,7 +192,7 @@ type stix_markings_object {
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel _ ['object_marking_refs']?: marking-definition-id
+    rel _ 'object_marking_refs'?: [marking-definition-id]
 
     /// The **granular_markings** property specifies a list of granular markings applied to this object.
     ///
@@ -200,7 +200,7 @@ type stix_markings_object {
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel _ ['granular_markings']?: granular-marking
+    rel _ 'granular_markings'?: [granular-marking]
 }
 
 /// STIX defines a set of STIX Domain Objects (SDOs): Attack Pattern, Campaign, Course of Action, Grouping, Identity, Indicator, Infrastructure, Intrusion Set, Location, Malware, Malware Analysis, Note, Observed Data, Opinion, Report, Threat Actor, Tool, and Vulnerability.
@@ -255,10 +255,10 @@ pub type attack-pattern {
     rel _ 'description'?: string
 
     /// Alternative names used to identify this Attack Pattern.
-    rel _ ['aliases']?: string
+    rel _ 'aliases'?: [string]
 
     /// The list of Kill Chain Phases for which this Attack Pattern is used.
-    rel _ ['kill_chain_phases']?: kill-chain-phase
+    rel _ 'kill_chain_phases'?: [kill-chain-phase]
 }
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, or groups.

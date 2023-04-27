@@ -323,12 +323,12 @@ fn map_type_mismatch_in_func() {
 fn map_array_mismatch() {
     "
     type foo
-    rel foo ['a']: string
-    rel foo ['b']: string
+    rel foo 'a': [string]
+    rel foo 'b': [string]
 
     type bar
     rel bar 'a': string
-    rel bar ['b']: int
+    rel bar 'b': [int]
 
     map x y {
         foo {
@@ -347,8 +347,8 @@ fn map_array_mismatch() {
 #[test]
 fn array_map_without_brackets() {
     "
-    type foo { rel _ ['a']: string }
-    type bar { rel _ ['b']: string }
+    type foo { rel _ 'a': [string] }
+    type bar { rel _ 'b': [string] }
 
     map x {
         foo {
@@ -377,8 +377,8 @@ fn only_entities_may_have_reverse_relationship() {
     "
     type foo
     type bar
-    rel foo 'a'::['aa'] bar {} // ERROR only entities may have named reverse relationship
-    rel foo 'b'::['bb'] string // ERROR only entities may have named reverse relationship
+    rel [foo] 'a'::'aa' bar {} // ERROR only entities may have named reverse relationship
+    rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -440,7 +440,7 @@ fn various_monadic_properties() {
     rel bar 'maybe'?: string
 
     // bar and string may be related via b many times
-    rel bar ['array']: string
+    rel bar 'array': [string]
 
     // a is either a string or null
     rel bar 'nullable': string
