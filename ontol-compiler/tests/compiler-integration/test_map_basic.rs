@@ -204,117 +204,6 @@ fn test_map_value_to_map_func() {
 }
 
 #[test]
-fn test_map_matching_array() {
-    "
-    pub type foo
-    pub type bar
-    rel foo ['a']: int
-    rel bar ['b']: int
-    map x {
-        foo {
-            rel 'a': [x]
-        }
-        bar {
-            rel 'b': [x]
-        }
-    }
-    "
-    .compile_ok(|env| {
-        assert_domain_map(
-            &env,
-            ("foo", "bar"),
-            json!({ "a": [42] }),
-            json!({ "b": [42] }),
-        );
-        assert_domain_map(
-            &env,
-            ("bar", "foo"),
-            json!({ "b": [42] }),
-            json!({ "a": [42] }),
-        );
-    });
-}
-
-// map call inside array
-const DEEP_ARRAY: &str = "
-type foo { rel _ 'f': string }
-type bar { rel _ 'b': string }
-pub type foos { rel _ ['foos']: foo }
-pub type bars { rel _ ['bars']: bar }
-
-map x {
-    foos {
-        rel 'foos': [x]
-    }
-    bars {
-        rel 'bars': [x]
-    }
-}
-map x {
-    foo {
-        rel 'f': x
-    }
-    bar {
-        rel 'b': x
-    }
-}
-";
-
-#[test]
-fn test_map_deep_array_item_empty() {
-    DEEP_ARRAY.compile_ok(|env| {
-        assert_domain_map(
-            &env,
-            ("foos", "bars"),
-            json!({ "foos": [] }),
-            json!({ "bars": [] }),
-        );
-        assert_domain_map(
-            &env,
-            ("bars", "foos"),
-            json!({ "bars": [] }),
-            json!({ "foos": [] }),
-        );
-    });
-}
-
-#[test]
-fn test_map_deep_array_item_one() {
-    DEEP_ARRAY.compile_ok(|env| {
-        assert_domain_map(
-            &env,
-            ("foos", "bars"),
-            json!({ "foos": [{ "f": "42" }] }),
-            json!({ "bars": [{ "b": "42" }] }),
-        );
-        assert_domain_map(
-            &env,
-            ("bars", "foos"),
-            json!({ "bars": [{ "b": "42" }] }),
-            json!({ "foos": [{ "f": "42" }] }),
-        );
-    });
-}
-
-#[test]
-fn test_map_deep_array_item_many() {
-    DEEP_ARRAY.compile_ok(|env| {
-        assert_domain_map(
-            &env,
-            ("foos", "bars"),
-            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
-            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
-        );
-        assert_domain_map(
-            &env,
-            ("bars", "foos"),
-            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
-            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
-        );
-    });
-}
-
-#[test]
 fn test_deep_structural_map() {
     "
     pub type foo
@@ -365,6 +254,157 @@ fn test_deep_structural_map() {
             ("foo", "bar"),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
+        );
+    });
+}
+
+#[test]
+fn test_map_matching_array() {
+    "
+    pub type foo
+    pub type bar
+    rel foo ['a']: int
+    rel bar ['b']: int
+    map x {
+        foo {
+            rel 'a': [x]
+        }
+        bar {
+            rel 'b': [x]
+        }
+    }
+    "
+    .compile_ok(|env| {
+        assert_domain_map(
+            &env,
+            ("foo", "bar"),
+            json!({ "a": [42] }),
+            json!({ "b": [42] }),
+        );
+        assert_domain_map(
+            &env,
+            ("bar", "foo"),
+            json!({ "b": [42] }),
+            json!({ "a": [42] }),
+        );
+    });
+}
+
+// map call inside array
+const MAP_IN_ARRAY: &str = "
+type foo { rel _ 'f': string }
+type bar { rel _ 'b': string }
+pub type foos { rel _ ['foos']: foo }
+pub type bars { rel _ ['bars']: bar }
+
+map x {
+    foos {
+        rel 'foos': [x]
+    }
+    bars {
+        rel 'bars': [x]
+    }
+}
+map x {
+    foo {
+        rel 'f': x
+    }
+    bar {
+        rel 'b': x
+    }
+}
+";
+
+#[test]
+fn test_map_in_array_item_empty() {
+    MAP_IN_ARRAY.compile_ok(|env| {
+        assert_domain_map(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [] }),
+            json!({ "bars": [] }),
+        );
+        assert_domain_map(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [] }),
+            json!({ "foos": [] }),
+        );
+    });
+}
+
+#[test]
+fn test_map_in_array_item_one() {
+    MAP_IN_ARRAY.compile_ok(|env| {
+        assert_domain_map(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [{ "f": "42" }] }),
+            json!({ "bars": [{ "b": "42" }] }),
+        );
+        assert_domain_map(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [{ "b": "42" }] }),
+            json!({ "foos": [{ "f": "42" }] }),
+        );
+    });
+}
+
+#[test]
+fn test_map_in_array_item_many() {
+    MAP_IN_ARRAY.compile_ok(|env| {
+        assert_domain_map(
+            &env,
+            ("foos", "bars"),
+            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
+            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+        );
+        assert_domain_map(
+            &env,
+            ("bars", "foos"),
+            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
+        );
+    });
+}
+
+#[test]
+fn test_aggr_cross_parallel() {
+    "
+    type foo { rel _ 'f': string }
+    type bar { rel _ 'b': string }
+    pub type foos {
+        rel _ ['f1']: foo
+        rel _ ['f2']: foo
+    }
+    pub type bars {
+        rel _ ['b1']: bar
+        rel _ ['b2']: bar
+    }
+
+    map a b {
+        foos {
+            rel 'f1': [a]
+            rel 'f2': [b]
+        }
+        bars {
+            rel 'b2': [b]
+            rel 'b1': [a]
+        }
+    }
+
+    map x {
+        foo { rel 'f': x }
+        bar { rel 'b': x }
+    }
+    "
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("foos", "bars"),
+            json!({ "f1": [{ "f": "1A" }, { "f": "1B" }], "f2": [{ "f": "2" }] }),
+            json!({ "b1": [{ "b": "1A" }, { "b": "1B" }], "b2": [{ "b": "2" }] }),
         );
     });
 }
