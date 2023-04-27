@@ -374,6 +374,11 @@ fn test_aggr_cross_parallel() {
     "
     type foo { rel _ 'f': string }
     type bar { rel _ 'b': string }
+    map x {
+        foo { rel 'f': x }
+        bar { rel 'b': x }
+    }
+
     pub type foos {
         rel _ ['f1']: foo
         rel _ ['f2']: foo
@@ -382,7 +387,6 @@ fn test_aggr_cross_parallel() {
         rel _ ['b1']: bar
         rel _ ['b2']: bar
     }
-
     map a b {
         foos {
             rel 'f1': [a]
@@ -393,11 +397,6 @@ fn test_aggr_cross_parallel() {
             rel 'b1': [a]
         }
     }
-
-    map x {
-        foo { rel 'f': x }
-        bar { rel 'b': x }
-    }
     "
     .compile_ok(|test_env| {
         assert_domain_map(
@@ -405,6 +404,65 @@ fn test_aggr_cross_parallel() {
             ("foos", "bars"),
             json!({ "f1": [{ "f": "1A" }, { "f": "1B" }], "f2": [{ "f": "2" }] }),
             json!({ "b1": [{ "b": "1A" }, { "b": "1B" }], "b2": [{ "b": "2" }] }),
+        );
+    });
+}
+
+#[test]
+fn test_aggr_multi_level() {
+    "
+    type foo { rel _ 'P': string }
+    type bar { rel _ 'Q': string }
+    map x {
+        foo { rel 'P': x }
+        bar { rel 'Q': x }
+    }
+
+    pub type f0 {
+        rel _ ['a']: foo
+        rel _ ['b']: foo
+    }
+    pub type f1 {
+        rel _ ['a']: f0
+        rel _ ['b']: f0
+    }
+    pub type b0 {
+        rel _ ['a']: bar
+        rel _ ['b']: bar
+    }
+    pub type b1 {
+        rel _ ['a']: b0
+        rel _ ['b']: b0
+    }
+    map v0 v1 v2 v3 {
+        f1 {
+            rel 'a': [f0 {
+                rel 'a': [v0]
+                rel 'b': [v1]
+            }]
+            rel 'b': [f0 {
+                rel 'a': [v2]
+                rel 'b': [v3]
+            }]
+        }
+        b1 {
+            rel 'b': [b0 {
+                rel 'b': [v3]
+                rel 'a': [v2]
+            }]
+            rel 'a': [b0 {
+                rel 'b': [v1]
+                rel 'a': [v0]
+            }]
+        }
+    }
+    "
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("f1", "b1"),
+            json!({ "a": [{ "a": [{ "P": "0" }], "b": [{ "P": "1" }]}], "b": [{ "a": [{ "P": "2" }], "b": [{ "P": "3" }]}]}),
+            json!({ "a": [{ "a": [{ "Q": "0" }], "b": [{ "Q": "1" }]}], "b": [{ "a": [{ "Q": "2" }], "b": [{ "Q": "3" }]}]}),
         );
     });
 }

@@ -1,6 +1,6 @@
 use ontol_runtime::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
-use tracing::debug;
+use tracing::{debug, Level};
 
 use crate::{codegen::optimize::optimize, SourceSpan};
 
@@ -95,24 +95,11 @@ impl ProcBuilder {
             block_addr += block.ir.len() as u32 + 1;
         }
 
-        let mut index = 0;
-        debug!("Proc ({:?}):", self.n_params);
-        for (block_index, block) in self.blocks.iter().enumerate() {
-            debug!("  BlockIndex({block_index}):");
-
-            for (ir, _) in &block.ir {
-                debug!("    {index}: {ir:?}");
-                index += 1;
-            }
-
-            debug!("    T: {:?}", block.terminator);
-
-            index += 1;
+        if tracing::enabled!(Level::DEBUG) {
+            self.debug_blocks();
         }
 
         optimize(&mut self);
-
-        // assert_eq!(0, self.depth);
 
         let mut output = smallvec![];
 
@@ -152,18 +139,37 @@ impl ProcBuilder {
             }
         }
 
-        debug!(
-            "Built proc: {:?} {:#?}",
-            self.n_params,
-            output
-                .iter()
-                .enumerate()
-                .map(|(index, (opcode, _))| format!("{index}: {opcode:?}"))
-                .collect::<Vec<_>>()
-        );
+        if tracing::enabled!(Level::DEBUG) {
+            debug_output(self.n_params, &output);
+        }
 
         output
     }
+
+    fn debug_blocks(&self) {
+        debug!("Proc ({:?}):", self.n_params);
+        for (block_index, block) in self.blocks.iter().enumerate() {
+            debug!("  BlockIndex({block_index}):");
+
+            for (index, (ir, _)) in block.ir.iter().enumerate() {
+                debug!("    {index}: {ir:?}");
+            }
+
+            debug!("    T: {:?}", block.terminator);
+        }
+    }
+}
+
+fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
+    debug!(
+        "Built proc: {:?} {:#?}",
+        n_params,
+        output
+            .iter()
+            .enumerate()
+            .map(|(index, (opcode, _))| format!("{index}: {opcode:?}"))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[allow(unused)]
