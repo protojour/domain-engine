@@ -85,7 +85,7 @@ fn define_locals(
     for unpack_prop in unpack_props {
         match &unpack_prop.kind {
             UnpackKind::Leaf(property_id) => {
-                gen.builder.push(
+                gen.builder.append(
                     block,
                     Ir::TakeAttr2(source_local, *property_id),
                     Stack(2),
@@ -97,7 +97,7 @@ fn define_locals(
                 property_id,
                 unpack_props: inner_unpack_props,
             } => {
-                gen.builder.push(
+                gen.builder.append(
                     block,
                     Ir::TakeAttr2(source_local, *property_id),
                     Stack(2),

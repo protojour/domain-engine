@@ -43,7 +43,6 @@ pub trait Stack {
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
     fn bump(&mut self, source: Local);
-    fn remove(&mut self, local: Local);
     fn pop_until(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
@@ -113,10 +112,6 @@ impl<'l> AbstractVm<'l> {
                 }
                 OpCode::Bump(source) => {
                     stack.bump(*source);
-                    self.program_counter += 1;
-                }
-                OpCode::Remove(local) => {
-                    stack.remove(*local);
                     self.program_counter += 1;
                 }
                 OpCode::PopUntil(local) => {

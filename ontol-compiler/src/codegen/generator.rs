@@ -130,7 +130,7 @@ impl<'a> CodeGenerator<'a> {
 
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
-                self.builder.push(
+                self.builder.append(
                     block,
                     Ir::CallBuiltin(*proc, return_def_id),
                     stack_delta,
@@ -141,7 +141,7 @@ impl<'a> CodeGenerator<'a> {
                 let return_def_id = expr.ty.get_single_def_id().unwrap();
 
                 self.builder
-                    .push(block, Ir::Constant(*k, return_def_id), Stack(1), span);
+                    .append(block, Ir::Constant(*k, return_def_id), Stack(1), span);
             }
             HirKind::Variable(var) => {
                 self.codegen_variable(block, *var, &span)?;
@@ -162,14 +162,14 @@ impl<'a> CodeGenerator<'a> {
                     n_params: NParams(1),
                 };
 
-                self.builder.push(block, Ir::Call(proc), Stack(0), span);
+                self.builder.append(block, Ir::Call(proc), Stack(0), span);
             }
             HirKind::Aggr(seq_idx, body_idx) => {
                 let return_def_id = expr.ty.get_single_def_id().unwrap_or_else(|| {
                     panic!("No def id found in {:?}", expr.ty);
                 });
                 let output = match expr.ty {
-                    Type::Array(_) => self.builder.push(
+                    Type::Array(_) => self.builder.append(
                         block,
                         Ir::CallBuiltin(BuiltinProc::NewSeq, return_def_id),
                         Stack(1),
@@ -185,7 +185,7 @@ impl<'a> CodeGenerator<'a> {
 
                 let counter =
                     self.builder
-                        .push(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
+                        .append(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
 
                 let iter_offset = block.current_offset();
 
@@ -197,38 +197,33 @@ impl<'a> CodeGenerator<'a> {
                     self.codegen_body(&mut block2, equation, *body_idx)?;
 
                     self.builder
-                        .push(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
+                        .append(&mut block2, Ir::Clone(rel_params_local), Stack(1), span);
 
                     // still two items on the stack: append to original sequence
                     // for now, rel_params is not mapped
                     // FIXME: This is only correct for sequence generation:
                     self.builder
-                        .push(&mut block2, Ir::AppendAttr2(output), Stack(-2), span);
+                        .append(&mut block2, Ir::AppendAttr2(output), Stack(-2), span);
 
-                    let stack_pop = Stack(counter.0 as i32 - self.builder.top().0 as i32);
-
-                    self.builder
-                        .push(&mut block2, Ir::PopUntil(counter), stack_pop, span);
+                    self.builder.append_pop_until(block, counter, span);
 
                     self.builder
                         .commit(block2, Terminator::PopGoto(block.index(), iter_offset))
                 };
 
-                self.builder.push(
+                self.builder.append(
                     block,
                     Ir::Iter(input_seq, counter, for_each_body_index),
                     Stack(0),
                     span,
                 );
-                self.builder
-                    .push(block, Ir::Remove(counter), Stack(-1), span);
-                self.builder
-                    .push(block, Ir::Remove(input_seq), Stack(-1), span);
+
+                self.builder.append_pop_until(block, output, span);
             }
             HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx)?,
             HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();
-                let local = self.builder.push(
+                let local = self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewMap, *def_id),
                     Stack(1),
@@ -237,7 +232,7 @@ impl<'a> CodeGenerator<'a> {
 
                 for (property_id, node_id) in attrs {
                     self.codegen_expr(block, equation, *node_id)?;
-                    self.builder.push(
+                    self.builder.append(
                         block,
                         Ir::PutAttrValue(local, *property_id),
                         Stack(-1),
@@ -261,7 +256,8 @@ impl<'a> CodeGenerator<'a> {
     ) -> CodegenResult<()> {
         for scope in self.scope_stack.iter().rev() {
             if let Some(local) = scope.in_scope.get(&var) {
-                self.builder.push(block, Ir::Clone(*local), Stack(1), *span);
+                self.builder
+                    .append(block, Ir::Clone(*local), Stack(1), *span);
                 return Ok(());
             }
         }

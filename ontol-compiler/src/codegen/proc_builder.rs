@@ -70,7 +70,7 @@ impl ProcBuilder {
     }
 
     /// Generate one instruction in the given block
-    pub fn push(
+    pub fn append(
         &mut self,
         block: &mut Block,
         ir: Ir,
@@ -81,6 +81,11 @@ impl ProcBuilder {
         self.stack_size += stack_delta.0;
         block.ir.push((ir, span));
         local
+    }
+
+    pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
+        let stack_delta = Stack(local.0 as i32 - self.top().0 as i32);
+        self.append(block, Ir::PopUntil(local), stack_delta, span);
     }
 
     pub fn build(mut self) -> SpannedOpCodes {
@@ -109,7 +114,6 @@ impl ProcBuilder {
                     Ir::Call(proc) => OpCode::Call(proc),
                     Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
                     Ir::PopUntil(local) => OpCode::PopUntil(local),
-                    Ir::Remove(local) => OpCode::Remove(local),
                     Ir::Clone(local) => OpCode::Clone(local),
                     Ir::Bump(local) => OpCode::Bump(local),
                     Ir::Iter(seq, counter, block_index) => OpCode::Iter(

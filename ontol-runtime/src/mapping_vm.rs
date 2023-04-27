@@ -102,12 +102,6 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn remove(&mut self, local: Local) {
-        let stack_pos = self.local0_pos;
-        self.stack.remove(stack_pos + local.0 as usize);
-    }
-
-    #[inline(always)]
     fn pop_until(&mut self, local: Local) {
         self.stack.truncate(self.local0_pos + local.0 as usize + 1);
     }
@@ -427,8 +421,6 @@ mod tests {
                 OpCode::Iter(Local(0), Local(2), AddressOffset(4)),
                 OpCode::Return(Local(1)),
                 // Offset(4): map item
-                // remove rel params
-                OpCode::Remove(Local(3)),
                 OpCode::PushConstant(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
                 // add rel params
@@ -491,8 +483,7 @@ mod tests {
                 OpCode::PutUnitAttr(Local(9), prop_b),
                 OpCode::Bump(Local(7)),
                 OpCode::AppendAttr2(Local(6)),
-                OpCode::Remove(Local(8)),
-                OpCode::Remove(Local(7)),
+                OpCode::PopUntil(Local(6)),
                 OpCode::Goto(AddressOffset(4)),
             ],
         );

@@ -16,7 +16,6 @@ pub enum Ir {
     Call(Procedure),
     CallBuiltin(BuiltinProc, DefId),
     PopUntil(Local),
-    Remove(Local),
     /// Clone a local and put top of stack
     Clone(Local),
     /// Bump some local to top, leaving Unit behind
