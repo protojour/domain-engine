@@ -29,6 +29,27 @@ fn test_fake_primitives() {
 }
 
 #[test]
+fn test_fake_string_like_types() {
+    "
+    pub type foo {
+        rel _ 'id': uuid
+        rel _ 'created_at': datetime
+    }
+    "
+    .compile_ok(|test_env| {
+        let foo = TypeBinding::new(&test_env, "foo");
+
+        assert_eq!(
+            foo.serialize_identity_json(&foo.new_fake(ProcessorMode::Create)),
+            json!({
+                "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
+                "created_at": "1943-07-25T19:00:15.149284864+00:00",
+            })
+        );
+    });
+}
+
+#[test]
 fn test_fake_geojson() {
     GEOJSON.compile_ok(|test_env| {
         let geometry = TypeBinding::new(&test_env, "Geometry");

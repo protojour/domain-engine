@@ -16,6 +16,7 @@ ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
 smartstring.workspace = true
 fake = { version = "2", features = ["uuid", "chrono", "bigdecimal_rs"] }
+uuid = "1"
 rand = { version = "0.8", features = ["std_rng"] }
 rand_regex = "0.15"
 regex-syntax = "0.6"

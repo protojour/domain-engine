@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::DefId;
+use ontol_runtime::{string_types::StringLikeType, DefId};
 
 use crate::{
     def::{DefKind, Defs},
@@ -32,8 +32,7 @@ pub enum Type<'m> {
     /// A specific string
     StringConstant(DefId),
     Regex(DefId),
-    Uuid(DefId),
-    DateTime(DefId),
+    StringLike(DefId, StringLikeType),
     Array(TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
@@ -64,8 +63,7 @@ impl<'m> Type<'m> {
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
-            Self::Uuid(def_id) => Some(*def_id),
-            Self::DateTime(def_id) => Some(*def_id),
+            Self::StringLike(def_id, _) => Some(*def_id),
             Self::Array(ty) => ty.get_single_def_id(),
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function { .. } => None,
@@ -187,8 +185,8 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
                 write!(f, "/{lit}/")
             }
-            Type::Uuid(_) => write!(f, "uuid"),
-            Type::DateTime(_) => write!(f, "datetime"),
+            Type::StringLike(_, StringLikeType::Uuid) => write!(f, "uuid"),
+            Type::StringLike(_, StringLikeType::DateTime) => write!(f, "datetime"),
             Type::Array(ty) => {
                 write!(f, "[{}]", FormatType(ty, defs, primitives))
             }

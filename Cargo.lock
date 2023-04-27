@@ -940,6 +940,7 @@ dependencies = [
  "regex-syntax",
  "smartstring",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

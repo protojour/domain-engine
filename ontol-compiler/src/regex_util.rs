@@ -10,7 +10,6 @@ use regex_syntax::{
     Parser,
 };
 use smartstring::alias::String;
-use tracing::debug;
 
 pub fn uuid() -> Hir {
     let hex = Hir::class(Class::Unicode(ClassUnicode::new([
@@ -46,7 +45,7 @@ pub fn uuid() -> Hir {
 
 pub fn datetime_rfc3339() -> Hir {
     Parser::new()
-        .parse(r#"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"#)
+        .parse(r#"((?:([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?))(Z|[\+-][0-9]{2}:[0-9]{2})?)"#)
         .unwrap()
 }
 
@@ -69,9 +68,7 @@ pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
                 collect_hir_constant_parts(child, parts);
             }
         }
-        other => {
-            debug!("constant parts from {other:?}");
-        }
+        _ => {}
     }
 }
 

@@ -7,7 +7,7 @@ use crate::{
     mem::Intern,
     namespace::Space,
     package::CORE_PKG,
-    patterns::StringPatternSegment,
+    patterns::{store_string_pattern_segment, StringPatternSegment},
     regex_util,
     relation::Constructor,
     types::{Type, TypeRef},
@@ -70,18 +70,25 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_uuid(&mut self) {
-        let (uuid, _) = self.define_domain_type("uuid", Type::DateTime);
-        self.relations.properties_by_type_mut(uuid).constructor =
-            Constructor::StringFmt(StringPatternSegment::Regex(regex_util::uuid()));
+        let (uuid, _) = self.define_domain_type("uuid", |def_id| {
+            Type::StringLike(def_id, StringLikeType::Uuid)
+        });
+        let segment = StringPatternSegment::Regex(regex_util::uuid());
+        store_string_pattern_segment(&mut self.patterns, uuid, &segment);
+        self.relations.properties_by_type_mut(uuid).constructor = Constructor::StringFmt(segment);
         self.defs
             .string_like_types
             .insert(uuid, StringLikeType::Uuid);
     }
 
     fn def_datetime(&mut self) {
-        let (datetime, _) = self.define_domain_type("datetime", Type::DateTime);
+        let (datetime, _) = self.define_domain_type("datetime", |def_id| {
+            Type::StringLike(def_id, StringLikeType::DateTime)
+        });
+        let segment = StringPatternSegment::Regex(regex_util::datetime_rfc3339());
+        store_string_pattern_segment(&mut self.patterns, datetime, &segment);
         self.relations.properties_by_type_mut(datetime).constructor =
-            Constructor::StringFmt(StringPatternSegment::Regex(regex_util::datetime_rfc3339()));
+            Constructor::StringFmt(segment.clone());
         self.defs
             .string_like_types
             .insert(datetime, StringLikeType::DateTime);

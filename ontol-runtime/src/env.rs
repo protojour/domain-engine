@@ -68,6 +68,10 @@ impl Env {
         self.string_patterns.get(&def_id)
     }
 
+    pub fn get_string_like_type(&self, def_id: DefId) -> Option<StringLikeType> {
+        self.string_like_types.get(&def_id).cloned()
+    }
+
     pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
         self.domains.iter()
     }

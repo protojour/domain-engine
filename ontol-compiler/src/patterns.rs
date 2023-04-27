@@ -205,24 +205,31 @@ fn compile_string_pattern_constructors(compiler: &mut Compiler) {
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 
-        let anchored_hir = Hir::concat(vec![
-            Hir::anchor(Anchor::StartText),
-            segment.to_regex_hir(&mut CaptureCursor(1)),
-            Hir::anchor(Anchor::EndText),
-        ]);
-        debug!("{def_id:?} regex: {anchored_hir:?}");
-
-        let mut constant_parts = vec![];
-        segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
-
-        compiler.patterns.string_patterns.insert(
-            def_id,
-            StringPattern {
-                regex: compile_regex(anchored_hir),
-                constant_parts,
-            },
-        );
+        store_string_pattern_segment(&mut compiler.patterns, def_id, segment);
     }
+}
+
+pub fn store_string_pattern_segment(
+    patterns: &mut Patterns,
+    def_id: DefId,
+    segment: &StringPatternSegment,
+) {
+    let anchored_hir = Hir::concat(vec![
+        Hir::anchor(Anchor::StartText),
+        segment.to_regex_hir(&mut CaptureCursor(1)),
+        Hir::anchor(Anchor::EndText),
+    ]);
+
+    let mut constant_parts = vec![];
+    segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
+
+    patterns.string_patterns.insert(
+        def_id,
+        StringPattern {
+            regex: compile_regex(anchored_hir),
+            constant_parts,
+        },
+    );
 }
 
 fn compile_regex(hir: Hir) -> Regex {

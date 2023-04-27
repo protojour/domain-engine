@@ -142,11 +142,11 @@ pub struct StringMatcher<'e> {
 
 impl<'e> ValueMatcher for StringMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        expecting_custom_string(self.env, self.def_id, f)
+        write!(f, "string")
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        try_deserialize_custom_string(self.env, self.def_id, str).map_err(|_| ())
+        Ok(Value::new(Data::String(str.into()), self.def_id))
     }
 }
 
@@ -173,16 +173,18 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
 pub struct StringPatternMatcher<'e> {
     pub pattern: &'e StringPattern,
     pub def_id: DefId,
+    pub env: &'e Env,
 }
 
 impl<'e> ValueMatcher for StringPatternMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "string matching /{}/", self.pattern.regex)
+        expecting_custom_string(self.env, self.def_id, f)
+            .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if self.pattern.regex.is_match(str) {
-            Ok(Value::new(Data::String(str.into()), self.def_id))
+            try_deserialize_custom_string(self.env, self.def_id, str).map_err(|_| ())
         } else {
             Err(())
         }
@@ -587,11 +589,8 @@ fn expecting_custom_string(
     env: &Env,
     def_id: DefId,
     f: &mut std::fmt::Formatter,
-) -> std::fmt::Result {
-    match env.string_like_types.get(&def_id) {
-        Some(custom_string_deserializer) => {
-            write!(f, "`{}`", custom_string_deserializer.type_name())
-        }
-        None => write!(f, "string"),
-    }
+) -> Option<std::fmt::Result> {
+    env.string_like_types
+        .get(&def_id)
+        .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))
 }

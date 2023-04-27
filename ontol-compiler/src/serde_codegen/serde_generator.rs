@@ -316,13 +316,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::StringPattern(*def_id),
                 ))
             }
-            Type::Uuid(_) => Some(OperatorAllocation::Allocated(
+            Type::StringLike(_, _) => Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),
-                SerdeOperator::String(def_variant.def_id),
-            )),
-            Type::DateTime(_) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::String(def_variant.def_id),
+                SerdeOperator::StringPattern(def_variant.def_id),
             )),
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
@@ -444,22 +440,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }),
                 ))
             }
-            Constructor::StringFmt(segment) => {
-                assert!(self
-                    .patterns
-                    .string_patterns
-                    .contains_key(&def_variant.def_id));
-
-                let operator = match segment {
-                    StringPatternSegment::AllStrings => SerdeOperator::String(def_variant.def_id),
-                    _ => SerdeOperator::CapturingStringPattern(def_variant.def_id),
-                };
-
-                Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def_variant),
-                    operator,
-                ))
-            }
+            Constructor::StringFmt(segment) => self.alloc_string_fmt_operator(def_variant, segment),
         }
     }
 
@@ -634,6 +615,27 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }),
             ))
         }
+    }
+
+    fn alloc_string_fmt_operator(
+        &mut self,
+        def_variant: DefVariant,
+        segment: &StringPatternSegment,
+    ) -> Option<OperatorAllocation> {
+        assert!(self
+            .patterns
+            .string_patterns
+            .contains_key(&def_variant.def_id));
+
+        let operator = match segment {
+            StringPatternSegment::AllStrings => SerdeOperator::String(def_variant.def_id),
+            _ => SerdeOperator::CapturingStringPattern(def_variant.def_id),
+        };
+
+        Some(OperatorAllocation::Allocated(
+            self.alloc_operator_id(&def_variant),
+            operator,
+        ))
     }
 
     fn create_union_operator(

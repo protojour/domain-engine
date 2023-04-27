@@ -7,11 +7,12 @@ use ontol_runtime::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
+    string_types::StringLikeType,
     value::{Attribute, Data, Value},
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use tracing::debug;
+use std::fmt::Write;
 
 const MAX_REPEAT: u32 = 128;
 
@@ -91,11 +92,22 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 Value::new(Data::String(s.clone()), *def_id)
             }
             SerdeOperator::StringPattern(def_id) => {
-                let pattern = self.env.get_string_pattern(*def_id).unwrap();
-                let rand_regex =
-                    rand_regex::Regex::compile(pattern.regex.as_str(), MAX_REPEAT).unwrap();
-                let string: std::string::String = self.rng.sample(&rand_regex);
-                Value::new(Data::String(string.into()), *def_id)
+                if let Some(string_like_type) = self.env.get_string_like_type(*def_id) {
+                    match string_like_type {
+                        StringLikeType::Uuid => {
+                            Value::new(Data::Uuid(Faker.fake_with_rng(self.rng)), *def_id)
+                        }
+                        StringLikeType::DateTime => {
+                            Value::new(Data::ChronoDateTime(Faker.fake_with_rng(self.rng)), *def_id)
+                        }
+                    }
+                } else {
+                    let pattern = self.env.get_string_pattern(*def_id).unwrap();
+                    let rand_regex =
+                        rand_regex::Regex::compile(pattern.regex.as_str(), MAX_REPEAT).unwrap();
+                    let string: std::string::String = self.rng.sample(&rand_regex);
+                    Value::new(Data::String(string.into()), *def_id)
+                }
             }
             SerdeOperator::CapturingStringPattern(def_id) => {
                 let string_pattern = self.env.get_string_pattern(*def_id).unwrap();
@@ -108,11 +120,10 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     let hir = regex_syntax::hir::translate::Translator::new()
                         .translate(&ast_string, &ast)
                         .unwrap();
-                    let regex_string = hir.to_string();
+                    let mut expression = String::new();
+                    write!(&mut expression, "{hir}").unwrap();
 
-                    debug!("fake for regex: {regex_string}");
-
-                    let rand_regex = rand_regex::Regex::compile(&regex_string, MAX_REPEAT).unwrap();
+                    let rand_regex = rand_regex::Regex::compile(&expression, MAX_REPEAT).unwrap();
 
                     let string: std::string::String = self.rng.sample(&rand_regex);
 
