@@ -4,9 +4,8 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr,
-    StructPatternAttrRel, TypeParam, TypeParamPattern, TypeParamPatternBinding, UnitOrSeq,
-    UseStatement, Visibility, WithStatement,
+    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr, TypeParam,
+    TypeParamPattern, TypeParamPatternBinding, UnitOrSeq, UseStatement, Visibility, WithStatement,
 };
 
 use super::{
@@ -238,7 +237,13 @@ fn map_statement() -> impl AstParser<MapStatement> {
 }
 
 fn map_arm() -> impl AstParser<MapArm> {
-    struct_pattern(pattern()).map(MapArm::Struct)
+    let struct_arm = struct_pattern(pattern()).map(MapArm::Struct);
+    let binding_arm = spanned(path())
+        .then_ignore(colon())
+        .then(expr_pattern())
+        .map(|(path, expr)| MapArm::Binding { path, expr });
+
+    struct_arm.or(binding_arm)
 }
 
 fn pattern() -> impl AstParser<Pattern> {
@@ -253,7 +258,7 @@ fn pattern() -> impl AstParser<Pattern> {
 fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<StructPattern> {
     spanned(path())
         .then(
-            struct_pattern_attr(pattern)
+            spanned(struct_pattern_attr(pattern))
                 .repeated()
                 .delimited_by(open('{'), close('}')),
         )
@@ -264,24 +269,16 @@ fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<St
 fn struct_pattern_attr(
     pattern: impl AstParser<Pattern> + Clone,
 ) -> impl AstParser<StructPatternAttr> {
-    let variable = expr_pattern().map(StructPatternAttr::Expr);
-    let rel = keyword(Token::Rel)
+    keyword(Token::Rel)
         .then(spanned(ty()))
         .then_ignore(colon())
         .then(spanned(pattern))
-        .map_with_span(|((kw, relation), object), span| {
-            StructPatternAttr::Rel((
-                StructPatternAttrRel {
-                    kw,
-                    relation,
-                    relation_struct: None,
-                    object,
-                },
-                span,
-            ))
-        });
-
-    variable.or(rel)
+        .map_with_span(|((kw, relation), object), _span| StructPatternAttr {
+            kw,
+            relation,
+            relation_struct: None,
+            object,
+        })
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
@@ -563,7 +560,7 @@ mod tests {
     fn parse_map() {
         let source = "
         map x y {
-            foo { x }
+            foo: x
             bar {
                 rel 'foo': x
             }
@@ -571,7 +568,7 @@ mod tests {
 
         // comment
         map x y {
-            foo { x + 1 }
+            foo: x + 1
             bar {
                 rel 'foo': (x / 3) + 4
             }

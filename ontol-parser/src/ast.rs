@@ -132,17 +132,11 @@ pub enum UnitOrSeq {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPattern {
     pub path: Spanned<Path>,
-    pub attributes: Vec<StructPatternAttr>,
+    pub attributes: Vec<Spanned<StructPatternAttr>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum StructPatternAttr {
-    Expr(Spanned<ExprPattern>),
-    Rel(Spanned<StructPatternAttrRel>),
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct StructPatternAttrRel {
+pub struct StructPatternAttr {
     pub kw: Span,
     pub relation: Spanned<Type>,
     pub relation_struct: Option<Spanned<StructPattern>>,

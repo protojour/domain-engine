@@ -132,8 +132,8 @@ fn test_meters() {
     rel meters is: int
     rel millimeters is: int
     map x {
-        meters { x / 1000 }
-        millimeters { x }
+        meters: x / 1000
+        millimeters: x
     }
     "
     .compile_ok(|env| {
@@ -153,8 +153,8 @@ fn test_temperature() {
     }
 
     map x {
-        celsius { x }
-        fahrenheit { x * 9 / 5 + 32 }
+        celsius: x
+        fahrenheit: x * 9 / 5 + 32
     }
     "
     .compile_ok(|env| {
@@ -171,7 +171,7 @@ fn test_map_value_to_map_no_func() {
     rel one is: string
     rel two 'a': string
     map x {
-        one { x }
+        one: x
         two {
             rel 'a': x
         }
@@ -191,7 +191,7 @@ fn test_map_value_to_map_func() {
     rel one is: int
     rel two 'a': int
     map x {
-        one { x }
+        one: x
         two {
             rel 'a': x * 2
         }
@@ -598,8 +598,8 @@ fn test_map_delegation() {
             }
 
             map m {
-                meters { m }
-                millimeters { m * 1000 }
+                meters: m
+                millimeters: m * 1000
             }
             ",
         ),

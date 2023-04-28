@@ -630,33 +630,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let attributes = struct_pat
             .attributes
             .into_iter()
-            .map(|struct_attr| match struct_attr {
-                ast::StructPatternAttr::Expr((expr, expr_span)) => {
-                    let key = (
-                        DefReference {
-                            def_id: DefId::unit(),
-                            pattern_bindings: Default::default(),
-                        },
-                        self.src.span(&expr_span),
-                    );
-                    let expr = self.lower_expr_pattern((expr, expr_span), var_table)?;
+            .map(|(struct_attr, _span)| {
+                let ast::StructPatternAttr {
+                    relation,
+                    object: (object, object_span),
+                    ..
+                } = struct_attr;
 
-                    Ok((key, expr))
-                }
-                ast::StructPatternAttr::Rel((
-                    ast::StructPatternAttrRel {
-                        relation,
-                        object: (object, object_span),
-                        ..
-                    },
-                    _span,
-                )) => {
-                    let def = self.resolve_type_reference(relation.0, &relation.1)?;
+                let def = self.resolve_type_reference(relation.0, &relation.1)?;
 
-                    let inner_expr = self.lower_pattern((object, object_span), var_table);
+                let inner_expr = self.lower_pattern((object, object_span), var_table);
 
-                    inner_expr.map(|expr| ((def, self.src.span(&relation.1)), expr))
-                }
+                inner_expr.map(|expr| ((def, self.src.span(&relation.1)), expr))
             })
             .collect::<Result<_, _>>()?;
 

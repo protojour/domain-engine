@@ -46,7 +46,7 @@ fn lex_error_recovery_works() {
             rel 'prop':
                 x
                 ;; // ERROR lex error: illegal character `;`
-                foobar // ERROR undeclared variable
+                foobar // ERROR parse error: found `foobar`, expected one of `}`, `*`, `+`, `-`, `/`, `rel`
         }
     }
     "
@@ -204,7 +204,7 @@ fn map_undeclared_variable() {
     type foo
     type bar
     map {
-        foo { x } // ERROR undeclared variable
+        foo: x // ERROR undeclared variable
         bar {}
     }
     "
@@ -249,9 +249,8 @@ fn map_attribute_mismatch() {
     rel foo 'prop2': bar
     rel bar is: int
     map x {
-        foo { // ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
-            x // ERROR expected named property
-        }
+        foo: // ERROR expected named property// ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
+            x
         bar {} // ERROR expected expression
     }
     "
