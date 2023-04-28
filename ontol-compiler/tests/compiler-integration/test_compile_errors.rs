@@ -40,14 +40,14 @@ fn lex_error_recovery_works() {
     rel bar 'prop': int
     map x {
         foo {
-            rel 'prop': x
+            'prop': x
         }
         bar {
-            rel 'prop':
+            'prop':
                 x
                 ;; // ERROR lex error: illegal character `;`
-                foobar // ERROR parse error: found `foobar`, expected one of `}`, `*`, `+`, `-`, `/`, `rel`
-        }
+                foobar
+        } // ERROR parse error: found `}`, expected one of `.`, `:`, `<`
     }
     "
     .compile_fail()
@@ -232,7 +232,7 @@ fn map_obj_non_domain_type_and_unit_type() {
     map x {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
-            rel 'prop': x
+            'prop': x
         }
     }
     "
@@ -265,9 +265,9 @@ fn map_duplicate_unknown_property() {
     rel foo 'a': bar
     map x {
         foo {
-            rel 'a': x
-            rel 'a': x // ERROR duplicate property
-            rel 'b': x // ERROR unknown property
+            'a': x
+            'a': x // ERROR duplicate property
+            'b': x // ERROR unknown property
         }
         bar {}
     }
@@ -284,10 +284,10 @@ fn map_type_mismatch_simple() {
     rel bar 'prop': int
     map x {
         foo {
-            rel 'prop': x
+            'prop': x
         }
         bar {
-            rel 'prop':
+            'prop':
                 x // ERROR type mismatch: expected `int`, found `string`
         }
     }
@@ -306,10 +306,10 @@ fn map_type_mismatch_in_func() {
     rel bar 'prop': int
     map x {
         foo {
-            rel 'prop': x
+            'prop': x
         }
         bar {
-            rel 'prop':
+            'prop':
                 x // ERROR type mismatch: expected `int`, found `string`
                 * 2
         }
@@ -331,12 +331,12 @@ fn map_array_mismatch() {
 
     map x y {
         foo {
-            rel 'a': x // ERROR [string] variable must be enclosed in []
-            rel 'b': y // ERROR [string] variable must be enclosed in []
+            'a': x // ERROR [string] variable must be enclosed in []
+            'b': y // ERROR [string] variable must be enclosed in []
         }
         bar {
-            rel 'a': x
-            rel 'b': y // ERROR [int] variable must be enclosed in []
+            'a': x
+            'b': y // ERROR [int] variable must be enclosed in []
         }
     }
     "
@@ -351,10 +351,10 @@ fn array_map_without_brackets() {
 
     map x {
         foo {
-            rel 'a': x // ERROR [string] variable must be enclosed in []
+            'a': x // ERROR [string] variable must be enclosed in []
         }
         bar {
-            rel 'b': x // ERROR [string] variable must be enclosed in []
+            'b': x // ERROR [string] variable must be enclosed in []
         }
     }
     "
@@ -393,11 +393,11 @@ fn unresolved_transitive_map() {
 
     map x {
         c {
-            rel 'p0':
+            'p0':
                 x // ERROR cannot convert this `a` from `b`: These types are not equated.
         }
         d {
-            rel 'p1':
+            'p1':
                 x // ERROR cannot convert this `b` from `a`: These types are not equated.
         }
     }

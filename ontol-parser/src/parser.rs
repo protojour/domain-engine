@@ -269,12 +269,10 @@ fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<St
 fn struct_pattern_attr(
     pattern: impl AstParser<Pattern> + Clone,
 ) -> impl AstParser<StructPatternAttr> {
-    keyword(Token::Rel)
-        .then(spanned(ty()))
+    spanned(ty())
         .then_ignore(colon())
         .then(spanned(pattern))
-        .map_with_span(|((kw, relation), object), _span| StructPatternAttr {
-            kw,
+        .map_with_span(|(relation, object), _span| StructPatternAttr {
             relation,
             relation_struct: None,
             object,
@@ -562,7 +560,7 @@ mod tests {
         map x y {
             foo: x
             bar {
-                rel 'foo': x
+                'foo': x
             }
         }
 
@@ -570,7 +568,7 @@ mod tests {
         map x y {
             foo: x + 1
             bar {
-                rel 'foo': (x / 3) + 4
+                'foo': (x / 3) + 4
             }
         }
         ";

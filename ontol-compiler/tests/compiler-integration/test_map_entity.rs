@@ -61,19 +61,19 @@ fn test_map_invert() {
 
             map p_id p_name tech_id tech_name {
                 work.worker {
-                    rel 'ID': p_id
-                    rel 'name': p_name
-                    rel 'technologies': [work.technology {
-                        rel 'ID': tech_id
-                        rel 'name': tech_name
+                    'ID': p_id
+                    'name': p_name
+                    'technologies': [work.technology {
+                        'ID': tech_id
+                        'name': tech_name
                     }]
                 }
                 dev.language {
-                    rel 'id': tech_id
-                    rel 'name': tech_name
-                    rel 'developers': [dev.developer { // ERROR TODO: Incompatible aggregation group
-                        rel 'id': p_id
-                        rel 'name': p_name
+                    'id': tech_id
+                    'name': tech_name
+                    'developers': [dev.developer { // ERROR TODO: Incompatible aggregation group
+                        'id': p_id
+                        'name': p_name
                     }]
                 }
             }
@@ -97,26 +97,26 @@ fn artist_etc_routing() {
             rel gsu route: ai {
                 map id n p {
                     gsu.artist {
-                        rel 'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
-                        rel 'name': n
-                        rel 'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
+                        'name': n
+                        'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                     ai.artist {
-                        rel 'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
-                        rel 'name': n
-                        rel 'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
+                        'name': n
+                        'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                 }
 
                 map id t p n {
                     gsu.synth {
-                        rel 'instrument-id': id
-                        rel 'type': t
-                        rel 'polyphony': p
+                        'instrument-id': id
+                        'type': t
+                        'polyphony': p
                     }
                     ai.instrument {
-                        rel 'ID': id
-                        rel 'name': n
+                        'ID': id
+                        'name': n
                     }
                 }
             }

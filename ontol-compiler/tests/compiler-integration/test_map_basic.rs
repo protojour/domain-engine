@@ -100,12 +100,8 @@ fn test_map_simple() {
     rel foo 'f': string
     rel bar 'b': string
     map x {
-        foo {
-            rel 'f': x
-        }
-        bar {
-            rel 'b': x
-        }
+        foo { 'f': x }
+        bar { 'b': x }
     }
     "
     .compile_ok(|env| {
@@ -173,7 +169,7 @@ fn test_map_value_to_map_no_func() {
     map x {
         one: x
         two {
-            rel 'a': x
+            'a': x
         }
     }
     "
@@ -193,7 +189,7 @@ fn test_map_value_to_map_func() {
     map x {
         one: x
         two {
-            rel 'a': x * 2
+            'a': x * 2
         }
     }
     "
@@ -233,17 +229,17 @@ fn test_deep_structural_map() {
 
     map a b c {
         foo {
-            rel 'a': a
-            rel 'inner': foo_inner {
-                rel 'b': b
-                rel 'c': c
+            'a': a
+            'inner': foo_inner {
+                'b': b
+                'c': c
             }
         }
         bar {
-            rel 'a': a
-            rel 'b': b
-            rel 'inner': bar_inner {
-                rel 'c': c
+            'a': a
+            'b': b
+            'inner': bar_inner {
+                'c': c
             }
         }
     }
@@ -267,10 +263,10 @@ fn test_map_matching_array() {
     rel bar 'b': [int]
     map x {
         foo {
-            rel 'a': [x]
+            'a': [x]
         }
         bar {
-            rel 'b': [x]
+            'b': [x]
         }
     }
     "
@@ -298,20 +294,12 @@ pub type foos { rel _ 'foos': [foo] }
 pub type bars { rel _ 'bars': [bar] }
 
 map x {
-    foos {
-        rel 'foos': [x]
-    }
-    bars {
-        rel 'bars': [x]
-    }
+    foos { 'foos': [x] }
+    bars { 'bars': [x] }
 }
 map x {
-    foo {
-        rel 'f': x
-    }
-    bar {
-        rel 'b': x
-    }
+    foo { 'f': x }
+    bar { 'b': x }
 }
 ";
 
@@ -375,8 +363,8 @@ fn test_aggr_cross_parallel() {
     type foo { rel _ 'f': string }
     type bar { rel _ 'b': string }
     map x {
-        foo { rel 'f': x }
-        bar { rel 'b': x }
+        foo { 'f': x }
+        bar { 'b': x }
     }
 
     pub type foos {
@@ -389,12 +377,12 @@ fn test_aggr_cross_parallel() {
     }
     map a b {
         foos {
-            rel 'f1': [a]
-            rel 'f2': [b]
+            'f1': [a]
+            'f2': [b]
         }
         bars {
-            rel 'b2': [b]
-            rel 'b1': [a]
+            'b2': [b]
+            'b1': [a]
         }
     }
     "
@@ -414,8 +402,8 @@ fn test_aggr_multi_level() {
     type foo { rel _ 'P': string }
     type bar { rel _ 'Q': string }
     map x {
-        foo { rel 'P': x }
-        bar { rel 'Q': x }
+        foo { 'P': x }
+        bar { 'Q': x }
     }
 
     pub type f0 {
@@ -436,23 +424,23 @@ fn test_aggr_multi_level() {
     }
     map v0 v1 v2 v3 {
         f1 {
-            rel 'a': [f0 {
-                rel 'a': [v0]
-                rel 'b': [v1]
+            'a': [f0 {
+                'a': [v0]
+                'b': [v1]
             }]
-            rel 'b': [f0 {
-                rel 'a': [v2]
-                rel 'b': [v3]
+            'b': [f0 {
+                'a': [v2]
+                'b': [v3]
             }]
         }
         b1 {
-            rel 'b': [b0 {
-                rel 'b': [v3]
-                rel 'a': [v2]
+            'b': [b0 {
+                'b': [v3]
+                'a': [v2]
             }]
-            rel 'a': [b0 {
-                rel 'b': [v1]
-                rel 'a': [v0]
+            'a': [b0 {
+                'b': [v1]
+                'a': [v0]
             }]
         }
     }
@@ -488,14 +476,14 @@ fn test_flat_map1() {
 
     map a b {
         foo {
-            rel 'a': a
-            rel 'inner': [foo_inner {
-                rel 'b': b
+            'a': a
+            'inner': [foo_inner {
+                'b': b
             }]
         }
         [bar {
-            rel 'a': a
-            rel 'b': b
+            'a': a
+            'b': b
         }]
     }
     "
@@ -529,14 +517,14 @@ fn test_map_complex_flow() {
 
     map x y {
         one {
-            rel 'a': x
-            rel 'b': y
+            'a': x
+            'b': y
         }
         two {
-            rel 'a': x
-            rel 'b': y
-            rel 'c': x
-            rel 'd': y
+            'a': x
+            'b': y
+            'c': x
+            'd': y
         }
     }
     "
@@ -579,10 +567,10 @@ fn test_map_delegation() {
 
             map l {
                 car {
-                    rel 'length': l
+                    'length': l
                 }
                 vehicle {
-                    rel 'length': l
+                    'length': l
                 }
             }
             ",
