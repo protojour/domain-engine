@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, Path, Pattern, StructPattern, StructPatternAttr,
+    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr,
     StructPatternAttrRel, TypeParam, TypeParamPattern, TypeParamPatternBinding, UnitOrSeq,
     UseStatement, Visibility, WithStatement,
 };
@@ -225,8 +225,8 @@ fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
         .then(spanned(variable()).repeated())
         .then(
-            spanned(with_unit_or_seq(struct_pattern(pattern())))
-                .then(spanned(with_unit_or_seq(struct_pattern(pattern()))))
+            spanned(with_unit_or_seq(map_arm()))
+                .then(spanned(with_unit_or_seq(map_arm())))
                 .delimited_by(open('{'), close('}')),
         )
         .map(|((kw, variables), (first, second))| MapStatement {
@@ -235,6 +235,10 @@ fn map_statement() -> impl AstParser<MapStatement> {
             first,
             second,
         })
+}
+
+fn map_arm() -> impl AstParser<MapArm> {
+    struct_pattern(pattern()).map(MapArm::Struct)
 }
 
 fn pattern() -> impl AstParser<Pattern> {

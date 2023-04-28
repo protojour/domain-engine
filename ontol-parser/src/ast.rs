@@ -102,8 +102,17 @@ pub struct RelChain {
 pub struct MapStatement {
     pub kw: Span,
     pub variables: Vec<Spanned<String>>,
-    pub first: Spanned<(UnitOrSeq, StructPattern)>,
-    pub second: Spanned<(UnitOrSeq, StructPattern)>,
+    pub first: Spanned<(UnitOrSeq, MapArm)>,
+    pub second: Spanned<(UnitOrSeq, MapArm)>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum MapArm {
+    Binding {
+        path: Spanned<Path>,
+        expr: Spanned<ExprPattern>,
+    },
+    Struct(StructPattern),
 }
 
 /// A pattern is either `struct {}` or leaf expr.

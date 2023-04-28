@@ -129,8 +129,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ));
                 }
 
-                let first = self.lower_struct_pattern_root(first, &mut var_table)?;
-                let second = self.lower_struct_pattern_root(second, &mut var_table)?;
+                let first = self.lower_map_arm(first, &mut var_table)?;
+                let second = self.lower_map_arm(second, &mut var_table)?;
 
                 Ok([self.define(
                     DefKind::Mapping(Variables(variables.into()), first, second),
@@ -564,24 +564,61 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn lower_struct_pattern_root(
+    fn lower_map_arm(
         &mut self,
-        ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::StructPattern), Span),
+        ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::MapArm), Span),
         var_table: &mut ExprVarTable,
     ) -> Res<ExprId> {
-        let expr = match unit_or_seq {
-            ast::UnitOrSeq::Unit => self.lower_struct_pattern((ast, span), var_table)?,
-            ast::UnitOrSeq::Seq => {
-                let seq_id = var_table.new_aggregation_group();
-                let inner = self.lower_struct_pattern((ast, span.clone()), var_table)?;
-                self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span)
+        let unit_expr = match ast {
+            ast::MapArm::Struct(ast) => {
+                self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
+            ast::MapArm::Binding { path, expr } => {
+                self.lower_map_binding(path, expr, span.clone(), var_table)?
+            }
+        };
+        let expr = match unit_or_seq {
+            ast::UnitOrSeq::Unit => unit_expr,
+            ast::UnitOrSeq::Seq => self.expr(
+                ExprKind::Seq(var_table.new_aggregation_group(), Box::new(unit_expr)),
+                &span,
+            ),
         };
 
         let expr_id = self.compiler.expressions.alloc_expr_id();
         self.compiler.expressions.map.insert(expr_id, expr);
 
         Ok(expr_id)
+    }
+
+    fn lower_map_binding(
+        &mut self,
+        path: (ast::Path, Span),
+        expr: (ast::ExprPattern, Span),
+        span: Span,
+        var_table: &mut ExprVarTable,
+    ) -> Res<Expr> {
+        let type_def_id = self.lookup_path(&path.0, &path.1)?;
+        let key = (
+            DefReference {
+                def_id: DefId::unit(),
+                pattern_bindings: Default::default(),
+            },
+            self.src.span(&span),
+        );
+        let expr = self.lower_expr_pattern((expr.0, expr.1), var_table)?;
+
+        Ok(self.expr(
+            // FIXME: This ExprKind shouldn't really be struct..
+            ExprKind::Struct(
+                TypePath {
+                    def_id: type_def_id,
+                    span: self.src.span(&path.1),
+                },
+                [(key, expr)].into(),
+            ),
+            &span,
+        ))
     }
 
     fn lower_struct_pattern(
@@ -688,13 +725,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
             }
             ast::ExprPattern::Variable(var_ident) => {
-                let id = var_table
-                    .get_var_id(var_ident.as_str())
-                    .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;
-                Ok(self.expr(ExprKind::Variable(id), &span))
+                self.lower_expr_variable(var_ident, span, var_table)
             }
             _ => Err((CompileError::InvalidExpression, span)),
         }
+    }
+
+    fn lower_expr_variable(
+        &mut self,
+        var_ident: String,
+        span: Span,
+        var_table: &ExprVarTable,
+    ) -> Res<Expr> {
+        let id = var_table
+            .get_var_id(var_ident.as_str())
+            .ok_or_else(|| (CompileError::UndeclaredVariable, span.clone()))?;
+        Ok(self.expr(ExprKind::Variable(id), &span))
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
