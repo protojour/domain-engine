@@ -82,7 +82,7 @@
 					<key>name</key>
 					<string>keyword.declaration.map.ontol</string>
 				</dict>
-				<key>3</key>
+				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>variable.parameter.ontol</string>
@@ -91,7 +91,7 @@
 			<key>comment</key>
 			<string>map declaration</string>
 			<key>match</key>
-			<string>\b(map)\s*(\()(.*)(\))</string>
+			<string>\b(map)\s*([\w\s]*)</string>
 		</dict>
 		<dict>
 			<key>comment</key>

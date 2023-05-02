@@ -43,13 +43,13 @@ patterns:
     name: keyword.operator.fatarrow.ontol
     match: (=>)
 
-  # "map (..) { }" should include
+  # "map .. { }" should include
   # block, path, expressions etc.
   - comment: map declaration
-    match: \b(map)\s*(\()(.*)(\))
+    match: \b(map)\s*([\w\s]*)
     captures:
       '1': { name: keyword.declaration.map.ontol }
-      '3': { name: variable.parameter.ontol }
+      '2': { name: variable.parameter.ontol }
 
   - comment: built-in types
     name: storage.type.ontol
