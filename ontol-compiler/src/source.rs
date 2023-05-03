@@ -78,7 +78,7 @@ impl<'m, T> SpannedBorrow<'m, T> {
     }
 }
 
-/// A structured where compiled source code can be temporarily stored.
+/// A structure where compiled source code can be temporarily stored.
 /// This is useful for error diagnostics.
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
