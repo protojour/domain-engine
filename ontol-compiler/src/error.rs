@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use chumsky::{error::SimpleReason, prelude::Simple};
-use miette::Diagnostic;
 use ontol_parser::Token;
 use ontol_runtime::format_utils::{LogicOp, Missing};
 use smartstring::alias::String;
@@ -9,14 +8,13 @@ use thiserror::Error;
 
 use crate::source::SourceSpan;
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Error)]
 #[error("oops")]
 pub struct UnifiedCompileError {
-    #[related]
     pub errors: Vec<SpannedCompileError>,
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Error)]
 #[error("")]
 pub struct SpannedCompileError {
     pub error: CompileError,
@@ -24,7 +22,7 @@ pub struct SpannedCompileError {
     pub span: SourceSpan,
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Error)]
 pub enum CompileError {
     #[error("lex error: {0}")]
     Lex(LexError),
