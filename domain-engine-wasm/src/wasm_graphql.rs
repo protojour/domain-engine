@@ -43,13 +43,13 @@ impl WasmGraphqlSchema {
         .await?;
 
         if !execution_errors.is_empty() {
-            return Err(WasmError {
-                msg: execution_errors
+            return Err(WasmError::Generic(
+                execution_errors
                     .into_iter()
                     .map(|error| format!("{error:?}"))
                     .collect::<Vec<_>>()
                     .join("\n"),
-            });
+            ));
         }
 
         Ok(value.serialize(&js_serializer())?)

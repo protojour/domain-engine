@@ -94,9 +94,7 @@ impl WasmTypeInfo {
             )
             .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
             .map(|attr| attr.value)
-            .map_err(|err| WasmError {
-                msg: format!("Deserialization failed: {err}"),
-            })?;
+            .map_err(|err| WasmError::Generic(format!("Deserialization failed: {err}")))?;
 
         Ok(WasmValue {
             value,
@@ -134,9 +132,7 @@ impl WasmValue {
                 ProcessorLevel::Root,
             )
             .serialize_value(&self.value, None, &js_serializer())
-            .map_err(|err| WasmError {
-                msg: format!("Serialization failed: {err}"),
-            })
+            .map_err(|err| WasmError::Generic(format!("Serialization failed: {err}")))
     }
 }
 
@@ -183,11 +179,9 @@ pub(crate) fn operator_id(type_info: &TypeInfo) -> Result<SerdeOperatorId, WasmE
     if let Some(operator_id) = type_info.operator_id {
         Ok(operator_id)
     } else {
-        Err(WasmError {
-            msg: format!(
-                "The type `{}` cannot be serialized",
-                type_info.name.as_deref().unwrap_or("")
-            ),
-        })
+        Err(WasmError::Generic(format!(
+            "The type `{}` cannot be serialized",
+            type_info.name.as_deref().unwrap_or("")
+        )))
     }
 }
