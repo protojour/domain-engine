@@ -1,4 +1,4 @@
-mod test_compile_errors;
+mod errors;
 mod test_conduit;
 mod test_deserialize;
 mod test_entity;
