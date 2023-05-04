@@ -229,9 +229,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_package_data_type(subject_ty, &subject.1);
                 self.check_package_data_type(object_ty, &object.1);
             }
-            RelationKind::Builtin(BuiltinRelationKind::Doc | BuiltinRelationKind::Example) => {
-                return subject_ty
-            }
+            RelationKind::Builtin(
+                BuiltinRelationKind::Min
+                | BuiltinRelationKind::Max
+                | BuiltinRelationKind::Default
+                | BuiltinRelationKind::Doc
+                | BuiltinRelationKind::Example,
+            ) => return subject_ty,
         };
 
         object_ty

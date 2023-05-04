@@ -22,16 +22,16 @@ impl<'m> Compiler<'m> {
         self.register_type(self.primitives.unit, Type::Unit);
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
+        self.register_named_builtin_relation(self.primitives.is_relation, "is");
+        self.register_named_builtin_relation(self.primitives.identifies_relation, "identifies");
+        self.register_named_builtin_relation(self.primitives.min_relation, "min");
+        self.register_named_builtin_relation(self.primitives.max_relation, "max");
+        self.register_named_builtin_relation(self.primitives.default_relation, "default");
+        self.register_named_builtin_relation(self.primitives.route_relation, "route");
+
         self.register_named_type(self.primitives.false_value, "false", Type::Bool);
         self.register_named_type(self.primitives.true_value, "true", Type::Bool);
         self.register_named_type(self.primitives.bool, "bool", Type::Bool);
-        self.register_named_type(self.primitives.is_relation, "is", |_| Type::BuiltinRelation);
-        self.register_named_type(self.primitives.identifies_relation, "identifies", |_| {
-            Type::BuiltinRelation
-        });
-        self.register_named_type(self.primitives.route_relation, "route", |_| {
-            Type::BuiltinRelation
-        });
 
         let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let _ = self.register_named_type(self.primitives.number, "number", Type::Number);
@@ -131,6 +131,10 @@ impl<'m> Compiler<'m> {
             .insert(ident.into(), def_id);
         self.def_types.map.insert(def_id, ty);
         ty
+    }
+
+    fn register_named_builtin_relation(&mut self, def_id: DefId, ident: &str) -> TypeRef<'m> {
+        self.register_named_type(def_id, ident, |_| Type::BuiltinRelation)
     }
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
