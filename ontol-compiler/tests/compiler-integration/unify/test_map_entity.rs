@@ -1,8 +1,8 @@
 use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use test_log::test;
 
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../../examples/artist_and_instrument.on");
+const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth_union.on");
 
 const WORK: &str = "
 pub type worker_id { fmt '' => 'worker/' => uuid => _ }
