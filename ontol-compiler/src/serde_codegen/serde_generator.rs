@@ -54,7 +54,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         operator_id
     }
 
-    pub fn get_serde_operator_id(&mut self, key: SerdeKey) -> Option<SerdeOperatorId> {
+    pub fn gen_operator_id(&mut self, key: SerdeKey) -> Option<SerdeOperatorId> {
         if let Some(id) = self.operators_by_key.get(&key) {
             return Some(*id);
         }
@@ -66,7 +66,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(operator_id)
             }
             Some(OperatorAllocation::Redirect(def_variant)) => {
-                let operator_id = self.get_serde_operator_id(SerdeKey::Def(def_variant))?;
+                let operator_id = self.gen_operator_id(SerdeKey::Def(def_variant))?;
                 // debug!("key {key:?} redirected to {:?}", def_variant.modifier());
                 self.operators_by_key.insert(key, operator_id);
                 Some(operator_id)
@@ -75,8 +75,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    pub fn get_serde_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
-        let operator_id = self.get_serde_operator_id(key)?;
+    pub fn gen_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
+        let operator_id = self.gen_operator_id(key)?;
         Some(&self.operators_by_id[operator_id.0 as usize])
     }
 
@@ -88,7 +88,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
-                self.get_serde_operator_id(SerdeKey::Def(DefVariant {
+                self.gen_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
                     modifier: DataModifier::default(),
                 }))
@@ -96,7 +96,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.get_serde_operator_id(SerdeKey::Def(DefVariant {
+                self.gen_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
                     modifier: DataModifier::default() | DataModifier::ARRAY,
                 }))
@@ -125,7 +125,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let operator_id = self.alloc_operator_id_for_key(&key);
                 let mut iterator = keys.iter();
-                let first_id = self.get_serde_operator_id(iterator.next()?.clone())?;
+                let first_id = self.gen_operator_id(iterator.next()?.clone())?;
 
                 let mut intersected_map = self
                     .find_unambiguous_struct_operator(first_id)
@@ -135,7 +135,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .clone();
 
                 for next_key in iterator {
-                    let next_id = self.get_serde_operator_id(next_key.clone()).unwrap();
+                    let next_id = self.gen_operator_id(next_key.clone()).unwrap();
 
                     if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
                         for (key, value) in &next_map_type.properties {
@@ -168,7 +168,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let property_name = meta.relation.subject_prop(self.defs)?;
 
                 let object_operator_id = self
-                    .get_serde_operator_id(SerdeKey::no_modifier(meta.relationship.object.0.def_id))
+                    .gen_operator_id(SerdeKey::no_modifier(meta.relationship.object.0.def_id))
                     .expect("No object operator for primary id property");
 
                 Some(OperatorAllocation::Allocated(
@@ -177,7 +177,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ))
             }
             SerdeKey::Def(def_variant) if def_variant.modifier.contains(DataModifier::ARRAY) => {
-                let item_operator_id = self.get_serde_operator_id(SerdeKey::Def(
+                let item_operator_id = self.gen_operator_id(SerdeKey::Def(
                     def_variant.remove_modifier(DataModifier::ARRAY),
                 ))?;
 
@@ -408,14 +408,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 while let Some((_, element)) = element_iterator.next() {
                     let operator_id = match element {
                         None => self
-                            .get_serde_operator_id(SerdeKey::no_modifier(DefId::unit()))
+                            .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
                             .unwrap(),
                         Some(relationship_id) => {
                             let meta = self
                                 .get_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
-                            self.get_serde_operator_id(SerdeKey::Def(
+                            self.gen_operator_id(SerdeKey::Def(
                                 def_variant.with_def(meta.relationship.object.0.def_id),
                             ))
                             .expect("no inner operator")
@@ -464,7 +464,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             };
 
-            let id_operator_id = match self.get_serde_operator_id(SerdeKey::Def(
+            let id_operator_id = match self.gen_operator_id(SerdeKey::Def(
                 def_variant.with_local_mod(DataModifier::PRIMARY_ID),
             )) {
                 Some(id_operator_id) => id_operator_id,
@@ -484,7 +484,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             // Create a union between { '_id' } and the map properties itself
             let map_properties_operator_id = self
-                .get_serde_operator_id(SerdeKey::Def(map_def_variant))
+                .gen_operator_id(SerdeKey::Def(map_def_variant))
                 .expect("No property map operator");
 
             let id_property_name =
@@ -673,7 +673,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .build(self, |this, operator_id, result_type| {
                     if root_types.contains(&result_type) {
                         // Make the intersection:
-                        this.get_serde_operator_id(SerdeKey::Intersection(Box::new(
+                        this.gen_operator_id(SerdeKey::Intersection(Box::new(
                             [
                                 inherent_properties_key.clone(),
                                 SerdeKey::Def(def_variant.with_def(result_type)),
@@ -747,9 +747,21 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.get_property_operator(type_def_id, property.cardinality);
 
                 let rel_params_operator_id = match &meta.relationship.rel_params {
-                    RelParams::Type(def) => self.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(def.def_id, DataModifier::default()),
-                    )),
+                    RelParams::Type(def) => {
+                        let key =
+                            SerdeKey::Def(DefVariant::new(def.def_id, DataModifier::default()));
+                        match self.gen_operator(key.clone()) {
+                            Some(SerdeOperator::Struct(struct_op)) => {
+                                if !struct_op.properties.is_empty() {
+                                    self.gen_operator_id(key)
+                                } else {
+                                    None
+                                }
+                            }
+                            Some(_) => self.gen_operator_id(key),
+                            _ => None,
+                        }
+                    }
                     RelParams::Unit => None,
                     _ => todo!(),
                 };

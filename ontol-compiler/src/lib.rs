@@ -190,7 +190,7 @@ impl<'m> Compiler<'m> {
                                 id_relation_id: *id_relation_id,
                                 id_value_def_id: identifies_meta.relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
-                                    .get_serde_operator_id(SerdeKey::Def(DefVariant::new(
+                                    .gen_operator_id(SerdeKey::Def(DefVariant::new(
                                         identifies_meta.relationship.subject.0.def_id,
                                         DataModifier::NONE,
                                     )))
@@ -222,9 +222,10 @@ impl<'m> Compiler<'m> {
                     public,
                     name: Some(type_name),
                     entity_info,
-                    operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, DataModifier::default()),
-                    )),
+                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                        type_def_id,
+                        DataModifier::default(),
+                    ))),
                 });
             }
 
@@ -234,9 +235,10 @@ impl<'m> Compiler<'m> {
                     public: false,
                     name: None,
                     entity_info: None,
-                    operator_id: serde_generator.get_serde_operator_id(SerdeKey::Def(
-                        DefVariant::new(type_def_id, DataModifier::default()),
-                    )),
+                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                        type_def_id,
+                        DataModifier::default(),
+                    ))),
                 });
             }
 
