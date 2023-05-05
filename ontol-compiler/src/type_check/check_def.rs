@@ -1,10 +1,9 @@
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 use tracing::debug;
 
 use crate::{
     codegen::{CodegenTask, ConstCodegenTask},
     def::{DefKind, TypeDef},
-    error::CompileError,
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::check_expr::CheckExprContext,
@@ -18,7 +17,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(type_ref) = self.def_types.map.get(&def_id) {
             return type_ref;
         }
+        let ty = self.check_def_inner(def_id);
+        self.def_types.map.insert(def_id, ty);
+        ty
+    }
 
+    fn check_def_inner(&mut self, def_id: DefId) -> TypeRef<'m> {
         let def = self
             .defs
             .map
@@ -29,26 +33,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Type(TypeDef {
                 ident: Some(_ident),
                 ..
-            }) => {
-                let ty = self.types.intern(Type::Domain(def_id));
-                self.def_types.map.insert(def_id, ty);
-                ty
-            }
+            }) => self.types.intern(Type::Domain(def_id)),
             DefKind::Type(TypeDef { ident: None, .. }) => {
-                let ty = self.types.intern(Type::Anonymous(def_id));
-                self.def_types.map.insert(def_id, ty);
-                ty
+                self.types.intern(Type::Anonymous(def_id))
             }
-            DefKind::StringLiteral(_) => {
-                let ty = self.types.intern(Type::StringConstant(def_id));
-                self.def_types.map.insert(def_id, ty);
-                ty
-            }
-            DefKind::Regex(_) => {
-                let ty = self.types.intern(Type::Regex(def_id));
-                self.def_types.map.insert(def_id, ty);
-                ty
-            }
+            DefKind::StringLiteral(_) => self.types.intern(Type::StringConstant(def_id)),
+            DefKind::Regex(_) => self.types.intern(Type::Regex(def_id)),
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
@@ -66,13 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Constant(expr_id) => {
                 let mut expr_root = self.consume_expr(*expr_id);
                 expr_root.expected_ty = match self.expected_constant_types.remove(&def_id) {
-                    None => {
-                        self.error(
-                            CompileError::TODO(smart_format!("No expected type for constant")),
-                            &def.span,
-                        );
-                        return self.types.intern(Type::Error);
-                    }
+                    None => return self.types.intern(Type::Error),
                     Some(ty) => Some(ty),
                 };
 

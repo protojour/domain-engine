@@ -418,6 +418,16 @@ fn namespace_not_found() {
 }
 
 #[test]
+fn constant_in_weird_place() {
+    "
+    type foo {
+        rel _ 'prop' := 42 // ERROR object must be a data type
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn bad_domain_relation() {
     TestPackages::with_sources([
         (SourceName("a"), ""),
