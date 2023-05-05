@@ -506,7 +506,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Type::NumberLiteral(lit) => {
                 let lit = self.compiler.strings.intern(&lit);
                 let def_id = self.compiler.defs.add_def(
-                    DefKind::NumberLiteral(&lit),
+                    DefKind::NumberLiteral(lit),
                     CORE_PKG,
                     self.src.span(span),
                 );

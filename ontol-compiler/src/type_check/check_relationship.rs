@@ -271,7 +271,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
                             Some(object_ty) => {
                                 // just copy the type, type check done later
-                                self.def_types.map.insert(object.0.def_id, &object_ty);
+                                self.def_types.map.insert(object.0.def_id, object_ty);
                                 object_ty
                             }
                             None => self.error(
