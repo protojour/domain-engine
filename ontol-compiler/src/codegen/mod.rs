@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Address, Lib, NParams, Procedure},
-    MapKey,
+    DefId, MapKey,
 };
 
 mod equation;
@@ -19,7 +19,7 @@ use tracing::{debug, error, warn};
 
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
-    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirNodeTable},
+    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirNodeTable},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -35,6 +35,7 @@ use self::{
 pub struct CodegenTasks<'m> {
     tasks: Vec<CodegenTask<'m>>,
     pub result_lib: Lib,
+    pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
 }
 
@@ -54,6 +55,8 @@ impl<'m> CodegenTasks<'m> {
 
 #[derive(Debug)]
 pub enum CodegenTask<'m> {
+    // A procedure with 0 arguments, used to produce a constant value
+    Const(ConstCodegenTask<'m>),
     Map(MapCodegenTask<'m>),
 }
 
@@ -64,9 +67,18 @@ pub struct MapCodegenTask<'m> {
     pub span: SourceSpan,
 }
 
+#[derive(Debug)]
+pub struct ConstCodegenTask<'m> {
+    pub def_id: DefId,
+    pub nodes: HirNodeTable<'m>,
+    pub root: HirIdx,
+    pub span: SourceSpan,
+}
+
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
+    pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
+    pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub map_calls: Vec<MapCall>,
 }
 
@@ -111,6 +123,26 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for task in tasks {
         match task {
+            CodegenTask::Const(ConstCodegenTask {
+                def_id,
+                nodes,
+                root,
+                span,
+            }) => {
+                let equation = HirEquation::new(nodes);
+                let mut builder = ProcBuilder::new(NParams(1));
+                let mut block = builder.new_block(Stack(1), span);
+                let mut generator =
+                    CodeGenerator::new(&mut proc_table, &mut builder, &[], CodeDirection::Forward);
+
+                match generator.codegen_expr(&mut block, &equation, root) {
+                    Ok(_) => {
+                        builder.commit(block, Terminator::Return(builder.top()));
+                        proc_table.const_procedures.insert(def_id, builder);
+                    }
+                    Err(error) => panic!("BUG: Problem generating const expression: {error:?}"),
+                }
+            }
             CodegenTask::Map(map_task) => {
                 let bodies = map_task.bodies;
                 let mut equation = HirEquation::new(map_task.nodes);
@@ -146,9 +178,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         }
     }
 
-    let LinkResult { lib, map_procs } = link(compiler, &mut proc_table);
+    let LinkResult {
+        lib,
+        const_procs,
+        map_procs,
+    } = link(compiler, &mut proc_table);
 
     compiler.codegen_tasks.result_lib = lib;
+    compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_procs = map_procs;
 }
 
@@ -195,7 +232,7 @@ fn codegen_map_solve(
         (Some(from_def), Some(to_def)) => {
             let (_, _, span) = equation.resolve_node(&equation.expansions, to);
 
-            let mut builder = ProcBuilder::new(NParams(1));
+            let mut builder = ProcBuilder::new(NParams(0));
             let mut block = builder.new_block(Stack(1), span);
             let mut generator = CodeGenerator::new(proc_table, &mut builder, bodies, direction);
 
@@ -203,7 +240,9 @@ fn codegen_map_solve(
                 Ok(()) => {
                     builder.commit(block, Terminator::Return(builder.top()));
 
-                    proc_table.procedures.insert((from_def, to_def), builder);
+                    proc_table
+                        .map_procedures
+                        .insert((from_def, to_def), builder);
                     true
                 }
                 Err(e) => {

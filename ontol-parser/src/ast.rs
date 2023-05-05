@@ -58,7 +58,7 @@ pub struct RelStatement {
     pub kw: Span,
     pub subject: Spanned<Option<Type>>,
     pub relation: Relation,
-    pub object: Spanned<Option<Type>>,
+    pub object: Spanned<Option<TypeOrPattern>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
@@ -152,6 +152,12 @@ pub enum ExprPattern {
         BinaryOp,
         Box<Spanned<ExprPattern>>,
     ),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum TypeOrPattern {
+    Type(Type),
+    Pattern(Pattern),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

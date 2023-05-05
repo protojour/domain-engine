@@ -4,8 +4,9 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr, TypeParam,
-    TypeParamPattern, TypeParamPatternBinding, UnitOrSeq, UseStatement, Visibility, WithStatement,
+    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr,
+    TypeOrPattern, TypeParam, TypeParamPattern, TypeParamPatternBinding, UnitOrSeq, UseStatement,
+    Visibility, WithStatement,
 };
 
 use super::{
@@ -116,6 +117,13 @@ fn with_statement(
 fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
     let ctx_block = stmt_parser.repeated().delimited_by(open('{'), close('}'));
 
+    let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_underscore())
+        .map(|(unit_or_seq, (opt_ty, span))| (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span)))
+        .or(sigil('=').ignore_then(
+            spanned(pattern())
+                .map(|(pat, span)| (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))),
+        ));
+
     doc_comments()
         .then(keyword(Token::Rel))
         // subject
@@ -123,7 +131,7 @@ fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
         // relation
         .then(relation())
         // object
-        .then(with_unit_or_seq(spanned_ty_or_underscore()))
+        .then(object_type_or_pattern)
         .then(spanned(ctx_block).or_not())
         .map(
             |(

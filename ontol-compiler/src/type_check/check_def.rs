@@ -2,14 +2,16 @@ use ontol_runtime::{smart_format, DefId};
 use tracing::debug;
 
 use crate::{
+    codegen::{CodegenTask, ConstCodegenTask},
     def::{DefKind, TypeDef},
     error::CompileError,
     mem::Intern,
     primitive::PrimitiveKind,
+    type_check::check_expr::CheckExprContext,
     types::{Type, TypeRef},
 };
 
-use super::{TypeCheck, TypeError};
+use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
@@ -61,27 +63,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            DefKind::NumberLiteral(lit) => match self.expected_constant_types.get(&def_id) {
-                None => {
-                    self.error(
-                        CompileError::TODO(smart_format!("No expected type for constant")),
-                        &def.span,
-                    );
-                    self.types.intern(Type::Error)
-                }
-                Some(Type::Int(_)) => match lit.parse::<i64>() {
-                    Ok(number) => {
-                        let ty = self.types.intern(Type::IntConstant(number));
-                        self.def_types.map.insert(def_id, ty);
-                        ty
+            DefKind::Constant(expr_id) => {
+                let mut expr_root = self.consume_expr(*expr_id);
+                expr_root.expected_ty = match self.expected_constant_types.get(&def_id) {
+                    None => {
+                        self.error(
+                            CompileError::TODO(smart_format!("No expected type for constant")),
+                            &def.span,
+                        );
+                        return self.types.intern(Type::Error);
                     }
-                    Err(_) => {
-                        self.error(CompileError::InvalidInteger, &def.span);
-                        self.types.intern(Type::Error)
-                    }
-                },
-                Some(ty) => self.type_error(TypeError::NotConvertibleFromNumber(ty), &def.span),
-            },
+                    Some(ty) => Some(ty),
+                };
+
+                let mut ctx = CheckExprContext::new();
+                let (ty, hir_idx) = self.check_expr_root(expr_root, &mut ctx);
+
+                self.codegen_tasks
+                    .push(CodegenTask::Const(ConstCodegenTask {
+                        def_id,
+                        nodes: ctx.nodes,
+                        root: hir_idx,
+                        span: def.span,
+                    }));
+
+                ty
+            }
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

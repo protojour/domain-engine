@@ -286,7 +286,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                     _ => self.error(
                         CompileError::TODO(smart_format!(
-                            "default not supported here, must be on a realtion type"
+                            "default not supported here, must be on a relation type"
                         )),
                         span,
                     ),

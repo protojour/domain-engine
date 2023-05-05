@@ -20,6 +20,7 @@ use crate::{
 
 /// Runtime environment
 pub struct Env {
+    pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) mapper_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
@@ -35,6 +36,7 @@ impl Env {
     pub fn builder() -> EnvBuilder {
         EnvBuilder {
             env: Self {
+                const_proc_table: Default::default(),
                 mapper_proc_table: Default::default(),
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
@@ -190,6 +192,11 @@ impl EnvBuilder {
 
     pub fn lib(mut self, lib: Lib) -> Self {
         self.env.lib = lib;
+        self
+    }
+
+    pub fn const_procs(mut self, const_procs: FnvHashMap<DefId, Procedure>) -> Self {
+        self.env.const_proc_table = const_procs;
         self
     }
 

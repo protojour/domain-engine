@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     proc::{Address, Lib, OpCode, Procedure},
-    smart_format,
+    smart_format, DefId,
 };
 use smartstring::alias::String;
 
@@ -11,23 +11,35 @@ use super::{MapKey, ProcTable};
 
 pub struct LinkResult {
     pub lib: Lib,
+    pub const_procs: FnvHashMap<DefId, Procedure>,
     pub map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
+    let mut map_procs: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
+    let mut const_procs: FnvHashMap<DefId, Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
     let mut spans: Vec<SourceSpan> = vec![];
 
-    for ((from, to), proc_builder) in std::mem::take(&mut proc_table.procedures) {
+    for (def_id, proc_builder) in std::mem::take(&mut proc_table.const_procedures) {
         let n_params = proc_builder.n_params;
         let opcodes = proc_builder.build();
         spans.extend(opcodes.iter().map(|(_, span)| span));
 
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
-        mapping_procs.insert((from, to), procedure);
+        const_procs.insert(def_id, procedure);
+    }
+
+    for ((from, to), proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
+        let n_params = proc_builder.n_params;
+        let opcodes = proc_builder.build();
+        spans.extend(opcodes.iter().map(|(_, span)| span));
+
+        let procedure =
+            lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
+        map_procs.insert((from, to), procedure);
     }
 
     // correct "call" opcodes to point to correct address
@@ -35,7 +47,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         if let OpCode::Call(call_procedure) = opcode {
             let map_call = &proc_table.map_calls[call_procedure.address.0 as usize];
 
-            match mapping_procs.get(&map_call.mapping) {
+            match map_procs.get(&map_call.mapping) {
                 Some(mapping_proc) => {
                     call_procedure.address = mapping_proc.address;
                 }
@@ -55,7 +67,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 
     LinkResult {
         lib,
-        map_procs: mapping_procs,
+        const_procs,
+        map_procs,
     }
 }
 

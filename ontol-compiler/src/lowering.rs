@@ -214,8 +214,27 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let subject_def =
             self.resolve_contextual_type_reference(subject, subject_span.clone(), &block_context)?;
-        let object_def =
-            self.resolve_contextual_type_reference(object, object_span.clone(), &block_context)?;
+        let object_def = match object {
+            Some(ast::TypeOrPattern::Type(ty)) => self.resolve_contextual_type_reference(
+                Some(ty),
+                object_span.clone(),
+                &block_context,
+            )?,
+            Some(ast::TypeOrPattern::Pattern(pattern)) => {
+                let mut var_table = ExprVarTable::default();
+                let expr = self.lower_pattern((pattern, object_span.clone()), &mut var_table)?;
+                let expr_id = self.compiler.expressions.alloc_expr_id();
+                self.compiler.expressions.map.insert(expr_id, expr);
+
+                DefReference {
+                    def_id: self.define(DefKind::Constant(expr_id), &object_span),
+                    pattern_bindings: Default::default(),
+                }
+            }
+            None => {
+                self.resolve_contextual_type_reference(None, object_span.clone(), &block_context)?
+            }
+        };
 
         self.def_relationship(
             (subject_def, &subject_span),
