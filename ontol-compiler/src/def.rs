@@ -261,7 +261,10 @@ impl<'m> Defs<'m> {
             })
             .ok_or(())?;
 
-        Ok((relationship, relation))
+        Ok(RelationshipMeta {
+            relationship,
+            relation,
+        })
     }
 
     pub fn alloc_def_id(&mut self, package_id: PackageId) -> DefId {

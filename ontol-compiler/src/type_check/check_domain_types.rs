@@ -39,21 +39,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             match property_id.role {
                 Role::Subject => {
-                    let (relationship, _) = self
+                    let meta = self
                         .property_meta_by_subject(def_id, property_id.relation_id)
                         .unwrap();
                     let object_properties = self
                         .relations
-                        .properties_by_type(relationship.object.0.def_id)
+                        .properties_by_type(meta.relationship.object.0.def_id)
                         .unwrap();
 
                     // Check if the property is the primary id
                     if let Some(id_relation) = object_properties.identifies {
-                        let (id_relationship, _) = self
-                            .property_meta_by_subject(relationship.object.0.def_id, id_relation)
+                        let id_meta = self
+                            .property_meta_by_subject(
+                                meta.relationship.object.0.def_id,
+                                id_relation,
+                            )
                             .unwrap();
 
-                        if id_relationship.object.0.def_id == def_id {
+                        if id_meta.relationship.object.0.def_id == def_id {
                             actions.push(Action::RedefineAsPrimaryId(def_id, *property_id));
                         }
                     }
@@ -76,14 +79,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                     let all_entities =
                                         relationships.iter().all(|(relationship_id, _span)| {
-                                            let (relationship, relation) = self
+                                            let meta = self
                                                 .get_relationship_meta(*relationship_id)
                                                 .expect("BUG: problem getting property meta");
 
-                                            let variant_def = match &relation.kind {
+                                            let variant_def = match &meta.relation.kind {
                                                 RelationKind::Named(def)
                                                 | RelationKind::FmtTransition(def) => def.def_id,
-                                                _ => relationship.object.0.def_id,
+                                                _ => meta.relationship.object.0.def_id,
                                             };
 
                                             let subject_properties = self
@@ -113,12 +116,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
                     } else {
-                        let (relationship, _) = self
+                        let meta = self
                             .property_meta_by_object(def_id, property_id.relation_id)
                             .unwrap();
                         let subject_properties = self
                             .relations
-                            .properties_by_type(relationship.subject.0.def_id)
+                            .properties_by_type(meta.relationship.subject.0.def_id)
                             .unwrap();
 
                         if subject_properties.identified_by.is_some() {
@@ -142,12 +145,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("perform action {action:?}");
             match action {
                 Action::ReportNonEntityInObjectRelationship(def_id, relation_id) => {
-                    let (relationship, _) =
-                        self.property_meta_by_object(def_id, relation_id).unwrap();
+                    let meta = self.property_meta_by_object(def_id, relation_id).unwrap();
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,
-                        relationship.span,
+                        meta.relationship.span,
                     );
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {

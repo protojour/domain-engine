@@ -4,7 +4,7 @@ use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId,
 
 use crate::{def::Cardinality, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct RelationshipId(pub DefId);
 
 #[derive(Default, Debug)]
@@ -13,6 +13,8 @@ pub struct Relations {
     pub properties_by_type: FnvHashMap<DefId, Properties>,
     pub relationships_by_subject: FnvHashMap<(DefId, RelationId), RelationshipId>,
     pub relationships_by_object: FnvHashMap<(DefId, RelationId), RelationshipId>,
+
+    pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
 
     pub value_unions: FnvHashSet<DefId>,
     pub string_pattern_constructors: FnvHashSet<DefId>,

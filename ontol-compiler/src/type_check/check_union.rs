@@ -57,15 +57,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut used_variants: FnvHashSet<DefId> = Default::default();
 
         for (relationship_id, span) in relationship_ids {
-            let (relationship, relation) = self
+            let meta = self
                 .get_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting property meta");
 
-            debug!("check union {relationship:?}");
+            debug!("check union {:?}", meta.relationship);
 
-            let variant_def = match &relation.kind {
+            let variant_def = match &meta.relation.kind {
                 RelationKind::Named(def) | RelationKind::FmtTransition(def) => def.def_id,
-                _ => relationship.object.0.def_id,
+                _ => meta.relationship.object.0.def_id,
             };
 
             if used_variants.contains(&variant_def) {
@@ -81,13 +81,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if let Some(properties) = self.relations.properties_by_type(variant_def) {
                 if let Some(id_relation_id) = &properties.identified_by {
-                    let (identifies_relationship, _) = self
+                    let identifies_meta = self
                         .property_meta_by_object(variant_def, *id_relation_id)
                         .expect("BUG: problem getting property meta");
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
-                        identifies_relationship.subject.0.def_id,
+                        identifies_meta.relationship.subject.0.def_id,
                         &mut error_set,
                         span,
                     );
@@ -212,11 +212,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         _,
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                     ) => {
-                        let (relationship, _) = self
+                        let meta = self
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting property meta");
 
-                        def_id = relationship.object.0.def_id;
+                        def_id = meta.relationship.object.0.def_id;
                         continue;
                     }
                     Constructor::Value(_, _, _) => {
@@ -256,17 +256,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         for (property_id, _cardinality) in property_set {
-            let (relationship, relation) = self
+            let meta = self
                 .property_meta_by_subject(variant_def, property_id.relation_id)
                 .expect("BUG: problem getting property meta");
 
-            let (object_reference, _) = &relationship.object;
+            let (object_reference, _) = &meta.relationship.object;
             let object_ty = self.def_types.map.get(&object_reference.def_id).unwrap();
-            let Some(property_name) = relation.object_prop(self.defs) else {
+            let Some(property_name) = meta.relation.object_prop(self.defs) else {
                 continue;
             };
 
-            debug!("trying rel {relationship:?} {relation:?} ty: {object_ty:?}");
+            debug!(
+                "trying rel {:?} {:?} ty: {object_ty:?}",
+                meta.relationship, meta.relation
+            );
 
             match object_ty {
                 Type::IntConstant(_) => {
@@ -276,7 +279,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let string_literal = self.defs.get_string_representation(*def_id);
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
-                            relation_id: relationship.relation_id,
+                            relation_id: meta.relationship.relation_id,
                             discriminant: Discriminant::HasStringAttribute(
                                 property_id.relation_id,
                                 property_name.into(),

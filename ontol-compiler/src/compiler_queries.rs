@@ -46,10 +46,10 @@ where
     }
 }
 
-pub type RelationshipMeta<'m> = (
-    SpannedBorrow<'m, Relationship>,
-    SpannedBorrow<'m, Relation<'m>>,
-);
+pub struct RelationshipMeta<'m> {
+    pub relationship: SpannedBorrow<'m, Relationship>,
+    pub relation: SpannedBorrow<'m, Relation<'m>>,
+}
 
 pub trait GetPropertyMeta<'m> {
     fn get_relationship_meta(

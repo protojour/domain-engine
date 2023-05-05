@@ -422,13 +422,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .iter()
                             .filter_map(|(property_id, _cardinality)| match property_id.role {
                                 Role::Subject => {
-                                    let (relationship, relation) = self
+                                    let meta = self
                                         .property_meta_by_subject(
                                             *subject_id,
                                             property_id.relation_id,
                                         )
                                         .expect("BUG: problem getting property meta");
-                                    let property_name = relation
+                                    let property_name = meta
+                                        .relation
                                         .subject_prop(self.defs)
                                         .expect("BUG: Expected named subject property");
 
@@ -436,8 +437,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         property_name,
                                         MatchProperty {
                                             relation_id: property_id.relation_id,
-                                            cardinality: relationship.subject_cardinality,
-                                            object_def: relationship.object.0.def_id,
+                                            cardinality: meta.relationship.subject_cardinality,
+                                            object_def: meta.relationship.object.0.def_id,
                                             used: false,
                                         },
                                     ))
@@ -515,11 +516,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut attributes = attributes.into_vec().into_iter();
                 match attributes.next() {
                     Some(((def, _), value)) if def.def_id == DefId::unit() => {
-                        let (relationship, _) = self
+                        let meta = self
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting anonymous property meta");
 
-                        let object_ty = self.check_def(relationship.object.0.def_id);
+                        let object_ty = self.check_def(meta.relationship.object.0.def_id);
                         let node_id = self.check_expr_expect(value, object_ty, ctx).1;
 
                         ctx.nodes.add(HirNode {

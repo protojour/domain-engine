@@ -182,25 +182,26 @@ impl<'m> Compiler<'m> {
                 let entity_info =
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
                         if let Some(id_relation_id) = &properties.identified_by {
-                            let (identifies_relationship, _) = self
+                            let identifies_meta = self
                                 .property_meta_by_object(type_def_id, *id_relation_id)
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
                                 id_relation_id: *id_relation_id,
-                                id_value_def_id: identifies_relationship.subject.0.def_id,
+                                id_value_def_id: identifies_meta.relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
                                     .get_serde_operator_id(SerdeKey::Def(DefVariant::new(
-                                        identifies_relationship.subject.0.def_id,
+                                        identifies_meta.relationship.subject.0.def_id,
                                         DataModifier::NONE,
                                     )))
                                     .unwrap(),
                                 id_inherent_property_name: match self
                                     .find_inherent_primary_id(type_def_id, properties)
                                 {
-                                    Some((_, relation)) => {
-                                        relation.subject_prop(&self.defs).map(|name| name.into())
-                                    }
+                                    Some(meta) => meta
+                                        .relation
+                                        .subject_prop(&self.defs)
+                                        .map(|name| name.into()),
                                     None => None,
                                 },
                             })

@@ -159,14 +159,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
-                let (relationship, relation) = self
+                let meta = self
                     .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
                     .expect("Problem getting property meta");
 
-                let property_name = relation.subject_prop(self.defs)?;
+                let property_name = meta.relation.subject_prop(self.defs)?;
 
                 let object_operator_id = self
-                    .get_serde_operator_id(SerdeKey::no_modifier(relationship.object.0.def_id))
+                    .get_serde_operator_id(SerdeKey::no_modifier(meta.relationship.object.0.def_id))
                     .expect("No object operator for primary id property");
 
                 Some(OperatorAllocation::Allocated(
@@ -409,12 +409,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .get_serde_operator_id(SerdeKey::no_modifier(DefId::unit()))
                             .unwrap(),
                         Some(relationship_id) => {
-                            let (relationship, _relation) = self
+                            let meta = self
                                 .get_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
                             self.get_serde_operator_id(SerdeKey::Def(
-                                def_variant.with_def(relationship.object.0.def_id),
+                                def_variant.with_def(meta.relationship.object.0.def_id),
                             ))
                             .expect("no inner operator")
                         }
@@ -476,7 +476,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let map_def_variant = def_variant.remove_modifier(union_id);
 
-            let (identifies_relationship, _) = self
+            let identifies_meta = self
                 .property_meta_by_object(def_variant.def_id, identifies_relation_id)
                 .expect("Problem getting subject property meta");
 
@@ -505,7 +505,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 ),
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
-                                    identifies_relationship.subject.0.def_id,
+                                    identifies_meta.relationship.subject.0.def_id,
                                     DataModifier::NONE,
                                 ),
                             },
@@ -562,12 +562,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             } else {
                 let mut intersection_keys = BTreeSet::new();
                 for (relationship_id, _, _cardinality) in items {
-                    let Ok((relationship, _)) = self.get_relationship_meta(*relationship_id) else {
+                    let Ok(meta) = self.get_relationship_meta(*relationship_id) else {
                         panic!("Problem getting property meta");
                     };
 
                     intersection_keys.insert(SerdeKey::Def(DefVariant::new(
-                        relationship.object.0.def_id,
+                        meta.relationship.object.0.def_id,
                         DataModifier::default(),
                     )));
                 }
@@ -591,11 +591,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             let (relationship_id, _, cardinality) = items[0];
 
-            let Ok((relationship, _)) = self.get_relationship_meta(relationship_id) else {
+            let Ok(meta) = self.get_relationship_meta(relationship_id) else {
                 panic!("Problem getting property meta");
             };
 
-            let value_def = relationship.object.0.def_id;
+            let value_def = meta.relationship.object.0.def_id;
 
             let (requirement, inner_operator_id) =
                 self.get_property_operator(value_def, cardinality);
@@ -714,28 +714,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             // panic!();
                         }
 
-                        let (relationship, relation) = self
+                        let meta = self
                             .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting subject property meta");
-                        let object = relationship.object.0.def_id;
+                        let object = meta.relationship.object.0.def_id;
 
-                        let prop_key = relation
+                        let prop_key = meta
+                            .relation
                             .subject_prop(self.defs)
                             .expect("Subject property has no name");
 
-                        (relationship, prop_key, object)
+                        (meta.relationship, prop_key, object)
                     }
                     Role::Object => {
-                        let (relationship, relation) = self
+                        let meta = self
                             .property_meta_by_object(def_variant.def_id, property_id.relation_id)
                             .expect("Problem getting object property meta");
-                        let subject = relationship.subject.0.def_id;
+                        let subject = meta.relationship.subject.0.def_id;
 
-                        let prop_key = relation
+                        let prop_key = meta
+                            .relation
                             .object_prop(self.defs)
                             .expect("Object property has no name");
 
-                        (relationship, prop_key, subject)
+                        (meta.relationship, prop_key, subject)
                     }
                 };
 
@@ -760,6 +762,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         property_id: *property_id,
                         value_operator_id,
                         optional: property_cardinality.is_optional(),
+                        default_const: None,
                         rel_params_operator_id,
                     },
                 );

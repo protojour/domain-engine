@@ -203,5 +203,6 @@ pub struct SerdeProperty {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
     pub optional: bool,
+    pub default_const: Option<DefId>,
     pub rel_params_operator_id: Option<SerdeOperatorId>,
 }

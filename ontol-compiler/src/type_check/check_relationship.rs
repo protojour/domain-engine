@@ -273,6 +273,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 // just copy the type, type check done later
                                 self.expected_constant_types
                                     .insert(object.0.def_id, object_ty);
+
+                                self.relations.default_const_objects.insert(
+                                    RelationshipId(*outer_relationship_id),
+                                    object.0.def_id,
+                                );
+
                                 object_ty
                             }
                             None => self.error(
