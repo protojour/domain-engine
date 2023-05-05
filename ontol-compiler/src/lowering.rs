@@ -19,6 +19,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, TypePath},
     namespace::Space,
     package::{PackageReference, CORE_PKG},
+    relation::RelationshipId,
     Compiler, Src,
 };
 
@@ -165,6 +166,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
                 ident: Some(ident),
                 params,
+                rel_type_for: None,
             }),
             &span,
         );
@@ -280,6 +282,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ImplicitRelationId::Reused(relation_id) => relation_id,
         };
 
+        let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some((_, span)) = ctx_block {
                 return Err((
@@ -290,7 +294,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some((ctx_block, _)) = ctx_block {
-            let rel_def = self.define_anonymous_type(&span);
+            let rel_def = self.define_anonymous_type(
+                TypeDef {
+                    public: false,
+                    ident: None,
+                    params: None,
+                    rel_type_for: Some(RelationshipId(relationship_id)),
+                },
+                &span,
+            );
             let context_fn = || rel_def.clone();
 
             root_defs.push(rel_def.def_id);
@@ -341,7 +353,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             rel_params,
         };
 
-        root_defs.push(self.define(DefKind::Relationship(relationship), &span));
+        self.set_def_kind(relationship_id, DefKind::Relationship(relationship), &span);
+        root_defs.push(relationship_id);
 
         Ok(root_defs)
     }
@@ -380,7 +393,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            let target_def = self.define_anonymous_type(&span);
+            let target_def = self.define_anonymous_type(
+                TypeDef {
+                    public: false,
+                    ident: None,
+                    params: None,
+                    rel_type_for: None,
+                },
+                &span,
+            );
 
             root_defs.push(self.ast_fmt_transition_to_def(
                 (origin_def, &origin_span),
@@ -482,6 +503,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     pattern_bindings: args,
                 })
             }
+            ast::Type::NumberLiteral(lit) => {
+                let lit = self.compiler.strings.intern(&lit);
+                let def_id = self.compiler.defs.add_def(
+                    DefKind::NumberLiteral(&lit),
+                    CORE_PKG,
+                    self.src.span(span),
+                );
+                Ok(DefReference {
+                    def_id,
+                    pattern_bindings: Default::default(),
+                })
+            }
             ast::Type::StringLiteral(lit) => {
                 let def_id = match lit.as_str() {
                     "" => self.compiler.primitives.empty_string,
@@ -508,9 +541,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     pattern_bindings: Default::default(),
                 })
             }
-            _ => Err((CompileError::InvalidType, span.clone())),
-            // ast::Type::EmptySequence => Ok(self.compiler.defs.empty_sequence()),
-            // ast::Type::Literal(_) => Err(self.error(CompileError::InvalidType, span)),
         }
     }
 
@@ -796,17 +826,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_anonymous_type(&mut self, span: &Span) -> DefReference {
+    fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.set_def_kind(
-            anonymous_def_id,
-            DefKind::Type(TypeDef {
-                public: false,
-                ident: None,
-                params: None,
-            }),
-            span,
-        );
+        self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         DefReference {
             def_id: anonymous_def_id,
             pattern_bindings: Default::default(),

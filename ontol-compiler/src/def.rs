@@ -38,6 +38,7 @@ pub enum DefKind<'m> {
     Package(PackageId),
     Primitive(PrimitiveKind),
     StringLiteral(&'m str),
+    NumberLiteral(&'m str),
     EmptySequence,
     Regex(&'m str),
     /// A type definition in some domain:
@@ -63,6 +64,7 @@ impl<'m> DefKind<'m> {
             Self::Primitive(PrimitiveKind::Number) => Some("number".into()),
             Self::Primitive(PrimitiveKind::String) => Some("string".into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
+            Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
             Self::CoreFn(_) => None,
@@ -79,6 +81,7 @@ pub struct TypeDef<'m> {
     pub public: bool,
     pub ident: Option<&'m str>,
     pub params: Option<IndexMap<&'m str, TypeDefParam>>,
+    pub rel_type_for: Option<RelationshipId>,
 }
 
 #[derive(Debug)]

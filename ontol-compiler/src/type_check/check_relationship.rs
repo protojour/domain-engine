@@ -1,10 +1,10 @@
-use ontol_runtime::{value::PropertyId, DefId, RelationId};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId};
 use tracing::debug;
 
 use crate::{
     def::{
         BuiltinRelationKind, Def, DefKind, DefReference, PropertyCardinality, Relation,
-        RelationKind, Relationship,
+        RelationKind, Relationship, TypeDef,
     },
     error::CompileError,
     mem::Intern,
@@ -75,11 +75,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object: &(DefReference, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let subject_ty = self.check_def(subject.0.def_id);
-        let object_ty = self.check_def(object.0.def_id);
-
         match &relation.1.kind {
             RelationKind::Builtin(BuiltinRelationKind::Is) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -133,8 +133,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
+
+                object_ty
             }
             RelationKind::Builtin(BuiltinRelationKind::Identifies) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -161,8 +166,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Some(RelationId(self.primitives.identifies_relation))
                     }
                 }
+
+                object_ty
             }
             RelationKind::Builtin(BuiltinRelationKind::Indexed) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_type_mut(subject.0.def_id);
@@ -190,8 +200,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .error(CompileError::InvalidMixOfRelationshipTypeForSubject, span)
                     }
                 }
+
+                object_ty
             }
             RelationKind::Named(_) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
 
@@ -223,22 +238,71 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     }
                 }
+
+                object_ty
             }
-            RelationKind::FmtTransition(_) => return subject_ty,
+            RelationKind::FmtTransition(_) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let _ = self.check_def(object.0.def_id);
+
+                subject_ty
+            }
             RelationKind::Builtin(BuiltinRelationKind::Route) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
                 self.check_package_data_type(subject_ty, &subject.1);
                 self.check_package_data_type(object_ty, &object.1);
+
+                object_ty
+            }
+            RelationKind::Builtin(BuiltinRelationKind::Default) => {
+                let _subject_ty = self.check_def(subject.0.def_id);
+                let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
+
+                match subject_def_kind {
+                    DefKind::Type(TypeDef {
+                        rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                        ..
+                    }) => match self.defs.get_def_kind(*outer_relationship_id) {
+                        Some(DefKind::Relationship(Relationship {
+                            object: outer_object,
+                            ..
+                        })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
+                            Some(object_ty) => {
+                                // just copy the type, type check done later
+                                self.def_types.map.insert(object.0.def_id, &object_ty);
+                                object_ty
+                            }
+                            None => self.error(
+                                CompileError::TODO(smart_format!(
+                                    "the type of the default relation has not been checked"
+                                )),
+                                span,
+                            ),
+                        },
+                        _ => unreachable!(),
+                    },
+                    _ => self.error(
+                        CompileError::TODO(smart_format!(
+                            "default not supported here, must be on a realtion type"
+                        )),
+                        span,
+                    ),
+                }
             }
             RelationKind::Builtin(
                 BuiltinRelationKind::Min
                 | BuiltinRelationKind::Max
-                | BuiltinRelationKind::Default
                 | BuiltinRelationKind::Doc
                 | BuiltinRelationKind::Example,
-            ) => return subject_ty,
-        };
+            ) => {
+                let subject_ty = self.check_def(subject.0.def_id);
+                let _ = self.check_def(object.0.def_id);
 
-        object_ty
+                subject_ty
+            }
+        }
     }
 
     /// Check object property, the inverse of a subject property

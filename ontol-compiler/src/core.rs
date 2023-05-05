@@ -105,6 +105,7 @@ impl<'m> Compiler<'m> {
                 public: true,
                 ident: Some(ident),
                 params: None,
+                rel_type_for: None,
             }),
             CORE_PKG,
             SourceSpan::none(),

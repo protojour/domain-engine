@@ -243,6 +243,18 @@ fn test_serde_datetime() {
 }
 
 #[test]
+fn test_default() {
+    "
+    pub type foo {
+        rel _ 'bar': int {
+            rel _ default: 42
+        }
+    }
+    "
+    .compile_ok(|_env| {});
+}
+
+#[test]
 fn test_jsonml() {
     "
     type tag
