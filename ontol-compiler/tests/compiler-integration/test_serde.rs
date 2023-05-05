@@ -251,7 +251,10 @@ fn test_num_default() {
         }
     }
     "
-    .compile_ok(|_env| {});
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        assert_json_io_matches!(foo, json!({}), json!({ "bar": 42 }));
+    });
 }
 
 #[test]

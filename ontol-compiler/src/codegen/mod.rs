@@ -130,8 +130,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 span,
             }) => {
                 let equation = HirEquation::new(nodes);
-                let mut builder = ProcBuilder::new(NParams(1));
-                let mut block = builder.new_block(Stack(1), span);
+                let mut builder = ProcBuilder::new(NParams(0));
+                let mut block = builder.new_block(Stack(0), span);
                 let mut generator =
                     CodeGenerator::new(&mut proc_table, &mut builder, &[], CodeDirection::Forward);
 

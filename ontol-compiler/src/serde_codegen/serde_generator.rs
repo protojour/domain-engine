@@ -708,7 +708,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     continue;
                 }
 
-                let (relationship, prop_key, type_def_id) = match property_id.role {
+                let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
                         if property_id.relation_id.0 == self.primitives.identifies_relation {
                             // panic!();
@@ -724,7 +724,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .subject_prop(self.defs)
                             .expect("Subject property has no name");
 
-                        (meta.relationship, prop_key, object)
+                        (meta, prop_key, object)
                     }
                     Role::Object => {
                         let meta = self
@@ -737,20 +737,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .object_prop(self.defs)
                             .expect("Object property has no name");
 
-                        (meta.relationship, prop_key, subject)
+                        (meta, prop_key, subject)
                     }
                 };
 
                 let (property_cardinality, value_operator_id) =
                     self.get_property_operator(type_def_id, property.cardinality);
 
-                let rel_params_operator_id = match &relationship.rel_params {
+                let rel_params_operator_id = match &meta.relationship.rel_params {
                     RelParams::Type(def) => self.get_serde_operator_id(SerdeKey::Def(
                         DefVariant::new(def.def_id, DataModifier::default()),
                     )),
                     RelParams::Unit => None,
                     _ => todo!(),
                 };
+
+                let mut default_const = None;
+
+                if let Some(default_const_def) = self
+                    .relations
+                    .default_const_objects
+                    .get(&meta.relationship_id)
+                {
+                    default_const = Some(*default_const_def);
+                }
 
                 if property_cardinality.is_mandatory() {
                     n_mandatory_properties += 1;
@@ -762,7 +772,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         property_id: *property_id,
                         value_operator_id,
                         optional: property_cardinality.is_optional(),
-                        default_const: None,
+                        default_const,
                         rel_params_operator_id,
                     },
                 );

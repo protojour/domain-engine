@@ -82,6 +82,10 @@ impl Env {
         self.domains.get(&package_id)
     }
 
+    pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
+        self.const_proc_table.get(&const_id).cloned()
+    }
+
     pub fn mapper_procs(&self) -> impl Iterator<Item = ((MapKey, MapKey), Procedure)> + '_ {
         self.mapper_proc_table
             .iter()

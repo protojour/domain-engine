@@ -195,6 +195,7 @@ pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,
+    // This number _includes_ required properties with _default fallback values_.
     pub n_mandatory_properties: usize,
 }
 

@@ -509,6 +509,29 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         }
     }
 
+    if n_mandatory_properties < expected_mandatory_properties {
+        // Generate default values if missing
+        for (_, property) in properties {
+            if let Some(default_const_def_id) = property.default_const {
+                if !property.optional && !attributes.contains_key(&property.property_id) {
+                    let mut mapping_vm = processor.env.new_mapper();
+                    let proc = processor
+                        .env
+                        .get_const_proc(default_const_def_id)
+                        .unwrap_or_else(|| {
+                            panic!("No const proc for {default_const_def_id:?}");
+                        });
+
+                    let value = mapping_vm.eval(proc, []);
+
+                    // BUG: No support for rel_params:
+                    attributes.insert(property.property_id, value.into());
+                    n_mandatory_properties += 1;
+                }
+            }
+        }
+    }
+
     if n_mandatory_properties < expected_mandatory_properties
         || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
     {

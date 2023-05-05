@@ -47,6 +47,7 @@ where
 }
 
 pub struct RelationshipMeta<'m> {
+    pub relationship_id: RelationshipId,
     pub relationship: SpannedBorrow<'m, Relationship>,
     pub relation: SpannedBorrow<'m, Relation<'m>>,
 }

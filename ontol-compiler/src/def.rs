@@ -262,6 +262,7 @@ impl<'m> Defs<'m> {
             .ok_or(())?;
 
         Ok(RelationshipMeta {
+            relationship_id,
             relationship,
             relation,
         })
