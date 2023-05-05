@@ -1,4 +1,5 @@
-use ontol_runtime::smart_format;
+use fnv::FnvHashMap;
+use ontol_runtime::{smart_format, DefId};
 
 use crate::{
     codegen::CodegenTasks,
@@ -29,6 +30,7 @@ pub enum TypeError<'m> {
     NotEnoughInformation,
     // Another error is the cause of this error
     Propagated,
+    NotConvertibleFromNumber(TypeRef<'m>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +43,8 @@ pub struct TypeEquation<'m> {
 /// It is not only an immutable "check" of typing,
 /// but also actually produces more output for later compile stages.
 pub struct TypeCheck<'c, 'm> {
+    /// This map stores the expected type of constants
+    expected_constant_types: FnvHashMap<DefId, TypeRef<'m>>,
     types: &'c mut Types<'m>,
     def_types: &'c mut DefTypes<'m>,
     relations: &'c mut Relations,
@@ -91,6 +95,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 span,
             ),
             TypeError::Propagated => self.types.intern(Type::Error),
+            TypeError::NotConvertibleFromNumber(ty) => self.error(
+                CompileError::TODO(smart_format!(
+                    "Type {} cannot be represented as a number",
+                    FormatType(ty, self.defs, self.primitives)
+                )),
+                span,
+            ),
         }
     }
 }
@@ -110,6 +121,7 @@ impl<'c, 'm> AsRef<Relations> for TypeCheck<'c, 'm> {
 impl<'m> Compiler<'m> {
     pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
         TypeCheck {
+            expected_constant_types: Default::default(),
             types: &mut self.types,
             errors: &mut self.errors,
             def_types: &mut self.def_types,

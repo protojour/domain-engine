@@ -1,14 +1,15 @@
-use ontol_runtime::DefId;
+use ontol_runtime::{smart_format, DefId};
 use tracing::debug;
 
 use crate::{
     def::{DefKind, TypeDef},
+    error::CompileError,
     mem::Intern,
     primitive::PrimitiveKind,
     types::{Type, TypeRef},
 };
 
-use super::TypeCheck;
+use super::{TypeCheck, TypeError};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
@@ -60,6 +61,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
+            DefKind::NumberLiteral(lit) => match self.expected_constant_types.get(&def_id) {
+                None => {
+                    self.error(
+                        CompileError::TODO(smart_format!("No expected type for constant")),
+                        &def.span,
+                    );
+                    self.types.intern(Type::Error)
+                }
+                Some(Type::Int(_)) => match lit.parse::<i64>() {
+                    Ok(number) => {
+                        let ty = self.types.intern(Type::IntConstant(number));
+                        self.def_types.map.insert(def_id, ty);
+                        ty
+                    }
+                    Err(_) => {
+                        self.error(CompileError::InvalidInteger, &def.span);
+                        self.types.intern(Type::Error)
+                    }
+                },
+                Some(ty) => self.type_error(TypeError::NotConvertibleFromNumber(ty), &def.span),
+            },
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

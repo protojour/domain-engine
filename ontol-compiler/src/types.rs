@@ -18,7 +18,7 @@ pub enum Type<'m> {
     // This is the "type" of an equivalence assertion.
     // It has no specific meaning.
     Tautology,
-    IntConstant(i32),
+    IntConstant(i64),
     Unit(DefId),
     // The DefId encodes which variant this is, false, true or bool
     Bool(DefId),
