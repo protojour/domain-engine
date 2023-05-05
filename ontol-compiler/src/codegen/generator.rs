@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, NParams, Procedure},
+    vm::proc::{BuiltinProc, Local, NParams, Procedure},
     DefId,
 };
 use smallvec::SmallVec;

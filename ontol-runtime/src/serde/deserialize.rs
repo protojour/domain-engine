@@ -10,9 +10,9 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
-    proc::{NParams, Procedure},
     serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
+    vm::proc::{NParams, Procedure},
     DefId,
 };
 
@@ -515,7 +515,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         for (_, property) in properties {
             if let Some(default_const_proc_address) = property.default_const_proc_address {
                 if !property.optional && !attributes.contains_key(&property.property_id) {
-                    let mut mapping_vm = processor.env.new_mapper();
+                    let mut mapping_vm = processor.env.new_vm();
                     let value = mapping_vm.eval(
                         Procedure {
                             address: default_const_proc_address,

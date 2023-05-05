@@ -3,10 +3,10 @@ use tracing::debug;
 
 use crate::{
     env::{Env, TypeInfo},
-    proc::{BuiltinProc, Lib, Local},
     serde::operator::SerdeOperator,
     value::PropertyId,
-    vm::{AbstractVm, Stack, VmDebug},
+    vm::abstract_vm::{AbstractVm, Stack, VmDebug},
+    vm::proc::{BuiltinProc, Lib, Local},
     DefId,
 };
 

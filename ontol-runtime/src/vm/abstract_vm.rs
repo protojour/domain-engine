@@ -1,6 +1,6 @@
 use crate::{
-    proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
     value::PropertyId,
+    vm::proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
     DefId,
 };
 

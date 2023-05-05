@@ -250,7 +250,7 @@ impl<'m> Compiler<'m> {
         builder
             .lib(self.codegen_tasks.result_lib)
             .const_procs(self.codegen_tasks.result_const_procs)
-            .mapping_procs(self.codegen_tasks.result_map_procs)
+            .mapper_procs(self.codegen_tasks.result_map_procs)
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .string_like_types(self.defs.string_like_types)

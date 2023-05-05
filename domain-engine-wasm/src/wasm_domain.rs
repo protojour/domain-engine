@@ -3,12 +3,12 @@ use std::sync::Arc;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     env::{Env, TypeInfo},
-    proc::Procedure,
     serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
     value::Value,
+    vm::proc::Procedure,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -164,7 +164,7 @@ impl WasmMapper {
 
     pub fn map(&self, input: &WasmValue) -> Result<WasmValue, WasmError> {
         let proc = self.env.get_mapper_proc(self.from, self.to).unwrap();
-        let mut mapper = self.env.new_mapper();
+        let mut mapper = self.env.new_vm();
 
         let output = mapper.eval(proc, [input.value.clone()]);
 

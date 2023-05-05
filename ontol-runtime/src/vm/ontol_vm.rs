@@ -5,19 +5,19 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
-    proc::{BuiltinProc, Lib, Local, Procedure},
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
-    vm::{AbstractVm, Stack, VmDebug},
+    vm::abstract_vm::{AbstractVm, Stack, VmDebug},
+    vm::proc::{BuiltinProc, Lib, Local, Procedure},
     DefId,
 };
 
 /// Virtual machine for executing ONTOL procedures
-pub struct MappingVm<'l> {
+pub struct OntolVm<'l> {
     abstract_vm: AbstractVm<'l>,
     value_stack: ValueStack,
 }
 
-impl<'l> MappingVm<'l> {
+impl<'l> OntolVm<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             abstract_vm: AbstractVm::new(lib),
@@ -269,8 +269,8 @@ mod tests {
     use test_log::test;
 
     use crate::{
-        proc::{AddressOffset, NParams, OpCode},
         value::Value,
+        vm::proc::{AddressOffset, NParams, OpCode},
         DefId, PackageId, RelationId,
     };
 
@@ -295,7 +295,7 @@ mod tests {
             ],
         );
 
-        let mut vm = MappingVm::new(&lib);
+        let mut vm = OntolVm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::new(
@@ -368,7 +368,7 @@ mod tests {
             ],
         );
 
-        let mut vm = MappingVm::new(&lib);
+        let mut vm = OntolVm::new(&lib);
         let output = vm.trace_eval(
             mapping_proc,
             [Value::new(
@@ -431,7 +431,7 @@ mod tests {
             ],
         );
 
-        let mut vm = MappingVm::new(&lib);
+        let mut vm = OntolVm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::new(
@@ -488,7 +488,7 @@ mod tests {
             ],
         );
 
-        let mut vm = MappingVm::new(&lib);
+        let mut vm = OntolVm::new(&lib);
         let output = vm.trace_eval(
             proc,
             [Value::new(

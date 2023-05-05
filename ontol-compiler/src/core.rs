@@ -1,6 +1,6 @@
 //! The core domain
 
-use ontol_runtime::{proc::BuiltinProc, string_types::StringLikeType, DefId};
+use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
     def::{DefKind, TypeDef},

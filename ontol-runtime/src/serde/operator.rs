@@ -7,8 +7,8 @@ use smartstring::alias::String;
 
 use crate::{
     discriminator::{VariantDiscriminator, VariantPurpose},
-    proc::Address,
     value::PropertyId,
+    vm::proc::Address,
     DefId, DefVariant,
 };
 

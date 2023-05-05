@@ -1,6 +1,6 @@
 use ontol_runtime::{
-    proc::{BuiltinProc, Local, Procedure},
     value::PropertyId,
+    vm::proc::{BuiltinProc, Local, Procedure},
     DefId,
 };
 

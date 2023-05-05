@@ -5,9 +5,6 @@ use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
-    mapping_vm::MappingVm,
-    proc::{Lib, Procedure},
-    property_probe::PropertyProbe,
     serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -15,6 +12,11 @@ use crate::{
     },
     string_pattern::StringPattern,
     string_types::StringLikeType,
+    vm::{
+        ontol_vm::OntolVm,
+        proc::{Lib, Procedure},
+        property_probe::PropertyProbe,
+    },
     DefId, MapKey, PackageId, RelationId,
 };
 
@@ -49,8 +51,8 @@ impl Env {
         }
     }
 
-    pub fn new_mapper(&self) -> MappingVm<'_> {
-        MappingVm::new(&self.lib)
+    pub fn new_vm(&self) -> OntolVm<'_> {
+        OntolVm::new(&self.lib)
     }
 
     pub fn new_property_probe(&self) -> PropertyProbe<'_> {
@@ -204,7 +206,7 @@ impl EnvBuilder {
         self
     }
 
-    pub fn mapping_procs(mut self, mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure>) -> Self {
+    pub fn mapper_procs(mut self, mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure>) -> Self {
         self.env.mapper_proc_table = mapping_procs;
         self
     }

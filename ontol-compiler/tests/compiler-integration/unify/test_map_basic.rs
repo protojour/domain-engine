@@ -81,7 +81,7 @@ fn assert_domain_map(
         ),
     };
 
-    let mut mapper = test_env.env.new_mapper();
+    let mut mapper = test_env.env.new_vm();
     let value = mapper.trace_eval(procedure, [value]);
 
     let output_json = match &to {

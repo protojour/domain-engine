@@ -8,7 +8,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
-use ontol_runtime::{proc::BuiltinProc, value::PropertyId};
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use smallvec::SmallVec;
 
 use crate::{types::TypeRef, SourceSpan};

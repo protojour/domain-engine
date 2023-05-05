@@ -1,4 +1,4 @@
-use ontol_runtime::proc::{AddressOffset, Local, NParams, OpCode};
+use ontol_runtime::vm::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
 use tracing::{debug, Level};
 

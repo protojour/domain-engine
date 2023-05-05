@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Address, Lib, OpCode, Procedure},
-    smart_format, DefId,
+    smart_format,
+    vm::proc::{Address, Lib, OpCode, Procedure},
+    DefId,
 };
 use smartstring::alias::String;
 

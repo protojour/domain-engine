@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    proc::BuiltinProc, string_types::StringLikeType, DefId, DefParamId, PackageId, RelationId,
+    string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId, PackageId, RelationId,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;

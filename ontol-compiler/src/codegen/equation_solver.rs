@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use ontol_runtime::{format_utils::Indent, proc::BuiltinProc};
+use ontol_runtime::{format_utils::Indent, vm::proc::BuiltinProc};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -293,7 +293,7 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 }
 
 mod rules {
-    use ontol_runtime::proc::BuiltinProc;
+    use ontol_runtime::vm::proc::BuiltinProc;
 
     pub struct Pattern(BuiltinProc, &'static [Match]);
     pub struct Subst(BuiltinProc, &'static [u8]);
@@ -349,7 +349,7 @@ mod rules {
 
 #[cfg(test)]
 mod tests {
-    use ontol_runtime::{proc::BuiltinProc, DefId, PackageId};
+    use ontol_runtime::{vm::proc::BuiltinProc, DefId, PackageId};
     use test_log::test;
     use tracing::info;
 

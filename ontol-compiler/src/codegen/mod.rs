@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    proc::{Address, Lib, NParams, Procedure},
+    vm::proc::{Address, Lib, NParams, Procedure},
     DefId, MapKey,
 };
 

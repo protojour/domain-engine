@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{proc::Local, value::PropertyId};
+use ontol_runtime::{value::PropertyId, vm::proc::Local};
 
 use crate::{
     codegen::{
