@@ -65,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Constant(expr_id) => {
                 let mut expr_root = self.consume_expr(*expr_id);
-                expr_root.expected_ty = match self.expected_constant_types.get(&def_id) {
+                expr_root.expected_ty = match self.expected_constant_types.remove(&def_id) {
                     None => {
                         self.error(
                             CompileError::TODO(smart_format!("No expected type for constant")),
