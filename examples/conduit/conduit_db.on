@@ -1,0 +1,15 @@
+pub type User {
+    rel uuid identifies: _
+}
+
+pub type Article {
+    rel string identifies: _
+    rel _ 'slug': string
+    rel _ 'title': string
+    rel _ 'description': string
+    rel _ 'body': string
+    rel _ 'createdAt': datetime
+    rel _ 'updatedAt': datetime
+    rel _ 'favorited_by'::'favorited' [User]
+    rel _ 'author': User
+}

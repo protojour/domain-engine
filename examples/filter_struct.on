@@ -1,0 +1,43 @@
+
+type Person {
+    rel _ 'name': string
+    rel _ 'is_friends_with': [Person]
+    rel _ 'works_for'?: Company
+}
+type Company {
+    rel _ 'name': string
+}
+type Query {
+    rel _ 'friend_works_for': string
+}
+
+type Graph {
+    rel _ 'person': string
+    rel _ 'foaf': [string]
+}
+
+unify {
+    Query { 'friend_works_for': works_for &&.. }
+    Person {
+        'is_friends_with': [Person {
+            'works_for': Company {
+                'name': company_name
+            }
+        }]
+        &&..
+    }
+    if works_for in [company_name]
+}
+
+unify {
+    Person {
+        'name': name
+        'is_friends_with': [Person {
+            'name': foaf
+        }]
+    }
+    Graph {
+        'person': name
+        'foaf': [foaf]
+    }
+}

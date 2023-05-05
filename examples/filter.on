@@ -1,0 +1,26 @@
+
+type a {
+    rel _ 'a': [string]
+}
+type b {
+    rel _ 'b': [string]
+}
+
+map {
+    a {
+        'a': [x]
+    }
+    if x starts_with: 'q' and x ends_with: 'l'
+    type b {
+        'b': [x]
+    }
+}
+
+map {
+    a {
+        'a': [_]
+    }
+    b {
+        'b': [_]
+    }
+}
