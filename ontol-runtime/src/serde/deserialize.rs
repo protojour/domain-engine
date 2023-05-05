@@ -10,6 +10,7 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
+    proc::{NParams, Procedure},
     serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
@@ -512,17 +513,16 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     if n_mandatory_properties < expected_mandatory_properties {
         // Generate default values if missing
         for (_, property) in properties {
-            if let Some(default_const_def_id) = property.default_const {
+            if let Some(default_const_proc_address) = property.default_const_proc_address {
                 if !property.optional && !attributes.contains_key(&property.property_id) {
                     let mut mapping_vm = processor.env.new_mapper();
-                    let proc = processor
-                        .env
-                        .get_const_proc(default_const_def_id)
-                        .unwrap_or_else(|| {
-                            panic!("No const proc for {default_const_def_id:?}");
-                        });
-
-                    let value = mapping_vm.eval(proc, []);
+                    let value = mapping_vm.eval(
+                        Procedure {
+                            address: default_const_proc_address,
+                            n_params: NParams(0),
+                        },
+                        [],
+                    );
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());

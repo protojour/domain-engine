@@ -14,6 +14,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
+    codegen::CodegenTasks,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::{Patterns, StringPatternSegment},
@@ -32,6 +33,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
     pub(super) patterns: &'c Patterns,
+    pub(super) codegen_tasks: &'c CodegenTasks<'m>,
     pub(super) operators_by_id: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorId>,
 }
@@ -752,14 +754,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     _ => todo!(),
                 };
 
-                let mut default_const = None;
+                let mut default_const_proc_address = None;
 
                 if let Some(default_const_def) = self
                     .relations
                     .default_const_objects
                     .get(&meta.relationship_id)
                 {
-                    default_const = Some(*default_const_def);
+                    let proc = self
+                        .codegen_tasks
+                        .result_const_procs
+                        .get(default_const_def)
+                        .unwrap_or_else(|| panic!());
+
+                    default_const_proc_address = Some(proc.address);
                 }
 
                 if property_cardinality.is_mandatory() {
@@ -772,7 +780,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         property_id: *property_id,
                         value_operator_id,
                         optional: property_cardinality.is_optional(),
-                        default_const,
+                        default_const_proc_address,
                         rel_params_operator_id,
                     },
                 );

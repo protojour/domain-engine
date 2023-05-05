@@ -7,6 +7,7 @@ use smartstring::alias::String;
 
 use crate::{
     discriminator::{VariantDiscriminator, VariantPurpose},
+    proc::Address,
     value::PropertyId,
     DefId, DefVariant,
 };
@@ -204,6 +205,6 @@ pub struct SerdeProperty {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
     pub optional: bool,
-    pub default_const: Option<DefId>,
+    pub default_const_proc_address: Option<Address>,
     pub rel_params_operator_id: Option<SerdeOperatorId>,
 }
