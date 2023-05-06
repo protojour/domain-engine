@@ -56,6 +56,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "rel" => Token::Rel,
         "fmt" => Token::Fmt,
         "map" => Token::Map,
+        "unify" => Token::Map,
         "pub" => Token::Pub,
         _ => Token::Sym(ident),
     });
