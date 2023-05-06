@@ -20,11 +20,18 @@ pub enum ExprKind {
     /// Function call
     Call(DefId, Box<[Expr]>),
     /// Object constructor
-    Struct(TypePath, Box<[(ObjKey, Expr)]>),
+    Struct(TypePath, Box<[ExprStructAttr]>),
     /// Expression enclosed in sequence brackets: `[expr]`
     Seq(ExprId, Box<Expr>),
     Variable(ExprId),
     Constant(i64),
+}
+
+#[derive(Debug)]
+pub struct ExprStructAttr {
+    pub key: ObjKey,
+    pub option: bool,
+    pub expr: Expr,
 }
 
 #[derive(Debug)]

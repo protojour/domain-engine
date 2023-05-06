@@ -278,10 +278,12 @@ fn struct_pattern_attr(
     pattern: impl AstParser<Pattern> + Clone,
 ) -> impl AstParser<StructPatternAttr> {
     spanned(ty())
+        .then(spanned(sigil('?')).or_not())
         .then_ignore(colon())
         .then(spanned(pattern))
-        .map_with_span(|(relation, object), _span| StructPatternAttr {
+        .map_with_span(|((relation, option), object), _span| StructPatternAttr {
             relation,
+            option: option.map(|(_, span)| ((), span)),
             relation_struct: None,
             object,
         })

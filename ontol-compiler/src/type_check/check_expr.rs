@@ -5,9 +5,9 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, DefReference, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, Def, DefKind, PropertyCardinality, ValueCardinality},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     hir_node::{
         BindDepth, HirBodyIdx, HirIdx, HirKind, HirNode, HirNodeTable, HirVariable, ERROR_NODE,
     },
@@ -396,7 +396,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_struct(
         &mut self,
         type_path: TypePath,
-        attributes: Box<[((DefReference, SourceSpan), Expr)]>,
+        attributes: Box<[ExprStructAttr]>,
         span: SourceSpan,
         ctx: &mut CheckExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
@@ -449,7 +449,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let mut typed_properties = IndexMap::new();
 
-                        for ((def, prop_span), expr) in attributes.into_vec().into_iter() {
+                        for ExprStructAttr {
+                            key: (def, prop_span),
+                            option: _,
+                            expr,
+                        } in attributes.into_vec().into_iter()
+                        {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                 Some(DefKind::StringLiteral(lit)) => lit,
                                 _ => {
@@ -471,6 +476,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let object_ty = self.check_def(match_property.object_def);
+                            debug!("object_ty: {object_ty:?}");
+
                             let object_ty = match match_property.cardinality {
                                 (PropertyCardinality::Mandatory, ValueCardinality::One) => {
                                     object_ty
@@ -515,7 +522,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Value(relationship_id, _, _)) => {
                 let mut attributes = attributes.into_vec().into_iter();
                 match attributes.next() {
-                    Some(((def, _), value)) if def.def_id == DefId::unit() => {
+                    Some(ExprStructAttr {
+                        key: (def, _),
+                        option: _,
+                        expr: value,
+                    }) if def.def_id == DefId::unit() => {
                         let meta = self
                             .get_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting anonymous property meta");

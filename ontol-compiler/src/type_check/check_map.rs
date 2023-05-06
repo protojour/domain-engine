@@ -8,7 +8,7 @@ use crate::{
     codegen::{CodegenTask, MapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, Expressions},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr, Expressions},
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
     type_check::check_expr::Arm,
@@ -150,7 +150,10 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 }
             }
             ExprKind::Struct(_, attributes) => {
-                for (_, attr) in attributes.iter() {
+                for ExprStructAttr {
+                    key: _, expr: attr, ..
+                } in attributes.iter()
+                {
                     group_set.join(self.aggr_group_map_variables(
                         attr,
                         variables,

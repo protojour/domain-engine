@@ -16,7 +16,7 @@ use crate::{
         RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
     },
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     namespace::Space,
     package::{PackageReference, CORE_PKG},
     relation::RelationshipId,
@@ -664,7 +664,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
                 },
-                [(key, expr)].into(),
+                [ExprStructAttr {
+                    key,
+                    option: false,
+                    expr,
+                }]
+                .into(),
             ),
             &span,
         ))
@@ -682,6 +687,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .map(|(struct_attr, _span)| {
                 let ast::StructPatternAttr {
                     relation,
+                    option,
                     object: (object, object_span),
                     ..
                 } = struct_attr;
@@ -690,7 +696,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let inner_expr = self.lower_pattern((object, object_span), var_table);
 
-                inner_expr.map(|expr| ((def, self.src.span(&relation.1)), expr))
+                inner_expr.map(|expr| ExprStructAttr {
+                    key: (def, self.src.span(&relation.1)),
+                    option: option.is_some(),
+                    expr,
+                })
             })
             .collect::<Result<_, _>>()?;
 

@@ -1,4 +1,5 @@
 use ontol_test_utils::TestCompile;
+use test_log::test;
 
 #[test]
 fn test_unify_partial() {

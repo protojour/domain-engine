@@ -138,6 +138,7 @@ pub struct StructPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
+    pub option: Option<Spanned<()>>,
     pub relation_struct: Option<Spanned<StructPattern>>,
     pub object: Spanned<Pattern>,
 }
