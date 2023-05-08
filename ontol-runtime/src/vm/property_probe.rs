@@ -135,11 +135,18 @@ impl Stack for PropStack {
         false
     }
 
-    fn take_map_attr2(&mut self, source: Local, key: PropertyId) {
+    fn take_attr2(&mut self, source: Local, key: PropertyId) {
         let map = self.get_map_mut(source);
-        let set = map.remove(&key).unwrap();
-        self.stack.push(Props::Set(FnvHashSet::default()));
-        self.stack.push(Props::Set(set));
+        match map.remove(&key) {
+            Some(set) => {
+                self.stack.push(Props::Set(FnvHashSet::default()));
+                self.stack.push(Props::Set(set));
+            }
+            None => {
+                self.stack.push(Props::Set(FnvHashSet::default()));
+                self.stack.push(Props::Set(FnvHashSet::default()));
+            }
+        }
     }
 
     fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
@@ -147,10 +154,6 @@ impl Stack for PropStack {
         let map = self.get_map_mut(target);
         let target_set = map.entry(key).or_default();
         target_set.extend(source_set.into_iter());
-    }
-
-    fn take_seq_attr2(&mut self, _local: Local, _index: usize) {
-        todo!()
     }
 
     fn push_constant(&mut self, _k: i64, _: DefId) {

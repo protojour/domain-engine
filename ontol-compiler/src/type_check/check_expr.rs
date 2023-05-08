@@ -44,6 +44,8 @@ pub struct CheckExprContext<'m> {
 
     pub aggr_forest: AggregationForest,
 
+    pub partial: bool,
+
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
@@ -61,6 +63,7 @@ impl<'m> CheckExprContext<'m> {
             aggr_variables: Default::default(),
             aggr_body_map: Default::default(),
             aggr_forest: Default::default(),
+            partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
             hir_var_allocations: vec![0],
@@ -249,6 +252,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let (ty, hir_idx) = self.check_struct(type_path, attributes, expr.span, ctx);
                 match expected_ty {
                     Some(Type::Domain(_)) => (ty, hir_idx),
+                    Some(Type::Option(Type::Domain(_))) => {
+                        (self.types.intern(Type::Option(ty)), hir_idx)
+                    }
                     Some(expected_ty) => (
                         self.type_error(
                             TypeError::Mismatch(TypeEquation {
@@ -451,7 +457,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for ExprStructAttr {
                             key: (def, prop_span),
-                            option: _,
+                            bind_option,
                             expr,
                         } in attributes.into_vec().into_iter()
                         {
@@ -478,17 +484,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
-                            let object_ty = match match_property.cardinality {
-                                (PropertyCardinality::Mandatory, ValueCardinality::One) => {
-                                    object_ty
-                                }
-                                (PropertyCardinality::Optional, ValueCardinality::One) => {
+                            let object_ty = match match_property.cardinality.1 {
+                                ValueCardinality::One => object_ty,
+                                ValueCardinality::Many => self.types.intern(Type::Array(object_ty)),
+                            };
+                            let object_ty = match match_property.cardinality.0 {
+                                PropertyCardinality::Mandatory => object_ty,
+                                PropertyCardinality::Optional => {
+                                    if !bind_option {
+                                        ctx.partial = true;
+                                        panic!("partial unification");
+                                    }
                                     self.types.intern(Type::Option(object_ty))
                                 }
-                                (_, ValueCardinality::Many) => {
-                                    self.types.intern(Type::Array(object_ty))
-                                }
                             };
+
                             let (_, node_id) = self.check_expr_expect(expr, object_ty, ctx);
 
                             typed_properties
@@ -524,7 +534,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match attributes.next() {
                     Some(ExprStructAttr {
                         key: (def, _),
-                        option: _,
+                        bind_option: _,
                         expr: value,
                     }) if def.def_id == DefId::unit() => {
                         let meta = self

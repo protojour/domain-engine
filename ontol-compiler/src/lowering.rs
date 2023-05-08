@@ -666,7 +666,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 },
                 [ExprStructAttr {
                     key,
-                    option: false,
+                    bind_option: false,
                     expr,
                 }]
                 .into(),
@@ -698,7 +698,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 inner_expr.map(|expr| ExprStructAttr {
                     key: (def, self.src.span(&relation.1)),
-                    option: option.is_some(),
+                    bind_option: option.is_some(),
                     expr,
                 })
             })

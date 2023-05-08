@@ -2,6 +2,7 @@ use ontol_test_utils::TestCompile;
 use test_log::test;
 
 #[test]
+#[should_panic = "partial unification"]
 fn test_unify_partial() {
     "
     type Filter {

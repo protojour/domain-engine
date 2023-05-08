@@ -72,6 +72,60 @@ fn test_temperature() {
 }
 
 #[test]
+fn test_optional_attribute() {
+    "
+    pub type person {
+        rel _ 'age'?: int
+    }
+    pub type creature {
+        rel _ 'years'?: int
+    }
+
+    unify x {
+        person { 'age'?: x }
+        creature { 'years'?: x }
+    }
+
+    pub type person_container {
+        rel _ 'person'?: person
+    }
+    pub type creature_container {
+        rel _ 'creature'?: creature
+    }
+
+    unify x {
+        person_container {
+            'person'?: person {
+                'age'?: x
+            }
+        }
+        creature_container {
+            'creature'?: creature {
+                'years'?: x
+            }
+        }
+    }
+
+    "
+    .compile_ok(|env| {
+        assert_domain_map(&env, ("person", "creature"), json!({}), json!({}));
+        assert_domain_map(
+            &env,
+            ("person", "creature"),
+            json!({ "age": 42 }),
+            json!({ "years": 42 }),
+        );
+
+        assert_domain_map(
+            &env,
+            ("person_container", "creature_container"),
+            json!({}),
+            json!({}),
+        );
+    });
+}
+
+#[test]
 fn test_map_value_to_map_no_func() {
     "
     pub type one

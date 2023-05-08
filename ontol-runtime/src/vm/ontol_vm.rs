@@ -134,27 +134,27 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn take_map_attr2(&mut self, source: Local, key: PropertyId) {
+    fn take_attr2(&mut self, source: Local, key: PropertyId) {
         let map = self.struct_local_mut(source);
-        let attribute = map.remove(&key).expect("Attribute not found");
-        self.stack.push(attribute.rel_params);
-        self.stack.push(attribute.value);
+        match map.remove(&key) {
+            Some(attribute) => {
+                self.stack.push(attribute.rel_params);
+                self.stack.push(attribute.value);
+            }
+            None => {
+                self.stack.push(Value::unit());
+                self.stack.push(Value::unit());
+            }
+        }
     }
 
     #[inline(always)]
     fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
-        let map = self.struct_local_mut(target);
-        map.insert(key, value.to_unit_attr());
-    }
-
-    #[inline(always)]
-    fn take_seq_attr2(&mut self, local: Local, index: usize) {
-        let seq = self.sequence_local_mut(local);
-        let mut attribute = Value::unit().to_unit_attr();
-        std::mem::swap(&mut seq[index], &mut attribute);
-        self.stack.push(attribute.rel_params);
-        self.stack.push(attribute.value);
+        if !matches!(value.data, Data::Unit) {
+            let map = self.struct_local_mut(target);
+            map.insert(key, value.to_unit_attr());
+        }
     }
 
     #[inline(always)]
