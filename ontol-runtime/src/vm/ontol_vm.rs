@@ -11,6 +11,8 @@ use crate::{
     DefId,
 };
 
+use super::proc::Predicate;
+
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
     abstract_vm: AbstractVm<'l>,
@@ -168,6 +170,28 @@ impl Stack for ValueStack {
         let seq = self.sequence_local_mut(seq);
         seq.push(Attribute { value, rel_params });
     }
+
+    #[inline(always)]
+    fn get_discriminant(&mut self, local: Local) {
+        let local = self.local(local);
+        let discriminant = def_id_to_int(local.type_def_id);
+        self.stack
+            .push(Value::new(Data::Int(discriminant), DefId::unit()));
+    }
+
+    #[inline(always)]
+    fn cond_predicate(&mut self, predicate: &Predicate) -> bool {
+        if self.eval_predicate(predicate) {
+            self.stack.pop();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+fn def_id_to_int(def_id: DefId) -> i64 {
+    (((def_id.0 .0) as i64) << 32) | def_id.1 as i64
 }
 
 impl ValueStack {
@@ -247,6 +271,22 @@ impl ValueStack {
         Value: Cast<T>,
     {
         array::from_fn(|_| self.pop_one().cast_into())
+    }
+
+    #[inline(always)]
+    fn eval_predicate(&mut self, predicate: &Predicate) -> bool {
+        let top = match self.stack.last() {
+            Some(Value {
+                data: Data::Int(int),
+                ..
+            }) => int,
+            _ => panic!(),
+        };
+
+        match predicate {
+            Predicate::MatchesDiscriminant(def_id) => def_id_to_int(*def_id) == *top,
+            Predicate::True => true,
+        }
     }
 }
 
@@ -519,6 +559,64 @@ mod tests {
         assert_eq!(
             "[{subj(0, 0): 'a', subj(0, 1): 'b0'}, {subj(0, 0): 'a', subj(0, 1): 'b1'}]",
             format!("{}", ValueDebug(&output))
+        );
+    }
+
+    #[test]
+    fn discriminant_cond() {
+        let mut lib = Lib::default();
+
+        let prop = PropertyId::subject(RelationId(def_id(42)));
+        let inner_def_id = def_id(100);
+
+        let proc = lib.append_procedure(
+            NParams(1),
+            [
+                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(7)),
+                OpCode::TakeAttr2(Local(0), prop),
+                OpCode::GetDiscriminant(Local(3)),
+                OpCode::Cond(
+                    Predicate::MatchesDiscriminant(inner_def_id),
+                    AddressOffset(5),
+                ),
+                OpCode::Return(Local(1)),
+                // AddressOffset(5):
+                OpCode::PushConstant(666, def_id(200)),
+                OpCode::PutUnitAttr(Local(1), prop),
+                OpCode::Return(Local(1)),
+            ],
+        );
+
+        let mut vm = OntolVm::new(&lib);
+
+        assert_eq!(
+            "{}",
+            format!(
+                "{}",
+                ValueDebug(&vm.trace_eval(proc, [Value::new(Data::Struct([].into()), def_id(0))]))
+            )
+        );
+
+        assert_eq!(
+            "{subj(0, 42): int(666)}",
+            format!(
+                "{}",
+                ValueDebug(
+                    &vm.trace_eval(
+                        proc,
+                        [Value::new(
+                            Data::Struct(
+                                [(
+                                    prop,
+                                    Value::new(Data::String("a".into()), inner_def_id).into(),
+                                )]
+                                .into()
+                            ),
+                            def_id(0)
+                        )]
+                    )
+                )
+            )
         );
     }
 }

@@ -75,6 +75,10 @@ pub enum OpCode {
     AppendAttr2(Local),
     /// Push a constant to the stack.
     PushConstant(i64, DefId),
+    /// Extract the discriminant of a local, push onto stack
+    GetDiscriminant(Local),
+    /// Runs predicate agains top of stack. If successful, pops the stack. If unsuccessful, keeps the value.
+    Cond(Predicate, AddressOffset),
 }
 
 /// A reference to a local on the value stack during procedure execution.
@@ -92,4 +96,10 @@ pub enum BuiltinProc {
     NewMap,
     NewSeq,
     NewUnit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Predicate {
+    MatchesDiscriminant(DefId),
+    True,
 }

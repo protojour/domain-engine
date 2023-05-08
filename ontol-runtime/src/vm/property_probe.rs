@@ -10,6 +10,8 @@ use crate::{
     DefId,
 };
 
+use super::proc::Predicate;
+
 pub struct PropertyProbe<'l> {
     abstract_vm: AbstractVm<'l>,
     prop_stack: PropStack,
@@ -162,6 +164,14 @@ impl Stack for PropStack {
 
     fn append_attr2(&mut self, _seq: Local) {
         todo!();
+    }
+
+    fn get_discriminant(&mut self, _local: Local) {
+        self.stack.push(Props::Set(FnvHashSet::default()));
+    }
+
+    fn cond_predicate(&mut self, _predicate: &Predicate) -> bool {
+        false
     }
 }
 

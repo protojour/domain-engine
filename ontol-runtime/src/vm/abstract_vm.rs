@@ -1,6 +1,6 @@
 use crate::{
     value::PropertyId,
-    vm::proc::{BuiltinProc, Lib, Local, OpCode, Procedure},
+    vm::proc::{BuiltinProc, Lib, Local, OpCode, Predicate, Procedure},
     DefId,
 };
 
@@ -50,6 +50,8 @@ pub trait Stack {
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
     fn push_constant(&mut self, k: i64, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
+    fn get_discriminant(&mut self, local: Local);
+    fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
 }
 
 impl<'l> AbstractVm<'l> {
@@ -139,6 +141,17 @@ impl<'l> AbstractVm<'l> {
                 OpCode::AppendAttr2(seq) => {
                     stack.append_attr2(*seq);
                     self.program_counter += 1;
+                }
+                OpCode::GetDiscriminant(local) => {
+                    stack.get_discriminant(*local);
+                    self.program_counter += 1;
+                }
+                OpCode::Cond(predicate, offset) => {
+                    if stack.cond_predicate(predicate) {
+                        self.program_counter = self.proc_address + offset.0 as usize;
+                    } else {
+                        self.program_counter += 1;
+                    }
                 }
             }
         }
