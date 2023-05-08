@@ -220,6 +220,9 @@ impl<'a> CodeGenerator<'a> {
 
                 self.builder.append_pop_until(block, output, span);
             }
+            HirKind::Match(_var_idx, _table) => {
+                todo!()
+            }
             HirKind::ValuePattern(node_idx) => self.codegen_expr(block, equation, *node_idx)?,
             HirKind::StructPattern(attrs) => {
                 let def_id = &equation.nodes[node_idx].ty.get_single_def_id().unwrap();

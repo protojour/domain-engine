@@ -13,7 +13,7 @@ pub struct Expr {
     pub span: SourceSpan,
 }
 
-type ObjKey = (DefReference, SourceSpan);
+type PropertyKey = (DefReference, SourceSpan);
 
 #[derive(Debug)]
 pub enum ExprKind {
@@ -29,7 +29,7 @@ pub enum ExprKind {
 
 #[derive(Debug)]
 pub struct ExprStructAttr {
-    pub key: ObjKey,
+    pub key: PropertyKey,
     pub bind_option: bool,
     pub expr: Expr,
 }

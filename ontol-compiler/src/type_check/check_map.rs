@@ -8,7 +8,7 @@ use crate::{
     codegen::{CodegenTask, MapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr, Expressions},
+    expr::{Expr, ExprId, ExprKind, Expressions},
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
     type_check::check_expr::Arm,
@@ -31,7 +31,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = CheckExprContext::new();
-        let root_body_id = ctx.alloc_map_body_id();
+        let root_body_idx = ctx.alloc_hir_body_idx();
 
         {
             let mut map_check = MapCheck {
@@ -41,7 +41,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             };
             debug!("FIRST ARM START");
             ctx.arm = Arm::First;
-            let _ = map_check.aggr_group_map_variables(
+            let _ = map_check.analyze_arm(
                 map_check.expressions.map.get(&first_id).unwrap(),
                 variables,
                 None,
@@ -49,7 +49,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             )?;
             debug!("SECOND ARM START");
             ctx.arm = Arm::Second;
-            let _ = map_check.aggr_group_map_variables(
+            let _ = map_check.analyze_arm(
                 map_check.expressions.map.get(&second_id).unwrap(),
                 variables,
                 None,
@@ -57,7 +57,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             )?;
         }
 
-        let mut root_body = ctx.expr_body_mut(root_body_id);
+        let mut root_body = ctx.expr_body_mut(root_body_idx);
         root_body.first = Some(self.consume_expr(first_id));
         root_body.second = Some(self.consume_expr(second_id));
 
@@ -129,7 +129,7 @@ pub struct MapCheck<'c, 'm> {
 }
 
 impl<'c, 'm> MapCheck<'c, 'm> {
-    fn aggr_group_map_variables(
+    fn analyze_arm(
         &mut self,
         expr: &Expr,
         variables: &Variables,
@@ -141,21 +141,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         match &expr.kind {
             ExprKind::Call(_, args) => {
                 for arg in args.iter() {
-                    group_set.join(self.aggr_group_map_variables(
-                        arg,
-                        variables,
-                        parent_aggr_group,
-                        ctx,
-                    )?);
+                    group_set.join(self.analyze_arm(arg, variables, parent_aggr_group, ctx)?);
                 }
             }
             ExprKind::Struct(_, attributes) => {
-                for ExprStructAttr {
-                    key: _, expr: attr, ..
-                } in attributes.iter()
-                {
-                    group_set.join(self.aggr_group_map_variables(
-                        attr,
+                for attr in attributes.iter() {
+                    group_set.join(self.analyze_arm(
+                        &attr.expr,
                         variables,
                         parent_aggr_group,
                         ctx,
@@ -167,11 +159,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
-                    let aggr_body_id = ctx.alloc_map_body_id();
+                    let aggr_body_idx = ctx.alloc_hir_body_idx();
                     debug!("first arm seq: expr_id={expr_id:?}");
-                    ctx.aggr_body_map.insert(*expr_id, aggr_body_id);
-                    ctx.aggr_forest
-                        .insert(aggr_body_id, parent_aggr_group.map(|parent| parent.body_id));
+                    ctx.aggr_body_map.insert(*expr_id, aggr_body_idx);
+                    ctx.aggr_forest.insert(
+                        aggr_body_idx,
+                        parent_aggr_group.map(|parent| parent.body_id),
+                    );
 
                     // Register aggregation variable
                     let aggr_var = ctx.alloc_hir_variable();
@@ -180,15 +174,15 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         kind: HirKind::Variable(aggr_var),
                         span: expr.span,
                     });
-                    ctx.aggr_variables.insert(aggr_body_id, aggr_var_idx);
+                    ctx.aggr_variables.insert(aggr_body_idx, aggr_var_idx);
 
                     let result =
                         ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
-                            self.aggr_group_map_variables(
+                            self.analyze_arm(
                                 inner,
                                 variables,
                                 Some(AggregationGroup {
-                                    body_id: aggr_body_id,
+                                    body_id: aggr_body_idx,
                                     bind_depth: ctx.current_bind_depth(),
                                 }),
                                 ctx,
@@ -200,9 +194,8 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     let outer_bind_depth = ctx.current_bind_depth();
 
                     ctx.enter_aggregation::<Result<(), AggrGroupError>>(|ctx, _| {
-                        let inner_aggr_group = self
-                            .aggr_group_map_variables(inner, variables, None, ctx)
-                            .unwrap();
+                        let inner_aggr_group =
+                            self.analyze_arm(inner, variables, None, ctx).unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
                             Ok(aggr_body_id) => {

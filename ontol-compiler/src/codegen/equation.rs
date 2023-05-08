@@ -84,7 +84,7 @@ impl<'m> HirEquation<'m> {
             equation: self,
             substitutions,
             node_id,
-            property_id: None,
+            key: None,
             depth: 0,
         }
     }
@@ -100,17 +100,21 @@ pub struct DebugTree<'a, 'm> {
     equation: &'a HirEquation<'m>,
     substitutions: &'a SubstitutionTable,
     node_id: HirIdx,
-    property_id: Option<PropertyId>,
+    key: Option<Key>,
     depth: usize,
 }
 
+enum Key {
+    Property(PropertyId),
+}
+
 impl<'a, 'm> DebugTree<'a, 'm> {
-    fn child(&self, node_id: HirIdx, property_id: Option<PropertyId>) -> Self {
+    fn child(&self, key: Option<Key>, node_id: HirIdx) -> Self {
         Self {
             equation: self.equation,
             substitutions: self.substitutions,
             node_id,
-            property_id,
+            key,
             depth: self.depth + 1,
         }
     }
@@ -129,9 +133,12 @@ impl<'a, 'm> DebugTree<'a, 'm> {
             write!(&mut s, "}} ").unwrap();
         }
 
-        if let Some(property_id) = &self.property_id {
-            let def_id = &property_id.relation_id.0;
-            write!(&mut s, "(rel {}, {}) ", def_id.0 .0, def_id.1).unwrap();
+        match &self.key {
+            Some(Key::Property(property_id)) => {
+                let def_id = &property_id.relation_id.0;
+                write!(&mut s, "(rel {}, {}) ", def_id.0 .0, def_id.1).unwrap();
+            }
+            None => {}
         }
 
         write!(&mut s, "{}", name).unwrap();
@@ -153,18 +160,18 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
             HirKind::Call(proc, params) => {
                 let mut tup = f.debug_tuple(&self.header(&format!("{proc:?}")));
                 for param in params {
-                    tup.field(&self.child(*param, None));
+                    tup.field(&self.child(None, *param));
                 }
                 tup.finish()?
             }
             HirKind::ValuePattern(node_id) => f
                 .debug_tuple(&self.header("ValuePattern"))
-                .field(&self.child(*node_id, None))
+                .field(&self.child(None, *node_id))
                 .finish()?,
             HirKind::StructPattern(attributes) => {
                 let mut tup = f.debug_tuple(&self.header("StructPattern"));
                 for (property_id, node_id) in attributes {
-                    tup.field(&self.child(*node_id, Some(*property_id)));
+                    tup.field(&self.child(Some(Key::Property(*property_id)), *node_id));
                 }
                 tup.finish()?;
             }
@@ -176,17 +183,27 @@ impl<'a, 'm> Debug for DebugTree<'a, 'm> {
                 .finish()?,
             HirKind::VariableRef(var_id) => f
                 .debug_tuple(&self.header("VarRef"))
-                .field(&self.child(*var_id, None))
+                .field(&self.child(None, *var_id))
                 .finish()?,
             HirKind::MapCall(node_id, _) => f
                 .debug_tuple(&self.header("MapCall"))
-                .field(&self.child(*node_id, None))
+                .field(&self.child(None, *node_id))
                 .finish()?,
             HirKind::Aggr(var_idx, body_id) => f
                 .debug_tuple(&self.header("Aggr"))
-                .field(&self.child(*var_idx, None))
+                .field(&self.child(None, *var_idx))
                 .field(body_id)
                 .finish()?,
+            HirKind::Match(var_idx, match_table) => {
+                let mut tup = f.debug_tuple(&self.header("Match"));
+                tup.field(&self.child(None, *var_idx));
+
+                for (predicate, body_idx) in &match_table.table {
+                    tup.field(&(predicate, body_idx));
+                }
+
+                tup.finish()?;
+            }
         };
 
         Ok(())

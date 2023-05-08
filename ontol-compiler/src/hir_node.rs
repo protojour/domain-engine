@@ -55,7 +55,21 @@ pub enum HirKind<'m> {
     /// A mapping from one type to another.
     /// Normally translates into a procedure call.
     MapCall(HirIdx, TypeRef<'m>),
+    /// Aggregate an array variable, call the given body for each element
     Aggr(HirIdx, HirBodyIdx),
+    /// Match a value
+    Match(HirIdx, HirMatchTable),
+}
+
+#[derive(Clone, Debug)]
+pub struct HirMatchTable {
+    pub table: SmallVec<[(HirPredicate, HirBodyIdx); 2]>,
+}
+
+#[derive(Clone, Debug)]
+pub enum HirPredicate {
+    True,
+    IsNotUnit,
 }
 
 /// An index/reference to a typed HirNode.

@@ -86,7 +86,7 @@ impl<'m> CheckExprContext<'m> {
         ret
     }
 
-    pub fn alloc_map_body_id(&mut self) -> HirBodyIdx {
+    pub fn alloc_hir_body_idx(&mut self) -> HirBodyIdx {
         let next = self.body_id_counter;
         self.body_id_counter += 1;
         self.bodies.push(ExprBody::default());
@@ -488,21 +488,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ValueCardinality::One => object_ty,
                                 ValueCardinality::Many => self.types.intern(Type::Array(object_ty)),
                             };
-                            let object_ty = match match_property.cardinality.0 {
-                                PropertyCardinality::Mandatory => object_ty,
+                            let (_, node_idx) = match match_property.cardinality.0 {
+                                PropertyCardinality::Mandatory => {
+                                    self.check_expr_expect(expr, object_ty, ctx)
+                                }
                                 PropertyCardinality::Optional => {
-                                    if !bind_option {
+                                    let object_ty = self.types.intern(Type::Option(object_ty));
+
+                                    if bind_option {
+                                    } else {
                                         ctx.partial = true;
                                         panic!("partial unification");
                                     }
-                                    self.types.intern(Type::Option(object_ty))
+
+                                    self.check_expr_expect(expr, object_ty, ctx)
                                 }
                             };
 
-                            let (_, node_id) = self.check_expr_expect(expr, object_ty, ctx);
-
                             typed_properties
-                                .insert(PropertyId::subject(match_property.relation_id), node_id);
+                                .insert(PropertyId::subject(match_property.relation_id), node_idx);
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {

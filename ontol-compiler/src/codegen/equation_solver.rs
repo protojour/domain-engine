@@ -191,6 +191,11 @@ impl<'t, 'm> EquationSolver<'t, 'm> {
 
                 Ok(Substitution::Constant(idx))
             }
+            HirKind::Match(var_idx, _match_table) => {
+                self.reductions[idx] = *var_idx;
+
+                Ok(Substitution::Constant(idx))
+            }
         }
     }
 
