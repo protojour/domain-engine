@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    check_expr::{AggregationGroup, BoundVariable, CheckExprContext},
+    check_expr::{BoundVariable, CheckExprContext, CtrlFlowGroup},
     inference::Infer,
     TypeCheck, TypeError,
 };
@@ -133,7 +133,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         &mut self,
         expr: &Expr,
         variables: &Variables,
-        parent_aggr_group: Option<AggregationGroup>,
+        parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut CheckExprContext<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
@@ -161,8 +161,8 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     // Register aggregation body
                     let aggr_body_idx = ctx.alloc_hir_body_idx();
                     debug!("first arm seq: expr_id={expr_id:?}");
-                    ctx.aggr_body_map.insert(*expr_id, aggr_body_idx);
-                    ctx.aggr_forest.insert(
+                    ctx.body_map.insert(*expr_id, aggr_body_idx);
+                    ctx.ctrl_flow_forest.insert(
                         aggr_body_idx,
                         parent_aggr_group.map(|parent| parent.body_id),
                     );
@@ -174,14 +174,14 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         kind: HirKind::Variable(aggr_var),
                         span: expr.span,
                     });
-                    ctx.aggr_variables.insert(aggr_body_idx, aggr_var_idx);
+                    ctx.body_variables.insert(aggr_body_idx, aggr_var_idx);
 
                     let result =
-                        ctx.enter_aggregation::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
+                        ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
                             self.analyze_arm(
                                 inner,
                                 variables,
-                                Some(AggregationGroup {
+                                Some(CtrlFlowGroup {
                                     body_id: aggr_body_idx,
                                     bind_depth: ctx.current_bind_depth(),
                                 }),
@@ -193,16 +193,16 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 } else {
                     let outer_bind_depth = ctx.current_bind_depth();
 
-                    ctx.enter_aggregation::<Result<(), AggrGroupError>>(|ctx, _| {
+                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx, _| {
                         let inner_aggr_group =
                             self.analyze_arm(inner, variables, None, ctx).unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
                             Ok(aggr_body_id) => {
-                                ctx.aggr_body_map.insert(*expr_id, aggr_body_id);
+                                ctx.body_map.insert(*expr_id, aggr_body_id);
 
-                                group_set.add(ctx.aggr_forest.find_parent(aggr_body_id).map(
-                                    |body_id| AggregationGroup {
+                                group_set.add(ctx.ctrl_flow_forest.find_parent(aggr_body_id).map(
+                                    |body_id| CtrlFlowGroup {
                                         body_id,
                                         bind_depth: outer_bind_depth,
                                     },
@@ -227,7 +227,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
             ExprKind::Variable(expr_id) => {
                 if let Some(bound_variable) = ctx.bound_variables.get(expr_id) {
                     // Variable is used more than once
-                    if ctx.arm.is_first() && bound_variable.aggr_group != parent_aggr_group {
+                    if ctx.arm.is_first() && bound_variable.ctrl_group != parent_aggr_group {
                         self.error(
                             CompileError::TODO(smart_format!("Incompatible aggregation group")),
                             &expr.span,
@@ -236,7 +236,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     debug!("Join existing bound variable");
 
-                    group_set.add(bound_variable.aggr_group);
+                    group_set.add(bound_variable.ctrl_group);
                 } else {
                     let (variable_expr_id, variable_span) = variables
                         .0
@@ -258,7 +258,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             BoundVariable {
                                 syntax_var,
                                 node_id: var_id,
-                                aggr_group: parent_aggr_group,
+                                ctrl_group: parent_aggr_group,
                             },
                         );
 
@@ -272,7 +272,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                 vac.insert(BoundVariable {
                                     syntax_var,
                                     node_id: var_id,
-                                    aggr_group: parent_aggr_group,
+                                    ctrl_group: parent_aggr_group,
                                 });
                                 group_set.add(parent_aggr_group);
                             }
@@ -321,7 +321,7 @@ impl AggrGroupSet {
         self.tallest_depth = core::cmp::max(self.tallest_depth, other.tallest_depth)
     }
 
-    fn add(&mut self, aggr_group: Option<AggregationGroup>) {
+    fn add(&mut self, aggr_group: Option<CtrlFlowGroup>) {
         self.set.insert(aggr_group.map(|group| group.body_id));
         if let Some(group) = aggr_group {
             self.tallest_depth = core::cmp::max(self.tallest_depth, group.bind_depth.0)
@@ -342,8 +342,8 @@ impl AggrGroupSet {
         let mut parents: FnvHashSet<HirBodyIdx> = Default::default();
 
         for group in self.set.iter().flatten() {
-            roots.insert(ctx.aggr_forest.find_root(*group));
-            if let Some(parent) = ctx.aggr_forest.find_parent(*group) {
+            roots.insert(ctx.ctrl_flow_forest.find_root(*group));
+            if let Some(parent) = ctx.ctrl_flow_forest.find_parent(*group) {
                 parents.insert(parent);
             }
         }

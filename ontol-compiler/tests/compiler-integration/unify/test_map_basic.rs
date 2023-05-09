@@ -105,7 +105,6 @@ fn test_optional_attribute() {
             }
         }
     }
-
     "
     .compile_ok(|env| {
         assert_domain_map(&env, ("person", "creature"), json!({}), json!({}));

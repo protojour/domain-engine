@@ -22,27 +22,15 @@ use super::{
     TypeCheck, TypeEquation, TypeError,
 };
 
-#[derive(Default)]
-pub struct ExprBody<'m> {
-    pub first: Option<ExprRoot<'m>>,
-    pub second: Option<ExprRoot<'m>>,
-}
-
-pub struct ExprRoot<'m> {
-    pub id: ExprId,
-    pub expr: Expr,
-    pub expected_ty: Option<TypeRef<'m>>,
-}
-
 pub struct CheckExprContext<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<ExprBody<'m>>,
+    pub bodies: Vec<CtrlFlowBody<'m>>,
     pub nodes: HirNodeTable<'m>,
     pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
-    pub aggr_variables: FnvHashMap<HirBodyIdx, HirIdx>,
-    pub aggr_body_map: FnvHashMap<ExprId, HirBodyIdx>,
+    pub body_variables: FnvHashMap<HirBodyIdx, HirIdx>,
+    pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
 
-    pub aggr_forest: AggregationForest,
+    pub ctrl_flow_forest: CtrlFlowForest,
 
     pub partial: bool,
 
@@ -60,9 +48,9 @@ impl<'m> CheckExprContext<'m> {
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
             bound_variables: Default::default(),
-            aggr_variables: Default::default(),
-            aggr_body_map: Default::default(),
-            aggr_forest: Default::default(),
+            body_variables: Default::default(),
+            body_map: Default::default(),
+            ctrl_flow_forest: Default::default(),
             partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
@@ -75,12 +63,12 @@ impl<'m> CheckExprContext<'m> {
         self.bind_depth
     }
 
-    pub fn enter_aggregation<T>(&mut self, f: impl FnOnce(&mut Self, HirVariable) -> T) -> T {
-        // There is a unique bind depth for the aggregation variable:
-        let aggregation_var = self.alloc_hir_variable();
+    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, HirVariable) -> T) -> T {
+        // There is a unique bind depth for the control flow variable:
+        let ctrl_flow_var = self.alloc_hir_variable();
 
         self.bind_depth.0 += 1;
-        let ret = f(self, aggregation_var);
+        let ret = f(self, ctrl_flow_var);
         self.bind_depth.0 -= 1;
 
         ret
@@ -89,11 +77,11 @@ impl<'m> CheckExprContext<'m> {
     pub fn alloc_hir_body_idx(&mut self) -> HirBodyIdx {
         let next = self.body_id_counter;
         self.body_id_counter += 1;
-        self.bodies.push(ExprBody::default());
+        self.bodies.push(CtrlFlowBody::default());
         HirBodyIdx(next)
     }
 
-    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut ExprBody<'m> {
+    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut CtrlFlowBody<'m> {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
@@ -105,46 +93,58 @@ impl<'m> CheckExprContext<'m> {
     }
 }
 
+#[derive(Default)]
+pub struct CtrlFlowBody<'m> {
+    pub first: Option<ExprRoot<'m>>,
+    pub second: Option<ExprRoot<'m>>,
+}
+
+pub struct ExprRoot<'m> {
+    pub id: ExprId,
+    pub expr: Expr,
+    pub expected_ty: Option<TypeRef<'m>>,
+}
+
 pub struct BoundVariable {
     pub syntax_var: HirVariable,
     pub node_id: HirIdx,
-    pub aggr_group: Option<AggregationGroup>,
+    pub ctrl_group: Option<CtrlFlowGroup>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct AggregationGroup {
+pub struct CtrlFlowGroup {
     pub body_id: HirBodyIdx,
     pub bind_depth: BindDepth,
 }
 
-/// Tracks which aggregations are children of other aggregations
+/// Tracks which control flow "statements" are children of other control flow "statements"
 #[derive(Default)]
-pub struct AggregationForest {
+pub struct CtrlFlowForest {
     /// if the map is self-referential, that means a root
     map: FnvHashMap<HirBodyIdx, HirBodyIdx>,
 }
 
-impl AggregationForest {
-    pub fn insert(&mut self, aggr: HirBodyIdx, parent: Option<HirBodyIdx>) {
-        self.map.insert(aggr, parent.unwrap_or(aggr));
+impl CtrlFlowForest {
+    pub fn insert(&mut self, idx: HirBodyIdx, parent: Option<HirBodyIdx>) {
+        self.map.insert(idx, parent.unwrap_or(idx));
     }
 
-    pub fn find_parent(&self, aggr: HirBodyIdx) -> Option<HirBodyIdx> {
-        let parent = self.map.get(&aggr).unwrap();
-        if parent == &aggr {
+    pub fn find_parent(&self, idx: HirBodyIdx) -> Option<HirBodyIdx> {
+        let parent = self.map.get(&idx).unwrap();
+        if parent == &idx {
             None
         } else {
             Some(*parent)
         }
     }
 
-    pub fn find_root(&self, mut aggr: HirBodyIdx) -> HirBodyIdx {
+    pub fn find_root(&self, mut idx: HirBodyIdx) -> HirBodyIdx {
         loop {
-            let parent = self.map.get(&aggr).unwrap();
-            if parent == &aggr {
-                return aggr;
+            let parent = self.map.get(&idx).unwrap();
+            if parent == &idx {
+                return idx;
             }
-            aggr = *parent;
+            idx = *parent;
         }
     }
 }
@@ -270,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
                 // The variables outside the aggregation refer to the aggregated object (an array).
-                let aggr_body_idx = *ctx.aggr_body_map.get(&aggr_expr_id).unwrap();
+                let aggr_body_idx = *ctx.body_map.get(&aggr_expr_id).unwrap();
 
                 let expr_id = self.expressions.alloc_expr_id();
 
@@ -309,7 +309,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 let aggr_variable = ctx
-                    .aggr_variables
+                    .body_variables
                     .get(&aggr_body_idx)
                     .expect("No aggregation variable");
 
