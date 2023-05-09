@@ -6,7 +6,7 @@ use crate::{
     def::{DefKind, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
-    type_check::check_expr::CheckExprContext,
+    type_check::unify_ctx::UnifyExprContext,
     types::{Type, TypeRef},
 };
 
@@ -60,7 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => Some(ty),
                 };
 
-                let mut ctx = CheckExprContext::new();
+                let mut ctx = UnifyExprContext::new();
                 let (ty, hir_idx) = self.check_expr_root(expr_root, &mut ctx);
 
                 self.codegen_tasks

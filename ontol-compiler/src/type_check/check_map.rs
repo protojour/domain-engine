@@ -11,14 +11,14 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, Expressions},
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
-    type_check::check_expr::Arm,
+    type_check::unify_ctx::Arm,
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };
 
 use super::{
-    check_expr::{BoundVariable, CheckExprContext, CtrlFlowGroup},
     inference::Infer,
+    unify_ctx::{BoundVariable, CtrlFlowGroup, UnifyExprContext},
     TypeCheck, TypeError,
 };
 
@@ -30,7 +30,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = CheckExprContext::new();
+        let mut ctx = UnifyExprContext::new();
         let root_body_idx = ctx.alloc_hir_body_idx();
 
         {
@@ -134,7 +134,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         expr: &Expr,
         variables: &Variables,
         parent_aggr_group: Option<CtrlFlowGroup>,
-        ctx: &mut CheckExprContext<'m>,
+        ctx: &mut UnifyExprContext<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
@@ -331,7 +331,7 @@ impl AggrGroupSet {
     // Find a unique leaf in the aggregation forest
     fn disambiguate(
         self,
-        ctx: &CheckExprContext,
+        ctx: &UnifyExprContext,
         max_depth: BindDepth,
     ) -> Result<HirBodyIdx, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {

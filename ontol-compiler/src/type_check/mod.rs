@@ -21,6 +21,7 @@ pub mod inference;
 mod check_expr;
 mod check_map;
 mod check_relationship;
+mod unify_ctx;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {
