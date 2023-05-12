@@ -12,6 +12,7 @@ pub enum Error<'s> {
     InvalidToken(Token<'s>),
     InvalidIdent(&'s str),
     InvalidNumber,
+    InvalidVariableNumber,
 }
 
 #[derive(Debug)]
@@ -28,169 +29,167 @@ pub enum Token<'s> {
     LParen,
     RParen,
     Ident(&'s str),
-    Number(u32),
+    Int(i64),
     Hash,
     Underscore,
 }
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
 
-pub fn parse(input: &str) -> ParseResult<'_, Hir2Ast> {
-    let input = input.trim_start();
-    match parse_token(input)? {
-        (Token::LParen, input) => {
-            let (node, input) = match parse_ident(input)? {
-                ("destruct", input) => {
-                    let (_, input) = parse_hash(input)?;
-                    let (var, input) = parse_var_after_hash(input)?;
-                    let (children, input) = parse_many(input, parse)?;
-                    (Hir2Ast::Destruct(var, children), input)
+pub fn parse(next: &str) -> ParseResult<'_, Hir2Ast> {
+    let next = next.trim_start();
+    match parse_token(next)? {
+        (Token::LParen, next) => {
+            let (node, next) = match parse_ident(next)? {
+                ("destruct", next) => {
+                    let (_, next) = parse_hash(next)?;
+                    let (var, next) = parse_var_after_hash(next)?;
+                    let (children, next) = parse_many(next, parse)?;
+                    (Hir2Ast::Destruct(var, children), next)
                 }
-                ("construct", input) => {
-                    let (children, input) = parse_many(input, parse)?;
-                    (Hir2Ast::Construct(children), input)
+                ("construct", next) => {
+                    let (children, next) = parse_many(next, parse)?;
+                    (Hir2Ast::Construct(children), next)
                 }
-                ("destruct-prop", input) => {
-                    let (prop, input) = parse_ident(input)?;
-                    let (arms, input) = parse_many(input, parse_prop_match_arm)?;
-                    (Hir2Ast::DestructProp(String::from(prop), arms), input)
+                ("destruct-prop", next) => {
+                    let (prop, next) = parse_ident(next)?;
+                    let (arms, next) = parse_many(next, parse_prop_match_arm)?;
+                    (Hir2Ast::DestructProp(String::from(prop), arms), next)
                 }
-                ("construct-prop", input) => {
-                    let (prop, input) = parse_ident(input)?;
-                    let (rel, input) = parse(input)?;
-                    let (value, input) = parse(input)?;
+                ("construct-prop", next) => {
+                    let (prop, next) = parse_ident(next)?;
+                    let (rel, next) = parse(next)?;
+                    let (value, next) = parse(next)?;
                     (
                         Hir2Ast::ConstructProp(String::from(prop), Box::new(rel), Box::new(value)),
-                        input,
+                        next,
                     )
                 }
-                ("+", input) => parse_binary_call(BuiltinProc::Add, input)?,
-                ("-", input) => parse_binary_call(BuiltinProc::Sub, input)?,
-                ("*", input) => parse_binary_call(BuiltinProc::Mul, input)?,
-                ("/", input) => parse_binary_call(BuiltinProc::Div, input)?,
+                ("+", next) => parse_binary_call(BuiltinProc::Add, next)?,
+                ("-", next) => parse_binary_call(BuiltinProc::Sub, next)?,
+                ("*", next) => parse_binary_call(BuiltinProc::Mul, next)?,
+                ("/", next) => parse_binary_call(BuiltinProc::Div, next)?,
                 (ident, _) => return Err(Error::InvalidIdent(ident)),
             };
-            let (_, input) = parse_rparen(input)?;
-            Ok((node, input))
+            let (_, next) = parse_rparen(next)?;
+            Ok((node, next))
         }
-        (Token::Hash, input) => match parse_token(input)? {
-            (Token::Number(num), input) => Ok((Hir2Ast::VariableRef(Hir2AstVariable(num)), input)),
-            (Token::Ident(ident), input) => match ident {
-                "u" => Ok((Hir2Ast::Unit, input)),
+        (Token::Hash, next) => match parse_token(next)? {
+            (Token::Int(int), next) => Ok((Hir2Ast::VariableRef(mk_var(int)?), next)),
+            (Token::Ident(ident), next) => match ident {
+                "u" => Ok((Hir2Ast::Unit, next)),
                 other => Err(Error::InvalidIdent(other)),
             },
             (token, _) => Err(Error::InvalidToken(token)),
         },
-        (Token::Number(num), input) => Ok((Hir2Ast::Int(num as i64), input)),
+        (Token::Int(num), next) => Ok((Hir2Ast::Int(num as i64), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
 
 fn parse_many<'s, T>(
-    mut input: &'s str,
+    mut next: &'s str,
     item_fn: impl Fn(&'s str) -> ParseResult<'s, T>,
 ) -> ParseResult<'s, Vec<T>> {
     let mut nodes = vec![];
     loop {
-        match item_fn(input) {
-            Ok((node, next_input)) => {
-                input = next_input;
+        match item_fn(next) {
+            Ok((node, next_next)) => {
+                next = next_next;
                 nodes.push(node);
             }
             Err(Error::Unexpected(Class::Eof | Class::RParen)) => {
-                return Ok((nodes, input));
+                return Ok((nodes, next));
             }
             Err(error) => return Err(error),
         }
     }
 }
 
-fn parse_prop_match_arm(input: &str) -> ParseResult<'_, Hir2AstPropMatchArm> {
-    let (_, input) = parse_lparen(input)?;
-    let (_, input) = parse_lparen(input)?;
-    let (pattern, input) = match parse_pattern_binding(input) {
-        Ok((rel_binding, input)) => {
-            let (val_binding, input) = parse_pattern_binding(input)?;
-            let (_, input) = parse_rparen(input)?;
+fn parse_prop_match_arm(next: &str) -> ParseResult<'_, Hir2AstPropMatchArm> {
+    let (_, next) = parse_lparen(next)?;
+    let (_, next) = parse_lparen(next)?;
+    let (pattern, next) = match parse_pattern_binding(next) {
+        Ok((rel_binding, next)) => {
+            let (val_binding, next) = parse_pattern_binding(next)?;
+            let (_, next) = parse_rparen(next)?;
 
-            (Hir2AstPropPattern::Present(rel_binding, val_binding), input)
+            (Hir2AstPropPattern::Present(rel_binding, val_binding), next)
         }
         Err(Error::Unexpected(Class::RParen)) => {
-            let (_, input) = parse_rparen(input)?;
-            (Hir2AstPropPattern::NotPresent, input)
+            let (_, next) = parse_rparen(next)?;
+            (Hir2AstPropPattern::NotPresent, next)
         }
         Err(other) => return Err(other),
     };
-    let (node, input) = parse(input)?;
-    let (_, input) = parse_rparen(input)?;
+    let (node, next) = parse(next)?;
+    let (_, next) = parse_rparen(next)?;
 
-    Ok((Hir2AstPropMatchArm { pattern, node }, input))
+    Ok((Hir2AstPropMatchArm { pattern, node }, next))
 }
 
-fn parse_pattern_binding(input: &str) -> ParseResult<'_, Hir2AstPatternBinding> {
-    let (_, input) = parse_hash(input)?;
-    match parse_token(input)? {
-        (Token::Number(num), input) => {
-            Ok((Hir2AstPatternBinding::Binder(Hir2AstVariable(num)), input))
-        }
-        (Token::Underscore, input) => Ok((Hir2AstPatternBinding::Wildcard, input)),
+fn parse_pattern_binding(next: &str) -> ParseResult<'_, Hir2AstPatternBinding> {
+    let (_, next) = parse_hash(next)?;
+    match parse_token(next)? {
+        (Token::Int(int), next) => Ok((Hir2AstPatternBinding::Binder(mk_var(int)?), next)),
+        (Token::Underscore, next) => Ok((Hir2AstPatternBinding::Wildcard, next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
 
-fn parse_binary_call(proc: BuiltinProc, input: &str) -> ParseResult<'_, Hir2Ast> {
-    let (a, input) = parse(input)?;
-    let (b, input) = parse(input)?;
+fn parse_binary_call(proc: BuiltinProc, next: &str) -> ParseResult<'_, Hir2Ast> {
+    let (a, next) = parse(next)?;
+    let (b, next) = parse(next)?;
 
-    Ok((Hir2Ast::Call(proc, vec![a, b]), input))
+    Ok((Hir2Ast::Call(proc, vec![a, b]), next))
 }
 
-fn parse_ident(input: &str) -> ParseResult<'_, &str> {
-    match parse_token(input)? {
-        (Token::Ident(ident), input) => Ok((ident, input)),
+fn parse_ident(next: &str) -> ParseResult<'_, &str> {
+    match parse_token(next)? {
+        (Token::Ident(ident), next) => Ok((ident, next)),
         _ => Err(Error::Expected(Class::Ident)),
     }
 }
 
-fn parse_hash(input: &str) -> ParseResult<'_, ()> {
-    match parse_token(input)? {
-        (Token::Hash, input) => Ok(((), input)),
+fn parse_hash(next: &str) -> ParseResult<'_, ()> {
+    match parse_token(next)? {
+        (Token::Hash, next) => Ok(((), next)),
         _ => Err(Error::Expected(Class::Hash)),
     }
 }
 
-fn parse_var_after_hash(input: &str) -> ParseResult<'_, Hir2AstVariable> {
-    match parse_token(input)? {
-        (Token::Number(num), input) => Ok((Hir2AstVariable(num), input)),
+fn parse_var_after_hash(next: &str) -> ParseResult<'_, Hir2AstVariable> {
+    match parse_token(next)? {
+        (Token::Int(int), next) => Ok((mk_var(int)?, next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
 
-fn parse_lparen(input: &str) -> ParseResult<'_, ()> {
-    match parse_token(input)? {
-        (Token::LParen, input) => Ok(((), input)),
+fn parse_lparen(next: &str) -> ParseResult<'_, ()> {
+    match parse_token(next)? {
+        (Token::LParen, next) => Ok(((), next)),
         _ => Err(Error::Expected(Class::LParen)),
     }
 }
 
-fn parse_rparen(input: &str) -> ParseResult<'_, ()> {
-    match parse_raw_token(input)? {
-        (Token::RParen, input) => Ok(((), input)),
+fn parse_rparen(next: &str) -> ParseResult<'_, ()> {
+    match parse_raw_token(next)? {
+        (Token::RParen, next) => Ok(((), next)),
         _ => Err(Error::Expected(Class::RParen)),
     }
 }
 
-fn parse_token(input: &str) -> ParseResult<'_, Token<'_>> {
-    match parse_raw_token(input)? {
+fn parse_token(next: &str) -> ParseResult<'_, Token<'_>> {
+    match parse_raw_token(next)? {
         (Token::RParen, _) => Err(Error::Unexpected(Class::RParen)),
-        (token, input) => Ok((token, input)),
+        (token, next) => Ok((token, next)),
     }
 }
 
-fn parse_raw_token(input: &str) -> ParseResult<'_, Token<'_>> {
-    let input = input.trim_start();
+fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
+    let next = next.trim_start();
+    let mut chars = next.char_indices();
 
-    let mut chars = input.char_indices();
     match chars.next() {
         None => Err(Error::Unexpected(Class::Eof)),
         Some((_, '(')) => Ok((Token::LParen, chars.as_str())),
@@ -198,40 +197,36 @@ fn parse_raw_token(input: &str) -> ParseResult<'_, Token<'_>> {
         Some((_, '#')) => Ok((Token::Hash, chars.as_str())),
         Some((_, '_')) => Ok((Token::Underscore, chars.as_str())),
         Some((_, char)) if char.is_numeric() => {
-            let mut remain = chars.as_str();
-
             while let Some((index, char)) = chars.next() {
                 if !char.is_numeric() {
-                    let str = &input[0..index];
-                    return parse_number(str, remain);
-                } else {
-                    remain = chars.as_str();
+                    return Ok((parse_int(&next[0..index])?, &next[index..]));
                 }
             }
 
-            parse_number(input, remain)
+            Ok((parse_int(next)?, chars.as_str()))
         }
-        Some((_, char)) if !char.is_whitespace() => {
-            let mut remain = chars.as_str();
+        Some((_, char)) if char.is_ascii() => {
             while let Some((index, char)) = chars.next() {
                 if char.is_whitespace() || char == '(' || char == ')' {
-                    let ident = &input[0..index];
-                    return Ok((Token::Ident(ident), remain));
-                } else {
-                    remain = chars.as_str();
+                    return Ok((Token::Ident(&next[0..index]), &next[index..]));
                 }
             }
 
-            Ok((Token::Ident(input), remain))
+            Ok((Token::Ident(next), chars.as_str()))
         }
         Some((_, char)) => Err(Error::InvalidChar(char)),
     }
 }
 
-fn parse_number<'r>(num: &str, remain: &'r str) -> Result<(Token<'static>, &'r str), Error<'r>> {
-    let result: Result<u32, _> = num.parse();
+fn parse_int(num: &str) -> Result<Token<'_>, Error<'_>> {
+    let result: Result<i64, _> = num.parse();
     match result {
-        Ok(num) => Ok((Token::Number(num), remain)),
+        Ok(num) => Ok(Token::Int(num)),
         Err(_) => Err(Error::InvalidNumber),
     }
+}
+
+fn mk_var(num: i64) -> Result<Hir2AstVariable, Error<'static>> {
+    let num: u32 = num.try_into().map_err(|_| Error::InvalidVariableNumber)?;
+    Ok(Hir2AstVariable(num))
 }

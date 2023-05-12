@@ -13,7 +13,7 @@ pub enum LoweringError {
     VariableGap(u32),
 }
 
-pub fn lower_hir2(asts: &[Hir2Ast]) -> Hir2NodeTable<'static> {
+pub fn lower_hir2(asts: &[Hir2Ast]) -> (Hir2NodeTable<'static>, Vec<HirIdx>) {
     let mut analyzer = AstAnalyzer {
         variables: vec![],
         prop_map: Default::default(),
@@ -33,11 +33,9 @@ pub fn lower_hir2(asts: &[Hir2Ast]) -> Hir2NodeTable<'static> {
         prop_map: analyzer.prop_map,
     };
 
-    for ast in asts {
-        builder.lower_ast(ast);
-    }
+    let root_indices = asts.iter().map(|ast| builder.lower_ast(ast)).collect();
 
-    table
+    (table, root_indices)
 }
 
 struct TableBuilder<'a> {
