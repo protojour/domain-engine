@@ -30,5 +30,5 @@ pub enum Hir2AstPropPattern {
 #[derive(Debug)]
 pub enum Hir2AstPatternBinding {
     Wildcard,
-    Binder(u32),
+    Binder(Hir2AstVariable),
 }

@@ -92,8 +92,7 @@ impl Print<Hir2Ast> for Printer {
             }
             Hir2Ast::ConstructProp(prop, rel, val) => {
                 write!(f, "{indent}(construct-prop {prop}")?;
-                let multi =
-                    self.print_all::<Hir2Ast, _>(Sep::Space, [rel.as_ref(), val.as_ref()], f)?;
+                let multi = self.print_all(Sep::Space, [rel.as_ref(), val.as_ref()], f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -148,7 +147,7 @@ impl Print<Hir2AstPatternBinding> for Printer {
     ) -> PrintResult {
         match ast {
             Hir2AstPatternBinding::Binder(var) => {
-                write!(f, "{sep}#{}", var)?;
+                write!(f, "{sep}#{}", var.0)?;
             }
             Hir2AstPatternBinding::Wildcard => {
                 write!(f, "{sep}#_")?;

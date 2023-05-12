@@ -24,16 +24,17 @@ use tracing::debug;
 use types::{DefTypes, Types};
 
 pub mod error;
+pub mod hir2;
 pub mod mem;
 pub mod package;
 pub mod serde_codegen;
+pub mod source;
 
 mod codegen;
 mod compiler_queries;
 mod core;
 mod def;
 mod expr;
-mod hir2;
 mod hir_node;
 mod lowering;
 mod namespace;
@@ -42,10 +43,11 @@ mod primitive;
 mod regex_util;
 mod relation;
 mod sequence;
-mod source;
 mod strings;
 mod type_check;
 mod types;
+
+pub use hir_node::HirIdx;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {

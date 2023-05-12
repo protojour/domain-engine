@@ -1,1 +1,1 @@
-mod hir2_node;
+pub mod node;

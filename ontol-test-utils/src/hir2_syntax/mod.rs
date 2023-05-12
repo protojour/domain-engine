@@ -1,7 +1,9 @@
 pub mod ast;
+pub mod lower;
 pub mod parse;
 
 mod display;
+mod visitor;
 
 #[cfg(test)]
 mod tests {
