@@ -33,6 +33,7 @@ mod compiler_queries;
 mod core;
 mod def;
 mod expr;
+mod hir2;
 mod hir_node;
 mod lowering;
 mod namespace;

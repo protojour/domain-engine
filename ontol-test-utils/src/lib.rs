@@ -10,6 +10,7 @@ use ontol_compiler::{
 use ontol_runtime::{env::Env, PackageId};
 
 pub mod diagnostics;
+pub mod hir2_syntax;
 pub mod type_binding;
 
 pub const ROOT_SRC_NAME: &str = "test_root.on";

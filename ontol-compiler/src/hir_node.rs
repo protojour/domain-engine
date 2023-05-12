@@ -58,6 +58,7 @@ pub enum HirKind<'m> {
     /// Aggregate an array variable, call the given body for each element
     Aggr(HirIdx, HirBodyIdx),
     /// Match a value
+    #[allow(unused)]
     Match(HirIdx, HirMatchTable),
 }
 
@@ -67,6 +68,7 @@ pub struct HirMatchTable {
 }
 
 #[derive(Clone, Debug)]
+#[allow(unused)]
 pub enum HirPredicate {
     True,
     IsNotUnit,

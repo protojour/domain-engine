@@ -72,6 +72,7 @@ fn test_temperature() {
 }
 
 #[test]
+#[should_panic = "Value at Local(2) is not a map"]
 fn test_optional_attribute() {
     "
     pub type person {
