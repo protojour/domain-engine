@@ -82,7 +82,7 @@ pub fn parse(next: &str) -> ParseResult<'_, Hir2Ast> {
             },
             (token, _) => Err(Error::InvalidToken(token)),
         },
-        (Token::Int(num), next) => Ok((Hir2Ast::Int(num as i64), next)),
+        (Token::Int(num), next) => Ok((Hir2Ast::Int(num), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
@@ -197,7 +197,7 @@ fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
         Some((_, '#')) => Ok((Token::Hash, chars.as_str())),
         Some((_, '_')) => Ok((Token::Underscore, chars.as_str())),
         Some((_, char)) if char.is_numeric() => {
-            while let Some((index, char)) = chars.next() {
+            for (index, char) in chars.by_ref() {
                 if !char.is_numeric() {
                     return Ok((parse_int(&next[0..index])?, &next[index..]));
                 }
@@ -206,7 +206,7 @@ fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
             Ok((parse_int(next)?, chars.as_str()))
         }
         Some((_, char)) if char.is_ascii() => {
-            while let Some((index, char)) = chars.next() {
+            for (index, char) in chars.by_ref() {
                 if char.is_whitespace() || char == '(' || char == ')' {
                     return Ok((Token::Ident(&next[0..index]), &next[index..]));
                 }

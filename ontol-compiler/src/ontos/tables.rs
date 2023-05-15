@@ -29,6 +29,7 @@ impl<'m> IndexMut<HirIdx> for Hir2NodeTable<'m> {
     }
 }
 
+#[allow(unused)]
 pub struct UnificationTable<'m> {
     /// The set of nodes part of the equation
     pub nodes: Hir2NodeTable<'m>,
