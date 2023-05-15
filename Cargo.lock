@@ -973,6 +973,7 @@ name = "ontos"
 version = "0.1.0"
 dependencies = [
  "ontol-runtime",
+ "pretty_assertions",
  "test-log",
  "tracing-subscriber",
 ]
