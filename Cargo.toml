@@ -7,7 +7,8 @@ members = [
     "ontol-runtime",
     "ontol-compiler",
     "ontol-parser",
-    "ontol-test-utils"
+    "ontol-test-utils",
+    "ontos"
 ]
 
 [workspace.dependencies]
@@ -17,6 +18,8 @@ serde_json = "1"
 smartstring = { version = "1", features = ["serde"] }
 indexmap = "1"
 fnv = "1"
+tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
 
 # Set the settings for build scripts and proc-macros.
 [profile.release.package.domain-engine-wasm]

@@ -969,6 +969,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ontos"
+version = "0.1.0"
+dependencies = [
+ "ontol-runtime",
+ "test-log",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ordered-float"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
