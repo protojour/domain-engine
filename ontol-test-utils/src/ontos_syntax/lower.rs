@@ -4,7 +4,7 @@ use super::{
     ast::{Hir2Ast, Hir2AstVariable},
     visitor::Hir2AstVisitor,
 };
-use ontol_compiler::hir2::node::{Hir2Kind, Hir2NodeTable};
+use ontol_compiler::ontos::{node::Hir2Kind, tables::Hir2NodeTable};
 use ontol_compiler::HirIdx;
 use ontol_runtime::{value::PropertyId, DefId, PackageId, RelationId};
 

@@ -6,8 +6,9 @@ use ontol_runtime::{
     DefId, MapKey,
 };
 
+pub mod equation_solver;
+
 mod equation;
-mod equation_solver;
 mod generator;
 mod ir;
 mod link;

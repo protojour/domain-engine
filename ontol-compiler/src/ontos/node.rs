@@ -10,17 +10,6 @@ use crate::{
     SourceSpan,
 };
 
-#[derive(Default, Debug)]
-pub struct Hir2NodeTable<'m>(pub(super) Vec<Hir2Node<'m>>);
-
-impl<'m> Hir2NodeTable<'m> {
-    pub fn add(&mut self, expr: Hir2Node<'m>) -> HirIdx {
-        let id = HirIdx(self.0.len() as u32);
-        self.0.push(expr);
-        id
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Hir2Node<'m> {
     pub kind: Hir2Kind<'m>,
