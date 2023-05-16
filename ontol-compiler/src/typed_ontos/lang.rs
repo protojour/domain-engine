@@ -1,4 +1,4 @@
-use ontos::{kind::NodeKind, Lang, Node};
+use ontos::kind::NodeKind;
 
 use crate::{
     types::{Type, TypeRef},
@@ -8,10 +8,10 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct TypedOntos;
 
-impl Lang for TypedOntos {
-    type Node<'a> = OntosNode<'a>;
+impl ontos::Lang for TypedOntos {
+    type Node<'m> = OntosNode<'m>;
 
-    fn make_node<'a>(&self, kind: NodeKind<'a, Self>) -> Self::Node<'a> {
+    fn make_node<'m>(&self, kind: NodeKind<'m, Self>) -> Self::Node<'m> {
         OntosNode {
             kind,
             ty: &Type::Tautology,
@@ -26,7 +26,7 @@ pub struct OntosNode<'m> {
     pub span: SourceSpan,
 }
 
-impl<'m> Node<'m, TypedOntos> for OntosNode<'m> {
+impl<'m> ontos::Node<'m, TypedOntos> for OntosNode<'m> {
     fn kind(&self) -> &NodeKind<'m, TypedOntos> {
         &self.kind
     }
