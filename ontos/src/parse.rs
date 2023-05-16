@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    node::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable},
+    kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable},
     Lang,
 };
 

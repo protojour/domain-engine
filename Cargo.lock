@@ -892,6 +892,7 @@ dependencies = [
  "ontol-parser",
  "ontol-runtime",
  "ontol-test-utils",
+ "ontos",
  "patricia_tree",
  "pretty_assertions",
  "regex",

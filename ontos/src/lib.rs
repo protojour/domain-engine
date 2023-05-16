@@ -1,7 +1,7 @@
-use node::NodeKind;
+use kind::NodeKind;
 
 // pub mod lower;
-pub mod node;
+pub mod kind;
 pub mod parse;
 
 mod display;

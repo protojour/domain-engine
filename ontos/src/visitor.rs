@@ -1,9 +1,9 @@
 use crate::{
-    node::{NodeKind, PatternBinding, PropPattern, Variable},
+    kind::{NodeKind, PatternBinding, PropPattern, Variable},
     Lang, Node,
 };
 
-pub trait Hir2AstVisitor<L: Lang> {
+pub trait OntosVisitor<L: Lang> {
     fn visit_kind(&mut self, kind: &NodeKind<'_, L>) {
         match kind {
             NodeKind::VariableRef(var) => {
