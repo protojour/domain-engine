@@ -1,7 +1,8 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
-use super::ast::{
-    Hir2Ast, Hir2AstPatternBinding, Hir2AstPropMatchArm, Hir2AstPropPattern, Hir2AstVariable,
+use crate::{
+    node::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable},
+    Lang,
 };
 
 #[derive(Debug)]
@@ -36,112 +37,143 @@ pub enum Token<'s> {
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
 
-pub fn parse(next: &str) -> ParseResult<'_, Hir2Ast> {
-    let next = next.trim_start();
-    match parse_token(next)? {
-        (Token::LParen, next) => {
-            let (node, next) = match parse_ident(next)? {
-                ("destruct", next) => {
-                    let (_, next) = parse_hash(next)?;
-                    let (var, next) = parse_var_after_hash(next)?;
-                    let (children, next) = parse_many(next, parse)?;
-                    (Hir2Ast::Destruct(var, children), next)
+pub struct Parser<L: Lang> {
+    lang: L,
+}
+
+impl<L: Lang> Parser<L> {
+    pub fn new(lang: L) -> Self {
+        Self { lang }
+    }
+
+    fn make_node<'a>(&self, kind: NodeKind<'a, L>) -> L::Node<'a> {
+        self.lang.make_node(kind)
+    }
+
+    pub fn parse<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
+        let next = next.trim_start();
+        match parse_token(next)? {
+            (Token::LParen, next) => {
+                let (node, next) = match parse_ident(next)? {
+                    ("struct", next) => {
+                        let (binder, next) = parse_binder(next)?;
+                        let (children, next) = self.parse_many(next, Self::parse)?;
+                        (self.make_node(NodeKind::Struct(binder, children)), next)
+                    }
+                    ("prop", next) => {
+                        let (var, next) = parse_hash_var(next)?;
+                        let (prop, next) = parse_ident(next)?;
+                        let (rel, next) = self.parse(next)?;
+                        let (value, next) = self.parse(next)?;
+                        (
+                            self.make_node(NodeKind::Prop(
+                                var,
+                                prop.into(),
+                                Box::new(rel),
+                                Box::new(value),
+                            )),
+                            next,
+                        )
+                    }
+                    ("destruct", next) => {
+                        let (var, next) = parse_hash_var(next)?;
+                        let (children, next) = self.parse_many(next, Self::parse)?;
+                        (self.make_node(NodeKind::Destruct(var, children)), next)
+                    }
+                    ("match-prop", next) => {
+                        let (struct_var, next) = parse_hash_var(next)?;
+                        let (prop, next) = parse_ident(next)?;
+                        let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
+                        (
+                            self.make_node(NodeKind::MatchProp(struct_var, prop.into(), arms)),
+                            next,
+                        )
+                    }
+                    ("+", next) => self.parse_binary_call(BuiltinProc::Add, next)?,
+                    ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next)?,
+                    ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next)?,
+                    ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
+                    (ident, _) => return Err(Error::InvalidIdent(ident)),
+                };
+                let (_, next) = parse_rparen(next)?;
+                Ok((node, next))
+            }
+            (Token::Hash, next) => match parse_token(next)? {
+                (Token::Int(int), next) => {
+                    Ok((self.make_node(NodeKind::VariableRef(mk_var(int)?)), next))
                 }
-                ("construct", next) => {
-                    let (children, next) = parse_many(next, parse)?;
-                    (Hir2Ast::Construct(children), next)
-                }
-                ("destruct-prop", next) => {
-                    let (prop, next) = parse_ident(next)?;
-                    let (arms, next) = parse_many(next, parse_prop_match_arm)?;
-                    (Hir2Ast::DestructProp(String::from(prop), arms), next)
-                }
-                ("construct-prop", next) => {
-                    let (prop, next) = parse_ident(next)?;
-                    let (rel, next) = parse(next)?;
-                    let (value, next) = parse(next)?;
-                    (
-                        Hir2Ast::ConstructProp(String::from(prop), Box::new(rel), Box::new(value)),
-                        next,
-                    )
-                }
-                ("+", next) => parse_binary_call(BuiltinProc::Add, next)?,
-                ("-", next) => parse_binary_call(BuiltinProc::Sub, next)?,
-                ("*", next) => parse_binary_call(BuiltinProc::Mul, next)?,
-                ("/", next) => parse_binary_call(BuiltinProc::Div, next)?,
-                (ident, _) => return Err(Error::InvalidIdent(ident)),
-            };
-            let (_, next) = parse_rparen(next)?;
-            Ok((node, next))
-        }
-        (Token::Hash, next) => match parse_token(next)? {
-            (Token::Int(int), next) => Ok((Hir2Ast::VariableRef(mk_var(int)?), next)),
-            (Token::Ident(ident), next) => match ident {
-                "u" => Ok((Hir2Ast::Unit, next)),
-                other => Err(Error::InvalidIdent(other)),
+                (Token::Ident(ident), next) => match ident {
+                    "u" => Ok((self.make_node(NodeKind::Unit), next)),
+                    other => Err(Error::InvalidIdent(other)),
+                },
+                (token, _) => Err(Error::InvalidToken(token)),
             },
+            (Token::Int(num), next) => Ok((self.make_node(NodeKind::Int(num)), next)),
             (token, _) => Err(Error::InvalidToken(token)),
-        },
-        (Token::Int(num), next) => Ok((Hir2Ast::Int(num), next)),
-        (token, _) => Err(Error::InvalidToken(token)),
+        }
     }
-}
 
-fn parse_many<'s, T>(
-    mut next: &'s str,
-    item_fn: impl Fn(&'s str) -> ParseResult<'s, T>,
-) -> ParseResult<'s, Vec<T>> {
-    let mut nodes = vec![];
-    loop {
-        match item_fn(next) {
-            Ok((node, next_next)) => {
-                next = next_next;
-                nodes.push(node);
+    fn parse_many<'p, 's, T>(
+        &'p self,
+        mut next: &'s str,
+        item_fn: impl Fn(&'p Self, &'s str) -> ParseResult<'s, T>,
+    ) -> ParseResult<'s, Vec<T>> {
+        let mut nodes = vec![];
+        loop {
+            match item_fn(self, next) {
+                Ok((node, next_next)) => {
+                    next = next_next;
+                    nodes.push(node);
+                }
+                Err(Error::Unexpected(Class::Eof | Class::RParen)) => {
+                    return Ok((nodes, next));
+                }
+                Err(error) => return Err(error),
             }
-            Err(Error::Unexpected(Class::Eof | Class::RParen)) => {
-                return Ok((nodes, next));
+        }
+    }
+
+    fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
+        let (_, next) = parse_lparen(next)?;
+        let (_, next) = parse_lparen(next)?;
+        let (pattern, next) = match self.parse_pattern_binding(next) {
+            Ok((rel_binding, next)) => {
+                let (val_binding, next) = self.parse_pattern_binding(next)?;
+                let (_, next) = parse_rparen(next)?;
+
+                (PropPattern::Present(rel_binding, val_binding), next)
             }
-            Err(error) => return Err(error),
+            Err(Error::Unexpected(Class::RParen)) => {
+                let (_, next) = parse_rparen(next)?;
+                (PropPattern::NotPresent, next)
+            }
+            Err(other) => return Err(other),
+        };
+        let (node, next) = self.parse(next)?;
+        let (_, next) = parse_rparen(next)?;
+
+        Ok((MatchArm { pattern, node }, next))
+    }
+
+    fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, PatternBinding> {
+        let (_, next) = parse_hash(next)?;
+        match parse_token(next)? {
+            (Token::Int(int), next) => Ok((PatternBinding::Binder(mk_var(int)?), next)),
+            (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
+            (token, _) => Err(Error::InvalidToken(token)),
         }
     }
-}
 
-fn parse_prop_match_arm(next: &str) -> ParseResult<'_, Hir2AstPropMatchArm> {
-    let (_, next) = parse_lparen(next)?;
-    let (_, next) = parse_lparen(next)?;
-    let (pattern, next) = match parse_pattern_binding(next) {
-        Ok((rel_binding, next)) => {
-            let (val_binding, next) = parse_pattern_binding(next)?;
-            let (_, next) = parse_rparen(next)?;
+    fn parse_binary_call<'a, 's>(
+        &self,
+        proc: BuiltinProc,
+        next: &'s str,
+    ) -> ParseResult<'s, L::Node<'a>> {
+        let (a, next) = self.parse(next)?;
+        let (b, next) = self.parse(next)?;
 
-            (Hir2AstPropPattern::Present(rel_binding, val_binding), next)
-        }
-        Err(Error::Unexpected(Class::RParen)) => {
-            let (_, next) = parse_rparen(next)?;
-            (Hir2AstPropPattern::NotPresent, next)
-        }
-        Err(other) => return Err(other),
-    };
-    let (node, next) = parse(next)?;
-    let (_, next) = parse_rparen(next)?;
-
-    Ok((Hir2AstPropMatchArm { pattern, node }, next))
-}
-
-fn parse_pattern_binding(next: &str) -> ParseResult<'_, Hir2AstPatternBinding> {
-    let (_, next) = parse_hash(next)?;
-    match parse_token(next)? {
-        (Token::Int(int), next) => Ok((Hir2AstPatternBinding::Binder(mk_var(int)?), next)),
-        (Token::Underscore, next) => Ok((Hir2AstPatternBinding::Wildcard, next)),
-        (token, _) => Err(Error::InvalidToken(token)),
+        Ok((self.make_node(NodeKind::Call(proc, [a, b].into())), next))
     }
-}
-
-fn parse_binary_call(proc: BuiltinProc, next: &str) -> ParseResult<'_, Hir2Ast> {
-    let (a, next) = parse(next)?;
-    let (b, next) = parse(next)?;
-
-    Ok((Hir2Ast::Call(proc, vec![a, b]), next))
 }
 
 fn parse_ident(next: &str) -> ParseResult<'_, &str> {
@@ -158,11 +190,19 @@ fn parse_hash(next: &str) -> ParseResult<'_, ()> {
     }
 }
 
-fn parse_var_after_hash(next: &str) -> ParseResult<'_, Hir2AstVariable> {
+fn parse_hash_var(next: &str) -> ParseResult<'_, Variable> {
+    let (_, next) = parse_hash(next)?;
     match parse_token(next)? {
         (Token::Int(int), next) => Ok((mk_var(int)?, next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
+}
+
+fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
+    let (_, next) = parse_lparen(next)?;
+    let (var, next) = parse_hash_var(next)?;
+    let (_, next) = parse_rparen(next)?;
+    Ok((Binder(var), next))
 }
 
 fn parse_lparen(next: &str) -> ParseResult<'_, ()> {
@@ -226,7 +266,7 @@ fn parse_int(num: &str) -> Result<Token<'_>, Error<'_>> {
     }
 }
 
-fn mk_var(num: i64) -> Result<Hir2AstVariable, Error<'static>> {
+fn mk_var(num: i64) -> Result<Variable, Error<'static>> {
     let num: u32 = num.try_into().map_err(|_| Error::InvalidVariableNumber)?;
-    Ok(Hir2AstVariable(num))
+    Ok(Variable(num))
 }

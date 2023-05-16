@@ -1,38 +1,44 @@
-use super::ast::{Hir2Ast, Hir2AstPatternBinding, Hir2AstPropPattern, Hir2AstVariable};
+use crate::{
+    node::{NodeKind, PatternBinding, PropPattern, Variable},
+    Lang, Node,
+};
 
-pub trait Hir2AstVisitor {
-    fn visit_ast(&mut self, ast: &Hir2Ast) {
-        match ast {
-            Hir2Ast::VariableRef(var) => {
+pub trait Hir2AstVisitor<L: Lang> {
+    fn visit_kind(&mut self, kind: &NodeKind<'_, L>) {
+        match kind {
+            NodeKind::VariableRef(var) => {
                 self.visit_variable(var);
             }
-            Hir2Ast::Int(_) => {}
-            Hir2Ast::Unit => {}
-            Hir2Ast::Call(_proc, args) => {
+            NodeKind::Int(_) => {}
+            NodeKind::Unit => {}
+            NodeKind::Call(_proc, args) => {
                 for arg in args {
-                    self.visit_ast(arg);
+                    self.visit_kind(arg.kind());
                 }
             }
-            Hir2Ast::Construct(children) => {
+            NodeKind::Struct(binder, children) => {
+                self.visit_binder(&binder.0);
                 for child in children {
-                    self.visit_ast(child);
+                    self.visit_kind(child.kind());
                 }
             }
-            Hir2Ast::ConstructProp(prop, rel, val) => {
+            NodeKind::Prop(struct_var, prop, rel, val) => {
+                self.visit_variable(struct_var);
                 self.visit_prop(prop);
-                self.visit_ast(rel);
-                self.visit_ast(val);
+                self.visit_kind(rel.kind());
+                self.visit_kind(val.kind());
             }
-            Hir2Ast::Destruct(arg, children) => {
+            NodeKind::Destruct(arg, children) => {
                 self.visit_variable(arg);
                 for child in children {
-                    self.visit_ast(child);
+                    self.visit_kind(child.kind());
                 }
             }
-            Hir2Ast::DestructProp(prop, arms) => {
+            NodeKind::MatchProp(struct_var, prop, arms) => {
+                self.visit_variable(struct_var);
                 self.visit_prop(prop);
                 for arm in arms {
-                    if let Hir2AstPropPattern::Present(rel, val) = &arm.pattern {
+                    if let PropPattern::Present(rel, val) = &arm.pattern {
                         self.visit_pattern_binding(rel);
                         self.visit_pattern_binding(val);
                     }
@@ -40,13 +46,13 @@ pub trait Hir2AstVisitor {
             }
         }
     }
-    fn visit_pattern_binding(&mut self, binding: &Hir2AstPatternBinding) {
+    fn visit_pattern_binding(&mut self, binding: &PatternBinding) {
         match binding {
-            Hir2AstPatternBinding::Binder(var) => self.visit_binder(var),
-            Hir2AstPatternBinding::Wildcard => {}
+            PatternBinding::Binder(var) => self.visit_binder(var),
+            PatternBinding::Wildcard => {}
         }
     }
     fn visit_prop(&mut self, prop: &str);
-    fn visit_variable(&mut self, variable: &Hir2AstVariable);
-    fn visit_binder(&mut self, variable: &Hir2AstVariable);
+    fn visit_binder(&mut self, variable: &Variable);
+    fn visit_variable(&mut self, variable: &Variable);
 }

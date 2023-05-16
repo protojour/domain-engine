@@ -10,6 +10,7 @@ doctest = false
 
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
+smartstring.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

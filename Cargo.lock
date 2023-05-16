@@ -974,6 +974,7 @@ version = "0.1.0"
 dependencies = [
  "ontol-runtime",
  "pretty_assertions",
+ "smartstring",
  "test-log",
  "tracing-subscriber",
 ]

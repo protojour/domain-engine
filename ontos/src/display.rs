@@ -1,8 +1,11 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
-use super::ast::{Hir2Ast, Hir2AstPatternBinding, Hir2AstPropMatchArm, Hir2AstPropPattern};
+use crate::{
+    node::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    Lang, Node,
+};
 
-impl std::fmt::Display for Hir2Ast {
+impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Printer::new().print(Sep::None, self, f)?;
         Ok(())
@@ -51,27 +54,28 @@ trait Print<T>: Copy {
 }
 
 #[derive(Clone, Copy)]
-struct Printer {
+struct Printer<L: Lang> {
     indent: Indent,
+    lang: std::marker::PhantomData<L>,
 }
 
-impl Print<Hir2Ast> for Printer {
-    fn print(self, sep: Sep, ast: &Hir2Ast, f: &mut std::fmt::Formatter) -> PrintResult {
+impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
+    fn print(self, sep: Sep, kind: &NodeKind<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         let indent = self.indent;
-        match ast {
-            Hir2Ast::VariableRef(var) => {
+        match kind {
+            NodeKind::VariableRef(var) => {
                 write!(f, "{sep}#{}", var.0)?;
                 Ok(sep.multiline())
             }
-            Hir2Ast::Int(int) => {
+            NodeKind::Int(int) => {
                 write!(f, "{sep}{int}")?;
                 Ok(sep.multiline())
             }
-            Hir2Ast::Unit => {
+            NodeKind::Unit => {
                 write!(f, "{sep}#u")?;
                 Ok(sep.multiline())
             }
-            Hir2Ast::Call(proc, args) => {
+            NodeKind::Call(proc, args) => {
                 let proc = match proc {
                     BuiltinProc::Add => "+",
                     BuiltinProc::Sub => "+",
@@ -80,31 +84,31 @@ impl Print<Hir2Ast> for Printer {
                     proc => panic!("unsupported proc {proc:?}"),
                 };
                 write!(f, "({proc}")?;
-                let multi = self.print_all(Sep::Space, args, f)?;
+                let multi = self.print_all(Sep::Space, args.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi)
             }
-            Hir2Ast::Construct(children) => {
-                write!(f, "{indent}(construct")?;
-                let multi = self.print_all(Sep::Space, children, f)?;
+            NodeKind::Struct(binder, children) => {
+                write!(f, "{indent}(struct (#{})", binder.0 .0)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Hir2Ast::ConstructProp(prop, rel, val) => {
-                write!(f, "{indent}(construct-prop {prop}")?;
-                let multi = self.print_all(Sep::Space, [rel.as_ref(), val.as_ref()], f)?;
+            NodeKind::Prop(struct_var, prop, rel, val) => {
+                write!(f, "{indent}(prop #{} {prop}", struct_var.0)?;
+                let multi = self.print_all(Sep::Space, [rel.kind(), val.kind()].into_iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Hir2Ast::Destruct(arg, children) => {
+            NodeKind::Destruct(arg, children) => {
                 write!(f, "{indent}(destruct #{}", arg.0)?;
-                let multi = self.print_all(Sep::Space, children, f)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Hir2Ast::DestructProp(prop, arms) => {
-                write!(f, "{indent}(destruct-prop {}", prop)?;
-                let multi = self.print_all(Sep::Space, arms, f)?;
+            NodeKind::MatchProp(struct_var, prop, arms) => {
+                write!(f, "{indent}(match-prop #{} {}", struct_var.0, prop)?;
+                let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -112,44 +116,34 @@ impl Print<Hir2Ast> for Printer {
     }
 }
 
-impl Print<Hir2AstPropMatchArm> for Printer {
-    fn print(
-        self,
-        _sep: Sep,
-        ast: &Hir2AstPropMatchArm,
-        f: &mut std::fmt::Formatter,
-    ) -> PrintResult {
+impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
+    fn print(self, _sep: Sep, ast: &MatchArm<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
         match &ast.pattern {
-            Hir2AstPropPattern::Present(rel, val) => {
+            PropPattern::Present(rel, val) => {
                 write!(f, "(")?;
                 self.print(Sep::None, rel, f)?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            Hir2AstPropPattern::NotPresent => {
+            PropPattern::NotPresent => {
                 write!(f, "()")?;
             }
         }
-        let multi = self.indented(|p| p.print(Sep::Space, &ast.node, f))?;
+        let multi = self.indented(|p| p.print(Sep::Space, ast.node.kind(), f))?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }
 }
 
-impl Print<Hir2AstPatternBinding> for Printer {
-    fn print(
-        self,
-        sep: Sep,
-        ast: &Hir2AstPatternBinding,
-        f: &mut std::fmt::Formatter,
-    ) -> PrintResult {
+impl<L: Lang> Print<PatternBinding> for Printer<L> {
+    fn print(self, sep: Sep, ast: &PatternBinding, f: &mut std::fmt::Formatter) -> PrintResult {
         match ast {
-            Hir2AstPatternBinding::Binder(var) => {
+            PatternBinding::Binder(var) => {
                 write!(f, "{sep}#{}", var.0)?;
             }
-            Hir2AstPatternBinding::Wildcard => {
+            PatternBinding::Wildcard => {
                 write!(f, "{sep}#_")?;
             }
         }
@@ -157,9 +151,12 @@ impl Print<Hir2AstPatternBinding> for Printer {
     }
 }
 
-impl Printer {
+impl<L: Lang> Printer<L> {
     pub fn new() -> Self {
-        Self { indent: Indent(0) }
+        Self {
+            indent: Indent(0),
+            lang: std::marker::PhantomData,
+        }
     }
 
     fn print_rparen(self, multi: Multiline, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -172,7 +169,7 @@ impl Printer {
         Ok(())
     }
 
-    fn indented(self, mut func: impl FnMut(Printer) -> PrintResult) -> PrintResult {
+    fn indented(self, mut func: impl FnMut(Self) -> PrintResult) -> PrintResult {
         let mut indented = self;
         indented.indent.0 += 1;
         func(indented)
@@ -186,7 +183,7 @@ impl Printer {
     ) -> PrintResult
     where
         Self: Print<T>,
-        I: IntoIterator<Item = &'a T>,
+        I: Iterator<Item = &'a T>,
     {
         let mut printer = self;
         printer.indent.0 += 1;
