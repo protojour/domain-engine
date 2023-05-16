@@ -10,11 +10,12 @@ pub enum NodeKind<'a, L: Lang> {
     Unit,
     Int(i64),
     Call(BuiltinProc, Nodes<'a, L>),
-    MapSeq(Variable, Binder, Nodes<'a, L>),
+    Seq(Binder, Nodes<'a, L>),
     Struct(Binder, Nodes<'a, L>),
     Prop(Variable, String, Box<L::Node<'a>>, Box<L::Node<'a>>),
     Destruct(Variable, Nodes<'a, L>),
     MatchProp(Variable, String, Vec<MatchArm<'a, L>>),
+    MapSeq(Variable, Binder, Nodes<'a, L>),
 }
 
 impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {

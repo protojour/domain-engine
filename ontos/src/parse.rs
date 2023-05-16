@@ -55,6 +55,10 @@ impl<L: Lang> Parser<L> {
         match parse_token(next)? {
             (Token::LParen, next) => {
                 let (node, next) = match parse_ident(next)? {
+                    ("+", next) => self.parse_binary_call(BuiltinProc::Add, next)?,
+                    ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next)?,
+                    ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next)?,
+                    ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
                     ("struct", next) => {
                         let (binder, next) = parse_binder(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;
@@ -75,6 +79,11 @@ impl<L: Lang> Parser<L> {
                             next,
                         )
                     }
+                    ("seq", next) => {
+                        let (binder, next) = parse_binder(next)?;
+                        let (children, next) = self.parse_many(next, Self::parse)?;
+                        (self.make_node(NodeKind::Seq(binder, children)), next)
+                    }
                     ("destruct", next) => {
                         let (var, next) = parse_hash_var(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;
@@ -89,10 +98,15 @@ impl<L: Lang> Parser<L> {
                             next,
                         )
                     }
-                    ("+", next) => self.parse_binary_call(BuiltinProc::Add, next)?,
-                    ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next)?,
-                    ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next)?,
-                    ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
+                    ("map-seq", next) => {
+                        let (var, next) = parse_hash_var(next)?;
+                        let (binder, next) = parse_binder(next)?;
+                        let (children, next) = self.parse_many(next, Self::parse)?;
+                        (
+                            self.make_node(NodeKind::MapSeq(var, binder, children)),
+                            next,
+                        )
+                    }
                     (ident, _) => return Err(Error::InvalidIdent(ident)),
                 };
                 let (_, next) = parse_rparen(next)?;

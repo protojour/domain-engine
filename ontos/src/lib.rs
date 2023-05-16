@@ -116,4 +116,32 @@ mod tests {
         };
         assert_eq!(src, parse_print(src));
     }
+
+    #[test]
+    fn test_seq() {
+        let src = indoc! {"
+            (struct (#0)
+                (prop #0 a #u
+                    (seq (#1) #1)
+                )
+            )"
+        };
+        assert_eq!(src, parse_print(src));
+    }
+
+    #[test]
+    fn test_map_seq() {
+        let src = indoc! {"
+            (struct (#0)
+                (destruct #1
+                    (match-prop #1 prop
+                        ((#_ #2)
+                            (map-seq #2 (#3) #3)
+                        )
+                    )
+                )
+            )"
+        };
+        assert_eq!(src, parse_print(src));
+    }
 }

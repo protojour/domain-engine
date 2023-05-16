@@ -68,8 +68,8 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi)
             }
-            NodeKind::MapSeq(var, binder, children) => {
-                write!(f, "{indent}(map-seq #{} #({})", var.0, binder.0 .0)?;
+            NodeKind::Seq(binder, children) => {
+                write!(f, "{indent}(seq (#{})", binder.0 .0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -95,6 +95,12 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
             NodeKind::MatchProp(struct_var, prop, arms) => {
                 write!(f, "{indent}(match-prop #{} {}", struct_var.0, prop)?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
+            NodeKind::MapSeq(var, binder, children) => {
+                write!(f, "{indent}(map-seq #{} (#{})", var.0, binder.0 .0)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
