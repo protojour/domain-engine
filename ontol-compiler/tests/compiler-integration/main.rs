@@ -1,5 +1,5 @@
 mod errors;
-mod hir2;
+mod ontos;
 mod serde;
 mod test_conduit;
 mod test_entity;

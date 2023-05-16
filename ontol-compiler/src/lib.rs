@@ -25,7 +25,6 @@ use types::{DefTypes, Types};
 
 pub mod error;
 pub mod mem;
-pub mod ontos;
 pub mod package;
 pub mod serde_codegen;
 pub mod source;
