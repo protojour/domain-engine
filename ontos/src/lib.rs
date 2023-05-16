@@ -22,6 +22,7 @@ mod tests {
     use crate::parse::Parser;
 
     use super::*;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[derive(Clone, Copy)]
@@ -58,56 +59,61 @@ mod tests {
 
     #[test]
     fn test_destruct1() {
-        let src = "
-(destruct #0
-    (match-prop #0 foo
-        ((#_ #2) #u)
-        (() #u)
-    )
-)";
+        let src = indoc! {"
+            (destruct #0
+                (match-prop #0 foo
+                    ((#_ #2) #u)
+                    (() #u)
+                )
+            )"
+        };
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
     fn test_destruct2() {
-        let src = "
-(destruct #0
-    (match-prop #0 foo
-        ((#_ #2)
-            (destruct #2
-                (match-prop #2 bar
-                    ((#_ #3) #u)
+        let src = indoc! {"
+            (destruct #0
+                (match-prop #0 foo
+                    ((#_ #2)
+                        (destruct #2
+                            (match-prop #2 bar
+                                ((#_ #3) #u)
+                                (() #u)
+                            )
+                        )
+                    )
                     (() #u)
                 )
-            )
-        )
-        (() #u)
-    )
-)";
+            )"
+        };
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
     fn test_struct() {
-        let src = "
-(struct (#0)
-    (prop #0 foo #u #u)
-    (prop #0 foo #u
-        (struct (#1))
-    )
-    (prop #0 foo
-        (struct (#2))
-        #u
-    )
-)";
+        let src = indoc! {"
+            (struct (#0)
+                (prop #0 foo #u #u)
+                (prop #0 foo #u
+                    (struct (#1))
+                )
+                (prop #0 foo
+                    (struct (#2))
+                    #u
+                )
+            )"
+        };
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
     fn test_mixed() {
-        let src = "(+ 1
-    (struct (#0))
-)";
+        let src = indoc! {"
+            (+ 1
+                (struct (#0))
+            )"
+        };
         assert_eq!(src, parse_print(src));
     }
 }

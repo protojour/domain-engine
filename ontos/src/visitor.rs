@@ -16,6 +16,13 @@ pub trait OntosVisitor<L: Lang> {
                     self.visit_kind(arg.kind());
                 }
             }
+            NodeKind::MapSeq(var, binder, children) => {
+                self.visit_variable(var);
+                self.visit_binder(&binder.0);
+                for child in children {
+                    self.visit_kind(child.kind());
+                }
+            }
             NodeKind::Struct(binder, children) => {
                 self.visit_binder(&binder.0);
                 for child in children {

@@ -16,3 +16,4 @@ smartstring.workspace = true
 tracing-subscriber.workspace = true
 test-log.workspace = true
 pretty_assertions = "1"
+indoc = "2"

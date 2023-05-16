@@ -12,26 +12,6 @@ impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Multiline(bool);
-
-#[derive(Clone, Copy)]
-enum Sep {
-    None,
-    Space,
-    Indent(usize),
-}
-
-impl Sep {
-    fn multiline(self) -> Multiline {
-        if matches!(self, Sep::Indent(_)) {
-            Multiline(true)
-        } else {
-            Multiline(false)
-        }
-    }
-}
-
 impl std::fmt::Display for Sep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -55,7 +35,7 @@ trait Print<T>: Copy {
 
 #[derive(Clone, Copy)]
 struct Printer<L: Lang> {
-    indent: Indent,
+    indent: Sep,
     lang: std::marker::PhantomData<L>,
 }
 
@@ -87,6 +67,12 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 let multi = self.print_all(Sep::Space, args.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi)
+            }
+            NodeKind::MapSeq(var, binder, children) => {
+                write!(f, "{indent}(map-seq #{} #({})", var.0, binder.0 .0)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
             }
             NodeKind::Struct(binder, children) => {
                 write!(f, "{indent}(struct (#{})", binder.0 .0)?;
@@ -154,14 +140,14 @@ impl<L: Lang> Print<PatternBinding> for Printer<L> {
 impl<L: Lang> Printer<L> {
     pub fn new() -> Self {
         Self {
-            indent: Indent(0),
+            indent: Sep::None,
             lang: std::marker::PhantomData,
         }
     }
 
     fn print_rparen(self, multi: Multiline, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if multi.0 {
-            let indent = self.indent;
+            let indent = self.indent.force_indent();
             write!(f, "{indent})")?;
         } else {
             write!(f, ")")?;
@@ -171,7 +157,7 @@ impl<L: Lang> Printer<L> {
 
     fn indented(self, mut func: impl FnMut(Self) -> PrintResult) -> PrintResult {
         let mut indented = self;
-        indented.indent.0 += 1;
+        indented.indent = self.indent.indent();
         func(indented)
     }
 
@@ -186,17 +172,53 @@ impl<L: Lang> Printer<L> {
         I: Iterator<Item = &'a T>,
     {
         let mut printer = self;
-        printer.indent.0 += 1;
+        printer.indent = self.indent.indent();
         let mut multiline = Multiline(false);
         for ast in asts {
-            multiline = printer.print(sep, ast, f)?;
-            if multiline.0 {
-                sep = Sep::Indent(printer.indent.0);
+            let last_multiline = printer.print(sep, ast, f)?;
+            if last_multiline.0 {
+                sep = printer.indent;
+                multiline = last_multiline;
             } else {
                 sep = Sep::Space;
             }
         }
         Ok(multiline)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Multiline(bool);
+
+#[derive(Clone, Copy)]
+enum Sep {
+    None,
+    Space,
+    Indent(usize),
+}
+
+impl Sep {
+    fn multiline(self) -> Multiline {
+        if matches!(self, Sep::Indent(_)) {
+            Multiline(true)
+        } else {
+            Multiline(false)
+        }
+    }
+
+    fn indent(self) -> Self {
+        match self {
+            Self::None => Self::Indent(1),
+            Self::Space => Self::Space,
+            Self::Indent(level) => Self::Indent(level + 1),
+        }
+    }
+
+    fn force_indent(self) -> Self {
+        match self {
+            Self::None | Self::Space => Self::Indent(0),
+            Self::Indent(level) => Self::Indent(level),
+        }
     }
 }
 

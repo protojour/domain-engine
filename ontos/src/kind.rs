@@ -3,16 +3,17 @@ use smartstring::alias::String;
 
 use crate::{Lang, Node};
 
-type Nodes<'a, O, const N: usize> = Vec<<O as Lang>::Node<'a>>;
+type Nodes<'a, O> = Vec<<O as Lang>::Node<'a>>;
 
 pub enum NodeKind<'a, L: Lang> {
     VariableRef(Variable),
     Unit,
     Int(i64),
-    Call(BuiltinProc, Nodes<'a, L, 2>),
-    Struct(Binder, Nodes<'a, L, 2>),
+    Call(BuiltinProc, Nodes<'a, L>),
+    MapSeq(Variable, Binder, Nodes<'a, L>),
+    Struct(Binder, Nodes<'a, L>),
     Prop(Variable, String, Box<L::Node<'a>>, Box<L::Node<'a>>),
-    Destruct(Variable, Nodes<'a, L, 2>),
+    Destruct(Variable, Nodes<'a, L>),
     MatchProp(Variable, String, Vec<MatchArm<'a, L>>),
 }
 
