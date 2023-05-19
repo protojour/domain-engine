@@ -32,6 +32,12 @@ pub struct OntosNode<'m> {
     pub meta: Meta<'m>,
 }
 
+impl<'m> OntosNode<'m> {
+    pub fn split(self) -> (OntosKind<'m>, Meta<'m>) {
+        (self.kind, self.meta)
+    }
+}
+
 impl<'m> ontos::Node<'m, TypedOntos> for OntosNode<'m> {
     fn kind(&self) -> &NodeKind<'m, TypedOntos> {
         &self.kind
@@ -45,7 +51,7 @@ impl<'m> std::fmt::Display for OntosNode<'m> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Meta<'m> {
     pub ty: TypeRef<'m>,
     pub span: SourceSpan,

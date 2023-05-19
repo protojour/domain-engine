@@ -27,12 +27,18 @@ fn test_unify_struct_tmp() {
         ",
         "
         (struct (#2)
-            (prop #2 a #u #0)
+            (prop #2 b #u #0)
         )
         ",
     );
     let expected = indoc! {
-        "(struct (#2))"
+        "(struct (#2)
+            (destruct #1
+                (match-prop #1 a
+                    ((#_ #0) #0)
+                )
+            )
+        )"
     };
     assert_eq!(expected, output);
 }

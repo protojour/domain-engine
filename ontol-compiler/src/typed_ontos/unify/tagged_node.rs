@@ -1,7 +1,7 @@
 use bit_set::BitSet;
 use ontos::kind::{Binder, NodeKind, Variable};
 
-use crate::typed_ontos::lang::{Meta, OntosKind, OntosNode};
+use crate::typed_ontos::lang::{Meta, OntosNode};
 
 #[derive(Clone, Copy, Debug)]
 pub struct TaggedTree;
@@ -11,12 +11,6 @@ impl ontos::Lang for TaggedTree {
 
     fn make_node<'a>(&self, _kind: NodeKind<'a, Self>) -> Self::Node<'a> {
         unimplemented!()
-    }
-}
-
-impl<'m> OntosNode<'m> {
-    fn split(self) -> (OntosKind<'m>, Meta<'m>) {
-        (self.kind, self.meta)
     }
 }
 
@@ -51,9 +45,9 @@ impl<'m> TaggedNode<'m> {
     }
 }
 
-#[derive(Default)]
 pub struct TagCtx {
     in_scope: BitSet,
+    largest_variable: Variable,
 }
 
 impl TagCtx {
@@ -64,6 +58,20 @@ impl TagCtx {
         let value = func(self);
         self.in_scope.remove(binder.0 .0 as usize);
         value
+    }
+
+    pub fn next_variable(&self) -> Variable {
+        let idx = self.largest_variable.0 + 1;
+        Variable(idx)
+    }
+}
+
+impl Default for TagCtx {
+    fn default() -> Self {
+        Self {
+            in_scope: BitSet::default(),
+            largest_variable: Variable(0),
+        }
     }
 }
 
@@ -78,6 +86,10 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
     let (kind, meta) = node.split();
     match kind {
         NodeKind::VariableRef(var) => {
+            if var.0 > ctx.largest_variable.0 {
+                ctx.largest_variable.0 = var.0;
+            }
+
             let tagged_node = TaggedNode::new(NodeKind::VariableRef(var), meta);
             if ctx.in_scope.contains(var.0 as usize) {
                 tagged_node
@@ -108,14 +120,14 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
                 free_variables,
             }
         }
+        NodeKind::MapSeq(..) => {
+            todo!()
+        }
         NodeKind::Destruct(..) => {
             unimplemented!("BUG: Destruct is an output node")
         }
         NodeKind::MatchProp(..) => {
             unimplemented!("BUG: MatchProp is an output node")
-        }
-        NodeKind::MapSeq(..) => {
-            todo!()
         }
     }
 }
@@ -180,71 +192,3 @@ mod tests {
         );
     }
 }
-/*
-fn subst_invert<'m>(node: OntosNode<'m>, ctx: &mut Ctx<'m>) -> Option<InvertedNode<'m>> {
-    subst_filter_map_kind(node, |kind| match kind {
-        NodeKind::Struct(binder, nodes) => {
-            let children = nodes
-                .into_iter()
-                .filter_map(|node| subst_invert(node, ctx))
-                .filter_map(Inverted::unbound);
-
-            Some(Inverted {
-                value: NodeKind::Destruct(binder.0, children.collect()),
-                free_var: Some(binder.0),
-            })
-        }
-        NodeKind::Prop(var, prop, rel, val) => {
-            let rel = subst_invert(*rel, ctx).and_then(Inverted::bindable);
-            let val = subst_invert(*val, ctx).and_then(Inverted::bindable);
-
-            let match_arm = match (rel, val) {
-                (None, None) => return None,
-                (Some((rel_var, rel)), None) => MatchArm {
-                    pattern: PropPattern::Present(
-                        PatternBinding::Binder(rel_var),
-                        PatternBinding::Wildcard,
-                    ),
-                    node: rel,
-                },
-                (None, Some((val_var, val))) => MatchArm {
-                    pattern: PropPattern::Present(
-                        PatternBinding::Wildcard,
-                        PatternBinding::Binder(val_var),
-                    ),
-                    node: val,
-                },
-                (Some((rel_var, rel)), Some((val_var, val))) => MatchArm {
-                    pattern: PropPattern::Present(
-                        PatternBinding::Binder(rel_var),
-                        PatternBinding::Binder(val_var),
-                    ),
-                    node: val,
-                },
-            };
-
-            Some(Inverted {
-                value: NodeKind::MatchProp(var, prop, vec![match_arm]),
-                free_var: None,
-            })
-        }
-        _ => None,
-    })
-}
-
-fn subst_filter_map_kind<'m>(
-    node: OntosNode<'m>,
-    mut f: impl FnMut(OntosKind<'m>) -> Option<InvertedKind<'m>>,
-) -> Option<InvertedNode<'m>> {
-    let inverted_kind = f(node.kind)?;
-    let node = OntosNode {
-        kind: inverted_kind.value,
-        ty: node.ty,
-        span: node.span,
-    };
-    Some(Inverted {
-        free_var: inverted_kind.free_var,
-        value: node,
-    })
-}
-*/

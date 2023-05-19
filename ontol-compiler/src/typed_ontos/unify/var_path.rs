@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::OntosNode;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Path(pub SmallVec<[u16; 32]>);
 
 pub struct LocateCtx<'a> {
@@ -50,12 +50,12 @@ fn locate_in_node(node: &OntosNode, ctx: &mut LocateCtx) {
             ctx.enter_child(0, |ctx| locate_in_node(rel, ctx));
             ctx.enter_child(1, |ctx| locate_in_node(val, ctx));
         }
+        NodeKind::MapSeq(..) => {
+            todo!()
+        }
         NodeKind::Destruct(_, nodes) => locate_in_list(nodes, ctx),
         NodeKind::MatchProp(_, _, _) => {
             unimplemented!("Cannot locate within MatchProp")
-        }
-        NodeKind::MapSeq(..) => {
-            todo!()
         }
     }
 }
