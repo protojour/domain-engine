@@ -7,34 +7,19 @@ use crate::{
 
 impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Printer::new().print(Sep::None, self, f)?;
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for Sep {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::None => {}
-            Self::Space => {
-                write!(f, " ")?;
-            }
-            Self::Indent(indent) => {
-                write!(f, "{}", Indent(*indent))?;
-            }
-        }
+        Printer::default().print(Sep::None, self, f)?;
         Ok(())
     }
 }
 
 type PrintResult = Result<Multiline, std::fmt::Error>;
 
-trait Print<T>: Copy {
+pub trait Print<T>: Copy {
     fn print(self, whitespace: Sep, ast: &T, f: &mut std::fmt::Formatter) -> PrintResult;
 }
 
 #[derive(Clone, Copy)]
-struct Printer<L: Lang> {
+pub struct Printer<L: Lang> {
     indent: Sep,
     lang: std::marker::PhantomData<L>,
 }
@@ -143,14 +128,16 @@ impl<L: Lang> Print<PatternBinding> for Printer<L> {
     }
 }
 
-impl<L: Lang> Printer<L> {
-    pub fn new() -> Self {
+impl<L: Lang> Default for Printer<L> {
+    fn default() -> Self {
         Self {
             indent: Sep::None,
             lang: std::marker::PhantomData,
         }
     }
+}
 
+impl<L: Lang> Printer<L> {
     fn print_rparen(self, multi: Multiline, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if multi.0 {
             let indent = self.indent.force_indent();
@@ -194,10 +181,10 @@ impl<L: Lang> Printer<L> {
 }
 
 #[derive(Clone, Copy)]
-struct Multiline(bool);
+pub struct Multiline(bool);
 
 #[derive(Clone, Copy)]
-enum Sep {
+pub enum Sep {
     None,
     Space,
     Indent(usize),
@@ -225,6 +212,21 @@ impl Sep {
             Self::None | Self::Space => Self::Indent(0),
             Self::Indent(level) => Self::Indent(level),
         }
+    }
+}
+
+impl std::fmt::Display for Sep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => {}
+            Self::Space => {
+                write!(f, " ")?;
+            }
+            Self::Indent(indent) => {
+                write!(f, "{}", Indent(*indent))?;
+            }
+        }
+        Ok(())
     }
 }
 

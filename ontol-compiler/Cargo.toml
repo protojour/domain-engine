@@ -25,6 +25,7 @@ thiserror = "1"
 regex-syntax = "0.6"
 regex = "1"
 patricia_tree = "0.5"
+bit-set = "0.5"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
@@ -33,3 +34,4 @@ tracing-subscriber.workspace = true
 test-log.workspace = true
 assert_matches = "1"
 pretty_assertions = "1"
+indoc = "2"

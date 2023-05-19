@@ -5,6 +5,7 @@ use crate::{Lang, Node};
 
 type Nodes<'a, O> = Vec<<O as Lang>::Node<'a>>;
 
+#[derive(Debug)]
 pub enum NodeKind<'a, L: Lang> {
     VariableRef(Variable),
     Unit,
@@ -24,10 +25,10 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Variable(pub u32);
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
 #[derive(Debug)]

@@ -1,10 +1,9 @@
 use kind::NodeKind;
 
-// pub mod lower;
+pub mod display;
 pub mod kind;
 pub mod parse;
 
-mod display;
 mod visitor;
 
 pub trait Lang: Sized + Copy {

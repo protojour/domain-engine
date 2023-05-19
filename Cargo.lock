@@ -889,12 +889,14 @@ name = "ontol-compiler"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
+ "bit-set",
  "bumpalo",
  "chumsky",
  "ena",
  "fnv",
  "fraction",
  "indexmap",
+ "indoc",
  "ontol-parser",
  "ontol-runtime",
  "ontol-test-utils",
