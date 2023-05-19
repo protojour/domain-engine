@@ -1,20 +1,32 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::kind::{NodeKind, Variable};
+use ontos::{
+    kind::{NodeKind, Variable},
+    visitor::OntosVisitor,
+};
 use smallvec::SmallVec;
 
-use crate::typed_ontos::lang::OntosNode;
+use crate::typed_ontos::lang::TypedOntos;
 
 #[derive(Clone, Default, Debug)]
 pub struct Path(pub SmallVec<[u16; 32]>);
 
 pub struct LocateCtx<'a> {
     variables: &'a BitSet,
-    output: FnvHashMap<Variable, Path>,
     current_path: Path,
+
+    pub(super) output: FnvHashMap<Variable, Path>,
 }
 
 impl<'a> LocateCtx<'a> {
+    pub(super) fn new(variables: &'a BitSet) -> Self {
+        Self {
+            variables,
+            output: FnvHashMap::default(),
+            current_path: Path::default(),
+        }
+    }
+
     fn enter_child(&mut self, index: usize, func: impl Fn(&mut Self)) {
         self.current_path.0.push(index as u16);
         func(self);
@@ -22,50 +34,27 @@ impl<'a> LocateCtx<'a> {
     }
 }
 
-pub fn locate_variables(node: &OntosNode, variables: &BitSet) -> FnvHashMap<Variable, Path> {
-    let mut ctx = LocateCtx {
-        variables,
-        output: FnvHashMap::default(),
-        current_path: Path::default(),
-    };
-    locate_in_node(node, &mut ctx);
-    ctx.output
-}
-
-fn locate_in_node(node: &OntosNode, ctx: &mut LocateCtx) {
-    match &node.kind {
-        NodeKind::VariableRef(var) => {
-            if ctx.variables.contains(var.0 as usize)
-                && ctx.output.insert(*var, ctx.current_path.clone()).is_some()
-            {
-                panic!("BUG: Variable appears more than once");
-            }
-        }
-        NodeKind::Unit => {}
-        NodeKind::Int(_) => {}
-        NodeKind::Let(_, def, body) => {
-            ctx.enter_child(0, |ctx| locate_in_node(def, ctx));
-            locate_in_list(1, body, ctx);
-        }
-        NodeKind::Call(_, args) => locate_in_list(0, args, ctx),
-        NodeKind::Seq(_, nodes) => locate_in_list(0, nodes, ctx),
-        NodeKind::Struct(_, nodes) => locate_in_list(0, nodes, ctx),
-        NodeKind::Prop(_, _, variant) => {
-            ctx.enter_child(0, |ctx| locate_in_node(&variant.rel, ctx));
-            ctx.enter_child(1, |ctx| locate_in_node(&variant.val, ctx));
-        }
-        NodeKind::MapSeq(..) => {
-            todo!()
-        }
-        NodeKind::Destruct(_, nodes) => locate_in_list(0, nodes, ctx),
-        NodeKind::MatchProp(_, _, _) => {
-            unimplemented!("Cannot locate within MatchProp")
+impl<'a> OntosVisitor<TypedOntos> for LocateCtx<'a> {
+    fn visit_variable(&mut self, variable: &Variable) {
+        if self.variables.contains(variable.0 as usize)
+            && self
+                .output
+                .insert(*variable, self.current_path.clone())
+                .is_some()
+        {
+            panic!("BUG: Variable appears more than once");
         }
     }
-}
 
-fn locate_in_list(start: usize, nodes: &[OntosNode], ctx: &mut LocateCtx) {
-    for (index, node) in nodes.iter().enumerate() {
-        ctx.enter_child(start + index, |ctx| locate_in_node(node, ctx));
+    fn visit_kind(&mut self, index: usize, kind: &NodeKind<'_, TypedOntos>) {
+        self.enter_child(index, |ctx| ctx.traverse_kind(kind));
+    }
+
+    fn visit_match_arm(&mut self, index: usize, match_arm: &ontos::kind::MatchArm<'_, TypedOntos>) {
+        self.enter_child(index, |ctx| ctx.traverse_match_arm(match_arm));
+    }
+
+    fn visit_pattern_binding(&mut self, index: usize, binding: &ontos::kind::PatternBinding) {
+        self.enter_child(index, |ctx| ctx.traverse_pattern_binding(binding));
     }
 }

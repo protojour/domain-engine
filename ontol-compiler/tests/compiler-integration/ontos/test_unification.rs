@@ -65,8 +65,8 @@ fn test_unify_struct_complex1() {
         (struct (#2)
             (destruct #1
                 (match-prop #1 a
-                    ((#_ #1)
-                        (let (#0 (+ #1 10))
+                    ((#_ #3)
+                        (let (#0 (+ #3 10))
                             (prop #2 b
                                 (#u (+ #0 20))
                             )

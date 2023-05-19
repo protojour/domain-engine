@@ -3,6 +3,7 @@ use kind::NodeKind;
 pub mod display;
 pub mod kind;
 pub mod parse;
+pub mod visitor;
 
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;

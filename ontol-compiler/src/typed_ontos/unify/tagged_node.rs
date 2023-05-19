@@ -91,9 +91,9 @@ impl<'m> TaggedNode<'m> {
     }
 }
 
+#[derive(Default)]
 pub struct TagCtx {
     in_scope: BitSet,
-    largest_variable: Variable,
 }
 
 impl TagCtx {
@@ -104,20 +104,6 @@ impl TagCtx {
         let value = func(self);
         self.in_scope.remove(binder.0 .0 as usize);
         value
-    }
-
-    pub fn next_variable(&self) -> Variable {
-        let idx = self.largest_variable.0 + 1;
-        Variable(idx)
-    }
-}
-
-impl Default for TagCtx {
-    fn default() -> Self {
-        Self {
-            in_scope: BitSet::default(),
-            largest_variable: Variable(0),
-        }
     }
 }
 
@@ -132,10 +118,6 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
     let (kind, meta) = node.split();
     match kind {
         NodeKind::VariableRef(var) => {
-            if var.0 > ctx.largest_variable.0 {
-                ctx.largest_variable.0 = var.0;
-            }
-
             let tagged_node = TaggedNode::new(NodeKind::VariableRef(var), meta);
             if ctx.in_scope.contains(var.0 as usize) {
                 tagged_node
