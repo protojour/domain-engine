@@ -35,11 +35,11 @@ pub trait OntosVisitor<L: Lang> {
                     self.visit_kind(child.kind());
                 }
             }
-            NodeKind::Prop(struct_var, prop, rel, val) => {
+            NodeKind::Prop(struct_var, prop, variant) => {
                 self.visit_variable(struct_var);
                 self.visit_prop(prop);
-                self.visit_kind(rel.kind());
-                self.visit_kind(val.kind());
+                self.visit_kind(variant.rel.kind());
+                self.visit_kind(variant.val.kind());
             }
             NodeKind::Destruct(arg, children) => {
                 self.visit_variable(arg);

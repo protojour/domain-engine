@@ -46,9 +46,9 @@ fn locate_in_node(node: &OntosNode, ctx: &mut LocateCtx) {
         NodeKind::Call(_, args) => locate_in_list(args, ctx),
         NodeKind::Seq(_, nodes) => locate_in_list(nodes, ctx),
         NodeKind::Struct(_, nodes) => locate_in_list(nodes, ctx),
-        NodeKind::Prop(_, _, rel, val) => {
-            ctx.enter_child(0, |ctx| locate_in_node(rel, ctx));
-            ctx.enter_child(1, |ctx| locate_in_node(val, ctx));
+        NodeKind::Prop(_, _, variant) => {
+            ctx.enter_child(0, |ctx| locate_in_node(&variant.rel, ctx));
+            ctx.enter_child(1, |ctx| locate_in_node(&variant.val, ctx));
         }
         NodeKind::MapSeq(..) => {
             todo!()

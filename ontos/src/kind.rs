@@ -12,7 +12,7 @@ pub enum NodeKind<'a, L: Lang> {
     Call(BuiltinProc, Nodes<'a, L>),
     Seq(Binder, Nodes<'a, L>),
     Struct(Binder, Nodes<'a, L>),
-    Prop(Variable, String, Box<L::Node<'a>>, Box<L::Node<'a>>),
+    Prop(Variable, String, PropVariant<'a, L>),
     MapSeq(Variable, Binder, Nodes<'a, L>),
     Destruct(Variable, Nodes<'a, L>),
     MatchProp(Variable, String, Vec<MatchArm<'a, L>>),
@@ -29,6 +29,11 @@ pub struct Variable(pub u32);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
+
+pub struct PropVariant<'a, L: Lang> {
+    pub rel: Box<L::Node<'a>>,
+    pub val: Box<L::Node<'a>>,
+}
 
 pub struct MatchArm<'a, L: Lang> {
     pub pattern: PropPattern,

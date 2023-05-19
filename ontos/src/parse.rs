@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable},
+    kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Variable},
     Lang,
 };
 
@@ -67,14 +67,18 @@ impl<L: Lang> Parser<L> {
                     ("prop", next) => {
                         let (var, next) = parse_hash_var(next)?;
                         let (prop, next) = parse_ident(next)?;
+                        let (_, next) = parse_lparen(next)?;
                         let (rel, next) = self.parse(next)?;
                         let (value, next) = self.parse(next)?;
+                        let (_, next) = parse_rparen(next)?;
                         (
                             self.make_node(NodeKind::Prop(
                                 var,
                                 prop.into(),
-                                Box::new(rel),
-                                Box::new(value),
+                                PropVariant {
+                                    rel: Box::new(rel),
+                                    val: Box::new(value),
+                                },
                             )),
                             next,
                         )

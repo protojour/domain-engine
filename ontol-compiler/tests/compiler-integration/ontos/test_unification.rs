@@ -18,21 +18,52 @@ fn test_unify(source: &str, target: &str) -> String {
 }
 
 #[test]
-fn test_unify_struct_tmp() {
+fn test_unify_basic_struct() {
     let output = test_unify(
         "
         (struct (#1)
-            (prop #1 a #u #0)
+            (prop #1 a (#u #0))
         )
         ",
         "
         (struct (#2)
-            (prop #2 b #u #0)
+            (prop #2 b (#u #0))
         )
         ",
     );
-    let expected = indoc! {
-        "(struct (#2)
+    let expected = indoc! {"
+        (struct (#2)
+            (destruct #1
+                (match-prop #1 a
+                    ((#_ #0)
+                        (prop #2 b
+                            (#u #0)
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+#[should_panic]
+fn test_unify_struct_complex1() {
+    let output = test_unify(
+        "
+        (struct (#1)
+            (prop #1 a (#u (- #0 10)))
+        )
+        ",
+        "
+        (struct (#2)
+            (prop #2 b (#u #0))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        (struct (#2)
             (destruct #1
                 (match-prop #1 a
                     ((#_ #0)

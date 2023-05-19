@@ -1,5 +1,5 @@
 use bit_set::BitSet;
-use ontos::kind::{Binder, MatchArm, NodeKind, Variable};
+use ontos::kind::{Binder, MatchArm, NodeKind, PropVariant, Variable};
 
 use crate::typed_ontos::lang::{Meta, OntosNode};
 
@@ -55,11 +55,13 @@ impl<'m> TaggedNode<'m> {
             NodeKind::Call(proc, args) => NodeKind::Call(proc, nodes_to_ontos(args)),
             NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
             NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
-            NodeKind::Prop(struct_var, prop, rel, val) => NodeKind::Prop(
+            NodeKind::Prop(struct_var, prop, variant) => NodeKind::Prop(
                 struct_var,
                 prop,
-                Box::new((*rel).into_ontos_node()),
-                Box::new((*val).into_ontos_node()),
+                PropVariant {
+                    rel: Box::new((*variant.rel).into_ontos_node()),
+                    val: Box::new((*variant.val).into_ontos_node()),
+                },
             ),
             NodeKind::MapSeq(var, binder, nodes) => {
                 NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
@@ -147,14 +149,21 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
         NodeKind::Struct(binder, nodes) => ctx.enter_binder(binder, |ctx| {
             tag_union_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta, ctx)
         }),
-        NodeKind::Prop(struct_var, prop, rel, val) => {
-            let rel = tag_node(*rel, ctx);
-            let val = tag_node(*val, ctx);
+        NodeKind::Prop(struct_var, prop, variant) => {
+            let rel = tag_node(*variant.rel, ctx);
+            let val = tag_node(*variant.val, ctx);
             let free_variables =
                 union_bitsets([&rel.free_variables, &val.free_variables].into_iter());
 
             TaggedNode {
-                kind: NodeKind::Prop(struct_var, prop, Box::new(rel), Box::new(val)),
+                kind: NodeKind::Prop(
+                    struct_var,
+                    prop,
+                    PropVariant {
+                        rel: Box::new(rel),
+                        val: Box::new(val),
+                    },
+                ),
                 meta,
                 free_variables,
             }
@@ -215,9 +224,13 @@ mod tests {
     fn test_tag() {
         let src = "
             (struct (#0)
-                (prop #0 a #1
-                    (struct (#2)
-                        (prop #2 b #3 #4)
+                (prop #0 a
+                    (#1
+                        (struct (#2)
+                            (prop #2 b
+                                (#3 #4)
+                            )
+                        )
                     )
                 )
             )

@@ -68,9 +68,11 @@ fn unify_node<'m>(
                 binder: Some(*binder),
             }
         }
-        NodeKind::Prop(struct_var, prop, rel, val) => {
-            let rel_binding = unify_pattern_binding(rel, u_node.unify_children.remove(&0), ctx);
-            let val_binding = unify_pattern_binding(val, u_node.unify_children.remove(&1), ctx);
+        NodeKind::Prop(struct_var, prop, variant) => {
+            let rel_binding =
+                unify_pattern_binding(&variant.rel, u_node.unify_children.remove(&0), ctx);
+            let val_binding =
+                unify_pattern_binding(&variant.val, u_node.unify_children.remove(&1), ctx);
 
             let arms = match (rel_binding.nodes, val_binding.nodes) {
                 (None, None) => {

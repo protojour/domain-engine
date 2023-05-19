@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     Lang, Node,
 };
 
@@ -15,7 +15,7 @@ impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
 type PrintResult = Result<Multiline, std::fmt::Error>;
 
 pub trait Print<T>: Copy {
-    fn print(self, whitespace: Sep, node: &T, f: &mut std::fmt::Formatter) -> PrintResult;
+    fn print(self, sep: Sep, node: &T, f: &mut std::fmt::Formatter) -> PrintResult;
 }
 
 #[derive(Clone, Copy)]
@@ -65,9 +65,9 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Prop(struct_var, prop, rel, val) => {
+            NodeKind::Prop(struct_var, prop, variant) => {
                 write!(f, "{indent}(prop #{} {prop}", struct_var.0)?;
-                let multi = self.print_all(Sep::Space, [rel.kind(), val.kind()].into_iter(), f)?;
+                let multi = self.print_all(Sep::Space, [variant].into_iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -90,6 +90,21 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 Ok(Multiline(true))
             }
         }
+    }
+}
+
+impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        _sep: Sep,
+        node: &PropVariant<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        let indent = self.indent;
+        write!(f, "{indent}(")?;
+        let multi = self.print_all(Sep::None, [node.rel.kind(), node.val.kind()].into_iter(), f)?;
+        self.print_rparen(multi, f)?;
+        Ok(Multiline(true))
     }
 }
 

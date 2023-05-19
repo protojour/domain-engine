@@ -93,13 +93,19 @@ mod tests {
     fn test_struct() {
         let src = indoc! {"
             (struct (#0)
-                (prop #0 foo #u #u)
-                (prop #0 foo #u
-                    (struct (#1))
+                (prop #0 foo
+                    (#u #u)
                 )
                 (prop #0 foo
-                    (struct (#2))
-                    #u
+                    (#u
+                        (struct (#1))
+                    )
+                )
+                (prop #0 foo
+                    (
+                        (struct (#2))
+                        #u
+                    )
                 )
             )"
         };
@@ -120,8 +126,10 @@ mod tests {
     fn test_seq() {
         let src = indoc! {"
             (struct (#0)
-                (prop #0 a #u
-                    (seq (#1) #1)
+                (prop #0 a
+                    (#u
+                        (seq (#1) #1)
+                    )
                 )
             )"
         };
