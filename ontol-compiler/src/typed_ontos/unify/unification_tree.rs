@@ -7,7 +7,7 @@ use super::{tagged_node::TaggedNode, var_path::Path};
 
 pub struct UnificationNode<'m> {
     pub index: usize,
-    pub unify_children: BTreeMap<u16, UnificationNode<'m>>,
+    pub sub_unifications: BTreeMap<u16, UnificationNode<'m>>,
     pub target_nodes: Vec<TaggedNode<'m>>,
     pub dependents: Vec<UnificationNode<'m>>,
 }
@@ -16,7 +16,7 @@ impl<'m> UnificationNode<'m> {
     fn new(index: usize) -> Self {
         Self {
             index,
-            unify_children: BTreeMap::new(),
+            sub_unifications: BTreeMap::new(),
             target_nodes: vec![],
             dependents: vec![],
         }
@@ -51,7 +51,7 @@ pub fn add_to_tree<'m>(
         while let Some(path) = path_iterator.next() {
             for index in &path.0 {
                 tree = tree
-                    .unify_children
+                    .sub_unifications
                     .entry(*index)
                     .or_insert_with(|| UnificationNode::new(*index as usize));
             }

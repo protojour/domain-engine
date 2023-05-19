@@ -59,6 +59,17 @@ impl<L: Lang> Parser<L> {
                     ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next)?,
                     ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next)?,
                     ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
+                    ("let", next) => {
+                        let (_, next) = parse_lparen(next)?;
+                        let (bind_var, next) = parse_hash_var(next)?;
+                        let (def, next) = self.parse(next)?;
+                        let (_, next) = parse_rparen(next)?;
+                        let (body, next) = self.parse_many(next, Self::parse)?;
+                        (
+                            self.make_node(NodeKind::Let(Binder(bind_var), Box::new(def), body)),
+                            next,
+                        )
+                    }
                     ("struct", next) => {
                         let (binder, next) = parse_binder(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;

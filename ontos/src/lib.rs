@@ -4,8 +4,6 @@ pub mod display;
 pub mod kind;
 pub mod parse;
 
-mod visitor;
-
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
 
@@ -146,6 +144,18 @@ mod tests {
                             (map-seq #2 (#3) #3)
                         )
                     )
+                )
+            )"
+        };
+        assert_eq!(src, parse_print(src));
+    }
+
+    #[test]
+    fn test_let() {
+        let src = indoc! {"
+            (let (#0 (+ 1 2))
+                (prop #1 a
+                    (#u #0)
                 )
             )"
         };

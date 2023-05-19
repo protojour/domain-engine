@@ -43,9 +43,13 @@ fn locate_in_node(node: &OntosNode, ctx: &mut LocateCtx) {
         }
         NodeKind::Unit => {}
         NodeKind::Int(_) => {}
-        NodeKind::Call(_, args) => locate_in_list(args, ctx),
-        NodeKind::Seq(_, nodes) => locate_in_list(nodes, ctx),
-        NodeKind::Struct(_, nodes) => locate_in_list(nodes, ctx),
+        NodeKind::Let(_, def, body) => {
+            ctx.enter_child(0, |ctx| locate_in_node(def, ctx));
+            locate_in_list(1, body, ctx);
+        }
+        NodeKind::Call(_, args) => locate_in_list(0, args, ctx),
+        NodeKind::Seq(_, nodes) => locate_in_list(0, nodes, ctx),
+        NodeKind::Struct(_, nodes) => locate_in_list(0, nodes, ctx),
         NodeKind::Prop(_, _, variant) => {
             ctx.enter_child(0, |ctx| locate_in_node(&variant.rel, ctx));
             ctx.enter_child(1, |ctx| locate_in_node(&variant.val, ctx));
@@ -53,15 +57,15 @@ fn locate_in_node(node: &OntosNode, ctx: &mut LocateCtx) {
         NodeKind::MapSeq(..) => {
             todo!()
         }
-        NodeKind::Destruct(_, nodes) => locate_in_list(nodes, ctx),
+        NodeKind::Destruct(_, nodes) => locate_in_list(0, nodes, ctx),
         NodeKind::MatchProp(_, _, _) => {
             unimplemented!("Cannot locate within MatchProp")
         }
     }
 }
 
-fn locate_in_list(nodes: &[OntosNode], ctx: &mut LocateCtx) {
+fn locate_in_list(start: usize, nodes: &[OntosNode], ctx: &mut LocateCtx) {
     for (index, node) in nodes.iter().enumerate() {
-        ctx.enter_child(index, |ctx| locate_in_node(node, ctx));
+        ctx.enter_child(start + index, |ctx| locate_in_node(node, ctx));
     }
 }

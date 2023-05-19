@@ -48,7 +48,6 @@ fn test_unify_basic_struct() {
 }
 
 #[test]
-#[should_panic]
 fn test_unify_struct_complex1() {
     let output = test_unify(
         "
@@ -58,7 +57,7 @@ fn test_unify_struct_complex1() {
         ",
         "
         (struct (#2)
-            (prop #2 b (#u #0))
+            (prop #2 b (#u (+ #0 20)))
         )
         ",
     );
@@ -66,8 +65,12 @@ fn test_unify_struct_complex1() {
         (struct (#2)
             (destruct #1
                 (match-prop #1 a
-                    ((#_ #0)
-                        (prop #2 b #u #0)
+                    ((#_ #1)
+                        (let (#0 (+ #1 10))
+                            (prop #2 b
+                                (#u (+ #0 20))
+                            )
+                        )
                     )
                 )
             )

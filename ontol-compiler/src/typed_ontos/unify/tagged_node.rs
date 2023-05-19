@@ -53,6 +53,11 @@ impl<'m> TaggedNode<'m> {
             NodeKind::Unit => NodeKind::Unit,
             NodeKind::Int(int) => NodeKind::Int(int),
             NodeKind::Call(proc, args) => NodeKind::Call(proc, nodes_to_ontos(args)),
+            NodeKind::Let(binder, def, body) => NodeKind::Let(
+                binder,
+                Box::new(def.into_ontos_node()),
+                nodes_to_ontos(body),
+            ),
             NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
             NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
             NodeKind::Prop(struct_var, prop, variant) => NodeKind::Prop(
@@ -140,6 +145,21 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
         }
         NodeKind::Unit => TaggedNode::new(NodeKind::Unit, meta),
         NodeKind::Int(int) => TaggedNode::new(NodeKind::Int(int), meta),
+        NodeKind::Let(binder, definition, body) => {
+            let definition = *definition;
+            let definition = tag_node(definition, ctx);
+            let def_free_vars = definition.free_variables.clone();
+            let mut tagged = ctx.enter_binder(binder, |ctx| {
+                tag_union_children(
+                    body,
+                    move |body| NodeKind::Let(binder, Box::new(definition), body),
+                    meta,
+                    ctx,
+                )
+            });
+            tagged.free_variables.union_with(&def_free_vars);
+            tagged
+        }
         NodeKind::Call(proc, args) => {
             tag_union_children(args, |args| NodeKind::Call(proc, args), meta, ctx)
         }

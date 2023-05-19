@@ -40,6 +40,14 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 write!(f, "{sep}#u")?;
                 Ok(sep.multiline())
             }
+            NodeKind::Let(binder, definition, body) => {
+                write!(f, "{indent}(let (#{}", binder.0 .0)?;
+                let multi = self.print(Sep::Space, definition.kind(), f)?;
+                self.print_rparen(multi, f)?;
+                let multi = self.print_all(Sep::Space, body.iter().map(Node::kind), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
             NodeKind::Call(proc, args) => {
                 let proc = match proc {
                     BuiltinProc::Add => "+",
@@ -48,7 +56,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                     BuiltinProc::Div => "/",
                     proc => panic!("unsupported proc {proc:?}"),
                 };
-                write!(f, "({proc}")?;
+                write!(f, "{sep}({proc}")?;
                 let multi = self.print_all(Sep::Space, args.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi)

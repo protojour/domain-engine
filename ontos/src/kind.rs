@@ -3,12 +3,14 @@ use smartstring::alias::String;
 
 use crate::{Lang, Node};
 
-type Nodes<'a, O> = Vec<<O as Lang>::Node<'a>>;
+type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
+#[derive(Clone)]
 pub enum NodeKind<'a, L: Lang> {
     VariableRef(Variable),
     Unit,
     Int(i64),
+    Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Seq(Binder, Nodes<'a, L>),
     Struct(Binder, Nodes<'a, L>),
@@ -30,6 +32,7 @@ pub struct Variable(pub u32);
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
+#[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
     pub rel: Box<L::Node<'a>>,
     pub val: Box<L::Node<'a>>,
@@ -37,15 +40,29 @@ pub struct PropVariant<'a, L: Lang> {
 
 pub struct MatchArm<'a, L: Lang> {
     pub pattern: PropPattern,
-    pub nodes: Nodes<'a, L>,
+    pub nodes: Vec<<L as Lang>::Node<'a>>,
 }
 
+// BUG: Why can't this be derived?
+impl<'a, L: Lang> Clone for MatchArm<'a, L>
+where
+    <L as Lang>::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pattern: self.pattern.clone(),
+            nodes: self.nodes.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum PropPattern {
     Present(PatternBinding, PatternBinding),
     NotPresent,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PatternBinding {
     Wildcard,
     Binder(Variable),

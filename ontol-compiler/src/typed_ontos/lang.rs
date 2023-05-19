@@ -27,6 +27,7 @@ impl ontos::Lang for TypedOntos {
 
 pub type OntosKind<'m> = ontos::kind::NodeKind<'m, TypedOntos>;
 
+#[derive(Clone)]
 pub struct OntosNode<'m> {
     pub kind: OntosKind<'m>,
     pub meta: Meta<'m>,
