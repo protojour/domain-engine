@@ -1,5 +1,5 @@
 use bit_set::BitSet;
-use ontos::kind::{Binder, NodeKind, Variable};
+use ontos::kind::{Binder, MatchArm, NodeKind, Variable};
 
 use crate::typed_ontos::lang::{Meta, OntosNode};
 
@@ -16,7 +16,6 @@ impl ontos::Lang for TaggedTree {
 
 type TaggedKind<'m> = NodeKind<'m, TaggedTree>;
 
-#[derive(Debug)]
 #[allow(unused)]
 pub struct TaggedNode<'m> {
     pub kind: TaggedKind<'m>,
@@ -42,6 +41,46 @@ impl<'m> TaggedNode<'m> {
     fn with_free_variable(mut self, var: Variable) -> Self {
         self.free_variables.insert(var.0 as usize);
         self
+    }
+
+    pub fn into_ontos_node(self) -> OntosNode<'m> {
+        fn nodes_to_ontos(nodes: Vec<TaggedNode>) -> Vec<OntosNode> {
+            nodes.into_iter().map(TaggedNode::into_ontos_node).collect()
+        }
+
+        let kind = match self.kind {
+            NodeKind::VariableRef(var) => NodeKind::VariableRef(var),
+            NodeKind::Unit => NodeKind::Unit,
+            NodeKind::Int(int) => NodeKind::Int(int),
+            NodeKind::Call(proc, args) => NodeKind::Call(proc, nodes_to_ontos(args)),
+            NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
+            NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
+            NodeKind::Prop(struct_var, prop, rel, val) => NodeKind::Prop(
+                struct_var,
+                prop,
+                Box::new((*rel).into_ontos_node()),
+                Box::new((*val).into_ontos_node()),
+            ),
+            NodeKind::MapSeq(var, binder, nodes) => {
+                NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
+            }
+            NodeKind::Destruct(var, nodes) => NodeKind::Destruct(var, nodes_to_ontos(nodes)),
+            NodeKind::MatchProp(struct_var, prop, arms) => NodeKind::MatchProp(
+                struct_var,
+                prop,
+                arms.into_iter()
+                    .map(|arm| MatchArm {
+                        pattern: arm.pattern,
+                        nodes: nodes_to_ontos(arm.nodes),
+                    })
+                    .collect(),
+            ),
+        };
+
+        OntosNode {
+            kind,
+            meta: self.meta,
+        }
     }
 }
 

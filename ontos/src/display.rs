@@ -15,7 +15,7 @@ impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
 type PrintResult = Result<Multiline, std::fmt::Error>;
 
 pub trait Print<T>: Copy {
-    fn print(self, whitespace: Sep, ast: &T, f: &mut std::fmt::Formatter) -> PrintResult;
+    fn print(self, whitespace: Sep, node: &T, f: &mut std::fmt::Formatter) -> PrintResult;
 }
 
 #[derive(Clone, Copy)]
@@ -94,10 +94,10 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
 }
 
 impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
-    fn print(self, _sep: Sep, ast: &MatchArm<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
+    fn print(self, _sep: Sep, node: &MatchArm<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
-        match &ast.pattern {
+        match &node.pattern {
             PropPattern::Present(rel, val) => {
                 write!(f, "(")?;
                 self.print(Sep::None, rel, f)?;
@@ -108,7 +108,7 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
                 write!(f, "()")?;
             }
         }
-        let multi = self.indented(|p| p.print(Sep::Space, ast.node.kind(), f))?;
+        let multi = self.print_all(Sep::Space, node.nodes.iter().map(Node::kind), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }
@@ -146,12 +146,6 @@ impl<L: Lang> Printer<L> {
             write!(f, ")")?;
         }
         Ok(())
-    }
-
-    fn indented(self, mut func: impl FnMut(Self) -> PrintResult) -> PrintResult {
-        let mut indented = self;
-        indented.indent = self.indent.indent();
-        func(indented)
     }
 
     fn print_all<'a, T: 'a, I>(

@@ -1,11 +1,14 @@
 use ontos::kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable};
+use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::{OntosKind, OntosNode};
 
 use super::unification_tree::UnificationNode;
 
+type UnifiedNodes<'m> = SmallVec<[OntosNode<'m>; 1]>;
+
 pub struct Unified<'m> {
-    pub node: OntosNode<'m>,
+    pub nodes: UnifiedNodes<'m>,
     pub binder: Option<Binder>,
 }
 
@@ -41,13 +44,13 @@ fn unify_node<'m>(
     let OntosNode { kind, meta } = source;
     let meta = *meta;
     match kind {
-        NodeKind::VariableRef(var) => Unified {
-            node: OntosNode {
-                kind: OntosKind::VariableRef(*var),
-                meta,
-            },
-            binder: Some(Binder(*var)),
-        },
+        NodeKind::VariableRef(var) => {
+            let nodes = merge_target_nodes(u_node);
+            Unified {
+                nodes,
+                binder: Some(Binder(*var)),
+            }
+        }
         NodeKind::Unit => panic!(),
         NodeKind::Int(_int) => panic!(),
         NodeKind::Call(_proc, _args) => {
@@ -57,10 +60,11 @@ fn unify_node<'m>(
         NodeKind::Struct(binder, nodes) => {
             let nodes = unify_children(nodes, u_node, ctx);
             Unified {
-                node: OntosNode {
+                nodes: [OntosNode {
                     kind: OntosKind::Destruct(binder.0, nodes),
                     meta,
-                },
+                }]
+                .into(),
                 binder: Some(*binder),
             }
         }
@@ -68,7 +72,7 @@ fn unify_node<'m>(
             let rel_binding = unify_pattern_binding(rel, u_node.unify_children.remove(&0), ctx);
             let val_binding = unify_pattern_binding(val, u_node.unify_children.remove(&1), ctx);
 
-            let arms = match (rel_binding.node, val_binding.node) {
+            let arms = match (rel_binding.nodes, val_binding.nodes) {
                 (None, None) => {
                     vec![]
                 }
@@ -78,7 +82,7 @@ fn unify_node<'m>(
                             rel_binding.binding,
                             PatternBinding::Wildcard,
                         ),
-                        node: rel,
+                        nodes: rel.into_iter().collect(),
                     }]
                 }
                 (None, Some(val)) => {
@@ -87,7 +91,7 @@ fn unify_node<'m>(
                             PatternBinding::Wildcard,
                             val_binding.binding,
                         ),
-                        node: val,
+                        nodes: val.into_iter().collect(),
                     }]
                 }
                 (Some(_rel), Some(_val)) => {
@@ -96,10 +100,11 @@ fn unify_node<'m>(
             };
 
             Unified {
-                node: OntosNode {
+                nodes: [OntosNode {
                     kind: OntosKind::MatchProp(*struct_var, prop.clone(), arms),
                     meta,
-                },
+                }]
+                .into(),
                 binder: None,
             }
         }
@@ -115,6 +120,15 @@ fn unify_node<'m>(
     }
 }
 
+fn merge_target_nodes<'m>(u_node: UnificationNode<'m>) -> UnifiedNodes<'m> {
+    let mut merged: UnifiedNodes<'m> = Default::default();
+    for tagged_node in u_node.target_nodes {
+        merged.push(tagged_node.into_ontos_node());
+    }
+
+    merged
+}
+
 fn unify_children<'m>(
     children: &[OntosNode<'m>],
     u_node: UnificationNode<'m>,
@@ -123,17 +137,17 @@ fn unify_children<'m>(
     u_node
         .unify_children
         .into_iter()
-        .map(|(index, u_node)| {
+        .flat_map(|(index, u_node)| {
             let child = &children[index as usize];
 
-            unify_node(child, u_node, ctx).node
+            unify_node(child, u_node, ctx).nodes
         })
         .collect()
 }
 
 struct UnifyPatternBinding<'m> {
     binding: PatternBinding,
-    node: Option<OntosNode<'m>>,
+    nodes: Option<UnifiedNodes<'m>>,
 }
 
 fn unify_pattern_binding<'m>(
@@ -146,18 +160,18 @@ fn unify_pattern_binding<'m>(
         None => {
             return UnifyPatternBinding {
                 binding: PatternBinding::Wildcard,
-                node: None,
+                nodes: None,
             }
         }
     };
 
-    let Unified { node, binder } = unify_node(source, u_node, ctx);
+    let Unified { nodes, binder } = unify_node(source, u_node, ctx);
     let binding = match binder {
         Some(binder) => PatternBinding::Binder(binder.0),
         None => PatternBinding::Wildcard,
     };
     UnifyPatternBinding {
         binding,
-        node: Some(node),
+        nodes: Some(nodes),
     }
 }

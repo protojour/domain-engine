@@ -28,7 +28,7 @@ pub fn unify<'m>(source: OntosNode<'m>, target: OntosNode<'m>) -> OntosNode<'m> 
             debug!("free variable paths: {variable_paths:#?}");
             let unification_tree = build_unification_tree(tagged_nodes, &variable_paths);
             let Unified {
-                node,
+                nodes,
                 binder: _input_binder,
             } = unify_tree(
                 &source,
@@ -37,7 +37,7 @@ pub fn unify<'m>(source: OntosNode<'m>, target: OntosNode<'m>) -> OntosNode<'m> 
             );
 
             OntosNode {
-                kind: NodeKind::Struct(binder, vec![node]),
+                kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
                 meta,
             }
         }

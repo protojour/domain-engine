@@ -35,7 +35,9 @@ fn test_unify_struct_tmp() {
         "(struct (#2)
             (destruct #1
                 (match-prop #1 a
-                    ((#_ #0) #0)
+                    ((#_ #0)
+                        (prop #2 b #u #0)
+                    )
                 )
             )
         )"

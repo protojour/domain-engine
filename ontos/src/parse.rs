@@ -163,10 +163,10 @@ impl<L: Lang> Parser<L> {
             }
             Err(other) => return Err(other),
         };
-        let (node, next) = self.parse(next)?;
+        let (nodes, next) = self.parse_many(next, Self::parse)?;
         let (_, next) = parse_rparen(next)?;
 
-        Ok((MatchArm { pattern, node }, next))
+        Ok((MatchArm { pattern, nodes }, next))
     }
 
     fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, PatternBinding> {

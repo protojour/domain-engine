@@ -5,7 +5,6 @@ use ontos::kind::Variable;
 
 use super::{tagged_node::TaggedNode, var_path::Path};
 
-#[derive(Debug)]
 pub struct UnificationNode<'m> {
     pub index: usize,
     pub unify_children: BTreeMap<u16, UnificationNode<'m>>,

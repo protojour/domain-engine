@@ -5,7 +5,6 @@ use crate::{Lang, Node};
 
 type Nodes<'a, O> = Vec<<O as Lang>::Node<'a>>;
 
-#[derive(Debug)]
 pub enum NodeKind<'a, L: Lang> {
     VariableRef(Variable),
     Unit,
@@ -25,19 +24,17 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct Variable(pub u32);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
-#[derive(Debug)]
 pub struct MatchArm<'a, L: Lang> {
     pub pattern: PropPattern,
-    pub node: L::Node<'a>,
+    pub nodes: Nodes<'a, L>,
 }
 
-#[derive(Debug)]
 pub enum PropPattern {
     Present(PatternBinding, PatternBinding),
     NotPresent,
