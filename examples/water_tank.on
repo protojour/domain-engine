@@ -1,0 +1,40 @@
+type cubic_meters {
+    rel _ is: int
+}
+
+type meters {
+    rel _ is: int
+}
+
+type meters_per_second {
+    rel _ is: int
+}
+
+type seconds {
+    rel _ is: int
+}
+
+type water_tank {
+    rel _ 'height': meters
+    rel _ 'radius': meters
+    rel _ 'contents': cubic_meters
+}
+
+type velocity_of_emptying {
+    rel _ 'velocity': meters_per_second
+    rel _ 'duration': seconds
+    rel _ 'capacity': cubic_meters
+}
+
+map {
+    water_tank {
+        'height': h
+        'contents': con
+        'radius': r
+    }
+    velocity_of_emptying {
+        'velocity': r * r
+        'duration': con / (r * r)
+        'capacity': r * r * h * PI
+    }
+}
