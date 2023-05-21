@@ -13,7 +13,7 @@ use crate::{
     hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
-    Compiler, SourceSpan,
+    Compiler, IrVariant, SourceSpan, IR_VARIANT,
 };
 
 use super::{
@@ -22,8 +22,6 @@ use super::{
     link::{link, LinkResult},
     proc_builder::ProcBuilder,
 };
-
-const ONTOS_ENABLED: bool = false;
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
@@ -186,7 +184,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 );
             }
             CodegenTask::OntosMap(map_task) => {
-                if !ONTOS_ENABLED {
+                if IR_VARIANT != IrVariant::Ontos {
                     continue;
                 }
 

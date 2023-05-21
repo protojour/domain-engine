@@ -49,6 +49,14 @@ mod types;
 
 pub use hir_node::HirIdx;
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum IrVariant {
+    Classic,
+    Ontos,
+}
+
+const IR_VARIANT: IrVariant = IrVariant::Classic;
+
 #[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,

@@ -12,7 +12,7 @@ use crate::{
     relation::Constructor,
     type_check::unify_ctx::Arm,
     types::{Type, TypeRef},
-    SourceSpan,
+    IrVariant, SourceSpan,
 };
 
 use super::{
@@ -122,6 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 expected: expected_ty,
                             }),
                             &expr.span,
+                            IrVariant::Classic,
                         ),
                         hir_idx,
                     ),
@@ -137,7 +138,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let elem_ty = match expected_ty {
                     Some(Type::Array(elem_ty)) => elem_ty,
                     Some(other_ty) => {
-                        self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
+                        self.type_error(
+                            TypeError::MustBeSequence(other_ty),
+                            &expr.span,
+                            IrVariant::Classic,
+                        );
                         self.types.intern(Type::Error)
                     }
                     None => self
@@ -211,6 +216,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         self.type_error(
                             TypeError::VariableMustBeSequenceEnclosed(elem_ty),
                             &expr.span,
+                            IrVariant::Classic,
                         ),
                         ERROR_NODE,
                     ),
@@ -239,7 +245,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             span: expr.span,
                                         }),
                                     ),
-                                    _ => (self.type_error(err, &expr.span), ERROR_NODE),
+                                    _ => (
+                                        self.type_error(err, &expr.span, IrVariant::Classic),
+                                        ERROR_NODE,
+                                    ),
                                 }
                             }
                             Err(err) => todo!("Report unification error: {err:?}"),
@@ -324,19 +333,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                 Some(DefKind::StringLiteral(lit)) => lit,
                                 _ => {
-                                    self.error(CompileError::NamedPropertyExpected, &prop_span);
+                                    self.ir_error(
+                                        CompileError::NamedPropertyExpected,
+                                        &prop_span,
+                                        IrVariant::Classic,
+                                    );
                                     continue;
                                 }
                             };
                             let match_property = match match_properties.get_mut(attr_prop) {
                                 Some(match_properties) => match_properties,
                                 None => {
-                                    self.error(CompileError::UnknownProperty, &prop_span);
+                                    self.ir_error(
+                                        CompileError::UnknownProperty,
+                                        &prop_span,
+                                        IrVariant::Classic,
+                                    );
                                     continue;
                                 }
                             };
                             if match_property.used {
-                                self.error(CompileError::DuplicateProperty, &prop_span);
+                                self.ir_error(
+                                    CompileError::DuplicateProperty,
+                                    &prop_span,
+                                    IrVariant::Classic,
+                                );
                                 continue;
                             }
                             match_property.used = true;
@@ -371,7 +392,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for (prop_name, match_property) in match_properties.into_iter() {
                             if !match_property.used {
-                                self.error(CompileError::MissingProperty(prop_name.into()), &span);
+                                self.ir_error(
+                                    CompileError::MissingProperty(prop_name.into()),
+                                    &span,
+                                    IrVariant::Classic,
+                                );
                             }
                         }
 
@@ -440,7 +465,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, HirIdx) {
-        self.errors.push(error.spanned(span));
+        self.ir_error(error, span, IrVariant::Classic);
         (self.types.intern(Type::Error), ERROR_NODE)
     }
 }
