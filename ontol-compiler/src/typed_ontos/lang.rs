@@ -1,6 +1,7 @@
 use ontos::{
     display::{Print, Printer, Sep},
     kind::NodeKind,
+    Binder,
 };
 
 use crate::{
@@ -60,4 +61,9 @@ impl<'m> std::fmt::Display for OntosNode<'m> {
 pub struct Meta<'m> {
     pub ty: TypeRef<'m>,
     pub span: SourceSpan,
+}
+
+pub struct OntosFunc<'m> {
+    pub arg: Binder,
+    pub body: OntosNode<'m>,
 }

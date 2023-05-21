@@ -1,21 +1,30 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::{kind::NodeKind, visitor::OntosVisitor, Variable};
+use ontos::{kind::NodeKind, visitor::OntosVisitor, Node, Variable};
 use smallvec::SmallVec;
 
-use crate::typed_ontos::lang::TypedOntos;
+use crate::typed_ontos::lang::{OntosNode, TypedOntos};
 
 #[derive(Clone, Default, Debug)]
 pub struct Path(pub SmallVec<[u16; 32]>);
 
-pub struct LocateCtx<'a> {
+pub fn locate_variables<'m>(
+    node: &mut OntosNode<'m>,
+    variables: &BitSet,
+) -> FnvHashMap<Variable, Path> {
+    let mut locator = VarLocator::new(&variables);
+    locator.traverse_kind(node.kind_mut());
+    locator.output
+}
+
+struct VarLocator<'a> {
     variables: &'a BitSet,
     current_path: Path,
 
-    pub(super) output: FnvHashMap<Variable, Path>,
+    output: FnvHashMap<Variable, Path>,
 }
 
-impl<'a> LocateCtx<'a> {
+impl<'a> VarLocator<'a> {
     pub(super) fn new(variables: &'a BitSet) -> Self {
         Self {
             variables,
@@ -31,7 +40,7 @@ impl<'a> LocateCtx<'a> {
     }
 }
 
-impl<'a, 'm> OntosVisitor<'m, TypedOntos> for LocateCtx<'a> {
+impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
     fn visit_variable(&mut self, variable: &mut Variable) {
         if self.variables.contains(variable.0 as usize)
             && self

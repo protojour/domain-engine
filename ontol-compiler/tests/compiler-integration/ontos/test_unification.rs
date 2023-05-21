@@ -12,10 +12,10 @@ fn parse_typed(src: &str) -> OntosNode<'static> {
 }
 
 fn test_unify(source: &str, target: &str) -> String {
-    let node = unify_to_function(parse_typed(source), parse_typed(target));
+    let func = unify_to_function(parse_typed(source), parse_typed(target));
     let mut output = String::new();
     use std::fmt::Write;
-    write!(&mut output, "{node}").unwrap();
+    write!(&mut output, "|#{}| {}", func.arg.0 .0, func.body).unwrap();
     output
 }
 
@@ -34,7 +34,7 @@ fn test_unify_basic_struct() {
         ",
     );
     let expected = indoc! {"
-        (struct (#2)
+        |#1| (struct (#2)
             (match-prop #1 a
                 ((#_ #0)
                     (prop #2 b
@@ -62,7 +62,7 @@ fn test_unify_struct_simple_arithmetic() {
         ",
     );
     let expected = indoc! {"
-        (struct (#2)
+        |#1| (struct (#2)
             (match-prop #1 a
                 ((#_ #3)
                     (let (#0 (+ #3 10))
@@ -95,7 +95,7 @@ fn test_struct_arithmetic_property_dependency() {
         ",
     );
     let expected = indoc! {"
-        (struct (#3)
+        |#2| (struct (#3)
             (match-prop #2 a
                 ((#_ #4)
                     (let (#0 (+ #4 10))

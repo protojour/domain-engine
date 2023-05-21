@@ -2,15 +2,15 @@ use ontol_runtime::vm::proc::BuiltinProc;
 use ontos::{
     kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
     visitor::OntosVisitor,
-    Binder, Node, Variable,
+    Binder, Variable,
 };
 use smallvec::SmallVec;
-use tracing::debug;
 
 use crate::typed_ontos::{
-    lang::{Meta, OntosKind, OntosNode},
+    lang::{Meta, OntosFunc, OntosKind, OntosNode},
     unify::{
-        tagged_node::union_bitsets, unification_tree::build_unification_tree, var_path::LocateCtx,
+        tagged_node::union_bitsets, unification_tree::build_unification_tree,
+        var_path::locate_variables,
     },
 };
 
@@ -43,7 +43,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 pub fn unify_to_function<'m>(
     mut source: OntosNode<'m>,
     mut target: OntosNode<'m>,
-) -> OntosNode<'m> {
+) -> OntosFunc<'m> {
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, &mut source);
     var_tracker.visit_node(0, &mut target);
@@ -54,16 +54,19 @@ pub fn unify_to_function<'m>(
         NodeKind::Struct(binder, children) => {
             let Unified {
                 nodes,
-                binder: _input_binder,
+                binder: input_binder,
             } = unify_tagged_nodes(
                 Tagger::default().enter_binder(binder, |ctx| ctx.tag_nodes(children)),
                 &mut source,
-                var_tracker,
+                var_tracker.next_variable(),
             );
 
-            OntosNode {
-                kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
-                meta,
+            OntosFunc {
+                arg: input_binder.unwrap(),
+                body: OntosNode {
+                    kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
+                    meta,
+                },
             }
         }
         kind => {
@@ -74,25 +77,20 @@ pub fn unify_to_function<'m>(
 
 fn unify_tagged_nodes<'m>(
     tagged_nodes: Vec<TaggedNode<'m>>,
-    source: &mut OntosNode<'m>,
-    var_tracker: VariableTracker,
+    root_source: &mut OntosNode<'m>,
+    next_variable: Variable,
 ) -> Unified<'m> {
     let free_variables = union_bitsets(tagged_nodes.iter().map(|node| &node.free_variables));
+    let u_tree = build_unification_tree(
+        tagged_nodes,
+        &locate_variables(root_source, &free_variables),
+    );
 
-    let variable_paths = {
-        let mut locate_ctx = LocateCtx::new(&free_variables);
-        locate_ctx.traverse_kind(source.kind_mut());
-        locate_ctx.output
-    };
-
-    debug!("free variable paths: {variable_paths:#?}");
-    let u_tree = build_unification_tree(tagged_nodes, &variable_paths);
-
-    let mut ctx = Unifier {
-        next_variable: var_tracker.next_variable(),
-        root_source: source,
-    };
-    ctx.unify_node(u_tree, source)
+    Unifier {
+        root_source,
+        next_variable,
+    }
+    .unify_node(u_tree, root_source)
 }
 
 struct InvertedCall<'m> {
