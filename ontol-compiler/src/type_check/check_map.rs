@@ -58,11 +58,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         // experimental:
-        {
-            self.check_root_expr2(first_id, &mut ctx);
-            self.check_root_expr2(second_id, &mut ctx);
-        }
+        self.check_arms_v2(def, first_id, second_id, &mut ctx)?;
 
+        self.check_arms_v1(def, first_id, second_id, root_body_idx, &mut ctx)?;
+
+        Ok(self.types.intern(Type::Tautology))
+    }
+
+    fn check_arms_v1(
+        &mut self,
+        def: &Def,
+        first_id: ExprId,
+        second_id: ExprId,
+        root_body_idx: HirBodyIdx,
+        ctx: &mut UnifyExprContext<'m>,
+    ) -> Result<(), AggrGroupError> {
         let mut root_body = ctx.expr_body_mut(root_body_idx);
         root_body.first = Some(self.consume_expr(first_id));
         root_body.second = Some(self.consume_expr(second_id));
@@ -84,9 +94,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             // If these are not Some, an error should have been raised
             if let (Some(first_root), Some(second_root)) = (first_root, second_root) {
                 ctx.arm = Arm::First;
-                let (_first_ty, first) = self.check_expr_root(first_root, &mut ctx);
+                let (_first_ty, first) = self.check_expr_root(first_root, ctx);
                 ctx.arm = Arm::Second;
-                let (_second_ty, second) = self.check_expr_root(second_root, &mut ctx);
+                let (_second_ty, second) = self.check_expr_root(second_root, ctx);
 
                 // pad the vector
                 bodies.resize_with(body_index as usize + 1, || HirBody {
@@ -119,12 +129,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            nodes: ctx.nodes,
+            nodes: std::mem::take(&mut ctx.nodes),
             bodies,
             span: def.span,
         }));
 
-        Ok(self.types.intern(Type::Tautology))
+        Ok(())
+    }
+
+    fn check_arms_v2(
+        &mut self,
+        _def: &Def,
+        first_id: ExprId,
+        second_id: ExprId,
+        ctx: &mut UnifyExprContext<'m>,
+    ) -> Result<(), AggrGroupError> {
+        self.check_root_expr2(first_id, ctx);
+        self.check_root_expr2(second_id, ctx);
+
+        Ok(())
     }
 }
 
