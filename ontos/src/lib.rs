@@ -56,33 +56,27 @@ mod tests {
     }
 
     #[test]
-    fn test_destruct1() {
+    fn test_match_prop1() {
         let src = indoc! {"
-            (destruct #0
-                (match-prop #0 foo
-                    ((#_ #2) #u)
-                    (() #u)
-                )
+            (match-prop #0 foo
+                ((#_ #2) #u)
+                (() #u)
             )"
         };
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
-    fn test_destruct2() {
+    fn test_match_prop2() {
         let src = indoc! {"
-            (destruct #0
-                (match-prop #0 foo
-                    ((#_ #2)
-                        (destruct #2
-                            (match-prop #2 bar
-                                ((#_ #3) #u)
-                                (() #u)
-                            )
-                        )
+            (match-prop #0 foo
+                ((#_ #2)
+                    (match-prop #2 bar
+                        ((#_ #3) #u)
+                        (() #u)
                     )
-                    (() #u)
                 )
+                (() #u)
             )"
         };
         assert_eq!(src, parse_print(src));
@@ -139,11 +133,9 @@ mod tests {
     fn test_map_seq() {
         let src = indoc! {"
             (struct (#0)
-                (destruct #1
-                    (match-prop #1 prop
-                        ((#_ #2)
-                            (map-seq #2 (#3) #3)
-                        )
+                (match-prop #1 prop
+                    ((#_ #2)
+                        (map-seq #2 (#3) #3)
                     )
                 )
             )"
