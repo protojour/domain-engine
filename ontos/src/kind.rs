@@ -23,6 +23,10 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
     fn kind(&self) -> &NodeKind<'a, L> {
         self
     }
+
+    fn kind_mut(&mut self) -> &mut NodeKind<'a, L> {
+        self
+    }
 }
 
 #[derive(Clone)]

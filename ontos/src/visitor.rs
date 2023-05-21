@@ -3,32 +3,37 @@ use crate::{
     Lang, Node, Variable,
 };
 
-pub trait OntosVisitor<L: Lang> {
+pub trait OntosVisitor<'a, L: Lang + 'a> {
     #[allow(unused_variables)]
-    fn visit_kind(&mut self, index: usize, kind: &NodeKind<'_, L>) {
+    fn visit_node(&mut self, index: usize, node: &mut L::Node<'a>) {
+        self.visit_kind(index, node.kind_mut());
+    }
+
+    #[allow(unused_variables)]
+    fn visit_kind(&mut self, index: usize, kind: &mut NodeKind<'a, L>) {
         self.traverse_kind(kind);
     }
 
     #[allow(unused_variables)]
-    fn visit_match_arm(&mut self, index: usize, match_arm: &MatchArm<'_, L>) {
+    fn visit_match_arm(&mut self, index: usize, match_arm: &mut MatchArm<'a, L>) {
         self.traverse_match_arm(match_arm);
     }
 
     #[allow(unused_variables)]
-    fn visit_pattern_binding(&mut self, index: usize, binding: &PatternBinding) {
+    fn visit_pattern_binding(&mut self, index: usize, binding: &mut PatternBinding) {
         self.traverse_pattern_binding(binding);
     }
 
     #[allow(unused_variables)]
-    fn visit_prop(&mut self, prop: &str) {}
+    fn visit_prop(&mut self, prop: &mut str) {}
 
     #[allow(unused_variables)]
-    fn visit_binder(&mut self, variable: &Variable) {}
+    fn visit_binder(&mut self, variable: &mut Variable) {}
 
     #[allow(unused_variables)]
-    fn visit_variable(&mut self, variable: &Variable) {}
+    fn visit_variable(&mut self, variable: &mut Variable) {}
 
-    fn traverse_kind(&mut self, kind: &NodeKind<'_, L>) {
+    fn traverse_kind(&mut self, kind: &mut NodeKind<'a, L>) {
         match kind {
             NodeKind::VariableRef(var) => {
                 self.visit_variable(var);
@@ -36,60 +41,60 @@ pub trait OntosVisitor<L: Lang> {
             NodeKind::Int(_) => {}
             NodeKind::Unit => {}
             NodeKind::Call(_proc, args) => {
-                for (index, arg) in args.iter().enumerate() {
-                    self.visit_kind(index, arg.kind());
+                for (index, arg) in args.iter_mut().enumerate() {
+                    self.visit_node(index, arg);
                 }
             }
             NodeKind::Let(binder, def, body) => {
-                self.visit_binder(&binder.0);
-                self.visit_kind(0, def.kind());
-                for (index, node) in body.iter().enumerate() {
-                    self.visit_kind(index + 1, node.kind());
+                self.visit_binder(&mut binder.0);
+                self.visit_node(0, def);
+                for (index, node) in body.iter_mut().enumerate() {
+                    self.visit_node(index + 1, node);
                 }
             }
             NodeKind::Seq(binder, children) => {
-                self.visit_binder(&binder.0);
-                for (index, child) in children.iter().enumerate() {
-                    self.visit_kind(index, child.kind());
+                self.visit_binder(&mut binder.0);
+                for (index, child) in children.iter_mut().enumerate() {
+                    self.visit_node(index, child);
                 }
             }
             NodeKind::MapSeq(var, binder, children) => {
                 self.visit_variable(var);
-                self.visit_binder(&binder.0);
-                for (index, child) in children.iter().enumerate() {
-                    self.visit_kind(index, child.kind());
+                self.visit_binder(&mut binder.0);
+                for (index, child) in children.iter_mut().enumerate() {
+                    self.visit_node(index, child);
                 }
             }
             NodeKind::Struct(binder, children) => {
-                self.visit_binder(&binder.0);
-                for (index, child) in children.iter().enumerate() {
-                    self.visit_kind(index, child.kind());
+                self.visit_binder(&mut binder.0);
+                for (index, child) in children.iter_mut().enumerate() {
+                    self.visit_node(index, child);
                 }
             }
             NodeKind::Prop(struct_var, prop, variant) => {
                 self.visit_variable(struct_var);
                 self.visit_prop(prop);
-                self.visit_kind(0, variant.rel.kind());
-                self.visit_kind(1, variant.val.kind());
+                self.visit_node(0, &mut variant.rel);
+                self.visit_node(1, &mut variant.val);
             }
             NodeKind::MatchProp(struct_var, prop, arms) => {
                 self.visit_variable(struct_var);
                 self.visit_prop(prop);
-                for (index, arm) in arms.iter().enumerate() {
+                for (index, arm) in arms.iter_mut().enumerate() {
                     self.visit_match_arm(index, arm);
                 }
             }
         }
     }
 
-    fn traverse_match_arm(&mut self, match_arm: &MatchArm<'_, L>) {
-        if let PropPattern::Present(rel, val) = &match_arm.pattern {
+    fn traverse_match_arm(&mut self, match_arm: &mut MatchArm<'a, L>) {
+        if let PropPattern::Present(rel, val) = &mut match_arm.pattern {
             self.visit_pattern_binding(0, rel);
             self.visit_pattern_binding(1, val);
         }
     }
 
-    fn traverse_pattern_binding(&mut self, binding: &PatternBinding) {
+    fn traverse_pattern_binding(&mut self, binding: &mut PatternBinding) {
         match binding {
             PatternBinding::Binder(var) => self.visit_binder(var),
             PatternBinding::Wildcard => {}

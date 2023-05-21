@@ -30,6 +30,10 @@ impl<'m> ontos::Node<'m, TaggedTree> for TaggedNode<'m> {
     fn kind(&self) -> &NodeKind<'m, TaggedTree> {
         &self.kind
     }
+
+    fn kind_mut(&mut self) -> &mut NodeKind<'m, TaggedTree> {
+        &mut self.kind
+    }
 }
 
 impl<'m> TaggedNode<'m> {

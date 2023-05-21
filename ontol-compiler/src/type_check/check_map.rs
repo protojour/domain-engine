@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_runtime::smart_format;
+use ontos::visitor::OntosVisitor;
 use tracing::debug;
 
 use crate::{
@@ -12,12 +13,13 @@ use crate::{
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
     type_check::unify_ctx::Arm,
+    typed_ontos::lang::{OntosNode, TypedOntos},
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };
 
 use super::{
-    inference::Infer,
+    inference::{Infer, TypeVar},
     unify_ctx::{BoundVariable, CtrlFlowGroup, UnifyExprContext},
     TypeCheck, TypeError,
 };
@@ -144,10 +146,50 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: ExprId,
         ctx: &mut UnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
-        self.check_root_expr2(first_id, ctx);
-        self.check_root_expr2(second_id, ctx);
+        let mut first = self.check_root_expr2(first_id, ctx);
+        self.infer_ontos_types(&mut first, ctx);
+
+        let mut second = self.check_root_expr2(second_id, ctx);
+        self.infer_ontos_types(&mut second, ctx);
 
         Ok(())
+    }
+
+    fn infer_ontos_types(&mut self, node: &mut OntosNode<'m>, ctx: &mut UnifyExprContext<'m>) {
+        let mut inference = OntosTypeInference {
+            types: self.types,
+            eq_relations: &mut ctx.inference.eq_relations,
+            errors: self.errors,
+        };
+        inference.visit_node(0, node);
+    }
+}
+
+struct OntosTypeInference<'c, 'm> {
+    types: &'c mut Types<'m>,
+    eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
+    errors: &'c mut CompileErrors,
+}
+
+impl<'c, 'm> OntosVisitor<'m, TypedOntos> for OntosTypeInference<'c, 'm> {
+    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontos::Lang>::Node<'m>) {
+        let mut infer = Infer {
+            types: self.types,
+            eq_relations: self.eq_relations,
+        };
+        match infer.infer_recursive(node.meta.ty) {
+            Ok(ty) => node.meta.ty = ty,
+            Err(TypeError::Propagated) => {}
+            Err(TypeError::NotEnoughInformation) => {
+                self.errors.push(
+                    CompileError::TODO(smart_format!("Not enough type information"))
+                        .spanned(&node.meta.span),
+                );
+            }
+            _ => panic!("Unexpected inference error"),
+        }
+
+        self.visit_kind(index, &mut node.kind);
     }
 }
 

@@ -28,6 +28,7 @@ pub trait Lang: Sized + Copy {
 
 pub trait Node<'a, L: Lang> {
     fn kind(&self) -> &NodeKind<'a, L>;
+    fn kind_mut(&mut self) -> &mut NodeKind<'a, L>;
 }
 
 #[cfg(test)]

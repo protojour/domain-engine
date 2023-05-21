@@ -43,6 +43,10 @@ impl<'m> ontos::Node<'m, TypedOntos> for OntosNode<'m> {
     fn kind(&self) -> &NodeKind<'m, TypedOntos> {
         &self.kind
     }
+
+    fn kind_mut(&mut self) -> &mut NodeKind<'m, TypedOntos> {
+        &mut self.kind
+    }
 }
 
 impl<'m> std::fmt::Display for OntosNode<'m> {

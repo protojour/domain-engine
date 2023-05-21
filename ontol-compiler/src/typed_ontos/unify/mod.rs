@@ -22,12 +22,12 @@ struct VariableTracker {
     largest: Variable,
 }
 
-impl OntosVisitor<TypedOntos> for VariableTracker {
-    fn visit_variable(&mut self, variable: &Variable) {
+impl<'a> OntosVisitor<'a, TypedOntos> for VariableTracker {
+    fn visit_variable(&mut self, variable: &mut Variable) {
         self.observe(*variable);
     }
 
-    fn visit_binder(&mut self, variable: &Variable) {
+    fn visit_binder(&mut self, variable: &mut Variable) {
         self.observe(*variable);
     }
 }
@@ -53,10 +53,10 @@ impl VariableTracker {
     }
 }
 
-pub fn unify<'m>(source: OntosNode<'m>, target: OntosNode<'m>) -> OntosNode<'m> {
+pub fn unify<'m>(mut source: OntosNode<'m>, mut target: OntosNode<'m>) -> OntosNode<'m> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_kind(0, source.kind());
-    var_tracker.visit_kind(0, target.kind());
+    var_tracker.visit_node(0, &mut source);
+    var_tracker.visit_node(0, &mut target);
 
     let mut tag_ctx = TagCtx::default();
     let meta = target.meta;
@@ -66,9 +66,11 @@ pub fn unify<'m>(source: OntosNode<'m>, target: OntosNode<'m>) -> OntosNode<'m> 
             let free_variables =
                 union_bitsets(tagged_nodes.iter().map(|node| &node.free_variables));
 
-            let mut locate_ctx = LocateCtx::new(&free_variables);
-            locate_ctx.traverse_kind(source.kind());
-            let variable_paths = locate_ctx.output;
+            let variable_paths = {
+                let mut locate_ctx = LocateCtx::new(&free_variables);
+                locate_ctx.traverse_kind(source.kind_mut());
+                locate_ctx.output
+            };
 
             debug!("free variable paths: {variable_paths:#?}");
             let unification_tree = build_unification_tree(tagged_nodes, &variable_paths);
