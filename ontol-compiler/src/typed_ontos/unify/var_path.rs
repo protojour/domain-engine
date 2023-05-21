@@ -8,11 +8,8 @@ use crate::typed_ontos::lang::{OntosNode, TypedOntos};
 #[derive(Clone, Default, Debug)]
 pub struct Path(pub SmallVec<[u16; 32]>);
 
-pub fn locate_variables<'m>(
-    node: &mut OntosNode<'m>,
-    variables: &BitSet,
-) -> FnvHashMap<Variable, Path> {
-    let mut locator = VarLocator::new(&variables);
+pub fn locate_variables(node: &mut OntosNode, variables: &BitSet) -> FnvHashMap<Variable, Path> {
+    let mut locator = VarLocator::new(variables);
     locator.traverse_kind(node.kind_mut());
     locator.output
 }

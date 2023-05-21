@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     inference::UnifyValue,
-    unify_ctx::{ExprRoot, UnifyExprContext},
+    unify_ctx::{CheckUnifyExprContext, ExprRoot},
     TypeCheck, TypeEquation, TypeError,
 };
 
@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn check_expr_root(
         &mut self,
         root: ExprRoot<'m>,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         let (ty, hir_idx) = self.check_expr(
             root.expr,
@@ -69,7 +69,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr: Expr,
         expected_ty: Option<TypeRef<'m>>,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         match (expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
@@ -207,7 +207,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let type_var = ctx.inference.new_type_variable(expr_id);
                 let bound_variable = ctx
-                    .bound_variables
+                    .explicit_variables
                     .get(&expr_id)
                     .expect("variable not found");
 
@@ -273,7 +273,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         type_path: TypePath,
         attributes: Box<[ExprStructAttr]>,
         span: SourceSpan,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
@@ -459,7 +459,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr: Expr,
         expected_ty: TypeRef<'m>,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> (TypeRef<'m>, HirIdx) {
         self.check_expr(expr, Some(expected_ty), ctx)
     }

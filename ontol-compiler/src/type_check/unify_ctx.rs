@@ -8,11 +8,11 @@ use crate::{
 
 use super::inference::Inference;
 
-pub struct UnifyExprContext<'m> {
+pub struct CheckUnifyExprContext<'m> {
     pub inference: Inference<'m>,
     pub bodies: Vec<CtrlFlowBody<'m>>,
     pub nodes: HirNodeTable<'m>,
-    pub bound_variables: FnvHashMap<ExprId, BoundVariable>,
+    pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
     pub body_variables: FnvHashMap<HirBodyIdx, HirIdx>,
     pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
 
@@ -23,24 +23,24 @@ pub struct UnifyExprContext<'m> {
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
-    hir_var_allocations: Vec<u32>,
+    ontos_var_allocations: Vec<u32>,
     body_id_counter: u32,
 }
 
-impl<'m> UnifyExprContext<'m> {
+impl<'m> CheckUnifyExprContext<'m> {
     pub fn new() -> Self {
         Self {
             inference: Inference::new(),
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
-            bound_variables: Default::default(),
+            explicit_variables: Default::default(),
             body_variables: Default::default(),
             body_map: Default::default(),
             ctrl_flow_forest: Default::default(),
             partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
-            hir_var_allocations: vec![0],
+            ontos_var_allocations: vec![0],
             body_id_counter: 0,
         }
     }
@@ -51,7 +51,7 @@ impl<'m> UnifyExprContext<'m> {
 
     pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontos::Variable) -> T) -> T {
         // There is a unique bind depth for the control flow variable:
-        let ctrl_flow_var = self.alloc_hir_variable();
+        let ctrl_flow_var = self.alloc_ontos_variable();
 
         self.bind_depth.0 += 1;
         let ret = f(self, ctrl_flow_var);
@@ -71,11 +71,11 @@ impl<'m> UnifyExprContext<'m> {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
-    pub fn alloc_hir_variable(&mut self) -> ontos::Variable {
-        let alloc = self.hir_var_allocations.get_mut(0).unwrap();
-        let hir_var = ontos::Variable(*alloc);
+    pub fn alloc_ontos_variable(&mut self) -> ontos::Variable {
+        let alloc = self.ontos_var_allocations.get_mut(0).unwrap();
+        let var = ontos::Variable(*alloc);
         *alloc += 1;
-        hir_var
+        var
     }
 }
 
@@ -91,7 +91,7 @@ pub struct ExprRoot<'m> {
     pub expected_ty: Option<TypeRef<'m>>,
 }
 
-pub struct BoundVariable {
+pub struct ExplicitVariable {
     pub variable: ontos::Variable,
     pub node_id: HirIdx,
     pub ctrl_group: Option<CtrlFlowGroup>,

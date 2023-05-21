@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     smart_format, value::PropertyId, vm::proc::BuiltinProc, DefId, RelationId, Role,
 };
-use ontos::{kind::NodeKind, Binder, Variable};
+use ontos::{kind::NodeKind, Binder};
 use tracing::debug;
 
 use crate::{
@@ -18,13 +18,13 @@ use crate::{
     IrVariant, SourceSpan,
 };
 
-use super::{unify_ctx::UnifyExprContext, TypeCheck, TypeEquation, TypeError};
+use super::{unify_ctx::CheckUnifyExprContext, TypeCheck, TypeEquation, TypeError};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn check_root_expr2(
         &mut self,
         expr_id: ExprId,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> OntosNode<'m> {
         // temporarily remove from map
         let expr = self.expressions.map.remove(&expr_id).unwrap();
@@ -56,7 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr: &Expr,
         expected_ty: Option<TypeRef<'m>>,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> OntosNode<'m> {
         match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
@@ -139,7 +139,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let type_var = ctx.inference.new_type_variable(*expr_id);
                 let bound_variable = ctx
-                    .bound_variables
+                    .explicit_variables
                     .get(expr_id)
                     .expect("variable not found");
 
@@ -211,7 +211,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         type_path: &TypePath,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> OntosNode<'m> {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
@@ -338,7 +338,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        NodeKind::Struct(Binder(Variable(0)), [].into())
+                        let binder = Binder(ctx.alloc_ontos_variable());
+                        NodeKind::Struct(binder, [].into())
                     }
                     None => {
                         if !attributes.is_empty() {
@@ -386,8 +387,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
         }
     }
-
-    // Note: These should be replaced with versions that report errors to the user
 
     fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> OntosNode<'m> {
         self.type_error(error, span, IrVariant::Ontos);

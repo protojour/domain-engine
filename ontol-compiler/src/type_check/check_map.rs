@@ -20,7 +20,7 @@ use crate::{
 
 use super::{
     inference::{Infer, TypeVar},
-    unify_ctx::{BoundVariable, CtrlFlowGroup, UnifyExprContext},
+    unify_ctx::{CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
     TypeCheck, TypeError,
 };
 
@@ -32,7 +32,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = UnifyExprContext::new();
+        let mut ctx = CheckUnifyExprContext::new();
         let root_body_idx = ctx.alloc_hir_body_idx();
 
         {
@@ -73,7 +73,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         first_id: ExprId,
         second_id: ExprId,
         root_body_idx: HirBodyIdx,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
         let mut root_body = ctx.expr_body_mut(root_body_idx);
         root_body.first = Some(self.consume_expr(first_id));
@@ -144,7 +144,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def: &Def,
         first_id: ExprId,
         second_id: ExprId,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
         let mut first = self.check_root_expr2(first_id, ctx);
         self.infer_ontos_types(&mut first, ctx);
@@ -164,7 +164,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(())
     }
 
-    fn infer_ontos_types(&mut self, node: &mut OntosNode<'m>, ctx: &mut UnifyExprContext<'m>) {
+    fn infer_ontos_types(&mut self, node: &mut OntosNode<'m>, ctx: &mut CheckUnifyExprContext<'m>) {
         let mut inference = OntosTypeInference {
             types: self.types,
             eq_relations: &mut ctx.inference.eq_relations,
@@ -214,7 +214,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         expr: &Expr,
         variables: &Variables,
         parent_aggr_group: Option<CtrlFlowGroup>,
-        ctx: &mut UnifyExprContext<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
@@ -248,7 +248,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     );
 
                     // Register aggregation variable
-                    let aggr_var = ctx.alloc_hir_variable();
+                    let aggr_var = ctx.alloc_ontos_variable();
                     let aggr_var_idx = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
                         kind: HirKind::Variable(aggr_var),
@@ -305,9 +305,9 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 }
             }
             ExprKind::Variable(expr_id) => {
-                if let Some(bound_variable) = ctx.bound_variables.get(expr_id) {
+                if let Some(explicit_variable) = ctx.explicit_variables.get(expr_id) {
                     // Variable is used more than once
-                    if ctx.arm.is_first() && bound_variable.ctrl_group != parent_aggr_group {
+                    if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                         self.error(
                             CompileError::TODO(smart_format!("Incompatible aggregation group")),
                             &expr.span,
@@ -316,7 +316,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     debug!("Join existing bound variable");
 
-                    group_set.add(bound_variable.ctrl_group);
+                    group_set.add(explicit_variable.ctrl_group);
                 } else {
                     let (variable_expr_id, variable_span) = variables
                         .0
@@ -325,7 +325,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .unwrap();
 
                     // Register variable
-                    let syntax_var = ctx.alloc_hir_variable();
+                    let syntax_var = ctx.alloc_ontos_variable();
                     let var_id = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
                         kind: HirKind::Variable(syntax_var),
@@ -333,9 +333,9 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     });
 
                     if ctx.arm.is_first() {
-                        ctx.bound_variables.insert(
+                        ctx.explicit_variables.insert(
                             *variable_expr_id,
-                            BoundVariable {
+                            ExplicitVariable {
                                 variable: syntax_var,
                                 node_id: var_id,
                                 ctrl_group: parent_aggr_group,
@@ -344,12 +344,12 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                         group_set.add(parent_aggr_group);
                     } else {
-                        match ctx.bound_variables.entry(*variable_expr_id) {
+                        match ctx.explicit_variables.entry(*variable_expr_id) {
                             Entry::Occupied(_occ) => {
                                 todo!();
                             }
                             Entry::Vacant(vac) => {
-                                vac.insert(BoundVariable {
+                                vac.insert(ExplicitVariable {
                                     variable: syntax_var,
                                     node_id: var_id,
                                     ctrl_group: parent_aggr_group,
@@ -411,7 +411,7 @@ impl AggrGroupSet {
     // Find a unique leaf in the aggregation forest
     fn disambiguate(
         self,
-        ctx: &UnifyExprContext,
+        ctx: &CheckUnifyExprContext,
         max_depth: BindDepth,
     ) -> Result<HirBodyIdx, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {

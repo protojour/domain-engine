@@ -191,7 +191,9 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("1st: {}", map_task.first);
                 debug!("2nd: {}", map_task.second);
 
+                debug!("Ontos forward");
                 unify_to_function(map_task.first.clone(), map_task.second.clone());
+                debug!("Ontos backward");
                 unify_to_function(map_task.second, map_task.first);
             }
         }
