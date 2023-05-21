@@ -16,7 +16,6 @@ pub enum NodeKind<'a, L: Lang> {
     Struct(Binder, Nodes<'a, L>),
     Prop(Variable, String, PropVariant<'a, L>),
     MapSeq(Variable, Binder, Nodes<'a, L>),
-    Destruct(Variable, Nodes<'a, L>),
     MatchProp(Variable, String, Vec<MatchArm<'a, L>>),
 }
 

@@ -6,7 +6,7 @@ use ontos::{
 use tracing::debug;
 
 use crate::typed_ontos::unify::{
-    unifier::{unify_tree, Unified, UnifyCtx},
+    unifier::{unify_tree, Unified},
     var_path::LocateCtx,
 };
 
@@ -80,11 +80,7 @@ pub fn unify<'m>(source: OntosNode<'m>, target: OntosNode<'m>) -> OntosNode<'m> 
             let Unified {
                 nodes,
                 binder: _input_binder,
-            } = unify_tree(
-                &source,
-                unification_tree,
-                &mut UnifyCtx::new(var_tracker.next_variable()),
-            );
+            } = unify_tree(unification_tree, &source, var_tracker.next_variable());
 
             OntosNode {
                 kind: NodeKind::Struct(binder, nodes.into_iter().collect()),

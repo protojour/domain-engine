@@ -85,12 +85,6 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Destruct(arg, children) => {
-                write!(f, "{indent}(destruct #{}", arg.0)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
-                self.print_rparen(multi, f)?;
-                Ok(Multiline(true))
-            }
             NodeKind::MatchProp(struct_var, prop, arms) => {
                 write!(f, "{indent}(match-prop #{} {}", struct_var.0, prop)?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;

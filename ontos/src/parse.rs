@@ -99,11 +99,6 @@ impl<L: Lang> Parser<L> {
                         let (children, next) = self.parse_many(next, Self::parse)?;
                         (self.make_node(NodeKind::Seq(binder, children)), next)
                     }
-                    ("destruct", next) => {
-                        let (var, next) = parse_hash_var(next)?;
-                        let (children, next) = self.parse_many(next, Self::parse)?;
-                        (self.make_node(NodeKind::Destruct(var, children)), next)
-                    }
                     ("match-prop", next) => {
                         let (struct_var, next) = parse_hash_var(next)?;
                         let (prop, next) = parse_ident(next)?;

@@ -71,7 +71,6 @@ impl<'m> TaggedNode<'m> {
             NodeKind::MapSeq(var, binder, nodes) => {
                 NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
             }
-            NodeKind::Destruct(var, nodes) => NodeKind::Destruct(var, nodes_to_ontos(nodes)),
             NodeKind::MatchProp(struct_var, prop, arms) => NodeKind::MatchProp(
                 struct_var,
                 prop,
@@ -172,9 +171,6 @@ fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
         }
         NodeKind::MapSeq(..) => {
             todo!()
-        }
-        NodeKind::Destruct(..) => {
-            unimplemented!("BUG: Destruct is an output node")
         }
         NodeKind::MatchProp(..) => {
             unimplemented!("BUG: MatchProp is an output node")

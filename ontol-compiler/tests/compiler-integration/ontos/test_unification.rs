@@ -33,12 +33,10 @@ fn test_unify_basic_struct() {
     );
     let expected = indoc! {"
         (struct (#2)
-            (destruct #1
-                (match-prop #1 a
-                    ((#_ #0)
-                        (prop #2 b
-                            (#u #0)
-                        )
+            (match-prop #1 a
+                ((#_ #0)
+                    (prop #2 b
+                        (#u #0)
                     )
                 )
             )
@@ -48,7 +46,7 @@ fn test_unify_basic_struct() {
 }
 
 #[test]
-fn test_unify_struct_complex1() {
+fn test_unify_struct_simple_arithmetic() {
     let output = test_unify(
         "
         (struct (#1)
@@ -63,13 +61,62 @@ fn test_unify_struct_complex1() {
     );
     let expected = indoc! {"
         (struct (#2)
-            (destruct #1
-                (match-prop #1 a
-                    ((#_ #3)
-                        (let (#0 (+ #3 10))
-                            (prop #2 b
-                                (#u (+ #0 20))
+            (match-prop #1 a
+                ((#_ #3)
+                    (let (#0 (+ #3 10))
+                        (prop #2 b
+                            (#u (+ #0 20))
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_struct_arithmetic_property_dependency() {
+    let output = test_unify(
+        "
+        (struct (#2)
+            (prop #2 a (#u (- #0 10)))
+            (prop #2 b (#u (- #1 10)))
+        )
+        ",
+        "
+        (struct (#3)
+            (prop #3 c (#u (+ #0 #1)))
+            (prop #3 d (#u (+ #0 20)))
+            (prop #3 e (#u (+ #1 20)))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        (struct (#3)
+            (match-prop #2 a
+                ((#_ #4)
+                    (let (#0 (+ #4 10))
+                        (prop #3 d
+                            (#u (+ #0 20))
+                        )
+                        (match-prop #2 b
+                            ((#_ #5)
+                                (let (#1 (+ #5 10))
+                                    (prop #3 c
+                                        (#u (+ #0 #1))
+                                    )
+                                )
                             )
+                        )
+                    )
+                )
+            )
+            (match-prop #2 b
+                ((#_ #6)
+                    (let (#1 (+ #6 10))
+                        (prop #3 e
+                            (#u (+ #1 20))
                         )
                     )
                 )

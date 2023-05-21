@@ -72,12 +72,6 @@ pub trait OntosVisitor<L: Lang> {
                 self.visit_kind(0, variant.rel.kind());
                 self.visit_kind(1, variant.val.kind());
             }
-            NodeKind::Destruct(arg, children) => {
-                self.visit_variable(arg);
-                for (index, child) in children.iter().enumerate() {
-                    self.visit_kind(index, child.kind());
-                }
-            }
             NodeKind::MatchProp(struct_var, prop, arms) => {
                 self.visit_variable(struct_var);
                 self.visit_prop(prop);
