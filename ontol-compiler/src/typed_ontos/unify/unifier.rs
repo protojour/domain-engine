@@ -1,5 +1,8 @@
 use ontol_runtime::vm::proc::BuiltinProc;
-use ontos::kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, Variable};
+use ontos::{
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    Binder, Variable,
+};
 use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::{Meta, OntosKind, OntosNode};

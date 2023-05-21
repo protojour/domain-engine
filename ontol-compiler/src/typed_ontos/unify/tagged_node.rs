@@ -1,5 +1,8 @@
 use bit_set::BitSet;
-use ontos::kind::{Binder, MatchArm, NodeKind, PropVariant, Variable};
+use ontos::{
+    kind::{MatchArm, NodeKind, PropVariant},
+    Binder, Variable,
+};
 
 use crate::typed_ontos::lang::{Meta, OntosNode};
 
@@ -204,7 +207,7 @@ pub fn union_bitsets<'a>(iterator: impl Iterator<Item = &'a BitSet>) -> BitSet {
 #[cfg(test)]
 mod tests {
     use bit_set::BitSet;
-    use ontos::{kind::Variable, parse::Parser};
+    use ontos::{parse::Parser, Variable};
 
     use crate::typed_ontos::lang::TypedOntos;
 

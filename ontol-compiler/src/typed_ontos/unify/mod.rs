@@ -1,8 +1,4 @@
-use ontos::{
-    kind::{NodeKind, Variable},
-    visitor::OntosVisitor,
-    Node,
-};
+use ontos::{kind::NodeKind, visitor::OntosVisitor, Node, Variable};
 use tracing::debug;
 
 use crate::typed_ontos::unify::{

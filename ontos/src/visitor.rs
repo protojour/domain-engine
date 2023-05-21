@@ -1,6 +1,6 @@
 use crate::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, Variable},
-    Lang, Node,
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    Lang, Node, Variable,
 };
 
 pub trait OntosVisitor<L: Lang> {

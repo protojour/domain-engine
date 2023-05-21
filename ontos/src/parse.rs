@@ -1,8 +1,8 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{Binder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Variable},
-    Lang,
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    Binder, Lang, Variable,
 };
 
 #[derive(Debug)]

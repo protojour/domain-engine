@@ -1,9 +1,6 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::{
-    kind::{NodeKind, Variable},
-    visitor::OntosVisitor,
-};
+use ontos::{kind::NodeKind, visitor::OntosVisitor, Variable};
 use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::TypedOntos;

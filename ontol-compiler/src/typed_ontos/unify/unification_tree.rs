@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use fnv::FnvHashMap;
-use ontos::kind::Variable;
+use ontos::Variable;
 
 use super::{tagged_node::TaggedNode, var_path::Path};
 

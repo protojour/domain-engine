@@ -5,6 +5,12 @@ pub mod kind;
 pub mod parse;
 pub mod visitor;
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct Variable(pub u32);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Binder(pub Variable);
+
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
 

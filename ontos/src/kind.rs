@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 use smartstring::alias::String;
 
-use crate::{Lang, Node};
+use crate::{Binder, Lang, Node, Variable};
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
@@ -24,12 +24,6 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
         self
     }
 }
-
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct Variable(pub u32);
-
-#[derive(Clone, Copy, Debug)]
-pub struct Binder(pub Variable);
 
 #[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
