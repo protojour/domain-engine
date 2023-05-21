@@ -1,6 +1,8 @@
 use indoc::indoc;
-use ontol_compiler::typed_ontos::lang::{OntosNode, TypedOntos};
-use ontol_compiler::typed_ontos::unify::unify;
+use ontol_compiler::typed_ontos::{
+    lang::{OntosNode, TypedOntos},
+    unify::unifier::unify_to_function,
+};
 use ontos::parse::Parser;
 use pretty_assertions::assert_eq;
 use test_log::test;
@@ -10,7 +12,7 @@ fn parse_typed(src: &str) -> OntosNode<'static> {
 }
 
 fn test_unify(source: &str, target: &str) -> String {
-    let node = unify(parse_typed(source), parse_typed(target));
+    let node = unify_to_function(parse_typed(source), parse_typed(target));
     let mut output = String::new();
     use std::fmt::Write;
     write!(&mut output, "{node}").unwrap();

@@ -11,7 +11,7 @@ use tracing::{debug, error, warn};
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
     hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirNodeTable},
-    typed_ontos::{lang::OntosNode, unify::unify},
+    typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -190,8 +190,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     continue;
                 }
 
-                unify(map_task.first.clone(), map_task.second.clone());
-                unify(map_task.second, map_task.first);
+                unify_to_function(map_task.first.clone(), map_task.second.clone());
+                unify_to_function(map_task.second, map_task.first);
             }
         }
     }

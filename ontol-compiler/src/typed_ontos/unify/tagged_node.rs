@@ -98,11 +98,11 @@ impl<'m> TaggedNode<'m> {
 }
 
 #[derive(Default)]
-pub struct TagCtx {
+pub struct Tagger {
     in_scope: BitSet,
 }
 
-impl TagCtx {
+impl Tagger {
     pub fn enter_binder<T>(&mut self, binder: Binder, func: impl FnOnce(&mut Self) -> T) -> T {
         if !self.in_scope.insert(binder.0 .0 as usize) {
             panic!("Malformed ONTOS: {binder:?} variable was already in scope");
@@ -111,92 +111,91 @@ impl TagCtx {
         self.in_scope.remove(binder.0 .0 as usize);
         value
     }
-}
 
-pub fn tag_nodes<'m>(children: Vec<OntosNode<'m>>, ctx: &mut TagCtx) -> Vec<TaggedNode<'m>> {
-    children
-        .into_iter()
-        .map(|child| tag_node(child, ctx))
-        .collect()
-}
+    pub fn tag_nodes<'m>(&mut self, children: Vec<OntosNode<'m>>) -> Vec<TaggedNode<'m>> {
+        children
+            .into_iter()
+            .map(|child| self.tag_node(child))
+            .collect()
+    }
 
-fn tag_node<'m>(node: OntosNode<'m>, ctx: &mut TagCtx) -> TaggedNode<'m> {
-    let (kind, meta) = node.split();
-    match kind {
-        NodeKind::VariableRef(var) => {
-            let tagged_node = TaggedNode::new(NodeKind::VariableRef(var), meta);
-            if ctx.in_scope.contains(var.0 as usize) {
-                tagged_node
-            } else {
-                tagged_node.with_free_variable(var)
+    fn tag_node<'m>(&mut self, node: OntosNode<'m>) -> TaggedNode<'m> {
+        let (kind, meta) = node.split();
+        match kind {
+            NodeKind::VariableRef(var) => {
+                let tagged_node = TaggedNode::new(NodeKind::VariableRef(var), meta);
+                if self.in_scope.contains(var.0 as usize) {
+                    tagged_node
+                } else {
+                    tagged_node.with_free_variable(var)
+                }
             }
-        }
-        NodeKind::Unit => TaggedNode::new(NodeKind::Unit, meta),
-        NodeKind::Int(int) => TaggedNode::new(NodeKind::Int(int), meta),
-        NodeKind::Let(binder, definition, body) => {
-            let definition = *definition;
-            let definition = tag_node(definition, ctx);
-            let def_free_vars = definition.free_variables.clone();
-            let mut tagged = ctx.enter_binder(binder, |ctx| {
-                tag_union_children(
-                    body,
-                    move |body| NodeKind::Let(binder, Box::new(definition), body),
+            NodeKind::Unit => TaggedNode::new(NodeKind::Unit, meta),
+            NodeKind::Int(int) => TaggedNode::new(NodeKind::Int(int), meta),
+            NodeKind::Let(binder, definition, body) => {
+                let definition = *definition;
+                let definition = self.tag_node(definition);
+                let def_free_vars = definition.free_variables.clone();
+                let mut tagged = self.enter_binder(binder, |zelf| {
+                    zelf.tag_union_children(
+                        body,
+                        move |body| NodeKind::Let(binder, Box::new(definition), body),
+                        meta,
+                    )
+                });
+                tagged.free_variables.union_with(&def_free_vars);
+                tagged
+            }
+            NodeKind::Call(proc, args) => {
+                self.tag_union_children(args, |args| NodeKind::Call(proc, args), meta)
+            }
+            NodeKind::Seq(binder, nodes) => self.enter_binder(binder, |zelf| {
+                zelf.tag_union_children(nodes, |nodes| NodeKind::Seq(binder, nodes), meta)
+            }),
+            NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
+                zelf.tag_union_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
+            }),
+            NodeKind::Prop(struct_var, prop, variant) => {
+                let rel = self.tag_node(*variant.rel);
+                let val = self.tag_node(*variant.val);
+                let free_variables =
+                    union_bitsets([&rel.free_variables, &val.free_variables].into_iter());
+
+                TaggedNode {
+                    kind: NodeKind::Prop(
+                        struct_var,
+                        prop,
+                        PropVariant {
+                            rel: Box::new(rel),
+                            val: Box::new(val),
+                        },
+                    ),
                     meta,
-                    ctx,
-                )
-            });
-            tagged.free_variables.union_with(&def_free_vars);
-            tagged
-        }
-        NodeKind::Call(proc, args) => {
-            tag_union_children(args, |args| NodeKind::Call(proc, args), meta, ctx)
-        }
-        NodeKind::Seq(binder, nodes) => ctx.enter_binder(binder, |ctx| {
-            tag_union_children(nodes, |nodes| NodeKind::Seq(binder, nodes), meta, ctx)
-        }),
-        NodeKind::Struct(binder, nodes) => ctx.enter_binder(binder, |ctx| {
-            tag_union_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta, ctx)
-        }),
-        NodeKind::Prop(struct_var, prop, variant) => {
-            let rel = tag_node(*variant.rel, ctx);
-            let val = tag_node(*variant.val, ctx);
-            let free_variables =
-                union_bitsets([&rel.free_variables, &val.free_variables].into_iter());
-
-            TaggedNode {
-                kind: NodeKind::Prop(
-                    struct_var,
-                    prop,
-                    PropVariant {
-                        rel: Box::new(rel),
-                        val: Box::new(val),
-                    },
-                ),
-                meta,
-                free_variables,
+                    free_variables,
+                }
             }
-        }
-        NodeKind::MapSeq(..) => {
-            todo!()
-        }
-        NodeKind::MatchProp(..) => {
-            unimplemented!("BUG: MatchProp is an output node")
+            NodeKind::MapSeq(..) => {
+                todo!()
+            }
+            NodeKind::MatchProp(..) => {
+                unimplemented!("BUG: MatchProp is an output node")
+            }
         }
     }
-}
 
-fn tag_union_children<'m>(
-    children: Vec<OntosNode<'m>>,
-    func: impl FnOnce(Vec<TaggedNode<'m>>) -> TaggedKind<'m>,
-    meta: Meta<'m>,
-    ctx: &mut TagCtx,
-) -> TaggedNode<'m> {
-    let children = tag_nodes(children, ctx);
-    let free_variables = union_bitsets(children.iter().map(|arg| &arg.free_variables));
-    TaggedNode {
-        kind: func(children),
-        meta,
-        free_variables,
+    fn tag_union_children<'m>(
+        &mut self,
+        children: Vec<OntosNode<'m>>,
+        func: impl FnOnce(Vec<TaggedNode<'m>>) -> TaggedKind<'m>,
+        meta: Meta<'m>,
+    ) -> TaggedNode<'m> {
+        let children = self.tag_nodes(children);
+        let free_variables = union_bitsets(children.iter().map(|arg| &arg.free_variables));
+        TaggedNode {
+            kind: func(children),
+            meta,
+            free_variables,
+        }
     }
 }
 
@@ -214,8 +213,6 @@ mod tests {
     use ontos::{parse::Parser, Variable};
 
     use crate::typed_ontos::lang::TypedOntos;
-
-    use super::tag_node;
 
     fn free_variables(iterator: impl Iterator<Item = Variable>) -> BitSet {
         let mut bit_set = BitSet::new();
@@ -241,8 +238,7 @@ mod tests {
             )
         ";
         let node = Parser::new(TypedOntos).parse(src).unwrap().0;
-        let mut ctx = super::TagCtx::default();
-        let tagged_node = tag_node(node, &mut ctx);
+        let tagged_node = super::Tagger::default().tag_node(node);
         assert_eq!(
             free_variables([Variable(1), Variable(3), Variable(4)].into_iter()),
             tagged_node.free_variables,
