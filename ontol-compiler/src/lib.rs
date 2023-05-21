@@ -1,4 +1,4 @@
-use codegen::{execute_codegen_tasks, CodegenTasks};
+use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use compiler_queries::{GetPropertyMeta, RelationshipMeta};
 use def::{DefKind, Defs, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};

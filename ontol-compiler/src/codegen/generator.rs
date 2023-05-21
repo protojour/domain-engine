@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 use tracing::{debug, error};
 
 use crate::{
-    codegen::{find_mapping_key, proc_builder::Stack},
+    codegen::{proc_builder::Stack, task::find_mapping_key},
     hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode},
     types::Type,
     SourceSpan,
@@ -18,7 +18,7 @@ use super::{
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
     struct_scope::codegen_struct_pattern_scope,
-    ProcTable,
+    task::ProcTable,
 };
 
 #[derive(Debug)]

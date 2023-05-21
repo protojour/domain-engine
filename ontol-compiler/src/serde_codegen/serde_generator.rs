@@ -14,7 +14,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    codegen::CodegenTasks,
+    codegen::task::CodegenTasks,
     compiler_queries::{GetDefType, GetPropertyMeta},
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::{Patterns, StringPatternSegment},

@@ -2,7 +2,7 @@ use ontol_runtime::DefId;
 use tracing::debug;
 
 use crate::{
-    codegen::{CodegenTask, ConstCodegenTask},
+    codegen::task::{CodegenTask, ConstCodegenTask},
     def::{DefKind, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,

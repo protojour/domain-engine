@@ -6,7 +6,7 @@ use ontos::visitor::OntosVisitor;
 use tracing::debug;
 
 use crate::{
-    codegen::{CodegenTask, MapCodegenTask, OntosMapCodegenTask},
+    codegen::task::{CodegenTask, MapCodegenTask, OntosMapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},

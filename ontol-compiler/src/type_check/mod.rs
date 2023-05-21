@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{smart_format, DefId};
 
 use crate::{
-    codegen::CodegenTasks,
+    codegen::task::CodegenTasks,
     def::Defs,
     error::CompileError,
     expr::Expressions,

@@ -2,13 +2,13 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     smart_format,
     vm::proc::{Address, Lib, OpCode, Procedure},
-    DefId,
+    DefId, MapKey,
 };
 use smartstring::alias::String;
 
 use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
 
-use super::{MapKey, ProcTable};
+use super::task::ProcTable;
 
 pub struct LinkResult {
     pub lib: Lib,
