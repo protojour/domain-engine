@@ -70,7 +70,22 @@ pub fn unify_to_function<'m>(
             }
         }
         kind => {
-            todo!("unhandled: {kind}");
+            let tagged_node = Tagger::default().tag_node(OntosNode { kind, meta });
+            let Unified {
+                nodes,
+                binder: input_binder,
+            } = unify_tagged_nodes(vec![tagged_node], &mut source, var_tracker.next_variable());
+
+            let body = match nodes.len() {
+                0 => panic!("No nodes"),
+                1 => nodes.into_iter().next().unwrap(),
+                _ => panic!("Too many nodes"),
+            };
+
+            OntosFunc {
+                arg: input_binder.unwrap(),
+                body,
+            }
         }
     }
 }

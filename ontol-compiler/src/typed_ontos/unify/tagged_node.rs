@@ -119,7 +119,7 @@ impl Tagger {
             .collect()
     }
 
-    fn tag_node<'m>(&mut self, node: OntosNode<'m>) -> TaggedNode<'m> {
+    pub fn tag_node<'m>(&mut self, node: OntosNode<'m>) -> TaggedNode<'m> {
         let (kind, meta) = node.split();
         match kind {
             NodeKind::VariableRef(var) => {

@@ -44,14 +44,14 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 write!(f, "{indent}(let (#{}", binder.0 .0)?;
                 let multi = self.print(Sep::Space, definition.kind(), f)?;
                 self.print_rparen(multi, f)?;
-                let multi = self.print_all(Sep::Space, body.iter().map(Node::kind), f)?;
+                let multi = self.print_all(self.indent.indent(), body.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             NodeKind::Call(proc, args) => {
                 let proc = match proc {
                     BuiltinProc::Add => "+",
-                    BuiltinProc::Sub => "+",
+                    BuiltinProc::Sub => "-",
                     BuiltinProc::Mul => "*",
                     BuiltinProc::Div => "/",
                     proc => panic!("unsupported proc {proc:?}"),
@@ -59,7 +59,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 write!(f, "{sep}({proc}")?;
                 let multi = self.print_all(Sep::Space, args.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
-                Ok(multi)
+                Ok(multi.or(sep))
             }
             NodeKind::Seq(binder, children) => {
                 write!(f, "{indent}(seq (#{})", binder.0 .0)?;
@@ -193,6 +193,18 @@ impl<L: Lang> Printer<L> {
 
 #[derive(Clone, Copy)]
 pub struct Multiline(bool);
+
+impl Multiline {
+    fn or(self, sep: Sep) -> Self {
+        if self.0 {
+            return self;
+        }
+        match sep {
+            Sep::Indent(_) => Self(true),
+            _ => Self(false),
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub enum Sep {

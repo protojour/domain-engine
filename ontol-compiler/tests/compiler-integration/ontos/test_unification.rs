@@ -20,6 +20,40 @@ fn test_unify(source: &str, target: &str) -> String {
 }
 
 #[test]
+fn test_unify_no_op() {
+    let output = test_unify("#0", "#0");
+    assert_eq!("|#0| #0", output);
+}
+
+#[test]
+fn test_unify_expr1() {
+    let output = test_unify("(- #0 10)", "#0");
+    let expected = indoc! {"
+        |#1| (let (#0 (+ #1 10))
+            #0
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_expr2() {
+    let output = test_unify("#0", "(+ #0 20)");
+    assert_eq!("|#0| (+ #0 20)", output);
+}
+
+#[test]
+fn test_unify_symmetric_exprs() {
+    let output = test_unify("(- #0 10)", "(+ #0 20)");
+    let expected = indoc! {"
+        |#1| (let (#0 (+ #1 10))
+            (+ #0 20)
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_basic_struct() {
     let output = test_unify(
         "
