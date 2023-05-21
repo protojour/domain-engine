@@ -256,7 +256,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         ctx.bound_variables.insert(
                             *variable_expr_id,
                             BoundVariable {
-                                syntax_var,
+                                variable: syntax_var,
                                 node_id: var_id,
                                 ctrl_group: parent_aggr_group,
                             },
@@ -270,7 +270,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             }
                             Entry::Vacant(vac) => {
                                 vac.insert(BoundVariable {
-                                    syntax_var,
+                                    variable: syntax_var,
                                     node_id: var_id,
                                     ctrl_group: parent_aggr_group,
                                 });

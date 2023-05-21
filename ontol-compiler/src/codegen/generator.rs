@@ -8,7 +8,7 @@ use tracing::{debug, error};
 
 use crate::{
     codegen::{find_mapping_key, proc_builder::Stack},
-    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode, HirVariable},
+    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode},
     types::Type,
     SourceSpan,
 };
@@ -23,14 +23,14 @@ use super::{
 
 #[derive(Debug)]
 pub enum CodegenError {
-    InvalidScoping(HirVariable),
+    InvalidScoping(ontos::Variable),
 }
 
 pub type CodegenResult<T> = Result<T, CodegenError>;
 
 #[derive(Default)]
 pub struct Scope {
-    pub in_scope: FnvHashMap<HirVariable, Local>,
+    pub in_scope: FnvHashMap<ontos::Variable, Local>,
 }
 
 pub(super) struct CodeGenerator<'a> {
@@ -100,7 +100,7 @@ impl<'a> CodeGenerator<'a> {
                 scope
                     .in_scope
                     // FIXME, this won't always be variable 0
-                    .insert(HirVariable(0), self.builder.top());
+                    .insert(ontos::Variable(0), self.builder.top());
                 scope
             }
             HirKind::Variable(var) => {
@@ -254,7 +254,7 @@ impl<'a> CodeGenerator<'a> {
     fn codegen_variable(
         &mut self,
         block: &mut Block,
-        var: HirVariable,
+        var: ontos::Variable,
         span: &SourceSpan,
     ) -> CodegenResult<()> {
         for scope in self.scope_stack.iter().rev() {

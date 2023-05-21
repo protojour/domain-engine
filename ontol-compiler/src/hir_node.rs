@@ -16,16 +16,6 @@ use crate::{types::TypeRef, SourceSpan};
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct BindDepth(pub u16);
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct HirVariable(pub u16);
-
-impl Debug for HirVariable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let var = &self.0;
-        write!(f, "HirVariable({var})")
-    }
-}
-
 /// A "code" node with complete type information attached.
 /// Hir means High-level Intermediate Representation.
 #[derive(Clone, Debug)]
@@ -47,7 +37,7 @@ pub enum HirKind<'m> {
     /// A struct pattern, containing destructuring of properties
     StructPattern(IndexMap<PropertyId, HirIdx>),
     /// A variable definition
-    Variable(HirVariable),
+    Variable(ontos::Variable),
     /// A variable reference (usage site)
     VariableRef(HirIdx),
     /// A constant/literal expression

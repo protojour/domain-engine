@@ -360,7 +360,7 @@ mod tests {
 
     use crate::{
         codegen::equation::HirEquation,
-        hir_node::{HirKind, HirNode, HirNodeTable, HirVariable},
+        hir_node::{HirKind, HirNode, HirNodeTable},
         mem::{Intern, Mem},
         types::Type,
         Compiler, SourceSpan, Sources,
@@ -374,7 +374,7 @@ mod tests {
 
         let mut table = HirNodeTable::default();
         let var = table.add(HirNode {
-            kind: HirKind::Variable(HirVariable(42)),
+            kind: HirKind::Variable(ontos::Variable(42)),
             ty: int,
             span: SourceSpan::none(),
         });

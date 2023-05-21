@@ -7,14 +7,14 @@ use crate::{
         ir::Ir,
         proc_builder::{Block, Stack},
     },
-    hir_node::{HirIdx, HirKind, HirVariable},
+    hir_node::{HirIdx, HirKind},
     SourceSpan,
 };
 
 use super::{equation::HirEquation, generator::Scope};
 
 struct UnpackProp {
-    var: HirVariable,
+    var: ontos::Variable,
     kind: UnpackKind,
 }
 

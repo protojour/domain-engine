@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use kind::NodeKind;
 
 pub mod display;
@@ -5,8 +7,15 @@ pub mod kind;
 pub mod parse;
 pub mod visitor;
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Variable(pub u32);
+
+impl Debug for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = &self.0;
+        write!(f, "Variable({var})")
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);

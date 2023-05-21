@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 
 use crate::{
     expr::{Expr, ExprId},
-    hir_node::{BindDepth, HirBodyIdx, HirIdx, HirNodeTable, HirVariable},
+    hir_node::{BindDepth, HirBodyIdx, HirIdx, HirNodeTable},
     types::TypeRef,
 };
 
@@ -23,7 +23,7 @@ pub struct UnifyExprContext<'m> {
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
-    hir_var_allocations: Vec<u16>,
+    hir_var_allocations: Vec<u32>,
     body_id_counter: u32,
 }
 
@@ -49,7 +49,7 @@ impl<'m> UnifyExprContext<'m> {
         self.bind_depth
     }
 
-    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, HirVariable) -> T) -> T {
+    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontos::Variable) -> T) -> T {
         // There is a unique bind depth for the control flow variable:
         let ctrl_flow_var = self.alloc_hir_variable();
 
@@ -71,9 +71,9 @@ impl<'m> UnifyExprContext<'m> {
         self.bodies.get_mut(id.0 as usize).unwrap()
     }
 
-    pub fn alloc_hir_variable(&mut self) -> HirVariable {
+    pub fn alloc_hir_variable(&mut self) -> ontos::Variable {
         let alloc = self.hir_var_allocations.get_mut(0).unwrap();
-        let hir_var = HirVariable(*alloc);
+        let hir_var = ontos::Variable(*alloc);
         *alloc += 1;
         hir_var
     }
@@ -92,7 +92,7 @@ pub struct ExprRoot<'m> {
 }
 
 pub struct BoundVariable {
-    pub syntax_var: HirVariable,
+    pub variable: ontos::Variable,
     pub node_id: HirIdx,
     pub ctrl_group: Option<CtrlFlowGroup>,
 }
