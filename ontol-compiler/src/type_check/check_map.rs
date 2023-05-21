@@ -6,7 +6,7 @@ use ontos::visitor::OntosVisitor;
 use tracing::debug;
 
 use crate::{
-    codegen::{CodegenTask, MapCodegenTask},
+    codegen::{CodegenTask, MapCodegenTask, OntosMapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
@@ -141,16 +141,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_arms_v2(
         &mut self,
-        _def: &Def,
+        def: &Def,
         first_id: ExprId,
         second_id: ExprId,
         ctx: &mut UnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
         let mut first = self.check_root_expr2(first_id, ctx);
         self.infer_ontos_types(&mut first, ctx);
+        debug!("first: {first}");
 
         let mut second = self.check_root_expr2(second_id, ctx);
         self.infer_ontos_types(&mut second, ctx);
+        debug!("second: {first}");
+
+        self.codegen_tasks
+            .push(CodegenTask::OntosMap(OntosMapCodegenTask {
+                first,
+                second,
+                span: def.span,
+            }));
 
         Ok(())
     }

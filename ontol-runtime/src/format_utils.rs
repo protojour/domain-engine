@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 pub struct Missing<T> {
     pub items: Vec<T>,
@@ -112,5 +112,16 @@ impl Display for Indent {
             write!(f, "  ")?;
         }
         Ok(())
+    }
+}
+
+pub struct DebugViaDisplay<'a, T>(pub &'a T);
+
+impl<'a, T> Debug for DebugViaDisplay<'a, T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

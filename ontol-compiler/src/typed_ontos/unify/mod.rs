@@ -60,6 +60,7 @@ pub fn unify<'m>(mut source: OntosNode<'m>, mut target: OntosNode<'m>) -> OntosN
 
     let mut tag_ctx = TagCtx::default();
     let meta = target.meta;
+
     match target.kind {
         NodeKind::Struct(binder, children) => {
             let tagged_nodes = tag_ctx.enter_binder(binder, |ctx| tag_nodes(children, ctx));

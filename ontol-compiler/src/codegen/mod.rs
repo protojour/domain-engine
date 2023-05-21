@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    format_utils::DebugViaDisplay,
     vm::proc::{Address, Lib, NParams, Procedure},
     DefId, MapKey,
 };
@@ -21,6 +22,7 @@ use tracing::{debug, error, warn};
 use crate::{
     codegen::{generator::CodeGenerator, proc_builder::Stack},
     hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirNodeTable},
+    typed_ontos::{lang::OntosNode, unify::unify},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -31,6 +33,8 @@ use self::{
     link::{link, LinkResult},
     proc_builder::ProcBuilder,
 };
+
+const ONTOS_ENABLED: bool = false;
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
@@ -59,6 +63,15 @@ pub enum CodegenTask<'m> {
     // A procedure with 0 arguments, used to produce a constant value
     Const(ConstCodegenTask<'m>),
     Map(MapCodegenTask<'m>),
+    OntosMap(OntosMapCodegenTask<'m>),
+}
+
+#[derive(Debug)]
+pub struct ConstCodegenTask<'m> {
+    pub def_id: DefId,
+    pub nodes: HirNodeTable<'m>,
+    pub root: HirIdx,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug)]
@@ -68,12 +81,19 @@ pub struct MapCodegenTask<'m> {
     pub span: SourceSpan,
 }
 
-#[derive(Debug)]
-pub struct ConstCodegenTask<'m> {
-    pub def_id: DefId,
-    pub nodes: HirNodeTable<'m>,
-    pub root: HirIdx,
+pub struct OntosMapCodegenTask<'m> {
+    pub first: OntosNode<'m>,
+    pub second: OntosNode<'m>,
     pub span: SourceSpan,
+}
+
+impl<'m> Debug for OntosMapCodegenTask<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OntosMapCodegenTask")
+            .field("first", &DebugViaDisplay(&self.first))
+            .field("second", &DebugViaDisplay(&self.second))
+            .finish()
+    }
 }
 
 #[derive(Default)]
@@ -175,6 +195,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     &bodies,
                     CodeDirection::Backward,
                 );
+            }
+            CodegenTask::OntosMap(map_task) => {
+                if !ONTOS_ENABLED {
+                    continue;
+                }
+
+                unify(map_task.first.clone(), map_task.second.clone());
+                unify(map_task.second, map_task.first);
             }
         }
     }

@@ -20,6 +20,8 @@ use crate::{
 
 use super::{unify_ctx::UnifyExprContext, TypeCheck, TypeEquation, TypeError};
 
+const REPORT_ERRORS: bool = false;
+
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn check_root_expr2(
         &mut self,
@@ -69,7 +71,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Some(Type::Function { params, output }),
                     ) => {
                         if args.len() != params.len() {
-                            return self.expr2_error(
+                            return self.error_node(
                                 CompileError::IncorrectNumberOfArguments {
                                     expected: u8::try_from(params.len()).unwrap(),
                                     actual: u8::try_from(args.len()).unwrap(),
@@ -92,7 +94,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                         }
                     }
-                    _ => self.expr2_error(CompileError::NotCallable, &expr.span),
+                    _ => self.error_node(CompileError::NotCallable, &expr.span),
                 }
             }
             (ExprKind::Struct(type_path, attributes), expected_ty) => {
@@ -106,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             span: struct_node.meta.span,
                         },
                     },
-                    Some(expected_ty) => self.expr2_type_error(
+                    Some(expected_ty) => self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
                             actual: struct_node.meta.ty,
                             expected: expected_ty,
@@ -118,7 +120,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (ExprKind::Seq(_aggr_expr_id, _inner), _expected_ty) => {
                 debug!("TODO: Ontos sequence mapping");
-                self.error_node(&expr.span)
+                self.make_error_node(&expr.span)
             }
             (ExprKind::Constant(k), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
@@ -130,7 +132,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         },
                     }
                 } else {
-                    self.expr2_error(
+                    self.error_node(
                         CompileError::TODO(smart_format!("Expected integer type")),
                         &expr.span,
                     )
@@ -147,7 +149,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::Array(elem_ty)) => OntosNode {
                         kind: NodeKind::Unit,
                         meta: Meta {
-                            ty: self.log_type_error(
+                            ty: self.report_type_error(
                                 TypeError::VariableMustBeSequenceEnclosed(elem_ty),
                                 &expr.span,
                             ),
@@ -185,7 +187,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         },
                                     },
 
-                                    _ => self.expr2_type_error(err, &expr.span),
+                                    _ => self.type_error_node(err, &expr.span),
                                 }
                             }
                             Err(err) => todo!("Report unification error: {err:?}"),
@@ -196,7 +198,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (kind, ty) => self.expr2_error(
+            (kind, ty) => self.error_node(
                 CompileError::TODO(smart_format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"
                 )),
@@ -215,7 +217,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
             Type::Domain(subject_id) => subject_id,
-            _ => return self.expr2_error(CompileError::DomainTypeExpected, &type_path.span),
+            _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
         };
 
         let properties = self.relations.properties_by_type(type_path.def_id);
@@ -270,19 +272,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                 Some(DefKind::StringLiteral(lit)) => lit,
                                 _ => {
-                                    self.log_error(CompileError::NamedPropertyExpected, prop_span);
+                                    self.report_error(
+                                        CompileError::NamedPropertyExpected,
+                                        prop_span,
+                                    );
                                     continue;
                                 }
                             };
                             let match_property = match match_properties.get_mut(attr_prop) {
                                 Some(match_properties) => match_properties,
                                 None => {
-                                    self.log_error(CompileError::UnknownProperty, prop_span);
+                                    self.report_error(CompileError::UnknownProperty, prop_span);
                                     continue;
                                 }
                             };
                             if match_property.used {
-                                self.log_error(CompileError::DuplicateProperty, prop_span);
+                                self.report_error(CompileError::DuplicateProperty, prop_span);
                                 continue;
                             }
                             match_property.used = true;
@@ -317,7 +322,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for (prop_name, match_property) in match_properties.into_iter() {
                             if !match_property.used {
-                                self.log_error(
+                                self.report_error(
                                     CompileError::MissingProperty(prop_name.into()),
                                     &span,
                                 );
@@ -328,7 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     None => {
                         if !attributes.is_empty() {
-                            return self.expr2_error(CompileError::NoPropertiesExpected, &span);
+                            return self.error_node(CompileError::NoPropertiesExpected, &span);
                         }
                         NodeKind::Unit
                     }
@@ -351,14 +356,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         inner_node.kind
                     }
-                    _ => return self.expr2_error(CompileError::AnonymousPropertyExpected, &span),
+                    _ => return self.error_node(CompileError::AnonymousPropertyExpected, &span),
                 }
             }
             Some(Constructor::Intersection(_)) => {
                 todo!()
             }
             Some(Constructor::Union(_property_set)) => {
-                return self.expr2_error(CompileError::CannotMapUnion, &span)
+                return self.error_node(CompileError::CannotMapUnion, &span)
             }
             Some(Constructor::Sequence(_)) => todo!(),
             Some(Constructor::StringFmt(_)) => todo!(),
@@ -375,23 +380,35 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     // Note: These should be replaced with versions that report errors to the user
 
-    fn expr2_type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> OntosNode<'m> {
-        self.log_type_error(error, span);
-        self.error_node(span)
+    fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> OntosNode<'m> {
+        self.report_type_error(error, span);
+        self.make_error_node(span)
     }
 
-    fn expr2_error(&mut self, error: CompileError, span: &SourceSpan) -> OntosNode<'m> {
-        // self.errors.push(error.spanned(span));
-        error!("expr2 error: {error:?}");
-        self.error_node(span)
+    fn error_node(&mut self, error: CompileError, span: &SourceSpan) -> OntosNode<'m> {
+        self.report_error(error, span);
+        self.make_error_node(span)
     }
 
-    fn log_error(&mut self, error: CompileError, _span: &SourceSpan) -> TypeRef<'m> {
-        error!("expr2 error: {error:?}");
+    fn report_type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
+        if REPORT_ERRORS {
+            self.type_error(error, span);
+        } else {
+            error!("Type Error (noted): {error:?}");
+        }
         self.types.intern(Type::Error)
     }
 
-    fn error_node(&mut self, span: &SourceSpan) -> OntosNode<'m> {
+    fn report_error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
+        if REPORT_ERRORS {
+            self.error(error, span);
+        } else {
+            error!("expr2 error: {error:?}");
+        }
+        self.types.intern(Type::Error)
+    }
+
+    fn make_error_node(&mut self, span: &SourceSpan) -> OntosNode<'m> {
         OntosNode {
             kind: NodeKind::Unit,
             meta: Meta {

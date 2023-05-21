@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{smart_format, DefId};
-use tracing::error;
 
 use crate::{
     codegen::CodegenTasks,
@@ -106,11 +105,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 span,
             ),
         }
-    }
-
-    fn log_type_error(&mut self, error: TypeError<'m>, _span: &SourceSpan) -> TypeRef<'m> {
-        error!("Type Error (noted): {error:?}");
-        self.types.intern(Type::Error)
     }
 }
 
