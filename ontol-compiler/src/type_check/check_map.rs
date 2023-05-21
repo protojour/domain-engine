@@ -57,6 +57,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             )?;
         }
 
+        // experimental:
+        {
+            self.check_root_expr2(first_id, &mut ctx);
+            self.check_root_expr2(second_id, &mut ctx);
+        }
+
         let mut root_body = ctx.expr_body_mut(root_body_idx);
         root_body.first = Some(self.consume_expr(first_id));
         root_body.second = Some(self.consume_expr(second_id));
