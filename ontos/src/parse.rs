@@ -8,13 +8,16 @@ use crate::{
 #[derive(Debug)]
 pub enum Error<'s> {
     Unexpected(Class),
-    Expected(Class),
+    Expected(Class, Found<Token<'s>>),
     InvalidChar(char),
     InvalidToken(Token<'s>),
     InvalidIdent(&'s str),
     InvalidNumber,
     InvalidVariableNumber,
 }
+
+#[derive(Debug)]
+pub struct Found<T>(pub T);
 
 #[derive(Debug)]
 pub enum Class {
@@ -92,7 +95,9 @@ impl<L: Lang> Parser<L> {
                         (
                             self.make_node(NodeKind::Prop(
                                 var,
-                                prop.parse().map_err(|_| Error::Expected(Class::Property))?,
+                                prop.parse().map_err(|_| {
+                                    Error::Expected(Class::Property, Found(Token::Ident(prop)))
+                                })?,
                                 PropVariant {
                                     rel: Box::new(rel),
                                     val: Box::new(value),
@@ -113,7 +118,9 @@ impl<L: Lang> Parser<L> {
                         (
                             self.make_node(NodeKind::MatchProp(
                                 struct_var,
-                                prop.parse().map_err(|_| Error::Expected(Class::Property))?,
+                                prop.parse().map_err(|_| {
+                                    Error::Expected(Class::Property, Found(Token::Ident(prop)))
+                                })?,
                                 arms,
                             )),
                             next,
@@ -222,21 +229,21 @@ impl<L: Lang> Parser<L> {
 fn parse_ident(next: &str) -> ParseResult<'_, &str> {
     match parse_token(next)? {
         (Token::Ident(ident), next) => Ok((ident, next)),
-        _ => Err(Error::Expected(Class::Ident)),
+        (token, _) => Err(Error::Expected(Class::Ident, Found(token))),
     }
 }
 
 fn parse_dollar(next: &str) -> ParseResult<'_, ()> {
     match parse_token(next)? {
         (Token::Dollar, next) => Ok(((), next)),
-        _ => Err(Error::Expected(Class::Dollar)),
+        (token, _) => Err(Error::Expected(Class::Dollar, Found(token))),
     }
 }
 
 fn _parse_hash(next: &str) -> ParseResult<'_, ()> {
     match parse_token(next)? {
         (Token::Hash, next) => Ok(((), next)),
-        _ => Err(Error::Expected(Class::Hash)),
+        (token, _) => Err(Error::Expected(Class::Hash, Found(token))),
     }
 }
 
@@ -258,14 +265,14 @@ fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
 fn parse_lparen(next: &str) -> ParseResult<'_, ()> {
     match parse_token(next)? {
         (Token::LParen, next) => Ok(((), next)),
-        _ => Err(Error::Expected(Class::LParen)),
+        (token, _) => Err(Error::Expected(Class::LParen, Found(token))),
     }
 }
 
 fn parse_rparen(next: &str) -> ParseResult<'_, ()> {
     match parse_raw_token(next)? {
         (Token::RParen, next) => Ok(((), next)),
-        _ => Err(Error::Expected(Class::RParen)),
+        (token, _) => Err(Error::Expected(Class::RParen, Found(token))),
     }
 }
 

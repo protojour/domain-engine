@@ -196,12 +196,13 @@ fn test_unify_flat_map1() {
     let output = test_unify(
         "
         (struct ($2)
-            (prop #2 s:0:0 (#u $0))
-            (seq-prop #0 #2 s:1:1
-                (#u
-                    (struct (#4)
-                        (prop #4 s:2:2
-                            (#u #1)
+            (prop $2 s:0:0 (#u $0))
+            (prop $2 s:1:1
+                (seq @0
+                    #u
+                    (struct ($4)
+                        (prop $4 s:2:2
+                            (#u $1)
                         )
                     )
                 )
@@ -210,12 +211,13 @@ fn test_unify_flat_map1() {
         ",
         "
         (seq @0
-            (struct (#6)
-                (prop #6 o:0:0
-                    (#u #0)
+            #u
+            (struct ($6)
+                (prop $6 o:0:0
+                    (#u $0)
                 )
-                (prop #6 o:1:1
-                    (#u #1)
+                (prop $6 o:1:1
+                    (#u $1)
                 )
             )
         )
@@ -223,15 +225,6 @@ fn test_unify_flat_map1() {
     );
     let expected = indoc! {"
         |#1| (struct (#2)
-            (match-prop #1 s:0:0
-                ((#_ #3)
-                    (let (#0 (+ #3 10))
-                        (prop #2 s:0:1
-                            (#u (+ #0 20))
-                        )
-                    )
-                )
-            )
         )"
     };
     assert_eq!(expected, output);
