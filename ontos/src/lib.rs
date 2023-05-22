@@ -1,6 +1,8 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use kind::NodeKind;
+
+use crate::display::AsAlpha;
 
 pub mod display;
 pub mod kind;
@@ -12,16 +14,33 @@ pub struct Variable(pub u32);
 
 impl Debug for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let var = &self.0;
-        write!(f, "Variable({var})")
+        write!(f, "Variable({})", AsAlpha(self.0))
+    }
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", AsAlpha(self.0))
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Label(pub u32);
+
+impl Debug for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Label({})", AsAlpha(self.0))
+    }
+}
+
+impl Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", AsAlpha(self.0))
+    }
+}
 
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
@@ -69,16 +88,22 @@ mod tests {
     }
 
     #[test]
+    fn test_big_var() {
+        let src = "$abc";
+        assert_eq!(src, parse_print(src));
+    }
+
+    #[test]
     fn test_fn_call() {
-        let src = "(+ $0 2)";
+        let src = "(+ $a 2)";
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
     fn test_match_prop1() {
         let src = indoc! {"
-            (match-prop $0 s:10:10
-                (($_ $2) #u)
+            (match-prop $a S:10:10
+                (($_ $b) #u)
                 (() #u)
             )"
         };
@@ -88,10 +113,10 @@ mod tests {
     #[test]
     fn test_match_prop2() {
         let src = indoc! {"
-            (match-prop $0 s:0:0
-                (($_ $2)
-                    (match-prop $2 s:0:1
-                        (($_ $3) #u)
+            (match-prop $a S:0:0
+                (($_ $b)
+                    (match-prop $b S:0:1
+                        (($_ $c) #u)
                         (() #u)
                     )
                 )
@@ -104,18 +129,18 @@ mod tests {
     #[test]
     fn test_struct() {
         let src = indoc! {"
-            (struct ($0)
-                (prop $0 s:0:0
+            (struct ($a)
+                (prop $a S:0:0
                     (#u #u)
                 )
-                (prop $0 s:0:0
+                (prop $a S:0:0
                     (#u
-                        (struct ($1))
+                        (struct ($b))
                     )
                 )
-                (prop $0 s:0:0
+                (prop $a S:0:0
                     (
-                        (struct ($2))
+                        (struct ($c))
                         #u
                     )
                 )
@@ -128,7 +153,7 @@ mod tests {
     fn test_mixed() {
         let src = indoc! {"
             (+ 1
-                (struct ($0))
+                (struct ($a))
             )"
         };
         assert_eq!(src, parse_print(src));
@@ -137,10 +162,10 @@ mod tests {
     #[test]
     fn test_seq() {
         let src = indoc! {"
-            (struct ($0)
-                (prop $0 s:0:0
+            (struct ($a)
+                (prop $a S:0:0
                     (#u
-                        (seq (#0) $1)
+                        (seq (@c) $b)
                     )
                 )
             )"
@@ -151,10 +176,10 @@ mod tests {
     #[test]
     fn test_map_seq() {
         let src = indoc! {"
-            (struct ($0)
-                (match-prop $1 s:0:0
-                    (($_ $2)
-                        (map-seq $2 ($3) $3)
+            (struct ($a)
+                (match-prop $b S:0:0
+                    (($_ $c)
+                        (map-seq $c ($d) $d)
                     )
                 )
             )"
@@ -165,9 +190,9 @@ mod tests {
     #[test]
     fn test_let() {
         let src = indoc! {"
-            (let ($0 (+ 1 2))
-                (prop $1 s:0:0
-                    (#u $0)
+            (let ($a (+ 1 2))
+                (prop $b S:0:0
+                    (#u $a)
                 )
             )"
         };

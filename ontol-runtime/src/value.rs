@@ -142,8 +142,8 @@ impl Display for PropertyId {
             f,
             "{}:{}:{}",
             match self.role {
-                Role::Subject => 's',
-                Role::Object => 'o',
+                Role::Subject => 'S',
+                Role::Object => 'O',
             },
             self.relation_id.0 .0 .0,
             self.relation_id.0 .1,
@@ -157,8 +157,8 @@ impl FromStr for PropertyId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iterator = s.split(':');
         let role = match iterator.next().ok_or(())? {
-            "s" => Role::Subject,
-            "o" => Role::Object,
+            "S" => Role::Subject,
+            "O" => Role::Object,
             _ => Err(())?,
         };
         let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
