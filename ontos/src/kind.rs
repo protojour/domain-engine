@@ -1,5 +1,4 @@
-use ontol_runtime::vm::proc::BuiltinProc;
-use smartstring::alias::String;
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{Binder, Lang, Node, Variable};
 
@@ -14,9 +13,9 @@ pub enum NodeKind<'a, L: Lang> {
     Call(BuiltinProc, Nodes<'a, L>),
     Seq(Binder, Nodes<'a, L>),
     Struct(Binder, Nodes<'a, L>),
-    Prop(Variable, String, PropVariant<'a, L>),
+    Prop(Variable, PropertyId, PropVariant<'a, L>),
     MapSeq(Variable, Binder, Nodes<'a, L>),
-    MatchProp(Variable, String, Vec<MatchArm<'a, L>>),
+    MatchProp(Variable, PropertyId, Vec<MatchArm<'a, L>>),
 }
 
 impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {

@@ -1,11 +1,12 @@
 use std::{
     collections::BTreeMap,
     fmt::{Debug, Display},
+    str::FromStr,
 };
 
 use smartstring::alias::String;
 
-use crate::{cast::Cast, DefId, RelationId, Role};
+use crate::{cast::Cast, DefId, PackageId, RelationId, Role};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -133,6 +134,45 @@ impl<'d> Display for FormatStringData<'d> {
 pub struct PropertyId {
     pub role: Role,
     pub relation_id: RelationId,
+}
+
+impl Display for PropertyId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            match self.role {
+                Role::Subject => 's',
+                Role::Object => 'o',
+            },
+            self.relation_id.0 .0 .0,
+            self.relation_id.0 .1,
+        )
+    }
+}
+
+impl FromStr for PropertyId {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut iterator = s.split(":");
+        let role = match iterator.next().ok_or(())? {
+            "s" => Role::Subject,
+            "o" => Role::Object,
+            _ => Err(())?,
+        };
+        let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
+        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+
+        if !iterator.next().is_none() {
+            return Err(());
+        }
+
+        Ok(PropertyId {
+            role,
+            relation_id: RelationId(DefId(package_id, def_idx)),
+        })
+    }
 }
 
 impl Debug for PropertyId {

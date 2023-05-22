@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn test_match_prop1() {
         let src = indoc! {"
-            (match-prop #0 foo
+            (match-prop #0 s:10:10
                 ((#_ #2) #u)
                 (() #u)
             )"
@@ -85,9 +85,9 @@ mod tests {
     #[test]
     fn test_match_prop2() {
         let src = indoc! {"
-            (match-prop #0 foo
+            (match-prop #0 s:0:0
                 ((#_ #2)
-                    (match-prop #2 bar
+                    (match-prop #2 s:0:1
                         ((#_ #3) #u)
                         (() #u)
                     )
@@ -102,15 +102,15 @@ mod tests {
     fn test_struct() {
         let src = indoc! {"
             (struct (#0)
-                (prop #0 foo
+                (prop #0 s:0:0
                     (#u #u)
                 )
-                (prop #0 foo
+                (prop #0 s:0:0
                     (#u
                         (struct (#1))
                     )
                 )
-                (prop #0 foo
+                (prop #0 s:0:0
                     (
                         (struct (#2))
                         #u
@@ -135,7 +135,7 @@ mod tests {
     fn test_seq() {
         let src = indoc! {"
             (struct (#0)
-                (prop #0 a
+                (prop #0 s:0:0
                     (#u
                         (seq (#1) #1)
                     )
@@ -149,7 +149,7 @@ mod tests {
     fn test_map_seq() {
         let src = indoc! {"
             (struct (#0)
-                (match-prop #1 prop
+                (match-prop #1 s:0:0
                     ((#_ #2)
                         (map-seq #2 (#3) #3)
                     )
@@ -163,7 +163,7 @@ mod tests {
     fn test_let() {
         let src = indoc! {"
             (let (#0 (+ 1 2))
-                (prop #1 a
+                (prop #1 s:0:0
                     (#u #0)
                 )
             )"

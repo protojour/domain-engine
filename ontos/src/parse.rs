@@ -23,6 +23,7 @@ pub enum Class {
     RParen,
     Ident,
     Hash,
+    Property,
 }
 
 #[derive(Debug)]
@@ -85,7 +86,7 @@ impl<L: Lang> Parser<L> {
                         (
                             self.make_node(NodeKind::Prop(
                                 var,
-                                prop.into(),
+                                prop.parse().map_err(|_| Error::Expected(Class::Property))?,
                                 PropVariant {
                                     rel: Box::new(rel),
                                     val: Box::new(value),
@@ -104,7 +105,11 @@ impl<L: Lang> Parser<L> {
                         let (prop, next) = parse_ident(next)?;
                         let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
                         (
-                            self.make_node(NodeKind::MatchProp(struct_var, prop.into(), arms)),
+                            self.make_node(NodeKind::MatchProp(
+                                struct_var,
+                                prop.parse().map_err(|_| Error::Expected(Class::Property))?,
+                                arms,
+                            )),
                             next,
                         )
                     }

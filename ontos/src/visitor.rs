@@ -1,3 +1,5 @@
+use ontol_runtime::value::PropertyId;
+
 use crate::{
     kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
     Lang, Node, Variable,
@@ -25,7 +27,7 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
     }
 
     #[allow(unused_variables)]
-    fn visit_prop(&mut self, prop: &mut str) {}
+    fn visit_property_id(&mut self, prop: &mut PropertyId) {}
 
     #[allow(unused_variables)]
     fn visit_binder(&mut self, variable: &mut Variable) {}
@@ -73,13 +75,13 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
             }
             NodeKind::Prop(struct_var, prop, variant) => {
                 self.visit_variable(struct_var);
-                self.visit_prop(prop);
+                self.visit_property_id(prop);
                 self.visit_node(0, &mut variant.rel);
                 self.visit_node(1, &mut variant.val);
             }
             NodeKind::MatchProp(struct_var, prop, arms) => {
                 self.visit_variable(struct_var);
-                self.visit_prop(prop);
+                self.visit_property_id(prop);
                 for (index, arm) in arms.iter_mut().enumerate() {
                     self.visit_match_arm(index, arm);
                 }

@@ -2,7 +2,10 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     smart_format, value::PropertyId, vm::proc::BuiltinProc, DefId, RelationId, Role,
 };
-use ontos::{kind::NodeKind, Binder};
+use ontos::{
+    kind::{NodeKind, PropVariant},
+    Binder,
+};
 use tracing::debug;
 
 use crate::{
@@ -144,17 +147,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .expect("variable not found");
 
                 match expected_ty {
-                    Some(Type::Array(elem_ty)) => OntosNode {
-                        kind: NodeKind::Unit,
-                        meta: Meta {
-                            ty: self.type_error(
-                                TypeError::VariableMustBeSequenceEnclosed(elem_ty),
-                                &expr.span,
-                                IrVariant::Ontos,
-                            ),
-                            span: expr.span,
-                        },
-                    },
+                    Some(Type::Array(elem_ty)) => self.type_error_node(
+                        TypeError::VariableMustBeSequenceEnclosed(elem_ty),
+                        &expr.span,
+                    ),
                     Some(expected_ty) => {
                         let variable_ref = OntosNode {
                             kind: NodeKind::VariableRef(ontos::Variable(bound_variable.node_id.0)),
@@ -225,6 +221,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.map.as_ref()) {
                     Some(property_set) => {
+                        let struct_binder = Binder(ctx.alloc_ontos_variable());
+
                         struct MatchProperty {
                             relation_id: RelationId,
                             cardinality: Cardinality,
@@ -260,7 +258,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             })
                             .collect::<IndexMap<_, _>>();
 
-                        let mut typed_properties = IndexMap::new();
+                        let mut ontos_props = vec![];
 
                         for ExprStructAttr {
                             key: (def, prop_span),
@@ -324,8 +322,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                             };
 
-                            typed_properties
-                                .insert(PropertyId::subject(match_property.relation_id), node);
+                            ontos_props.push(OntosNode {
+                                kind: NodeKind::Prop(
+                                    struct_binder.0,
+                                    PropertyId::subject(match_property.relation_id),
+                                    PropVariant {
+                                        rel: Box::new(self.unit_node_no_span()),
+                                        val: Box::new(node),
+                                    },
+                                ),
+                                meta: Meta {
+                                    ty: self.types.intern(Type::Tautology),
+                                    span: *prop_span,
+                                },
+                            });
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -338,8 +348,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        let binder = Binder(ctx.alloc_ontos_variable());
-                        NodeKind::Struct(binder, [].into())
+                        NodeKind::Struct(struct_binder, ontos_props)
                     }
                     None => {
                         if !attributes.is_empty() {
@@ -404,6 +413,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             meta: Meta {
                 ty: self.types.intern(Type::Error),
                 span: *span,
+            },
+        }
+    }
+
+    fn unit_node_no_span(&mut self) -> OntosNode<'m> {
+        OntosNode {
+            kind: NodeKind::Unit,
+            meta: Meta {
+                ty: self.types.intern(Type::Unit(DefId::unit())),
+                span: SourceSpan::none(),
             },
         }
     }
