@@ -47,6 +47,9 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index, arg);
                 }
             }
+            NodeKind::Map(arg) => {
+                self.visit_node(0, arg);
+            }
             NodeKind::Let(binder, def, body) => {
                 self.visit_binder(&mut binder.0);
                 self.visit_node(0, def);

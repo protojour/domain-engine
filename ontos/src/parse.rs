@@ -71,6 +71,10 @@ impl<L: Lang> Parser<L> {
                             next,
                         )
                     }
+                    ("map", next) => {
+                        let (arg, next) = self.parse(next)?;
+                        (self.make_node(NodeKind::Map(Box::new(arg))), next)
+                    }
                     ("struct", next) => {
                         let (binder, next) = parse_binder(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;

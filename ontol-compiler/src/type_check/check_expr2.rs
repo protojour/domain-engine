@@ -1,7 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{
-    smart_format, value::PropertyId, vm::proc::BuiltinProc, DefId, RelationId, Role,
-};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use ontos::{
     kind::{NodeKind, PropVariant},
     Binder,
@@ -171,11 +169,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Err(err @ TypeError::Mismatch(type_eq)) => {
                                 match (&type_eq.actual, &type_eq.expected) {
                                     (Type::Domain(_), Type::Domain(_)) => OntosNode {
-                                        // FIXME: Properly represent map call
-                                        kind: NodeKind::Call(
-                                            BuiltinProc::Append,
-                                            [variable_ref].into(),
-                                        ),
+                                        kind: NodeKind::Map(Box::new(variable_ref)),
                                         meta: Meta {
                                             ty: expected_ty,
                                             span: expr.span,

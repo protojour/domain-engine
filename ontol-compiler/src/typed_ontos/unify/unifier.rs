@@ -139,7 +139,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::Int(_int) => panic!(),
             NodeKind::Call(proc, args) => match u_node.sub_unifications.len() {
                 0 => {
-                    let args = self.unify_children(args, u_node);
+                    let args = self.unify_children(u_node, args);
                     Unified {
                         binder: None,
                         nodes: [OntosNode {
@@ -169,12 +169,27 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     panic!("Multiple variables in function call!");
                 }
             },
+            NodeKind::Map(arg) => match u_node.sub_unifications.remove(&0) {
+                None => {
+                    let unified_arg = self.unify_node(u_node, arg);
+                    let arg: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
+                    Unified {
+                        binder: unified_arg.binder,
+                        nodes: [OntosNode {
+                            kind: NodeKind::Map(Box::new(arg)),
+                            meta,
+                        }]
+                        .into(),
+                    }
+                }
+                Some(sub_node) => self.unify_node(sub_node, arg),
+            },
             NodeKind::Let(..) => {
                 unimplemented!("BUG: Let is an output node")
             }
             NodeKind::Seq(_binder, _nodes) => panic!(),
             NodeKind::Struct(binder, nodes) => {
-                let nodes = self.unify_children(nodes, u_node);
+                let nodes = self.unify_children(u_node, nodes);
                 Unified {
                     binder: Some(*binder),
                     nodes: nodes.into(),
@@ -327,8 +342,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_children(
         &mut self,
-        children: &[OntosNode<'m>],
         u_node: UnificationNode<'m>,
+        children: &[OntosNode<'m>],
     ) -> Vec<OntosNode<'m>> {
         u_node
             .sub_unifications

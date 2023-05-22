@@ -55,7 +55,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                 None => {
                     call_procedure.address = Address(0);
                     compiler.push_error(
-                        CompileError::CannotConvertMissingEquation {
+                        CompileError::CannotConvertMissingMapping {
                             input: format_map_key(compiler, map_call.mapping.0),
                             output: format_map_key(compiler, map_call.mapping.1),
                         }

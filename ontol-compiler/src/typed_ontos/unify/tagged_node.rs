@@ -60,6 +60,7 @@ impl<'m> TaggedNode<'m> {
             NodeKind::Unit => NodeKind::Unit,
             NodeKind::Int(int) => NodeKind::Int(int),
             NodeKind::Call(proc, args) => NodeKind::Call(proc, nodes_to_ontos(args)),
+            NodeKind::Map(arg) => NodeKind::Map(Box::new(arg.into_ontos_node())),
             NodeKind::Let(binder, def, body) => NodeKind::Let(
                 binder,
                 Box::new(def.into_ontos_node()),
@@ -148,6 +149,15 @@ impl Tagger {
             }
             NodeKind::Call(proc, args) => {
                 self.tag_union_children(args, |args| NodeKind::Call(proc, args), meta)
+            }
+            NodeKind::Map(arg) => {
+                let arg = self.tag_node(*arg);
+                let free_variables = arg.free_variables.clone();
+                TaggedNode {
+                    kind: NodeKind::Map(Box::new(arg)),
+                    meta,
+                    free_variables,
+                }
             }
             NodeKind::Seq(binder, nodes) => self.enter_binder(binder, |zelf| {
                 zelf.tag_union_children(nodes, |nodes| NodeKind::Seq(binder, nodes), meta)

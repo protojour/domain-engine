@@ -82,6 +82,34 @@ fn test_unify_basic_struct() {
 }
 
 #[test]
+fn test_unify_struct_map_prop() {
+    let output = test_unify(
+        "
+        (struct (#1)
+            (prop #1 s:0:0 (#u (map #0)))
+        )
+        ",
+        "
+        (struct (#2)
+            (prop #2 s:0:1 (#u (map #0)))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |#1| (struct (#2)
+            (match-prop #1 s:0:0
+                ((#_ #0)
+                    (prop #2 s:0:1
+                        (#u (map #0))
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_struct_simple_arithmetic() {
     let output = test_unify(
         "
