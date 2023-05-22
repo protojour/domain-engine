@@ -235,12 +235,12 @@ mod tests {
     #[test]
     fn test_tag() {
         let src = "
-            (struct (#0)
-                (prop #0 s:0:0
-                    (#1
-                        (struct (#2)
-                            (prop #2 s:0:1
-                                (#3 #4)
+            (struct ($0)
+                (prop $0 s:0:0
+                    ($1
+                        (struct ($2)
+                            (prop $2 s:0:1
+                                ($3 $4)
                             )
                         )
                     )

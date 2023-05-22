@@ -29,7 +29,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
         let indent = self.indent;
         match kind {
             NodeKind::VariableRef(var) => {
-                write!(f, "{sep}#{}", var.0)?;
+                write!(f, "{sep}${}", var.0)?;
                 Ok(sep.multiline())
             }
             NodeKind::Int(int) => {
@@ -41,7 +41,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 Ok(sep.multiline())
             }
             NodeKind::Let(binder, definition, body) => {
-                write!(f, "{indent}(let (#{}", binder.0 .0)?;
+                write!(f, "{indent}(let (${}", binder.0 .0)?;
                 let multi = self.print(Sep::Space, definition.kind(), f)?;
                 self.print_rparen(multi, f)?;
                 let multi = self.print_all(self.indent.indent(), body.iter().map(Node::kind), f)?;
@@ -69,31 +69,31 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 Ok(multi.or(sep))
             }
             NodeKind::Seq(binder, children) => {
-                write!(f, "{indent}(seq (#{})", binder.0 .0)?;
+                write!(f, "{indent}(seq (${})", binder.0 .0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             NodeKind::Struct(binder, children) => {
-                write!(f, "{indent}(struct (#{})", binder.0 .0)?;
+                write!(f, "{indent}(struct (${})", binder.0 .0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             NodeKind::Prop(struct_var, id, variant) => {
-                write!(f, "{indent}(prop #{} {id}", struct_var.0)?;
+                write!(f, "{indent}(prop ${} {id}", struct_var.0)?;
                 let multi = self.print_all(Sep::Space, [variant].into_iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             NodeKind::MapSeq(var, binder, children) => {
-                write!(f, "{indent}(map-seq #{} (#{})", var.0, binder.0 .0)?;
+                write!(f, "{indent}(map-seq ${} (${})", var.0, binder.0 .0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             NodeKind::MatchProp(struct_var, id, arms) => {
-                write!(f, "{indent}(match-prop #{} {}", struct_var.0, id)?;
+                write!(f, "{indent}(match-prop ${} {}", struct_var.0, id)?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -142,10 +142,10 @@ impl<L: Lang> Print<PatternBinding> for Printer<L> {
     fn print(self, sep: Sep, ast: &PatternBinding, f: &mut std::fmt::Formatter) -> PrintResult {
         match ast {
             PatternBinding::Binder(var) => {
-                write!(f, "{sep}#{}", var.0)?;
+                write!(f, "{sep}${}", var.0)?;
             }
             PatternBinding::Wildcard => {
-                write!(f, "{sep}#_")?;
+                write!(f, "{sep}$_")?;
             }
         }
         Ok(Multiline(false))

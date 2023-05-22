@@ -67,15 +67,15 @@ mod tests {
 
     #[test]
     fn test_fn_call() {
-        let src = "(+ #0 2)";
+        let src = "(+ $0 2)";
         assert_eq!(src, parse_print(src));
     }
 
     #[test]
     fn test_match_prop1() {
         let src = indoc! {"
-            (match-prop #0 s:10:10
-                ((#_ #2) #u)
+            (match-prop $0 s:10:10
+                (($_ $2) #u)
                 (() #u)
             )"
         };
@@ -85,10 +85,10 @@ mod tests {
     #[test]
     fn test_match_prop2() {
         let src = indoc! {"
-            (match-prop #0 s:0:0
-                ((#_ #2)
-                    (match-prop #2 s:0:1
-                        ((#_ #3) #u)
+            (match-prop $0 s:0:0
+                (($_ $2)
+                    (match-prop $2 s:0:1
+                        (($_ $3) #u)
                         (() #u)
                     )
                 )
@@ -101,18 +101,18 @@ mod tests {
     #[test]
     fn test_struct() {
         let src = indoc! {"
-            (struct (#0)
-                (prop #0 s:0:0
+            (struct ($0)
+                (prop $0 s:0:0
                     (#u #u)
                 )
-                (prop #0 s:0:0
+                (prop $0 s:0:0
                     (#u
-                        (struct (#1))
+                        (struct ($1))
                     )
                 )
-                (prop #0 s:0:0
+                (prop $0 s:0:0
                     (
-                        (struct (#2))
+                        (struct ($2))
                         #u
                     )
                 )
@@ -125,7 +125,7 @@ mod tests {
     fn test_mixed() {
         let src = indoc! {"
             (+ 1
-                (struct (#0))
+                (struct ($0))
             )"
         };
         assert_eq!(src, parse_print(src));
@@ -134,10 +134,10 @@ mod tests {
     #[test]
     fn test_seq() {
         let src = indoc! {"
-            (struct (#0)
-                (prop #0 s:0:0
+            (struct ($0)
+                (prop $0 s:0:0
                     (#u
-                        (seq (#1) #1)
+                        (seq ($1) $1)
                     )
                 )
             )"
@@ -148,10 +148,10 @@ mod tests {
     #[test]
     fn test_map_seq() {
         let src = indoc! {"
-            (struct (#0)
-                (match-prop #1 s:0:0
-                    ((#_ #2)
-                        (map-seq #2 (#3) #3)
+            (struct ($0)
+                (match-prop $1 s:0:0
+                    (($_ $2)
+                        (map-seq $2 ($3) $3)
                     )
                 )
             )"
@@ -162,9 +162,9 @@ mod tests {
     #[test]
     fn test_let() {
         let src = indoc! {"
-            (let (#0 (+ 1 2))
-                (prop #1 s:0:0
-                    (#u #0)
+            (let ($0 (+ 1 2))
+                (prop $1 s:0:0
+                    (#u $0)
                 )
             )"
         };

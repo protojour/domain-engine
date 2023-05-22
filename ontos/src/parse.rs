@@ -22,6 +22,7 @@ pub enum Class {
     LParen,
     RParen,
     Ident,
+    Dollar,
     Hash,
     Property,
 }
@@ -32,6 +33,7 @@ pub enum Token<'s> {
     RParen,
     Ident(&'s str),
     Int(i64),
+    Dollar,
     Hash,
     Underscore,
 }
@@ -62,7 +64,7 @@ impl<L: Lang> Parser<L> {
                     ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
                     ("let", next) => {
                         let (_, next) = parse_lparen(next)?;
-                        let (bind_var, next) = parse_hash_var(next)?;
+                        let (bind_var, next) = parse_dollar_var(next)?;
                         let (def, next) = self.parse(next)?;
                         let (_, next) = parse_rparen(next)?;
                         let (body, next) = self.parse_many(next, Self::parse)?;
@@ -81,7 +83,7 @@ impl<L: Lang> Parser<L> {
                         (self.make_node(NodeKind::Struct(binder, children)), next)
                     }
                     ("prop", next) => {
-                        let (var, next) = parse_hash_var(next)?;
+                        let (var, next) = parse_dollar_var(next)?;
                         let (prop, next) = parse_ident(next)?;
                         let (_, next) = parse_lparen(next)?;
                         let (rel, next) = self.parse(next)?;
@@ -105,7 +107,7 @@ impl<L: Lang> Parser<L> {
                         (self.make_node(NodeKind::Seq(binder, children)), next)
                     }
                     ("match-prop", next) => {
-                        let (struct_var, next) = parse_hash_var(next)?;
+                        let (struct_var, next) = parse_dollar_var(next)?;
                         let (prop, next) = parse_ident(next)?;
                         let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
                         (
@@ -118,7 +120,7 @@ impl<L: Lang> Parser<L> {
                         )
                     }
                     ("map-seq", next) => {
-                        let (var, next) = parse_hash_var(next)?;
+                        let (var, next) = parse_dollar_var(next)?;
                         let (binder, next) = parse_binder(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;
                         (
@@ -131,10 +133,18 @@ impl<L: Lang> Parser<L> {
                 let (_, next) = parse_rparen(next)?;
                 Ok((node, next))
             }
-            (Token::Hash, next) => match parse_token(next)? {
+            (Token::Dollar, next) => match parse_token(next)? {
                 (Token::Int(int), next) => {
                     Ok((self.make_node(NodeKind::VariableRef(mk_var(int)?)), next))
                 }
+                (token, _) => Err(Error::InvalidToken(token)),
+            },
+            (Token::Hash, next) => match parse_token(next)? {
+                /*
+                (Token::Int(int), next) => {
+                    Ok((self.make_node(NodeKind::VariableRef(mk_var(int)?)), next))
+                }
+                */
                 (Token::Ident(ident), next) => match ident {
                     "u" => Ok((self.make_node(NodeKind::Unit), next)),
                     other => Err(Error::InvalidIdent(other)),
@@ -189,7 +199,7 @@ impl<L: Lang> Parser<L> {
     }
 
     fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, PatternBinding> {
-        let (_, next) = parse_hash(next)?;
+        let (_, next) = parse_dollar(next)?;
         match parse_token(next)? {
             (Token::Int(int), next) => Ok((PatternBinding::Binder(mk_var(int)?), next)),
             (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
@@ -216,15 +226,22 @@ fn parse_ident(next: &str) -> ParseResult<'_, &str> {
     }
 }
 
-fn parse_hash(next: &str) -> ParseResult<'_, ()> {
+fn parse_dollar(next: &str) -> ParseResult<'_, ()> {
+    match parse_token(next)? {
+        (Token::Dollar, next) => Ok(((), next)),
+        _ => Err(Error::Expected(Class::Dollar)),
+    }
+}
+
+fn _parse_hash(next: &str) -> ParseResult<'_, ()> {
     match parse_token(next)? {
         (Token::Hash, next) => Ok(((), next)),
         _ => Err(Error::Expected(Class::Hash)),
     }
 }
 
-fn parse_hash_var(next: &str) -> ParseResult<'_, Variable> {
-    let (_, next) = parse_hash(next)?;
+fn parse_dollar_var(next: &str) -> ParseResult<'_, Variable> {
+    let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
         (Token::Int(int), next) => Ok((mk_var(int)?, next)),
         (token, _) => Err(Error::InvalidToken(token)),
@@ -233,7 +250,7 @@ fn parse_hash_var(next: &str) -> ParseResult<'_, Variable> {
 
 fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
     let (_, next) = parse_lparen(next)?;
-    let (var, next) = parse_hash_var(next)?;
+    let (var, next) = parse_dollar_var(next)?;
     let (_, next) = parse_rparen(next)?;
     Ok((Binder(var), next))
 }
@@ -267,6 +284,7 @@ fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
         None => Err(Error::Unexpected(Class::Eof)),
         Some((_, '(')) => Ok((Token::LParen, chars.as_str())),
         Some((_, ')')) => Ok((Token::RParen, chars.as_str())),
+        Some((_, '$')) => Ok((Token::Dollar, chars.as_str())),
         Some((_, '#')) => Ok((Token::Hash, chars.as_str())),
         Some((_, '_')) => Ok((Token::Underscore, chars.as_str())),
         Some((_, char)) if char.is_numeric() => {
