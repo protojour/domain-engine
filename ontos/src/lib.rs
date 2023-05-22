@@ -140,7 +140,7 @@ mod tests {
             (struct ($0)
                 (prop $0 s:0:0
                     (#u
-                        (seq ($1) $1)
+                        (seq (#0) $1)
                     )
                 )
             )"
