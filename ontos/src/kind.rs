@@ -1,6 +1,6 @@
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
-use crate::{Binder, Lang, Node, Variable};
+use crate::{Binder, Label, Lang, Node, Variable};
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
@@ -31,8 +31,15 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
 
 #[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
+    pub dimension: Dimension,
     pub rel: Box<L::Node<'a>>,
     pub val: Box<L::Node<'a>>,
+}
+
+#[derive(Clone)]
+pub enum Dimension {
+    Singular,
+    Sequence(Label),
 }
 
 pub struct MatchArm<'a, L: Lang> {

@@ -72,6 +72,7 @@ impl<'m> TaggedNode<'m> {
                 struct_var,
                 id,
                 PropVariant {
+                    dimension: variant.dimension,
                     rel: Box::new((*variant.rel).into_ontos_node()),
                     val: Box::new((*variant.val).into_ontos_node()),
                 },
@@ -176,6 +177,7 @@ impl Tagger {
                         struct_var,
                         prop,
                         PropVariant {
+                            dimension: variant.dimension,
                             rel: Box::new(rel),
                             val: Box::new(val),
                         },

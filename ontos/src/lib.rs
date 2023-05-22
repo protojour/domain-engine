@@ -20,6 +20,9 @@ impl Debug for Variable {
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
+#[derive(Clone, Copy, Debug)]
+pub struct Label(pub u32);
+
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
 

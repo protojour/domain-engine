@@ -1,8 +1,8 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
-    Binder, Lang, Variable,
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    Binder, Label, Lang, Variable,
 };
 
 #[derive(Debug)]
@@ -25,6 +25,7 @@ pub enum Class {
     LParen,
     RParen,
     Ident,
+    Seq,
     Dollar,
     Hash,
     Property,
@@ -86,6 +87,16 @@ impl<L: Lang> Parser<L> {
                         (self.make_node(NodeKind::Struct(binder, children)), next)
                     }
                     ("prop", next) => {
+                        let (dimension, next) = match parse_ident(next) {
+                            Ok(("seq", next)) => {
+                                let (label, next) = parse_hash_label(next)?;
+                                (Dimension::Sequence(label), next)
+                            }
+                            Ok((ident, _)) => {
+                                return Err(Error::Expected(Class::Seq, Found(Token::Ident(ident))))
+                            }
+                            Err(_) => (Dimension::Singular, next),
+                        };
                         let (var, next) = parse_dollar_var(next)?;
                         let (prop, next) = parse_ident(next)?;
                         let (_, next) = parse_lparen(next)?;
@@ -99,6 +110,7 @@ impl<L: Lang> Parser<L> {
                                     Error::Expected(Class::Property, Found(Token::Ident(prop)))
                                 })?,
                                 PropVariant {
+                                    dimension,
                                     rel: Box::new(rel),
                                     val: Box::new(value),
                                 },
@@ -141,9 +153,10 @@ impl<L: Lang> Parser<L> {
                 Ok((node, next))
             }
             (Token::Dollar, next) => match parse_token(next)? {
-                (Token::Int(int), next) => {
-                    Ok((self.make_node(NodeKind::VariableRef(mk_var(int)?)), next))
-                }
+                (Token::Int(int), next) => Ok((
+                    self.make_node(NodeKind::VariableRef(Variable(to_u32(int)?))),
+                    next,
+                )),
                 (token, _) => Err(Error::InvalidToken(token)),
             },
             (Token::Hash, next) => match parse_token(next)? {
@@ -208,7 +221,7 @@ impl<L: Lang> Parser<L> {
     fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, PatternBinding> {
         let (_, next) = parse_dollar(next)?;
         match parse_token(next)? {
-            (Token::Int(int), next) => Ok((PatternBinding::Binder(mk_var(int)?), next)),
+            (Token::Int(int), next) => Ok((PatternBinding::Binder(Variable(to_u32(int)?)), next)),
             (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
             (token, _) => Err(Error::InvalidToken(token)),
         }
@@ -240,17 +253,10 @@ fn parse_dollar(next: &str) -> ParseResult<'_, ()> {
     }
 }
 
-fn _parse_hash(next: &str) -> ParseResult<'_, ()> {
-    match parse_token(next)? {
-        (Token::Hash, next) => Ok(((), next)),
-        (token, _) => Err(Error::Expected(Class::Hash, Found(token))),
-    }
-}
-
 fn parse_dollar_var(next: &str) -> ParseResult<'_, Variable> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Int(int), next) => Ok((mk_var(int)?, next)),
+        (Token::Int(int), next) => Ok((Variable(to_u32(int)?), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
@@ -260,6 +266,21 @@ fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
     let (var, next) = parse_dollar_var(next)?;
     let (_, next) = parse_rparen(next)?;
     Ok((Binder(var), next))
+}
+
+fn parse_hash(next: &str) -> ParseResult<'_, ()> {
+    match parse_token(next)? {
+        (Token::Hash, next) => Ok(((), next)),
+        (token, _) => Err(Error::Expected(Class::Hash, Found(token))),
+    }
+}
+
+fn parse_hash_label(next: &str) -> ParseResult<'_, Label> {
+    let (_, next) = parse_hash(next)?;
+    match parse_token(next)? {
+        (Token::Int(int), next) => Ok((Label(to_u32(int)?), next)),
+        (token, _) => Err(Error::InvalidToken(token)),
+    }
 }
 
 fn parse_lparen(next: &str) -> ParseResult<'_, ()> {
@@ -324,7 +345,7 @@ fn parse_int(num: &str) -> Result<Token<'_>, Error<'_>> {
     }
 }
 
-fn mk_var(num: i64) -> Result<Variable, Error<'static>> {
+fn to_u32(num: i64) -> Result<u32, Error<'static>> {
     let num: u32 = num.try_into().map_err(|_| Error::InvalidVariableNumber)?;
-    Ok(Variable(num))
+    Ok(num)
 }

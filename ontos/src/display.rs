@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     Lang, Node,
 };
 
@@ -111,7 +111,15 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
     ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
-        let multi = self.print_all(Sep::None, [node.rel.kind(), node.val.kind()].into_iter(), f)?;
+
+        let sep = if let Dimension::Sequence(label) = &node.dimension {
+            write!(f, "seq @{}", label.0)?;
+            self.indent.indent()
+        } else {
+            Sep::None
+        };
+
+        let multi = self.print_all(sep, [node.rel.kind(), node.val.kind()].into_iter(), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }

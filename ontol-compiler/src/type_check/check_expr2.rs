@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use ontos::{
-    kind::{NodeKind, PropVariant},
+    kind::{Dimension, NodeKind, PropVariant},
     Binder,
 };
 use tracing::debug;
@@ -321,6 +321,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
                                     PropVariant {
+                                        dimension: Dimension::Singular,
                                         rel: Box::new(self.unit_node_no_span()),
                                         val: Box::new(node),
                                     },
