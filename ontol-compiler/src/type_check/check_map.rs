@@ -148,11 +148,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<(), AggrGroupError> {
         let mut first = self.check_root_expr2(first_id, ctx);
         self.infer_ontos_types(&mut first, ctx);
-        debug!("first: {first}");
 
         let mut second = self.check_root_expr2(second_id, ctx);
         self.infer_ontos_types(&mut second, ctx);
-        debug!("second: {first}");
 
         self.codegen_tasks
             .push(CodegenTask::OntosMap(OntosMapCodegenTask {

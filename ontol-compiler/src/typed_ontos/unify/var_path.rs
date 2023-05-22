@@ -5,19 +5,33 @@ use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::{OntosNode, TypedOntos};
 
+use super::UnifierError;
+
 #[derive(Clone, Default, Debug)]
 pub struct Path(pub SmallVec<[u16; 32]>);
 
-pub fn locate_variables(node: &mut OntosNode, variables: &BitSet) -> FnvHashMap<Variable, Path> {
+pub fn locate_variables(
+    node: &mut OntosNode,
+    variables: &BitSet,
+) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
     let mut locator = VarLocator::new(variables);
+
     locator.traverse_kind(node.kind_mut());
-    locator.output
+
+    if !locator.duplicates.is_empty() {
+        Err(UnifierError::NonUniqueVariableDatapoints(
+            locator.duplicates,
+        ))
+    } else {
+        Ok(locator.output)
+    }
 }
 
 struct VarLocator<'a> {
     variables: &'a BitSet,
     current_path: Path,
 
+    duplicates: BitSet,
     output: FnvHashMap<Variable, Path>,
 }
 
@@ -25,8 +39,9 @@ impl<'a> VarLocator<'a> {
     pub(super) fn new(variables: &'a BitSet) -> Self {
         Self {
             variables,
-            output: FnvHashMap::default(),
             current_path: Path::default(),
+            duplicates: BitSet::new(),
+            output: FnvHashMap::default(),
         }
     }
 
@@ -45,7 +60,7 @@ impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
                 .insert(*variable, self.current_path.clone())
                 .is_some()
         {
-            panic!("BUG: Variable appears more than once");
+            self.duplicates.insert(variable.0 as usize);
         }
     }
 

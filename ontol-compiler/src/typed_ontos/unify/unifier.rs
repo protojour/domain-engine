@@ -17,7 +17,7 @@ use crate::typed_ontos::{
 use super::{
     tagged_node::{TaggedNode, Tagger},
     unification_tree::UnificationNode,
-    VariableTracker,
+    UnifierError, VariableTracker,
 };
 
 type UnifiedNodes<'m> = SmallVec<[OntosNode<'m>; 1]>;
@@ -43,7 +43,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 pub fn unify_to_function<'m>(
     mut source: OntosNode<'m>,
     mut target: OntosNode<'m>,
-) -> OntosFunc<'m> {
+) -> Result<OntosFunc<'m>, UnifierError> {
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, &mut source);
     var_tracker.visit_node(0, &mut target);
@@ -59,22 +59,22 @@ pub fn unify_to_function<'m>(
                 Tagger::default().enter_binder(binder, |ctx| ctx.tag_nodes(children)),
                 &mut source,
                 var_tracker.next_variable(),
-            );
+            )?;
 
-            OntosFunc {
+            Ok(OntosFunc {
                 arg: input_binder.unwrap(),
                 body: OntosNode {
                     kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
                     meta,
                 },
-            }
+            })
         }
         kind => {
             let tagged_node = Tagger::default().tag_node(OntosNode { kind, meta });
             let Unified {
                 nodes,
                 binder: input_binder,
-            } = unify_tagged_nodes(vec![tagged_node], &mut source, var_tracker.next_variable());
+            } = unify_tagged_nodes(vec![tagged_node], &mut source, var_tracker.next_variable())?;
 
             let body = match nodes.len() {
                 0 => panic!("No nodes"),
@@ -82,10 +82,10 @@ pub fn unify_to_function<'m>(
                 _ => panic!("Too many nodes"),
             };
 
-            OntosFunc {
+            Ok(OntosFunc {
                 arg: input_binder.unwrap(),
                 body,
-            }
+            })
         }
     }
 }
@@ -94,18 +94,18 @@ fn unify_tagged_nodes<'m>(
     tagged_nodes: Vec<TaggedNode<'m>>,
     root_source: &mut OntosNode<'m>,
     next_variable: Variable,
-) -> Unified<'m> {
+) -> Result<Unified<'m>, UnifierError> {
     let free_variables = union_bitsets(tagged_nodes.iter().map(|node| &node.free_variables));
     let u_tree = build_unification_tree(
         tagged_nodes,
-        &locate_variables(root_source, &free_variables),
+        &locate_variables(root_source, &free_variables)?,
     );
 
-    Unifier {
+    Ok(Unifier {
         root_source,
         next_variable,
     }
-    .unify_node(u_tree, root_source)
+    .unify_node(u_tree, root_source))
 }
 
 struct InvertedCall<'m> {

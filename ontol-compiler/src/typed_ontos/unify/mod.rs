@@ -1,3 +1,4 @@
+use bit_set::BitSet;
 use ontos::{visitor::OntosVisitor, Variable};
 
 use super::lang::TypedOntos;
@@ -7,6 +8,11 @@ pub mod unifier;
 mod tagged_node;
 mod unification_tree;
 mod var_path;
+
+#[derive(Debug)]
+pub enum UnifierError {
+    NonUniqueVariableDatapoints(BitSet),
+}
 
 struct VariableTracker {
     largest: Variable,

@@ -12,7 +12,7 @@ fn parse_typed(src: &str) -> OntosNode<'static> {
 }
 
 fn test_unify(source: &str, target: &str) -> String {
-    let func = unify_to_function(parse_typed(source), parse_typed(target));
+    let func = unify_to_function(parse_typed(source), parse_typed(target)).unwrap();
     let mut output = String::new();
     use std::fmt::Write;
     write!(&mut output, "|#{}| {}", func.arg.0 .0, func.body).unwrap();
