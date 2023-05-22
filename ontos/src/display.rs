@@ -68,8 +68,8 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            NodeKind::Seq(binder, children) => {
-                write!(f, "{indent}(seq (${})", binder.0 .0)?;
+            NodeKind::Seq(label, children) => {
+                write!(f, "{indent}(seq (#{})", label.0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))

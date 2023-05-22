@@ -57,8 +57,7 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index + 1, node);
                 }
             }
-            NodeKind::Seq(binder, children) => {
-                self.visit_binder(&mut binder.0);
+            NodeKind::Seq(_label, children) => {
                 for (index, child) in children.iter_mut().enumerate() {
                     self.visit_node(index, child);
                 }

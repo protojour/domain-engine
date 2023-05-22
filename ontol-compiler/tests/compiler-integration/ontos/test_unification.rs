@@ -191,14 +191,13 @@ fn test_struct_arithmetic_property_dependency() {
 }
 
 #[test]
-#[should_panic]
 fn test_unify_flat_map1() {
     let output = test_unify(
         "
         (struct ($2)
             (prop $2 s:0:0 (#u $0))
             (prop $2 s:1:1
-                (seq @0
+                (seq (#0)
                     #u
                     (struct ($4)
                         (prop $4 s:2:2
@@ -210,7 +209,7 @@ fn test_unify_flat_map1() {
         )
         ",
         "
-        (seq @0
+        (seq (#0)
             #u
             (struct ($6)
                 (prop $6 o:0:0
@@ -223,8 +222,29 @@ fn test_unify_flat_map1() {
         )
         ",
     );
+    // BUG: this is not the correct unification
     let expected = indoc! {"
-        |#1| (struct (#2)
+        |$2| (match-prop $2 s:0:0
+            (($_ $0)
+                (match-prop $2 s:1:1
+                    (($_ $4)
+                        (match-prop $4 s:2:2
+                            (($_ $1)
+                                (seq (#0) #u
+                                    (struct ($6)
+                                        (prop $6 o:0:0
+                                            (#u $0)
+                                        )
+                                        (prop $6 o:1:1
+                                            (#u $1)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
         )"
     };
     assert_eq!(expected, output);

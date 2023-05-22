@@ -87,9 +87,14 @@ impl<L: Lang> Parser<L> {
                         (self.make_node(NodeKind::Struct(binder, children)), next)
                     }
                     ("prop", next) => {
+                        let (var, next) = parse_dollar_var(next)?;
+                        let (prop, next) = parse_ident(next)?;
+                        let (_, next) = parse_lparen(next)?;
                         let (dimension, next) = match parse_ident(next) {
                             Ok(("seq", next)) => {
+                                let (_, next) = parse_lparen(next)?;
                                 let (label, next) = parse_hash_label(next)?;
+                                let (_, next) = parse_rparen(next)?;
                                 (Dimension::Sequence(label), next)
                             }
                             Ok((ident, _)) => {
@@ -97,9 +102,6 @@ impl<L: Lang> Parser<L> {
                             }
                             Err(_) => (Dimension::Singular, next),
                         };
-                        let (var, next) = parse_dollar_var(next)?;
-                        let (prop, next) = parse_ident(next)?;
-                        let (_, next) = parse_lparen(next)?;
                         let (rel, next) = self.parse(next)?;
                         let (value, next) = self.parse(next)?;
                         let (_, next) = parse_rparen(next)?;
@@ -119,9 +121,11 @@ impl<L: Lang> Parser<L> {
                         )
                     }
                     ("seq", next) => {
-                        let (binder, next) = parse_binder(next)?;
+                        let (_, next) = parse_lparen(next)?;
+                        let (label, next) = parse_hash_label(next)?;
+                        let (_, next) = parse_rparen(next)?;
                         let (children, next) = self.parse_many(next, Self::parse)?;
-                        (self.make_node(NodeKind::Seq(binder, children)), next)
+                        (self.make_node(NodeKind::Seq(label, children)), next)
                     }
                     ("match-prop", next) => {
                         let (struct_var, next) = parse_dollar_var(next)?;

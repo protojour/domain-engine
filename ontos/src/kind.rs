@@ -12,7 +12,7 @@ pub enum NodeKind<'a, L: Lang> {
     Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Map(Box<L::Node<'a>>),
-    Seq(Binder, Nodes<'a, L>),
+    Seq(Label, Nodes<'a, L>),
     Struct(Binder, Nodes<'a, L>),
     Prop(Variable, PropertyId, PropVariant<'a, L>),
     MapSeq(Variable, Binder, Nodes<'a, L>),

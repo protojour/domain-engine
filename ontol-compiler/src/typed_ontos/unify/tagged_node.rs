@@ -160,9 +160,9 @@ impl Tagger {
                     free_variables,
                 }
             }
-            NodeKind::Seq(binder, nodes) => self.enter_binder(binder, |zelf| {
-                zelf.tag_union_children(nodes, |nodes| NodeKind::Seq(binder, nodes), meta)
-            }),
+            NodeKind::Seq(label, nodes) => {
+                self.tag_union_children(nodes, |nodes| NodeKind::Seq(label, nodes), meta)
+            }
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 zelf.tag_union_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
             }),
