@@ -112,7 +112,7 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
-        let sep = if let Dimension::Sequence(label) = &node.dimension {
+        let sep = if let Dimension::Seq(label) = &node.dimension {
             write!(f, "seq @{}", label.0)?;
             self.indent.indent()
         } else {
@@ -130,9 +130,16 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
         let indent = self.indent;
         write!(f, "{indent}(")?;
         match &node.pattern {
-            PropPattern::Present(rel, val) => {
+            PropPattern::Present(seq, rel, val) => {
                 write!(f, "(")?;
-                self.print(Sep::None, rel, f)?;
+                let sep = match seq {
+                    Some(_) => {
+                        write!(f, "seq")?;
+                        Sep::Space
+                    }
+                    None => Sep::None,
+                };
+                self.print(sep, rel, f)?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }

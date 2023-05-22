@@ -50,18 +50,26 @@ impl<'a> VarLocator<'a> {
         func(self);
         self.current_path.0.pop();
     }
+
+    fn register_var(&mut self, var: u32) {
+        if self.variables.contains(var as usize)
+            && self
+                .output
+                .insert(Variable(var), self.current_path.clone())
+                .is_some()
+        {
+            self.duplicates.insert(var as usize);
+        }
+    }
 }
 
 impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
     fn visit_variable(&mut self, variable: &mut Variable) {
-        if self.variables.contains(variable.0 as usize)
-            && self
-                .output
-                .insert(*variable, self.current_path.clone())
-                .is_some()
-        {
-            self.duplicates.insert(variable.0 as usize);
-        }
+        self.register_var(variable.0);
+    }
+
+    fn visit_label(&mut self, label: &mut ontos::Label) {
+        self.register_var(label.0);
     }
 
     fn visit_kind(&mut self, index: usize, kind: &mut NodeKind<'m, TypedOntos>) {

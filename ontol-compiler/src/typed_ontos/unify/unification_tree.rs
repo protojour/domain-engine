@@ -1,25 +1,31 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Debug};
 
 use fnv::FnvHashMap;
 use ontos::Variable;
+use tracing::debug;
 
 use super::{tagged_node::TaggedNode, var_path::Path};
 
+#[derive(Default)]
 pub struct UnificationNode<'m> {
-    pub index: usize,
     pub sub_unifications: BTreeMap<u16, UnificationNode<'m>>,
     pub target_nodes: Vec<TaggedNode<'m>>,
     pub dependents: Vec<UnificationNode<'m>>,
 }
 
-impl<'m> UnificationNode<'m> {
-    fn new(index: usize) -> Self {
-        Self {
-            index,
-            sub_unifications: BTreeMap::new(),
-            target_nodes: vec![],
-            dependents: vec![],
+impl<'m> Debug for UnificationNode<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug = f.debug_struct("UNode");
+        if !self.sub_unifications.is_empty() {
+            debug.field("sub", &self.sub_unifications);
         }
+        if !self.target_nodes.is_empty() {
+            debug.field("target_nodes", &self.target_nodes);
+        }
+        if !self.dependents.is_empty() {
+            debug.field("DEPS", &self.dependents);
+        }
+        debug.finish()
     }
 }
 
@@ -27,7 +33,7 @@ pub fn build_unification_tree<'m>(
     tagged_nodes: Vec<TaggedNode<'m>>,
     variable_paths: &FnvHashMap<Variable, Path>,
 ) -> UnificationNode<'m> {
-    let mut root = UnificationNode::new(0);
+    let mut root = UnificationNode::default();
 
     for tagged_node in tagged_nodes {
         add_to_tree(tagged_node, variable_paths, &mut root);
@@ -41,6 +47,8 @@ pub fn add_to_tree<'m>(
     variable_paths: &FnvHashMap<Variable, Path>,
     mut tree: &mut UnificationNode<'m>,
 ) {
+    debug!("add_to_tree {:?}", tagged_node.free_variables);
+
     {
         let mut path_iterator = tagged_node
             .free_variables
@@ -49,15 +57,17 @@ pub fn add_to_tree<'m>(
             .peekable();
 
         while let Some(path) = path_iterator.next() {
+            debug!("locating path {path:?}");
+
             for index in &path.0 {
                 tree = tree
                     .sub_unifications
                     .entry(*index)
-                    .or_insert_with(|| UnificationNode::new(*index as usize));
+                    .or_insert_with(|| UnificationNode::default());
             }
 
             if path_iterator.peek().is_some() {
-                tree.dependents.push(UnificationNode::new(0));
+                tree.dependents.push(UnificationNode::default());
                 tree = tree.dependents.last_mut().unwrap();
             }
         }

@@ -5,11 +5,12 @@ use ontos::{
     Binder, Variable,
 };
 use smallvec::SmallVec;
+use tracing::debug;
 
 use crate::typed_ontos::{
     lang::{Meta, OntosFunc, OntosKind, OntosNode},
     unify::{
-        tagged_node::union_bitsets, unification_tree::build_unification_tree,
+        tagged_node::union_free_variables, unification_tree::build_unification_tree,
         var_path::locate_variables,
     },
 };
@@ -95,11 +96,12 @@ fn unify_tagged_nodes<'m>(
     root_source: &mut OntosNode<'m>,
     next_variable: Variable,
 ) -> Result<Unified<'m>, UnifierError> {
-    let free_variables = union_bitsets(tagged_nodes.iter().map(|node| &node.free_variables));
-    let u_tree = build_unification_tree(
-        tagged_nodes,
-        &locate_variables(root_source, &free_variables)?,
-    );
+    let free_variables = union_free_variables(tagged_nodes.as_slice());
+    debug!("free_variables: {free_variables:?}");
+    let var_paths = &locate_variables(root_source, &free_variables)?;
+    debug!("var_paths: {var_paths:?}");
+    let u_tree = build_unification_tree(tagged_nodes, &var_paths);
+    debug!("{u_tree:#?}");
 
     Ok(Unifier {
         root_source,
@@ -208,6 +210,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     (Some(rel), None) => {
                         vec![MatchArm {
                             pattern: PropPattern::Present(
+                                None,
                                 rel_binding.binding,
                                 PatternBinding::Wildcard,
                             ),
@@ -217,6 +220,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     (None, Some(val)) => {
                         vec![MatchArm {
                             pattern: PropPattern::Present(
+                                None,
                                 PatternBinding::Wildcard,
                                 val_binding.binding,
                             ),
@@ -228,7 +232,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         concatenated.extend(rel);
                         concatenated.extend(val);
                         vec![MatchArm {
-                            pattern: PropPattern::Present(rel_binding.binding, val_binding.binding),
+                            pattern: PropPattern::Present(
+                                None,
+                                rel_binding.binding,
+                                val_binding.binding,
+                            ),
                             nodes: concatenated,
                         }]
                     }

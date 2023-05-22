@@ -197,7 +197,7 @@ fn test_unify_flat_map1() {
         (struct ($2)
             (prop $2 s:0:0 (#u $0))
             (prop $2 s:1:1
-                (seq (#0)
+                (seq (#3)
                     #u
                     (struct ($4)
                         (prop $4 s:2:2
@@ -209,33 +209,55 @@ fn test_unify_flat_map1() {
         )
         ",
         "
-        (seq (#0)
+        (seq (#3)
             #u
-            (struct ($6)
-                (prop $6 o:0:0
+            (struct ($5)
+                (prop $5 o:0:0
                     (#u $0)
                 )
-                (prop $6 o:1:1
+                (prop $5 o:1:1
                     (#u $1)
                 )
             )
         )
         ",
     );
+    let _expected = indoc! {"
+        |$2| (match-prop $2 s:0:0
+            (($_ $0)
+                (match-prop $2 s:1:1
+                    (seq ($_ $4)
+                        (match-prop $4 s:2:2
+                            (($_ $1)
+                                (struct ($5)
+                                    (prop $5 o:0:0
+                                        (#u $0)
+                                    )
+                                    (prop $5 o:1:1
+                                        (#u $1)
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
     // BUG: this is not the correct unification
-    let expected = indoc! {"
+    let actual = indoc! {"
         |$2| (match-prop $2 s:0:0
             (($_ $0)
                 (match-prop $2 s:1:1
                     (($_ $4)
                         (match-prop $4 s:2:2
                             (($_ $1)
-                                (seq (#0) #u
-                                    (struct ($6)
-                                        (prop $6 o:0:0
+                                (seq (#3) #u
+                                    (struct ($5)
+                                        (prop $5 o:0:0
                                             (#u $0)
                                         )
-                                        (prop $6 o:1:1
+                                        (prop $5 o:1:1
                                             (#u $1)
                                         )
                                     )
@@ -247,5 +269,5 @@ fn test_unify_flat_map1() {
             )
         )"
     };
-    assert_eq!(expected, output);
+    assert_eq!(actual, output);
 }

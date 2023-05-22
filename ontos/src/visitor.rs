@@ -1,8 +1,8 @@
 use ontol_runtime::value::PropertyId;
 
 use crate::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
-    Lang, Node, Variable,
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern},
+    Label, Lang, Node, Variable,
 };
 
 pub trait OntosVisitor<'a, L: Lang + 'a> {
@@ -35,6 +35,9 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
     #[allow(unused_variables)]
     fn visit_variable(&mut self, variable: &mut Variable) {}
 
+    #[allow(unused_variables)]
+    fn visit_label(&mut self, label: &mut Label) {}
+
     fn traverse_kind(&mut self, kind: &mut NodeKind<'a, L>) {
         match kind {
             NodeKind::VariableRef(var) => {
@@ -57,7 +60,8 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index + 1, node);
                 }
             }
-            NodeKind::Seq(_label, children) => {
+            NodeKind::Seq(label, children) => {
+                self.visit_label(label);
                 for (index, child) in children.iter_mut().enumerate() {
                     self.visit_node(index, child);
                 }
@@ -78,6 +82,9 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
             NodeKind::Prop(struct_var, id, variant) => {
                 self.visit_variable(struct_var);
                 self.visit_property_id(id);
+                if let Dimension::Seq(label) = &mut variant.dimension {
+                    self.visit_label(label);
+                }
                 self.visit_node(0, &mut variant.rel);
                 self.visit_node(1, &mut variant.val);
             }
@@ -92,7 +99,7 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
     }
 
     fn traverse_match_arm(&mut self, match_arm: &mut MatchArm<'a, L>) {
-        if let PropPattern::Present(rel, val) = &mut match_arm.pattern {
+        if let PropPattern::Present(_seq, rel, val) = &mut match_arm.pattern {
             self.visit_pattern_binding(0, rel);
             self.visit_pattern_binding(1, val);
         }

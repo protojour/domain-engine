@@ -39,7 +39,7 @@ pub struct PropVariant<'a, L: Lang> {
 #[derive(Clone)]
 pub enum Dimension {
     Singular,
-    Sequence(Label),
+    Seq(Label),
 }
 
 pub struct MatchArm<'a, L: Lang> {
@@ -62,9 +62,12 @@ where
 
 #[derive(Clone)]
 pub enum PropPattern {
-    Present(PatternBinding, PatternBinding),
+    Present(Option<Seq>, PatternBinding, PatternBinding),
     NotPresent,
 }
+
+#[derive(Clone)]
+pub struct Seq;
 
 #[derive(Clone, Debug)]
 pub enum PatternBinding {

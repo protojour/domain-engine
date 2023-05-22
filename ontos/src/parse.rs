@@ -1,7 +1,7 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq},
     Binder, Label, Lang, Variable,
 };
 
@@ -95,7 +95,7 @@ impl<L: Lang> Parser<L> {
                                 let (_, next) = parse_lparen(next)?;
                                 let (label, next) = parse_hash_label(next)?;
                                 let (_, next) = parse_rparen(next)?;
-                                (Dimension::Sequence(label), next)
+                                (Dimension::Seq(label), next)
                             }
                             Ok((ident, _)) => {
                                 return Err(Error::Expected(Class::Seq, Found(Token::Ident(ident))))
@@ -203,12 +203,17 @@ impl<L: Lang> Parser<L> {
     fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
         let (_, next) = parse_lparen(next)?;
         let (_, next) = parse_lparen(next)?;
+        let (seq, next) = match parse_ident(next) {
+            Ok(("seq", next)) => (Some(Seq), next),
+            Ok((ident, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Ident(ident)))),
+            _ => (None, next),
+        };
         let (pattern, next) = match self.parse_pattern_binding(next) {
             Ok((rel_binding, next)) => {
                 let (val_binding, next) = self.parse_pattern_binding(next)?;
                 let (_, next) = parse_rparen(next)?;
 
-                (PropPattern::Present(rel_binding, val_binding), next)
+                (PropPattern::Present(seq, rel_binding, val_binding), next)
             }
             Err(Error::Unexpected(Class::RParen)) => {
                 let (_, next) = parse_rparen(next)?;
