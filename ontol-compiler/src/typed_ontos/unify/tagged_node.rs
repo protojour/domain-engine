@@ -67,9 +67,9 @@ impl<'m> TaggedNode<'m> {
             ),
             NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
             NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
-            NodeKind::Prop(struct_var, prop, variant) => NodeKind::Prop(
+            NodeKind::Prop(struct_var, id, variant) => NodeKind::Prop(
                 struct_var,
-                prop,
+                id,
                 PropVariant {
                     rel: Box::new((*variant.rel).into_ontos_node()),
                     val: Box::new((*variant.val).into_ontos_node()),
@@ -78,9 +78,9 @@ impl<'m> TaggedNode<'m> {
             NodeKind::MapSeq(var, binder, nodes) => {
                 NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
             }
-            NodeKind::MatchProp(struct_var, prop, arms) => NodeKind::MatchProp(
+            NodeKind::MatchProp(struct_var, id, arms) => NodeKind::MatchProp(
                 struct_var,
-                prop,
+                id,
                 arms.into_iter()
                     .map(|arm| MatchArm {
                         pattern: arm.pattern,

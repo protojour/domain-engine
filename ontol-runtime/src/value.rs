@@ -155,7 +155,7 @@ impl FromStr for PropertyId {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut iterator = s.split(":");
+        let mut iterator = s.split(':');
         let role = match iterator.next().ok_or(())? {
             "s" => Role::Subject,
             "o" => Role::Object,
@@ -164,7 +164,7 @@ impl FromStr for PropertyId {
         let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
         let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
 
-        if !iterator.next().is_none() {
+        if iterator.next().is_some() {
             return Err(());
         }
 

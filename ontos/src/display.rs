@@ -73,8 +73,8 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Prop(struct_var, prop, variant) => {
-                write!(f, "{indent}(prop #{} {prop}", struct_var.0)?;
+            NodeKind::Prop(struct_var, id, variant) => {
+                write!(f, "{indent}(prop #{} {id}", struct_var.0)?;
                 let multi = self.print_all(Sep::Space, [variant].into_iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -85,8 +85,8 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::MatchProp(struct_var, prop, arms) => {
-                write!(f, "{indent}(match-prop #{} {}", struct_var.0, prop)?;
+            NodeKind::MatchProp(struct_var, id, arms) => {
+                write!(f, "{indent}(match-prop #{} {}", struct_var.0, id)?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))

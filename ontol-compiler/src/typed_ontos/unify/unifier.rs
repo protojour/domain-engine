@@ -180,7 +180,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes: nodes.into(),
                 }
             }
-            NodeKind::Prop(struct_var, prop, variant) => {
+            NodeKind::Prop(struct_var, id, variant) => {
                 let rel_binding =
                     self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.rel);
                 let val_binding =
@@ -222,7 +222,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Unified {
                     binder: None,
                     nodes: [OntosNode {
-                        kind: OntosKind::MatchProp(*struct_var, prop.clone(), arms),
+                        kind: OntosKind::MatchProp(*struct_var, *id, arms),
                         meta,
                     }]
                     .into(),

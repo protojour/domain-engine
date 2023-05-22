@@ -27,7 +27,7 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
     }
 
     #[allow(unused_variables)]
-    fn visit_property_id(&mut self, prop: &mut PropertyId) {}
+    fn visit_property_id(&mut self, id: &mut PropertyId) {}
 
     #[allow(unused_variables)]
     fn visit_binder(&mut self, variable: &mut Variable) {}
@@ -73,15 +73,15 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index, child);
                 }
             }
-            NodeKind::Prop(struct_var, prop, variant) => {
+            NodeKind::Prop(struct_var, id, variant) => {
                 self.visit_variable(struct_var);
-                self.visit_property_id(prop);
+                self.visit_property_id(id);
                 self.visit_node(0, &mut variant.rel);
                 self.visit_node(1, &mut variant.val);
             }
-            NodeKind::MatchProp(struct_var, prop, arms) => {
+            NodeKind::MatchProp(struct_var, id, arms) => {
                 self.visit_variable(struct_var);
-                self.visit_property_id(prop);
+                self.visit_property_id(id);
                 for (index, arm) in arms.iter_mut().enumerate() {
                     self.visit_match_arm(index, arm);
                 }
