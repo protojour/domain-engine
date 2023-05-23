@@ -229,51 +229,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_prop_variant_to_match_arm(
         &mut self,
-        mut u_node: UnificationNode<'m>,
+        u_node: UnificationNode<'m>,
         variant: &PropVariant<'m, TypedOntos>,
     ) -> Option<MatchArm<'m, TypedOntos>> {
         if u_node.target_nodes.is_empty() {
             // treat this "transparently"
-            let rel_binding =
-                self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel);
-            let val_binding =
-                self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.attr.val);
-
-            match (rel_binding.nodes, val_binding.nodes) {
-                (None, None) => {
-                    debug!("No nodes in variant binding");
-                    None
-                }
-                (Some(rel), None) => Some(MatchArm {
-                    pattern: PropPattern::Present(
-                        None,
-                        rel_binding.binding,
-                        PatternBinding::Wildcard,
-                    ),
-                    nodes: rel.into_iter().collect(),
-                }),
-                (None, Some(val)) => Some(MatchArm {
-                    pattern: PropPattern::Present(
-                        None,
-                        PatternBinding::Wildcard,
-                        val_binding.binding,
-                    ),
-                    nodes: val.into_iter().collect(),
-                }),
-                (Some(rel), Some(val)) => {
-                    let mut concatenated: Vec<OntosNode> = vec![];
-                    concatenated.extend(rel);
-                    concatenated.extend(val);
-                    Some(MatchArm {
-                        pattern: PropPattern::Present(
-                            None,
-                            rel_binding.binding,
-                            val_binding.binding,
-                        ),
-                        nodes: concatenated,
-                    })
-                }
-            }
+            self.make_match_arm(u_node, variant, None)
         } else if u_node.target_nodes.len() == 1 {
             if !matches!(&variant.dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
@@ -295,60 +256,53 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )
                     .unwrap();
                     debug!("seq var_paths: {var_paths:?}");
-                    let mut u_tree = build_unification_tree(vec![*attr.rel, *attr.val], &var_paths);
+
+                    let u_tree = build_unification_tree(vec![*attr.rel, *attr.val], &var_paths);
 
                     debug!("seq u_tree: {u_tree:#?}");
 
-                    let rel_binding = self.unify_pattern_binding(
-                        u_tree.sub_unifications.remove(&0),
-                        &variant.attr.rel,
-                    );
-                    let val_binding = self.unify_pattern_binding(
-                        u_tree.sub_unifications.remove(&1),
-                        &variant.attr.val,
-                    );
-
-                    // FIXME: DRY
-                    match (rel_binding.nodes, val_binding.nodes) {
-                        (None, None) => {
-                            debug!("No nodes in variant binding");
-                            None
-                        }
-                        (Some(rel), None) => Some(MatchArm {
-                            pattern: PropPattern::Present(
-                                Some(Seq),
-                                rel_binding.binding,
-                                PatternBinding::Wildcard,
-                            ),
-                            nodes: rel.into_iter().collect(),
-                        }),
-                        (None, Some(val)) => Some(MatchArm {
-                            pattern: PropPattern::Present(
-                                Some(Seq),
-                                PatternBinding::Wildcard,
-                                val_binding.binding,
-                            ),
-                            nodes: val.into_iter().collect(),
-                        }),
-                        (Some(rel), Some(val)) => {
-                            let mut concatenated: Vec<OntosNode> = vec![];
-                            concatenated.extend(rel);
-                            concatenated.extend(val);
-                            Some(MatchArm {
-                                pattern: PropPattern::Present(
-                                    Some(Seq),
-                                    rel_binding.binding,
-                                    val_binding.binding,
-                                ),
-                                nodes: concatenated,
-                            })
-                        }
-                    }
+                    self.make_match_arm(u_tree, variant, Some(Seq))
                 }
                 _ => panic!("BUG: Unsupported kind"),
             }
         } else {
             panic!("BUG: Many target nodes for prop variant");
+        }
+    }
+
+    fn make_match_arm(
+        &mut self,
+        mut u_node: UnificationNode<'m>,
+        variant: &PropVariant<'m, TypedOntos>,
+        seq: Option<Seq>,
+    ) -> Option<MatchArm<'m, TypedOntos>> {
+        let rel_binding =
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel);
+        let val_binding =
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.attr.val);
+
+        match (rel_binding.nodes, val_binding.nodes) {
+            (None, None) => {
+                debug!("No nodes in variant binding");
+                None
+            }
+            (Some(rel), None) => Some(MatchArm {
+                pattern: PropPattern::Present(seq, rel_binding.binding, PatternBinding::Wildcard),
+                nodes: rel.into_iter().collect(),
+            }),
+            (None, Some(val)) => Some(MatchArm {
+                pattern: PropPattern::Present(seq, PatternBinding::Wildcard, val_binding.binding),
+                nodes: val.into_iter().collect(),
+            }),
+            (Some(rel), Some(val)) => {
+                let mut concatenated: Vec<OntosNode> = vec![];
+                concatenated.extend(rel);
+                concatenated.extend(val);
+                Some(MatchArm {
+                    pattern: PropPattern::Present(seq, rel_binding.binding, val_binding.binding),
+                    nodes: concatenated,
+                })
+            }
         }
     }
 
