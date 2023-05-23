@@ -8,7 +8,6 @@ use crate::{
 macro_rules! visitor_trait {
     ($mut:tt, $ident:ident, $kind:ident, $iter:ident) => {
         pub trait $ident<'a, L: Lang + 'a> {
-            #[allow(unused_variables)]
             fn visit_node(&mut self, index: usize, node: param!($mut L::Node<'a>)) {
                 self.visit_kind(index, node.$kind());
             }

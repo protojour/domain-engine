@@ -264,6 +264,22 @@ pub fn union_free_variables<'a, 'm: 'a>(
     output
 }
 
+pub struct DebugVariables<'a>(pub &'a BitSet);
+
+impl<'a> Debug for DebugVariables<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        let mut iterator = self.0.iter().peekable();
+        while let Some(var) = iterator.next() {
+            write!(f, "{}", Variable(var as u32))?;
+            if iterator.peek().is_some() {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "]")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bit_set::BitSet;

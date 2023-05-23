@@ -165,7 +165,7 @@ mod tests {
             (struct ($a)
                 (prop $a S:0:0
                     (#u
-                        (seq (@c) $b)
+                        (seq (@c) #u $b)
                     )
                 )
             )"

@@ -222,13 +222,13 @@ fn test_unify_flat_map1() {
         )
         ",
     );
-    let _expected = indoc! {"
-        |$2| (match-prop $c S:0:0
-            (($_ $a)
-                (match-prop $c S:1:1
-                    (seq ($_ $e)
+    let expected = indoc! {"
+        |$c| (match-prop $c S:1:1
+            (($_ $b)
+                (match-prop $c S:0:0
+                    ((seq $_ $e)
                         (match-prop $e S:2:2
-                            (($_ $b)
+                            (($_ $a)
                                 (struct ($f)
                                     (prop $f O:0:0
                                         (#u $a)
@@ -244,13 +244,5 @@ fn test_unify_flat_map1() {
             )
         )"
     };
-    // BUG: this is not the correct unification
-    let actual = indoc! {"
-        |$c| (match-prop $c S:1:1
-            (($_ $b)
-                (match-prop $c S:0:0)
-            )
-        )"
-    };
-    assert_eq!(actual, output);
+    assert_eq!(expected, output);
 }

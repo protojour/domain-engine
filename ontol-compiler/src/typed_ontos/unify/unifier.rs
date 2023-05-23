@@ -1,6 +1,6 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 use ontos::{
-    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq},
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -10,8 +10,9 @@ use tracing::debug;
 use crate::typed_ontos::{
     lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedOntos},
     unify::{
-        tagged_node::union_free_variables, unification_tree::build_unification_tree,
-        var_path::locate_variables,
+        tagged_node::{union_free_variables, DebugVariables},
+        unification_tree::build_unification_tree,
+        var_path::{locate_slice_variables, locate_variables},
     },
 };
 
@@ -84,15 +85,11 @@ fn unify_tagged_nodes<'m>(
     next_variable: Variable,
 ) -> Result<Unified<'m>, UnifierError> {
     let free_variables = union_free_variables(tagged_nodes.as_slice());
-    debug!(
-        "free_variables: {:?}",
-        free_variables
-            .iter()
-            .map(|i| format!("{}", Variable(i as u32)))
-            .collect::<Vec<_>>()
-    );
+    debug!("free_variables: {:?}", DebugVariables(&free_variables));
+
     let var_paths = locate_variables(root_source, &free_variables)?;
     debug!("var_paths: {var_paths:?}");
+
     let u_tree = build_unification_tree(tagged_nodes, &var_paths);
     debug!("{u_tree:#?}");
 
@@ -286,20 +283,67 @@ impl<'a, 'm> Unifier<'a, 'm> {
             let _meta = target.meta;
 
             match target.kind {
-                NodeKind::Seq(_, _attr) => {
-                    /*
-                        let Unified {
-                            nodes,
-                            binder: input_binder,
-                        } = unify_tagged_nodes(
-                            vec![*attr.rel, *attr.val],
-                            &mut source,
-                            var_tracker.next_variable(),
-                        )
-                        .unwrap();
-                    */
+                NodeKind::Seq(_, attr) => {
+                    let free_variables =
+                        union_free_variables([attr.rel.as_ref(), attr.val.as_ref()]);
 
-                    todo!();
+                    debug!("seq free_variables: {:?}", DebugVariables(&free_variables));
+
+                    let var_paths = locate_slice_variables(
+                        &[variant.attr.rel.as_ref(), variant.attr.val.as_ref()],
+                        &free_variables,
+                    )
+                    .unwrap();
+                    debug!("seq var_paths: {var_paths:?}");
+                    let mut u_tree = build_unification_tree(vec![*attr.rel, *attr.val], &var_paths);
+
+                    debug!("seq u_tree: {u_tree:#?}");
+
+                    let rel_binding = self.unify_pattern_binding(
+                        u_tree.sub_unifications.remove(&0),
+                        &variant.attr.rel,
+                    );
+                    let val_binding = self.unify_pattern_binding(
+                        u_tree.sub_unifications.remove(&1),
+                        &variant.attr.val,
+                    );
+
+                    // FIXME: DRY
+                    match (rel_binding.nodes, val_binding.nodes) {
+                        (None, None) => {
+                            debug!("No nodes in variant binding");
+                            None
+                        }
+                        (Some(rel), None) => Some(MatchArm {
+                            pattern: PropPattern::Present(
+                                Some(Seq),
+                                rel_binding.binding,
+                                PatternBinding::Wildcard,
+                            ),
+                            nodes: rel.into_iter().collect(),
+                        }),
+                        (None, Some(val)) => Some(MatchArm {
+                            pattern: PropPattern::Present(
+                                Some(Seq),
+                                PatternBinding::Wildcard,
+                                val_binding.binding,
+                            ),
+                            nodes: val.into_iter().collect(),
+                        }),
+                        (Some(rel), Some(val)) => {
+                            let mut concatenated: Vec<OntosNode> = vec![];
+                            concatenated.extend(rel);
+                            concatenated.extend(val);
+                            Some(MatchArm {
+                                pattern: PropPattern::Present(
+                                    Some(Seq),
+                                    rel_binding.binding,
+                                    val_binding.binding,
+                                ),
+                                nodes: concatenated,
+                            })
+                        }
+                    }
                 }
                 _ => panic!("BUG: Unsupported kind"),
             }

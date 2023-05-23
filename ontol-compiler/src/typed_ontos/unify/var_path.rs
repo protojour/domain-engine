@@ -19,16 +19,19 @@ pub fn locate_variables(
     variables: &BitSet,
 ) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
     let mut locator = VarLocator::new(variables);
-
     locator.traverse_kind(node.kind());
+    locator.finish()
+}
 
-    if !locator.duplicates.is_empty() {
-        Err(UnifierError::NonUniqueVariableDatapoints(
-            locator.duplicates,
-        ))
-    } else {
-        Ok(locator.output)
+pub fn locate_slice_variables(
+    nodes: &[&OntosNode],
+    variables: &BitSet,
+) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
+    let mut locator = VarLocator::new(variables);
+    for (index, node) in nodes.iter().enumerate() {
+        locator.enter_child(index, |locator| locator.traverse_kind(node.kind()));
     }
+    locator.finish()
 }
 
 struct VarLocator<'a> {
@@ -40,6 +43,14 @@ struct VarLocator<'a> {
 }
 
 impl<'a> VarLocator<'a> {
+    fn finish(self) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
+        if !self.duplicates.is_empty() {
+            Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
+        } else {
+            Ok(self.output)
+        }
+    }
+
     pub(super) fn new(variables: &'a BitSet) -> Self {
         Self {
             variables,
