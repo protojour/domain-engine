@@ -15,12 +15,12 @@ use super::UnifierError;
 pub struct Path(pub SmallVec<[u16; 32]>);
 
 pub fn locate_variables(
-    node: &mut OntosNode,
+    node: &OntosNode,
     variables: &BitSet,
 ) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
     let mut locator = VarLocator::new(variables);
 
-    locator.traverse_kind(node.kind_mut());
+    locator.traverse_kind(node.kind());
 
     if !locator.duplicates.is_empty() {
         Err(UnifierError::NonUniqueVariableDatapoints(
@@ -68,21 +68,21 @@ impl<'a> VarLocator<'a> {
 }
 
 impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
-    fn visit_variable(&mut self, variable: &mut Variable) {
+    fn visit_variable(&mut self, variable: &Variable) {
         self.register_var(variable.0);
     }
 
-    fn visit_label(&mut self, label: &mut ontos::Label) {
+    fn visit_label(&mut self, label: &ontos::Label) {
         self.register_var(label.0);
     }
 
-    fn visit_kind(&mut self, index: usize, kind: &mut NodeKind<'m, TypedOntos>) {
+    fn visit_kind(&mut self, index: usize, kind: &NodeKind<'m, TypedOntos>) {
         self.enter_child(index, |_self| _self.traverse_kind(kind));
     }
 
-    fn visit_prop_variant(&mut self, index: usize, variant: &mut PropVariant<'m, TypedOntos>) {
+    fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant<'m, TypedOntos>) {
         self.enter_child(index, |_self| {
-            match &mut variant.dimension {
+            match &variant.dimension {
                 Dimension::Singular => {
                     _self.traverse_prop_variant(variant);
                 }
@@ -95,15 +95,11 @@ impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
         });
     }
 
-    fn visit_match_arm(
-        &mut self,
-        index: usize,
-        match_arm: &mut ontos::kind::MatchArm<'m, TypedOntos>,
-    ) {
+    fn visit_match_arm(&mut self, index: usize, match_arm: &ontos::kind::MatchArm<'m, TypedOntos>) {
         self.enter_child(index, |_self| _self.traverse_match_arm(match_arm));
     }
 
-    fn visit_pattern_binding(&mut self, index: usize, binding: &mut ontos::kind::PatternBinding) {
+    fn visit_pattern_binding(&mut self, index: usize, binding: &ontos::kind::PatternBinding) {
         self.enter_child(index, |_self| _self.traverse_pattern_binding(binding));
     }
 }

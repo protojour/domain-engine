@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_runtime::smart_format;
-use ontos::visitor::OntosVisitor;
+use ontos::visitor::OntosMutVisitor;
 use tracing::debug;
 
 use crate::{
@@ -178,7 +178,7 @@ struct OntosTypeInference<'c, 'm> {
     errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> OntosVisitor<'m, TypedOntos> for OntosTypeInference<'c, 'm> {
+impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosTypeInference<'c, 'm> {
     fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontos::Lang>::Node<'m>) {
         let mut infer = Infer {
             types: self.types,

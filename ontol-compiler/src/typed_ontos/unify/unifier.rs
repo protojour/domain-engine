@@ -29,12 +29,12 @@ pub struct Unified<'m> {
 }
 
 pub fn unify_to_function<'m>(
-    mut source: OntosNode<'m>,
-    mut target: OntosNode<'m>,
+    source: OntosNode<'m>,
+    target: OntosNode<'m>,
 ) -> Result<OntosFunc<'m>, UnifierError> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, &mut source);
-    var_tracker.visit_node(0, &mut target);
+    var_tracker.visit_node(0, &source);
+    var_tracker.visit_node(0, &target);
 
     let meta = target.meta;
 
@@ -45,7 +45,7 @@ pub fn unify_to_function<'m>(
                 binder: input_binder,
             } = unify_tagged_nodes(
                 Tagger::default().enter_binder(binder, |tagger| tagger.tag_nodes(children)),
-                &mut source,
+                &source,
                 var_tracker.next_variable(),
             )?;
 
@@ -62,7 +62,7 @@ pub fn unify_to_function<'m>(
             let Unified {
                 nodes,
                 binder: input_binder,
-            } = unify_tagged_nodes(vec![tagged_node], &mut source, var_tracker.next_variable())?;
+            } = unify_tagged_nodes(vec![tagged_node], &source, var_tracker.next_variable())?;
 
             let body = match nodes.len() {
                 0 => panic!("No nodes"),
@@ -80,7 +80,7 @@ pub fn unify_to_function<'m>(
 
 fn unify_tagged_nodes<'m>(
     tagged_nodes: Vec<TaggedNode<'m>>,
-    root_source: &mut OntosNode<'m>,
+    root_source: &OntosNode<'m>,
     next_variable: Variable,
 ) -> Result<Unified<'m>, UnifierError> {
     let free_variables = union_free_variables(tagged_nodes.as_slice());

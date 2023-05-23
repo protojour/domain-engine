@@ -20,11 +20,11 @@ struct VariableTracker {
 }
 
 impl<'a> OntosVisitor<'a, TypedOntos> for VariableTracker {
-    fn visit_variable(&mut self, variable: &mut Variable) {
+    fn visit_variable(&mut self, variable: &Variable) {
         self.observe(*variable);
     }
 
-    fn visit_binder(&mut self, variable: &mut Variable) {
+    fn visit_binder(&mut self, variable: &Variable) {
         self.observe(*variable);
     }
 }
