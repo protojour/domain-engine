@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use ontos::{
-    kind::{MatchArm, NodeKind, PropVariant},
+    kind::{Attribute, MatchArm, NodeKind, PropVariant},
     Binder, Label, Node, Variable,
 };
 
@@ -78,7 +78,13 @@ impl<'m> TaggedNode<'m> {
                 Box::new(def.into_ontos_node()),
                 nodes_to_ontos(body),
             ),
-            NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
+            NodeKind::Seq(binder, attr) => NodeKind::Seq(
+                binder,
+                Attribute {
+                    rel: Box::new(attr.rel.into_ontos_node()),
+                    val: Box::new(attr.val.into_ontos_node()),
+                },
+            ),
             NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
             NodeKind::Prop(struct_var, id, variants) => NodeKind::Prop(
                 struct_var,
@@ -87,8 +93,10 @@ impl<'m> TaggedNode<'m> {
                     .into_iter()
                     .map(|variant| PropVariant {
                         dimension: variant.dimension,
-                        rel: Box::new((*variant.rel).into_ontos_node()),
-                        val: Box::new((*variant.val).into_ontos_node()),
+                        attr: Attribute {
+                            rel: Box::new(variant.attr.rel.into_ontos_node()),
+                            val: Box::new(variant.attr.val.into_ontos_node()),
+                        },
                     })
                     .collect(),
             ),
@@ -174,9 +182,23 @@ impl Tagger {
                     meta,
                 }
             }
-            NodeKind::Seq(label, nodes) => self
-                .tag_children(nodes, |nodes| NodeKind::Seq(label, nodes), meta)
-                .union_label(label),
+            NodeKind::Seq(label, attr) => {
+                let rel = self.tag_node(*attr.rel);
+                let val = self.tag_node(*attr.val);
+
+                TaggedNode {
+                    free_variables: union_free_variables([&rel, &val]),
+                    kind: NodeKind::Seq(
+                        label,
+                        Attribute {
+                            rel: Box::new(rel),
+                            val: Box::new(val),
+                        },
+                    ),
+                    meta,
+                }
+                .union_label(label)
+            }
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 zelf.tag_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
             }),
@@ -186,16 +208,18 @@ impl Tagger {
                 let variants = variants
                     .into_iter()
                     .map(|variant| {
-                        let rel = self.tag_node(*variant.rel);
-                        let val = self.tag_node(*variant.val);
+                        let rel = self.tag_node(*variant.attr.rel);
+                        let val = self.tag_node(*variant.attr.val);
 
                         free_variables.union_with(&rel.free_variables);
                         free_variables.union_with(&val.free_variables);
 
                         PropVariant {
                             dimension: variant.dimension,
-                            rel: Box::new(rel),
-                            val: Box::new(val),
+                            attr: Attribute {
+                                rel: Box::new(rel),
+                                val: Box::new(val),
+                            },
                         }
                     })
                     .collect();

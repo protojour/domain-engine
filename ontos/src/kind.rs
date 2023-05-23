@@ -12,7 +12,7 @@ pub enum NodeKind<'a, L: Lang> {
     Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Map(Box<L::Node<'a>>),
-    Seq(Label, Nodes<'a, L>),
+    Seq(Label, Attribute<Box<L::Node<'a>>>),
     Struct(Binder, Nodes<'a, L>),
     Prop(Variable, PropertyId, Vec<PropVariant<'a, L>>),
     MapSeq(Variable, Binder, Nodes<'a, L>),
@@ -32,14 +32,19 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
 #[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
     pub dimension: Dimension,
-    pub rel: Box<L::Node<'a>>,
-    pub val: Box<L::Node<'a>>,
+    pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
 #[derive(Clone, Debug)]
 pub enum Dimension {
     Singular,
     Seq(Label),
+}
+
+#[derive(Clone)]
+pub struct Attribute<T> {
+    pub rel: T,
+    pub val: T,
 }
 
 pub struct MatchArm<'a, L: Lang> {

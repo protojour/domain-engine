@@ -1,6 +1,6 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 use ontos::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -28,19 +28,6 @@ pub struct Unified<'m> {
     pub nodes: UnifiedNodes<'m>,
 }
 
-struct Unifier<'a, 'm> {
-    root_source: &'a OntosNode<'m>,
-    next_variable: Variable,
-}
-
-impl<'a, 'm> Unifier<'a, 'm> {
-    fn alloc_var(&mut self) -> Variable {
-        let var = self.next_variable;
-        self.next_variable.0 += 1;
-        var
-    }
-}
-
 pub fn unify_to_function<'m>(
     mut source: OntosNode<'m>,
     mut target: OntosNode<'m>,
@@ -57,7 +44,7 @@ pub fn unify_to_function<'m>(
                 nodes,
                 binder: input_binder,
             } = unify_tagged_nodes(
-                Tagger::default().enter_binder(binder, |ctx| ctx.tag_nodes(children)),
+                Tagger::default().enter_binder(binder, |tagger| tagger.tag_nodes(children)),
                 &mut source,
                 var_tracker.next_variable(),
             )?;
@@ -125,6 +112,19 @@ struct InvertedCall<'m> {
 struct UnifyPatternBinding<'m> {
     binding: PatternBinding,
     nodes: Option<UnifiedNodes<'m>>,
+}
+
+struct Unifier<'a, 'm> {
+    root_source: &'a OntosNode<'m>,
+    next_variable: Variable,
+}
+
+impl<'a, 'm> Unifier<'a, 'm> {
+    fn alloc_var(&mut self) -> Variable {
+        let var = self.next_variable;
+        self.next_variable.0 += 1;
+        var
+    }
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
@@ -238,9 +238,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
         if u_node.target_nodes.is_empty() {
             // treat this "transparently"
             let rel_binding =
-                self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.rel);
+                self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel);
             let val_binding =
-                self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.val);
+                self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.attr.val);
 
             match (rel_binding.nodes, val_binding.nodes) {
                 (None, None) => {
@@ -277,9 +277,34 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
             }
+        } else if u_node.target_nodes.len() == 1 {
+            if !matches!(&variant.dimension, Dimension::Seq(_)) {
+                panic!("BUG: Non-sequence");
+            }
+
+            let target = u_node.target_nodes.into_iter().next().unwrap();
+            let _meta = target.meta;
+
+            match target.kind {
+                NodeKind::Seq(_, _attr) => {
+                    /*
+                        let Unified {
+                            nodes,
+                            binder: input_binder,
+                        } = unify_tagged_nodes(
+                            vec![*attr.rel, *attr.val],
+                            &mut source,
+                            var_tracker.next_variable(),
+                        )
+                        .unwrap();
+                    */
+
+                    todo!();
+                }
+                _ => panic!("BUG: Unsupported kind"),
+            }
         } else {
-            // probably(?) a sequence transformation
-            None
+            panic!("BUG: Many target nodes for prop variant");
         }
     }
 

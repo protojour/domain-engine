@@ -65,11 +65,10 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index + 1, node);
                 }
             }
-            NodeKind::Seq(label, children) => {
+            NodeKind::Seq(label, spec) => {
                 self.visit_label(label);
-                for (index, child) in children.iter_mut().enumerate() {
-                    self.visit_node(index, child);
-                }
+                self.visit_node(0, &mut spec.rel);
+                self.visit_node(1, &mut spec.val);
             }
             NodeKind::MapSeq(var, binder, children) => {
                 self.visit_variable(var);
@@ -105,8 +104,8 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
         if let Dimension::Seq(label) = &mut variant.dimension {
             self.visit_label(label);
         }
-        self.visit_node(0, &mut variant.rel);
-        self.visit_node(1, &mut variant.val);
+        self.visit_node(0, &mut variant.attr.rel);
+        self.visit_node(1, &mut variant.attr.val);
     }
 
     fn traverse_match_arm(&mut self, match_arm: &mut MatchArm<'a, L>) {

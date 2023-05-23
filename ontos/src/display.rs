@@ -70,9 +70,15 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            NodeKind::Seq(label, children) => {
+            NodeKind::Seq(label, attr) => {
                 write!(f, "{indent}(seq ({})", label)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
+                let multi = self.print_all(
+                    Sep::Space,
+                    [attr.rel.as_ref(), attr.val.as_ref()]
+                        .into_iter()
+                        .map(Node::kind),
+                    f,
+                )?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -121,7 +127,11 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
             Sep::None
         };
 
-        let multi = self.print_all(sep, [node.rel.kind(), node.val.kind()].into_iter(), f)?;
+        let multi = self.print_all(
+            sep,
+            [node.attr.rel.kind(), node.attr.val.kind()].into_iter(),
+            f,
+        )?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }
