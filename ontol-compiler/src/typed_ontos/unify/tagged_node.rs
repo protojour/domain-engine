@@ -80,14 +80,17 @@ impl<'m> TaggedNode<'m> {
             ),
             NodeKind::Seq(binder, nodes) => NodeKind::Seq(binder, nodes_to_ontos(nodes)),
             NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
-            NodeKind::Prop(struct_var, id, variant) => NodeKind::Prop(
+            NodeKind::Prop(struct_var, id, variants) => NodeKind::Prop(
                 struct_var,
                 id,
-                PropVariant {
-                    dimension: variant.dimension,
-                    rel: Box::new((*variant.rel).into_ontos_node()),
-                    val: Box::new((*variant.val).into_ontos_node()),
-                },
+                variants
+                    .into_iter()
+                    .map(|variant| PropVariant {
+                        dimension: variant.dimension,
+                        rel: Box::new((*variant.rel).into_ontos_node()),
+                        val: Box::new((*variant.val).into_ontos_node()),
+                    })
+                    .collect(),
             ),
             NodeKind::MapSeq(var, binder, nodes) => {
                 NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
@@ -177,21 +180,29 @@ impl Tagger {
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 zelf.tag_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
             }),
-            NodeKind::Prop(struct_var, prop, variant) => {
-                let rel = self.tag_node(*variant.rel);
-                let val = self.tag_node(*variant.val);
+            NodeKind::Prop(struct_var, prop, variants) => {
+                let mut free_variables = BitSet::new();
 
-                TaggedNode {
-                    free_variables: union_free_variables([&rel, &val]),
-                    kind: NodeKind::Prop(
-                        struct_var,
-                        prop,
+                let variants = variants
+                    .into_iter()
+                    .map(|variant| {
+                        let rel = self.tag_node(*variant.rel);
+                        let val = self.tag_node(*variant.val);
+
+                        free_variables.union_with(&rel.free_variables);
+                        free_variables.union_with(&val.free_variables);
+
                         PropVariant {
                             dimension: variant.dimension,
                             rel: Box::new(rel),
                             val: Box::new(val),
-                        },
-                    ),
+                        }
+                    })
+                    .collect();
+
+                TaggedNode {
+                    free_variables,
+                    kind: NodeKind::Prop(struct_var, prop, variants),
                     meta,
                 }
             }

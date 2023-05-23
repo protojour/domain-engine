@@ -84,10 +84,12 @@ pub trait OntosVisitor<'a, L: Lang + 'a> {
                     self.visit_node(index, child);
                 }
             }
-            NodeKind::Prop(struct_var, id, variant) => {
+            NodeKind::Prop(struct_var, id, variants) => {
                 self.visit_variable(struct_var);
                 self.visit_property_id(id);
-                self.visit_prop_variant(0, variant);
+                for (index, variant) in variants.iter_mut().enumerate() {
+                    self.visit_prop_variant(index, variant);
+                }
             }
             NodeKind::MatchProp(struct_var, id, arms) => {
                 self.visit_variable(struct_var);

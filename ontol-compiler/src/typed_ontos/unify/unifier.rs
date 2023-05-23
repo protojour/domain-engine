@@ -1,6 +1,6 @@
 use ontol_runtime::vm::proc::BuiltinProc;
 use ontos::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::typed_ontos::{
-    lang::{Meta, OntosFunc, OntosKind, OntosNode},
+    lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedOntos},
     unify::{
         tagged_node::union_free_variables, unification_tree::build_unification_tree,
         var_path::locate_variables,
@@ -203,69 +203,19 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes: nodes.into(),
                 }
             }
-            NodeKind::Prop(struct_var, id, variant) => {
-                let mut variant_u_node = match u_node.sub_unifications.remove(&0) {
-                    Some(variant_u_node) => variant_u_node,
-                    None => {
-                        return Unified {
-                            binder: None,
-                            nodes: SmallVec::default(),
-                        }
-                    }
-                };
-
-                let rel_binding = self.unify_pattern_binding(
-                    variant_u_node.sub_unifications.remove(&0),
-                    &variant.rel,
-                );
-                let val_binding = self.unify_pattern_binding(
-                    variant_u_node.sub_unifications.remove(&1),
-                    &variant.val,
-                );
-
-                let arms = match (rel_binding.nodes, val_binding.nodes) {
-                    (None, None) => {
-                        vec![]
-                    }
-                    (Some(rel), None) => {
-                        vec![MatchArm {
-                            pattern: PropPattern::Present(
-                                None,
-                                rel_binding.binding,
-                                PatternBinding::Wildcard,
-                            ),
-                            nodes: rel.into_iter().collect(),
-                        }]
-                    }
-                    (None, Some(val)) => {
-                        vec![MatchArm {
-                            pattern: PropPattern::Present(
-                                None,
-                                PatternBinding::Wildcard,
-                                val_binding.binding,
-                            ),
-                            nodes: val.into_iter().collect(),
-                        }]
-                    }
-                    (Some(rel), Some(val)) => {
-                        let mut concatenated: Vec<OntosNode> = vec![];
-                        concatenated.extend(rel);
-                        concatenated.extend(val);
-                        vec![MatchArm {
-                            pattern: PropPattern::Present(
-                                None,
-                                rel_binding.binding,
-                                val_binding.binding,
-                            ),
-                            nodes: concatenated,
-                        }]
-                    }
-                };
+            NodeKind::Prop(struct_var, id, variants) => {
+                let match_arms = u_node
+                    .sub_unifications
+                    .into_iter()
+                    .flat_map(|(index, variant_u_node)| {
+                        self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])
+                    })
+                    .collect();
 
                 Unified {
                     binder: None,
                     nodes: [OntosNode {
-                        kind: OntosKind::MatchProp(*struct_var, *id, arms),
+                        kind: OntosKind::MatchProp(*struct_var, *id, match_arms),
                         meta,
                     }]
                     .into(),
@@ -277,6 +227,59 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
+        }
+    }
+
+    fn unify_prop_variant_to_match_arm(
+        &mut self,
+        mut u_node: UnificationNode<'m>,
+        variant: &PropVariant<'m, TypedOntos>,
+    ) -> Option<MatchArm<'m, TypedOntos>> {
+        if u_node.target_nodes.is_empty() {
+            // treat this "transparently"
+            let rel_binding =
+                self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.rel);
+            let val_binding =
+                self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.val);
+
+            match (rel_binding.nodes, val_binding.nodes) {
+                (None, None) => {
+                    debug!("No nodes in variant binding");
+                    None
+                }
+                (Some(rel), None) => Some(MatchArm {
+                    pattern: PropPattern::Present(
+                        None,
+                        rel_binding.binding,
+                        PatternBinding::Wildcard,
+                    ),
+                    nodes: rel.into_iter().collect(),
+                }),
+                (None, Some(val)) => Some(MatchArm {
+                    pattern: PropPattern::Present(
+                        None,
+                        PatternBinding::Wildcard,
+                        val_binding.binding,
+                    ),
+                    nodes: val.into_iter().collect(),
+                }),
+                (Some(rel), Some(val)) => {
+                    let mut concatenated: Vec<OntosNode> = vec![];
+                    concatenated.extend(rel);
+                    concatenated.extend(val);
+                    Some(MatchArm {
+                        pattern: PropPattern::Present(
+                            None,
+                            rel_binding.binding,
+                            val_binding.binding,
+                        ),
+                        nodes: concatenated,
+                    })
+                }
+            }
+        } else {
+            // probably(?) a sequence transformation
+            None
         }
     }
 
@@ -304,7 +307,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
         let mut new_args: Vec<OntosNode<'m>> = vec![];
 
         let (unification_idx, mut sub_unification) = u_node.sub_unifications.pop_first().unwrap();
-        let unification_idx = unification_idx as usize;
         for (index, arg) in args.iter().enumerate() {
             if index != unification_idx {
                 new_args.push(arg.clone());
@@ -376,11 +378,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         u_node
             .sub_unifications
             .into_iter()
-            .flat_map(|(index, u_node)| {
-                let child = &children[index as usize];
-
-                self.unify_node(u_node, child).nodes
-            })
+            .flat_map(|(index, u_node)| self.unify_node(u_node, &children[index]).nodes)
             .collect()
     }
 

@@ -320,11 +320,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 kind: NodeKind::Prop(
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
-                                    PropVariant {
+                                    vec![PropVariant {
                                         dimension: Dimension::Singular,
                                         rel: Box::new(self.unit_node_no_span()),
                                         val: Box::new(node),
-                                    },
+                                    }],
                                 ),
                                 meta: Meta {
                                     ty: self.types.intern(Type::Tautology),

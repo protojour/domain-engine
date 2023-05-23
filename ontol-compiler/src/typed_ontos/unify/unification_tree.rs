@@ -8,7 +8,7 @@ use super::{tagged_node::TaggedNode, var_path::Path};
 
 #[derive(Default)]
 pub struct UnificationNode<'m> {
-    pub sub_unifications: BTreeMap<u16, UnificationNode<'m>>,
+    pub sub_unifications: BTreeMap<usize, UnificationNode<'m>>,
     pub target_nodes: Vec<TaggedNode<'m>>,
     pub dependents: Vec<UnificationNode<'m>>,
 }
@@ -62,7 +62,7 @@ pub fn add_to_tree<'m>(
             for index in &path.0 {
                 tree = tree
                     .sub_unifications
-                    .entry(*index)
+                    .entry(*index as usize)
                     .or_insert_with(UnificationNode::default);
             }
 

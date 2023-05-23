@@ -82,9 +82,9 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Prop(struct_var, id, variant) => {
+            NodeKind::Prop(struct_var, id, variants) => {
                 write!(f, "{indent}(prop {struct_var} {id}")?;
-                let multi = self.print_all(Sep::Space, [variant].into_iter(), f)?;
+                let multi = self.print_all(Sep::Space, variants.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }

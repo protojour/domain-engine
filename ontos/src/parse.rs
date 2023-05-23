@@ -91,33 +91,14 @@ impl<L: Lang> Parser<L> {
                     ("prop", next) => {
                         let (var, next) = parse_dollar_var(next)?;
                         let (prop, next) = parse_symbol(next)?;
-                        let (_, next) = parse_lparen(next)?;
-                        let (dimension, next) = match parse_symbol(next) {
-                            Ok(("seq", next)) => {
-                                let (_, next) = parse_lparen(next)?;
-                                let (label, next) = parse_at_label(next)?;
-                                let (_, next) = parse_rparen(next)?;
-                                (Dimension::Seq(label), next)
-                            }
-                            Ok((sym, _)) => {
-                                return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym))))
-                            }
-                            Err(_) => (Dimension::Singular, next),
-                        };
-                        let (rel, next) = self.parse(next)?;
-                        let (value, next) = self.parse(next)?;
-                        let (_, next) = parse_rparen(next)?;
+                        let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
                         (
                             self.make_node(NodeKind::Prop(
                                 var,
                                 prop.parse().map_err(|_| {
                                     Error::Expected(Class::Property, Found(Token::Symbol(prop)))
                                 })?,
-                                PropVariant {
-                                    dimension,
-                                    rel: Box::new(rel),
-                                    val: Box::new(value),
-                                },
+                                variants,
                             )),
                             next,
                         )
@@ -195,6 +176,32 @@ impl<L: Lang> Parser<L> {
                 Err(error) => return Err(error),
             }
         }
+    }
+
+    fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
+        let (_, next) = parse_lparen(next)?;
+        let (dimension, next) = match parse_symbol(next) {
+            Ok(("seq", next)) => {
+                let (_, next) = parse_lparen(next)?;
+                let (label, next) = parse_at_label(next)?;
+                let (_, next) = parse_rparen(next)?;
+                (Dimension::Seq(label), next)
+            }
+            Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+            Err(_) => (Dimension::Singular, next),
+        };
+        let (rel, next) = self.parse(next)?;
+        let (value, next) = self.parse(next)?;
+        let (_, next) = parse_rparen(next)?;
+
+        Ok((
+            PropVariant {
+                dimension,
+                rel: Box::new(rel),
+                val: Box::new(value),
+            },
+            next,
+        ))
     }
 
     fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
