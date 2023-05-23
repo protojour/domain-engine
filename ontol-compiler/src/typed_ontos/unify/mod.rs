@@ -12,6 +12,7 @@ mod var_path;
 #[derive(Debug)]
 pub enum UnifierError {
     NonUniqueVariableDatapoints(BitSet),
+    NoInputBinder,
 }
 
 struct VariableTracker {

@@ -63,7 +63,7 @@ pub fn add_to_tree<'m>(
                 tree = tree
                     .sub_unifications
                     .entry(*index)
-                    .or_insert_with(|| UnificationNode::default());
+                    .or_insert_with(UnificationNode::default);
             }
 
             if path_iterator.peek().is_some() {

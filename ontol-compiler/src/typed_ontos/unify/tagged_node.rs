@@ -25,7 +25,6 @@ pub struct TaggedNode<'m> {
     pub kind: TaggedKind<'m>,
     pub meta: Meta<'m>,
     pub free_variables: BitSet,
-    pub labels: BitSet,
 }
 
 impl<'m> Debug for TaggedNode<'m> {
@@ -50,17 +49,16 @@ impl<'m> TaggedNode<'m> {
             kind,
             meta,
             free_variables: BitSet::new(),
-            labels: BitSet::new(),
         }
     }
 
-    fn with_free_variable(mut self, var: Variable) -> Self {
+    fn union_var(mut self, var: Variable) -> Self {
         self.free_variables.insert(var.0 as usize);
         self
     }
 
-    fn with_label(mut self, label: Label) -> Self {
-        self.labels.insert(label.0 as usize);
+    fn union_label(mut self, label: Label) -> Self {
+        self.free_variables.insert(label.0 as usize);
         self
     }
 
@@ -143,7 +141,7 @@ impl Tagger {
                 if self.in_scope.contains(var.0 as usize) {
                     tagged_node
                 } else {
-                    tagged_node.with_free_variable(var)
+                    tagged_node.union_var(var)
                 }
             }
             NodeKind::Unit => TaggedNode::new(NodeKind::Unit, meta),
@@ -153,7 +151,7 @@ impl Tagger {
                 let definition = self.tag_node(definition);
                 let def_free_vars = definition.free_variables.clone();
                 let mut tagged = self.enter_binder(binder, |zelf| {
-                    zelf.tag_union_children(
+                    zelf.tag_children(
                         body,
                         move |body| NodeKind::Let(binder, Box::new(definition), body),
                         meta,
@@ -163,22 +161,21 @@ impl Tagger {
                 tagged
             }
             NodeKind::Call(proc, args) => {
-                self.tag_union_children(args, |args| NodeKind::Call(proc, args), meta)
+                self.tag_children(args, |args| NodeKind::Call(proc, args), meta)
             }
             NodeKind::Map(arg) => {
                 let arg = self.tag_node(*arg);
                 TaggedNode {
                     free_variables: arg.free_variables.clone(),
-                    labels: BitSet::new(),
                     kind: NodeKind::Map(Box::new(arg)),
                     meta,
                 }
             }
             NodeKind::Seq(label, nodes) => self
-                .tag_union_children(nodes, |nodes| NodeKind::Seq(label, nodes), meta)
-                .with_label(label),
+                .tag_children(nodes, |nodes| NodeKind::Seq(label, nodes), meta)
+                .union_label(label),
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
-                zelf.tag_union_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
+                zelf.tag_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
             }),
             NodeKind::Prop(struct_var, prop, variant) => {
                 let rel = self.tag_node(*variant.rel);
@@ -186,7 +183,6 @@ impl Tagger {
 
                 TaggedNode {
                     free_variables: union_free_variables([&rel, &val]),
-                    labels: BitSet::new(),
                     kind: NodeKind::Prop(
                         struct_var,
                         prop,
@@ -208,7 +204,7 @@ impl Tagger {
         }
     }
 
-    fn tag_union_children<'m>(
+    fn tag_children<'m>(
         &mut self,
         children: Vec<OntosNode<'m>>,
         func: impl FnOnce(Vec<TaggedNode<'m>>) -> TaggedKind<'m>,
@@ -217,7 +213,6 @@ impl Tagger {
         let children = self.tag_nodes(children);
         TaggedNode {
             free_variables: union_free_variables(children.as_slice()),
-            labels: BitSet::new(),
             kind: func(children),
             meta,
         }

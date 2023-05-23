@@ -360,7 +360,7 @@ fn try_alpha_to_u32(sym: &str) -> Result<u32, Error<'_>> {
     let mut iterator = sym.chars().peekable();
 
     while let Some(char) = iterator.next() {
-        if char < 'a' || char > 'z' {
+        if !char.is_ascii_lowercase() {
             return Err(Error::InvalidVariableNumber);
         }
 

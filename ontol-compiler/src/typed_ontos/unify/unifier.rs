@@ -63,7 +63,7 @@ pub fn unify_to_function<'m>(
             )?;
 
             Ok(OntosFunc {
-                arg: input_binder.unwrap(),
+                arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
                 body: OntosNode {
                     kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
                     meta,
@@ -84,7 +84,7 @@ pub fn unify_to_function<'m>(
             };
 
             Ok(OntosFunc {
-                arg: input_binder.unwrap(),
+                arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
                 body,
             })
         }
@@ -97,8 +97,14 @@ fn unify_tagged_nodes<'m>(
     next_variable: Variable,
 ) -> Result<Unified<'m>, UnifierError> {
     let free_variables = union_free_variables(tagged_nodes.as_slice());
-    debug!("free_variables: {free_variables:?}");
-    let var_paths = &locate_variables(root_source, &free_variables)?;
+    debug!(
+        "free_variables: {:?}",
+        free_variables
+            .iter()
+            .map(|i| format!("{}", Variable(i as u32)))
+            .collect::<Vec<_>>()
+    );
+    let var_paths = locate_variables(root_source, &free_variables)?;
     debug!("var_paths: {var_paths:?}");
     let u_tree = build_unification_tree(tagged_nodes, &var_paths);
     debug!("{u_tree:#?}");
@@ -198,10 +204,24 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
             }
             NodeKind::Prop(struct_var, id, variant) => {
-                let rel_binding =
-                    self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.rel);
-                let val_binding =
-                    self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.val);
+                let mut variant_u_node = match u_node.sub_unifications.remove(&0) {
+                    Some(variant_u_node) => variant_u_node,
+                    None => {
+                        return Unified {
+                            binder: None,
+                            nodes: SmallVec::default(),
+                        }
+                    }
+                };
+
+                let rel_binding = self.unify_pattern_binding(
+                    variant_u_node.sub_unifications.remove(&0),
+                    &variant.rel,
+                );
+                let val_binding = self.unify_pattern_binding(
+                    variant_u_node.sub_unifications.remove(&1),
+                    &variant.val,
+                );
 
                 let arms = match (rel_binding.nodes, val_binding.nodes) {
                     (None, None) => {

@@ -115,7 +115,7 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
         write!(f, "{indent}(")?;
 
         let sep = if let Dimension::Seq(label) = &node.dimension {
-            write!(f, "seq @{}", label.0)?;
+            write!(f, "seq ({})", label)?;
             self.indent.indent()
         } else {
             Sep::None

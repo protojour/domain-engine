@@ -1,6 +1,10 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::{kind::NodeKind, visitor::OntosVisitor, Node, Variable};
+use ontos::{
+    kind::{Dimension, NodeKind, PropVariant},
+    visitor::OntosVisitor,
+    Node, Variable,
+};
 use smallvec::SmallVec;
 
 use crate::typed_ontos::lang::{OntosNode, TypedOntos};
@@ -73,7 +77,22 @@ impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
     }
 
     fn visit_kind(&mut self, index: usize, kind: &mut NodeKind<'m, TypedOntos>) {
-        self.enter_child(index, |ctx| ctx.traverse_kind(kind));
+        self.enter_child(index, |_self| _self.traverse_kind(kind));
+    }
+
+    fn visit_prop_variant(&mut self, index: usize, variant: &mut PropVariant<'m, TypedOntos>) {
+        self.enter_child(index, |_self| {
+            match &mut variant.dimension {
+                Dimension::Singular => {
+                    _self.traverse_prop_variant(variant);
+                }
+                Dimension::Seq(label) => {
+                    // The search stops here for now, sequence mappings are black boxes,
+                    // only register the label:
+                    _self.visit_label(label);
+                }
+            }
+        });
     }
 
     fn visit_match_arm(
@@ -81,10 +100,10 @@ impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
         index: usize,
         match_arm: &mut ontos::kind::MatchArm<'m, TypedOntos>,
     ) {
-        self.enter_child(index, |ctx| ctx.traverse_match_arm(match_arm));
+        self.enter_child(index, |_self| _self.traverse_match_arm(match_arm));
     }
 
     fn visit_pattern_binding(&mut self, index: usize, binding: &mut ontos::kind::PatternBinding) {
-        self.enter_child(index, |ctx| ctx.traverse_pattern_binding(binding));
+        self.enter_child(index, |_self| _self.traverse_pattern_binding(binding));
     }
 }

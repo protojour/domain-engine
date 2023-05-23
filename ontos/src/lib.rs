@@ -174,6 +174,21 @@ mod tests {
     }
 
     #[test]
+    fn test_seq_prop() {
+        let src = indoc! {"
+            (struct ($a)
+                (prop $a S:0:0
+                    (seq (@c)
+                        #u
+                        $b
+                    )
+                )
+            )"
+        };
+        assert_eq!(src, parse_print(src));
+    }
+
+    #[test]
     fn test_map_seq() {
         let src = indoc! {"
             (struct ($a)
