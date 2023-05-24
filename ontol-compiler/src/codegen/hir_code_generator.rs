@@ -4,7 +4,7 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::SmallVec;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 
 use crate::{
     codegen::{proc_builder::Stack, task::find_mapping_key},
@@ -14,12 +14,81 @@ use crate::{
 };
 
 use super::{
-    equation::HirEquation,
+    hir_equation::HirEquation,
+    hir_struct_scope::codegen_hir_struct_pattern_scope,
     ir::{Ir, Terminator},
     proc_builder::{Block, ProcBuilder},
-    struct_scope::codegen_struct_pattern_scope,
     task::ProcTable,
 };
+
+pub(super) fn codegen_map_hir_solve(
+    proc_table: &mut ProcTable,
+    equation: &mut HirEquation,
+    bodies: &[HirBody],
+    direction: CodeDirection,
+) -> bool {
+    let mut solver = equation.solver();
+
+    // solve equation(s)
+    for body in bodies {
+        solver
+            .reduce_node(body.bindings_node(direction))
+            .unwrap_or_else(|error| {
+                panic!("TODO: could not solve: {error:?}");
+            });
+    }
+
+    for (index, body) in bodies.iter().enumerate() {
+        let (from, to) = body.order(direction);
+        match direction {
+            CodeDirection::Forward => debug!(
+                "HirBodyIdx({index}) forward solved:\n<={:#?}\n=>{:#?}",
+                equation.debug_tree(from, &equation.reductions),
+                equation.debug_tree(to, &equation.expansions),
+            ),
+            CodeDirection::Backward => debug!(
+                "HirBodyIdx({index}) backward solved:\n=>{:#?}\n<={:#?}",
+                equation.debug_tree(to, &equation.expansions),
+                equation.debug_tree(from, &equation.reductions),
+            ),
+        }
+    }
+
+    let root_body = bodies.first().unwrap();
+    let (from, to) = root_body.order(direction);
+
+    let from_def = find_mapping_key(&equation.nodes[from].ty);
+    let to_def = find_mapping_key(&equation.nodes[to].ty);
+
+    match (from_def, to_def) {
+        (Some(from_def), Some(to_def)) => {
+            let (_, _, span) = equation.resolve_node(&equation.expansions, to);
+
+            let mut builder = ProcBuilder::new(NParams(0));
+            let mut block = builder.new_block(Stack(1), span);
+            let mut generator = HirCodeGenerator::new(proc_table, &mut builder, bodies, direction);
+
+            match generator.codegen_body(&mut block, equation, HirBodyIdx(0)) {
+                Ok(()) => {
+                    builder.commit(block, Terminator::Return(builder.top()));
+
+                    proc_table
+                        .map_procedures
+                        .insert((from_def, to_def), builder);
+                    true
+                }
+                Err(e) => {
+                    error!("Codegen problem, ignoring this (for now): {e:?}");
+                    false
+                }
+            }
+        }
+        other => {
+            warn!("unable to save mapping: key = {other:?}");
+            false
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum CodegenError {
@@ -33,7 +102,7 @@ pub struct Scope {
     pub in_scope: FnvHashMap<ontos::Variable, Local>,
 }
 
-pub(super) struct CodeGenerator<'a> {
+pub(super) struct HirCodeGenerator<'a> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     bodies: &'a [HirBody],
@@ -42,7 +111,7 @@ pub(super) struct CodeGenerator<'a> {
     scope_stack: SmallVec<[Scope; 3]>,
 }
 
-impl<'a> CodeGenerator<'a> {
+impl<'a> HirCodeGenerator<'a> {
     pub fn new(
         proc_table: &'a mut ProcTable,
         builder: &'a mut ProcBuilder,
@@ -87,7 +156,7 @@ impl<'a> CodeGenerator<'a> {
         pattern: &HirNode,
     ) -> Scope {
         match &pattern.kind {
-            HirKind::StructPattern(attrs) => codegen_struct_pattern_scope(
+            HirKind::StructPattern(attrs) => codegen_hir_struct_pattern_scope(
                 self,
                 block,
                 equation,

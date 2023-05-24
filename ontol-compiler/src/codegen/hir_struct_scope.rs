@@ -3,7 +3,7 @@ use ontol_runtime::{value::PropertyId, vm::proc::Local};
 
 use crate::{
     codegen::{
-        generator::CodeGenerator,
+        hir_code_generator::HirCodeGenerator,
         ir::Ir,
         proc_builder::{Block, Stack},
     },
@@ -11,7 +11,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::{equation::HirEquation, generator::Scope};
+use super::{hir_code_generator::Scope, hir_equation::HirEquation};
 
 struct UnpackProp {
     var: ontos::Variable,
@@ -27,8 +27,8 @@ enum UnpackKind {
 }
 
 /// Generate code originating from a struct destructuring
-pub(super) fn codegen_struct_pattern_scope(
-    gen: &mut CodeGenerator,
+pub(super) fn codegen_hir_struct_pattern_scope(
+    gen: &mut HirCodeGenerator,
     block: &mut Block,
     equation: &HirEquation,
     struct_local: Local,
@@ -75,7 +75,7 @@ fn analyze_unpack(equation: &HirEquation, attrs: &IndexMap<PropertyId, HirIdx>) 
 }
 
 fn define_locals(
-    gen: &mut CodeGenerator,
+    gen: &mut HirCodeGenerator,
     block: &mut Block,
     source_local: Local,
     unpack_props: &[UnpackProp],

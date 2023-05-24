@@ -1,10 +1,10 @@
-pub mod equation_solver;
+pub mod hir_equation_solver;
 pub mod task;
 
-mod equation;
-mod generator;
+mod hir_code_generator;
+mod hir_equation;
+mod hir_struct_scope;
 mod ir;
 mod link;
 mod optimize;
 mod proc_builder;
-mod struct_scope;

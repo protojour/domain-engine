@@ -6,18 +6,19 @@ use ontol_runtime::{
     vm::proc::{Address, Lib, NParams, Procedure},
     DefId, MapKey,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::{
-    codegen::{generator::CodeGenerator, proc_builder::Stack},
-    hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirNodeTable},
+    codegen::{hir_code_generator::HirCodeGenerator, proc_builder::Stack},
+    hir_node::{CodeDirection, HirBody, HirIdx, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
     Compiler, IrVariant, SourceSpan, IR_VARIANT,
 };
 
 use super::{
-    equation::HirEquation,
+    hir_code_generator::codegen_map_hir_solve,
+    hir_equation::HirEquation,
     ir::Terminator,
     link::{link, LinkResult},
     proc_builder::ProcBuilder,
@@ -140,8 +141,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 let equation = HirEquation::new(nodes);
                 let mut builder = ProcBuilder::new(NParams(0));
                 let mut block = builder.new_block(Stack(0), span);
-                let mut generator =
-                    CodeGenerator::new(&mut proc_table, &mut builder, &[], CodeDirection::Forward);
+                let mut generator = HirCodeGenerator::new(
+                    &mut proc_table,
+                    &mut builder,
+                    &[],
+                    CodeDirection::Forward,
+                );
 
                 match generator.codegen_expr(&mut block, &equation, root) {
                     Ok(_) => {
@@ -167,7 +172,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     );
                 }
 
-                codegen_map_solve(
+                codegen_map_hir_solve(
                     &mut proc_table,
                     &mut equation,
                     &bodies,
@@ -176,7 +181,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
                 equation.reset();
 
-                codegen_map_solve(
+                codegen_map_hir_solve(
                     &mut proc_table,
                     &mut equation,
                     &bodies,
@@ -215,73 +220,4 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_procs = map_procs;
-}
-
-fn codegen_map_solve(
-    proc_table: &mut ProcTable,
-    equation: &mut HirEquation,
-    bodies: &[HirBody],
-    direction: CodeDirection,
-) -> bool {
-    let mut solver = equation.solver();
-
-    // solve equation(s)
-    for body in bodies {
-        solver
-            .reduce_node(body.bindings_node(direction))
-            .unwrap_or_else(|error| {
-                panic!("TODO: could not solve: {error:?}");
-            });
-    }
-
-    for (index, body) in bodies.iter().enumerate() {
-        let (from, to) = body.order(direction);
-        match direction {
-            CodeDirection::Forward => debug!(
-                "HirBodyIdx({index}) forward solved:\n<={:#?}\n=>{:#?}",
-                equation.debug_tree(from, &equation.reductions),
-                equation.debug_tree(to, &equation.expansions),
-            ),
-            CodeDirection::Backward => debug!(
-                "HirBodyIdx({index}) backward solved:\n=>{:#?}\n<={:#?}",
-                equation.debug_tree(to, &equation.expansions),
-                equation.debug_tree(from, &equation.reductions),
-            ),
-        }
-    }
-
-    let root_body = bodies.first().unwrap();
-    let (from, to) = root_body.order(direction);
-
-    let from_def = find_mapping_key(&equation.nodes[from].ty);
-    let to_def = find_mapping_key(&equation.nodes[to].ty);
-
-    match (from_def, to_def) {
-        (Some(from_def), Some(to_def)) => {
-            let (_, _, span) = equation.resolve_node(&equation.expansions, to);
-
-            let mut builder = ProcBuilder::new(NParams(0));
-            let mut block = builder.new_block(Stack(1), span);
-            let mut generator = CodeGenerator::new(proc_table, &mut builder, bodies, direction);
-
-            match generator.codegen_body(&mut block, equation, HirBodyIdx(0)) {
-                Ok(()) => {
-                    builder.commit(block, Terminator::Return(builder.top()));
-
-                    proc_table
-                        .map_procedures
-                        .insert((from_def, to_def), builder);
-                    true
-                }
-                Err(e) => {
-                    error!("Codegen problem, ignoring this (for now): {e:?}");
-                    false
-                }
-            }
-        }
-        other => {
-            warn!("unable to save mapping: key = {other:?}");
-            false
-        }
-    }
 }

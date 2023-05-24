@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::hir_node::{HirIdx, HirKind, HirNode, HirNodeTable};
 
-use super::equation::HirEquation;
+use super::hir_equation::HirEquation;
 
 /// A substitution table tracks rewrites of node indices.
 ///
@@ -359,7 +359,7 @@ mod tests {
     use tracing::info;
 
     use crate::{
-        codegen::equation::HirEquation,
+        codegen::hir_equation::HirEquation,
         hir_node::{HirKind, HirNode, HirNodeTable},
         mem::{Intern, Mem},
         types::Type,

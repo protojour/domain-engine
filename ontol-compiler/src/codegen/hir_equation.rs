@@ -7,7 +7,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::equation_solver::{EquationSolver, SubstitutionTable};
+use super::hir_equation_solver::{EquationSolver, SubstitutionTable};
 
 /// Table used to store equation-like expression trees
 /// suitable for rewriting.
