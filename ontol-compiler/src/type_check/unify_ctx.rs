@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontos::Label;
 
 use crate::{
     expr::{Expr, ExprId},
@@ -15,6 +16,7 @@ pub struct CheckUnifyExprContext<'m> {
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
     pub body_variables: FnvHashMap<HirBodyIdx, HirIdx>,
     pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
+    pub ontos_seq_labels: FnvHashMap<HirBodyIdx, Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
@@ -36,6 +38,7 @@ impl<'m> CheckUnifyExprContext<'m> {
             explicit_variables: Default::default(),
             body_variables: Default::default(),
             body_map: Default::default(),
+            ontos_seq_labels: Default::default(),
             ctrl_flow_forest: Default::default(),
             partial: false,
             arm: Arm::First,
@@ -76,6 +79,16 @@ impl<'m> CheckUnifyExprContext<'m> {
         let var = ontos::Variable(*alloc);
         *alloc += 1;
         var
+    }
+
+    pub fn get_or_compute_seq_label(&mut self, body_idx: HirBodyIdx) -> Label {
+        if let Some(label) = self.ontos_seq_labels.get(&body_idx) {
+            return *label;
+        }
+
+        let label = Label(self.alloc_ontos_variable().0);
+        self.ontos_seq_labels.insert(body_idx, label);
+        label
     }
 }
 

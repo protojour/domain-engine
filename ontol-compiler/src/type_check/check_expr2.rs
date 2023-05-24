@@ -14,7 +14,7 @@ use crate::{
     mem::Intern,
     relation::Constructor,
     type_check::inference::UnifyValue,
-    typed_ontos::lang::{Meta, OntosNode},
+    typed_ontos::lang::{Meta, OntosNode, TypedOntos},
     types::{Type, TypeRef},
     IrVariant, SourceSpan,
 };
@@ -295,38 +295,67 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
-                            let object_ty = match match_property.cardinality.1 {
-                                ValueCardinality::One => object_ty,
-                                ValueCardinality::Many => self.types.intern(Type::Array(object_ty)),
-                            };
-                            let node = match match_property.cardinality.0 {
-                                PropertyCardinality::Mandatory => {
-                                    self.check_expr2(expr, Some(object_ty), ctx)
-                                }
-                                PropertyCardinality::Optional => {
-                                    let object_ty = self.types.intern(Type::Option(object_ty));
-
-                                    if *bind_option {
-                                    } else {
-                                        ctx.partial = true;
-                                        panic!("partial unification");
-                                    }
-
-                                    self.check_expr2(expr, Some(object_ty), ctx)
-                                }
-                            };
-
-                            ontos_props.push(OntosNode {
-                                kind: NodeKind::Prop(
-                                    struct_binder.0,
-                                    PropertyId::subject(match_property.relation_id),
-                                    vec![PropVariant {
+                            let prop_variant: PropVariant<'_, TypedOntos> = match match_property
+                                .cardinality
+                                .1
+                            {
+                                ValueCardinality::One => {
+                                    let node = self.check_expr2(expr, Some(object_ty), ctx);
+                                    PropVariant {
                                         dimension: Dimension::Singular,
                                         attr: Attribute {
                                             rel: Box::new(self.unit_node_no_span()),
                                             val: Box::new(node),
                                         },
-                                    }],
+                                    }
+                                }
+                                ValueCardinality::Many => match &expr.kind {
+                                    ExprKind::Seq(aggr_expr_id, inner) => {
+                                        let node = self.check_expr2(inner, Some(object_ty), ctx);
+                                        let aggr_body_idx =
+                                            *ctx.body_map.get(aggr_expr_id).unwrap();
+                                        let label = ctx.get_or_compute_seq_label(aggr_body_idx);
+
+                                        PropVariant {
+                                            dimension: Dimension::Seq(label),
+                                            attr: Attribute {
+                                                rel: Box::new(self.unit_node_no_span()),
+                                                val: Box::new(node),
+                                            },
+                                        }
+                                    }
+                                    _ => {
+                                        self.type_error(
+                                            TypeError::VariableMustBeSequenceEnclosed(object_ty),
+                                            &expr.span,
+                                            IrVariant::Ontos,
+                                        );
+                                        continue;
+                                    }
+                                },
+                            };
+
+                            let prop_variants: Vec<PropVariant<'_, TypedOntos>> =
+                                match match_property.cardinality.0 {
+                                    PropertyCardinality::Mandatory => {
+                                        vec![prop_variant]
+                                    }
+                                    PropertyCardinality::Optional => {
+                                        if *bind_option {
+                                        } else {
+                                            ctx.partial = true;
+                                            panic!("partial unification");
+                                        }
+
+                                        vec![prop_variant]
+                                    }
+                                };
+
+                            ontos_props.push(OntosNode {
+                                kind: NodeKind::Prop(
+                                    struct_binder.0,
+                                    PropertyId::subject(match_property.relation_id),
+                                    prop_variants,
                                 ),
                                 meta: Meta {
                                     ty: self.types.intern(Type::Tautology),
