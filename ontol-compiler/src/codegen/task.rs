@@ -110,7 +110,7 @@ pub(super) struct MapCall {
     pub mapping: (MapKey, MapKey),
 }
 
-pub(super) fn find_mapping_key(ty: &TypeRef) -> Option<MapKey> {
+pub(super) fn find_mapping_key(ty: TypeRef) -> Option<MapKey> {
     match ty {
         Type::Domain(def_id) => Some(MapKey {
             def_id: *def_id,

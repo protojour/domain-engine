@@ -56,8 +56,8 @@ pub(super) fn codegen_map_hir_solve(
     let root_body = bodies.first().unwrap();
     let (from, to) = root_body.order(direction);
 
-    let from_def = find_mapping_key(&equation.nodes[from].ty);
-    let to_def = find_mapping_key(&equation.nodes[to].ty);
+    let from_def = find_mapping_key(equation.nodes[from].ty);
+    let to_def = find_mapping_key(equation.nodes[to].ty);
 
     match (from_def, to_def) {
         (Some(from_def), Some(to_def)) => {
@@ -220,7 +220,7 @@ impl<'a> HirCodeGenerator<'a> {
                     expr.ty
                 );
                 let from = find_mapping_key(from_ty).unwrap();
-                let to = find_mapping_key(&expr.ty).unwrap();
+                let to = find_mapping_key(expr.ty).unwrap();
 
                 let proc = Procedure {
                     address: self.proc_table.gen_mapping_addr(from, to),
