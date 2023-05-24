@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use ontol_runtime::vm::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
 use tracing::{debug, Level};
@@ -8,6 +9,11 @@ use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
 /// How an instruction influences the size of the stack
 pub struct Stack(pub i32);
+
+#[derive(Default)]
+pub struct Scope {
+    pub in_scope: FnvHashMap<ontos::Variable, Local>,
+}
 
 pub struct ProcBuilder {
     pub n_params: NParams,

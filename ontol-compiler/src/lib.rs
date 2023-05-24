@@ -51,11 +51,12 @@ pub use hir_node::HirIdx;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum IrVariant {
-    Classic,
+    Hir,
     Ontos,
 }
 
-const IR_VARIANT: IrVariant = IrVariant::Ontos;
+const TYPE_CHECKER: IrVariant = IrVariant::Ontos;
+const CODE_GENERATOR: IrVariant = IrVariant::Hir;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {

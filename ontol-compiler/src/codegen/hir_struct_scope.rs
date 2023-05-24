@@ -11,7 +11,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::{hir_code_generator::Scope, hir_equation::HirEquation};
+use super::{hir_equation::HirEquation, proc_builder::Scope};
 
 struct UnpackProp {
     var: ontos::Variable,

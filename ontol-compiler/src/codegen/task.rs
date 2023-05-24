@@ -9,11 +9,14 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{hir_code_generator::HirCodeGenerator, proc_builder::Stack},
+    codegen::{
+        hir_code_generator::HirCodeGenerator, ontos_code_generator::map_codegen_ontos,
+        proc_builder::Stack,
+    },
     hir_node::{CodeDirection, HirBody, HirIdx, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
-    Compiler, IrVariant, SourceSpan, IR_VARIANT,
+    Compiler, IrVariant, SourceSpan, TYPE_CHECKER,
 };
 
 use super::{
@@ -189,7 +192,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 );
             }
             CodegenTask::OntosMap(map_task) => {
-                if IR_VARIANT != IrVariant::Ontos {
+                if TYPE_CHECKER != IrVariant::Ontos {
                     continue;
                 }
 
@@ -197,15 +200,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("2nd:\n{}", map_task.second);
 
                 debug!("Ontos forward start");
-                if let Ok(forward) =
-                    unify_to_function(map_task.first.clone(), map_task.second.clone())
+                if let Ok(func) = unify_to_function(map_task.first.clone(), map_task.second.clone())
                 {
-                    debug!("Forward result:\n{}", forward.body);
+                    map_codegen_ontos(&mut proc_table, func);
                 }
 
                 debug!("Ontos backward start");
-                if let Ok(backward) = unify_to_function(map_task.second, map_task.first) {
-                    debug!("Backward result:\n{}", backward.body);
+                if let Ok(func) = unify_to_function(map_task.second, map_task.first) {
+                    map_codegen_ontos(&mut proc_table, func);
                 }
             }
         }

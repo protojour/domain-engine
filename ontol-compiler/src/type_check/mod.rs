@@ -10,7 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, Compiler, IrVariant, SourceSpan, IR_VARIANT,
+    CompileErrors, Compiler, IrVariant, SourceSpan, TYPE_CHECKER,
 };
 
 pub mod check_def;
@@ -69,7 +69,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
         variant: IrVariant,
     ) -> TypeRef<'m> {
-        if variant == IR_VARIANT {
+        if variant == TYPE_CHECKER {
             self.errors.push(error.spanned(span));
         }
         self.types.intern(Type::Error)
@@ -81,7 +81,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
         variant: IrVariant,
     ) -> TypeRef<'m> {
-        if variant != IR_VARIANT {
+        if variant != TYPE_CHECKER {
             return self.types.intern(Type::Error);
         }
 

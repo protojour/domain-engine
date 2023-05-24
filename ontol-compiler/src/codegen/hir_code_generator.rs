@@ -1,6 +1,5 @@
-use fnv::FnvHashMap;
 use ontol_runtime::{
-    vm::proc::{BuiltinProc, Local, NParams, Procedure},
+    vm::proc::{BuiltinProc, NParams, Procedure},
     DefId,
 };
 use smallvec::SmallVec;
@@ -10,14 +9,14 @@ use crate::{
     codegen::{proc_builder::Stack, task::find_mapping_key},
     hir_node::{CodeDirection, HirBody, HirBodyIdx, HirIdx, HirKind, HirNode},
     types::Type,
-    SourceSpan,
+    IrVariant, SourceSpan, CODE_GENERATOR,
 };
 
 use super::{
     hir_equation::HirEquation,
     hir_struct_scope::codegen_hir_struct_pattern_scope,
     ir::{Ir, Terminator},
-    proc_builder::{Block, ProcBuilder},
+    proc_builder::{Block, ProcBuilder, Scope},
     task::ProcTable,
 };
 
@@ -72,9 +71,11 @@ pub(super) fn codegen_map_hir_solve(
                 Ok(()) => {
                     builder.commit(block, Terminator::Return(builder.top()));
 
-                    proc_table
-                        .map_procedures
-                        .insert((from_def, to_def), builder);
+                    if CODE_GENERATOR == IrVariant::Hir {
+                        proc_table
+                            .map_procedures
+                            .insert((from_def, to_def), builder);
+                    }
                     true
                 }
                 Err(e) => {
@@ -96,11 +97,6 @@ pub enum CodegenError {
 }
 
 pub type CodegenResult<T> = Result<T, CodegenError>;
-
-#[derive(Default)]
-pub struct Scope {
-    pub in_scope: FnvHashMap<ontos::Variable, Local>,
-}
 
 pub(super) struct HirCodeGenerator<'a> {
     proc_table: &'a mut ProcTable,

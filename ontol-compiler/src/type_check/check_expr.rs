@@ -122,7 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 expected: expected_ty,
                             }),
                             &expr.span,
-                            IrVariant::Classic,
+                            IrVariant::Hir,
                         ),
                         hir_idx,
                     ),
@@ -141,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         self.type_error(
                             TypeError::MustBeSequence(other_ty),
                             &expr.span,
-                            IrVariant::Classic,
+                            IrVariant::Hir,
                         );
                         self.types.intern(Type::Error)
                     }
@@ -216,7 +216,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         self.type_error(
                             TypeError::VariableMustBeSequenceEnclosed(elem_ty),
                             &expr.span,
-                            IrVariant::Classic,
+                            IrVariant::Hir,
                         ),
                         ERROR_NODE,
                     ),
@@ -246,7 +246,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         }),
                                     ),
                                     _ => (
-                                        self.type_error(err, &expr.span, IrVariant::Classic),
+                                        self.type_error(err, &expr.span, IrVariant::Hir),
                                         ERROR_NODE,
                                     ),
                                 }
@@ -336,7 +336,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     self.ir_error(
                                         CompileError::NamedPropertyExpected,
                                         &prop_span,
-                                        IrVariant::Classic,
+                                        IrVariant::Hir,
                                     );
                                     continue;
                                 }
@@ -347,7 +347,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     self.ir_error(
                                         CompileError::UnknownProperty,
                                         &prop_span,
-                                        IrVariant::Classic,
+                                        IrVariant::Hir,
                                     );
                                     continue;
                                 }
@@ -356,7 +356,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 self.ir_error(
                                     CompileError::DuplicateProperty,
                                     &prop_span,
-                                    IrVariant::Classic,
+                                    IrVariant::Hir,
                                 );
                                 continue;
                             }
@@ -395,7 +395,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 self.ir_error(
                                     CompileError::MissingProperty(prop_name.into()),
                                     &span,
-                                    IrVariant::Classic,
+                                    IrVariant::Hir,
                                 );
                             }
                         }
@@ -465,7 +465,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn expr_error(&mut self, error: CompileError, span: &SourceSpan) -> (TypeRef<'m>, HirIdx) {
-        self.ir_error(error, span, IrVariant::Classic);
+        self.ir_error(error, span, IrVariant::Hir);
         (self.types.intern(Type::Error), ERROR_NODE)
     }
 }
