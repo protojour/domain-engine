@@ -188,13 +188,20 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     continue;
                 }
 
-                debug!("1st: {}", map_task.first);
-                debug!("2nd: {}", map_task.second);
+                debug!("1st:\n{}", map_task.first);
+                debug!("2nd:\n{}", map_task.second);
 
-                debug!("Ontos forward");
-                let _ = unify_to_function(map_task.first.clone(), map_task.second.clone());
-                debug!("Ontos backward");
-                let _ = unify_to_function(map_task.second, map_task.first);
+                debug!("Ontos forward start");
+                if let Ok(forward) =
+                    unify_to_function(map_task.first.clone(), map_task.second.clone())
+                {
+                    debug!("Forward result:\n{}", forward.body);
+                }
+
+                debug!("Ontos backward start");
+                if let Ok(backward) = unify_to_function(map_task.second, map_task.first) {
+                    debug!("Backward result:\n{}", backward.body);
+                }
             }
         }
     }

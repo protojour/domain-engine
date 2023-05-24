@@ -55,7 +55,7 @@ enum IrVariant {
     Ontos,
 }
 
-const IR_VARIANT: IrVariant = IrVariant::Classic;
+const IR_VARIANT: IrVariant = IrVariant::Ontos;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {

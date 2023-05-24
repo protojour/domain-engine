@@ -39,9 +39,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match node.meta.ty {
             Type::Error | Type::Infer(_) => {}
             _ => {
-                let type_var = ctx.inference.new_type_variable(expr_id);
+                let type_var = ctx.ontos_inference.new_type_variable(expr_id);
                 debug!("Check expr(2) root type result: {:?}", node.meta.ty);
-                ctx.inference
+                ctx.ontos_inference
                     .eq_relations
                     .unify_var_value(type_var, UnifyValue::Known(node.meta.ty))
                     .unwrap();
@@ -59,7 +59,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expected_ty: Option<TypeRef<'m>>,
         ctx: &mut CheckUnifyExprContext<'m>,
     ) -> OntosNode<'m> {
-        match (&expr.kind, expected_ty) {
+        let node = match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
                 match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
                     (
@@ -99,6 +99,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Struct(type_path, attributes), expected_ty) => {
                 let struct_node = self.check_struct2(type_path, attributes, expr.span, ctx);
                 match expected_ty {
+                    Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
                     Some(Type::Option(Type::Domain(_))) => OntosNode {
                         kind: struct_node.kind,
@@ -117,9 +118,47 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => struct_node,
                 }
             }
-            (ExprKind::Seq(_aggr_expr_id, _inner), _expected_ty) => {
-                debug!("TODO: Ontos sequence mapping");
-                self.make_error_node(&expr.span)
+            (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
+                let elem_ty = match expected_ty {
+                    Some(Type::Array(elem_ty)) => elem_ty,
+                    Some(other_ty) => {
+                        self.type_error(
+                            TypeError::MustBeSequence(other_ty),
+                            &expr.span,
+                            IrVariant::Ontos,
+                        );
+                        self.types.intern(Type::Error)
+                    }
+                    None => {
+                        let expr_id = self.expressions.alloc_expr_id();
+
+                        let ty = self
+                            .types
+                            .intern(Type::Infer(ctx.ontos_inference.new_type_variable(expr_id)));
+
+                        debug!("Infer seq type: {ty:?}");
+                        ty
+                    }
+                };
+
+                let inner_node = self.check_expr2(inner, Some(elem_ty), ctx);
+                let aggr_body_idx = *ctx.body_map.get(aggr_expr_id).unwrap();
+                let label = ctx.get_or_compute_seq_label(aggr_body_idx);
+                let array_ty = self.types.intern(Type::Array(elem_ty));
+
+                OntosNode {
+                    kind: NodeKind::Seq(
+                        label,
+                        Attribute {
+                            rel: Box::new(self.unit_node_no_span()),
+                            val: Box::new(inner_node),
+                        },
+                    ),
+                    meta: Meta {
+                        ty: array_ty,
+                        span: expr.span,
+                    },
+                }
             }
             (ExprKind::Constant(k), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
@@ -138,7 +177,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::Variable(expr_id), expected_ty) => {
-                let type_var = ctx.inference.new_type_variable(*expr_id);
+                let type_var = ctx.ontos_inference.new_type_variable(*expr_id);
                 let bound_variable = ctx
                     .explicit_variables
                     .get(expr_id)
@@ -159,7 +198,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         };
 
                         match ctx
-                            .inference
+                            .ontos_inference
                             .eq_relations
                             .unify_var_value(type_var, UnifyValue::Known(expected_ty))
                         {
@@ -193,7 +232,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )),
                 &expr.span,
             ),
+        };
+
+        debug!("expected/meta: {:?} {:?}", expected_ty, node.meta.ty);
+
+        match (expected_ty, node.meta.ty) {
+            (_, Type::Error | Type::Infer(_)) => {}
+            (Some(Type::Infer(type_var)), _) => {
+                ctx.ontos_inference
+                    .eq_relations
+                    .unify_var_value(*type_var, UnifyValue::Known(node.meta.ty))
+                    .unwrap();
+            }
+            _ => {}
         }
+
+        node
     }
 
     fn check_struct2(
@@ -413,6 +467,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Sequence(_)) => todo!(),
             Some(Constructor::StringFmt(_)) => todo!(),
         };
+
+        debug!("Struct type: {domain_type:?}");
 
         OntosNode {
             kind: node_kind,

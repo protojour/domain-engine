@@ -11,6 +11,7 @@ use super::inference::Inference;
 
 pub struct CheckUnifyExprContext<'m> {
     pub inference: Inference<'m>,
+    pub ontos_inference: Inference<'m>,
     pub bodies: Vec<CtrlFlowBody<'m>>,
     pub nodes: HirNodeTable<'m>,
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
@@ -33,6 +34,7 @@ impl<'m> CheckUnifyExprContext<'m> {
     pub fn new() -> Self {
         Self {
             inference: Inference::new(),
+            ontos_inference: Inference::new(),
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
             explicit_variables: Default::default(),

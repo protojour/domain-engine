@@ -165,7 +165,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn infer_ontos_types(&mut self, node: &mut OntosNode<'m>, ctx: &mut CheckUnifyExprContext<'m>) {
         let mut inference = OntosTypeInference {
             types: self.types,
-            eq_relations: &mut ctx.inference.eq_relations,
+            eq_relations: &mut ctx.ontos_inference.eq_relations,
             errors: self.errors,
         };
         inference.visit_node(0, node);
