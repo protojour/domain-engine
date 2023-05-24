@@ -34,7 +34,7 @@ pub struct Unified<'m> {
 pub fn unify_to_function<'m>(
     source: OntosNode<'m>,
     target: OntosNode<'m>,
-) -> Result<OntosFunc<'m>, UnifierError> {
+) -> UnifierResult<OntosFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, &source);
     var_tracker.visit_node(0, &target);
@@ -85,7 +85,7 @@ fn unify_tagged_nodes<'m>(
     tagged_nodes: Vec<TaggedNode<'m>>,
     root_source: &OntosNode<'m>,
     next_variable: Variable,
-) -> Result<Unified<'m>, UnifierError> {
+) -> UnifierResult<Unified<'m>> {
     let free_variables = union_free_variables(tagged_nodes.as_slice());
     trace!("free_variables: {:?}", DebugVariables(&free_variables));
 
@@ -383,7 +383,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn merge_target_nodes(
         &mut self,
         u_node: &mut UnificationNode<'m>,
-    ) -> Result<UnifiedNodes<'m>, UnifierError> {
+    ) -> UnifierResult<UnifiedNodes<'m>> {
         let mut merged: UnifiedNodes<'m> = Default::default();
         for tagged_node in std::mem::take(&mut u_node.target_nodes) {
             merged.push(tagged_node.into_ontos_node());
@@ -401,7 +401,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         u_node: UnificationNode<'m>,
         children: &[OntosNode<'m>],
-    ) -> Result<Vec<OntosNode<'m>>, UnifierError> {
+    ) -> UnifierResult<Vec<OntosNode<'m>>> {
         let mut output = vec![];
         for (index, sub_node) in u_node.sub_unifications {
             output.extend(self.unify_node(sub_node, &children[index])?.nodes);
@@ -414,7 +414,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         u_node: Option<UnificationNode<'m>>,
         source: &OntosNode<'m>,
-    ) -> Result<UnifyPatternBinding<'m>, UnifierError> {
+    ) -> UnifierResult<UnifyPatternBinding<'m>> {
         let u_node = match u_node {
             Some(u_node) => u_node,
             None => {
