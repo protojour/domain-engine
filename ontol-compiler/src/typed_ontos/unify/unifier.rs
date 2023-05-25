@@ -63,8 +63,7 @@ struct Unifier<'a, 'm> {
 }
 
 struct InvertedCall<'m> {
-    pivot_variable: Variable,
-    subst_ty: TypeRef<'m>,
+    let_binder: Variable,
     def: OntosNode<'m>,
     body: UnifiedNodes<'m>,
 }
@@ -181,17 +180,28 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
                 1 => {
+                    // Invert call algorithm:
+                    // start with a _variable_ representing this expression.
+                    // Expand this expression along the way recursing _down_ to
+                    // find the actual inner variable.
+                    // That inner variable is the _binder_ of the resulting `let` expression.
                     let subst_var = self.alloc_var();
-                    let inverted_call = self.invert_call(proc, subst_var, u_node, args, meta)?;
+                    let inner_expr = OntosNode {
+                        kind: OntosKind::VariableRef(subst_var),
+                        meta,
+                    };
+                    let inverted_call =
+                        self.invert_call_recursive(proc, args, u_node, meta, inner_expr)?;
+
                     let return_ty = self.last_type(inverted_call.body.iter());
                     Ok(Unified {
                         binder: Some(TypedBinder {
                             variable: subst_var,
-                            ty: inverted_call.subst_ty,
+                            ty: meta.ty,
                         }),
                         nodes: [OntosNode {
                             kind: NodeKind::Let(
-                                Binder(inverted_call.pivot_variable),
+                                Binder(inverted_call.let_binder),
                                 Box::new(inverted_call.def),
                                 inverted_call.body.into_iter().collect(),
                             ),
@@ -385,13 +395,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
         })
     }
 
-    fn invert_call(
+    fn invert_call_recursive(
         &mut self,
         proc: &BuiltinProc,
-        subst_var: Variable,
-        mut u_node: UnificationNode<'m>,
         args: &[OntosNode<'m>],
+        mut u_node: UnificationNode<'m>,
         meta: Meta<'m>,
+        inner_expr: OntosNode<'m>,
     ) -> UnifierResult<InvertedCall<'m>> {
         if u_node.sub_unifications.len() > 1 {
             panic!("Too many sub unifications in function call");
@@ -416,21 +426,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
 
         let pivot_arg = &args[unification_idx];
-        debug!("pivot_arg type: {:?}", pivot_arg.meta.ty);
+
         match &pivot_arg.kind {
             NodeKind::VariableRef(var) => {
-                new_args.insert(
-                    unification_idx,
-                    OntosNode {
-                        kind: NodeKind::VariableRef(subst_var),
-                        meta: pivot_arg.meta,
-                    },
-                );
+                new_args.insert(unification_idx, inner_expr);
                 let body = self.merge_target_nodes(&mut sub_unification)?;
 
                 Ok(InvertedCall {
-                    pivot_variable: *var,
-                    subst_ty: meta.ty,
+                    let_binder: *var,
                     def: OntosNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
@@ -439,23 +442,18 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             NodeKind::Call(child_proc, child_args) => {
-                let sub_inverted_call = self.invert_call(
+                new_args.insert(unification_idx, inner_expr);
+                let new_inner_expr = OntosNode {
+                    kind: NodeKind::Call(inverted_proc, new_args),
+                    meta,
+                };
+                self.invert_call_recursive(
                     child_proc,
-                    subst_var,
-                    sub_unification,
                     child_args,
+                    sub_unification,
                     pivot_arg.meta,
-                )?;
-                new_args.insert(unification_idx, sub_inverted_call.def);
-                Ok(InvertedCall {
-                    pivot_variable: sub_inverted_call.pivot_variable,
-                    subst_ty: meta.ty,
-                    def: OntosNode {
-                        kind: NodeKind::Call(inverted_proc, new_args),
-                        meta,
-                    },
-                    body: sub_inverted_call.body,
-                })
+                    new_inner_expr,
+                )
             }
             _ => unimplemented!(),
         }
