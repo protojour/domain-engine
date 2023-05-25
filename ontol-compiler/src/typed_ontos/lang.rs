@@ -21,7 +21,7 @@ impl ontos::Lang for TypedOntos {
         OntosNode {
             kind,
             meta: Meta {
-                ty: &Type::Tautology,
+                ty: &Type::Error,
                 span: SourceSpan::none(),
             },
         }

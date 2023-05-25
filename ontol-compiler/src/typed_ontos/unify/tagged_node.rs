@@ -1,4 +1,6 @@
+use derive_debug_extras::DebugExtras;
 use std::fmt::Debug;
+use tracing::debug;
 
 use bit_set::BitSet;
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
@@ -9,11 +11,10 @@ use ontos::{
 
 use crate::{
     typed_ontos::lang::{Meta, OntosNode},
-    types::Type,
     SourceSpan,
 };
 
-#[derive(Debug)]
+#[derive(DebugExtras)]
 pub enum TaggedKind {
     VariableRef(Variable),
     Unit,
@@ -29,12 +30,20 @@ pub enum TaggedKind {
 
 // Note: This is more granular than ontos nodes.
 // prop and match arms should be "untyped".
-#[derive(Debug)]
 pub struct TaggedNode<'m> {
     pub kind: TaggedKind,
     pub children: TaggedNodes<'m>,
     pub meta: Meta<'m>,
     pub free_variables: BitSet,
+}
+
+impl<'m> Debug for TaggedNode<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TaggedNode")
+            .field(&self.kind)
+            .field(&self.children.0)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -217,8 +226,13 @@ impl Tagger {
                 let variants = variants
                     .into_iter()
                     .map(|variant| {
+                        debug!("rel ty: {:?}", variant.attr.rel.meta.ty);
+                        debug!("val ty: {:?}", variant.attr.val.meta.ty);
+
                         let rel = self.tag_node(*variant.attr.rel);
                         let val = self.tag_node(*variant.attr.val);
+
+                        let val_ty = val.meta.ty;
 
                         let mut variant_variables = BitSet::new();
 
@@ -236,7 +250,8 @@ impl Tagger {
                             free_variables: variant_variables,
                             children: TaggedNodes(vec![rel, val]),
                             meta: Meta {
-                                ty: &Type::Tautology,
+                                // BUG: Not correct
+                                ty: val_ty,
                                 span: SourceSpan::none(),
                             },
                         }

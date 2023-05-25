@@ -183,7 +183,9 @@ impl<'a> OntosCodeGenerator<'a> {
                                     block,
                                     Ir::CallBuiltin(
                                         BuiltinProc::NewSeq,
-                                        elem_ty.get_single_def_id().unwrap(),
+                                        elem_ty
+                                            .get_single_def_id()
+                                            .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
                                     ),
                                     Stack(1),
                                     span,

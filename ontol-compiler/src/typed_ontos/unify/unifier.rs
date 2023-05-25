@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use ontos::{
     kind::{
         Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq,
@@ -8,7 +8,7 @@ use ontos::{
     Binder, Variable,
 };
 use smallvec::SmallVec;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 use crate::{
     mem::Intern,
@@ -183,7 +183,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 1 => {
                     let subst_var = self.alloc_var();
                     let inverted_call = self.invert_call(proc, subst_var, u_node, args, meta)?;
-                    let return_ty = last_type(inverted_call.body.iter());
+                    let return_ty = self.last_type(inverted_call.body.iter());
                     Ok(Unified {
                         binder: Some(TypedBinder {
                             variable: subst_var,
@@ -243,23 +243,33 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     if let Some(typed_match_arm) =
                         self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?
                     {
+                        if let Type::Tautology = typed_match_arm.ty {
+                            panic!("found Tautology");
+                        }
+
                         ty = typed_match_arm.ty;
                         match_arms.push(typed_match_arm.arm);
                     }
                 }
 
-                debug!("prop ty: {:?}", ty);
-
                 Ok(Unified {
                     binder: None,
-                    nodes: [OntosNode {
-                        kind: OntosKind::MatchProp(*struct_var, *id, match_arms),
-                        meta: Meta {
-                            ty,
-                            span: meta.span,
-                        },
-                    }]
-                    .into(),
+                    nodes: if match_arms.is_empty() {
+                        SmallVec::default()
+                    } else {
+                        if let Type::Tautology = ty {
+                            unreachable!();
+                        }
+
+                        [OntosNode {
+                            kind: OntosKind::MatchProp(*struct_var, *id, match_arms),
+                            meta: Meta {
+                                ty,
+                                span: meta.span,
+                            },
+                        }]
+                        .into()
+                    },
                 })
             }
             NodeKind::MapSeq(..) => {
@@ -334,40 +344,33 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 debug!("No nodes in variant binding");
                 None
             }
-            (Some(rel), None) => {
-                let ty = last_type(rel.iter());
-                Some(TypedMatchArm {
-                    arm: MatchArm {
-                        pattern: PropPattern::Present(
-                            seq,
-                            rel_binding.binding,
-                            PatternBinding::Wildcard,
-                        ),
-                        nodes: rel.into_iter().collect(),
-                    },
-                    ty,
-                })
-            }
-            (None, Some(val)) => {
-                let ty = last_type(val.iter());
-                Some(TypedMatchArm {
-                    arm: MatchArm {
-                        pattern: PropPattern::Present(
-                            seq,
-                            PatternBinding::Wildcard,
-                            val_binding.binding,
-                        ),
-                        nodes: val.into_iter().collect(),
-                    },
-                    ty,
-                })
-            }
+            (Some(rel), None) => Self::last_type_opt(rel.iter()).map(|ty| TypedMatchArm {
+                arm: MatchArm {
+                    pattern: PropPattern::Present(
+                        seq,
+                        rel_binding.binding,
+                        PatternBinding::Wildcard,
+                    ),
+                    nodes: rel.into_iter().collect(),
+                },
+                ty,
+            }),
+            (None, Some(val)) => Self::last_type_opt(val.iter()).map(|ty| TypedMatchArm {
+                arm: MatchArm {
+                    pattern: PropPattern::Present(
+                        seq,
+                        PatternBinding::Wildcard,
+                        val_binding.binding,
+                    ),
+                    nodes: val.into_iter().collect(),
+                },
+                ty,
+            }),
             (Some(rel), Some(val)) => {
                 let mut concatenated: Vec<OntosNode> = vec![];
                 concatenated.extend(rel);
                 concatenated.extend(val);
-                let ty = last_type(concatenated.iter());
-                Some(TypedMatchArm {
+                Self::last_type_opt(concatenated.iter()).map(|ty| TypedMatchArm {
                     arm: MatchArm {
                         pattern: PropPattern::Present(
                             seq,
@@ -482,8 +485,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         for ((variable, property_id), dimension_variants) in property_groups {
             let mut variants = vec![];
+            let mut ty = &Type::Tautology;
             for (dimension, variant) in dimension_variants {
                 let (rel, val) = variant.children.into_ontos_pair();
+                ty = variant.meta.ty;
+                if let Type::Tautology = ty {
+                    warn!(
+                        "Prop variant is Tautology (rel, val): ({:?}, {:?}) ({}, {})",
+                        rel.meta.ty, val.meta.ty, rel, val
+                    );
+                }
                 variants.push(PropVariant {
                     dimension,
                     attr: Attribute {
@@ -496,7 +507,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             merged.push(OntosNode {
                 kind: NodeKind::Prop(variable, property_id, variants),
                 meta: Meta {
-                    ty: &Type::Tautology,
+                    ty,
                     span: SourceSpan::none(),
                 },
             })
@@ -548,16 +559,39 @@ impl<'a, 'm> Unifier<'a, 'm> {
             nodes: Some(nodes),
         })
     }
-}
 
-fn last_type<'a, 'm: 'a>(mut iterator: impl Iterator<Item = &'a OntosNode<'m>>) -> TypeRef<'m> {
-    if let Some(next) = iterator.next() {
-        let mut ty = next.meta.ty;
-        for next in iterator {
-            ty = next.meta.ty;
+    fn last_type<'n>(
+        &mut self,
+        mut iterator: impl Iterator<Item = &'n OntosNode<'m>>,
+    ) -> TypeRef<'m>
+    where
+        'm: 'n,
+    {
+        if let Some(next) = iterator.next() {
+            let mut ty = next.meta.ty;
+            for next in iterator {
+                ty = next.meta.ty;
+            }
+            ty
+        } else {
+            self.types.intern(Type::Unit(DefId::unit()))
         }
-        ty
-    } else {
-        &Type::Tautology
+    }
+
+    fn last_type_opt<'n>(
+        mut iterator: impl Iterator<Item = &'n OntosNode<'m>>,
+    ) -> Option<TypeRef<'m>>
+    where
+        'm: 'n,
+    {
+        if let Some(next) = iterator.next() {
+            let mut ty = next.meta.ty;
+            for next in iterator {
+                ty = next.meta.ty;
+            }
+            Some(ty)
+        } else {
+            None
+        }
     }
 }

@@ -412,7 +412,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     prop_variants,
                                 ),
                                 meta: Meta {
-                                    ty: self.types.intern(Type::Tautology),
+                                    ty: self.types.intern(Type::Unit(DefId::unit())),
                                     span: *prop_span,
                                 },
                             });

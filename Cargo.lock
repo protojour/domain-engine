@@ -825,6 +825,7 @@ dependencies = [
  "bit-set",
  "bumpalo",
  "chumsky",
+ "derive-debug-extras",
  "ena",
  "fnv",
  "fraction",
