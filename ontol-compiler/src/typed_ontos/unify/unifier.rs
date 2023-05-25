@@ -7,13 +7,16 @@ use ontos::{
 use smallvec::SmallVec;
 use tracing::{debug, trace};
 
-use crate::typed_ontos::{
-    lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedOntos},
-    unify::{
-        tagged_node::{union_free_variables, DebugVariables},
-        unification_tree::build_unification_tree,
-        var_path::{locate_slice_variables, locate_variables},
+use crate::{
+    typed_ontos::{
+        lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedBinder, TypedOntos},
+        unify::{
+            tagged_node::{union_free_variables, DebugVariables},
+            unification_tree::build_unification_tree,
+            var_path::{locate_slice_variables, locate_variables},
+        },
     },
+    types::{Type, TypeRef},
 };
 
 use super::{
@@ -27,7 +30,7 @@ type UnifiedNodes<'m> = SmallVec<[OntosNode<'m>; 1]>;
 type UnifierResult<T> = Result<T, UnifierError>;
 
 pub struct Unified<'m> {
-    pub binder: Option<Binder>,
+    pub binder: Option<TypedBinder<'m>>,
     pub nodes: UnifiedNodes<'m>,
 }
 
@@ -73,6 +76,8 @@ pub fn unify_to_function<'m>(
                 _ => panic!("Too many nodes"),
             };
 
+            debug!("Root input binder: {input_binder:?}");
+
             Ok(OntosFunc {
                 arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
                 body,
@@ -104,6 +109,7 @@ fn unify_tagged_nodes<'m>(
 
 struct InvertedCall<'m> {
     pivot_variable: Variable,
+    subst_ty: TypeRef<'m>,
     def: OntosNode<'m>,
     body: UnifiedNodes<'m>,
 }
@@ -111,6 +117,11 @@ struct InvertedCall<'m> {
 struct UnifyPatternBinding<'m> {
     binding: PatternBinding,
     nodes: Option<UnifiedNodes<'m>>,
+}
+
+struct TypedMatchArm<'m> {
+    arm: MatchArm<'m, TypedOntos>,
+    ty: TypeRef<'m>,
 }
 
 struct Unifier<'a, 'm> {
@@ -138,7 +149,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::VariableRef(var) => {
                 let nodes = self.merge_target_nodes(&mut u_node)?;
                 Ok(Unified {
-                    binder: Some(Binder(*var)),
+                    binder: Some(TypedBinder {
+                        variable: *var,
+                        ty: meta.ty,
+                    }),
                     nodes,
                 })
             }
@@ -160,7 +174,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let subst_var = self.alloc_var();
                     let inverted_call = self.invert_call(proc, subst_var, u_node, args, meta)?;
                     Ok(Unified {
-                        binder: Some(Binder(subst_var)),
+                        binder: Some(TypedBinder {
+                            variable: subst_var,
+                            ty: inverted_call.subst_ty,
+                        }),
                         nodes: [OntosNode {
                             kind: NodeKind::Let(
                                 Binder(inverted_call.pivot_variable),
@@ -198,23 +215,35 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::Struct(binder, nodes) => {
                 let nodes = self.unify_children(u_node, nodes)?;
                 Ok(Unified {
-                    binder: Some(*binder),
+                    binder: Some(TypedBinder {
+                        variable: binder.0,
+                        ty: meta.ty,
+                    }),
                     nodes: nodes.into(),
                 })
             }
             NodeKind::Prop(struct_var, id, variants) => {
                 let mut match_arms = vec![];
+                let mut ty = &Type::Tautology;
                 for (index, variant_u_node) in u_node.sub_unifications {
-                    match_arms.extend(
-                        self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?,
-                    );
+                    if let Some(typed_match_arm) =
+                        self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?
+                    {
+                        ty = typed_match_arm.ty;
+                        match_arms.push(typed_match_arm.arm);
+                    }
                 }
+
+                debug!("prop ty: {:?}", ty);
 
                 Ok(Unified {
                     binder: None,
                     nodes: [OntosNode {
                         kind: OntosKind::MatchProp(*struct_var, *id, match_arms),
-                        meta,
+                        meta: Meta {
+                            ty,
+                            span: meta.span,
+                        },
                     }]
                     .into(),
                 })
@@ -232,7 +261,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         u_node: UnificationNode<'m>,
         variant: &PropVariant<'m, TypedOntos>,
-    ) -> UnifierResult<Option<MatchArm<'m, TypedOntos>>> {
+    ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         if u_node.target_nodes.is_empty() {
             // treat this "transparently"
             self.make_match_arm(u_node, variant, None)
@@ -276,7 +305,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         mut u_node: UnificationNode<'m>,
         variant: &PropVariant<'m, TypedOntos>,
         seq: Option<Seq>,
-    ) -> UnifierResult<Option<MatchArm<'m, TypedOntos>>> {
+    ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         let rel_binding =
             self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel)?;
         let val_binding =
@@ -287,21 +316,49 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 debug!("No nodes in variant binding");
                 None
             }
-            (Some(rel), None) => Some(MatchArm {
-                pattern: PropPattern::Present(seq, rel_binding.binding, PatternBinding::Wildcard),
-                nodes: rel.into_iter().collect(),
-            }),
-            (None, Some(val)) => Some(MatchArm {
-                pattern: PropPattern::Present(seq, PatternBinding::Wildcard, val_binding.binding),
-                nodes: val.into_iter().collect(),
-            }),
+            (Some(rel), None) => {
+                let ty = last_type(rel.iter());
+                Some(TypedMatchArm {
+                    arm: MatchArm {
+                        pattern: PropPattern::Present(
+                            seq,
+                            rel_binding.binding,
+                            PatternBinding::Wildcard,
+                        ),
+                        nodes: rel.into_iter().collect(),
+                    },
+                    ty,
+                })
+            }
+            (None, Some(val)) => {
+                let ty = last_type(val.iter());
+                Some(TypedMatchArm {
+                    arm: MatchArm {
+                        pattern: PropPattern::Present(
+                            seq,
+                            PatternBinding::Wildcard,
+                            val_binding.binding,
+                        ),
+                        nodes: val.into_iter().collect(),
+                    },
+                    ty,
+                })
+            }
             (Some(rel), Some(val)) => {
                 let mut concatenated: Vec<OntosNode> = vec![];
                 concatenated.extend(rel);
                 concatenated.extend(val);
-                Some(MatchArm {
-                    pattern: PropPattern::Present(seq, rel_binding.binding, val_binding.binding),
-                    nodes: concatenated,
+                let ty = last_type(concatenated.iter());
+                Some(TypedMatchArm {
+                    arm: MatchArm {
+                        pattern: PropPattern::Present(
+                            seq,
+                            rel_binding.binding,
+                            val_binding.binding,
+                        ),
+                        nodes: concatenated,
+                    },
+                    ty,
                 })
             }
         })
@@ -351,6 +408,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(InvertedCall {
                     pivot_variable: *var,
+                    subst_ty: pivot_arg.meta.ty,
                     def: OntosNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
@@ -369,6 +427,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 new_args.insert(unification_idx, sub_inverted_call.def);
                 Ok(InvertedCall {
                     pivot_variable: sub_inverted_call.pivot_variable,
+                    subst_ty: sub_inverted_call.subst_ty,
                     def: OntosNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
@@ -427,12 +486,24 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         let Unified { nodes, binder } = self.unify_node(u_node, source)?;
         let binding = match binder {
-            Some(binder) => PatternBinding::Binder(binder.0),
+            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
             None => PatternBinding::Wildcard,
         };
         Ok(UnifyPatternBinding {
             binding,
             nodes: Some(nodes),
         })
+    }
+}
+
+fn last_type<'a, 'm: 'a>(mut iterator: impl Iterator<Item = &'a OntosNode<'m>>) -> TypeRef<'m> {
+    if let Some(next) = iterator.next() {
+        let mut ty = next.meta.ty;
+        for next in iterator {
+            ty = next.meta.ty;
+        }
+        ty
+    } else {
+        &Type::Tautology
     }
 }

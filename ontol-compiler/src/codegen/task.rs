@@ -16,7 +16,7 @@ use crate::{
     hir_node::{CodeDirection, HirBody, HirIdx, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
-    Compiler, IrVariant, SourceSpan, TYPE_CHECKER,
+    Compiler, IrVariant, SourceSpan, CODE_GENERATOR, TYPE_CHECKER,
 };
 
 use super::{
@@ -160,6 +160,10 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 }
             }
             CodegenTask::Map(map_task) => {
+                if CODE_GENERATOR != IrVariant::Hir {
+                    continue;
+                }
+
                 let bodies = map_task.bodies;
                 let mut equation = HirEquation::new(map_task.nodes);
 

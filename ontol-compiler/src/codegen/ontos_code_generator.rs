@@ -4,14 +4,15 @@ use ontol_runtime::{
     DefId,
 };
 use ontos::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern},
+    kind::{NodeKind, PatternBinding, PropPattern},
     Variable,
 };
 use tracing::debug;
 
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
-    typed_ontos::lang::{OntosFunc, OntosNode, TypedOntos},
+    typed_ontos::lang::{OntosFunc, OntosNode},
+    IrVariant, CODE_GENERATOR,
 };
 
 use super::{
@@ -23,6 +24,10 @@ use super::{
 pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> bool {
     debug!("Generating code for\n{}", func.body);
 
+    let return_ty = func.body.meta.ty;
+
+    debug!("Return type: {return_ty:?}");
+
     let mut builder = ProcBuilder::new(NParams(0));
     let mut block = builder.new_block(Stack(1), func.body.meta.span);
     let mut generator = OntosCodeGenerator {
@@ -30,11 +35,26 @@ pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> 
         builder: &mut builder,
         scope: Default::default(),
     };
-    generator.scope.insert(func.arg.0, Local(0));
+    generator.scope.insert(func.arg.variable, Local(0));
     generator.gen_node(func.body, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
-    false
+    match (find_mapping_key(func.arg.ty), find_mapping_key(return_ty)) {
+        (Some(from_def), Some(to_def)) => {
+            if CODE_GENERATOR == IrVariant::Ontos {
+                proc_table
+                    .map_procedures
+                    .insert((from_def, to_def), builder);
+            }
+            true
+        }
+        (from_def, to_def) => {
+            if CODE_GENERATOR == IrVariant::Ontos {
+                panic!("Problem finding def ids: ({from_def:?}, {to_def:?})");
+            }
+            false
+        }
+    }
 }
 
 pub(super) struct OntosCodeGenerator<'a> {

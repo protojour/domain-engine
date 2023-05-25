@@ -1,7 +1,7 @@
 use ontos::{
     display::{Print, Printer, Sep},
     kind::NodeKind,
-    Binder,
+    Variable,
 };
 
 use crate::{
@@ -64,6 +64,12 @@ pub struct Meta<'m> {
 }
 
 pub struct OntosFunc<'m> {
-    pub arg: Binder,
+    pub arg: TypedBinder<'m>,
     pub body: OntosNode<'m>,
+}
+
+#[derive(Debug)]
+pub struct TypedBinder<'m> {
+    pub variable: Variable,
+    pub ty: TypeRef<'m>,
 }
