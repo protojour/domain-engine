@@ -1,6 +1,9 @@
-use ontol_runtime::vm::proc::BuiltinProc;
+use indexmap::IndexMap;
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use ontos::{
-    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq},
+    kind::{
+        Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq,
+    },
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -18,11 +21,11 @@ use crate::{
         },
     },
     types::{Type, TypeRef, Types},
-    Compiler,
+    Compiler, SourceSpan,
 };
 
 use super::{
-    tagged_node::{TaggedNode, Tagger},
+    tagged_node::{TaggedKind, TaggedNode, Tagger},
     unification_tree::UnificationNode,
     UnifierError, VariableTracker,
 };
@@ -284,9 +287,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
             let _meta = target.meta;
 
             match target.kind {
-                NodeKind::Seq(_, attr) => {
-                    let free_variables =
-                        union_free_variables([attr.rel.as_ref(), attr.val.as_ref()]);
+                TaggedKind::Seq(_) | TaggedKind::PropVariant(_, _, Dimension::Seq(_)) => {
+                    let free_variables = union_free_variables(target.children.0.iter());
 
                     trace!("seq free_variables: {:?}", DebugVariables(&free_variables));
 
@@ -297,7 +299,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     .unwrap();
                     trace!("seq var_paths: {var_paths:?}");
 
-                    let u_tree = build_unification_tree(vec![*attr.rel, *attr.val], &var_paths);
+                    let u_tree = build_unification_tree(target.children.0, &var_paths);
 
                     trace!("seq u_tree: {u_tree:#?}");
 
@@ -308,7 +310,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             typed_arm
                         }))
                 }
-                _ => panic!("BUG: Unsupported kind"),
+                other => panic!("BUG: Unsupported kind: {other:?}"),
             }
         } else {
             panic!("BUG: Many target nodes for prop variant");
@@ -460,8 +462,43 @@ impl<'a, 'm> Unifier<'a, 'm> {
         u_node: &mut UnificationNode<'m>,
     ) -> UnifierResult<UnifiedNodes<'m>> {
         let mut merged: UnifiedNodes<'m> = Default::default();
+        let mut property_groups: IndexMap<(Variable, PropertyId), Vec<(Dimension, TaggedNode)>> =
+            Default::default();
+
         for tagged_node in std::mem::take(&mut u_node.target_nodes) {
-            merged.push(tagged_node.into_ontos_node());
+            match &tagged_node.kind {
+                TaggedKind::PropVariant(variable, property_id, dimension) => {
+                    property_groups
+                        .entry((*variable, *property_id))
+                        .or_default()
+                        .push((*dimension, tagged_node));
+                }
+                _ => {
+                    merged.push(tagged_node.into_ontos_node());
+                }
+            }
+        }
+
+        for ((variable, property_id), dimension_variants) in property_groups {
+            let mut variants = vec![];
+            for (dimension, variant) in dimension_variants {
+                let (rel, val) = variant.children.into_ontos_pair();
+                variants.push(PropVariant {
+                    dimension,
+                    attr: Attribute {
+                        rel: Box::new(rel),
+                        val: Box::new(val),
+                    },
+                })
+            }
+
+            merged.push(OntosNode {
+                kind: NodeKind::Prop(variable, property_id, variants),
+                meta: Meta {
+                    ty: &Type::Tautology,
+                    span: SourceSpan::none(),
+                },
+            })
         }
 
         for root_u_node in std::mem::take(&mut u_node.dependents) {

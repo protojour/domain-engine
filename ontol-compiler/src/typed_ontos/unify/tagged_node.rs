@@ -1,52 +1,50 @@
 use std::fmt::Debug;
 
 use bit_set::BitSet;
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use ontos::{
-    kind::{Attribute, MatchArm, NodeKind, PropVariant},
-    Binder, Label, Node, Variable,
+    kind::{Attribute, Dimension, NodeKind, PropVariant},
+    Binder, Label, Variable,
 };
 
-use crate::typed_ontos::lang::{Meta, OntosNode};
+use crate::{
+    typed_ontos::lang::{Meta, OntosNode},
+    types::Type,
+    SourceSpan,
+};
 
-#[derive(Clone, Copy, Debug)]
-pub struct TaggedTree;
-
-impl ontos::Lang for TaggedTree {
-    type Node<'m> = TaggedNode<'m>;
-
-    fn make_node<'a>(&self, _kind: NodeKind<'a, Self>) -> Self::Node<'a> {
-        unimplemented!()
-    }
+#[derive(Debug)]
+pub enum TaggedKind {
+    VariableRef(Variable),
+    Unit,
+    Int(i64),
+    Let(Binder),
+    Call(BuiltinProc),
+    Map,
+    Seq(Label),
+    Struct(Binder),
+    Prop(Variable, PropertyId),
+    PropVariant(Variable, PropertyId, Dimension),
 }
 
-type TaggedKind<'m> = NodeKind<'m, TaggedTree>;
-
+// Note: This is more granular than ontos nodes.
+// prop and match arms should be "untyped".
+#[derive(Debug)]
 pub struct TaggedNode<'m> {
-    pub kind: TaggedKind<'m>,
+    pub kind: TaggedKind,
+    pub children: TaggedNodes<'m>,
     pub meta: Meta<'m>,
     pub free_variables: BitSet,
 }
 
-impl<'m> Debug for TaggedNode<'m> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.kind())
-    }
-}
-
-impl<'m> ontos::Node<'m, TaggedTree> for TaggedNode<'m> {
-    fn kind(&self) -> &NodeKind<'m, TaggedTree> {
-        &self.kind
-    }
-
-    fn kind_mut(&mut self) -> &mut NodeKind<'m, TaggedTree> {
-        &mut self.kind
-    }
-}
+#[derive(Debug)]
+pub struct TaggedNodes<'m>(pub Vec<TaggedNode<'m>>);
 
 impl<'m> TaggedNode<'m> {
-    fn new(kind: TaggedKind<'m>, meta: Meta<'m>) -> Self {
+    fn new(kind: TaggedKind, meta: Meta<'m>) -> Self {
         Self {
             kind,
+            children: TaggedNodes(vec![]),
             meta,
             free_variables: BitSet::new(),
         }
@@ -63,62 +61,84 @@ impl<'m> TaggedNode<'m> {
     }
 
     pub fn into_ontos_node(self) -> OntosNode<'m> {
-        fn nodes_to_ontos(nodes: Vec<TaggedNode>) -> Vec<OntosNode> {
-            nodes.into_iter().map(TaggedNode::into_ontos_node).collect()
-        }
-
         let kind = match self.kind {
-            NodeKind::VariableRef(var) => NodeKind::VariableRef(var),
-            NodeKind::Unit => NodeKind::Unit,
-            NodeKind::Int(int) => NodeKind::Int(int),
-            NodeKind::Call(proc, args) => NodeKind::Call(proc, nodes_to_ontos(args)),
-            NodeKind::Map(arg) => NodeKind::Map(Box::new(arg.into_ontos_node())),
-            NodeKind::Let(binder, def, body) => NodeKind::Let(
-                binder,
-                Box::new(def.into_ontos_node()),
-                nodes_to_ontos(body),
-            ),
-            NodeKind::Seq(binder, attr) => NodeKind::Seq(
-                binder,
-                Attribute {
-                    rel: Box::new(attr.rel.into_ontos_node()),
-                    val: Box::new(attr.val.into_ontos_node()),
-                },
-            ),
-            NodeKind::Struct(binder, nodes) => NodeKind::Struct(binder, nodes_to_ontos(nodes)),
-            NodeKind::Prop(struct_var, id, variants) => NodeKind::Prop(
-                struct_var,
-                id,
-                variants
-                    .into_iter()
-                    .map(|variant| PropVariant {
-                        dimension: variant.dimension,
-                        attr: Attribute {
-                            rel: Box::new(variant.attr.rel.into_ontos_node()),
-                            val: Box::new(variant.attr.val.into_ontos_node()),
-                        },
-                    })
-                    .collect(),
-            ),
-            NodeKind::MapSeq(var, binder, nodes) => {
-                NodeKind::MapSeq(var, binder, nodes_to_ontos(nodes))
+            TaggedKind::VariableRef(var) => NodeKind::VariableRef(var),
+            TaggedKind::Unit => NodeKind::Unit,
+            TaggedKind::Int(int) => NodeKind::Int(int),
+            TaggedKind::Call(proc) => NodeKind::Call(proc, self.children.into_ontos()),
+            TaggedKind::Map => NodeKind::Map(Box::new(self.children.into_ontos_one())),
+            TaggedKind::Let(binder) => {
+                let (def, body) = self.children.one_then_rest_into_ontos();
+                NodeKind::Let(binder, Box::new(def), body)
             }
-            NodeKind::MatchProp(struct_var, id, arms) => NodeKind::MatchProp(
+            TaggedKind::Seq(binder) => {
+                let (rel, val) = self.children.into_ontos_pair();
+                NodeKind::Seq(
+                    binder,
+                    Attribute {
+                        rel: Box::new(rel),
+                        val: Box::new(val),
+                    },
+                )
+            }
+            TaggedKind::Struct(binder) => NodeKind::Struct(binder, self.children.into_ontos()),
+            TaggedKind::Prop(struct_var, id) => NodeKind::Prop(
                 struct_var,
                 id,
-                arms.into_iter()
-                    .map(|arm| MatchArm {
-                        pattern: arm.pattern,
-                        nodes: nodes_to_ontos(arm.nodes),
+                self.children
+                    .0
+                    .into_iter()
+                    .map(|node| match node.kind {
+                        TaggedKind::PropVariant(_, _, dimension) => {
+                            let (rel, val) = node.children.into_ontos_pair();
+
+                            PropVariant {
+                                dimension,
+                                attr: Attribute {
+                                    rel: Box::new(rel),
+                                    val: Box::new(val),
+                                },
+                            }
+                        }
+                        _ => panic!(),
                     })
                     .collect(),
             ),
+            other => panic!("{other:?} should not be handled at top level"),
         };
 
         OntosNode {
             kind,
             meta: self.meta,
         }
+    }
+}
+
+impl<'m> TaggedNodes<'m> {
+    pub fn into_ontos(self) -> Vec<OntosNode<'m>> {
+        Self::collect(self.0.into_iter())
+    }
+
+    pub fn one_then_rest_into_ontos(self) -> (OntosNode<'m>, Vec<OntosNode<'m>>) {
+        let mut iterator = self.0.into_iter();
+        let first = iterator.next().unwrap();
+        let rest = Self::collect(iterator);
+        (first.into_ontos_node(), rest)
+    }
+
+    pub fn into_ontos_one(self) -> OntosNode<'m> {
+        self.0.into_iter().next().unwrap().into_ontos_node()
+    }
+
+    pub fn into_ontos_pair(self) -> (OntosNode<'m>, OntosNode<'m>) {
+        let mut iterator = self.0.into_iter();
+        let first = iterator.next().unwrap();
+        let second = iterator.next().unwrap();
+        (first.into_ontos_node(), second.into_ontos_node())
+    }
+
+    fn collect(iterator: impl Iterator<Item = TaggedNode<'m>>) -> Vec<OntosNode<'m>> {
+        iterator.map(TaggedNode::into_ontos_node).collect()
     }
 }
 
@@ -148,37 +168,32 @@ impl Tagger {
         let (kind, meta) = node.split();
         match kind {
             NodeKind::VariableRef(var) => {
-                let tagged_node = TaggedNode::new(NodeKind::VariableRef(var), meta);
+                let tagged_node = TaggedNode::new(TaggedKind::VariableRef(var), meta);
                 if self.in_scope.contains(var.0 as usize) {
                     tagged_node
                 } else {
                     tagged_node.union_var(var)
                 }
             }
-            NodeKind::Unit => TaggedNode::new(NodeKind::Unit, meta),
-            NodeKind::Int(int) => TaggedNode::new(NodeKind::Int(int), meta),
+            NodeKind::Unit => TaggedNode::new(TaggedKind::Unit, meta),
+            NodeKind::Int(int) => TaggedNode::new(TaggedKind::Int(int), meta),
             NodeKind::Let(binder, definition, body) => {
                 let definition = *definition;
                 let definition = self.tag_node(definition);
                 let def_free_vars = definition.free_variables.clone();
                 let mut tagged = self.enter_binder(binder, |zelf| {
-                    zelf.tag_children(
-                        body,
-                        move |body| NodeKind::Let(binder, Box::new(definition), body),
-                        meta,
-                    )
+                    zelf.tag_children(body, TaggedKind::Let(binder), meta)
                 });
                 tagged.free_variables.union_with(&def_free_vars);
                 tagged
             }
-            NodeKind::Call(proc, args) => {
-                self.tag_children(args, |args| NodeKind::Call(proc, args), meta)
-            }
+            NodeKind::Call(proc, args) => self.tag_children(args, TaggedKind::Call(proc), meta),
             NodeKind::Map(arg) => {
                 let arg = self.tag_node(*arg);
                 TaggedNode {
                     free_variables: arg.free_variables.clone(),
-                    kind: NodeKind::Map(Box::new(arg)),
+                    kind: TaggedKind::Map,
+                    children: TaggedNodes(vec![arg]),
                     meta,
                 }
             }
@@ -188,19 +203,14 @@ impl Tagger {
 
                 TaggedNode {
                     free_variables: union_free_variables([&rel, &val]),
-                    kind: NodeKind::Seq(
-                        label,
-                        Attribute {
-                            rel: Box::new(rel),
-                            val: Box::new(val),
-                        },
-                    ),
+                    kind: TaggedKind::Seq(label),
+                    children: TaggedNodes(vec![rel, val]),
                     meta,
                 }
                 .union_label(label)
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
-                zelf.tag_children(nodes, |nodes| NodeKind::Struct(binder, nodes), meta)
+                zelf.tag_children(nodes, TaggedKind::Struct(binder), meta)
             }),
             NodeKind::Prop(struct_var, prop, variants) => {
                 let mut free_variables = BitSet::new();
@@ -211,14 +221,24 @@ impl Tagger {
                         let rel = self.tag_node(*variant.attr.rel);
                         let val = self.tag_node(*variant.attr.val);
 
-                        free_variables.union_with(&rel.free_variables);
-                        free_variables.union_with(&val.free_variables);
+                        let mut variant_variables = BitSet::new();
 
-                        PropVariant {
-                            dimension: variant.dimension,
-                            attr: Attribute {
-                                rel: Box::new(rel),
-                                val: Box::new(val),
+                        variant_variables.union_with(&rel.free_variables);
+                        variant_variables.union_with(&val.free_variables);
+
+                        if let Dimension::Seq(label) = variant.dimension {
+                            variant_variables.insert(label.0 as usize);
+                        }
+
+                        free_variables.union_with(&variant_variables);
+
+                        TaggedNode {
+                            kind: TaggedKind::PropVariant(struct_var, prop, variant.dimension),
+                            free_variables: variant_variables,
+                            children: TaggedNodes(vec![rel, val]),
+                            meta: Meta {
+                                ty: &Type::Tautology,
+                                span: SourceSpan::none(),
                             },
                         }
                     })
@@ -226,7 +246,8 @@ impl Tagger {
 
                 TaggedNode {
                     free_variables,
-                    kind: NodeKind::Prop(struct_var, prop, variants),
+                    kind: TaggedKind::Prop(struct_var, prop),
+                    children: TaggedNodes(variants),
                     meta,
                 }
             }
@@ -242,13 +263,14 @@ impl Tagger {
     fn tag_children<'m>(
         &mut self,
         children: Vec<OntosNode<'m>>,
-        func: impl FnOnce(Vec<TaggedNode<'m>>) -> TaggedKind<'m>,
+        kind: TaggedKind,
         meta: Meta<'m>,
     ) -> TaggedNode<'m> {
         let children = self.tag_nodes(children);
         TaggedNode {
             free_variables: union_free_variables(children.as_slice()),
-            kind: func(children),
+            kind,
+            children: TaggedNodes(children),
             meta,
         }
     }

@@ -4,6 +4,8 @@ use fnv::FnvHashMap;
 use ontos::Variable;
 use tracing::debug;
 
+use crate::typed_ontos::unify::tagged_node::TaggedKind;
+
 use super::{tagged_node::TaggedNode, var_path::Path};
 
 #[derive(Default)]
@@ -42,7 +44,25 @@ pub fn build_unification_tree<'m>(
     root
 }
 
-pub fn add_to_tree<'m>(
+fn add_to_tree<'m>(
+    tagged_node: TaggedNode<'m>,
+    variable_paths: &FnvHashMap<Variable, Path>,
+    tree: &mut UnificationNode<'m>,
+) {
+    match tagged_node.kind {
+        // Flatten certain node variants
+        TaggedKind::Prop(..) => {
+            for child in tagged_node.children.0 {
+                add_to_tree(child, variable_paths, tree);
+            }
+        }
+        _ => {
+            insert_at_path(tagged_node, variable_paths, tree);
+        }
+    }
+}
+
+pub fn insert_at_path<'m>(
     tagged_node: TaggedNode<'m>,
     variable_paths: &FnvHashMap<Variable, Path>,
     mut tree: &mut UnificationNode<'m>,

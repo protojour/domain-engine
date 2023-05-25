@@ -35,7 +35,7 @@ pub struct PropVariant<'a, L: Lang> {
     pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Dimension {
     Singular,
     Seq(Label),

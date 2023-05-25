@@ -197,6 +197,40 @@ fn test_struct_arithmetic_property_dependency() {
 }
 
 #[test]
+fn test_unify_basic_seq_prop() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop $b S:0:0
+                (seq (@d)
+                    #u
+                    $a
+                )
+            )
+        )
+        ",
+        "
+        (struct ($c)
+            (prop $c S:1:1
+                (seq (@d)
+                    #u
+                    $a
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($c)
+            (match-prop $b S:0:0
+                ((seq $_ $a) $a)
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_flat_map1() {
     let output = test_unify(
         "
