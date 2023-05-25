@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use ontos::{
     display::{Print, Printer, Sep},
     kind::NodeKind,
@@ -66,6 +68,12 @@ pub struct Meta<'m> {
 pub struct OntosFunc<'m> {
     pub arg: TypedBinder<'m>,
     pub body: OntosNode<'m>,
+}
+
+impl<'m> Display for OntosFunc<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "|{}| {}", self.arg.variable, self.body)
+    }
 }
 
 #[derive(Debug)]

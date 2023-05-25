@@ -23,11 +23,9 @@ use super::{
 };
 
 pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> bool {
-    debug!("Generating code for\n{}", func.body);
+    debug!("Generating code for\n{}", func);
 
     let return_ty = func.body.meta.ty;
-
-    debug!("Return type: {return_ty:?}");
 
     let mut builder = ProcBuilder::new(NParams(0));
     let mut block = builder.new_block(Stack(1), func.body.meta.span);
@@ -42,6 +40,8 @@ pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> 
 
     match (find_mapping_key(func.arg.ty), find_mapping_key(return_ty)) {
         (Some(from_def), Some(to_def)) => {
+            debug!("Saving proc: {:?} -> {:?}", func.arg.ty, return_ty);
+
             if CODE_GENERATOR == IrVariant::Ontos {
                 proc_table
                     .map_procedures
@@ -138,6 +138,7 @@ impl<'a> OntosCodeGenerator<'a> {
                 self.scope.insert(binder.0, local);
                 for node in nodes {
                     self.gen_node(node, block);
+                    self.builder.append_pop_until(block, local, span);
                 }
                 self.scope.remove(&binder.0);
             }

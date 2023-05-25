@@ -91,7 +91,9 @@ impl ProcBuilder {
 
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
         let stack_delta = Stack(local.0 as i32 - self.top().0 as i32);
-        self.append(block, Ir::PopUntil(local), stack_delta, span);
+        if stack_delta.0 != 0 {
+            self.append(block, Ir::PopUntil(local), stack_delta, span);
+        }
     }
 
     pub fn build(mut self) -> SpannedOpCodes {

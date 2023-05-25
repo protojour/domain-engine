@@ -21,7 +21,7 @@ fn test_unify(source: &str, target: &str) -> String {
     let func = unify_to_function(parse_typed(source), parse_typed(target), &mut compiler).unwrap();
     let mut output = String::new();
     use std::fmt::Write;
-    write!(&mut output, "|{}| {}", func.arg.variable, func.body).unwrap();
+    write!(&mut output, "{func}").unwrap();
     output
 }
 

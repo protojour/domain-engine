@@ -179,6 +179,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 1 => {
                     let subst_var = self.alloc_var();
                     let inverted_call = self.invert_call(proc, subst_var, u_node, args, meta)?;
+                    let return_ty = last_type(inverted_call.body.iter());
                     Ok(Unified {
                         binder: Some(TypedBinder {
                             variable: subst_var,
@@ -190,7 +191,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 Box::new(inverted_call.def),
                                 inverted_call.body.into_iter().collect(),
                             ),
-                            meta,
+                            meta: Meta {
+                                ty: return_ty,
+                                span: meta.span,
+                            },
                         }]
                         .into(),
                     })
@@ -406,6 +410,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
 
         let pivot_arg = &args[unification_idx];
+        debug!("pivot_arg type: {:?}", pivot_arg.meta.ty);
         match &pivot_arg.kind {
             NodeKind::VariableRef(var) => {
                 new_args.insert(
@@ -419,7 +424,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(InvertedCall {
                     pivot_variable: *var,
-                    subst_ty: pivot_arg.meta.ty,
+                    subst_ty: meta.ty,
                     def: OntosNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
@@ -438,7 +443,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 new_args.insert(unification_idx, sub_inverted_call.def);
                 Ok(InvertedCall {
                     pivot_variable: sub_inverted_call.pivot_variable,
-                    subst_ty: sub_inverted_call.subst_ty,
+                    subst_ty: meta.ty,
                     def: OntosNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
