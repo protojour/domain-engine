@@ -204,13 +204,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("2nd:\n{}", map_task.second);
 
                 debug!("Ontos forward start");
-                if let Ok(func) = unify_to_function(map_task.first.clone(), map_task.second.clone())
+                if let Ok(func) =
+                    unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
                 {
                     map_codegen_ontos(&mut proc_table, func);
                 }
 
                 debug!("Ontos backward start");
-                if let Ok(func) = unify_to_function(map_task.second, map_task.first) {
+                if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
                     map_codegen_ontos(&mut proc_table, func);
                 }
             }

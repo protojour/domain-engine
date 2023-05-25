@@ -8,6 +8,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
+    mem::Intern,
     typed_ontos::{
         lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedBinder, TypedOntos},
         unify::{
@@ -16,7 +17,8 @@ use crate::{
             var_path::{locate_slice_variables, locate_variables},
         },
     },
-    types::{Type, TypeRef},
+    types::{Type, TypeRef, Types},
+    Compiler,
 };
 
 use super::{
@@ -37,74 +39,24 @@ pub struct Unified<'m> {
 pub fn unify_to_function<'m>(
     source: OntosNode<'m>,
     target: OntosNode<'m>,
+    compiler: &mut Compiler<'m>,
 ) -> UnifierResult<OntosFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, &source);
     var_tracker.visit_node(0, &target);
 
-    let meta = target.meta;
-
-    match target.kind {
-        NodeKind::Struct(binder, children) => {
-            let Unified {
-                nodes,
-                binder: input_binder,
-            } = unify_tagged_nodes(
-                Tagger::default().enter_binder(binder, |tagger| tagger.tag_nodes(children)),
-                &source,
-                var_tracker.next_variable(),
-            )?;
-
-            Ok(OntosFunc {
-                arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
-                body: OntosNode {
-                    kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
-                    meta,
-                },
-            })
-        }
-        kind => {
-            let tagged_node = Tagger::default().tag_node(OntosNode { kind, meta });
-            let Unified {
-                nodes,
-                binder: input_binder,
-            } = unify_tagged_nodes(vec![tagged_node], &source, var_tracker.next_variable())?;
-
-            let body = match nodes.len() {
-                0 => panic!("No nodes"),
-                1 => nodes.into_iter().next().unwrap(),
-                _ => panic!("Too many nodes"),
-            };
-
-            debug!("Root input binder: {input_binder:?}");
-
-            Ok(OntosFunc {
-                arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
-                body,
-            })
-        }
+    Unifier {
+        root_source: &source,
+        next_variable: var_tracker.next_variable(),
+        types: &mut compiler.types,
     }
+    .unify_to_function(target)
 }
 
-fn unify_tagged_nodes<'m>(
-    tagged_nodes: Vec<TaggedNode<'m>>,
-    root_source: &OntosNode<'m>,
+struct Unifier<'a, 'm> {
+    root_source: &'a OntosNode<'m>,
     next_variable: Variable,
-) -> UnifierResult<Unified<'m>> {
-    let free_variables = union_free_variables(tagged_nodes.as_slice());
-    trace!("free_variables: {:?}", DebugVariables(&free_variables));
-
-    let var_paths = locate_variables(root_source, &free_variables)?;
-    trace!("var_paths: {var_paths:?}");
-
-    let u_tree = build_unification_tree(tagged_nodes, &var_paths);
-    trace!("{u_tree:#?}");
-
-    Unifier {
-        root_source,
-        next_variable,
-    }
-    .unify_node(u_tree, root_source)
+    types: &'a mut Types<'m>,
 }
 
 struct InvertedCall<'m> {
@@ -124,11 +76,6 @@ struct TypedMatchArm<'m> {
     ty: TypeRef<'m>,
 }
 
-struct Unifier<'a, 'm> {
-    root_source: &'a OntosNode<'m>,
-    next_variable: Variable,
-}
-
 impl<'a, 'm> Unifier<'a, 'm> {
     fn alloc_var(&mut self) -> Variable {
         let var = self.next_variable;
@@ -138,6 +85,65 @@ impl<'a, 'm> Unifier<'a, 'm> {
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
+    fn unify_to_function(&mut self, target: OntosNode<'m>) -> UnifierResult<OntosFunc<'m>> {
+        let meta = target.meta;
+
+        match target.kind {
+            NodeKind::Struct(binder, children) => {
+                let Unified {
+                    nodes,
+                    binder: input_binder,
+                } = self.unify_tagged_nodes(
+                    Tagger::default().enter_binder(binder, |tagger| tagger.tag_nodes(children)),
+                )?;
+
+                Ok(OntosFunc {
+                    arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
+                    body: OntosNode {
+                        kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
+                        meta,
+                    },
+                })
+            }
+            kind => {
+                let tagged_node = Tagger::default().tag_node(OntosNode { kind, meta });
+                let Unified {
+                    nodes,
+                    binder: input_binder,
+                } = self.unify_tagged_nodes(vec![tagged_node])?;
+
+                let body = match nodes.len() {
+                    0 => panic!("No nodes"),
+                    1 => nodes.into_iter().next().unwrap(),
+                    _ => panic!("Too many nodes"),
+                };
+
+                debug!("Root input binder: {input_binder:?}");
+
+                Ok(OntosFunc {
+                    arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
+                    body,
+                })
+            }
+        }
+    }
+
+    fn unify_tagged_nodes(
+        &mut self,
+        tagged_nodes: Vec<TaggedNode<'m>>,
+    ) -> UnifierResult<Unified<'m>> {
+        let free_variables = union_free_variables(tagged_nodes.as_slice());
+        trace!("free_variables: {:?}", DebugVariables(&free_variables));
+
+        let var_paths = locate_variables(self.root_source, &free_variables)?;
+        trace!("var_paths: {var_paths:?}");
+
+        let u_tree = build_unification_tree(tagged_nodes, &var_paths);
+        trace!("{u_tree:#?}");
+
+        self.unify_node(u_tree, self.root_source)
+    }
+
     fn unify_node(
         &mut self,
         mut u_node: UnificationNode<'m>,
@@ -291,7 +297,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                     trace!("seq u_tree: {u_tree:#?}");
 
-                    self.make_match_arm(u_tree, variant, Some(Seq))
+                    Ok(self
+                        .make_match_arm(u_tree, variant, Some(Seq))?
+                        .map(|mut typed_arm| {
+                            typed_arm.ty = self.types.intern(Type::Array(typed_arm.ty));
+                            typed_arm
+                        }))
                 }
                 _ => panic!("BUG: Unsupported kind"),
             }

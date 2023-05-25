@@ -1,18 +1,24 @@
 use indoc::indoc;
-use ontol_compiler::typed_ontos::{
-    lang::{OntosNode, TypedOntos},
-    unify::unifier::unify_to_function,
+use ontol_compiler::{
+    mem::Mem,
+    typed_ontos::{
+        lang::{OntosNode, TypedOntos},
+        unify::unifier::unify_to_function,
+    },
+    Compiler,
 };
 use ontos::parse::Parser;
 use pretty_assertions::assert_eq;
 use test_log::test;
 
-fn parse_typed(src: &str) -> OntosNode<'static> {
+fn parse_typed<'m>(src: &str) -> OntosNode<'m> {
     Parser::new(TypedOntos).parse(src).unwrap().0
 }
 
 fn test_unify(source: &str, target: &str) -> String {
-    let func = unify_to_function(parse_typed(source), parse_typed(target)).unwrap();
+    let mem = Mem::default();
+    let mut compiler = Compiler::new(&mem, Default::default());
+    let func = unify_to_function(parse_typed(source), parse_typed(target), &mut compiler).unwrap();
     let mut output = String::new();
     use std::fmt::Write;
     write!(&mut output, "|{}| {}", func.arg.variable, func.body).unwrap();

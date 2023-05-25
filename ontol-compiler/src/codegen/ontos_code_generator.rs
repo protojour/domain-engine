@@ -12,6 +12,7 @@ use tracing::debug;
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
     typed_ontos::lang::{OntosFunc, OntosNode},
+    types::Type,
     IrVariant, CODE_GENERATOR,
 };
 
@@ -66,26 +67,27 @@ pub(super) struct OntosCodeGenerator<'a> {
 
 impl<'a> OntosCodeGenerator<'a> {
     fn gen_node(&mut self, node: OntosNode, block: &mut Block) {
+        let ty = node.meta.ty;
+        let span = node.meta.span;
         match node.kind {
             NodeKind::VariableRef(var) => {
                 let local = self.var_local(var);
-                self.builder
-                    .append(block, Ir::Clone(local), Stack(1), node.meta.span);
+                self.builder.append(block, Ir::Clone(local), Stack(1), span);
             }
             NodeKind::Unit => {
                 self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
                     Stack(1),
-                    node.meta.span,
+                    span,
                 );
             }
             NodeKind::Int(int) => {
                 self.builder.append(
                     block,
-                    Ir::Constant(int, node.meta.ty.get_single_def_id().unwrap()),
+                    Ir::Constant(int, ty.get_single_def_id().unwrap()),
                     Stack(1),
-                    node.meta.span,
+                    span,
                 );
             }
             NodeKind::Let(binder, definition, body) => {
@@ -101,17 +103,17 @@ impl<'a> OntosCodeGenerator<'a> {
                 for param in params {
                     self.gen_node(param, block);
                 }
-                let return_def_id = node.meta.ty.get_single_def_id().unwrap();
+                let return_def_id = ty.get_single_def_id().unwrap();
                 self.builder.append(
                     block,
                     Ir::CallBuiltin(proc, return_def_id),
                     stack_delta,
-                    node.meta.span,
+                    span,
                 );
             }
             NodeKind::Map(param) => {
                 let from = find_mapping_key(param.meta.ty).unwrap();
-                let to = find_mapping_key(node.meta.ty).unwrap();
+                let to = find_mapping_key(ty).unwrap();
 
                 self.gen_node(*param, block);
 
@@ -120,19 +122,18 @@ impl<'a> OntosCodeGenerator<'a> {
                     n_params: NParams(1),
                 };
 
-                self.builder
-                    .append(block, Ir::Call(proc), Stack(0), node.meta.span);
+                self.builder.append(block, Ir::Call(proc), Stack(0), span);
             }
             NodeKind::Seq(_label, _attr) => {
                 todo!("seq");
             }
             NodeKind::Struct(binder, nodes) => {
-                let def_id = node.meta.ty.get_single_def_id().unwrap();
+                let def_id = ty.get_single_def_id().unwrap();
                 let local = self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewMap, def_id),
                     Stack(1),
-                    node.meta.span,
+                    span,
                 );
                 self.scope.insert(binder.0, local);
                 for node in nodes {
@@ -149,12 +150,8 @@ impl<'a> OntosCodeGenerator<'a> {
 
                     let struct_local = self.var_local(struct_var);
 
-                    self.builder.append(
-                        block,
-                        Ir::PutAttrValue(struct_local, id),
-                        Stack(-1),
-                        node.meta.span,
-                    );
+                    self.builder
+                        .append(block, Ir::PutAttrValue(struct_local, id), Stack(-1), span);
                 }
             }
             NodeKind::MapSeq(..) => {
@@ -162,15 +159,11 @@ impl<'a> OntosCodeGenerator<'a> {
             }
             NodeKind::MatchProp(struct_var, id, arms) => {
                 let struct_local = self.var_local(struct_var);
-                let stack_size = self.builder.top();
 
-                self.builder.append(
-                    block,
-                    Ir::TakeAttr2(struct_local, id),
-                    Stack(2),
-                    node.meta.span,
-                );
-                let value_local = self.builder.top();
+                self.builder
+                    .append(block, Ir::TakeAttr2(struct_local, id), Stack(2), span);
+
+                let val_local = self.builder.top();
                 let rel_local = self.builder.top_minus(1);
 
                 if arms.len() != 1 {
@@ -181,26 +174,82 @@ impl<'a> OntosCodeGenerator<'a> {
                     match arm.pattern {
                         PropPattern::Present(seq, rel_binding, val_binding) => match seq {
                             Some(_seq) => {
+                                let elem_ty = match ty {
+                                    Type::Array(elem_ty) => elem_ty,
+                                    _ => panic!("Not an array"),
+                                };
+                                let out_seq = self.builder.append(
+                                    block,
+                                    Ir::CallBuiltin(
+                                        BuiltinProc::NewSeq,
+                                        elem_ty.get_single_def_id().unwrap(),
+                                    ),
+                                    Stack(1),
+                                    span,
+                                );
+                                let counter = self.builder.append(
+                                    block,
+                                    Ir::Constant(0, DefId::unit()),
+                                    Stack(1),
+                                    span,
+                                );
+                                let iter_offset = block.current_offset();
+                                let elem_rel_local = self.builder.top_plus(1);
+                                let elem_val_local = self.builder.top_plus(2);
+
+                                let iter_body_index = {
+                                    let mut iter_block = self.builder.new_block(Stack(2), span);
+
+                                    self.gen_match_arm(
+                                        (elem_rel_local, rel_binding),
+                                        (elem_val_local, val_binding),
+                                        arm.nodes,
+                                        &mut iter_block,
+                                    );
+
+                                    self.builder.append(
+                                        &mut iter_block,
+                                        Ir::Clone(elem_rel_local),
+                                        Stack(1),
+                                        span,
+                                    );
+
+                                    // still two items on the stack: append to original sequence
+                                    // for now, rel_params is not mapped
+                                    // FIXME: This is only correct for sequence generation:
+                                    self.builder.append(
+                                        &mut iter_block,
+                                        Ir::AppendAttr2(out_seq),
+                                        Stack(-2),
+                                        span,
+                                    );
+
+                                    self.builder.append_pop_until(block, counter, span);
+
+                                    self.builder.commit(
+                                        iter_block,
+                                        Terminator::PopGoto(block.index(), iter_offset),
+                                    )
+                                };
+
+                                self.builder.append(
+                                    block,
+                                    Ir::Iter(val_local, counter, iter_body_index),
+                                    Stack(0),
+                                    span,
+                                );
+
+                                self.builder.append_pop_until(block, out_seq, span);
+
                                 // todo!("seq");
                             }
                             None => {
-                                if let PatternBinding::Binder(var) = rel_binding {
-                                    self.scope.insert(var, rel_local);
-                                }
-                                if let PatternBinding::Binder(var) = val_binding {
-                                    self.scope.insert(var, value_local);
-                                }
-
-                                for node in arm.nodes {
-                                    self.gen_node(node, block);
-                                }
-
-                                if let PatternBinding::Binder(var) = rel_binding {
-                                    self.scope.remove(&var);
-                                }
-                                if let PatternBinding::Binder(var) = val_binding {
-                                    self.scope.remove(&var);
-                                }
+                                self.gen_match_arm(
+                                    (rel_local, rel_binding),
+                                    (val_local, val_binding),
+                                    arm.nodes,
+                                    block,
+                                );
                             }
                         },
                         PropPattern::NotPresent => {
@@ -208,10 +257,33 @@ impl<'a> OntosCodeGenerator<'a> {
                         }
                     }
                 }
-
-                self.builder
-                    .append_pop_until(block, stack_size, node.meta.span);
             }
+        }
+    }
+
+    fn gen_match_arm(
+        &mut self,
+        (rel_local, rel_binding): (Local, PatternBinding),
+        (val_local, val_binding): (Local, PatternBinding),
+        nodes: Vec<OntosNode>,
+        block: &mut Block,
+    ) {
+        if let PatternBinding::Binder(var) = rel_binding {
+            self.scope.insert(var, rel_local);
+        }
+        if let PatternBinding::Binder(var) = val_binding {
+            self.scope.insert(var, val_local);
+        }
+
+        for node in nodes {
+            self.gen_node(node, block);
+        }
+
+        if let PatternBinding::Binder(var) = rel_binding {
+            self.scope.remove(&var);
+        }
+        if let PatternBinding::Binder(var) = val_binding {
+            self.scope.remove(&var);
         }
     }
 
