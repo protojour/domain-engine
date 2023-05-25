@@ -157,11 +157,11 @@ impl Tagger {
         value
     }
 
-    pub fn tag_nodes<'m>(&mut self, children: Vec<OntosNode<'m>>) -> Vec<TaggedNode<'m>> {
-        children
-            .into_iter()
-            .map(|child| self.tag_node(child))
-            .collect()
+    pub fn tag_nodes<'m>(
+        &mut self,
+        iterator: impl Iterator<Item = OntosNode<'m>>,
+    ) -> Vec<TaggedNode<'m>> {
+        iterator.map(|child| self.tag_node(child)).collect()
     }
 
     pub fn tag_node<'m>(&mut self, node: OntosNode<'m>) -> TaggedNode<'m> {
@@ -177,17 +177,16 @@ impl Tagger {
             }
             NodeKind::Unit => TaggedNode::new(TaggedKind::Unit, meta),
             NodeKind::Int(int) => TaggedNode::new(TaggedKind::Int(int), meta),
-            NodeKind::Let(binder, definition, body) => {
-                let definition = *definition;
-                let definition = self.tag_node(definition);
-                let def_free_vars = definition.free_variables.clone();
-                let mut tagged = self.enter_binder(binder, |zelf| {
-                    zelf.tag_children(body, TaggedKind::Let(binder), meta)
-                });
-                tagged.free_variables.union_with(&def_free_vars);
-                tagged
+            NodeKind::Let(binder, definition, body) => self.enter_binder(binder, |zelf| {
+                zelf.make_tagged(
+                    TaggedKind::Let(binder),
+                    [*definition].into_iter().chain(body),
+                    meta,
+                )
+            }),
+            NodeKind::Call(proc, args) => {
+                self.make_tagged(TaggedKind::Call(proc), args.into_iter(), meta)
             }
-            NodeKind::Call(proc, args) => self.tag_children(args, TaggedKind::Call(proc), meta),
             NodeKind::Map(arg) => {
                 let arg = self.tag_node(*arg);
                 TaggedNode {
@@ -210,7 +209,7 @@ impl Tagger {
                 .union_label(label)
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
-                zelf.tag_children(nodes, TaggedKind::Struct(binder), meta)
+                zelf.make_tagged(TaggedKind::Struct(binder), nodes.into_iter(), meta)
             }),
             NodeKind::Prop(struct_var, prop, variants) => {
                 let mut free_variables = BitSet::new();
@@ -260,10 +259,10 @@ impl Tagger {
         }
     }
 
-    fn tag_children<'m>(
+    fn make_tagged<'m>(
         &mut self,
-        children: Vec<OntosNode<'m>>,
         kind: TaggedKind,
+        children: impl Iterator<Item = OntosNode<'m>>,
         meta: Meta<'m>,
     ) -> TaggedNode<'m> {
         let children = self.tag_nodes(children);

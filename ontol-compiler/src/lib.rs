@@ -56,7 +56,7 @@ enum IrVariant {
 }
 
 const TYPE_CHECKER: IrVariant = IrVariant::Ontos;
-const CODE_GENERATOR: IrVariant = IrVariant::Ontos;
+const CODE_GENERATOR: IrVariant = IrVariant::Hir;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {

@@ -97,7 +97,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes,
                     binder: input_binder,
                 } = self.unify_tagged_nodes(
-                    Tagger::default().enter_binder(binder, |tagger| tagger.tag_nodes(children)),
+                    Tagger::default()
+                        .enter_binder(binder, |tagger| tagger.tag_nodes(children.into_iter())),
                 )?;
 
                 Ok(OntosFunc {
