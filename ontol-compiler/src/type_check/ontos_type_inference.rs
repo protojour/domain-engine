@@ -54,21 +54,22 @@ impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosVariableMapper<'c, 'm> {
 
         if let NodeKind::VariableRef(var) = &node.kind {
             if let Some(var_mapping) = self.variable_mapping.get(var) {
-                let mapped_type = match self.arm {
+                let arm = self.arm;
+                let mapped_type = match arm {
                     Arm::First => var_mapping.second_arm_type,
                     Arm::Second => var_mapping.first_arm_type,
                 };
 
                 let variable_ref = OntosNode {
                     kind: NodeKind::VariableRef(*var),
-                    meta: node.meta,
-                };
-                let map = OntosNode {
-                    kind: NodeKind::Map(Box::new(variable_ref)),
                     meta: Meta {
                         ty: mapped_type,
                         span: node.meta.span,
                     },
+                };
+                let map = OntosNode {
+                    kind: NodeKind::Map(Box::new(variable_ref)),
+                    meta: node.meta,
                 };
                 *node = map;
             }

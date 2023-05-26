@@ -288,21 +288,21 @@ impl<L: Lang> Parser<L> {
     }
 }
 
-fn parse_symbol(next: &str) -> ParseResult<'_, &str> {
+fn parse_symbol(next: &str) -> ParseResult<&str> {
     match parse_token(next)? {
         (Token::Symbol(sym), next) => Ok((sym, next)),
         (token, _) => Err(Error::Expected(Class::Symbol, Found(token))),
     }
 }
 
-fn parse_dollar(next: &str) -> ParseResult<'_, ()> {
+fn parse_dollar(next: &str) -> ParseResult<()> {
     match parse_token(next)? {
         (Token::Dollar, next) => Ok(((), next)),
         (token, _) => Err(Error::Expected(Class::Dollar, Found(token))),
     }
 }
 
-fn parse_dollar_var(next: &str) -> ParseResult<'_, Variable> {
+fn parse_dollar_var(next: &str) -> ParseResult<Variable> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
         (Token::Symbol(sym), next) => Ok((Variable(try_alpha_to_u32(sym)?), next)),
@@ -310,14 +310,14 @@ fn parse_dollar_var(next: &str) -> ParseResult<'_, Variable> {
     }
 }
 
-fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
+fn parse_binder(next: &str) -> ParseResult<Binder> {
     let (_, next) = parse_lparen(next)?;
     let (var, next) = parse_dollar_var(next)?;
     let (_, next) = parse_rparen(next)?;
     Ok((Binder(var), next))
 }
 
-fn parse_iter_binder(next: &str) -> ParseResult<'_, IterBinder> {
+fn parse_iter_binder(next: &str) -> ParseResult<IterBinder> {
     let (_, next) = parse_lparen(next)?;
     let (seq, next) = parse_pattern_binding(next)?;
     let (rel, next) = parse_pattern_binding(next)?;
@@ -326,7 +326,7 @@ fn parse_iter_binder(next: &str) -> ParseResult<'_, IterBinder> {
     Ok((IterBinder { seq, rel, val }, next))
 }
 
-fn parse_pattern_binding<'s>(next: &'s str) -> ParseResult<'s, PatternBinding> {
+fn parse_pattern_binding(next: &str) -> ParseResult<PatternBinding> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
         (Token::Symbol(sym), next) => Ok((
@@ -338,7 +338,7 @@ fn parse_pattern_binding<'s>(next: &'s str) -> ParseResult<'s, PatternBinding> {
     }
 }
 
-fn parse_at_label(next: &str) -> ParseResult<'_, Label> {
+fn parse_at_label(next: &str) -> ParseResult<Label> {
     let next = match parse_token(next)? {
         (Token::At, next) => next,
         (token, _) => return Err(Error::Expected(Class::At, Found(token))),
@@ -349,28 +349,28 @@ fn parse_at_label(next: &str) -> ParseResult<'_, Label> {
     }
 }
 
-fn parse_lparen(next: &str) -> ParseResult<'_, ()> {
+fn parse_lparen(next: &str) -> ParseResult<()> {
     match parse_token(next)? {
         (Token::LParen, next) => Ok(((), next)),
         (token, _) => Err(Error::Expected(Class::LParen, Found(token))),
     }
 }
 
-fn parse_rparen(next: &str) -> ParseResult<'_, ()> {
+fn parse_rparen(next: &str) -> ParseResult<()> {
     match parse_raw_token(next)? {
         (Token::RParen, next) => Ok(((), next)),
         (token, _) => Err(Error::Expected(Class::RParen, Found(token))),
     }
 }
 
-fn parse_token(next: &str) -> ParseResult<'_, Token<'_>> {
+fn parse_token(next: &str) -> ParseResult<Token> {
     match parse_raw_token(next)? {
         (Token::RParen, _) => Err(Error::Unexpected(Class::RParen)),
         (token, next) => Ok((token, next)),
     }
 }
 
-fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
+fn parse_raw_token(next: &str) -> ParseResult<Token> {
     let next = next.trim_start();
     let mut chars = next.char_indices();
 
@@ -404,7 +404,7 @@ fn parse_raw_token(next: &str) -> ParseResult<'_, Token<'_>> {
     }
 }
 
-fn parse_int(num: &str) -> Result<Token<'_>, Error<'_>> {
+fn parse_int(num: &str) -> Result<Token, Error> {
     let result: Result<i64, _> = num.parse();
     match result {
         Ok(num) => Ok(Token::Int(num)),
@@ -412,7 +412,7 @@ fn parse_int(num: &str) -> Result<Token<'_>, Error<'_>> {
     }
 }
 
-fn try_alpha_to_u32(sym: &str) -> Result<u32, Error<'_>> {
+fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
     if sym.is_empty() {
         return Err(Error::InvalidSymbol(sym));
     }

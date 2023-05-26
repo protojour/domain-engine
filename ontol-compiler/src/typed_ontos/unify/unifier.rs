@@ -239,12 +239,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::Map(arg) => match u_node.sub_unifications.remove(&0) {
                 None => {
                     let unified_arg = self.unify_node(u_node, arg)?;
-                    let arg: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
+                    let mut param: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
+                    let param_ty = param.meta.ty;
+                    param.meta.ty = meta.ty;
                     Ok(Unified {
                         binder: unified_arg.binder,
                         nodes: [OntosNode {
-                            kind: NodeKind::Map(Box::new(arg)),
-                            meta,
+                            kind: NodeKind::Map(Box::new(param)),
+                            meta: Meta {
+                                ty: param_ty,
+                                span: meta.span,
+                            },
                         }]
                         .into(),
                     })

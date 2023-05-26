@@ -148,6 +148,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
         };
         let ident = self.compiler.strings.intern(&type_stmt.ident.0);
+        debug!("type `{ident}`: got {def_id:?}");
         let params = type_stmt.params.map(|(ast_params, _span)| {
             ast_params
                 .into_iter()
@@ -346,8 +347,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } else {
             RelParams::Unit
         };
-
-        debug!("define relationship {relation_id:?}");
 
         let relationship = Relationship {
             relation_id,

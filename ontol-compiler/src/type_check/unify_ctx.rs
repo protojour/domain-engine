@@ -169,7 +169,7 @@ impl CtrlFlowForest {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Arm {
     First,
     Second,

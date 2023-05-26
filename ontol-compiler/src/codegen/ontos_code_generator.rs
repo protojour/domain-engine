@@ -251,8 +251,13 @@ impl<'a> OntosCodeGenerator<'a> {
 
                             // todo!("seq");
                         }
-                        PropPattern::Seq(_) => {
-                            todo!("Seq present")
+                        PropPattern::Seq(seq_binding) => {
+                            self.gen_match_arm(
+                                (rel_local, PatternBinding::Wildcard),
+                                (val_local, seq_binding),
+                                arm.nodes,
+                                block,
+                            );
                         }
                         PropPattern::Absent => {
                             todo!("Arm pattern not present")
@@ -260,14 +265,83 @@ impl<'a> OntosCodeGenerator<'a> {
                     }
                 }
             }
-            NodeKind::Gen(..) => {
-                todo!("gen");
+            NodeKind::Gen(seq_var, iter_binder, nodes) => {
+                let seq_local = self.var_local(seq_var);
+                let elem_ty = match ty {
+                    Type::Array(elem_ty) => elem_ty,
+                    _ => panic!("Not an array"),
+                };
+                let out_seq = self.builder.append(
+                    block,
+                    Ir::CallBuiltin(
+                        BuiltinProc::NewSeq,
+                        elem_ty
+                            .get_single_def_id()
+                            .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
+                    ),
+                    Stack(1),
+                    span,
+                );
+                let counter =
+                    self.builder
+                        .append(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
+
+                let iter_offset = block.current_offset();
+                let elem_rel_local = self.builder.top_plus(1);
+                let elem_val_local = self.builder.top_plus(2);
+
+                let iter_body_index = {
+                    let mut iter_block = self.builder.new_block(Stack(2), span);
+
+                    if let PatternBinding::Binder(var) = iter_binder.seq {
+                        self.scope.insert(var, out_seq);
+                    }
+
+                    self.gen_match_arm(
+                        (elem_rel_local, iter_binder.rel),
+                        (elem_val_local, iter_binder.val),
+                        nodes,
+                        &mut iter_block,
+                    );
+
+                    if let PatternBinding::Binder(var) = iter_binder.seq {
+                        self.scope.remove(&var);
+                    }
+
+                    self.builder
+                        .append_pop_until(&mut iter_block, counter, span);
+
+                    self.builder
+                        .commit(iter_block, Terminator::PopGoto(block.index(), iter_offset))
+                };
+
+                self.builder.append(
+                    block,
+                    Ir::Iter(seq_local, counter, iter_body_index),
+                    Stack(0),
+                    span,
+                );
+
+                self.builder.append_pop_until(block, out_seq, span);
             }
             NodeKind::Iter(..) => {
                 todo!("iter");
             }
-            NodeKind::Push(..) => {
-                todo!("push");
+            NodeKind::Push(seq_var, attr) => {
+                let top = self.builder.top();
+                let seq_local = self.var_local(seq_var);
+                self.gen_node(*attr.rel, block);
+                let rel_local = self.builder.top();
+
+                self.gen_node(*attr.val, block);
+
+                self.builder
+                    .append(block, Ir::Clone(rel_local), Stack(1), span);
+
+                self.builder
+                    .append(block, Ir::AppendAttr2(seq_local), Stack(-2), span);
+
+                self.builder.append_pop_until(block, top, span);
             }
         }
     }
