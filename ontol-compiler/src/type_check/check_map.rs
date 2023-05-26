@@ -15,7 +15,7 @@ use crate::{
     type_check::unify_ctx::{Arm, VariableMapping},
     typed_ontos::lang::OntosNode,
     types::{Type, TypeRef, Types},
-    CompileErrors, SourceSpan,
+    CompileErrors, IrVariant, SourceSpan,
 };
 
 use super::{
@@ -202,13 +202,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 {
                     Ok(_) => {}
                     Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
-                        ctx.variable_mapping.insert(
-                            ontos::Variable(explicit_var.node_id.0),
-                            VariableMapping {
-                                first_arm_type: actual,
-                                second_arm_type: expected,
-                            },
-                        );
+                        match (actual, expected) {
+                            (Type::Domain(_), Type::Domain(_)) => {
+                                ctx.variable_mapping.insert(
+                                    ontos::Variable(explicit_var.node_id.0),
+                                    VariableMapping {
+                                        first_arm_type: actual,
+                                        second_arm_type: expected,
+                                    },
+                                );
+                            }
+                            _ => {
+                                self.type_error(
+                                    TypeError::Mismatch(TypeEquation { actual, expected }),
+                                    &second_arm.span,
+                                    IrVariant::Ontos,
+                                );
+                            }
+                        }
                     }
                     Err(_) => todo!(),
                 }

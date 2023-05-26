@@ -193,7 +193,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Arm::Second => self.expressions.alloc_expr_id(),
                         };
 
-                        ExplicitVariableArm { expr_id }
+                        ExplicitVariableArm {
+                            expr_id,
+                            span: expr.span,
+                        }
                     });
                     ontos_arm.expr_id
                 };

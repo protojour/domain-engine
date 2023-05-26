@@ -4,6 +4,7 @@ use crate::{
     expr::{Expr, ExprId},
     hir_node::{BindDepth, HirBodyIdx, HirIdx, HirNodeTable},
     types::TypeRef,
+    SourceSpan,
 };
 
 use super::inference::Inference;
@@ -123,12 +124,7 @@ pub struct VariableMapping<'m> {
 pub struct ExplicitVariableArm {
     // In ontos, the variable has a different expr id depending on which arm it's in
     pub expr_id: ExprId,
-}
-
-impl Default for ExplicitVariableArm {
-    fn default() -> Self {
-        Self { expr_id: ExprId(0) }
-    }
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]

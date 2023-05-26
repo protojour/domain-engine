@@ -110,12 +110,12 @@ fn artist_etc_routing() {
 
                 map id t p n {
                     gsu.synth {
-                        'instrument-id': id
+                        'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
                         'type': t
                         'polyphony': p
                     }
                     ai.instrument {
-                        'ID': id
+                        'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
                         'name': n
                     }
                 }
