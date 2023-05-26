@@ -86,6 +86,17 @@ struct LetAttr<'m> {
     ty: TypeRef<'m>,
 }
 
+struct LetAttrPair<'m> {
+    rel: UnifiedTypedPatternBinding<'m>,
+    val: UnifiedTypedPatternBinding<'m>,
+}
+
+struct UnifiedTypedPatternBinding<'m> {
+    binding: PatternBinding,
+    nodes: Vec<OntosNode<'m>>,
+    ty: TypeRef<'m>,
+}
+
 impl<'a, 'm> Unifier<'a, 'm> {
     fn alloc_var(&mut self) -> Variable {
         let var = self.next_variable;
@@ -349,18 +360,35 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let input_seq_var = self.alloc_var();
                     let output_seq_var = self.alloc_var();
 
-                    Ok(self.let_attr(sub_tree, source)?.map(|let_attr| {
-                        let seq_ty = self.types.intern(Type::Array(let_attr.ty));
+                    Ok(self.let_attr_pair(sub_tree, source)?.map(|let_attr| {
+                        // FIXME: Array/seq types must take two parameters
+                        let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
 
                         let gen_node = OntosNode {
                             kind: NodeKind::Gen(
                                 input_seq_var,
                                 IterBinder {
                                     seq: PatternBinding::Binder(output_seq_var),
-                                    rel: let_attr.rel_binding,
-                                    val: let_attr.val_binding,
+                                    rel: let_attr.rel.binding,
+                                    val: let_attr.val.binding,
                                 },
-                                let_attr.nodes,
+                                vec![OntosNode {
+                                    kind: NodeKind::Push(
+                                        output_seq_var,
+                                        Attribute {
+                                            rel: Box::new(self.single_node_or_unit(
+                                                let_attr.rel.nodes.into_iter(),
+                                            )),
+                                            val: Box::new(self.single_node_or_unit(
+                                                let_attr.val.nodes.into_iter(),
+                                            )),
+                                        },
+                                    ),
+                                    meta: Meta {
+                                        ty: self.unit_type(),
+                                        span: SourceSpan::none(),
+                                    },
+                                }],
                             ),
                             meta: Meta {
                                 ty: seq_ty,
@@ -451,6 +479,63 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ty,
                 })
             }
+        })
+    }
+
+    fn let_attr_pair(
+        &mut self,
+        mut u_node: UnificationNode<'m>,
+        source: &PropVariant<'m, TypedOntos>,
+    ) -> UnifierResult<Option<LetAttrPair<'m>>> {
+        let rel_binding =
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &source.attr.rel)?;
+        let val_binding =
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &source.attr.val)?;
+
+        Ok(match (rel_binding.nodes, val_binding.nodes) {
+            (None, None) => {
+                debug!("No nodes in variant (pair) binding");
+                None
+            }
+            (Some(rel), None) => Self::last_type_opt(rel.iter()).map(|ty| LetAttrPair {
+                rel: UnifiedTypedPatternBinding {
+                    binding: rel_binding.binding,
+                    nodes: rel.into_iter().collect(),
+                    ty,
+                },
+                val: UnifiedTypedPatternBinding {
+                    binding: PatternBinding::Wildcard,
+                    nodes: vec![],
+                    ty: self.unit_type(),
+                },
+            }),
+            (None, Some(val)) => Self::last_type_opt(val.iter()).map(|ty| LetAttrPair {
+                rel: UnifiedTypedPatternBinding {
+                    binding: PatternBinding::Wildcard,
+                    nodes: vec![],
+                    ty: self.unit_type(),
+                },
+                val: UnifiedTypedPatternBinding {
+                    binding: val_binding.binding,
+                    nodes: val.into_iter().collect(),
+                    ty,
+                },
+            }),
+            (Some(rel), Some(val)) => Self::last_type_opt(val.iter()).map(|val_ty| {
+                let rel_ty = Self::last_type_opt(rel.iter()).unwrap_or_else(|| self.unit_type());
+                LetAttrPair {
+                    rel: UnifiedTypedPatternBinding {
+                        binding: rel_binding.binding,
+                        nodes: rel.into_iter().collect(),
+                        ty: rel_ty,
+                    },
+                    val: UnifiedTypedPatternBinding {
+                        binding: val_binding.binding,
+                        nodes: val.into_iter().collect(),
+                        ty: val_ty,
+                    },
+                }
+            }),
         })
     }
 
@@ -631,7 +716,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             ty
         } else {
-            self.types.intern(Type::Unit(DefId::unit()))
+            self.unit_type()
         }
     }
 
@@ -649,6 +734,31 @@ impl<'a, 'm> Unifier<'a, 'm> {
             Some(ty)
         } else {
             None
+        }
+    }
+
+    fn unit_type(&mut self) -> TypeRef<'m> {
+        self.types.intern(Type::Unit(DefId::unit()))
+    }
+
+    fn single_node_or_unit(
+        &mut self,
+        mut iterator: impl Iterator<Item = OntosNode<'m>>,
+    ) -> OntosNode<'m> {
+        match iterator.next() {
+            Some(node) => {
+                if iterator.next().is_some() {
+                    panic!("Contained more than a single node");
+                }
+                node
+            }
+            None => OntosNode {
+                kind: NodeKind::Unit,
+                meta: Meta {
+                    ty: self.unit_type(),
+                    span: SourceSpan::none(),
+                },
+            },
         }
     }
 }
