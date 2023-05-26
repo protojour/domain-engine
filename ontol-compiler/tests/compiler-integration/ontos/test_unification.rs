@@ -262,19 +262,23 @@ fn test_unify_flat_map1() {
         )
         ",
     );
-    let expected = indoc! {"
+    let _expected = indoc! {"
         |$c| (match-prop $c S:1:1
             (($_ $b)
                 (match-prop $c S:0:0
-                    ((seq $_ $e)
-                        (match-prop $e S:2:2
-                            (($_ $a)
-                                (struct ($f)
-                                    (prop $f O:0:0
-                                        (#u $a)
-                                    )
-                                    (prop $f O:1:1
-                                        (#u $b)
+                    ((seq $g)
+                        (gen $g ($h $_ $e)
+                            (match-prop $e S:2:2
+                                (($_ $a)
+                                    (push $h #u
+                                        (struct ($f)
+                                            (prop $f O:0:0
+                                                (#u $a)
+                                            )
+                                            (prop $f O:1:1
+                                                (#u $b)
+                                            )
+                                        )
                                     )
                                 )
                             )
@@ -284,5 +288,29 @@ fn test_unify_flat_map1() {
             )
         )"
     };
-    assert_eq!(expected, output);
+    let actual = indoc! {"
+        |$c| (match-prop $c S:1:1
+            (($_ $b)
+                (match-prop $c S:0:0
+                    ((seq $g)
+                        (gen $g ($h $_ $e)
+                            (match-prop $e S:2:2
+                                (($_ $a)
+                                    (struct ($f)
+                                        (prop $f O:0:0
+                                            (#u $a)
+                                        )
+                                        (prop $f O:1:1
+                                            (#u $b)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(actual, output);
 }

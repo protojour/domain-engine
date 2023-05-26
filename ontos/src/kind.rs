@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{Binder, Label, Lang, Node, Variable};
@@ -91,13 +89,7 @@ pub enum PatternBinding {
 
 #[derive(Clone)]
 pub struct IterBinder {
-    pub seq: Binder,
-    pub rel: Binder,
-    pub val: Binder,
-}
-
-impl Display for IterBinder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {})", self.seq.0, self.rel.0, self.val.0)
-    }
+    pub seq: PatternBinding,
+    pub rel: PatternBinding,
+    pub val: PatternBinding,
 }

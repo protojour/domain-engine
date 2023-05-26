@@ -245,8 +245,8 @@ impl<L: Lang> Parser<L> {
             Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
             _ => (false, next),
         };
-        let (pattern, next) = match self.parse_pattern_binding(next) {
-            Ok((first_binding, next)) => match self.parse_pattern_binding(next) {
+        let (pattern, next) = match parse_pattern_binding(next) {
+            Ok((first_binding, next)) => match parse_pattern_binding(next) {
                 Ok((val_binding, next)) => {
                     let (_, next) = parse_rparen(next)?;
                     (
@@ -274,18 +274,6 @@ impl<L: Lang> Parser<L> {
         let (_, next) = parse_rparen(next)?;
 
         Ok((MatchArm { pattern, nodes }, next))
-    }
-
-    fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, PatternBinding> {
-        let (_, next) = parse_dollar(next)?;
-        match parse_token(next)? {
-            (Token::Symbol(sym), next) => Ok((
-                PatternBinding::Binder(Variable(try_alpha_to_u32(sym)?)),
-                next,
-            )),
-            (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
-            (token, _) => Err(Error::InvalidToken(token)),
-        }
     }
 
     fn parse_binary_call<'a, 's>(
@@ -331,18 +319,23 @@ fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
 
 fn parse_iter_binder(next: &str) -> ParseResult<'_, IterBinder> {
     let (_, next) = parse_lparen(next)?;
-    let (seq, next) = parse_dollar_var(next)?;
-    let (rel, next) = parse_dollar_var(next)?;
-    let (val, next) = parse_dollar_var(next)?;
+    let (seq, next) = parse_pattern_binding(next)?;
+    let (rel, next) = parse_pattern_binding(next)?;
+    let (val, next) = parse_pattern_binding(next)?;
     let (_, next) = parse_rparen(next)?;
-    Ok((
-        IterBinder {
-            seq: Binder(seq),
-            rel: Binder(rel),
-            val: Binder(val),
-        },
-        next,
-    ))
+    Ok((IterBinder { seq, rel, val }, next))
+}
+
+fn parse_pattern_binding<'s>(next: &'s str) -> ParseResult<'s, PatternBinding> {
+    let (_, next) = parse_dollar(next)?;
+    match parse_token(next)? {
+        (Token::Symbol(sym), next) => Ok((
+            PatternBinding::Binder(Variable(try_alpha_to_u32(sym)?)),
+            next,
+        )),
+        (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
+        (token, _) => Err(Error::InvalidToken(token)),
+    }
 }
 
 fn parse_at_label(next: &str) -> ParseResult<'_, Label> {

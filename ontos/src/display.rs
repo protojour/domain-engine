@@ -3,7 +3,7 @@ use std::fmt::Display;
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     Lang, Node,
 };
 
@@ -332,6 +332,21 @@ impl Display for AsAlpha {
 
         let rem = self.0 % 26;
         write!(f, "{}", char::from_u32(u32::from('a') + rem).unwrap())
+    }
+}
+
+impl Display for PatternBinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Wildcard => write!(f, "$_"),
+            Self::Binder(var) => write!(f, "{var}"),
+        }
+    }
+}
+
+impl Display for IterBinder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.seq, self.rel, self.val)
     }
 }
 

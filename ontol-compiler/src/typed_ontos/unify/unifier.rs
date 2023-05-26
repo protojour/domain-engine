@@ -1,7 +1,10 @@
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use ontos::{
-    kind::{Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{
+        Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
+        PropVariant,
+    },
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -73,6 +76,13 @@ struct UnifyPatternBinding<'m> {
 
 struct TypedMatchArm<'m> {
     arm: MatchArm<'m, TypedOntos>,
+    ty: TypeRef<'m>,
+}
+
+struct LetAttr<'m> {
+    rel_binding: PatternBinding,
+    val_binding: PatternBinding,
+    nodes: Vec<OntosNode<'m>>,
     ty: TypeRef<'m>,
 }
 
@@ -298,13 +308,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_prop_variant_to_match_arm(
         &mut self,
         u_node: UnificationNode<'m>,
-        variant: &PropVariant<'m, TypedOntos>,
+        source: &PropVariant<'m, TypedOntos>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         if u_node.target_nodes.is_empty() {
             // treat this "transparently"
-            self.make_attr_match_arm(u_node, variant, |rel, val| PropPattern::Attr(rel, val))
+            Ok(self
+                .let_attr(u_node, source)?
+                .map(|let_attr| TypedMatchArm {
+                    arm: MatchArm {
+                        pattern: PropPattern::Attr(let_attr.rel_binding, let_attr.val_binding),
+                        nodes: let_attr.nodes,
+                    },
+                    ty: let_attr.ty,
+                }))
         } else if u_node.target_nodes.len() == 1 {
-            if !matches!(&variant.dimension, Dimension::Seq(_)) {
+            if !matches!(&source.dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
             }
 
@@ -312,13 +330,60 @@ impl<'a, 'm> Unifier<'a, 'm> {
             let _meta = target.meta;
 
             match target.kind {
-                TaggedKind::Seq(_) | TaggedKind::PropVariant(_, _, Dimension::Seq(_)) => {
+                TaggedKind::Seq(_) => {
                     let free_variables = union_free_variables(target.children.0.iter());
 
                     trace!("seq free_variables: {:?}", DebugVariables(&free_variables));
 
                     let var_paths = locate_slice_variables(
-                        &[variant.attr.rel.as_ref(), variant.attr.val.as_ref()],
+                        &[source.attr.rel.as_ref(), source.attr.val.as_ref()],
+                        &free_variables,
+                    )
+                    .unwrap();
+                    trace!("seq var_paths: {var_paths:?}");
+
+                    let sub_tree = build_unification_tree(target.children.0, &var_paths);
+
+                    trace!("seq u_tree: {sub_tree:#?}");
+
+                    let input_seq_var = self.alloc_var();
+                    let output_seq_var = self.alloc_var();
+
+                    Ok(self.let_attr(sub_tree, source)?.map(|let_attr| {
+                        let seq_ty = self.types.intern(Type::Array(let_attr.ty));
+
+                        let gen_node = OntosNode {
+                            kind: NodeKind::Gen(
+                                input_seq_var,
+                                IterBinder {
+                                    seq: PatternBinding::Binder(output_seq_var),
+                                    rel: let_attr.rel_binding,
+                                    val: let_attr.val_binding,
+                                },
+                                let_attr.nodes,
+                            ),
+                            meta: Meta {
+                                ty: seq_ty,
+                                span: SourceSpan::none(),
+                            },
+                        };
+
+                        TypedMatchArm {
+                            arm: MatchArm {
+                                pattern: PropPattern::Seq(PatternBinding::Binder(input_seq_var)),
+                                nodes: vec![gen_node],
+                            },
+                            ty: seq_ty,
+                        }
+                    }))
+                }
+                TaggedKind::PropVariant(_, _, Dimension::Seq(_)) => {
+                    let free_variables = union_free_variables(target.children.0.iter());
+
+                    trace!("seq free_variables: {:?}", DebugVariables(&free_variables));
+
+                    let var_paths = locate_slice_variables(
+                        &[source.attr.rel.as_ref(), source.attr.val.as_ref()],
                         &free_variables,
                     )
                     .unwrap();
@@ -329,12 +394,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     trace!("seq u_tree: {u_tree:#?}");
 
                     Ok(self
-                        .make_attr_match_arm(u_tree, variant, |rel, val| {
-                            PropPattern::SeqAttr(rel, val)
-                        })?
-                        .map(|mut typed_arm| {
-                            typed_arm.ty = self.types.intern(Type::Array(typed_arm.ty));
-                            typed_arm
+                        .let_attr(u_tree, source)?
+                        .map(|let_attr| TypedMatchArm {
+                            arm: MatchArm {
+                                pattern: PropPattern::SeqAttr(
+                                    let_attr.rel_binding,
+                                    let_attr.val_binding,
+                                ),
+                                nodes: let_attr.nodes,
+                            },
+                            ty: self.types.intern(Type::Array(let_attr.ty)),
                         }))
                 }
                 other => panic!("BUG: Unsupported kind: {other:?}"),
@@ -344,45 +413,41 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn make_attr_match_arm(
+    fn let_attr(
         &mut self,
         mut u_node: UnificationNode<'m>,
-        variant: &PropVariant<'m, TypedOntos>,
-        func: impl FnOnce(PatternBinding, PatternBinding) -> PropPattern,
-    ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
+        source: &PropVariant<'m, TypedOntos>,
+    ) -> UnifierResult<Option<LetAttr<'m>>> {
         let rel_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel)?;
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &source.attr.rel)?;
         let val_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &variant.attr.val)?;
+            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &source.attr.val)?;
 
         Ok(match (rel_binding.nodes, val_binding.nodes) {
             (None, None) => {
                 debug!("No nodes in variant binding");
                 None
             }
-            (Some(rel), None) => Self::last_type_opt(rel.iter()).map(|ty| TypedMatchArm {
-                arm: MatchArm {
-                    pattern: func(rel_binding.binding, PatternBinding::Wildcard),
-                    nodes: rel.into_iter().collect(),
-                },
+            (Some(rel), None) => Self::last_type_opt(rel.iter()).map(|ty| LetAttr {
+                rel_binding: rel_binding.binding,
+                val_binding: PatternBinding::Wildcard,
+                nodes: rel.into_iter().collect(),
                 ty,
             }),
-            (None, Some(val)) => Self::last_type_opt(val.iter()).map(|ty| TypedMatchArm {
-                arm: MatchArm {
-                    pattern: func(PatternBinding::Wildcard, val_binding.binding),
-                    nodes: val.into_iter().collect(),
-                },
+            (None, Some(val)) => Self::last_type_opt(val.iter()).map(|ty| LetAttr {
+                rel_binding: PatternBinding::Wildcard,
+                val_binding: val_binding.binding,
+                nodes: val.into_iter().collect(),
                 ty,
             }),
             (Some(rel), Some(val)) => {
                 let mut concatenated: Vec<OntosNode> = vec![];
                 concatenated.extend(rel);
                 concatenated.extend(val);
-                Self::last_type_opt(concatenated.iter()).map(|ty| TypedMatchArm {
-                    arm: MatchArm {
-                        pattern: func(rel_binding.binding, val_binding.binding),
-                        nodes: concatenated,
-                    },
+                Self::last_type_opt(concatenated.iter()).map(|ty| LetAttr {
+                    rel_binding: rel_binding.binding,
+                    val_binding: val_binding.binding,
+                    nodes: concatenated,
                     ty,
                 })
             }

@@ -147,9 +147,9 @@ macro_rules! visitor_trait {
             }
 
             fn traverse_iter_binder(&mut self, binder: param!($mut IterBinder)) {
-                self.visit_binder(borrow!($mut binder.seq.0));
-                self.visit_binder(borrow!($mut binder.rel.0));
-                self.visit_binder(borrow!($mut binder.val.0));
+                self.traverse_pattern_binding(borrow!($mut binder.seq));
+                self.traverse_pattern_binding(borrow!($mut binder.rel));
+                self.traverse_pattern_binding(borrow!($mut binder.val));
             }
         }
     };
