@@ -12,16 +12,17 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, Expressions},
     hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
     mem::Intern,
-    type_check::unify_ctx::Arm,
-    typed_ontos::lang::{OntosNode, TypedOntos},
+    type_check::unify_ctx::{Arm, VariableMapping},
+    typed_ontos::lang::OntosNode,
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };
 
 use super::{
-    inference::{Infer, TypeVar},
+    inference::Infer,
+    ontos_type_inference::{OntosArmTypeInference, OntosVariableMapper},
     unify_ctx::{CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
-    TypeCheck, TypeError,
+    TypeCheck, TypeEquation, TypeError,
 };
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -146,11 +147,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: ExprId,
         ctx: &mut CheckUnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
+        ctx.arm = Arm::First;
         let mut first = self.check_root_expr2(first_id, ctx);
-        self.infer_ontos_types(&mut first, ctx);
+        self.infer_ontos_arm_types(&mut first, ctx);
 
+        ctx.arm = Arm::Second;
         let mut second = self.check_root_expr2(second_id, ctx);
-        self.infer_ontos_types(&mut second, ctx);
+        self.infer_ontos_arm_types(&mut second, ctx);
+
+        // unify the type of variables on either side:
+        self.infer_ontos_unify_arms(&mut first, &mut second, ctx);
 
         self.codegen_tasks
             .push(CodegenTask::OntosMap(OntosMapCodegenTask {
@@ -162,41 +168,63 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(())
     }
 
-    fn infer_ontos_types(&mut self, node: &mut OntosNode<'m>, ctx: &mut CheckUnifyExprContext<'m>) {
-        let mut inference = OntosTypeInference {
+    fn infer_ontos_arm_types(
+        &mut self,
+        node: &mut OntosNode<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
+    ) {
+        let mut inference = OntosArmTypeInference {
             types: self.types,
             eq_relations: &mut ctx.ontos_inference.eq_relations,
             errors: self.errors,
         };
         inference.visit_node(0, node);
     }
-}
 
-struct OntosTypeInference<'c, 'm> {
-    types: &'c mut Types<'m>,
-    eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
-    errors: &'c mut CompileErrors,
-}
+    fn infer_ontos_unify_arms(
+        &mut self,
+        first: &mut OntosNode<'m>,
+        second: &mut OntosNode<'m>,
+        ctx: &mut CheckUnifyExprContext<'m>,
+    ) {
+        for explicit_var in &mut ctx.explicit_variables.values_mut() {
+            let first_arm = explicit_var.ontos_arms.remove(&Arm::First);
+            let second_arm = explicit_var.ontos_arms.remove(&Arm::Second);
 
-impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosTypeInference<'c, 'm> {
-    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontos::Lang>::Node<'m>) {
-        let mut infer = Infer {
-            types: self.types,
-            eq_relations: self.eq_relations,
-        };
-        match infer.infer_recursive(node.meta.ty) {
-            Ok(ty) => node.meta.ty = ty,
-            Err(TypeError::Propagated) => {}
-            Err(TypeError::NotEnoughInformation) => {
-                self.errors.push(
-                    CompileError::TODO(smart_format!("Not enough type information"))
-                        .spanned(&node.meta.span),
-                );
+            if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
+                let first_type_var = ctx.ontos_inference.new_type_variable(first_arm.expr_id);
+                let second_type_var = ctx.ontos_inference.new_type_variable(second_arm.expr_id);
+
+                match ctx
+                    .ontos_inference
+                    .eq_relations
+                    .unify_var_var(first_type_var, second_type_var)
+                {
+                    Ok(_) => {}
+                    Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
+                        ctx.variable_mapping.insert(
+                            ontos::Variable(explicit_var.node_id.0),
+                            VariableMapping {
+                                first_arm_type: actual,
+                                second_arm_type: expected,
+                            },
+                        );
+                    }
+                    Err(_) => todo!(),
+                }
             }
-            _ => panic!("Unexpected inference error"),
         }
 
-        self.visit_kind(index, &mut node.kind);
+        OntosVariableMapper {
+            variable_mapping: &ctx.variable_mapping,
+            arm: Arm::First,
+        }
+        .visit_node(0, first);
+        OntosVariableMapper {
+            variable_mapping: &ctx.variable_mapping,
+            arm: Arm::Second,
+        }
+        .visit_node(0, second);
     }
 }
 
@@ -337,6 +365,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                 variable: syntax_var,
                                 node_id: var_id,
                                 ctrl_group: parent_aggr_group,
+                                ontos_arms: Default::default(),
                             },
                         );
 
@@ -351,6 +380,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                     variable: syntax_var,
                                     node_id: var_id,
                                     ctrl_group: parent_aggr_group,
+                                    ontos_arms: Default::default(),
                                 });
                                 group_set.add(parent_aggr_group);
                             }

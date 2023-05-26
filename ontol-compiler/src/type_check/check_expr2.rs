@@ -13,7 +13,10 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     mem::Intern,
     relation::Constructor,
-    type_check::inference::UnifyValue,
+    type_check::{
+        inference::UnifyValue,
+        unify_ctx::{Arm, ExplicitVariableArm},
+    },
     typed_ontos::lang::{Meta, OntosNode, TypedOntos},
     types::{Type, TypeRef},
     IrVariant, SourceSpan,
@@ -177,11 +180,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::Variable(expr_id), expected_ty) => {
-                let type_var = ctx.ontos_inference.new_type_variable(*expr_id);
+                let arm = ctx.arm;
                 let bound_variable = ctx
                     .explicit_variables
-                    .get(expr_id)
+                    .get_mut(expr_id)
                     .expect("variable not found");
+
+                let arm_expr_id = {
+                    let ontos_arm = bound_variable.ontos_arms.entry(arm).or_insert_with(|| {
+                        let expr_id = match arm {
+                            Arm::First => *expr_id,
+                            Arm::Second => self.expressions.alloc_expr_id(),
+                        };
+
+                        ExplicitVariableArm { expr_id }
+                    });
+                    ontos_arm.expr_id
+                };
+
+                let type_var = ctx.ontos_inference.new_type_variable(arm_expr_id);
 
                 match expected_ty {
                     Some(Type::Array(elem_ty)) => self.type_error_node(
@@ -189,8 +206,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         &expr.span,
                     ),
                     Some(expected_ty) => {
+                        let variable = ontos::Variable(bound_variable.node_id.0);
                         let variable_ref = OntosNode {
-                            kind: NodeKind::VariableRef(ontos::Variable(bound_variable.node_id.0)),
+                            kind: NodeKind::VariableRef(variable),
                             meta: Meta {
                                 ty: expected_ty,
                                 span: expr.span,
@@ -207,13 +225,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             // Need to map:
                             Err(err @ TypeError::Mismatch(type_eq)) => {
                                 match (&type_eq.actual, &type_eq.expected) {
-                                    (Type::Domain(_), Type::Domain(_)) => OntosNode {
-                                        kind: NodeKind::Map(Box::new(variable_ref)),
-                                        meta: Meta {
-                                            ty: expected_ty,
-                                            span: expr.span,
-                                        },
-                                    },
+                                    (Type::Domain(_), Type::Domain(_)) => {
+                                        panic!("Should not happen anymore");
+
+                                        /*
+                                        OntosNode {
+                                            kind: NodeKind::Map(Box::new(variable_ref)),
+                                            meta: Meta {
+                                                ty: expected_ty,
+                                                span: expr.span,
+                                            },
+                                        }
+                                        */
+                                    }
 
                                     _ => self.type_error_node(err, &expr.span),
                                 }

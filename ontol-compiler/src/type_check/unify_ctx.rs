@@ -1,5 +1,4 @@
 use fnv::FnvHashMap;
-use ontos::Label;
 
 use crate::{
     expr::{Expr, ExprId},
@@ -17,9 +16,11 @@ pub struct CheckUnifyExprContext<'m> {
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
     pub body_variables: FnvHashMap<HirBodyIdx, HirIdx>,
     pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
-    pub ontos_seq_labels: FnvHashMap<HirBodyIdx, Label>,
+    pub ontos_seq_labels: FnvHashMap<HirBodyIdx, ontos::Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
+
+    pub variable_mapping: FnvHashMap<ontos::Variable, VariableMapping<'m>>,
 
     pub partial: bool,
 
@@ -42,6 +43,7 @@ impl<'m> CheckUnifyExprContext<'m> {
             body_map: Default::default(),
             ontos_seq_labels: Default::default(),
             ctrl_flow_forest: Default::default(),
+            variable_mapping: Default::default(),
             partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
@@ -83,12 +85,12 @@ impl<'m> CheckUnifyExprContext<'m> {
         var
     }
 
-    pub fn get_or_compute_seq_label(&mut self, body_idx: HirBodyIdx) -> Label {
+    pub fn get_or_compute_seq_label(&mut self, body_idx: HirBodyIdx) -> ontos::Label {
         if let Some(label) = self.ontos_seq_labels.get(&body_idx) {
             return *label;
         }
 
-        let label = Label(self.alloc_ontos_variable().0);
+        let label = ontos::Label(self.alloc_ontos_variable().0);
         self.ontos_seq_labels.insert(body_idx, label);
         label
     }
@@ -110,6 +112,23 @@ pub struct ExplicitVariable {
     pub variable: ontos::Variable,
     pub node_id: HirIdx,
     pub ctrl_group: Option<CtrlFlowGroup>,
+    pub ontos_arms: FnvHashMap<Arm, ExplicitVariableArm>,
+}
+
+pub struct VariableMapping<'m> {
+    pub first_arm_type: TypeRef<'m>,
+    pub second_arm_type: TypeRef<'m>,
+}
+
+pub struct ExplicitVariableArm {
+    // In ontos, the variable has a different expr id depending on which arm it's in
+    pub expr_id: ExprId,
+}
+
+impl Default for ExplicitVariableArm {
+    fn default() -> Self {
+        Self { expr_id: ExprId(0) }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -150,7 +169,7 @@ impl CtrlFlowForest {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Arm {
     First,
     Second,
