@@ -3,7 +3,7 @@ use ontol_runtime::vm::proc::BuiltinProc;
 use crate::{
     kind::{
         Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
-        PropVariant, Seq,
+        PropVariant,
     },
     Binder, Label, Lang, Variable,
 };
@@ -240,21 +240,33 @@ impl<L: Lang> Parser<L> {
     fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
         let (_, next) = parse_lparen(next)?;
         let (_, next) = parse_lparen(next)?;
-        let (seq, next) = match parse_symbol(next) {
-            Ok(("seq", next)) => (Some(Seq), next),
+        let (is_seq, next) = match parse_symbol(next) {
+            Ok(("seq", next)) => (true, next),
             Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
-            _ => (None, next),
+            _ => (false, next),
         };
         let (pattern, next) = match self.parse_pattern_binding(next) {
-            Ok((rel_binding, next)) => {
-                let (val_binding, next) = self.parse_pattern_binding(next)?;
-                let (_, next) = parse_rparen(next)?;
-
-                (PropPattern::Present(seq, rel_binding, val_binding), next)
-            }
+            Ok((first_binding, next)) => match self.parse_pattern_binding(next) {
+                Ok((val_binding, next)) => {
+                    let (_, next) = parse_rparen(next)?;
+                    (
+                        if is_seq {
+                            PropPattern::SeqAttr(first_binding, val_binding)
+                        } else {
+                            PropPattern::Attr(first_binding, val_binding)
+                        },
+                        next,
+                    )
+                }
+                Err(Error::Unexpected(Class::RParen)) if is_seq => {
+                    let (_, next) = parse_rparen(next)?;
+                    (PropPattern::Seq(first_binding), next)
+                }
+                Err(err) => return Err(err),
+            },
             Err(Error::Unexpected(Class::RParen)) => {
                 let (_, next) = parse_rparen(next)?;
-                (PropPattern::NotPresent, next)
+                (PropPattern::Absent, next)
             }
             Err(other) => return Err(other),
         };

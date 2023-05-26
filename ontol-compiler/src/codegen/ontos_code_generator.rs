@@ -170,90 +170,91 @@ impl<'a> OntosCodeGenerator<'a> {
 
                 for arm in arms {
                     match arm.pattern {
-                        PropPattern::Present(seq, rel_binding, val_binding) => match seq {
-                            Some(_seq) => {
-                                let elem_ty = match ty {
-                                    Type::Array(elem_ty) => elem_ty,
-                                    _ => panic!("Not an array"),
-                                };
-                                let out_seq = self.builder.append(
-                                    block,
-                                    Ir::CallBuiltin(
-                                        BuiltinProc::NewSeq,
-                                        elem_ty
-                                            .get_single_def_id()
-                                            .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
-                                    ),
-                                    Stack(1),
-                                    span,
+                        PropPattern::Attr(rel_binding, val_binding) => {
+                            self.gen_match_arm(
+                                (rel_local, rel_binding),
+                                (val_local, val_binding),
+                                arm.nodes,
+                                block,
+                            );
+                        }
+                        PropPattern::SeqAttr(rel_binding, val_binding) => {
+                            let elem_ty = match ty {
+                                Type::Array(elem_ty) => elem_ty,
+                                _ => panic!("Not an array"),
+                            };
+                            let out_seq = self.builder.append(
+                                block,
+                                Ir::CallBuiltin(
+                                    BuiltinProc::NewSeq,
+                                    elem_ty
+                                        .get_single_def_id()
+                                        .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
+                                ),
+                                Stack(1),
+                                span,
+                            );
+                            let counter = self.builder.append(
+                                block,
+                                Ir::Constant(0, DefId::unit()),
+                                Stack(1),
+                                span,
+                            );
+                            let iter_offset = block.current_offset();
+                            let elem_rel_local = self.builder.top_plus(1);
+                            let elem_val_local = self.builder.top_plus(2);
+
+                            let iter_body_index = {
+                                let mut iter_block = self.builder.new_block(Stack(2), span);
+
+                                self.gen_match_arm(
+                                    (elem_rel_local, rel_binding),
+                                    (elem_val_local, val_binding),
+                                    arm.nodes,
+                                    &mut iter_block,
                                 );
-                                let counter = self.builder.append(
-                                    block,
-                                    Ir::Constant(0, DefId::unit()),
-                                    Stack(1),
-                                    span,
-                                );
-                                let iter_offset = block.current_offset();
-                                let elem_rel_local = self.builder.top_plus(1);
-                                let elem_val_local = self.builder.top_plus(2);
-
-                                let iter_body_index = {
-                                    let mut iter_block = self.builder.new_block(Stack(2), span);
-
-                                    self.gen_match_arm(
-                                        (elem_rel_local, rel_binding),
-                                        (elem_val_local, val_binding),
-                                        arm.nodes,
-                                        &mut iter_block,
-                                    );
-
-                                    self.builder.append(
-                                        &mut iter_block,
-                                        Ir::Clone(elem_rel_local),
-                                        Stack(1),
-                                        span,
-                                    );
-
-                                    // still two items on the stack: append to original sequence
-                                    // for now, rel_params is not mapped
-                                    // FIXME: This is only correct for sequence generation:
-                                    self.builder.append(
-                                        &mut iter_block,
-                                        Ir::AppendAttr2(out_seq),
-                                        Stack(-2),
-                                        span,
-                                    );
-
-                                    self.builder
-                                        .append_pop_until(&mut iter_block, counter, span);
-
-                                    self.builder.commit(
-                                        iter_block,
-                                        Terminator::PopGoto(block.index(), iter_offset),
-                                    )
-                                };
 
                                 self.builder.append(
-                                    block,
-                                    Ir::Iter(val_local, counter, iter_body_index),
-                                    Stack(0),
+                                    &mut iter_block,
+                                    Ir::Clone(elem_rel_local),
+                                    Stack(1),
                                     span,
                                 );
 
-                                self.builder.append_pop_until(block, out_seq, span);
-
-                                // todo!("seq");
-                            }
-                            None => {
-                                self.gen_match_arm(
-                                    (rel_local, rel_binding),
-                                    (val_local, val_binding),
-                                    arm.nodes,
-                                    block,
+                                // still two items on the stack: append to original sequence
+                                // for now, rel_params is not mapped
+                                // FIXME: This is only correct for sequence generation:
+                                self.builder.append(
+                                    &mut iter_block,
+                                    Ir::AppendAttr2(out_seq),
+                                    Stack(-2),
+                                    span,
                                 );
-                            }
-                        },
-                        PropPattern::NotPresent => {
+
+                                self.builder
+                                    .append_pop_until(&mut iter_block, counter, span);
+
+                                self.builder.commit(
+                                    iter_block,
+                                    Terminator::PopGoto(block.index(), iter_offset),
+                                )
+                            };
+
+                            self.builder.append(
+                                block,
+                                Ir::Iter(val_local, counter, iter_body_index),
+                                Stack(0),
+                                span,
+                            );
+
+                            self.builder.append_pop_until(block, out_seq, span);
+
+                            // todo!("seq");
+                        }
+                        PropPattern::Seq(_) => {
+                            todo!("Seq present")
+                        }
+                        PropPattern::Absent => {
                             todo!("Arm pattern not present")
                         }
                     }

@@ -160,20 +160,24 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
         let indent = self.indent;
         write!(f, "{indent}(")?;
         match &node.pattern {
-            PropPattern::Present(seq, rel, val) => {
+            PropPattern::Attr(rel, val) => {
                 write!(f, "(")?;
-                let sep = match seq {
-                    Some(_) => {
-                        write!(f, "seq")?;
-                        Sep::Space
-                    }
-                    None => Sep::None,
-                };
-                self.print(sep, rel, f)?;
+                self.print(Sep::None, rel, f)?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            PropPattern::NotPresent => {
+            PropPattern::SeqAttr(rel, val) => {
+                write!(f, "(seq")?;
+                self.print(Sep::Space, rel, f)?;
+                self.print(Sep::Space, val, f)?;
+                write!(f, ")")?;
+            }
+            PropPattern::Seq(val) => {
+                write!(f, "(seq")?;
+                self.print(Sep::Space, val, f)?;
+                write!(f, ")")?;
+            }
+            PropPattern::Absent => {
                 write!(f, "()")?;
             }
         }

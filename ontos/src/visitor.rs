@@ -127,9 +127,15 @@ macro_rules! visitor_trait {
             }
 
             fn traverse_match_arm(&mut self, match_arm: param!($mut MatchArm<'a, L>)) {
-                if let PropPattern::Present(_seq, rel, val) = borrow!($mut match_arm.pattern) {
-                    self.visit_pattern_binding(0, rel);
-                    self.visit_pattern_binding(1, val);
+                match borrow!($mut match_arm.pattern) {
+                    PropPattern::Attr(rel, val) | PropPattern::SeqAttr(rel, val) => {
+                        self.visit_pattern_binding(0, rel);
+                        self.visit_pattern_binding(1, val);
+                    }
+                    PropPattern::Seq(val) => {
+                        self.visit_pattern_binding(0, val);
+                    }
+                    PropPattern::Absent => {}
                 }
             }
 

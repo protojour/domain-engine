@@ -71,12 +71,17 @@ where
 
 #[derive(Clone)]
 pub enum PropPattern {
-    Present(Option<Seq>, PatternBinding, PatternBinding),
-    NotPresent,
+    /// ($rel $val)
+    Attr(PatternBinding, PatternBinding),
+    /// (seq $rel $val)
+    /// Each _item_ in the sequence is bound to $rel, $val
+    SeqAttr(PatternBinding, PatternBinding),
+    /// (seq $val)
+    /// The sequence is captured in $val, relation is ignored
+    Seq(PatternBinding),
+    /// The property is absent
+    Absent,
 }
-
-#[derive(Clone)]
-pub struct Seq;
 
 #[derive(Clone, Debug)]
 pub enum PatternBinding {

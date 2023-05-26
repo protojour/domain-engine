@@ -1,9 +1,7 @@
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use ontos::{
-    kind::{
-        Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq,
-    },
+    kind::{Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     visitor::OntosVisitor,
     Binder, Variable,
 };
@@ -304,7 +302,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         if u_node.target_nodes.is_empty() {
             // treat this "transparently"
-            self.make_match_arm(u_node, variant, None)
+            self.make_attr_match_arm(u_node, variant, |rel, val| PropPattern::Attr(rel, val))
         } else if u_node.target_nodes.len() == 1 {
             if !matches!(&variant.dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
@@ -331,7 +329,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     trace!("seq u_tree: {u_tree:#?}");
 
                     Ok(self
-                        .make_match_arm(u_tree, variant, Some(Seq))?
+                        .make_attr_match_arm(u_tree, variant, |rel, val| {
+                            PropPattern::SeqAttr(rel, val)
+                        })?
                         .map(|mut typed_arm| {
                             typed_arm.ty = self.types.intern(Type::Array(typed_arm.ty));
                             typed_arm
@@ -344,11 +344,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn make_match_arm(
+    fn make_attr_match_arm(
         &mut self,
         mut u_node: UnificationNode<'m>,
         variant: &PropVariant<'m, TypedOntos>,
-        seq: Option<Seq>,
+        func: impl FnOnce(PatternBinding, PatternBinding) -> PropPattern,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         let rel_binding =
             self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &variant.attr.rel)?;
@@ -362,22 +362,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             (Some(rel), None) => Self::last_type_opt(rel.iter()).map(|ty| TypedMatchArm {
                 arm: MatchArm {
-                    pattern: PropPattern::Present(
-                        seq,
-                        rel_binding.binding,
-                        PatternBinding::Wildcard,
-                    ),
+                    pattern: func(rel_binding.binding, PatternBinding::Wildcard),
                     nodes: rel.into_iter().collect(),
                 },
                 ty,
             }),
             (None, Some(val)) => Self::last_type_opt(val.iter()).map(|ty| TypedMatchArm {
                 arm: MatchArm {
-                    pattern: PropPattern::Present(
-                        seq,
-                        PatternBinding::Wildcard,
-                        val_binding.binding,
-                    ),
+                    pattern: func(PatternBinding::Wildcard, val_binding.binding),
                     nodes: val.into_iter().collect(),
                 },
                 ty,
@@ -388,11 +380,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 concatenated.extend(val);
                 Self::last_type_opt(concatenated.iter()).map(|ty| TypedMatchArm {
                     arm: MatchArm {
-                        pattern: PropPattern::Present(
-                            seq,
-                            rel_binding.binding,
-                            val_binding.binding,
-                        ),
+                        pattern: func(rel_binding.binding, val_binding.binding),
                         nodes: concatenated,
                     },
                     ty,
