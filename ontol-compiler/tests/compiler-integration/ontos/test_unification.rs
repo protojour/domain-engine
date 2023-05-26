@@ -239,6 +239,164 @@ fn test_unify_basic_seq_prop() {
 }
 
 #[test]
+fn test_unify_seq_prop_deep() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop $b S:0:0
+                (seq (@f)
+                    #u
+                    (struct ($c)
+                        (prop $c S:1:1
+                            (seq (@g)
+                                #u
+                                (map $a)
+                            )
+                        )
+                    )
+                )
+            )
+        )",
+        "
+        (struct ($d)
+            (prop $d O:0:0
+                (seq (@f)
+                    #u
+                    (struct ($e)
+                        (prop $e O:1:1
+                            (seq (@g)
+                                #u
+                                (map $a)
+                            )
+                        )
+                    )
+                )
+            )
+        )",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($c)
+            (match-prop $b S:0:0
+                ((seq $d)
+                    (prop $c S:1:1
+                        (#u
+                            (gen $d ($e $_ $a)
+                                (push $e #u $a)
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_complex_seq_prop2() {
+    let output = test_unify(
+        "
+        (struct ($w)
+            (prop $w S:1:9
+                (seq (@aa)
+                    #u
+                    (struct ($x)
+                        (prop $x S:1:9
+                            (seq (@y)
+                                #u
+                                (map $c)
+                            )
+                        )
+                        (prop $x S:1:11
+                            (seq (@z)
+                                #u
+                                (map $e)
+                            )
+                        )
+                    )
+                )
+            )
+            (prop $w S:1:11
+                (seq (@ae)
+                    #u
+                    (struct ($ab)
+                        (prop $ab S:1:9
+                            (seq (@ac)
+                                #u
+                                (map $h)
+                            )
+                        )
+                        (prop $ab S:1:11
+                            (seq (@ad)
+                                #u
+                                (map $j)
+                            )
+                        )
+                    )
+                )
+            )
+        )",
+        "
+        (struct ($af)
+            (prop $af S:1:11
+                (seq (@ae)
+                    #u
+                    (struct ($ag)
+                        (prop $ag S:1:11
+                            (seq (@ad)
+                                #u
+                                (map $j)
+                            )
+                        )
+                        (prop $ag S:1:9
+                            (seq (@ac)
+                                #u
+                                (map $h)
+                            )
+                        )
+                    )
+                )
+            )
+            (prop $af S:1:9
+                (seq (@aa)
+                    #u
+                    (struct ($ah)
+                        (prop $ah S:1:11
+                            (seq (@z)
+                                #u
+                                (map $e)
+                            )
+                        )
+                        (prop $ah S:1:9
+                            (seq (@y)
+                                #u
+                                (map $c)
+                            )
+                        )
+                    )
+                )
+            )
+        )",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($c)
+            (match-prop $b S:0:0
+                ((seq $d)
+                    (prop $c S:1:1
+                        (#u
+                            (gen $d ($e $_ $a)
+                                (push $e #u $a)
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_flat_map1() {
     let output = test_unify(
         "

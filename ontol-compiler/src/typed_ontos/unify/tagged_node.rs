@@ -154,6 +154,7 @@ impl<'m> TaggedNodes<'m> {
 #[derive(Default)]
 pub struct Tagger {
     in_scope: BitSet,
+    labels: BitSet,
 }
 
 impl Tagger {
@@ -206,6 +207,7 @@ impl Tagger {
                 }
             }
             NodeKind::Seq(label, attr) => {
+                self.register_label(label);
                 let rel = self.tag_node(*attr.rel);
                 let val = self.tag_node(*attr.val);
 
@@ -240,10 +242,12 @@ impl Tagger {
                         variant_variables.union_with(&val.free_variables);
 
                         if let Dimension::Seq(label) = variant.dimension {
+                            self.register_label(label);
                             variant_variables.insert(label.0 as usize);
+                            free_variables.insert(label.0 as usize);
+                        } else {
+                            free_variables.union_with(&variant_variables);
                         }
-
-                        free_variables.union_with(&variant_variables);
 
                         TaggedNode {
                             kind: TaggedKind::PropVariant(struct_var, prop, variant.dimension),
@@ -293,6 +297,14 @@ impl Tagger {
             children: TaggedNodes(children),
             meta,
         }
+    }
+
+    fn register_label(&mut self, label: ontos::Label) {
+        if self.labels.contains(label.0 as usize) {
+            panic!("Duplicate label: {label}");
+        }
+
+        self.labels.insert(label.0 as usize);
     }
 }
 
