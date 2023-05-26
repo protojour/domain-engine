@@ -223,7 +223,15 @@ fn test_unify_basic_seq_prop() {
     let expected = indoc! {"
         |$b| (struct ($c)
             (match-prop $b S:0:0
-                ((seq $_ $a) $a)
+                ((seq $d)
+                    (prop $c S:1:1
+                        (#u
+                            (gen $d ($e $_ $a)
+                                (push $e #u $a)
+                            )
+                        )
+                    )
+                )
             )
         )"
     };

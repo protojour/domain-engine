@@ -73,6 +73,7 @@ pub enum PropPattern {
     Attr(PatternBinding, PatternBinding),
     /// (seq $rel $val)
     /// Each _item_ in the sequence is bound to $rel, $val
+    /// TODO: Remove
     SeqAttr(PatternBinding, PatternBinding),
     /// (seq $val)
     /// The sequence is captured in $val, relation is ignored

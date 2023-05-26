@@ -405,34 +405,93 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         }
                     }))
                 }
-                TaggedKind::PropVariant(_, _, Dimension::Seq(_)) => {
+                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
                     let free_variables = union_free_variables(target.children.0.iter());
 
-                    trace!("seq free_variables: {:?}", DebugVariables(&free_variables));
+                    trace!(
+                        "seq prop free_variables: {:?}",
+                        DebugVariables(&free_variables)
+                    );
 
                     let var_paths = locate_slice_variables(
                         &[source.attr.rel.as_ref(), source.attr.val.as_ref()],
                         &free_variables,
                     )
                     .unwrap();
-                    trace!("seq var_paths: {var_paths:?}");
+                    trace!("seq prop var_paths: {var_paths:?}");
 
-                    let u_tree = build_unification_tree(target.children.0, &var_paths);
+                    let sub_tree = build_unification_tree(target.children.0, &var_paths);
 
-                    trace!("seq u_tree: {u_tree:#?}");
+                    trace!("seq prop u_tree: {sub_tree:#?}");
 
-                    Ok(self
-                        .let_attr(u_tree, source)?
-                        .map(|let_attr| TypedMatchArm {
-                            arm: MatchArm {
-                                pattern: PropPattern::SeqAttr(
-                                    let_attr.rel_binding,
-                                    let_attr.val_binding,
-                                ),
-                                nodes: let_attr.nodes,
+                    let input_seq_var = self.alloc_var();
+                    let output_seq_var = self.alloc_var();
+
+                    Ok(self.let_attr_pair(sub_tree, source)?.map(|let_attr| {
+                        // FIXME: Array/seq types must take two parameters
+                        let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
+
+                        let gen_node = OntosNode {
+                            kind: NodeKind::Gen(
+                                input_seq_var,
+                                IterBinder {
+                                    seq: PatternBinding::Binder(output_seq_var),
+                                    rel: let_attr.rel.binding,
+                                    val: let_attr.val.binding,
+                                },
+                                vec![OntosNode {
+                                    kind: NodeKind::Push(
+                                        output_seq_var,
+                                        Attribute {
+                                            rel: Box::new(self.single_node_or_unit(
+                                                let_attr.rel.nodes.into_iter(),
+                                            )),
+                                            val: Box::new(self.single_node_or_unit(
+                                                let_attr.val.nodes.into_iter(),
+                                            )),
+                                        },
+                                    ),
+                                    meta: Meta {
+                                        ty: self.unit_type(),
+                                        span: SourceSpan::none(),
+                                    },
+                                }],
+                            ),
+                            meta: Meta {
+                                ty: seq_ty,
+                                span: SourceSpan::none(),
                             },
-                            ty: self.types.intern(Type::Array(let_attr.ty)),
-                        }))
+                        };
+
+                        let prop_node = OntosNode {
+                            // FIXME: It feels wrong to construct the NodeKind::Prop explicitly here.
+                            // this node should already be in target_nodes, so what should instead be done
+                            // is to put its variables into scope.
+                            kind: NodeKind::Prop(
+                                struct_var,
+                                prop_id,
+                                vec![PropVariant {
+                                    attr: Attribute {
+                                        rel: Box::new(self.unit_node()),
+                                        val: Box::new(gen_node),
+                                    },
+                                    dimension: Dimension::Singular,
+                                }],
+                            ),
+                            meta: Meta {
+                                ty: self.unit_type(),
+                                span: SourceSpan::none(),
+                            },
+                        };
+
+                        TypedMatchArm {
+                            arm: MatchArm {
+                                pattern: PropPattern::Seq(PatternBinding::Binder(input_seq_var)),
+                                nodes: vec![prop_node],
+                            },
+                            ty: seq_ty,
+                        }
+                    }))
                 }
                 other => panic!("BUG: Unsupported kind: {other:?}"),
             }
@@ -741,6 +800,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
         self.types.intern(Type::Unit(DefId::unit()))
     }
 
+    fn unit_node(&mut self) -> OntosNode<'m> {
+        OntosNode {
+            kind: NodeKind::Unit,
+            meta: Meta {
+                ty: self.unit_type(),
+                span: SourceSpan::none(),
+            },
+        }
+    }
+
     fn single_node_or_unit(
         &mut self,
         mut iterator: impl Iterator<Item = OntosNode<'m>>,
@@ -752,13 +821,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
                 node
             }
-            None => OntosNode {
-                kind: NodeKind::Unit,
-                meta: Meta {
-                    ty: self.unit_type(),
-                    span: SourceSpan::none(),
-                },
-            },
+            None => self.unit_node(),
         }
     }
 }
