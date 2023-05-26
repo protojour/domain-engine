@@ -92,7 +92,13 @@ impl ProcBuilder {
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
         let stack_delta = Stack(local.0 as i32 - self.top().0 as i32);
         if stack_delta.0 != 0 {
-            self.append(block, Ir::PopUntil(local), stack_delta, span);
+            if let Some((Ir::PopUntil(last_local), _)) = block.ir.last_mut() {
+                // peephole optimization: No need for consecutive PopUntil
+                self.stack_size += stack_delta.0;
+                *last_local = local;
+            } else {
+                self.append(block, Ir::PopUntil(local), stack_delta, span);
+            }
         }
     }
 
@@ -101,7 +107,14 @@ impl ProcBuilder {
 
         // compute addresses
         let mut block_addr = 0;
-        for block in &self.blocks {
+        for block in &mut self.blocks {
+            // Peephole: No need for PopUntil right before return
+            if let Some(Terminator::Return(_)) = &block.terminator {
+                if let Some((Ir::PopUntil(_), _)) = block.ir.last() {
+                    block.ir.pop();
+                }
+            }
+
             block_addresses.push(block_addr);
 
             // account for the terminator:

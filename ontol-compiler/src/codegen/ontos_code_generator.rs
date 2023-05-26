@@ -227,7 +227,8 @@ impl<'a> OntosCodeGenerator<'a> {
                                         span,
                                     );
 
-                                    self.builder.append_pop_until(block, counter, span);
+                                    self.builder
+                                        .append_pop_until(&mut iter_block, counter, span);
 
                                     self.builder.commit(
                                         iter_block,
