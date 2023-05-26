@@ -2,7 +2,8 @@ use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
     kind::{
-        Attribute, Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant, Seq,
+        Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
+        PropVariant, Seq,
     },
     Binder, Label, Lang, Variable,
 };
@@ -137,12 +138,30 @@ impl<L: Lang> Parser<L> {
                             next,
                         )
                     }
-                    ("map-seq", next) => {
-                        let (var, next) = parse_dollar_var(next)?;
-                        let (binder, next) = parse_binder(next)?;
-                        let (children, next) = self.parse_many(next, Self::parse)?;
+                    ("gen", next) => {
+                        let (seq_var, next) = parse_dollar_var(next)?;
+                        let (binder, next) = parse_iter_binder(next)?;
+                        let (body, next) = self.parse_many(next, Self::parse)?;
+                        (self.make_node(NodeKind::Gen(seq_var, binder, body)), next)
+                    }
+                    ("iter", next) => {
+                        let (seq_var, next) = parse_dollar_var(next)?;
+                        let (binder, next) = parse_iter_binder(next)?;
+                        let (body, next) = self.parse_many(next, Self::parse)?;
+                        (self.make_node(NodeKind::Iter(seq_var, binder, body)), next)
+                    }
+                    ("push", next) => {
+                        let (seq_var, next) = parse_dollar_var(next)?;
+                        let (rel, next) = self.parse(next)?;
+                        let (val, next) = self.parse(next)?;
                         (
-                            self.make_node(NodeKind::MapSeq(var, binder, children)),
+                            self.make_node(NodeKind::Push(
+                                seq_var,
+                                Attribute {
+                                    rel: Box::new(rel),
+                                    val: Box::new(val),
+                                },
+                            )),
                             next,
                         )
                     }
@@ -296,6 +315,22 @@ fn parse_binder(next: &str) -> ParseResult<'_, Binder> {
     let (var, next) = parse_dollar_var(next)?;
     let (_, next) = parse_rparen(next)?;
     Ok((Binder(var), next))
+}
+
+fn parse_iter_binder(next: &str) -> ParseResult<'_, IterBinder> {
+    let (_, next) = parse_lparen(next)?;
+    let (seq, next) = parse_dollar_var(next)?;
+    let (rel, next) = parse_dollar_var(next)?;
+    let (val, next) = parse_dollar_var(next)?;
+    let (_, next) = parse_rparen(next)?;
+    Ok((
+        IterBinder {
+            seq: Binder(seq),
+            rel: Binder(rel),
+            val: Binder(val),
+        },
+        next,
+    ))
 }
 
 fn parse_at_label(next: &str) -> ParseResult<'_, Label> {

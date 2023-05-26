@@ -1,7 +1,7 @@
 use ontol_runtime::value::PropertyId;
 
 use crate::{
-    kind::{Dimension, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     Label, Lang, Node, Variable,
 };
 
@@ -39,6 +39,11 @@ macro_rules! visitor_trait {
             fn visit_binder(&mut self, variable: param!($mut Variable)) {}
 
             #[allow(unused_variables)]
+            fn visit_iter_binder(&mut self, binder: param!($mut IterBinder)) {
+                self.traverse_iter_binder(binder);
+            }
+
+            #[allow(unused_variables)]
             fn visit_variable(&mut self, variable: param!($mut Variable)) {}
 
             #[allow(unused_variables)]
@@ -71,13 +76,6 @@ macro_rules! visitor_trait {
                         self.visit_node(0, borrow!($mut spec.rel));
                         self.visit_node(1, borrow!($mut spec.val));
                     }
-                    NodeKind::MapSeq(var, binder, children) => {
-                        self.visit_variable(var);
-                        self.visit_binder(borrow!($mut binder.0));
-                        for (index, child) in children.$iter().enumerate() {
-                            self.visit_node(index, child);
-                        }
-                    }
                     NodeKind::Struct(binder, children) => {
                         self.visit_binder(borrow!($mut binder.0));
                         for (index, child) in children.$iter().enumerate() {
@@ -97,6 +95,25 @@ macro_rules! visitor_trait {
                         for (index, arm) in arms.$iter().enumerate() {
                             self.visit_match_arm(index, arm);
                         }
+                    }
+                    NodeKind::Gen(seq_var, binder, children) => {
+                        self.visit_variable(seq_var);
+                        self.visit_iter_binder(binder);
+                        for (index, child) in children.$iter().enumerate() {
+                            self.visit_node(index, child);
+                        }
+                    }
+                    NodeKind::Iter(seq_var, binder, children) => {
+                        self.visit_variable(seq_var);
+                        self.visit_iter_binder(binder);
+                        for (index, child) in children.$iter().enumerate() {
+                            self.visit_node(index, child);
+                        }
+                    }
+                    NodeKind::Push(seq_var, attr) => {
+                        self.visit_variable(seq_var);
+                        self.visit_node(0, borrow!($mut attr.rel));
+                        self.visit_node(1, borrow!($mut attr.val));
                     }
                 }
             }
@@ -121,6 +138,12 @@ macro_rules! visitor_trait {
                     PatternBinding::Binder(var) => self.visit_binder(var),
                     PatternBinding::Wildcard => {}
                 }
+            }
+
+            fn traverse_iter_binder(&mut self, binder: param!($mut IterBinder)) {
+                self.visit_binder(borrow!($mut binder.seq.0));
+                self.visit_binder(borrow!($mut binder.rel.0));
+                self.visit_binder(borrow!($mut binder.val.0));
             }
         }
     };

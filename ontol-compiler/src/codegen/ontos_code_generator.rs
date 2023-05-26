@@ -155,9 +155,6 @@ impl<'a> OntosCodeGenerator<'a> {
                         .append(block, Ir::PutAttrValue(struct_local, id), Stack(-1), span);
                 }
             }
-            NodeKind::MapSeq(..) => {
-                unimplemented!("map-seq");
-            }
             NodeKind::MatchProp(struct_var, id, arms) => {
                 let struct_local = self.var_local(struct_var);
 
@@ -261,6 +258,15 @@ impl<'a> OntosCodeGenerator<'a> {
                         }
                     }
                 }
+            }
+            NodeKind::Gen(..) => {
+                todo!("gen");
+            }
+            NodeKind::Iter(..) => {
+                todo!("iter");
+            }
+            NodeKind::Push(..) => {
+                todo!("push");
             }
         }
     }

@@ -194,7 +194,7 @@ mod tests {
             (struct ($a)
                 (match-prop $b S:0:0
                     (($_ $c)
-                        (map-seq $c ($d) $d)
+                        (gen $c ($d $e $f) $d)
                     )
                 )
             )"

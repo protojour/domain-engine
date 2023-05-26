@@ -282,11 +282,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     },
                 })
             }
-            NodeKind::MapSeq(..) => {
-                todo!()
-            }
             NodeKind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
+            }
+            NodeKind::Gen(..) => {
+                todo!()
+            }
+            NodeKind::Iter(..) => {
+                todo!()
+            }
+            NodeKind::Push(..) => {
+                todo!()
             }
         }
     }

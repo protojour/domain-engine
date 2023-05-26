@@ -210,6 +210,10 @@ impl PropertyId {
 /// The parameter _value_ is itself a `Value`.
 ///
 /// The attribute value is also just a Value.
+///
+/// FIXME: There is probably a flaw in the modelling of one-to-many attributes.
+/// One-to-many has many rel_params too (currently represented using Data::Seq for the value).
+/// So should Attribute be an enum instead of a struct?
 #[derive(Clone, Debug)]
 pub struct Attribute {
     pub value: Value,

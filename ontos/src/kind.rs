@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{Binder, Label, Lang, Node, Variable};
@@ -15,8 +17,10 @@ pub enum NodeKind<'a, L: Lang> {
     Seq(Label, Attribute<Box<L::Node<'a>>>),
     Struct(Binder, Nodes<'a, L>),
     Prop(Variable, PropertyId, Vec<PropVariant<'a, L>>),
-    MapSeq(Variable, Binder, Nodes<'a, L>),
     MatchProp(Variable, PropertyId, Vec<MatchArm<'a, L>>),
+    Gen(Variable, IterBinder, Nodes<'a, L>),
+    Iter(Variable, IterBinder, Nodes<'a, L>),
+    Push(Variable, Attribute<Box<L::Node<'a>>>),
 }
 
 impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
@@ -78,4 +82,17 @@ pub struct Seq;
 pub enum PatternBinding {
     Wildcard,
     Binder(Variable),
+}
+
+#[derive(Clone)]
+pub struct IterBinder {
+    pub seq: Binder,
+    pub rel: Binder,
+    pub val: Binder,
+}
+
+impl Display for IterBinder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.seq.0, self.rel.0, self.val.0)
+    }
 }
