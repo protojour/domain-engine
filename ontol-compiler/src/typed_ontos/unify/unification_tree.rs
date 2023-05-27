@@ -44,7 +44,7 @@ pub fn build_unification_tree<'m>(
     root
 }
 
-fn add_to_tree<'m>(
+pub fn add_to_tree<'m>(
     tagged_node: TaggedNode<'m>,
     variable_paths: &FnvHashMap<Variable, Path>,
     tree: &mut UnificationNode<'m>,
@@ -67,7 +67,10 @@ pub fn insert_at_path<'m>(
     variable_paths: &FnvHashMap<Variable, Path>,
     mut tree: &mut UnificationNode<'m>,
 ) {
-    debug!("add_to_tree {:?}", tagged_node.free_variables);
+    debug!(
+        "add_to_tree {:?} vars={:?}",
+        tagged_node.kind, tagged_node.free_variables
+    );
 
     {
         let mut path_iterator = tagged_node

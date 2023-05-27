@@ -17,7 +17,7 @@ use crate::{
         lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedBinder, TypedOntos},
         unify::{
             tagged_node::{union_free_variables, DebugVariables},
-            unification_tree::build_unification_tree,
+            unification_tree::{add_to_tree, build_unification_tree},
             var_path::{locate_slice_variables, locate_variables},
         },
     },
@@ -55,6 +55,34 @@ pub fn unify_to_function<'m>(
         types: &mut compiler.types,
     }
     .unify_to_function(target)
+}
+
+pub fn unify_to_function2<'m>(
+    source: OntosNode<'m>,
+    target: OntosNode<'m>,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<OntosFunc<'m>> {
+    let mut var_tracker = VariableTracker::default();
+    var_tracker.visit_node(0, &source);
+    var_tracker.visit_node(0, &target);
+
+    let unified = Unifier {
+        root_source: &source,
+        next_variable: var_tracker.next_variable(),
+        types: &mut compiler.types,
+    }
+    .unify(Tagger::default().tag_node(target), &source)?;
+
+    let body = match unified.nodes.len() {
+        0 => panic!("No nodes"),
+        1 => unified.nodes.into_iter().next().unwrap(),
+        _ => panic!("Too many nodes"),
+    };
+
+    Ok(OntosFunc {
+        arg: unified.binder.ok_or(UnifierError::NoInputBinder)?,
+        body,
+    })
 }
 
 struct Unifier<'a, 'm> {
@@ -106,6 +134,28 @@ impl<'a, 'm> Unifier<'a, 'm> {
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
+    fn unify(
+        &mut self,
+        target_node: TaggedNode<'m>,
+        source_node: &OntosNode<'m>,
+    ) -> UnifierResult<Unified<'m>> {
+        trace!(
+            "free_variables: {:?}",
+            DebugVariables(&target_node.free_variables)
+        );
+
+        let variable_paths = locate_variables(source_node, &target_node.free_variables)?;
+        trace!("var_paths: {variable_paths:?}");
+
+        let mut u_tree = UnificationNode::default();
+
+        add_to_tree(target_node, &variable_paths, &mut u_tree);
+
+        trace!("{u_tree:#?}");
+
+        self.unify_source_node(None, u_tree, source_node)
+    }
+
     fn unify_to_function(&mut self, target: OntosNode<'m>) -> UnifierResult<OntosFunc<'m>> {
         let meta = target.meta;
 
@@ -163,11 +213,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
         let u_tree = build_unification_tree(tagged_nodes, &var_paths);
         trace!("{u_tree:#?}");
 
-        self.unify_source_node(u_tree, self.root_source)
+        self.unify_source_node(None, u_tree, self.root_source)
     }
 
     fn unify_source_node(
         &mut self,
+        debug_index: Option<usize>,
         mut u_node: UnificationNode<'m>,
         source: &OntosNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
@@ -175,6 +226,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         let meta = *meta;
         match kind {
             NodeKind::VariableRef(var) => {
+                debug!("unify_source_node({debug_index:?}, VariableRef)");
                 let nodes = self.merge_target_nodes(&mut u_node)?;
                 Ok(Unified {
                     binder: Some(TypedBinder {
@@ -188,6 +240,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::Int(_int) => panic!(),
             NodeKind::Call(proc, args) => match u_node.sub_unifications.len() {
                 0 => {
+                    debug!("unify_source_node({debug_index:?}, Call const)");
                     let args = self.unify_children(u_node, args)?;
                     Ok(Unified {
                         binder: None,
@@ -199,6 +252,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
                 1 => {
+                    debug!("unify_source_node({debug_index:?}, Call var)");
+
                     // Invert call algorithm:
                     // start with a _variable_ representing this expression.
                     // Expand this expression along the way recursing _down_ to
@@ -238,7 +293,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
             },
             NodeKind::Map(arg) => match u_node.sub_unifications.remove(&0) {
                 None => {
-                    let unified_arg = self.unify_source_node(u_node, arg)?;
+                    debug!("unify_source_node({debug_index:?}, Map const)");
+
+                    let unified_arg = self.unify_source_node(Some(0), u_node, arg)?;
                     let mut param: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
                     let param_ty = param.meta.ty;
                     param.meta.ty = meta.ty;
@@ -254,19 +311,26 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         .into(),
                     })
                 }
-                Some(sub_node) => self.unify_source_node(sub_node, arg),
+                Some(sub_node) => {
+                    debug!("unify_source_node({debug_index:?}, Map var)");
+
+                    self.unify_source_node(Some(0), sub_node, arg)
+                }
             },
             NodeKind::Let(..) => {
                 unimplemented!("BUG: Let is an output node")
             }
             NodeKind::Seq(_binder, _attr) => Err(UnifierError::SequenceInputNotSupported),
             NodeKind::Struct(binder, nodes) => {
+                debug!("unify_source_node({debug_index:?}, Struct({}))", binder.0);
                 self.unify_source_struct(u_node, *binder, nodes, meta)
             }
             NodeKind::Prop(struct_var, id, variants) => {
+                debug!("unify_source_node({debug_index:?}, Prop)");
                 let mut match_arms = vec![];
                 let mut ty = &Type::Tautology;
                 for (index, variant_u_node) in u_node.sub_unifications {
+                    debug!("unify_source_arm({index})");
                     if let Some(typed_match_arm) =
                         self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?
                     {
@@ -303,12 +367,15 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 unimplemented!("BUG: MatchProp is an output node")
             }
             NodeKind::Gen(..) => {
+                debug!("unify_source_node({debug_index:?}, Gen)");
                 todo!()
             }
             NodeKind::Iter(..) => {
+                debug!("unify_source_node({debug_index:?}, Iter)");
                 todo!()
             }
             NodeKind::Push(..) => {
+                debug!("unify_source_node({debug_index:?}, Push)");
                 todo!()
             }
         }
@@ -520,10 +587,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
         mut u_node: UnificationNode<'m>,
         source: &PropVariant<'m, TypedOntos>,
     ) -> UnifierResult<Option<LetAttr<'m>>> {
-        let rel_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &source.attr.rel)?;
-        let val_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &source.attr.val)?;
+        let rel_binding = self.unify_pattern_binding(
+            Some(0),
+            u_node.sub_unifications.remove(&0),
+            &source.attr.rel,
+        )?;
+        let val_binding = self.unify_pattern_binding(
+            Some(1),
+            u_node.sub_unifications.remove(&1),
+            &source.attr.val,
+        )?;
 
         Ok(match (rel_binding.nodes, val_binding.nodes) {
             (None, None) => {
@@ -561,10 +634,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
         mut u_node: UnificationNode<'m>,
         source: &PropVariant<'m, TypedOntos>,
     ) -> UnifierResult<Option<LetAttrPair<'m>>> {
-        let rel_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&0), &source.attr.rel)?;
-        let val_binding =
-            self.unify_pattern_binding(u_node.sub_unifications.remove(&1), &source.attr.val)?;
+        let rel_binding = self.unify_pattern_binding(
+            Some(0),
+            u_node.sub_unifications.remove(&0),
+            &source.attr.rel,
+        )?;
+        let val_binding = self.unify_pattern_binding(
+            Some(1),
+            u_node.sub_unifications.remove(&1),
+            &source.attr.val,
+        )?;
 
         Ok(match (rel_binding.nodes, val_binding.nodes) {
             (None, None) => {
@@ -730,7 +809,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
 
         for root_u_node in std::mem::take(&mut u_node.dependents) {
-            let unified = self.unify_source_node(root_u_node, self.root_source)?;
+            let unified = self.unify_source_node(None, root_u_node, self.root_source)?;
             merged.extend(unified.nodes);
         }
 
@@ -744,7 +823,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
     ) -> UnifierResult<Vec<OntosNode<'m>>> {
         let mut output = vec![];
         for (index, sub_node) in u_node.sub_unifications {
-            output.extend(self.unify_source_node(sub_node, &children[index])?.nodes);
+            output.extend(
+                self.unify_source_node(Some(index), sub_node, &children[index])?
+                    .nodes,
+            );
         }
 
         Ok(output)
@@ -752,6 +834,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_pattern_binding(
         &mut self,
+        debug_index: Option<usize>,
         u_node: Option<UnificationNode<'m>>,
         source: &OntosNode<'m>,
     ) -> UnifierResult<UnifyPatternBinding<'m>> {
@@ -765,7 +848,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
         };
 
-        let Unified { nodes, binder } = self.unify_source_node(u_node, source)?;
+        let Unified { nodes, binder } = self.unify_source_node(debug_index, u_node, source)?;
         let binding = match binder {
             Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
             None => PatternBinding::Wildcard,

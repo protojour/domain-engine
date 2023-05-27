@@ -275,13 +275,27 @@ fn test_unify_seq_prop_deep() {
         )",
     );
     let expected = indoc! {"
-        |$b| (struct ($c)
+        |$b| (struct ($d)
             (match-prop $b S:0:0
-                ((seq $d)
-                    (prop $c S:1:1
+                ((seq $h)
+                    (prop $d O:0:0
                         (#u
-                            (gen $d ($e $_ $a)
-                                (push $e #u $a)
+                            (gen $h ($f $_ $g)
+                                (push $f #u
+                                    (struct ($e)
+                                        (match-prop $g S:1:1
+                                            ((seq $q)
+                                                (prop $e O:1:1
+                                                    (#u
+                                                        (gen $q ($r $_ $s)
+                                                            (push $r #u (map $s))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
                             )
                         )
                     )
