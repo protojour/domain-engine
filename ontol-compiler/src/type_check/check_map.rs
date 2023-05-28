@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    hir_build_ctx::{BindDepth, CtrlFlowGroup, ExplicitVariable, HirBuildCtx},
+    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExplicitVariable, HirBuildCtx},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -198,28 +198,27 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
                     ctx.label_map.insert(*expr_id, label);
 
-                    let result =
-                        ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
-                            self.analyze_arm(
-                                inner,
-                                variables,
-                                Some(CtrlFlowGroup {
-                                    label,
-                                    bind_depth: ctx.current_bind_depth(),
-                                }),
-                                ctx,
-                            )
-                        });
+                    let result = ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx| {
+                        self.analyze_arm(
+                            inner,
+                            variables,
+                            Some(CtrlFlowGroup {
+                                label,
+                                bind_depth: ctx.current_ctrl_flow_depth(),
+                            }),
+                            ctx,
+                        )
+                    });
 
                     assert!(result.is_ok());
                 } else {
-                    let outer_bind_depth = ctx.current_bind_depth();
+                    let outer_bind_depth = ctx.current_ctrl_flow_depth();
 
-                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx, _| {
+                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         let inner_aggr_group =
                             self.analyze_arm(inner, variables, None, ctx).unwrap();
 
-                        match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
+                        match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
                                 ctx.label_map.insert(*expr_id, label);
 
@@ -349,7 +348,7 @@ impl AggrGroupSet {
     fn disambiguate(
         self,
         ctx: &HirBuildCtx,
-        max_depth: BindDepth,
+        max_depth: CtrlFlowDepth,
     ) -> Result<Label, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {
             return Err(AggrGroupError::DepthExceeded);

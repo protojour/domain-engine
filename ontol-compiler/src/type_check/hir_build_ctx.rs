@@ -6,7 +6,7 @@ use crate::{expr::ExprId, types::TypeRef, SourceSpan};
 use super::inference::Inference;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct BindDepth(pub u16);
+pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
     pub inference: Inference<'m>,
@@ -21,8 +21,8 @@ pub struct HirBuildCtx<'m> {
 
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
-    bind_depth: BindDepth,
-    hir_var_allocations: Vec<u32>,
+    ctrl_flow_depth: CtrlFlowDepth,
+    next_variable: Variable,
 }
 
 impl<'m> HirBuildCtx<'m> {
@@ -35,31 +35,27 @@ impl<'m> HirBuildCtx<'m> {
             variable_mapping: Default::default(),
             partial: false,
             arm: Arm::First,
-            bind_depth: BindDepth(0),
-            hir_var_allocations: vec![0],
+            ctrl_flow_depth: CtrlFlowDepth(0),
+            next_variable: Variable(0),
         }
     }
 
-    pub fn current_bind_depth(&self) -> BindDepth {
-        self.bind_depth
+    pub fn current_ctrl_flow_depth(&self) -> CtrlFlowDepth {
+        self.ctrl_flow_depth
     }
 
-    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontol_hir::Variable) -> T) -> T {
-        // There is a unique bind depth for the control flow variable:
-        let ctrl_flow_var = self.alloc_variable();
-
-        self.bind_depth.0 += 1;
-        let ret = f(self, ctrl_flow_var);
-        self.bind_depth.0 -= 1;
+    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.ctrl_flow_depth.0 += 1;
+        let ret = f(self);
+        self.ctrl_flow_depth.0 -= 1;
 
         ret
     }
 
     pub fn alloc_variable(&mut self) -> Variable {
-        let alloc = self.hir_var_allocations.get_mut(0).unwrap();
-        let var = Variable(*alloc);
-        *alloc += 1;
-        var
+        let next = self.next_variable;
+        self.next_variable.0 += 1;
+        next
     }
 }
 
@@ -83,7 +79,7 @@ pub struct ExplicitVariableArm {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CtrlFlowGroup {
     pub label: Label,
-    pub bind_depth: BindDepth,
+    pub bind_depth: CtrlFlowDepth,
 }
 
 /// Tracks which control flow "statements" are children of other control flow "statements"
