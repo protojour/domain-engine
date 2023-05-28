@@ -21,7 +21,7 @@ pub mod inference;
 mod check_expr2;
 mod check_map;
 mod check_relationship;
-mod ontos_type_inference;
+mod hir_type_inference;
 mod unify_ctx;
 
 #[derive(Clone, Copy, Debug)]

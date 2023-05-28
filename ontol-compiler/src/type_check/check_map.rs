@@ -12,13 +12,13 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
     type_check::unify_ctx::{Arm, VariableMapping},
-    typed_ontos::lang::OntosNode,
+    typed_hir::lang::TypedHirNode,
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };
 
 use super::{
-    ontos_type_inference::{OntosArmTypeInference, OntosVariableMapper},
+    hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     unify_ctx::{BindDepth, CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -71,14 +71,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<(), AggrGroupError> {
         ctx.arm = Arm::First;
         let mut first = self.check_root_expr2(first_id, ctx);
-        self.infer_ontos_arm_types(&mut first, ctx);
+        self.infer_hir_arm_types(&mut first, ctx);
 
         ctx.arm = Arm::Second;
         let mut second = self.check_root_expr2(second_id, ctx);
-        self.infer_ontos_arm_types(&mut second, ctx);
+        self.infer_hir_arm_types(&mut second, ctx);
 
         // unify the type of variables on either side:
-        self.infer_ontos_unify_arms(&mut first, &mut second, ctx);
+        self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
             first,
@@ -89,12 +89,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(())
     }
 
-    fn infer_ontos_arm_types(
+    fn infer_hir_arm_types(
         &mut self,
-        node: &mut OntosNode<'m>,
+        node: &mut TypedHirNode<'m>,
         ctx: &mut CheckUnifyExprContext<'m>,
     ) {
-        let mut inference = OntosArmTypeInference {
+        let mut inference = HirArmTypeInference {
             types: self.types,
             eq_relations: &mut ctx.inference.eq_relations,
             errors: self.errors,
@@ -102,15 +102,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         inference.visit_node(0, node);
     }
 
-    fn infer_ontos_unify_arms(
+    fn infer_hir_unify_arms(
         &mut self,
-        first: &mut OntosNode<'m>,
-        second: &mut OntosNode<'m>,
+        first: &mut TypedHirNode<'m>,
+        second: &mut TypedHirNode<'m>,
         ctx: &mut CheckUnifyExprContext<'m>,
     ) {
         for explicit_var in &mut ctx.explicit_variables.values_mut() {
-            let first_arm = explicit_var.ontos_arms.remove(&Arm::First);
-            let second_arm = explicit_var.ontos_arms.remove(&Arm::Second);
+            let first_arm = explicit_var.hir_arms.remove(&Arm::First);
+            let second_arm = explicit_var.hir_arms.remove(&Arm::Second);
 
             if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
                 let first_type_var = ctx.inference.new_type_variable(first_arm.expr_id);
@@ -146,12 +146,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        OntosVariableMapper {
+        HirVariableMapper {
             variable_mapping: &ctx.variable_mapping,
             arm: Arm::First,
         }
         .visit_node(0, first);
-        OntosVariableMapper {
+        HirVariableMapper {
             variable_mapping: &ctx.variable_mapping,
             arm: Arm::Second,
         }
@@ -279,7 +279,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             ExplicitVariable {
                                 variable: syntax_var,
                                 ctrl_group: parent_aggr_group,
-                                ontos_arms: Default::default(),
+                                hir_arms: Default::default(),
                             },
                         );
 
@@ -293,7 +293,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                 vac.insert(ExplicitVariable {
                                     variable: syntax_var,
                                     ctrl_group: parent_aggr_group,
-                                    ontos_arms: Default::default(),
+                                    hir_arms: Default::default(),
                                 });
                                 group_set.add(parent_aggr_group);
                             }

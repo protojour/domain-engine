@@ -28,7 +28,7 @@ pub mod mem;
 pub mod package;
 pub mod serde_codegen;
 pub mod source;
-pub mod typed_ontos;
+pub mod typed_hir;
 
 mod codegen;
 mod compiler_queries;

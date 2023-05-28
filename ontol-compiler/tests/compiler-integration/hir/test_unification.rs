@@ -1,8 +1,8 @@
 use indoc::indoc;
 use ontol_compiler::{
     mem::Mem,
-    typed_ontos::{
-        lang::{OntosNode, TypedOntos},
+    typed_hir::{
+        lang::{TypedHir, TypedHirNode},
         unify::unifier::unify_to_function,
     },
     Compiler,
@@ -11,8 +11,8 @@ use ontol_hir::parse::Parser;
 use pretty_assertions::assert_eq;
 use test_log::test;
 
-fn parse_typed<'m>(src: &str) -> OntosNode<'m> {
-    Parser::new(TypedOntos).parse(src).unwrap().0
+fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
+    Parser::new(TypedHir).parse(src).unwrap().0
 }
 
 fn test_unify(source: &str, target: &str) -> String {

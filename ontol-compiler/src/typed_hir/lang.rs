@@ -12,13 +12,13 @@ use crate::{
 };
 
 #[derive(Clone, Copy)]
-pub struct TypedOntos;
+pub struct TypedHir;
 
-impl ontol_hir::Lang for TypedOntos {
-    type Node<'m> = OntosNode<'m>;
+impl ontol_hir::Lang for TypedHir {
+    type Node<'m> = TypedHirNode<'m>;
 
     fn make_node<'m>(&self, kind: NodeKind<'m, Self>) -> Self::Node<'m> {
-        OntosNode {
+        TypedHirNode {
             kind,
             meta: Meta {
                 ty: &Type::Error,
@@ -28,31 +28,31 @@ impl ontol_hir::Lang for TypedOntos {
     }
 }
 
-pub type OntosKind<'m> = ontol_hir::kind::NodeKind<'m, TypedOntos>;
+pub type TypedHirKind<'m> = ontol_hir::kind::NodeKind<'m, TypedHir>;
 
 #[derive(Clone)]
-pub struct OntosNode<'m> {
-    pub kind: OntosKind<'m>,
+pub struct TypedHirNode<'m> {
+    pub kind: TypedHirKind<'m>,
     pub meta: Meta<'m>,
 }
 
-impl<'m> OntosNode<'m> {
-    pub fn split(self) -> (OntosKind<'m>, Meta<'m>) {
+impl<'m> TypedHirNode<'m> {
+    pub fn split(self) -> (TypedHirKind<'m>, Meta<'m>) {
         (self.kind, self.meta)
     }
 }
 
-impl<'m> ontol_hir::Node<'m, TypedOntos> for OntosNode<'m> {
-    fn kind(&self) -> &NodeKind<'m, TypedOntos> {
+impl<'m> ontol_hir::Node<'m, TypedHir> for TypedHirNode<'m> {
+    fn kind(&self) -> &NodeKind<'m, TypedHir> {
         &self.kind
     }
 
-    fn kind_mut(&mut self) -> &mut NodeKind<'m, TypedOntos> {
+    fn kind_mut(&mut self) -> &mut NodeKind<'m, TypedHir> {
         &mut self.kind
     }
 }
 
-impl<'m> std::fmt::Display for OntosNode<'m> {
+impl<'m> std::fmt::Display for TypedHirNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Printer::default().print(Sep::None, &self.kind, f)?;
         Ok(())
@@ -65,12 +65,12 @@ pub struct Meta<'m> {
     pub span: SourceSpan,
 }
 
-pub struct OntosFunc<'m> {
+pub struct HirFunc<'m> {
     pub arg: TypedBinder<'m>,
-    pub body: OntosNode<'m>,
+    pub body: TypedHirNode<'m>,
 }
 
-impl<'m> Display for OntosFunc<'m> {
+impl<'m> Display for HirFunc<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "|{}| {}", self.arg.variable, self.body)
     }

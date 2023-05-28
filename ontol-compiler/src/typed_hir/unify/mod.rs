@@ -1,7 +1,7 @@
 use bit_set::BitSet;
 use ontol_hir::{visitor::HirVisitor, Variable};
 
-use super::lang::TypedOntos;
+use super::lang::TypedHir;
 
 pub mod unifier;
 
@@ -20,7 +20,7 @@ struct VariableTracker {
     largest: Variable,
 }
 
-impl<'a> HirVisitor<'a, TypedOntos> for VariableTracker {
+impl<'a> HirVisitor<'a, TypedHir> for VariableTracker {
     fn visit_variable(&mut self, variable: &Variable) {
         self.observe(*variable);
     }

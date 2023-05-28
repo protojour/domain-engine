@@ -17,7 +17,7 @@ use crate::{
         inference::UnifyValue,
         unify_ctx::{Arm, ExplicitVariableArm},
     },
-    typed_ontos::lang::{Meta, OntosNode, TypedOntos},
+    typed_hir::lang::{Meta, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -29,7 +29,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr_id: ExprId,
         ctx: &mut CheckUnifyExprContext<'m>,
-    ) -> OntosNode<'m> {
+    ) -> TypedHirNode<'m> {
         let expr = self.expressions.map.remove(&expr_id).unwrap();
 
         let node = self.build_node(
@@ -58,7 +58,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr: &Expr,
         expected_ty: Option<TypeRef<'m>>,
         ctx: &mut CheckUnifyExprContext<'m>,
-    ) -> OntosNode<'m> {
+    ) -> TypedHirNode<'m> {
         let node = match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
                 match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
@@ -85,7 +85,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             parameters.push(node);
                         }
 
-                        OntosNode {
+                        TypedHirNode {
                             kind: NodeKind::Call(*proc, parameters),
                             meta: Meta {
                                 ty: output,
@@ -101,7 +101,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
-                    Some(Type::Option(Type::Domain(_))) => OntosNode {
+                    Some(Type::Option(Type::Domain(_))) => TypedHirNode {
                         kind: struct_node.kind,
                         meta: Meta {
                             ty: self.types.intern(Type::Option(struct_node.meta.ty)),
@@ -141,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                 let array_ty = self.types.intern(Type::Array(elem_ty));
 
-                OntosNode {
+                TypedHirNode {
                     kind: NodeKind::Seq(
                         label,
                         Attribute {
@@ -157,7 +157,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (ExprKind::Constant(k), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
-                    OntosNode {
+                    TypedHirNode {
                         kind: NodeKind::Int(*k),
                         meta: Meta {
                             ty: expected_ty,
@@ -179,7 +179,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .expect("variable not found");
 
                 let arm_expr_id = {
-                    let ontos_arm = explicit_variable.ontos_arms.entry(arm).or_insert_with(|| {
+                    let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
                         let expr_id = match arm {
                             Arm::First => *expr_id,
                             Arm::Second => self.expressions.alloc_expr_id(),
@@ -190,7 +190,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             span: expr.span,
                         }
                     });
-                    ontos_arm.expr_id
+                    hir_arm.expr_id
                 };
 
                 let type_var = ctx.inference.new_type_variable(arm_expr_id);
@@ -202,7 +202,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ),
                     Some(expected_ty) => {
                         let variable = explicit_variable.variable;
-                        let variable_ref = OntosNode {
+                        let variable_ref = TypedHirNode {
                             kind: NodeKind::VariableRef(variable),
                             meta: Meta {
                                 ty: expected_ty,
@@ -222,16 +222,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 match (&type_eq.actual, &type_eq.expected) {
                                     (Type::Domain(_), Type::Domain(_)) => {
                                         panic!("Should not happen anymore");
-
-                                        /*
-                                        OntosNode {
-                                            kind: NodeKind::Map(Box::new(variable_ref)),
-                                            meta: Meta {
-                                                ty: expected_ty,
-                                                span: expr.span,
-                                            },
-                                        }
-                                        */
                                     }
 
                                     _ => self.type_error_node(err, &expr.span),
@@ -275,7 +265,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         attributes: &[ExprStructAttr],
         span: SourceSpan,
         ctx: &mut CheckUnifyExprContext<'m>,
-    ) -> OntosNode<'m> {
+    ) -> TypedHirNode<'m> {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {
             Type::Domain(subject_id) => subject_id,
@@ -325,7 +315,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             })
                             .collect::<IndexMap<_, _>>();
 
-                        let mut ontos_props = vec![];
+                        let mut hir_props = vec![];
 
                         for ExprStructAttr {
                             key: (def, prop_span),
@@ -356,7 +346,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
-                            let prop_variant: PropVariant<'_, TypedOntos> = match match_property
+                            let prop_variant: PropVariant<'_, TypedHir> = match match_property
                                 .cardinality
                                 .1
                             {
@@ -393,7 +383,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 },
                             };
 
-                            let prop_variants: Vec<PropVariant<'_, TypedOntos>> =
+                            let prop_variants: Vec<PropVariant<'_, TypedHir>> =
                                 match match_property.cardinality.0 {
                                     PropertyCardinality::Mandatory => {
                                         vec![prop_variant]
@@ -409,7 +399,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                 };
 
-                            ontos_props.push(OntosNode {
+                            hir_props.push(TypedHirNode {
                                 kind: NodeKind::Prop(
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
@@ -428,7 +418,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        NodeKind::Struct(struct_binder, ontos_props)
+                        NodeKind::Struct(struct_binder, hir_props)
                     }
                     None => {
                         if !attributes.is_empty() {
@@ -470,7 +460,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("Struct type: {domain_type:?}");
 
-        OntosNode {
+        TypedHirNode {
             kind: node_kind,
             meta: Meta {
                 ty: domain_type,
@@ -479,18 +469,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> OntosNode<'m> {
+    fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypedHirNode<'m> {
         self.type_error(error, span);
         self.make_error_node(span)
     }
 
-    fn error_node(&mut self, error: CompileError, span: &SourceSpan) -> OntosNode<'m> {
+    fn error_node(&mut self, error: CompileError, span: &SourceSpan) -> TypedHirNode<'m> {
         self.error(error, span);
         self.make_error_node(span)
     }
 
-    fn make_error_node(&mut self, span: &SourceSpan) -> OntosNode<'m> {
-        OntosNode {
+    fn make_error_node(&mut self, span: &SourceSpan) -> TypedHirNode<'m> {
+        TypedHirNode {
             kind: NodeKind::Unit,
             meta: Meta {
                 ty: self.types.intern(Type::Error),
@@ -499,8 +489,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn unit_node_no_span(&mut self) -> OntosNode<'m> {
-        OntosNode {
+    fn unit_node_no_span(&mut self) -> TypedHirNode<'m> {
+        TypedHirNode {
             kind: NodeKind::Unit,
             meta: Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),

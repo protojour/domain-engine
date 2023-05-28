@@ -7,7 +7,7 @@ use ontol_hir::{
 };
 use smallvec::SmallVec;
 
-use crate::typed_ontos::lang::{OntosNode, TypedOntos};
+use crate::typed_hir::lang::{TypedHir, TypedHirNode};
 
 use super::UnifierError;
 
@@ -15,7 +15,7 @@ use super::UnifierError;
 pub struct Path(pub SmallVec<[u16; 32]>);
 
 pub fn locate_variables(
-    node: &OntosNode,
+    node: &TypedHirNode,
     variables: &BitSet,
 ) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
     let mut locator = VarLocator::new(variables);
@@ -67,7 +67,7 @@ impl<'a> VarLocator<'a> {
     }
 }
 
-impl<'a, 'm> HirVisitor<'m, TypedOntos> for VarLocator<'a> {
+impl<'a, 'm> HirVisitor<'m, TypedHir> for VarLocator<'a> {
     fn visit_variable(&mut self, variable: &Variable) {
         self.register_var(variable.0);
     }
@@ -76,11 +76,11 @@ impl<'a, 'm> HirVisitor<'m, TypedOntos> for VarLocator<'a> {
         self.register_var(label.0);
     }
 
-    fn visit_kind(&mut self, index: usize, kind: &NodeKind<'m, TypedOntos>) {
+    fn visit_kind(&mut self, index: usize, kind: &NodeKind<'m, TypedHir>) {
         self.enter_child(index, |_self| _self.traverse_kind(kind));
     }
 
-    fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant<'m, TypedOntos>) {
+    fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant<'m, TypedHir>) {
         self.enter_child(index, |_self| {
             match &variant.dimension {
                 Dimension::Singular => {
@@ -98,7 +98,7 @@ impl<'a, 'm> HirVisitor<'m, TypedOntos> for VarLocator<'a> {
     fn visit_match_arm(
         &mut self,
         index: usize,
-        match_arm: &ontol_hir::kind::MatchArm<'m, TypedOntos>,
+        match_arm: &ontol_hir::kind::MatchArm<'m, TypedHir>,
     ) {
         self.enter_child(index, |_self| _self.traverse_match_arm(match_arm));
     }

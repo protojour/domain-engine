@@ -10,7 +10,7 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::code_generator::map_codegen,
-    typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
+    typed_hir::{lang::TypedHirNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
@@ -52,12 +52,12 @@ pub enum CodegenTask<'m> {
 
 pub struct ConstCodegenTask<'m> {
     pub def_id: DefId,
-    pub node: OntosNode<'m>,
+    pub node: TypedHirNode<'m>,
 }
 
 pub struct MapCodegenTask<'m> {
-    pub first: OntosNode<'m>,
-    pub second: OntosNode<'m>,
+    pub first: TypedHirNode<'m>,
+    pub second: TypedHirNode<'m>,
     pub span: SourceSpan,
 }
 
@@ -71,7 +71,7 @@ impl<'m> Debug for ConstCodegenTask<'m> {
 
 impl<'m> Debug for MapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OntosMapCodegenTask")
+        f.debug_struct("MapCodegenTask")
             .field("first", &DebugViaDisplay(&self.first))
             .field("second", &DebugViaDisplay(&self.second))
             .finish()
@@ -133,14 +133,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("1st:\n{}", map_task.first);
                 debug!("2nd:\n{}", map_task.second);
 
-                debug!("Ontos forward start");
+                debug!("Forward start");
                 if let Ok(func) =
                     unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
                 {
                     map_codegen(&mut proc_table, func);
                 }
 
-                debug!("Ontos backward start");
+                debug!("Backward start");
                 if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
                     map_codegen(&mut proc_table, func);
                 }

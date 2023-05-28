@@ -11,7 +11,7 @@ use tracing::debug;
 
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
-    typed_ontos::lang::{OntosFunc, OntosNode},
+    typed_hir::lang::{HirFunc, TypedHirNode},
     types::Type,
 };
 
@@ -21,7 +21,7 @@ use super::{
     task::{find_mapping_key, ProcTable},
 };
 
-pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: OntosNode, def_id: DefId) {
+pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: TypedHirNode, def_id: DefId) {
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
@@ -37,7 +37,7 @@ pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: OntosNode, def_id:
     proc_table.const_procedures.insert(def_id, builder);
 }
 
-pub(super) fn map_codegen(proc_table: &mut ProcTable, func: OntosFunc) -> bool {
+pub(super) fn map_codegen(proc_table: &mut ProcTable, func: HirFunc) -> bool {
     debug!("Generating code for\n{}", func);
 
     let return_ty = func.body.meta.ty;
@@ -76,7 +76,7 @@ pub(super) struct CodeGenerator<'a> {
 }
 
 impl<'a> CodeGenerator<'a> {
-    fn gen_node(&mut self, node: OntosNode, block: &mut Block) {
+    fn gen_node(&mut self, node: TypedHirNode, block: &mut Block) {
         let ty = node.meta.ty;
         let span = node.meta.span;
         match node.kind {
@@ -360,7 +360,7 @@ impl<'a> CodeGenerator<'a> {
         &mut self,
         (rel_local, rel_binding): (Local, PatternBinding),
         (val_local, val_binding): (Local, PatternBinding),
-        nodes: Vec<OntosNode>,
+        nodes: Vec<TypedHirNode>,
         block: &mut Block,
     ) {
         if let PatternBinding::Binder(var) = rel_binding {

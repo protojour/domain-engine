@@ -4,7 +4,7 @@ use ontol_runtime::smart_format;
 
 use crate::{
     error::CompileError,
-    typed_ontos::lang::{Meta, OntosNode, TypedOntos},
+    typed_hir::lang::{Meta, TypedHir, TypedHirNode},
     types::Types,
     CompileErrors,
 };
@@ -15,14 +15,14 @@ use super::{
     TypeError,
 };
 
-pub(super) struct OntosArmTypeInference<'c, 'm> {
+pub(super) struct HirArmTypeInference<'c, 'm> {
     pub(super) types: &'c mut Types<'m>,
     pub(super) eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
     pub(super) errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosArmTypeInference<'c, 'm> {
-    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontol_hir::Lang>::Node<'m>) {
+impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirArmTypeInference<'c, 'm> {
+    fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
         let mut infer = Infer {
             types: self.types,
             eq_relations: self.eq_relations,
@@ -43,13 +43,13 @@ impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosArmTypeInference<'c, 'm> {
     }
 }
 
-pub(super) struct OntosVariableMapper<'c, 'm> {
+pub(super) struct HirVariableMapper<'c, 'm> {
     pub variable_mapping: &'c FnvHashMap<ontol_hir::Variable, VariableMapping<'m>>,
     pub arm: Arm,
 }
 
-impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosVariableMapper<'c, 'm> {
-    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontol_hir::Lang>::Node<'m>) {
+impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
+    fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
         self.visit_kind(index, &mut node.kind);
 
         if let NodeKind::VariableRef(var) = &node.kind {
@@ -60,14 +60,14 @@ impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosVariableMapper<'c, 'm> {
                     Arm::Second => var_mapping.first_arm_type,
                 };
 
-                let variable_ref = OntosNode {
+                let variable_ref = TypedHirNode {
                     kind: NodeKind::VariableRef(*var),
                     meta: Meta {
                         ty: mapped_type,
                         span: node.meta.span,
                     },
                 };
-                let map = OntosNode {
+                let map = TypedHirNode {
                     kind: NodeKind::Map(Box::new(variable_ref)),
                     meta: node.meta,
                 };

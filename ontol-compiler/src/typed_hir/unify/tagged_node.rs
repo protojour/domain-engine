@@ -10,7 +10,7 @@ use ontol_hir::{
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{
-    typed_ontos::lang::{Meta, OntosNode},
+    typed_hir::lang::{Meta, TypedHirNode},
     SourceSpan,
 };
 
@@ -28,7 +28,7 @@ pub enum TaggedKind {
     PropVariant(Variable, PropertyId, Dimension),
 }
 
-// Note: This is more granular than ontos nodes.
+// Note: This is more granular than typed_hir nodes.
 // prop and match arms should be "untyped".
 pub struct TaggedNode<'m> {
     pub kind: TaggedKind,
@@ -69,19 +69,19 @@ impl<'m> TaggedNode<'m> {
         self
     }
 
-    pub fn into_ontos_node(self) -> OntosNode<'m> {
+    pub fn into_hir_node(self) -> TypedHirNode<'m> {
         let kind = match self.kind {
             TaggedKind::VariableRef(var) => NodeKind::VariableRef(var),
             TaggedKind::Unit => NodeKind::Unit,
             TaggedKind::Int(int) => NodeKind::Int(int),
-            TaggedKind::Call(proc) => NodeKind::Call(proc, self.children.into_ontos()),
-            TaggedKind::Map => NodeKind::Map(Box::new(self.children.into_ontos_one())),
+            TaggedKind::Call(proc) => NodeKind::Call(proc, self.children.into_hir()),
+            TaggedKind::Map => NodeKind::Map(Box::new(self.children.into_hir_one())),
             TaggedKind::Let(binder) => {
-                let (def, body) = self.children.one_then_rest_into_ontos();
+                let (def, body) = self.children.one_then_rest_into_hir();
                 NodeKind::Let(binder, Box::new(def), body)
             }
             TaggedKind::Seq(binder) => {
-                let (rel, val) = self.children.into_ontos_pair();
+                let (rel, val) = self.children.into_hir_pair();
                 NodeKind::Seq(
                     binder,
                     Attribute {
@@ -90,7 +90,7 @@ impl<'m> TaggedNode<'m> {
                     },
                 )
             }
-            TaggedKind::Struct(binder) => NodeKind::Struct(binder, self.children.into_ontos()),
+            TaggedKind::Struct(binder) => NodeKind::Struct(binder, self.children.into_hir()),
             TaggedKind::Prop(struct_var, id) => NodeKind::Prop(
                 struct_var,
                 id,
@@ -99,7 +99,7 @@ impl<'m> TaggedNode<'m> {
                     .into_iter()
                     .map(|node| match node.kind {
                         TaggedKind::PropVariant(_, _, dimension) => {
-                            let (rel, val) = node.children.into_ontos_pair();
+                            let (rel, val) = node.children.into_hir_pair();
 
                             PropVariant {
                                 dimension,
@@ -116,7 +116,7 @@ impl<'m> TaggedNode<'m> {
             other => panic!("{other:?} should not be handled at top level"),
         };
 
-        OntosNode {
+        TypedHirNode {
             kind,
             meta: self.meta,
         }
@@ -124,30 +124,30 @@ impl<'m> TaggedNode<'m> {
 }
 
 impl<'m> TaggedNodes<'m> {
-    pub fn into_ontos(self) -> Vec<OntosNode<'m>> {
+    pub fn into_hir(self) -> Vec<TypedHirNode<'m>> {
         Self::collect(self.0.into_iter())
     }
 
-    pub fn one_then_rest_into_ontos(self) -> (OntosNode<'m>, Vec<OntosNode<'m>>) {
+    pub fn one_then_rest_into_hir(self) -> (TypedHirNode<'m>, Vec<TypedHirNode<'m>>) {
         let mut iterator = self.0.into_iter();
         let first = iterator.next().unwrap();
         let rest = Self::collect(iterator);
-        (first.into_ontos_node(), rest)
+        (first.into_hir_node(), rest)
     }
 
-    pub fn into_ontos_one(self) -> OntosNode<'m> {
-        self.0.into_iter().next().unwrap().into_ontos_node()
+    pub fn into_hir_one(self) -> TypedHirNode<'m> {
+        self.0.into_iter().next().unwrap().into_hir_node()
     }
 
-    pub fn into_ontos_pair(self) -> (OntosNode<'m>, OntosNode<'m>) {
+    pub fn into_hir_pair(self) -> (TypedHirNode<'m>, TypedHirNode<'m>) {
         let mut iterator = self.0.into_iter();
         let first = iterator.next().unwrap();
         let second = iterator.next().unwrap();
-        (first.into_ontos_node(), second.into_ontos_node())
+        (first.into_hir_node(), second.into_hir_node())
     }
 
-    fn collect(iterator: impl Iterator<Item = TaggedNode<'m>>) -> Vec<OntosNode<'m>> {
-        iterator.map(TaggedNode::into_ontos_node).collect()
+    fn collect(iterator: impl Iterator<Item = TaggedNode<'m>>) -> Vec<TypedHirNode<'m>> {
+        iterator.map(TaggedNode::into_hir_node).collect()
     }
 }
 
@@ -160,7 +160,7 @@ pub struct Tagger {
 impl Tagger {
     pub fn enter_binder<T>(&mut self, binder: Binder, func: impl FnOnce(&mut Self) -> T) -> T {
         if !self.in_scope.insert(binder.0 .0 as usize) {
-            panic!("Malformed ONTOS: {binder:?} variable was already in scope");
+            panic!("Malformed HIR: {binder:?} variable was already in scope");
         }
         let value = func(self);
         self.in_scope.remove(binder.0 .0 as usize);
@@ -169,12 +169,12 @@ impl Tagger {
 
     pub fn tag_nodes<'m>(
         &mut self,
-        iterator: impl Iterator<Item = OntosNode<'m>>,
+        iterator: impl Iterator<Item = TypedHirNode<'m>>,
     ) -> Vec<TaggedNode<'m>> {
         iterator.map(|child| self.tag_node(child)).collect()
     }
 
-    pub fn tag_node<'m>(&mut self, node: OntosNode<'m>) -> TaggedNode<'m> {
+    pub fn tag_node<'m>(&mut self, node: TypedHirNode<'m>) -> TaggedNode<'m> {
         let (kind, meta) = node.split();
         match kind {
             NodeKind::VariableRef(var) => {
@@ -287,7 +287,7 @@ impl Tagger {
     fn make_tagged<'m>(
         &mut self,
         kind: TaggedKind,
-        children: impl Iterator<Item = OntosNode<'m>>,
+        children: impl Iterator<Item = TypedHirNode<'m>>,
         meta: Meta<'m>,
     ) -> TaggedNode<'m> {
         let children = self.tag_nodes(children);
@@ -339,7 +339,7 @@ mod tests {
     use bit_set::BitSet;
     use ontol_hir::{parse::Parser, Variable};
 
-    use crate::typed_ontos::lang::TypedOntos;
+    use crate::typed_hir::lang::TypedHir;
 
     fn free_variables(iterator: impl Iterator<Item = Variable>) -> BitSet {
         let mut bit_set = BitSet::new();
@@ -364,7 +364,7 @@ mod tests {
                 )
             )
         ";
-        let node = Parser::new(TypedOntos).parse(src).unwrap().0;
+        let node = Parser::new(TypedHir).parse(src).unwrap().0;
         let tagged_node = super::Tagger::default().tag_node(node);
         assert_eq!(
             free_variables([Variable(1), Variable(3), Variable(4)].into_iter()),

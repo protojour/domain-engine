@@ -27,7 +27,7 @@ pub struct CheckUnifyExprContext<'m> {
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     bind_depth: BindDepth,
-    ontos_var_allocations: Vec<u32>,
+    hir_var_allocations: Vec<u32>,
 }
 
 impl<'m> CheckUnifyExprContext<'m> {
@@ -42,7 +42,7 @@ impl<'m> CheckUnifyExprContext<'m> {
             partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
-            ontos_var_allocations: vec![0],
+            hir_var_allocations: vec![0],
         }
     }
 
@@ -62,7 +62,7 @@ impl<'m> CheckUnifyExprContext<'m> {
     }
 
     pub fn alloc_variable(&mut self) -> Variable {
-        let alloc = self.ontos_var_allocations.get_mut(0).unwrap();
+        let alloc = self.hir_var_allocations.get_mut(0).unwrap();
         let var = Variable(*alloc);
         *alloc += 1;
         var
@@ -84,7 +84,7 @@ pub struct ExprRoot<'m> {
 pub struct ExplicitVariable {
     pub variable: Variable,
     pub ctrl_group: Option<CtrlFlowGroup>,
-    pub ontos_arms: FnvHashMap<Arm, ExplicitVariableArm>,
+    pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
 
 pub struct VariableMapping<'m> {
@@ -93,7 +93,7 @@ pub struct VariableMapping<'m> {
 }
 
 pub struct ExplicitVariableArm {
-    // In ontos, the variable has a different expr id depending on which arm it's in
+    // In hir, the variable has a different expr id depending on which arm it's in
     pub expr_id: ExprId,
     pub span: SourceSpan,
 }

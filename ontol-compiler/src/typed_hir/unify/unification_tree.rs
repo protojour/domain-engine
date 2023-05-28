@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_hir::{Binder, Variable};
 use tracing::debug;
 
-use crate::typed_ontos::{lang::Meta, unify::tagged_node::TaggedKind};
+use crate::typed_hir::{lang::Meta, unify::tagged_node::TaggedKind};
 
 use super::{tagged_node::TaggedNode, var_path::Path};
 

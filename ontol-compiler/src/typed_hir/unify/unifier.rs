@@ -13,8 +13,8 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     mem::Intern,
-    typed_ontos::{
-        lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedBinder, TypedOntos},
+    typed_hir::{
+        lang::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirKind, TypedHirNode},
         unify::{tagged_node::DebugVariables, var_path::locate_variables},
     },
     types::{Type, TypeRef, Types},
@@ -27,7 +27,7 @@ use super::{
     UnifierError, VariableTracker,
 };
 
-type UnifiedNodes<'m> = SmallVec<[OntosNode<'m>; 1]>;
+type UnifiedNodes<'m> = SmallVec<[TypedHirNode<'m>; 1]>;
 
 type UnifierResult<T> = Result<T, UnifierError>;
 
@@ -37,10 +37,10 @@ pub struct Unified<'m> {
 }
 
 pub fn unify_to_function<'m>(
-    scope_source: OntosNode<'m>,
-    target: OntosNode<'m>,
+    scope_source: TypedHirNode<'m>,
+    target: TypedHirNode<'m>,
     compiler: &mut Compiler<'m>,
-) -> UnifierResult<OntosFunc<'m>> {
+) -> UnifierResult<HirFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, &scope_source);
     var_tracker.visit_node(0, &target);
@@ -58,21 +58,21 @@ pub fn unify_to_function<'m>(
         _ => panic!("Too many nodes"),
     };
 
-    Ok(OntosFunc {
+    Ok(HirFunc {
         arg: unified.binder.ok_or(UnifierError::NoInputBinder)?,
         body,
     })
 }
 
 struct Unifier<'a, 'm> {
-    root_source: &'a OntosNode<'m>,
+    root_source: &'a TypedHirNode<'m>,
     next_variable: Variable,
     types: &'a mut Types<'m>,
 }
 
 struct InvertedCall<'m> {
     let_binder: Variable,
-    def: OntosNode<'m>,
+    def: TypedHirNode<'m>,
     body: UnifiedNodes<'m>,
 }
 
@@ -82,14 +82,14 @@ struct UnifyPatternBinding<'m> {
 }
 
 struct TypedMatchArm<'m> {
-    arm: MatchArm<'m, TypedOntos>,
+    arm: MatchArm<'m, TypedHir>,
     ty: TypeRef<'m>,
 }
 
 struct LetAttr<'m> {
     rel_binding: PatternBinding,
     val_binding: PatternBinding,
-    nodes: Vec<OntosNode<'m>>,
+    nodes: Vec<TypedHirNode<'m>>,
     ty: TypeRef<'m>,
 }
 
@@ -100,7 +100,7 @@ struct LetAttrPair<'m> {
 
 struct UnifiedTypedPatternBinding<'m> {
     binding: PatternBinding,
-    nodes: Vec<OntosNode<'m>>,
+    nodes: Vec<TypedHirNode<'m>>,
     ty: TypeRef<'m>,
 }
 
@@ -116,7 +116,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify(
         &mut self,
         expr: TaggedNode<'m>,
-        scope_node: &OntosNode<'m>,
+        scope_node: &TypedHirNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
         let u_tree = build_u_tree(expr, scope_node)?;
         self.unify_u_node(None, u_tree, scope_node)
@@ -126,7 +126,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         debug_index: Option<usize>,
         u_node: UnificationNode<'m>,
-        scope_source: &OntosNode<'m>,
+        scope_source: &TypedHirNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
         match u_node {
             UnificationNode::Scoping(scoping) => {
@@ -139,10 +139,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     self.unify_scoping(debug_index, struct_node.sub_scoping, scope_source)?;
 
                 for node in struct_node.nodes {
-                    nodes.push(node.into_ontos_node());
+                    nodes.push(node.into_hir_node());
                 }
 
-                let node = OntosNode {
+                let node = TypedHirNode {
                     kind: NodeKind::Struct(struct_node.binder, nodes.to_vec()),
                     meta,
                 };
@@ -159,9 +159,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         debug_index: Option<usize>,
         mut scoping: Scoping<'m>,
-        scope_source: &OntosNode<'m>,
+        scope_source: &TypedHirNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
-        let OntosNode { kind, meta } = scope_source;
+        let TypedHirNode { kind, meta } = scope_source;
         let meta = *meta;
         match kind {
             NodeKind::VariableRef(var) => {
@@ -190,7 +190,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let args = self.unify_children(scoping, args)?;
                     Ok(Unified {
                         binder: None,
-                        nodes: [OntosNode {
+                        nodes: [TypedHirNode {
                             kind: NodeKind::Call(*proc, args),
                             meta,
                         }]
@@ -206,8 +206,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     // find the actual inner variable.
                     // That inner variable is the _binder_ of the resulting `let` expression.
                     let subst_var = self.alloc_var();
-                    let inner_expr = OntosNode {
-                        kind: OntosKind::VariableRef(subst_var),
+                    let inner_expr = TypedHirNode {
+                        kind: TypedHirKind::VariableRef(subst_var),
                         meta,
                     };
                     let inverted_call =
@@ -219,7 +219,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             variable: subst_var,
                             ty: meta.ty,
                         }),
-                        nodes: [OntosNode {
+                        nodes: [TypedHirNode {
                             kind: NodeKind::Let(
                                 Binder(inverted_call.let_binder),
                                 Box::new(inverted_call.def),
@@ -242,12 +242,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     debug!("unify_scoping({debug_index:?}, Map const)");
 
                     let unified_arg = self.unify_scoping(Some(0), scoping, arg)?;
-                    let mut param: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
+                    let mut param: TypedHirNode = unified_arg.nodes.into_iter().next().unwrap();
                     let param_ty = param.meta.ty;
                     param.meta.ty = meta.ty;
                     Ok(Unified {
                         binder: unified_arg.binder,
-                        nodes: [OntosNode {
+                        nodes: [TypedHirNode {
                             kind: NodeKind::Map(Box::new(param)),
                             meta: Meta {
                                 ty: param_ty,
@@ -298,8 +298,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             unreachable!();
                         }
 
-                        [OntosNode {
-                            kind: OntosKind::MatchProp(*struct_var, *id, match_arms),
+                        [TypedHirNode {
+                            kind: TypedHirKind::MatchProp(*struct_var, *id, match_arms),
                             meta: Meta {
                                 ty,
                                 span: meta.span,
@@ -331,7 +331,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         scoping: Scoping<'m>,
         binder: Binder,
-        nodes: &[OntosNode<'m>],
+        nodes: &[TypedHirNode<'m>],
         meta: Meta<'m>,
     ) -> UnifierResult<Unified<'m>> {
         let nodes = self.unify_children(scoping, nodes)?;
@@ -347,7 +347,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_prop_variant_to_match_arm(
         &mut self,
         u_node: UnificationNode<'m>,
-        scope_source: &PropVariant<'m, TypedOntos>,
+        scope_source: &PropVariant<'m, TypedHir>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         let scoping = u_node.force_into_scoping();
 
@@ -391,7 +391,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             // FIXME: Array/seq types must take two parameters
                             let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
 
-                            let gen_node = OntosNode {
+                            let gen_node = TypedHirNode {
                                 kind: NodeKind::Gen(
                                     input_seq_var,
                                     IterBinder {
@@ -399,7 +399,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                         rel: let_attr.rel.binding,
                                         val: let_attr.val.binding,
                                     },
-                                    vec![OntosNode {
+                                    vec![TypedHirNode {
                                         kind: NodeKind::Push(
                                             output_seq_var,
                                             Attribute {
@@ -454,7 +454,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             // FIXME: Array/seq types must take two parameters
                             let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
 
-                            let gen_node = OntosNode {
+                            let gen_node = TypedHirNode {
                                 kind: NodeKind::Gen(
                                     input_seq_var,
                                     IterBinder {
@@ -462,7 +462,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                         rel: let_attr.rel.binding,
                                         val: let_attr.val.binding,
                                     },
-                                    vec![OntosNode {
+                                    vec![TypedHirNode {
                                         kind: NodeKind::Push(
                                             output_seq_var,
                                             Attribute {
@@ -486,7 +486,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 },
                             };
 
-                            let prop_node = OntosNode {
+                            let prop_node = TypedHirNode {
                                 // FIXME: It feels wrong to construct the NodeKind::Prop explicitly here.
                                 // this node should already be in target_nodes, so what should instead be done
                                 // is to put its variables into scope.
@@ -528,7 +528,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn let_attr(
         &mut self,
         mut scoping: Scoping<'m>,
-        scope_source: &PropVariant<'m, TypedOntos>,
+        scope_source: &PropVariant<'m, TypedHir>,
     ) -> UnifierResult<Option<LetAttr<'m>>> {
         let rel_binding = self.unify_pattern_binding(
             Some(0),
@@ -559,7 +559,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 ty,
             }),
             (Some(rel), Some(val)) => {
-                let mut concatenated: Vec<OntosNode> = vec![];
+                let mut concatenated: Vec<TypedHirNode> = vec![];
                 concatenated.extend(rel);
                 concatenated.extend(val);
                 Self::last_type_opt(concatenated.iter()).map(|ty| LetAttr {
@@ -627,10 +627,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn invert_call_recursive(
         &mut self,
         proc: &BuiltinProc,
-        args: &[OntosNode<'m>],
+        args: &[TypedHirNode<'m>],
         mut scoping: Scoping<'m>,
         meta: Meta<'m>,
-        inner_expr: OntosNode<'m>,
+        inner_expr: TypedHirNode<'m>,
     ) -> UnifierResult<InvertedCall<'m>> {
         if scoping.sub_nodes.len() > 1 {
             panic!("Too many sub unifications in function call");
@@ -645,7 +645,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
         };
 
-        let mut new_args: Vec<OntosNode<'m>> = vec![];
+        let mut new_args: Vec<TypedHirNode<'m>> = vec![];
 
         let (unification_idx, sub_unification) = scoping.sub_nodes.pop_first().unwrap();
         let mut sub_scoping = sub_unification.force_into_scoping();
@@ -665,7 +665,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(InvertedCall {
                     let_binder: *var,
-                    def: OntosNode {
+                    def: TypedHirNode {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
                     },
@@ -674,7 +674,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             NodeKind::Call(child_proc, child_args) => {
                 new_args.insert(unification_idx, inner_expr);
-                let new_inner_expr = OntosNode {
+                let new_inner_expr = TypedHirNode {
                     kind: NodeKind::Call(inverted_proc, new_args),
                     meta,
                 };
@@ -704,7 +704,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         .push((*dimension, expr));
                 }
                 _ => {
-                    merged.push(expr.into_ontos_node());
+                    merged.push(expr.into_hir_node());
                 }
             }
         }
@@ -713,7 +713,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             let mut variants = vec![];
             let mut ty = &Type::Tautology;
             for (dimension, variant) in dimension_variants {
-                let (rel, val) = variant.children.into_ontos_pair();
+                let (rel, val) = variant.children.into_hir_pair();
                 ty = variant.meta.ty;
                 if let Type::Tautology = ty {
                     warn!(
@@ -730,7 +730,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
 
-            merged.push(OntosNode {
+            merged.push(TypedHirNode {
                 kind: NodeKind::Prop(variable, property_id, variants),
                 meta: Meta {
                     ty,
@@ -750,8 +750,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_children(
         &mut self,
         scoping: Scoping<'m>,
-        children: &[OntosNode<'m>],
-    ) -> UnifierResult<Vec<OntosNode<'m>>> {
+        children: &[TypedHirNode<'m>],
+    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let mut output = vec![];
         for (index, sub_node) in scoping.sub_nodes {
             output.extend(
@@ -766,7 +766,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_expr_pattern_binding(
         &mut self,
         expr: TaggedNode<'m>,
-        scope_source: &OntosNode<'m>,
+        scope_source: &TypedHirNode<'m>,
     ) -> UnifierResult<UnifyPatternBinding<'m>> {
         let u_tree = build_u_tree(expr, scope_source)?;
         self.unify_pattern_binding(None, Some(u_tree), scope_source)
@@ -776,7 +776,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         debug_index: Option<usize>,
         u_node: Option<UnificationNode<'m>>,
-        source: &OntosNode<'m>,
+        source: &TypedHirNode<'m>,
     ) -> UnifierResult<UnifyPatternBinding<'m>> {
         let u_node = match u_node {
             Some(u_node) => u_node,
@@ -801,7 +801,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn last_type<'n>(
         &mut self,
-        mut iterator: impl Iterator<Item = &'n OntosNode<'m>>,
+        mut iterator: impl Iterator<Item = &'n TypedHirNode<'m>>,
     ) -> TypeRef<'m>
     where
         'm: 'n,
@@ -818,7 +818,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     }
 
     fn last_type_opt<'n>(
-        mut iterator: impl Iterator<Item = &'n OntosNode<'m>>,
+        mut iterator: impl Iterator<Item = &'n TypedHirNode<'m>>,
     ) -> Option<TypeRef<'m>>
     where
         'm: 'n,
@@ -838,8 +838,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
         self.types.intern(Type::Unit(DefId::unit()))
     }
 
-    fn unit_node(&mut self) -> OntosNode<'m> {
-        OntosNode {
+    fn unit_node(&mut self) -> TypedHirNode<'m> {
+        TypedHirNode {
             kind: NodeKind::Unit,
             meta: Meta {
                 ty: self.unit_type(),
@@ -850,8 +850,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn single_node_or_unit(
         &mut self,
-        mut iterator: impl Iterator<Item = OntosNode<'m>>,
-    ) -> OntosNode<'m> {
+        mut iterator: impl Iterator<Item = TypedHirNode<'m>>,
+    ) -> TypedHirNode<'m> {
         match iterator.next() {
             Some(node) => {
                 if iterator.next().is_some() {
@@ -866,7 +866,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
 fn build_u_tree<'m>(
     expr: TaggedNode<'m>,
-    scope_node: &OntosNode<'m>,
+    scope_node: &TypedHirNode<'m>,
 ) -> UnifierResult<UnificationNode<'m>> {
     trace!("free_variables: {:?}", DebugVariables(&expr.free_variables));
 
