@@ -25,7 +25,7 @@ use crate::{
 use super::{unify_ctx::CheckUnifyExprContext, TypeCheck, TypeEquation, TypeError};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn check_root_expr2(
+    pub(super) fn build_root_expr(
         &mut self,
         expr_id: ExprId,
         ctx: &mut CheckUnifyExprContext<'m>,

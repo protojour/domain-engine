@@ -18,7 +18,7 @@ pub mod check_domain_types;
 pub mod check_union;
 pub mod inference;
 
-mod check_expr2;
+mod build_hir;
 mod check_map;
 mod check_relationship;
 mod hir_type_inference;

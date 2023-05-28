@@ -70,11 +70,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut CheckUnifyExprContext<'m>,
     ) -> Result<(), AggrGroupError> {
         ctx.arm = Arm::First;
-        let mut first = self.check_root_expr2(first_id, ctx);
+        let mut first = self.build_root_expr(first_id, ctx);
         self.infer_hir_arm_types(&mut first, ctx);
 
         ctx.arm = Arm::Second;
-        let mut second = self.check_root_expr2(second_id, ctx);
+        let mut second = self.build_root_expr(second_id, ctx);
         self.infer_hir_arm_types(&mut second, ctx);
 
         // unify the type of variables on either side:
