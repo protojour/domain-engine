@@ -105,8 +105,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) {
         for explicit_var in &mut ctx.explicit_variables.values_mut() {
-            let first_arm = explicit_var.hir_arms.remove(&Arm::First);
-            let second_arm = explicit_var.hir_arms.remove(&Arm::Second);
+            let first_arm = explicit_var.hir_arms.get(&Arm::First);
+            let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
             if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
                 let first_type_var = ctx.inference.new_type_variable(first_arm.expr_id);

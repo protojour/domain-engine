@@ -84,6 +84,8 @@ pub enum CompileError {
     MissingProperty(String),
     #[error("undeclared variable")]
     UndeclaredVariable,
+    #[error("unbound variable")]
+    UnboundVariable,
     #[error("[{0}] variable must be enclosed in []")]
     VariableMustBeSequenceEnclosed(String),
     #[error("cannot discriminate type")]

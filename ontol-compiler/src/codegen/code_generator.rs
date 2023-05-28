@@ -11,8 +11,10 @@ use tracing::debug;
 
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
+    error::CompileError,
     typed_hir::lang::{HirFunc, TypedHirNode},
     types::Type,
+    CompileErrors, SpannedCompileError,
 };
 
 use super::{
@@ -21,7 +23,12 @@ use super::{
     task::{find_mapping_key, ProcTable},
 };
 
-pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: TypedHirNode, def_id: DefId) {
+pub(super) fn const_codegen(
+    proc_table: &mut ProcTable,
+    expr: TypedHirNode,
+    def_id: DefId,
+    errors: &mut CompileErrors,
+) {
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
@@ -30,6 +37,7 @@ pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: TypedHirNode, def_
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
+        errors,
     };
     generator.gen_node(expr, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
@@ -37,7 +45,11 @@ pub(super) fn const_codegen(proc_table: &mut ProcTable, expr: TypedHirNode, def_
     proc_table.const_procedures.insert(def_id, builder);
 }
 
-pub(super) fn map_codegen(proc_table: &mut ProcTable, func: HirFunc) -> bool {
+pub(super) fn map_codegen(
+    proc_table: &mut ProcTable,
+    func: HirFunc,
+    errors: &mut CompileErrors,
+) -> bool {
     debug!("Generating code for\n{}", func);
 
     let return_ty = func.body.meta.ty;
@@ -48,6 +60,7 @@ pub(super) fn map_codegen(proc_table: &mut ProcTable, func: HirFunc) -> bool {
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
+        errors,
     };
     generator.scope.insert(func.arg.variable, Local(0));
     generator.gen_node(func.body, &mut block);
@@ -71,6 +84,7 @@ pub(super) fn map_codegen(proc_table: &mut ProcTable, func: HirFunc) -> bool {
 pub(super) struct CodeGenerator<'a> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
+    pub errors: &'a mut CompileErrors,
 
     scope: FnvHashMap<Variable, Local>,
 }
@@ -80,10 +94,18 @@ impl<'a> CodeGenerator<'a> {
         let ty = node.meta.ty;
         let span = node.meta.span;
         match node.kind {
-            NodeKind::VariableRef(var) => {
-                let local = self.var_local(var);
-                self.builder.append(block, Ir::Clone(local), Stack(1), span);
-            }
+            NodeKind::VariableRef(var) => match self.scope.get(&var) {
+                Some(local) => {
+                    self.builder
+                        .append(block, Ir::Clone(*local), Stack(1), span);
+                }
+                None => {
+                    self.errors.push(SpannedCompileError {
+                        error: CompileError::UnboundVariable,
+                        span: node.meta.span,
+                    });
+                }
+            },
             NodeKind::Unit => {
                 self.builder.append(
                     block,

@@ -127,7 +127,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
-                const_codegen(&mut proc_table, node, def_id);
+                const_codegen(&mut proc_table, node, def_id, &mut compiler.errors);
             }
             CodegenTask::Map(map_task) => {
                 debug!("1st:\n{}", map_task.first);
@@ -137,12 +137,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 if let Ok(func) =
                     unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
                 {
-                    map_codegen(&mut proc_table, func);
+                    map_codegen(&mut proc_table, func, &mut compiler.errors);
                 }
 
                 debug!("Backward start");
                 if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
-                    map_codegen(&mut proc_table, func);
+                    map_codegen(&mut proc_table, func, &mut compiler.errors);
                 }
             }
         }

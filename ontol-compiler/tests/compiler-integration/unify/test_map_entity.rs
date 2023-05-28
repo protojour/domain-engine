@@ -84,9 +84,6 @@ fn test_map_invert() {
 }
 
 #[test]
-// BUG: This concerns the `'name': n` in the last map clause.
-// The compiler should not crash, but report it.
-#[should_panic = "Variable $d not in scope"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
@@ -114,12 +111,12 @@ fn artist_etc_routing() {
                 map id t p n {
                     gsu.synth {
                         'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
-                        'type': t
-                        'polyphony': p
+                        'type': t // ERROR unbound variable
+                        'polyphony': p // ERROR unbound variable
                     }
                     ai.instrument {
                         'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
-                        'name': n
+                        'name': n // ERROR unbound variable
                     }
                 }
             }
