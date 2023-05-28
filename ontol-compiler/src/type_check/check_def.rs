@@ -54,22 +54,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             DefKind::Constant(expr_id) => {
-                let mut expr_root = self.consume_expr(*expr_id);
-                expr_root.expected_ty = match self.expected_constant_types.remove(&def_id) {
+                let expr = self.expressions.map.remove(expr_id).unwrap();
+                let ty = match self.expected_constant_types.remove(&def_id) {
                     None => return self.types.intern(Type::Error),
-                    Some(ty) => Some(ty),
+                    Some(ty) => ty,
                 };
 
                 let mut ctx = CheckUnifyExprContext::new();
-                let (ty, hir_idx) = self.check_expr_root(expr_root, &mut ctx);
+                let node = self.check_expr2(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks
-                    .push(CodegenTask::Const(ConstCodegenTask {
-                        def_id,
-                        nodes: ctx.nodes,
-                        root: hir_idx,
-                        span: def.span,
-                    }));
+                    .push(CodegenTask::Const(ConstCodegenTask { def_id, node }));
 
                 ty
             }

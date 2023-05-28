@@ -22,6 +22,22 @@ use super::{
     task::{find_mapping_key, ProcTable},
 };
 
+pub(super) fn const_codegen_ontos(proc_table: &mut ProcTable, expr: OntosNode, def_id: DefId) {
+    debug!("Generating code for\n{}", expr);
+
+    let mut builder = ProcBuilder::new(NParams(0));
+    let mut block = builder.new_block(Stack(0), expr.meta.span);
+    let mut generator = OntosCodeGenerator {
+        proc_table,
+        builder: &mut builder,
+        scope: Default::default(),
+    };
+    generator.gen_node(expr, &mut block);
+    builder.commit(block, Terminator::Return(builder.top()));
+
+    proc_table.const_procedures.insert(def_id, builder);
+}
+
 pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> bool {
     debug!("Generating code for\n{}", func);
 

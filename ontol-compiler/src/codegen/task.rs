@@ -3,17 +3,14 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
-    vm::proc::{Address, Lib, NParams, Procedure},
+    vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
 };
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{
-        hir_code_generator::HirCodeGenerator, ontos_code_generator::map_codegen_ontos,
-        proc_builder::Stack,
-    },
-    hir_node::{CodeDirection, HirBody, HirIdx, HirNodeTable},
+    codegen::ontos_code_generator::map_codegen_ontos,
+    hir_node::{CodeDirection, HirBody, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
     Compiler, IrVariant, SourceSpan, CODE_GENERATOR, TYPE_CHECKER,
@@ -22,8 +19,8 @@ use crate::{
 use super::{
     hir_code_generator::codegen_map_hir_solve,
     hir_equation::HirEquation,
-    ir::Terminator,
     link::{link, LinkResult},
+    ontos_code_generator::const_codegen_ontos,
     proc_builder::ProcBuilder,
 };
 
@@ -57,12 +54,9 @@ pub enum CodegenTask<'m> {
     OntosMap(OntosMapCodegenTask<'m>),
 }
 
-#[derive(Debug)]
 pub struct ConstCodegenTask<'m> {
     pub def_id: DefId,
-    pub nodes: HirNodeTable<'m>,
-    pub root: HirIdx,
-    pub span: SourceSpan,
+    pub node: OntosNode<'m>,
 }
 
 #[derive(Debug)]
@@ -76,6 +70,14 @@ pub struct OntosMapCodegenTask<'m> {
     pub first: OntosNode<'m>,
     pub second: OntosNode<'m>,
     pub span: SourceSpan,
+}
+
+impl<'m> Debug for ConstCodegenTask<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConstCodegenTask")
+            .field("node", &DebugViaDisplay(&self.node))
+            .finish()
+    }
 }
 
 impl<'m> Debug for OntosMapCodegenTask<'m> {
@@ -135,29 +137,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for task in tasks {
         match task {
-            CodegenTask::Const(ConstCodegenTask {
-                def_id,
-                nodes,
-                root,
-                span,
-            }) => {
-                let equation = HirEquation::new(nodes);
-                let mut builder = ProcBuilder::new(NParams(0));
-                let mut block = builder.new_block(Stack(0), span);
-                let mut generator = HirCodeGenerator::new(
-                    &mut proc_table,
-                    &mut builder,
-                    &[],
-                    CodeDirection::Forward,
-                );
-
-                match generator.codegen_expr(&mut block, &equation, root) {
-                    Ok(_) => {
-                        builder.commit(block, Terminator::Return(builder.top()));
-                        proc_table.const_procedures.insert(def_id, builder);
-                    }
-                    Err(error) => panic!("BUG: Problem generating const expression: {error:?}"),
-                }
+            CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
+                const_codegen_ontos(&mut proc_table, node, def_id);
             }
             CodegenTask::Map(map_task) => {
                 if CODE_GENERATOR != IrVariant::Hir {

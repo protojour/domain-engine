@@ -56,7 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         node
     }
 
-    fn check_expr2(
+    pub(super) fn check_expr2(
         &mut self,
         expr: &Expr,
         expected_ty: Option<TypeRef<'m>>,
