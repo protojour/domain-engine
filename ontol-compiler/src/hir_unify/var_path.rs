@@ -7,7 +7,7 @@ use ontol_hir::{
 };
 use smallvec::SmallVec;
 
-use crate::typed_hir::lang::{TypedHir, TypedHirNode};
+use crate::typed_hir::{TypedHir, TypedHirNode};
 
 use super::UnifierError;
 

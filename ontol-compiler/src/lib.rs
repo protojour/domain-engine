@@ -24,6 +24,7 @@ use tracing::debug;
 use types::{DefTypes, Types};
 
 pub mod error;
+pub mod hir_unify;
 pub mod mem;
 pub mod package;
 pub mod serde_codegen;

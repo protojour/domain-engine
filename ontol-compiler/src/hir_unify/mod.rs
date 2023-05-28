@@ -1,7 +1,9 @@
+use std::fmt::Debug;
+
 use bit_set::BitSet;
 use ontol_hir::{visitor::HirVisitor, Variable};
 
-use super::lang::TypedHir;
+use crate::typed_hir::TypedHir;
 
 pub mod unifier;
 
@@ -48,5 +50,21 @@ impl VariableTracker {
     fn next_variable(&self) -> Variable {
         let idx = self.largest.0 + 1;
         Variable(idx)
+    }
+}
+
+pub struct DebugVariables<'a>(pub &'a BitSet);
+
+impl<'a> Debug for DebugVariables<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        let mut iterator = self.0.iter().peekable();
+        while let Some(var) = iterator.next() {
+            write!(f, "{}", Variable(var as u32))?;
+            if iterator.peek().is_some() {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "]")
     }
 }

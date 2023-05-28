@@ -5,9 +5,12 @@ use fnv::FnvHashMap;
 use ontol_hir::{Binder, Variable};
 use tracing::debug;
 
-use crate::typed_hir::{lang::Meta, unify::tagged_node::TaggedKind};
+use crate::typed_hir::Meta;
 
-use super::{tagged_node::TaggedNode, var_path::Path};
+use super::{
+    tagged_node::{TaggedKind, TaggedNode},
+    var_path::Path,
+};
 
 pub enum UnificationNode<'m> {
     Scoping(Scoping<'m>),

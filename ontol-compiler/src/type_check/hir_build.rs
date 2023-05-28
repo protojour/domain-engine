@@ -17,7 +17,7 @@ use crate::{
         hir_build_ctx::{Arm, ExplicitVariableArm},
         inference::UnifyValue,
     },
-    typed_hir::lang::{Meta, TypedHir, TypedHirNode},
+    typed_hir::{Meta, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
     SourceSpan,
 };

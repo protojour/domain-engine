@@ -1,10 +1,8 @@
 use indoc::indoc;
 use ontol_compiler::{
+    hir_unify::unifier::unify_to_function,
     mem::Mem,
-    typed_hir::{
-        lang::{TypedHir, TypedHirNode},
-        unify::unifier::unify_to_function,
-    },
+    typed_hir::{TypedHir, TypedHirNode},
     Compiler,
 };
 use ontol_hir::parse::Parser;

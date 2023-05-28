@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
     error::CompileError,
-    typed_hir::lang::{HirFunc, TypedHirNode},
+    typed_hir::{HirFunc, TypedHirNode},
     types::Type,
     CompileErrors, SpannedCompileError,
 };

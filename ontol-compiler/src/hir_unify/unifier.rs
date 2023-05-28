@@ -12,11 +12,9 @@ use smallvec::SmallVec;
 use tracing::{debug, trace, warn};
 
 use crate::{
+    hir_unify::var_path::locate_variables,
     mem::Intern,
-    typed_hir::{
-        lang::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirKind, TypedHirNode},
-        unify::{tagged_node::DebugVariables, var_path::locate_variables},
-    },
+    typed_hir::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirKind, TypedHirNode},
     types::{Type, TypeRef, Types},
     Compiler, SourceSpan,
 };
@@ -868,7 +866,10 @@ fn build_u_tree<'m>(
     expr: TaggedNode<'m>,
     scope_node: &TypedHirNode<'m>,
 ) -> UnifierResult<UnificationNode<'m>> {
-    trace!("free_variables: {:?}", DebugVariables(&expr.free_variables));
+    trace!(
+        "free_variables: {:?}",
+        super::DebugVariables(&expr.free_variables)
+    );
 
     let variable_paths = locate_variables(scope_node, &expr.free_variables)?;
     trace!("var_paths: {variable_paths:?}");

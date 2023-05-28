@@ -12,7 +12,7 @@ use crate::{
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
     type_check::hir_build_ctx::{Arm, VariableMapping},
-    typed_hir::lang::TypedHirNode,
+    typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };

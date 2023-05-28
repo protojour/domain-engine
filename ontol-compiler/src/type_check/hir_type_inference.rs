@@ -4,7 +4,7 @@ use ontol_runtime::smart_format;
 
 use crate::{
     error::CompileError,
-    typed_hir::lang::{Meta, TypedHir, TypedHirNode},
+    typed_hir::{Meta, TypedHir, TypedHirNode},
     types::Types,
     CompileErrors,
 };

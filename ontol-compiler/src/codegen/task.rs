@@ -10,7 +10,8 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::code_generator::map_codegen,
-    typed_hir::{lang::TypedHirNode, unify::unifier::unify_to_function},
+    hir_unify::unifier::unify_to_function,
+    typed_hir::TypedHirNode,
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };

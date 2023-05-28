@@ -13,7 +13,7 @@ The name is a silly spin on ALGOL (for algorithms!), this is a language for onto
 
 Work in progress. See [MDP 6](https://gitlab.com/protojour/x-design-proposals/-/issues/8).
 
-### ONTOL Architecture
+## ONTOL Architecture
 
 Ideal high level data flow:
 
@@ -25,6 +25,16 @@ Ideal high level data flow:
 Any number of virtual machines may be created and executed in parallel, because of the immutable environment.
 
 In the future, we may support precompiled environments.
+
+### ONTOL compiler transformation steps
+
+The compiler goes through a number of transformation steps before producing executable code:
+
+1. `ontol-parser`: Parse ONTOL source code.
+2. `lowering`: Lower these statements into various maps for representing relationships and `Expr` for representing expressions (used in map/unify).
+3. `type_check`: Type check the expressions and output typed `ontol-hir`.
+4. `hir_unify`: Unify map arms to produce `ontol-hir` functions.
+5. `codegen`: Turn `ontol-hir` functions into `ontol-vm` stack machine assembly-like language.
 
 ## Testing
 
