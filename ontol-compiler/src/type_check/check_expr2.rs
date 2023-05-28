@@ -138,8 +138,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 let inner_node = self.build_node(inner, Some(elem_ty), ctx);
-                let aggr_body_idx = *ctx.body_map.get(aggr_expr_id).unwrap();
-                let label = ctx.get_or_compute_seq_label(aggr_body_idx);
+                let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                 let array_ty = self.types.intern(Type::Array(elem_ty));
 
                 OntosNode {
@@ -289,7 +288,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.map.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = Binder(ctx.alloc_ontos_variable());
+                        let struct_binder = Binder(ctx.alloc_variable());
 
                         struct MatchProperty {
                             relation_id: RelationId,
@@ -374,9 +373,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ValueCardinality::Many => match &expr.kind {
                                     ExprKind::Seq(aggr_expr_id, inner) => {
                                         let node = self.build_node(inner, Some(object_ty), ctx);
-                                        let aggr_body_idx =
-                                            *ctx.body_map.get(aggr_expr_id).unwrap();
-                                        let label = ctx.get_or_compute_seq_label(aggr_body_idx);
+                                        let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
                                         PropVariant {
                                             dimension: Dimension::Seq(label),

@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_runtime::smart_format;
-use ontos::visitor::OntosMutVisitor;
+use ontos::{visitor::OntosMutVisitor, Label};
 use tracing::debug;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
-    hir_node::{HirBodyIdx, HirKind, HirNode},
+    hir_node::{HirKind, HirNode},
     mem::Intern,
     type_check::unify_ctx::{Arm, VariableMapping},
     typed_ontos::lang::OntosNode,
@@ -197,21 +197,11 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
-                    let aggr_var = ctx.alloc_ontos_variable();
-                    let aggr_body_idx = ctx.alloc_hir_body_idx();
+                    let label = Label(ctx.alloc_variable().0);
                     debug!("first arm seq: expr_id={expr_id:?}");
-                    ctx.body_map.insert(*expr_id, aggr_body_idx);
-                    ctx.ctrl_flow_forest.insert(
-                        aggr_body_idx,
-                        parent_aggr_group.map(|parent| parent.body_id),
-                    );
-
-                    // Register aggregation variable
-                    let _ = ctx.nodes.add(HirNode {
-                        ty: self.types.intern(Type::Tautology),
-                        kind: HirKind::Variable(aggr_var),
-                        span: expr.span,
-                    });
+                    ctx.ctrl_flow_forest
+                        .insert(label, parent_aggr_group.map(|parent| parent.label));
+                    ctx.label_map.insert(*expr_id, label);
 
                     let result =
                         ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {
@@ -219,7 +209,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                 inner,
                                 variables,
                                 Some(CtrlFlowGroup {
-                                    body_id: aggr_body_idx,
+                                    label,
                                     bind_depth: ctx.current_bind_depth(),
                                 }),
                                 ctx,
@@ -235,12 +225,12 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             self.analyze_arm(inner, variables, None, ctx).unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_bind_depth()) {
-                            Ok(aggr_body_id) => {
-                                ctx.body_map.insert(*expr_id, aggr_body_id);
+                            Ok(label) => {
+                                ctx.label_map.insert(*expr_id, label);
 
-                                group_set.add(ctx.ctrl_flow_forest.find_parent(aggr_body_id).map(
-                                    |body_id| CtrlFlowGroup {
-                                        body_id,
+                                group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
+                                    |label| CtrlFlowGroup {
+                                        label,
                                         bind_depth: outer_bind_depth,
                                     },
                                 ));
@@ -282,7 +272,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .unwrap();
 
                     // Register variable
-                    let syntax_var = ctx.alloc_ontos_variable();
+                    let syntax_var = ctx.alloc_variable();
                     let var_id = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
                         kind: HirKind::Variable(syntax_var),
@@ -335,7 +325,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 struct FirstArm(bool);
 
 struct AggrGroupSet {
-    set: FnvHashSet<Option<HirBodyIdx>>,
+    set: FnvHashSet<Option<Label>>,
     tallest_depth: u16,
 }
 
@@ -344,7 +334,7 @@ pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
-    TooManyLeaves(Vec<HirBodyIdx>),
+    TooManyLeaves(Vec<Label>),
 }
 
 impl AggrGroupSet {
@@ -361,7 +351,7 @@ impl AggrGroupSet {
     }
 
     fn add(&mut self, aggr_group: Option<CtrlFlowGroup>) {
-        self.set.insert(aggr_group.map(|group| group.body_id));
+        self.set.insert(aggr_group.map(|group| group.label));
         if let Some(group) = aggr_group {
             self.tallest_depth = core::cmp::max(self.tallest_depth, group.bind_depth.0)
         }
@@ -372,13 +362,13 @@ impl AggrGroupSet {
         self,
         ctx: &CheckUnifyExprContext,
         max_depth: BindDepth,
-    ) -> Result<HirBodyIdx, AggrGroupError> {
+    ) -> Result<Label, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {
             return Err(AggrGroupError::DepthExceeded);
         }
 
-        let mut roots: FnvHashSet<HirBodyIdx> = Default::default();
-        let mut parents: FnvHashSet<HirBodyIdx> = Default::default();
+        let mut roots: FnvHashSet<Label> = Default::default();
+        let mut parents: FnvHashSet<Label> = Default::default();
 
         for group in self.set.iter().flatten() {
             roots.insert(ctx.ctrl_flow_forest.find_root(*group));

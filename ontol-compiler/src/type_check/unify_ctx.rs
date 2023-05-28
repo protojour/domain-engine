@@ -1,8 +1,9 @@
 use fnv::FnvHashMap;
+use ontos::{Label, Variable};
 
 use crate::{
     expr::{Expr, ExprId},
-    hir_node::{HirBodyIdx, HirIdx, HirNodeTable},
+    hir_node::{HirIdx, HirNodeTable},
     types::TypeRef,
     SourceSpan,
 };
@@ -17,12 +18,11 @@ pub struct CheckUnifyExprContext<'m> {
     pub bodies: Vec<CtrlFlowBody<'m>>,
     pub nodes: HirNodeTable<'m>,
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
-    pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
-    pub ontos_seq_labels: FnvHashMap<HirBodyIdx, ontos::Label>,
+    pub label_map: FnvHashMap<ExprId, Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
-    pub variable_mapping: FnvHashMap<ontos::Variable, VariableMapping<'m>>,
+    pub variable_mapping: FnvHashMap<Variable, VariableMapping<'m>>,
 
     pub partial: bool,
 
@@ -30,7 +30,6 @@ pub struct CheckUnifyExprContext<'m> {
     pub arm: Arm,
     bind_depth: BindDepth,
     ontos_var_allocations: Vec<u32>,
-    body_id_counter: u32,
 }
 
 impl<'m> CheckUnifyExprContext<'m> {
@@ -40,15 +39,13 @@ impl<'m> CheckUnifyExprContext<'m> {
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
             explicit_variables: Default::default(),
-            body_map: Default::default(),
-            ontos_seq_labels: Default::default(),
+            label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
             variable_mapping: Default::default(),
             partial: false,
             arm: Arm::First,
             bind_depth: BindDepth(0),
             ontos_var_allocations: vec![0],
-            body_id_counter: 0,
         }
     }
 
@@ -58,7 +55,7 @@ impl<'m> CheckUnifyExprContext<'m> {
 
     pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontos::Variable) -> T) -> T {
         // There is a unique bind depth for the control flow variable:
-        let ctrl_flow_var = self.alloc_ontos_variable();
+        let ctrl_flow_var = self.alloc_variable();
 
         self.bind_depth.0 += 1;
         let ret = f(self, ctrl_flow_var);
@@ -67,28 +64,11 @@ impl<'m> CheckUnifyExprContext<'m> {
         ret
     }
 
-    pub fn alloc_hir_body_idx(&mut self) -> HirBodyIdx {
-        let next = self.body_id_counter;
-        self.body_id_counter += 1;
-        self.bodies.push(CtrlFlowBody::default());
-        HirBodyIdx(next)
-    }
-
-    pub fn alloc_ontos_variable(&mut self) -> ontos::Variable {
+    pub fn alloc_variable(&mut self) -> ontos::Variable {
         let alloc = self.ontos_var_allocations.get_mut(0).unwrap();
         let var = ontos::Variable(*alloc);
         *alloc += 1;
         var
-    }
-
-    pub fn get_or_compute_seq_label(&mut self, body_idx: HirBodyIdx) -> ontos::Label {
-        if let Some(label) = self.ontos_seq_labels.get(&body_idx) {
-            return *label;
-        }
-
-        let label = ontos::Label(self.alloc_ontos_variable().0);
-        self.ontos_seq_labels.insert(body_idx, label);
-        label
     }
 }
 
@@ -124,7 +104,7 @@ pub struct ExplicitVariableArm {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CtrlFlowGroup {
-    pub body_id: HirBodyIdx,
+    pub label: Label,
     pub bind_depth: BindDepth,
 }
 
@@ -132,30 +112,30 @@ pub struct CtrlFlowGroup {
 #[derive(Default)]
 pub struct CtrlFlowForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<HirBodyIdx, HirBodyIdx>,
+    map: FnvHashMap<Label, Label>,
 }
 
 impl CtrlFlowForest {
-    pub fn insert(&mut self, idx: HirBodyIdx, parent: Option<HirBodyIdx>) {
-        self.map.insert(idx, parent.unwrap_or(idx));
+    pub fn insert(&mut self, label: Label, parent_label: Option<Label>) {
+        self.map.insert(label, parent_label.unwrap_or(label));
     }
 
-    pub fn find_parent(&self, idx: HirBodyIdx) -> Option<HirBodyIdx> {
-        let parent = self.map.get(&idx).unwrap();
-        if parent == &idx {
+    pub fn find_parent(&self, label: Label) -> Option<Label> {
+        let parent = self.map.get(&label).unwrap();
+        if parent == &label {
             None
         } else {
             Some(*parent)
         }
     }
 
-    pub fn find_root(&self, mut idx: HirBodyIdx) -> HirBodyIdx {
+    pub fn find_root(&self, mut label: Label) -> Label {
         loop {
-            let parent = self.map.get(&idx).unwrap();
-            if parent == &idx {
-                return idx;
+            let parent = self.map.get(&label).unwrap();
+            if parent == &label {
+                return label;
             }
-            idx = *parent;
+            label = *parent;
         }
     }
 }

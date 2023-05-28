@@ -27,7 +27,7 @@ impl Display for Variable {
 #[derive(Clone, Copy, Debug)]
 pub struct Binder(pub Variable);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
 impl Debug for Label {
