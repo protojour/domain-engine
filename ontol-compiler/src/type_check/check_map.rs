@@ -11,15 +11,15 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
-    type_check::unify_ctx::{Arm, VariableMapping},
+    type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::lang::TypedHirNode,
     types::{Type, TypeRef, Types},
     CompileErrors, SourceSpan,
 };
 
 use super::{
+    hir_build_ctx::{BindDepth, CtrlFlowGroup, ExplicitVariable, HirBuildCtx},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
-    unify_ctx::{BindDepth, CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
     TypeCheck, TypeEquation, TypeError,
 };
 
@@ -31,7 +31,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = CheckUnifyExprContext::new();
+        let mut ctx = HirBuildCtx::new();
 
         {
             let mut map_check = MapCheck {
@@ -67,7 +67,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def: &Def,
         first_id: ExprId,
         second_id: ExprId,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
         ctx.arm = Arm::First;
         let mut first = self.build_root_expr(first_id, ctx);
@@ -89,11 +89,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(())
     }
 
-    fn infer_hir_arm_types(
-        &mut self,
-        node: &mut TypedHirNode<'m>,
-        ctx: &mut CheckUnifyExprContext<'m>,
-    ) {
+    fn infer_hir_arm_types(&mut self, node: &mut TypedHirNode<'m>, ctx: &mut HirBuildCtx<'m>) {
         let mut inference = HirArmTypeInference {
             types: self.types,
             eq_relations: &mut ctx.inference.eq_relations,
@@ -106,7 +102,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         first: &mut TypedHirNode<'m>,
         second: &mut TypedHirNode<'m>,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) {
         for explicit_var in &mut ctx.explicit_variables.values_mut() {
             let first_arm = explicit_var.hir_arms.remove(&Arm::First);
@@ -171,7 +167,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         expr: &Expr,
         variables: &Variables,
         parent_aggr_group: Option<CtrlFlowGroup>,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
@@ -352,7 +348,7 @@ impl AggrGroupSet {
     // Find a unique leaf in the aggregation forest
     fn disambiguate(
         self,
-        ctx: &CheckUnifyExprContext,
+        ctx: &HirBuildCtx,
         max_depth: BindDepth,
     ) -> Result<Label, AggrGroupError> {
         if self.tallest_depth > max_depth.0 {

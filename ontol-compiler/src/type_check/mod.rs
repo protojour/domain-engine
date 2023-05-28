@@ -18,11 +18,11 @@ pub mod check_domain_types;
 pub mod check_union;
 pub mod inference;
 
-mod build_hir;
 mod check_map;
 mod check_relationship;
+mod hir_build;
+mod hir_build_ctx;
 mod hir_type_inference;
-mod unify_ctx;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {

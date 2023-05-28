@@ -6,7 +6,7 @@ use crate::{
     def::{DefKind, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
-    type_check::unify_ctx::CheckUnifyExprContext,
+    type_check::hir_build_ctx::HirBuildCtx,
     types::{Type, TypeRef},
 };
 
@@ -60,7 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => ty,
                 };
 
-                let mut ctx = CheckUnifyExprContext::new();
+                let mut ctx = HirBuildCtx::new();
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks

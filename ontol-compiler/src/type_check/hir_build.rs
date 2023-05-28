@@ -14,21 +14,21 @@ use crate::{
     mem::Intern,
     relation::Constructor,
     type_check::{
+        hir_build_ctx::{Arm, ExplicitVariableArm},
         inference::UnifyValue,
-        unify_ctx::{Arm, ExplicitVariableArm},
     },
     typed_hir::lang::{Meta, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
     SourceSpan,
 };
 
-use super::{unify_ctx::CheckUnifyExprContext, TypeCheck, TypeEquation, TypeError};
+use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn build_root_expr(
         &mut self,
         expr_id: ExprId,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         let expr = self.expressions.map.remove(&expr_id).unwrap();
 
@@ -57,7 +57,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         expr: &Expr,
         expected_ty: Option<TypeRef<'m>>,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         let node = match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
@@ -264,7 +264,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         type_path: &TypePath,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
-        ctx: &mut CheckUnifyExprContext<'m>,
+        ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         let domain_type = self.check_def(type_path.def_id);
         let subject_id = match domain_type {

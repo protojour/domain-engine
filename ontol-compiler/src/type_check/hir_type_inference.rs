@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::{
+    hir_build_ctx::{Arm, VariableMapping},
     inference::{Infer, TypeVar},
-    unify_ctx::{Arm, VariableMapping},
     TypeError,
 };
 

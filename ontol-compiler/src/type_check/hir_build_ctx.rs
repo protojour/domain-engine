@@ -1,20 +1,15 @@
 use fnv::FnvHashMap;
 use ontol_hir::{Label, Variable};
 
-use crate::{
-    expr::{Expr, ExprId},
-    types::TypeRef,
-    SourceSpan,
-};
+use crate::{expr::ExprId, types::TypeRef, SourceSpan};
 
 use super::inference::Inference;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct BindDepth(pub u16);
 
-pub struct CheckUnifyExprContext<'m> {
+pub struct HirBuildCtx<'m> {
     pub inference: Inference<'m>,
-    pub bodies: Vec<CtrlFlowBody<'m>>,
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
     pub label_map: FnvHashMap<ExprId, Label>,
 
@@ -30,11 +25,10 @@ pub struct CheckUnifyExprContext<'m> {
     hir_var_allocations: Vec<u32>,
 }
 
-impl<'m> CheckUnifyExprContext<'m> {
+impl<'m> HirBuildCtx<'m> {
     pub fn new() -> Self {
         Self {
             inference: Inference::new(),
-            bodies: Default::default(),
             explicit_variables: Default::default(),
             label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
@@ -67,18 +61,6 @@ impl<'m> CheckUnifyExprContext<'m> {
         *alloc += 1;
         var
     }
-}
-
-#[derive(Default)]
-pub struct CtrlFlowBody<'m> {
-    pub first: Option<ExprRoot<'m>>,
-    pub second: Option<ExprRoot<'m>>,
-}
-
-pub struct ExprRoot<'m> {
-    pub id: ExprId,
-    pub expr: Expr,
-    pub expected_ty: Option<TypeRef<'m>>,
 }
 
 pub struct ExplicitVariable {
