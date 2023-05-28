@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ontos::{
+use ontol_hir::{
     display::{Print, Printer, Sep},
     kind::NodeKind,
     Variable,
@@ -14,7 +14,7 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct TypedOntos;
 
-impl ontos::Lang for TypedOntos {
+impl ontol_hir::Lang for TypedOntos {
     type Node<'m> = OntosNode<'m>;
 
     fn make_node<'m>(&self, kind: NodeKind<'m, Self>) -> Self::Node<'m> {
@@ -28,7 +28,7 @@ impl ontos::Lang for TypedOntos {
     }
 }
 
-pub type OntosKind<'m> = ontos::kind::NodeKind<'m, TypedOntos>;
+pub type OntosKind<'m> = ontol_hir::kind::NodeKind<'m, TypedOntos>;
 
 #[derive(Clone)]
 pub struct OntosNode<'m> {
@@ -42,7 +42,7 @@ impl<'m> OntosNode<'m> {
     }
 }
 
-impl<'m> ontos::Node<'m, TypedOntos> for OntosNode<'m> {
+impl<'m> ontol_hir::Node<'m, TypedOntos> for OntosNode<'m> {
     fn kind(&self) -> &NodeKind<'m, TypedOntos> {
         &self.kind
     }

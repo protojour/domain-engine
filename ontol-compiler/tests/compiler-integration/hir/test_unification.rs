@@ -7,7 +7,7 @@ use ontol_compiler::{
     },
     Compiler,
 };
-use ontos::parse::Parser;
+use ontol_hir::parse::Parser;
 use pretty_assertions::assert_eq;
 use test_log::test;
 

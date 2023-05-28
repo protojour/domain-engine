@@ -173,5 +173,5 @@ macro_rules! borrow {
     };
 }
 
-visitor_trait!(ref, OntosVisitor, kind, iter);
-visitor_trait!(mut, OntosMutVisitor, kind_mut, iter_mut);
+visitor_trait!(ref, HirVisitor, kind, iter);
+visitor_trait!(mut, HirMutVisitor, kind_mut, iter_mut);

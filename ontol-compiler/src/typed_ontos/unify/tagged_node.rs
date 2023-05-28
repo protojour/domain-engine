@@ -3,11 +3,11 @@ use std::fmt::Debug;
 use tracing::debug;
 
 use bit_set::BitSet;
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
-use ontos::{
+use ontol_hir::{
     kind::{Attribute, Dimension, NodeKind, PropVariant},
     Binder, Label, Variable,
 };
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{
     typed_ontos::lang::{Meta, OntosNode},
@@ -299,7 +299,7 @@ impl Tagger {
         }
     }
 
-    fn register_label(&mut self, label: ontos::Label) {
+    fn register_label(&mut self, label: ontol_hir::Label) {
         if self.labels.contains(label.0 as usize) {
             panic!("Duplicate label: {label}");
         }
@@ -337,7 +337,7 @@ impl<'a> Debug for DebugVariables<'a> {
 #[cfg(test)]
 mod tests {
     use bit_set::BitSet;
-    use ontos::{parse::Parser, Variable};
+    use ontol_hir::{parse::Parser, Variable};
 
     use crate::typed_ontos::lang::TypedOntos;
 

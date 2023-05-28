@@ -12,7 +12,7 @@ pub struct Stack(pub i32);
 
 #[derive(Default)]
 pub struct Scope {
-    pub in_scope: FnvHashMap<ontos::Variable, Local>,
+    pub in_scope: FnvHashMap<ontol_hir::Variable, Local>,
 }
 
 pub struct ProcBuilder {

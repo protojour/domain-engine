@@ -831,10 +831,10 @@ dependencies = [
  "fraction",
  "indexmap",
  "indoc",
+ "ontol-hir",
  "ontol-parser",
  "ontol-runtime",
  "ontol-test-utils",
- "ontos",
  "patricia_tree",
  "pretty_assertions",
  "regex",
@@ -861,6 +861,18 @@ dependencies = [
  "smartstring",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "ontol-hir"
+version = "0.1.0"
+dependencies = [
+ "indoc",
+ "ontol-runtime",
+ "pretty_assertions",
+ "smartstring",
+ "test-log",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -909,18 +921,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing",
-]
-
-[[package]]
-name = "ontos"
-version = "0.1.0"
-dependencies = [
- "indoc",
- "ontol-runtime",
- "pretty_assertions",
- "smartstring",
- "test-log",
- "tracing-subscriber",
 ]
 
 [[package]]

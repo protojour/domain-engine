@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
+use ontol_hir::{kind::NodeKind, visitor::HirMutVisitor};
 use ontol_runtime::smart_format;
-use ontos::{kind::NodeKind, visitor::OntosMutVisitor};
 
 use crate::{
     error::CompileError,
@@ -21,8 +21,8 @@ pub(super) struct OntosArmTypeInference<'c, 'm> {
     pub(super) errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosArmTypeInference<'c, 'm> {
-    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontos::Lang>::Node<'m>) {
+impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosArmTypeInference<'c, 'm> {
+    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontol_hir::Lang>::Node<'m>) {
         let mut infer = Infer {
             types: self.types,
             eq_relations: self.eq_relations,
@@ -44,12 +44,12 @@ impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosArmTypeInference<'c, 'm> {
 }
 
 pub(super) struct OntosVariableMapper<'c, 'm> {
-    pub variable_mapping: &'c FnvHashMap<ontos::Variable, VariableMapping<'m>>,
+    pub variable_mapping: &'c FnvHashMap<ontol_hir::Variable, VariableMapping<'m>>,
     pub arm: Arm,
 }
 
-impl<'c, 'm> OntosMutVisitor<'m, TypedOntos> for OntosVariableMapper<'c, 'm> {
-    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontos::Lang>::Node<'m>) {
+impl<'c, 'm> HirMutVisitor<'m, TypedOntos> for OntosVariableMapper<'c, 'm> {
+    fn visit_node(&mut self, index: usize, node: &mut <TypedOntos as ontol_hir::Lang>::Node<'m>) {
         self.visit_kind(index, &mut node.kind);
 
         if let NodeKind::VariableRef(var) = &node.kind {

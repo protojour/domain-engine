@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontos::{Label, Variable};
+use ontol_hir::{Label, Variable};
 
 use crate::{
     expr::{Expr, ExprId},
@@ -50,7 +50,7 @@ impl<'m> CheckUnifyExprContext<'m> {
         self.bind_depth
     }
 
-    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontos::Variable) -> T) -> T {
+    pub fn enter_ctrl<T>(&mut self, f: impl FnOnce(&mut Self, ontol_hir::Variable) -> T) -> T {
         // There is a unique bind depth for the control flow variable:
         let ctrl_flow_var = self.alloc_variable();
 
@@ -61,9 +61,9 @@ impl<'m> CheckUnifyExprContext<'m> {
         ret
     }
 
-    pub fn alloc_variable(&mut self) -> ontos::Variable {
+    pub fn alloc_variable(&mut self) -> Variable {
         let alloc = self.ontos_var_allocations.get_mut(0).unwrap();
-        let var = ontos::Variable(*alloc);
+        let var = Variable(*alloc);
         *alloc += 1;
         var
     }
@@ -82,7 +82,7 @@ pub struct ExprRoot<'m> {
 }
 
 pub struct ExplicitVariable {
-    pub variable: ontos::Variable,
+    pub variable: Variable,
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub ontos_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }

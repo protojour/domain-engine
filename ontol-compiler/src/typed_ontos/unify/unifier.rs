@@ -1,13 +1,13 @@
 use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
-use ontos::{
+use ontol_hir::{
     kind::{
         Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
         PropVariant,
     },
-    visitor::OntosVisitor,
+    visitor::HirVisitor,
     Binder, Variable,
 };
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
 use tracing::{debug, trace, warn};
 

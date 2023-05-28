@@ -9,9 +9,9 @@ edition = "2021"
 doctest = false
 
 [dependencies]
+ontol-hir.path = "../ontol-hir"
 ontol-runtime.path = "../ontol-runtime"
 ontol-parser.path = "../ontol-parser"
-ontos.path = "../ontos"
 tracing.workspace = true
 smartstring.workspace = true
 indexmap.workspace = true

@@ -4,11 +4,11 @@ members = [
     "domain-engine-juniper",
     "domain-engine-wasm",
     "ontol-faker",
+    "ontol-hir",
     "ontol-runtime",
     "ontol-compiler",
     "ontol-parser",
-    "ontol-test-utils",
-    "ontos"
+    "ontol-test-utils"
 ]
 
 [workspace.dependencies]

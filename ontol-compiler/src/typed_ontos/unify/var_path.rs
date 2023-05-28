@@ -1,8 +1,8 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::{
+use ontol_hir::{
     kind::{Dimension, NodeKind, PropVariant},
-    visitor::OntosVisitor,
+    visitor::HirVisitor,
     Node, Variable,
 };
 use smallvec::SmallVec;
@@ -67,12 +67,12 @@ impl<'a> VarLocator<'a> {
     }
 }
 
-impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
+impl<'a, 'm> HirVisitor<'m, TypedOntos> for VarLocator<'a> {
     fn visit_variable(&mut self, variable: &Variable) {
         self.register_var(variable.0);
     }
 
-    fn visit_label(&mut self, label: &ontos::Label) {
+    fn visit_label(&mut self, label: &ontol_hir::Label) {
         self.register_var(label.0);
     }
 
@@ -95,11 +95,15 @@ impl<'a, 'm> OntosVisitor<'m, TypedOntos> for VarLocator<'a> {
         });
     }
 
-    fn visit_match_arm(&mut self, index: usize, match_arm: &ontos::kind::MatchArm<'m, TypedOntos>) {
+    fn visit_match_arm(
+        &mut self,
+        index: usize,
+        match_arm: &ontol_hir::kind::MatchArm<'m, TypedOntos>,
+    ) {
         self.enter_child(index, |_self| _self.traverse_match_arm(match_arm));
     }
 
-    fn visit_pattern_binding(&mut self, index: usize, binding: &ontos::kind::PatternBinding) {
+    fn visit_pattern_binding(&mut self, index: usize, binding: &ontol_hir::kind::PatternBinding) {
         self.enter_child(index, |_self| _self.traverse_pattern_binding(binding));
     }
 }

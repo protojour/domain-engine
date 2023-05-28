@@ -1,9 +1,9 @@
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
-use ontos::{
+use ontol_hir::{
     kind::{Attribute, Dimension, NodeKind, PropVariant},
     Binder,
 };
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use tracing::debug;
 
 use crate::{

@@ -1,11 +1,11 @@
 use fnv::FnvHashMap;
+use ontol_hir::{
+    kind::{NodeKind, PatternBinding, PropPattern},
+    Variable,
+};
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Procedure},
     DefId,
-};
-use ontos::{
-    kind::{NodeKind, PatternBinding, PropPattern},
-    Variable,
 };
 use tracing::debug;
 

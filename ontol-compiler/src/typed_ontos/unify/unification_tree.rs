@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontos::{Binder, Variable};
+use ontol_hir::{Binder, Variable};
 use tracing::debug;
 
 use crate::typed_ontos::{lang::Meta, unify::tagged_node::TaggedKind};

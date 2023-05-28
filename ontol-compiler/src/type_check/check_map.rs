@@ -1,8 +1,8 @@
 use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
+use ontol_hir::{visitor::HirMutVisitor, Label};
 use ontol_runtime::smart_format;
-use ontos::{visitor::OntosMutVisitor, Label};
 use tracing::debug;
 
 use crate::{
