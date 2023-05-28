@@ -280,15 +280,15 @@ fn test_unify_seq_prop_deep() {
                 ((seq $h)
                     (prop $d O:0:0
                         (#u
-                            (gen $h ($f $_ $g)
-                                (push $f #u
+                            (gen $h ($i $_ $c)
+                                (push $i #u
                                     (struct ($e)
-                                        (match-prop $g S:1:1
-                                            ((seq $q)
+                                        (match-prop $c S:1:1
+                                            ((seq $f)
                                                 (prop $e O:1:1
                                                     (#u
-                                                        (gen $q ($r $_ $s)
-                                                            (push $r #u (map $s))
+                                                        (gen $f ($g $_ $a)
+                                                            (push $g #u (map $a))
                                                         )
                                                     )
                                                 )
@@ -393,13 +393,74 @@ fn test_unify_complex_seq_prop2() {
         )",
     );
     let expected = indoc! {"
-        |$b| (struct ($c)
-            (match-prop $b S:0:0
-                ((seq $d)
-                    (prop $c S:1:1
+        |$w| (struct ($af)
+            (match-prop $w S:1:9
+                ((seq $am)
+                    (prop $af S:1:9
                         (#u
-                            (gen $d ($e $_ $a)
-                                (push $e #u $a)
+                            (gen $am ($an $_ $x)
+                                (push $an #u
+                                    (struct ($ah)
+                                        (match-prop $x S:1:9
+                                            ((seq $ai)
+                                                (prop $ah S:1:9
+                                                    (#u
+                                                        (gen $ai ($aj $_ $c)
+                                                            (push $aj #u (map $c))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                        (match-prop $x S:1:11
+                                            ((seq $ak)
+                                                (prop $ah S:1:11
+                                                    (#u
+                                                        (gen $ak ($al $_ $e)
+                                                            (push $al #u (map $e))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            (match-prop $w S:1:11
+                ((seq $as)
+                    (prop $af S:1:11
+                        (#u
+                            (gen $as ($at $_ $ab)
+                                (push $at #u
+                                    (struct ($ag)
+                                        (match-prop $ab S:1:9
+                                            ((seq $ao)
+                                                (prop $ag S:1:9
+                                                    (#u
+                                                        (gen $ao ($ap $_ $h)
+                                                            (push $ap #u (map $h))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                        (match-prop $ab S:1:11
+                                            ((seq $aq)
+                                                (prop $ag S:1:11
+                                                    (#u
+                                                        (gen $aq ($ar $_ $j)
+                                                            (push $ar #u (map $j))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
                             )
                         )
                     )
@@ -449,16 +510,16 @@ fn test_unify_flat_map1() {
                     ((seq $g)
                         (gen $g ($h $_ $e)
                             (push $h #u
-                                (match-prop $e S:2:2
-                                    (($_ $a)
-                                        (struct ($f)
+                                (struct ($f)
+                                    (match-prop $e S:2:2
+                                        (($_ $a)
                                             (prop $f O:0:0
                                                 (#u $a)
                                             )
-                                            (prop $f O:1:1
-                                                (#u $b)
-                                            )
                                         )
+                                    )
+                                    (prop $f O:1:1
+                                        (#u $b)
                                     )
                                 )
                             )

@@ -23,17 +23,6 @@ pub fn locate_variables(
     locator.finish()
 }
 
-pub fn locate_slice_variables(
-    nodes: &[&OntosNode],
-    variables: &BitSet,
-) -> Result<FnvHashMap<Variable, Path>, UnifierError> {
-    let mut locator = VarLocator::new(variables);
-    for (index, node) in nodes.iter().enumerate() {
-        locator.enter_child(index, |locator| locator.traverse_kind(node.kind()));
-    }
-    locator.finish()
-}
-
 struct VarLocator<'a> {
     variables: &'a BitSet,
     current_path: Path,

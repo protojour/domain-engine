@@ -373,6 +373,9 @@ impl<'a> OntosCodeGenerator<'a> {
     }
 
     fn var_local(&self, var: Variable) -> Local {
-        *self.scope.get(&var).expect("Variable not in scope")
+        *self
+            .scope
+            .get(&var)
+            .unwrap_or_else(|| panic!("Variable {var} not in scope"))
     }
 }

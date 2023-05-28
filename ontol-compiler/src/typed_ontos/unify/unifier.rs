@@ -15,11 +15,7 @@ use crate::{
     mem::Intern,
     typed_ontos::{
         lang::{Meta, OntosFunc, OntosKind, OntosNode, TypedBinder, TypedOntos},
-        unify::{
-            tagged_node::{union_free_variables, DebugVariables},
-            unification_tree::{add_to_tree, build_unification_tree},
-            var_path::{locate_slice_variables, locate_variables},
-        },
+        unify::{tagged_node::DebugVariables, var_path::locate_variables},
     },
     types::{Type, TypeRef, Types},
     Compiler, SourceSpan,
@@ -27,7 +23,7 @@ use crate::{
 
 use super::{
     tagged_node::{TaggedKind, TaggedNode, Tagger},
-    unification_tree::UnificationNode,
+    unification_tree::{Scoping, UnificationNode},
     UnifierError, VariableTracker,
 };
 
@@ -41,37 +37,20 @@ pub struct Unified<'m> {
 }
 
 pub fn unify_to_function<'m>(
-    source: OntosNode<'m>,
+    scope_source: OntosNode<'m>,
     target: OntosNode<'m>,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<OntosFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, &source);
-    var_tracker.visit_node(0, &target);
-
-    Unifier {
-        root_source: &source,
-        next_variable: var_tracker.next_variable(),
-        types: &mut compiler.types,
-    }
-    .unify_to_function(target)
-}
-
-pub fn unify_to_function2<'m>(
-    source: OntosNode<'m>,
-    target: OntosNode<'m>,
-    compiler: &mut Compiler<'m>,
-) -> UnifierResult<OntosFunc<'m>> {
-    let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, &source);
+    var_tracker.visit_node(0, &scope_source);
     var_tracker.visit_node(0, &target);
 
     let unified = Unifier {
-        root_source: &source,
+        root_source: &scope_source,
         next_variable: var_tracker.next_variable(),
         types: &mut compiler.types,
     }
-    .unify(Tagger::default().tag_node(target), &source)?;
+    .unify(Tagger::default().tag_node(target), &scope_source)?;
 
     let body = match unified.nodes.len() {
         0 => panic!("No nodes"),
@@ -136,98 +115,58 @@ impl<'a, 'm> Unifier<'a, 'm> {
 impl<'a, 'm> Unifier<'a, 'm> {
     fn unify(
         &mut self,
-        target_node: TaggedNode<'m>,
-        source_node: &OntosNode<'m>,
+        expr: TaggedNode<'m>,
+        scope_node: &OntosNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
-        trace!(
-            "free_variables: {:?}",
-            DebugVariables(&target_node.free_variables)
-        );
-
-        let variable_paths = locate_variables(source_node, &target_node.free_variables)?;
-        trace!("var_paths: {variable_paths:?}");
-
-        let mut u_tree = UnificationNode::default();
-
-        add_to_tree(target_node, &variable_paths, &mut u_tree);
-
-        trace!("{u_tree:#?}");
-
-        self.unify_source_node(None, u_tree, source_node)
+        let u_tree = build_u_tree(expr, scope_node)?;
+        self.unify_u_node(None, u_tree, scope_node)
     }
 
-    fn unify_to_function(&mut self, target: OntosNode<'m>) -> UnifierResult<OntosFunc<'m>> {
-        let meta = target.meta;
-
-        match target.kind {
-            NodeKind::Struct(binder, children) => {
-                let Unified {
-                    nodes,
-                    binder: input_binder,
-                } = self.unify_tagged_nodes(
-                    Tagger::default()
-                        .enter_binder(binder, |tagger| tagger.tag_nodes(children.into_iter())),
-                )?;
-
-                Ok(OntosFunc {
-                    arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
-                    body: OntosNode {
-                        kind: NodeKind::Struct(binder, nodes.into_iter().collect()),
-                        meta,
-                    },
-                })
+    fn unify_u_node(
+        &mut self,
+        debug_index: Option<usize>,
+        u_node: UnificationNode<'m>,
+        scope_source: &OntosNode<'m>,
+    ) -> UnifierResult<Unified<'m>> {
+        match u_node {
+            UnificationNode::Scoping(scoping) => {
+                self.unify_scoping(debug_index, scoping, scope_source)
             }
-            kind => {
-                let tagged_node = Tagger::default().tag_node(OntosNode { kind, meta });
-                let Unified {
-                    nodes,
-                    binder: input_binder,
-                } = self.unify_tagged_nodes(vec![tagged_node])?;
+            UnificationNode::Struct(struct_node) => {
+                let meta = struct_node.meta;
 
-                let body = match nodes.len() {
-                    0 => panic!("No nodes"),
-                    1 => nodes.into_iter().next().unwrap(),
-                    _ => panic!("Too many nodes"),
+                let Unified { binder, mut nodes } =
+                    self.unify_scoping(debug_index, struct_node.sub_scoping, scope_source)?;
+
+                for node in struct_node.nodes {
+                    nodes.push(node.into_ontos_node());
+                }
+
+                let node = OntosNode {
+                    kind: NodeKind::Struct(struct_node.binder, nodes.to_vec()),
+                    meta,
                 };
 
-                debug!("Root input binder: {input_binder:?}");
-
-                Ok(OntosFunc {
-                    arg: input_binder.ok_or(UnifierError::NoInputBinder)?,
-                    body,
+                Ok(Unified {
+                    binder,
+                    nodes: [node].into(),
                 })
             }
         }
     }
 
-    fn unify_tagged_nodes(
-        &mut self,
-        tagged_nodes: Vec<TaggedNode<'m>>,
-    ) -> UnifierResult<Unified<'m>> {
-        let free_variables = union_free_variables(tagged_nodes.as_slice());
-        trace!("free_variables: {:?}", DebugVariables(&free_variables));
-
-        let var_paths = locate_variables(self.root_source, &free_variables)?;
-        trace!("var_paths: {var_paths:?}");
-
-        let u_tree = build_unification_tree(tagged_nodes, &var_paths);
-        trace!("{u_tree:#?}");
-
-        self.unify_source_node(None, u_tree, self.root_source)
-    }
-
-    fn unify_source_node(
+    fn unify_scoping(
         &mut self,
         debug_index: Option<usize>,
-        mut u_node: UnificationNode<'m>,
-        source: &OntosNode<'m>,
+        mut scoping: Scoping<'m>,
+        scope_source: &OntosNode<'m>,
     ) -> UnifierResult<Unified<'m>> {
-        let OntosNode { kind, meta } = source;
+        let OntosNode { kind, meta } = scope_source;
         let meta = *meta;
         match kind {
             NodeKind::VariableRef(var) => {
-                debug!("unify_source_node({debug_index:?}, VariableRef)");
-                let nodes = self.merge_target_nodes(&mut u_node)?;
+                debug!("unify_scoping({debug_index:?}, VariableRef)");
+                let nodes = self.merge_target_nodes(&mut scoping)?;
                 Ok(Unified {
                     binder: Some(TypedBinder {
                         variable: *var,
@@ -236,12 +175,19 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes,
                 })
             }
-            NodeKind::Unit => panic!(),
+            NodeKind::Unit => {
+                debug!("unify_scoping({debug_index:?}, Unit)");
+                let nodes = self.merge_target_nodes(&mut scoping)?;
+                Ok(Unified {
+                    binder: None,
+                    nodes,
+                })
+            }
             NodeKind::Int(_int) => panic!(),
-            NodeKind::Call(proc, args) => match u_node.sub_unifications.len() {
+            NodeKind::Call(proc, args) => match scoping.sub_nodes.len() {
                 0 => {
-                    debug!("unify_source_node({debug_index:?}, Call const)");
-                    let args = self.unify_children(u_node, args)?;
+                    debug!("unify_scoping({debug_index:?}, Call const)");
+                    let args = self.unify_children(scoping, args)?;
                     Ok(Unified {
                         binder: None,
                         nodes: [OntosNode {
@@ -252,7 +198,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
                 1 => {
-                    debug!("unify_source_node({debug_index:?}, Call var)");
+                    debug!("unify_scoping({debug_index:?}, Call var)");
 
                     // Invert call algorithm:
                     // start with a _variable_ representing this expression.
@@ -265,7 +211,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         meta,
                     };
                     let inverted_call =
-                        self.invert_call_recursive(proc, args, u_node, meta, inner_expr)?;
+                        self.invert_call_recursive(proc, args, scoping, meta, inner_expr)?;
 
                     let return_ty = self.last_type(inverted_call.body.iter());
                     Ok(Unified {
@@ -291,11 +237,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     panic!("Multiple variables in function call!");
                 }
             },
-            NodeKind::Map(arg) => match u_node.sub_unifications.remove(&0) {
+            NodeKind::Map(arg) => match scoping.sub_nodes.remove(&0) {
                 None => {
-                    debug!("unify_source_node({debug_index:?}, Map const)");
+                    debug!("unify_scoping({debug_index:?}, Map const)");
 
-                    let unified_arg = self.unify_source_node(Some(0), u_node, arg)?;
+                    let unified_arg = self.unify_scoping(Some(0), scoping, arg)?;
                     let mut param: OntosNode = unified_arg.nodes.into_iter().next().unwrap();
                     let param_ty = param.meta.ty;
                     param.meta.ty = meta.ty;
@@ -312,9 +258,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
                 Some(sub_node) => {
-                    debug!("unify_source_node({debug_index:?}, Map var)");
+                    debug!("unify_scoping({debug_index:?}, Map var)");
 
-                    self.unify_source_node(Some(0), sub_node, arg)
+                    self.unify_u_node(Some(0), sub_node, arg)
                 }
             },
             NodeKind::Let(..) => {
@@ -322,14 +268,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             NodeKind::Seq(_binder, _attr) => Err(UnifierError::SequenceInputNotSupported),
             NodeKind::Struct(binder, nodes) => {
-                debug!("unify_source_node({debug_index:?}, Struct({}))", binder.0);
-                self.unify_source_struct(u_node, *binder, nodes, meta)
+                debug!("unify_scoping({debug_index:?}, Struct({}))", binder.0);
+                self.unify_struct_scoping(scoping, *binder, nodes, meta)
             }
             NodeKind::Prop(struct_var, id, variants) => {
-                debug!("unify_source_node({debug_index:?}, Prop)");
+                debug!("unify_scoping({debug_index:?}, Prop)");
                 let mut match_arms = vec![];
                 let mut ty = &Type::Tautology;
-                for (index, variant_u_node) in u_node.sub_unifications {
+                for (index, variant_u_node) in scoping.sub_nodes {
                     debug!("unify_source_arm({index})");
                     if let Some(typed_match_arm) =
                         self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?
@@ -367,28 +313,28 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 unimplemented!("BUG: MatchProp is an output node")
             }
             NodeKind::Gen(..) => {
-                debug!("unify_source_node({debug_index:?}, Gen)");
+                debug!("unify_scoping({debug_index:?}, Gen)");
                 todo!()
             }
             NodeKind::Iter(..) => {
-                debug!("unify_source_node({debug_index:?}, Iter)");
+                debug!("unify_scoping({debug_index:?}, Iter)");
                 todo!()
             }
             NodeKind::Push(..) => {
-                debug!("unify_source_node({debug_index:?}, Push)");
+                debug!("unify_scoping({debug_index:?}, Push)");
                 todo!()
             }
         }
     }
 
-    fn unify_source_struct(
+    fn unify_struct_scoping(
         &mut self,
-        u_node: UnificationNode<'m>,
+        scoping: Scoping<'m>,
         binder: Binder,
         nodes: &[OntosNode<'m>],
         meta: Meta<'m>,
     ) -> UnifierResult<Unified<'m>> {
-        let nodes = self.unify_children(u_node, nodes)?;
+        let nodes = self.unify_children(scoping, nodes)?;
         Ok(Unified {
             binder: Some(TypedBinder {
                 variable: binder.0,
@@ -401,12 +347,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_prop_variant_to_match_arm(
         &mut self,
         u_node: UnificationNode<'m>,
-        source: &PropVariant<'m, TypedOntos>,
+        scope_source: &PropVariant<'m, TypedOntos>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
-        if u_node.target_nodes.is_empty() {
+        let scoping = u_node.force_into_scoping();
+
+        if scoping.expressions.is_empty() {
             // treat this "transparently"
             Ok(self
-                .let_attr(u_node, source)?
+                .let_attr(scoping, scope_source)?
                 .map(|let_attr| TypedMatchArm {
                     arm: MatchArm {
                         pattern: PropPattern::Attr(let_attr.rel_binding, let_attr.val_binding),
@@ -414,166 +362,161 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     },
                     ty: let_attr.ty,
                 }))
-        } else if u_node.target_nodes.len() == 1 {
-            if !matches!(&source.dimension, Dimension::Seq(_)) {
+        } else if scoping.expressions.len() == 1 {
+            if !matches!(&scope_source.dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
             }
 
-            let target = u_node.target_nodes.into_iter().next().unwrap();
-            let _meta = target.meta;
+            let expr = scoping.expressions.into_iter().next().unwrap();
+            let _meta = expr.meta;
 
-            match target.kind {
+            match expr.kind {
                 TaggedKind::Seq(_) => {
-                    let free_variables = union_free_variables(target.children.0.iter());
-
-                    trace!("seq free_variables: {:?}", DebugVariables(&free_variables));
-
-                    let var_paths = locate_slice_variables(
-                        &[source.attr.rel.as_ref(), source.attr.val.as_ref()],
-                        &free_variables,
-                    )
-                    .unwrap();
-                    trace!("seq var_paths: {var_paths:?}");
-
-                    let sub_tree = build_unification_tree(target.children.0, &var_paths);
-
-                    trace!("seq u_tree: {sub_tree:#?}");
+                    let mut iterator = expr.children.0.into_iter();
+                    let rel_binding = self.unify_expr_pattern_binding(
+                        iterator.next().unwrap(),
+                        &scope_source.attr.rel,
+                    )?;
+                    let val_binding = self.unify_expr_pattern_binding(
+                        iterator.next().unwrap(),
+                        &scope_source.attr.val,
+                    )?;
 
                     let input_seq_var = self.alloc_var();
                     let output_seq_var = self.alloc_var();
 
-                    Ok(self.let_attr_pair(sub_tree, source)?.map(|let_attr| {
-                        // FIXME: Array/seq types must take two parameters
-                        let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
+                    Ok(self
+                        .let_attr_pair(rel_binding, val_binding)?
+                        .map(|let_attr| {
+                            // FIXME: Array/seq types must take two parameters
+                            let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
 
-                        let gen_node = OntosNode {
-                            kind: NodeKind::Gen(
-                                input_seq_var,
-                                IterBinder {
-                                    seq: PatternBinding::Binder(output_seq_var),
-                                    rel: let_attr.rel.binding,
-                                    val: let_attr.val.binding,
-                                },
-                                vec![OntosNode {
-                                    kind: NodeKind::Push(
-                                        output_seq_var,
-                                        Attribute {
-                                            rel: Box::new(self.single_node_or_unit(
-                                                let_attr.rel.nodes.into_iter(),
-                                            )),
-                                            val: Box::new(self.single_node_or_unit(
-                                                let_attr.val.nodes.into_iter(),
-                                            )),
-                                        },
-                                    ),
-                                    meta: Meta {
-                                        ty: self.unit_type(),
-                                        span: SourceSpan::none(),
+                            let gen_node = OntosNode {
+                                kind: NodeKind::Gen(
+                                    input_seq_var,
+                                    IterBinder {
+                                        seq: PatternBinding::Binder(output_seq_var),
+                                        rel: let_attr.rel.binding,
+                                        val: let_attr.val.binding,
                                     },
-                                }],
-                            ),
-                            meta: Meta {
-                                ty: seq_ty,
-                                span: SourceSpan::none(),
-                            },
-                        };
+                                    vec![OntosNode {
+                                        kind: NodeKind::Push(
+                                            output_seq_var,
+                                            Attribute {
+                                                rel: Box::new(self.single_node_or_unit(
+                                                    let_attr.rel.nodes.into_iter(),
+                                                )),
+                                                val: Box::new(self.single_node_or_unit(
+                                                    let_attr.val.nodes.into_iter(),
+                                                )),
+                                            },
+                                        ),
+                                        meta: Meta {
+                                            ty: self.unit_type(),
+                                            span: SourceSpan::none(),
+                                        },
+                                    }],
+                                ),
+                                meta: Meta {
+                                    ty: seq_ty,
+                                    span: SourceSpan::none(),
+                                },
+                            };
 
-                        TypedMatchArm {
-                            arm: MatchArm {
-                                pattern: PropPattern::Seq(PatternBinding::Binder(input_seq_var)),
-                                nodes: vec![gen_node],
-                            },
-                            ty: seq_ty,
-                        }
-                    }))
+                            TypedMatchArm {
+                                arm: MatchArm {
+                                    pattern: PropPattern::Seq(PatternBinding::Binder(
+                                        input_seq_var,
+                                    )),
+                                    nodes: vec![gen_node],
+                                },
+                                ty: seq_ty,
+                            }
+                        }))
                 }
-                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(label)) => {
-                    let free_variables = union_free_variables(target.children.0.iter());
-
-                    trace!(
-                        "seq prop ({label}) free_variables: {:?}",
-                        DebugVariables(&free_variables)
-                    );
-
-                    let var_paths = locate_slice_variables(
-                        &[source.attr.rel.as_ref(), source.attr.val.as_ref()],
-                        &free_variables,
-                    )
-                    .unwrap();
-                    trace!("seq prop ({label}) var_paths: {var_paths:?}");
-
-                    let sub_tree = build_unification_tree(target.children.0, &var_paths);
-
-                    trace!("seq prop ({label}) sub_tree: {sub_tree:#?}");
+                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
+                    let mut iterator = expr.children.0.into_iter();
+                    let rel_binding = self.unify_expr_pattern_binding(
+                        iterator.next().unwrap(),
+                        &scope_source.attr.rel,
+                    )?;
+                    let val_binding = self.unify_expr_pattern_binding(
+                        iterator.next().unwrap(),
+                        &scope_source.attr.val,
+                    )?;
 
                     let input_seq_var = self.alloc_var();
                     let output_seq_var = self.alloc_var();
 
-                    Ok(self.let_attr_pair(sub_tree, source)?.map(|let_attr| {
-                        // FIXME: Array/seq types must take two parameters
-                        let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
+                    Ok(self
+                        .let_attr_pair(rel_binding, val_binding)?
+                        .map(|let_attr| {
+                            // FIXME: Array/seq types must take two parameters
+                            let seq_ty = self.types.intern(Type::Array(let_attr.val.ty));
 
-                        let gen_node = OntosNode {
-                            kind: NodeKind::Gen(
-                                input_seq_var,
-                                IterBinder {
-                                    seq: PatternBinding::Binder(output_seq_var),
-                                    rel: let_attr.rel.binding,
-                                    val: let_attr.val.binding,
-                                },
-                                vec![OntosNode {
-                                    kind: NodeKind::Push(
-                                        output_seq_var,
-                                        Attribute {
-                                            rel: Box::new(self.single_node_or_unit(
-                                                let_attr.rel.nodes.into_iter(),
-                                            )),
-                                            val: Box::new(self.single_node_or_unit(
-                                                let_attr.val.nodes.into_iter(),
-                                            )),
+                            let gen_node = OntosNode {
+                                kind: NodeKind::Gen(
+                                    input_seq_var,
+                                    IterBinder {
+                                        seq: PatternBinding::Binder(output_seq_var),
+                                        rel: let_attr.rel.binding,
+                                        val: let_attr.val.binding,
+                                    },
+                                    vec![OntosNode {
+                                        kind: NodeKind::Push(
+                                            output_seq_var,
+                                            Attribute {
+                                                rel: Box::new(self.single_node_or_unit(
+                                                    let_attr.rel.nodes.into_iter(),
+                                                )),
+                                                val: Box::new(self.single_node_or_unit(
+                                                    let_attr.val.nodes.into_iter(),
+                                                )),
+                                            },
+                                        ),
+                                        meta: Meta {
+                                            ty: self.unit_type(),
+                                            span: SourceSpan::none(),
                                         },
-                                    ),
-                                    meta: Meta {
-                                        ty: self.unit_type(),
-                                        span: SourceSpan::none(),
-                                    },
-                                }],
-                            ),
-                            meta: Meta {
+                                    }],
+                                ),
+                                meta: Meta {
+                                    ty: seq_ty,
+                                    span: SourceSpan::none(),
+                                },
+                            };
+
+                            let prop_node = OntosNode {
+                                // FIXME: It feels wrong to construct the NodeKind::Prop explicitly here.
+                                // this node should already be in target_nodes, so what should instead be done
+                                // is to put its variables into scope.
+                                kind: NodeKind::Prop(
+                                    struct_var,
+                                    prop_id,
+                                    vec![PropVariant {
+                                        attr: Attribute {
+                                            rel: Box::new(self.unit_node()),
+                                            val: Box::new(gen_node),
+                                        },
+                                        dimension: Dimension::Singular,
+                                    }],
+                                ),
+                                meta: Meta {
+                                    ty: self.unit_type(),
+                                    span: SourceSpan::none(),
+                                },
+                            };
+
+                            TypedMatchArm {
+                                arm: MatchArm {
+                                    pattern: PropPattern::Seq(PatternBinding::Binder(
+                                        input_seq_var,
+                                    )),
+                                    nodes: vec![prop_node],
+                                },
                                 ty: seq_ty,
-                                span: SourceSpan::none(),
-                            },
-                        };
-
-                        let prop_node = OntosNode {
-                            // FIXME: It feels wrong to construct the NodeKind::Prop explicitly here.
-                            // this node should already be in target_nodes, so what should instead be done
-                            // is to put its variables into scope.
-                            kind: NodeKind::Prop(
-                                struct_var,
-                                prop_id,
-                                vec![PropVariant {
-                                    attr: Attribute {
-                                        rel: Box::new(self.unit_node()),
-                                        val: Box::new(gen_node),
-                                    },
-                                    dimension: Dimension::Singular,
-                                }],
-                            ),
-                            meta: Meta {
-                                ty: self.unit_type(),
-                                span: SourceSpan::none(),
-                            },
-                        };
-
-                        TypedMatchArm {
-                            arm: MatchArm {
-                                pattern: PropPattern::Seq(PatternBinding::Binder(input_seq_var)),
-                                nodes: vec![prop_node],
-                            },
-                            ty: seq_ty,
-                        }
-                    }))
+                            }
+                        }))
                 }
                 other => panic!("BUG: Unsupported kind: {other:?}"),
             }
@@ -584,18 +527,18 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn let_attr(
         &mut self,
-        mut u_node: UnificationNode<'m>,
-        source: &PropVariant<'m, TypedOntos>,
+        mut scoping: Scoping<'m>,
+        scope_source: &PropVariant<'m, TypedOntos>,
     ) -> UnifierResult<Option<LetAttr<'m>>> {
         let rel_binding = self.unify_pattern_binding(
             Some(0),
-            u_node.sub_unifications.remove(&0),
-            &source.attr.rel,
+            scoping.sub_nodes.remove(&0),
+            &scope_source.attr.rel,
         )?;
         let val_binding = self.unify_pattern_binding(
             Some(1),
-            u_node.sub_unifications.remove(&1),
-            &source.attr.val,
+            scoping.sub_nodes.remove(&1),
+            &scope_source.attr.val,
         )?;
 
         Ok(match (rel_binding.nodes, val_binding.nodes) {
@@ -631,20 +574,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn let_attr_pair(
         &mut self,
-        mut u_node: UnificationNode<'m>,
-        source: &PropVariant<'m, TypedOntos>,
+        rel_binding: UnifyPatternBinding<'m>,
+        val_binding: UnifyPatternBinding<'m>,
     ) -> UnifierResult<Option<LetAttrPair<'m>>> {
-        let rel_binding = self.unify_pattern_binding(
-            Some(0),
-            u_node.sub_unifications.remove(&0),
-            &source.attr.rel,
-        )?;
-        let val_binding = self.unify_pattern_binding(
-            Some(1),
-            u_node.sub_unifications.remove(&1),
-            &source.attr.val,
-        )?;
-
         Ok(match (rel_binding.nodes, val_binding.nodes) {
             (None, None) => {
                 debug!("No nodes in variant (pair) binding");
@@ -696,11 +628,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         proc: &BuiltinProc,
         args: &[OntosNode<'m>],
-        mut u_node: UnificationNode<'m>,
+        mut scoping: Scoping<'m>,
         meta: Meta<'m>,
         inner_expr: OntosNode<'m>,
     ) -> UnifierResult<InvertedCall<'m>> {
-        if u_node.sub_unifications.len() > 1 {
+        if scoping.sub_nodes.len() > 1 {
             panic!("Too many sub unifications in function call");
         }
 
@@ -715,7 +647,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         let mut new_args: Vec<OntosNode<'m>> = vec![];
 
-        let (unification_idx, mut sub_unification) = u_node.sub_unifications.pop_first().unwrap();
+        let (unification_idx, sub_unification) = scoping.sub_nodes.pop_first().unwrap();
+        let mut sub_scoping = sub_unification.force_into_scoping();
+
         for (index, arg) in args.iter().enumerate() {
             if index != unification_idx {
                 new_args.push(arg.clone());
@@ -727,7 +661,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         match &pivot_arg.kind {
             NodeKind::VariableRef(var) => {
                 new_args.insert(unification_idx, inner_expr);
-                let body = self.merge_target_nodes(&mut sub_unification)?;
+                let body = self.merge_target_nodes(&mut sub_scoping)?;
 
                 Ok(InvertedCall {
                     let_binder: *var,
@@ -747,7 +681,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 self.invert_call_recursive(
                     child_proc,
                     child_args,
-                    sub_unification,
+                    sub_scoping,
                     pivot_arg.meta,
                     new_inner_expr,
                 )
@@ -756,24 +690,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn merge_target_nodes(
-        &mut self,
-        u_node: &mut UnificationNode<'m>,
-    ) -> UnifierResult<UnifiedNodes<'m>> {
+    fn merge_target_nodes(&mut self, scoping: &mut Scoping<'m>) -> UnifierResult<UnifiedNodes<'m>> {
         let mut merged: UnifiedNodes<'m> = Default::default();
         let mut property_groups: IndexMap<(Variable, PropertyId), Vec<(Dimension, TaggedNode)>> =
             Default::default();
 
-        for tagged_node in std::mem::take(&mut u_node.target_nodes) {
-            match &tagged_node.kind {
+        for expr in std::mem::take(&mut scoping.expressions) {
+            match &expr.kind {
                 TaggedKind::PropVariant(variable, property_id, dimension) => {
                     property_groups
                         .entry((*variable, *property_id))
                         .or_default()
-                        .push((*dimension, tagged_node));
+                        .push((*dimension, expr));
                 }
                 _ => {
-                    merged.push(tagged_node.into_ontos_node());
+                    merged.push(expr.into_ontos_node());
                 }
             }
         }
@@ -808,8 +739,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
             })
         }
 
-        for root_u_node in std::mem::take(&mut u_node.dependents) {
-            let unified = self.unify_source_node(None, root_u_node, self.root_source)?;
+        for root_u_node in std::mem::take(&mut scoping.dependent_scopes) {
+            let unified = self.unify_u_node(None, root_u_node, self.root_source)?;
             merged.extend(unified.nodes);
         }
 
@@ -818,18 +749,27 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_children(
         &mut self,
-        u_node: UnificationNode<'m>,
+        scoping: Scoping<'m>,
         children: &[OntosNode<'m>],
     ) -> UnifierResult<Vec<OntosNode<'m>>> {
         let mut output = vec![];
-        for (index, sub_node) in u_node.sub_unifications {
+        for (index, sub_node) in scoping.sub_nodes {
             output.extend(
-                self.unify_source_node(Some(index), sub_node, &children[index])?
+                self.unify_u_node(Some(index), sub_node, &children[index])?
                     .nodes,
             );
         }
 
         Ok(output)
+    }
+
+    fn unify_expr_pattern_binding(
+        &mut self,
+        expr: TaggedNode<'m>,
+        scope_source: &OntosNode<'m>,
+    ) -> UnifierResult<UnifyPatternBinding<'m>> {
+        let u_tree = build_u_tree(expr, scope_source)?;
+        self.unify_pattern_binding(None, Some(u_tree), scope_source)
     }
 
     fn unify_pattern_binding(
@@ -848,7 +788,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
         };
 
-        let Unified { nodes, binder } = self.unify_source_node(debug_index, u_node, source)?;
+        let Unified { nodes, binder } = self.unify_u_node(debug_index, u_node, source)?;
         let binding = match binder {
             Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
             None => PatternBinding::Wildcard,
@@ -922,4 +862,19 @@ impl<'a, 'm> Unifier<'a, 'm> {
             None => self.unit_node(),
         }
     }
+}
+
+fn build_u_tree<'m>(
+    expr: TaggedNode<'m>,
+    scope_node: &OntosNode<'m>,
+) -> UnifierResult<UnificationNode<'m>> {
+    trace!("free_variables: {:?}", DebugVariables(&expr.free_variables));
+
+    let variable_paths = locate_variables(scope_node, &expr.free_variables)?;
+    trace!("var_paths: {variable_paths:?}");
+
+    let u_tree = UnificationNode::build(expr, &variable_paths);
+
+    trace!("{u_tree:#?}");
+    Ok(u_tree)
 }
