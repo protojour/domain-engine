@@ -42,9 +42,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match node.meta.ty {
             Type::Error | Type::Infer(_) => {}
             _ => {
-                let type_var = ctx.ontos_inference.new_type_variable(expr_id);
+                let type_var = ctx.inference.new_type_variable(expr_id);
                 debug!("Check expr(2) root type result: {:?}", node.meta.ty);
-                ctx.ontos_inference
+                ctx.inference
                     .eq_relations
                     .unify_var_value(type_var, UnifyValue::Known(node.meta.ty))
                     .unwrap();
@@ -133,7 +133,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let ty = self
                             .types
-                            .intern(Type::Infer(ctx.ontos_inference.new_type_variable(expr_id)));
+                            .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
 
                         debug!("Infer seq type: {ty:?}");
                         ty
@@ -197,7 +197,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontos_arm.expr_id
                 };
 
-                let type_var = ctx.ontos_inference.new_type_variable(arm_expr_id);
+                let type_var = ctx.inference.new_type_variable(arm_expr_id);
 
                 match expected_ty {
                     Some(Type::Array(elem_ty)) => self.type_error_node(
@@ -215,7 +215,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         };
 
                         match ctx
-                            .ontos_inference
+                            .inference
                             .eq_relations
                             .unify_var_value(type_var, UnifyValue::Known(expected_ty))
                         {
@@ -262,7 +262,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match (expected_ty, node.meta.ty) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some(Type::Infer(type_var)), _) => {
-                ctx.ontos_inference
+                ctx.inference
                     .eq_relations
                     .unify_var_value(*type_var, UnifyValue::Known(node.meta.ty))
                     .unwrap();

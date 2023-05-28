@@ -6,11 +6,11 @@ use ontos::visitor::OntosMutVisitor;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, OntosMapCodegenTask},
+    codegen::task::{CodegenTask, MapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
-    hir_node::{BindDepth, HirBodyIdx, HirKind, HirNode},
+    hir_node::{HirBodyIdx, HirKind, HirNode},
     mem::Intern,
     type_check::unify_ctx::{Arm, VariableMapping},
     typed_ontos::lang::OntosNode,
@@ -20,7 +20,7 @@ use crate::{
 
 use super::{
     ontos_type_inference::{OntosArmTypeInference, OntosVariableMapper},
-    unify_ctx::{CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
+    unify_ctx::{BindDepth, CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
     TypeCheck, TypeEquation, TypeError,
 };
 
@@ -33,7 +33,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = CheckUnifyExprContext::new();
-        let _root_body_idx = ctx.alloc_hir_body_idx();
 
         {
             let mut map_check = MapCheck {
@@ -59,12 +58,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             )?;
         }
 
-        self.check_arms_v2(def, first_id, second_id, &mut ctx)?;
+        self.build_arms(def, first_id, second_id, &mut ctx)?;
 
         Ok(self.types.intern(Type::Tautology))
     }
 
-    fn check_arms_v2(
+    fn build_arms(
         &mut self,
         def: &Def,
         first_id: ExprId,
@@ -82,12 +81,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_ontos_unify_arms(&mut first, &mut second, ctx);
 
-        self.codegen_tasks
-            .push(CodegenTask::OntosMap(OntosMapCodegenTask {
-                first,
-                second,
-                span: def.span,
-            }));
+        self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
+            first,
+            second,
+            span: def.span,
+        }));
 
         Ok(())
     }
@@ -99,7 +97,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) {
         let mut inference = OntosArmTypeInference {
             types: self.types,
-            eq_relations: &mut ctx.ontos_inference.eq_relations,
+            eq_relations: &mut ctx.inference.eq_relations,
             errors: self.errors,
         };
         inference.visit_node(0, node);
@@ -116,11 +114,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let second_arm = explicit_var.ontos_arms.remove(&Arm::Second);
 
             if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
-                let first_type_var = ctx.ontos_inference.new_type_variable(first_arm.expr_id);
-                let second_type_var = ctx.ontos_inference.new_type_variable(second_arm.expr_id);
+                let first_type_var = ctx.inference.new_type_variable(first_arm.expr_id);
+                let second_type_var = ctx.inference.new_type_variable(second_arm.expr_id);
 
                 match ctx
-                    .ontos_inference
+                    .inference
                     .eq_relations
                     .unify_var_var(first_type_var, second_type_var)
                 {

@@ -1,7 +1,7 @@
 pub mod task;
 
+mod code_generator;
 mod ir;
 mod link;
-mod ontos_code_generator;
 mod optimize;
 mod proc_builder;

@@ -9,15 +9,15 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::ontos_code_generator::map_codegen_ontos,
+    codegen::code_generator::map_codegen,
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
 use super::{
+    code_generator::const_codegen,
     link::{link, LinkResult},
-    ontos_code_generator::const_codegen_ontos,
     proc_builder::ProcBuilder,
 };
 
@@ -47,7 +47,7 @@ impl<'m> CodegenTasks<'m> {
 pub enum CodegenTask<'m> {
     // A procedure with 0 arguments, used to produce a constant value
     Const(ConstCodegenTask<'m>),
-    OntosMap(OntosMapCodegenTask<'m>),
+    Map(MapCodegenTask<'m>),
 }
 
 pub struct ConstCodegenTask<'m> {
@@ -55,7 +55,7 @@ pub struct ConstCodegenTask<'m> {
     pub node: OntosNode<'m>,
 }
 
-pub struct OntosMapCodegenTask<'m> {
+pub struct MapCodegenTask<'m> {
     pub first: OntosNode<'m>,
     pub second: OntosNode<'m>,
     pub span: SourceSpan,
@@ -69,7 +69,7 @@ impl<'m> Debug for ConstCodegenTask<'m> {
     }
 }
 
-impl<'m> Debug for OntosMapCodegenTask<'m> {
+impl<'m> Debug for MapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OntosMapCodegenTask")
             .field("first", &DebugViaDisplay(&self.first))
@@ -127,9 +127,9 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
-                const_codegen_ontos(&mut proc_table, node, def_id);
+                const_codegen(&mut proc_table, node, def_id);
             }
-            CodegenTask::OntosMap(map_task) => {
+            CodegenTask::Map(map_task) => {
                 debug!("1st:\n{}", map_task.first);
                 debug!("2nd:\n{}", map_task.second);
 
@@ -137,12 +137,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 if let Ok(func) =
                     unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
                 {
-                    map_codegen_ontos(&mut proc_table, func);
+                    map_codegen(&mut proc_table, func);
                 }
 
                 debug!("Ontos backward start");
                 if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
-                    map_codegen_ontos(&mut proc_table, func);
+                    map_codegen(&mut proc_table, func);
                 }
             }
         }

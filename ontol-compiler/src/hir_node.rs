@@ -9,12 +9,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use smallvec::SmallVec;
-
 use crate::{types::TypeRef, SourceSpan};
-
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct BindDepth(pub u16);
 
 /// A "code" node with complete type information attached.
 /// Hir means High-level Intermediate Representation.
@@ -30,21 +25,6 @@ pub struct HirNode<'m> {
 pub enum HirKind {
     /// A variable definition
     Variable(ontos::Variable),
-    /// Match a value
-    #[allow(unused)]
-    Match(HirIdx, HirMatchTable),
-}
-
-#[derive(Clone, Debug)]
-pub struct HirMatchTable {
-    pub table: SmallVec<[(HirPredicate, HirBodyIdx); 2]>,
-}
-
-#[derive(Clone, Debug)]
-#[allow(unused)]
-pub enum HirPredicate {
-    True,
-    IsNotUnit,
 }
 
 /// An index/reference to a typed HirNode.
