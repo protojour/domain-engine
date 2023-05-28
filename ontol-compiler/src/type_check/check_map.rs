@@ -197,6 +197,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
+                    let aggr_var = ctx.alloc_ontos_variable();
                     let aggr_body_idx = ctx.alloc_hir_body_idx();
                     debug!("first arm seq: expr_id={expr_id:?}");
                     ctx.body_map.insert(*expr_id, aggr_body_idx);
@@ -206,13 +207,11 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     );
 
                     // Register aggregation variable
-                    let aggr_var = ctx.alloc_ontos_variable();
-                    let aggr_var_idx = ctx.nodes.add(HirNode {
+                    let _ = ctx.nodes.add(HirNode {
                         ty: self.types.intern(Type::Tautology),
                         kind: HirKind::Variable(aggr_var),
                         span: expr.span,
                     });
-                    ctx.body_variables.insert(aggr_body_idx, aggr_var_idx);
 
                     let result =
                         ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx, _| {

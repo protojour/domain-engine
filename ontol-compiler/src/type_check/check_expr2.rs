@@ -30,10 +30,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr_id: ExprId,
         ctx: &mut CheckUnifyExprContext<'m>,
     ) -> OntosNode<'m> {
-        // temporarily remove from map
         let expr = self.expressions.map.remove(&expr_id).unwrap();
 
-        let node = self.check_expr2(
+        let node = self.build_node(
             &expr, // Don't pass inference types as the expected type:
             None, ctx,
         );
@@ -51,12 +50,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        self.expressions.map.insert(expr_id, expr);
-
         node
     }
 
-    pub(super) fn check_expr2(
+    pub(super) fn build_node(
         &mut self,
         expr: &Expr,
         expected_ty: Option<TypeRef<'m>>,
@@ -84,7 +81,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let mut parameters = vec![];
                         for (arg, param_ty) in args.iter().zip(*params) {
-                            let node = self.check_expr2(arg, Some(param_ty), ctx);
+                            let node = self.build_node(arg, Some(param_ty), ctx);
                             parameters.push(node);
                         }
 
@@ -100,7 +97,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::Struct(type_path, attributes), expected_ty) => {
-                let struct_node = self.check_struct2(type_path, attributes, expr.span, ctx);
+                let struct_node = self.build_struct(type_path, attributes, expr.span, ctx);
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
@@ -140,7 +137,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 };
 
-                let inner_node = self.check_expr2(inner, Some(elem_ty), ctx);
+                let inner_node = self.build_node(inner, Some(elem_ty), ctx);
                 let aggr_body_idx = *ctx.body_map.get(aggr_expr_id).unwrap();
                 let label = ctx.get_or_compute_seq_label(aggr_body_idx);
                 let array_ty = self.types.intern(Type::Array(elem_ty));
@@ -273,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         node
     }
 
-    fn check_struct2(
+    fn build_struct(
         &mut self,
         type_path: &TypePath,
         attributes: &[ExprStructAttr],
@@ -365,7 +362,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .1
                             {
                                 ValueCardinality::One => {
-                                    let node = self.check_expr2(expr, Some(object_ty), ctx);
+                                    let node = self.build_node(expr, Some(object_ty), ctx);
                                     PropVariant {
                                         dimension: Dimension::Singular,
                                         attr: Attribute {
@@ -376,7 +373,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                                 ValueCardinality::Many => match &expr.kind {
                                     ExprKind::Seq(aggr_expr_id, inner) => {
-                                        let node = self.check_expr2(inner, Some(object_ty), ctx);
+                                        let node = self.build_node(inner, Some(object_ty), ctx);
                                         let aggr_body_idx =
                                             *ctx.body_map.get(aggr_expr_id).unwrap();
                                         let label = ctx.get_or_compute_seq_label(aggr_body_idx);
@@ -457,7 +454,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .expect("BUG: problem getting anonymous property meta");
 
                         let object_ty = self.check_def(meta.relationship.object.0.def_id);
-                        let inner_node = self.check_expr2(value, Some(object_ty), ctx);
+                        let inner_node = self.build_node(value, Some(object_ty), ctx);
 
                         inner_node.kind
                     }

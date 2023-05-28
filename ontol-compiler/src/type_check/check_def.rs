@@ -61,7 +61,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 let mut ctx = CheckUnifyExprContext::new();
-                let node = self.check_expr2(&expr, Some(ty), &mut ctx);
+                let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks
                     .push(CodegenTask::Const(ConstCodegenTask { def_id, node }));

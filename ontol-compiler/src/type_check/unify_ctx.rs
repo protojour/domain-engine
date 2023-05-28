@@ -17,7 +17,6 @@ pub struct CheckUnifyExprContext<'m> {
     pub bodies: Vec<CtrlFlowBody<'m>>,
     pub nodes: HirNodeTable<'m>,
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
-    pub body_variables: FnvHashMap<HirBodyIdx, HirIdx>,
     pub body_map: FnvHashMap<ExprId, HirBodyIdx>,
     pub ontos_seq_labels: FnvHashMap<HirBodyIdx, ontos::Label>,
 
@@ -41,7 +40,6 @@ impl<'m> CheckUnifyExprContext<'m> {
             bodies: Default::default(),
             nodes: HirNodeTable::default(),
             explicit_variables: Default::default(),
-            body_variables: Default::default(),
             body_map: Default::default(),
             ontos_seq_labels: Default::default(),
             ctrl_flow_forest: Default::default(),
