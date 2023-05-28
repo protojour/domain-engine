@@ -1,5 +1,7 @@
 //! # Typed expressions
 //!
+//! TODO: This module is a remnant of the old code generator and should be removed
+//!
 //! These data structures are emitted from the type check stage, and used in the codegen stage.
 
 use std::{
@@ -7,8 +9,6 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use smallvec::SmallVec;
 
 use crate::{types::TypeRef, SourceSpan};
@@ -20,33 +20,16 @@ pub struct BindDepth(pub u16);
 /// Hir means High-level Intermediate Representation.
 #[derive(Clone, Debug)]
 pub struct HirNode<'m> {
-    pub kind: HirKind<'m>,
+    pub kind: HirKind,
     pub ty: TypeRef<'m>,
     pub span: SourceSpan,
 }
 
 /// The different kinds of nodes.
 #[derive(Clone, Debug)]
-pub enum HirKind<'m> {
-    /// An expression with no information
-    Unit,
-    /// Call to a built-in procedure
-    Call(BuiltinProc, SmallVec<[HirIdx; 2]>),
-    /// A value pattern ("object" with one anonymous property/attribute)
-    ValuePattern(HirIdx),
-    /// A struct pattern, containing destructuring of properties
-    StructPattern(IndexMap<PropertyId, HirIdx>),
+pub enum HirKind {
     /// A variable definition
     Variable(ontos::Variable),
-    /// A variable reference (usage site)
-    VariableRef(HirIdx),
-    /// A constant/literal expression
-    Constant(i64),
-    /// A mapping from one type to another.
-    /// Normally translates into a procedure call.
-    MapCall(HirIdx, TypeRef<'m>),
-    /// Aggregate an array variable, call the given body for each element
-    Aggr(HirIdx, HirBodyIdx),
     /// Match a value
     #[allow(unused)]
     Match(HirIdx, HirMatchTable),
@@ -88,22 +71,6 @@ pub struct HirBody {
     pub second: HirIdx,
 }
 
-impl HirBody {
-    pub fn order(&self, direction: CodeDirection) -> (HirIdx, HirIdx) {
-        match direction {
-            CodeDirection::Forward => (self.first, self.second),
-            CodeDirection::Backward => (self.second, self.first),
-        }
-    }
-
-    pub fn bindings_node(&self, direction: CodeDirection) -> HirIdx {
-        match direction {
-            CodeDirection::Forward => self.first,
-            CodeDirection::Backward => self.second,
-        }
-    }
-}
-
 impl Default for HirBody {
     fn default() -> Self {
         Self {
@@ -111,12 +78,6 @@ impl Default for HirBody {
             second: ERROR_NODE,
         }
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum CodeDirection {
-    Forward,
-    Backward,
 }
 
 #[derive(Default, Debug)]

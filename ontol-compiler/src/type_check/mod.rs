@@ -10,7 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, Compiler, IrVariant, SourceSpan, TYPE_CHECKER,
+    CompileErrors, Compiler, SourceSpan,
 };
 
 pub mod check_def;
@@ -18,7 +18,6 @@ pub mod check_domain_types;
 pub mod check_union;
 pub mod inference;
 
-mod check_expr;
 mod check_expr2;
 mod check_map;
 mod check_relationship;
@@ -64,28 +63,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.types.intern(Type::Error)
     }
 
-    fn ir_error(
-        &mut self,
-        error: CompileError,
-        span: &SourceSpan,
-        variant: IrVariant,
-    ) -> TypeRef<'m> {
-        if variant == TYPE_CHECKER {
-            self.errors.push(error.spanned(span));
-        }
-        self.types.intern(Type::Error)
-    }
-
-    fn type_error(
-        &mut self,
-        error: TypeError<'m>,
-        span: &SourceSpan,
-        variant: IrVariant,
-    ) -> TypeRef<'m> {
-        if variant != TYPE_CHECKER {
-            return self.types.intern(Type::Error);
-        }
-
+    fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         match error {
             TypeError::Mismatch(equation) => self.error(
                 CompileError::TypeMismatch {

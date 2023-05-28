@@ -19,7 +19,7 @@ use crate::{
     },
     typed_ontos::lang::{Meta, OntosNode, TypedOntos},
     types::{Type, TypeRef},
-    IrVariant, SourceSpan,
+    SourceSpan,
 };
 
 use super::{unify_ctx::CheckUnifyExprContext, TypeCheck, TypeEquation, TypeError};
@@ -125,11 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let elem_ty = match expected_ty {
                     Some(Type::Array(elem_ty)) => elem_ty,
                     Some(other_ty) => {
-                        self.type_error(
-                            TypeError::MustBeSequence(other_ty),
-                            &expr.span,
-                            IrVariant::Ontos,
-                        );
+                        self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
                         self.types.intern(Type::Error)
                     }
                     None => {
@@ -344,31 +340,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
                                 Some(DefKind::StringLiteral(lit)) => lit,
                                 _ => {
-                                    self.ir_error(
-                                        CompileError::NamedPropertyExpected,
-                                        prop_span,
-                                        IrVariant::Ontos,
-                                    );
+                                    self.error(CompileError::NamedPropertyExpected, prop_span);
                                     continue;
                                 }
                             };
                             let match_property = match match_properties.get_mut(attr_prop) {
                                 Some(match_properties) => match_properties,
                                 None => {
-                                    self.ir_error(
-                                        CompileError::UnknownProperty,
-                                        prop_span,
-                                        IrVariant::Ontos,
-                                    );
+                                    self.error(CompileError::UnknownProperty, prop_span);
                                     continue;
                                 }
                             };
                             if match_property.used {
-                                self.ir_error(
-                                    CompileError::DuplicateProperty,
-                                    prop_span,
-                                    IrVariant::Ontos,
-                                );
+                                self.error(CompileError::DuplicateProperty, prop_span);
                                 continue;
                             }
                             match_property.used = true;
@@ -409,7 +393,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         self.type_error(
                                             TypeError::VariableMustBeSequenceEnclosed(object_ty),
                                             &expr.span,
-                                            IrVariant::Ontos,
                                         );
                                         continue;
                                     }
@@ -447,11 +430,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for (prop_name, match_property) in match_properties.into_iter() {
                             if !match_property.used {
-                                self.ir_error(
-                                    CompileError::MissingProperty(prop_name.into()),
-                                    &span,
-                                    IrVariant::Ontos,
-                                );
+                                self.error(CompileError::MissingProperty(prop_name.into()), &span);
                             }
                         }
 
@@ -507,12 +486,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> OntosNode<'m> {
-        self.type_error(error, span, IrVariant::Ontos);
+        self.type_error(error, span);
         self.make_error_node(span)
     }
 
     fn error_node(&mut self, error: CompileError, span: &SourceSpan) -> OntosNode<'m> {
-        self.ir_error(error, span, IrVariant::Ontos);
+        self.error(error, span);
         self.make_error_node(span)
     }
 

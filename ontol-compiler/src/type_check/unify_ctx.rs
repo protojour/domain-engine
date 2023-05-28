@@ -75,10 +75,6 @@ impl<'m> CheckUnifyExprContext<'m> {
         HirBodyIdx(next)
     }
 
-    pub fn expr_body_mut(&mut self, id: HirBodyIdx) -> &mut CtrlFlowBody<'m> {
-        self.bodies.get_mut(id.0 as usize).unwrap()
-    }
-
     pub fn alloc_ontos_variable(&mut self) -> ontos::Variable {
         let alloc = self.ontos_var_allocations.get_mut(0).unwrap();
         let var = ontos::Variable(*alloc);

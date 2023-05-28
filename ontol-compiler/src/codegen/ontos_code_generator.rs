@@ -13,7 +13,6 @@ use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
     typed_ontos::lang::{OntosFunc, OntosNode},
     types::Type,
-    IrVariant, CODE_GENERATOR,
 };
 
 use super::{
@@ -58,18 +57,13 @@ pub(super) fn map_codegen_ontos(proc_table: &mut ProcTable, func: OntosFunc) -> 
         (Some(from_def), Some(to_def)) => {
             debug!("Saving proc: {:?} -> {:?}", func.arg.ty, return_ty);
 
-            if CODE_GENERATOR == IrVariant::Ontos {
-                proc_table
-                    .map_procedures
-                    .insert((from_def, to_def), builder);
-            }
+            proc_table
+                .map_procedures
+                .insert((from_def, to_def), builder);
             true
         }
         (from_def, to_def) => {
-            if CODE_GENERATOR == IrVariant::Ontos {
-                panic!("Problem finding def ids: ({from_def:?}, {to_def:?})");
-            }
-            false
+            panic!("Problem finding def ids: ({from_def:?}, {to_def:?})");
         }
     }
 }

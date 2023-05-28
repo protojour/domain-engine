@@ -6,20 +6,19 @@ use ontos::visitor::OntosMutVisitor;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, MapCodegenTask, OntosMapCodegenTask},
+    codegen::task::{CodegenTask, OntosMapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
-    hir_node::{BindDepth, HirBody, HirBodyIdx, HirKind, HirNode, ERROR_NODE},
+    hir_node::{BindDepth, HirBodyIdx, HirKind, HirNode},
     mem::Intern,
     type_check::unify_ctx::{Arm, VariableMapping},
     typed_ontos::lang::OntosNode,
     types::{Type, TypeRef, Types},
-    CompileErrors, IrVariant, SourceSpan,
+    CompileErrors, SourceSpan,
 };
 
 use super::{
-    inference::Infer,
     ontos_type_inference::{OntosArmTypeInference, OntosVariableMapper},
     unify_ctx::{CheckUnifyExprContext, CtrlFlowGroup, ExplicitVariable},
     TypeCheck, TypeEquation, TypeError,
@@ -34,7 +33,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = CheckUnifyExprContext::new();
-        let root_body_idx = ctx.alloc_hir_body_idx();
+        let _root_body_idx = ctx.alloc_hir_body_idx();
 
         {
             let mut map_check = MapCheck {
@@ -60,84 +59,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             )?;
         }
 
-        // experimental:
         self.check_arms_v2(def, first_id, second_id, &mut ctx)?;
 
-        self.check_arms_v1(def, first_id, second_id, root_body_idx, &mut ctx)?;
-
         Ok(self.types.intern(Type::Tautology))
-    }
-
-    fn check_arms_v1(
-        &mut self,
-        def: &Def,
-        first_id: ExprId,
-        second_id: ExprId,
-        root_body_idx: HirBodyIdx,
-        ctx: &mut CheckUnifyExprContext<'m>,
-    ) -> Result<(), AggrGroupError> {
-        let mut root_body = ctx.expr_body_mut(root_body_idx);
-        root_body.first = Some(self.consume_expr(first_id));
-        root_body.second = Some(self.consume_expr(second_id));
-
-        let bodies_len = ctx.bodies.len() as u32;
-        let mut bodies = vec![];
-
-        // FIXME: This algorithm is no good..
-        // There is no guarantee that the bodies will be traversed in the correct order,
-        // they get "initialized" inside check_expr.
-        // Instead, check_expr has to notify which bodies are "done" and can be processed next.
-        for body_index in 0..bodies_len {
-            debug!("Check body {body_index}");
-
-            let expr_body = ctx.expr_body_mut(HirBodyIdx(body_index));
-            let first_root = expr_body.first.take();
-            let second_root = expr_body.second.take();
-
-            // If these are not Some, an error should have been raised
-            if let (Some(first_root), Some(second_root)) = (first_root, second_root) {
-                ctx.arm = Arm::First;
-                let (_first_ty, first) = self.check_expr_root(first_root, ctx);
-                ctx.arm = Arm::Second;
-                let (_second_ty, second) = self.check_expr_root(second_root, ctx);
-
-                // pad the vector
-                bodies.resize_with(body_index as usize + 1, || HirBody {
-                    first: ERROR_NODE,
-                    second: ERROR_NODE,
-                });
-
-                bodies[body_index as usize] = HirBody { first, second };
-            }
-        }
-
-        // Type inference:
-        for node in &mut ctx.nodes.0 {
-            let mut infer = Infer {
-                types: self.types,
-                eq_relations: &mut ctx.inference.eq_relations,
-            };
-
-            match infer.infer_recursive(node.ty) {
-                Ok(ty) => node.ty = ty,
-                Err(TypeError::Propagated) => {}
-                Err(TypeError::NotEnoughInformation) => {
-                    self.error(
-                        CompileError::TODO(smart_format!("Not enough type information")),
-                        &node.span,
-                    );
-                }
-                _ => panic!("Unexpected inference error"),
-            }
-        }
-
-        self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            nodes: std::mem::take(&mut ctx.nodes),
-            bodies,
-            span: def.span,
-        }));
-
-        Ok(())
     }
 
     fn check_arms_v2(
@@ -216,7 +140,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 self.type_error(
                                     TypeError::Mismatch(TypeEquation { actual, expected }),
                                     &second_arm.span,
-                                    IrVariant::Ontos,
                                 );
                             }
                         }

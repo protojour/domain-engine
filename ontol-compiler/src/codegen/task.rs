@@ -10,15 +10,12 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::ontos_code_generator::map_codegen_ontos,
-    hir_node::{CodeDirection, HirBody, HirNodeTable},
     typed_ontos::{lang::OntosNode, unify::unifier::unify_to_function},
     types::{Type, TypeRef},
-    Compiler, IrVariant, SourceSpan, CODE_GENERATOR, TYPE_CHECKER,
+    Compiler, SourceSpan,
 };
 
 use super::{
-    hir_code_generator::codegen_map_hir_solve,
-    hir_equation::HirEquation,
     link::{link, LinkResult},
     ontos_code_generator::const_codegen_ontos,
     proc_builder::ProcBuilder,
@@ -50,20 +47,12 @@ impl<'m> CodegenTasks<'m> {
 pub enum CodegenTask<'m> {
     // A procedure with 0 arguments, used to produce a constant value
     Const(ConstCodegenTask<'m>),
-    Map(MapCodegenTask<'m>),
     OntosMap(OntosMapCodegenTask<'m>),
 }
 
 pub struct ConstCodegenTask<'m> {
     pub def_id: DefId,
     pub node: OntosNode<'m>,
-}
-
-#[derive(Debug)]
-pub struct MapCodegenTask<'m> {
-    pub nodes: HirNodeTable<'m>,
-    pub bodies: Vec<HirBody>,
-    pub span: SourceSpan,
 }
 
 pub struct OntosMapCodegenTask<'m> {
@@ -140,47 +129,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
             CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
                 const_codegen_ontos(&mut proc_table, node, def_id);
             }
-            CodegenTask::Map(map_task) => {
-                if CODE_GENERATOR != IrVariant::Hir {
-                    continue;
-                }
-
-                let bodies = map_task.bodies;
-                let mut equation = HirEquation::new(map_task.nodes);
-
-                for (index, node) in equation.nodes.0.iter().enumerate() {
-                    debug!("{{{index}}}: {node:?}");
-                }
-
-                for (index, body) in bodies.iter().enumerate() {
-                    debug!(
-                        "HirBodyIdx({index}) equation before solve:\n=={:#?}\n=={:#?}",
-                        equation.debug_tree(body.first, &equation.reductions),
-                        equation.debug_tree(body.second, &equation.expansions),
-                    );
-                }
-
-                codegen_map_hir_solve(
-                    &mut proc_table,
-                    &mut equation,
-                    &bodies,
-                    CodeDirection::Forward,
-                );
-
-                equation.reset();
-
-                codegen_map_hir_solve(
-                    &mut proc_table,
-                    &mut equation,
-                    &bodies,
-                    CodeDirection::Backward,
-                );
-            }
             CodegenTask::OntosMap(map_task) => {
-                if TYPE_CHECKER != IrVariant::Ontos {
-                    continue;
-                }
-
                 debug!("1st:\n{}", map_task.first);
                 debug!("2nd:\n{}", map_task.second);
 
