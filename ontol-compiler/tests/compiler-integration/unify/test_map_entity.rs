@@ -84,6 +84,9 @@ fn test_map_invert() {
 }
 
 #[test]
+// BUG: This concerns the `'name': n` in the last map clause.
+// The compiler should not crash, but report it.
+#[should_panic = "Variable $d not in scope"]
 fn artist_etc_routing() {
     TestPackages::with_sources([
         (SourceName("gsu"), GUITAR_SYNTH_UNION),
