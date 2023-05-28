@@ -93,7 +93,7 @@ pub enum BuiltinProc {
     Mul,
     Div,
     Append,
-    NewMap,
+    NewStruct,
     NewSeq,
     NewUnit,
 }

@@ -100,7 +100,7 @@ impl Stack for PropStack {
 
     fn call_builtin(&mut self, proc: BuiltinProc, _: DefId) {
         let value = match proc {
-            BuiltinProc::NewMap => Props::Map(Default::default()),
+            BuiltinProc::NewStruct => Props::Map(Default::default()),
             _ => {
                 let mut a = self.pop_set();
                 let b = self.pop_set();

@@ -163,7 +163,7 @@ impl<'a> CodeGenerator<'a> {
                 let def_id = ty.get_single_def_id().unwrap();
                 let local = self.builder.append(
                     block,
-                    Ir::CallBuiltin(BuiltinProc::NewMap, def_id),
+                    Ir::CallBuiltin(BuiltinProc::NewStruct, def_id),
                     Stack(1),
                     span,
                 );

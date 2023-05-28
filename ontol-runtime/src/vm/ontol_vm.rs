@@ -217,7 +217,7 @@ impl ValueStack {
                 let [b, a]: [String; 2] = self.pop_n();
                 Data::String(a + b)
             }
-            BuiltinProc::NewMap => Data::Struct([].into()),
+            BuiltinProc::NewStruct => Data::Struct([].into()),
             BuiltinProc::NewSeq => Data::Sequence(vec![]),
             BuiltinProc::NewUnit => Data::Unit,
         }
@@ -326,7 +326,7 @@ mod tests {
         let proc = lib.append_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(42)),
+                OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(3)))),
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
@@ -391,7 +391,7 @@ mod tests {
         let mapping_proc = lib.append_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::Call(double),
@@ -516,7 +516,7 @@ mod tests {
                 OpCode::Return(Local(6)),
                 // Loop
                 // New object -> Local(9)
-                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 OpCode::Clone(Local(2)),
                 OpCode::PutUnitAttr(Local(9), prop_a),
                 OpCode::Bump(Local(8)),
@@ -572,7 +572,7 @@ mod tests {
         let proc = lib.append_procedure(
             NParams(1),
             [
-                OpCode::CallBuiltin(BuiltinProc::NewMap, def_id(7)),
+                OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
                 OpCode::TakeAttr2(Local(0), prop),
                 OpCode::GetDiscriminant(Local(3)),
                 OpCode::Cond(
