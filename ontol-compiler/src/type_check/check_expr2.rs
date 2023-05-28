@@ -173,13 +173,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let arm = ctx.arm;
-                let bound_variable = ctx
+                let explicit_variable = ctx
                     .explicit_variables
                     .get_mut(expr_id)
                     .expect("variable not found");
 
                 let arm_expr_id = {
-                    let ontos_arm = bound_variable.ontos_arms.entry(arm).or_insert_with(|| {
+                    let ontos_arm = explicit_variable.ontos_arms.entry(arm).or_insert_with(|| {
                         let expr_id = match arm {
                             Arm::First => *expr_id,
                             Arm::Second => self.expressions.alloc_expr_id(),
@@ -201,7 +201,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         &expr.span,
                     ),
                     Some(expected_ty) => {
-                        let variable = ontos::Variable(bound_variable.node_id.0);
+                        let variable = explicit_variable.variable;
                         let variable_ref = OntosNode {
                             kind: NodeKind::VariableRef(variable),
                             meta: Meta {

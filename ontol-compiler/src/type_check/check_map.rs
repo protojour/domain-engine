@@ -10,7 +10,6 @@ use crate::{
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
-    hir_node::{HirKind, HirNode},
     mem::Intern,
     type_check::unify_ctx::{Arm, VariableMapping},
     typed_ontos::lang::OntosNode,
@@ -127,7 +126,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         match (actual, expected) {
                             (Type::Domain(_), Type::Domain(_)) => {
                                 ctx.variable_mapping.insert(
-                                    ontos::Variable(explicit_var.node_id.0),
+                                    explicit_var.variable,
                                     VariableMapping {
                                         first_arm_type: actual,
                                         second_arm_type: expected,
@@ -265,7 +264,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     group_set.add(explicit_variable.ctrl_group);
                 } else {
-                    let (variable_expr_id, variable_span) = variables
+                    let (variable_expr_id, _variable_span) = variables
                         .0
                         .iter()
                         .find(|(var_expr_id, _)| var_expr_id == expr_id)
@@ -273,18 +272,12 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     // Register variable
                     let syntax_var = ctx.alloc_variable();
-                    let var_id = ctx.nodes.add(HirNode {
-                        ty: self.types.intern(Type::Tautology),
-                        kind: HirKind::Variable(syntax_var),
-                        span: *variable_span,
-                    });
 
                     if ctx.arm.is_first() {
                         ctx.explicit_variables.insert(
                             *variable_expr_id,
                             ExplicitVariable {
                                 variable: syntax_var,
-                                node_id: var_id,
                                 ctrl_group: parent_aggr_group,
                                 ontos_arms: Default::default(),
                             },
@@ -299,7 +292,6 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             Entry::Vacant(vac) => {
                                 vac.insert(ExplicitVariable {
                                     variable: syntax_var,
-                                    node_id: var_id,
                                     ctrl_group: parent_aggr_group,
                                     ontos_arms: Default::default(),
                                 });

@@ -3,7 +3,6 @@ use ontos::{Label, Variable};
 
 use crate::{
     expr::{Expr, ExprId},
-    hir_node::{HirIdx, HirNodeTable},
     types::TypeRef,
     SourceSpan,
 };
@@ -16,7 +15,6 @@ pub struct BindDepth(pub u16);
 pub struct CheckUnifyExprContext<'m> {
     pub inference: Inference<'m>,
     pub bodies: Vec<CtrlFlowBody<'m>>,
-    pub nodes: HirNodeTable<'m>,
     pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
     pub label_map: FnvHashMap<ExprId, Label>,
 
@@ -37,7 +35,6 @@ impl<'m> CheckUnifyExprContext<'m> {
         Self {
             inference: Inference::new(),
             bodies: Default::default(),
-            nodes: HirNodeTable::default(),
             explicit_variables: Default::default(),
             label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
@@ -86,7 +83,6 @@ pub struct ExprRoot<'m> {
 
 pub struct ExplicitVariable {
     pub variable: ontos::Variable,
-    pub node_id: HirIdx,
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub ontos_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }

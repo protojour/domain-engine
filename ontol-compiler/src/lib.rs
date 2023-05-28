@@ -35,7 +35,6 @@ mod compiler_queries;
 mod core;
 mod def;
 mod expr;
-mod hir_node;
 mod lowering;
 mod namespace;
 mod patterns;
@@ -46,8 +45,6 @@ mod sequence;
 mod strings;
 mod type_check;
 mod types;
-
-pub use hir_node::HirIdx;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {
