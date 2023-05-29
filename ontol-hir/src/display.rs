@@ -171,12 +171,6 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            PropPattern::SeqAttr(rel, val) => {
-                write!(f, "(seq")?;
-                self.print(Sep::Space, rel, f)?;
-                self.print(Sep::Space, val, f)?;
-                write!(f, ")")?;
-            }
             PropPattern::Seq(val) => {
                 write!(f, "(seq")?;
                 self.print(Sep::Space, val, f)?;

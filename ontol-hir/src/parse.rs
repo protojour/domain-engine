@@ -255,7 +255,7 @@ impl<L: Lang> Parser<L> {
                     let (_, next) = parse_rparen(next)?;
                     (
                         if is_seq {
-                            PropPattern::SeqAttr(first_binding, val_binding)
+                            return Err(Error::Unexpected(Class::Seq));
                         } else {
                             PropPattern::Attr(first_binding, val_binding)
                         },

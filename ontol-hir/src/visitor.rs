@@ -133,7 +133,7 @@ macro_rules! visitor_trait {
 
             fn traverse_match_arm(&mut self, match_arm: param!($mut MatchArm<'a, L>)) {
                 match borrow!($mut match_arm.pattern) {
-                    PropPattern::Attr(rel, val) | PropPattern::SeqAttr(rel, val) => {
+                    PropPattern::Attr(rel, val) => {
                         self.visit_pattern_binding(0, rel);
                         self.visit_pattern_binding(1, val);
                     }
