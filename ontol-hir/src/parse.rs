@@ -212,6 +212,10 @@ impl<L: Lang> Parser<L> {
     fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
         let (_, next) = parse_lparen(next)?;
         let (dimension, next) = match parse_symbol(next) {
+            Err(Error::Unexpected(Class::RParen)) => {
+                let (_, next) = parse_rparen(next)?;
+                return Ok((PropVariant::NotPresent, next));
+            }
             Ok(("seq", next)) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
@@ -226,7 +230,7 @@ impl<L: Lang> Parser<L> {
         let (_, next) = parse_rparen(next)?;
 
         Ok((
-            PropVariant {
+            PropVariant::Present {
                 dimension,
                 attr: Attribute {
                     rel: Box::new(rel),

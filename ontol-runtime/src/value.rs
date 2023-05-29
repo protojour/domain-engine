@@ -177,11 +177,7 @@ impl FromStr for PropertyId {
 
 impl Debug for PropertyId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "PropertyId({:?}, {:?}, {:?})",
-            self.role, self.relation_id.0 .0 .0, self.relation_id.0 .1
-        )
+        write!(f, "{self}")
     }
 }
 

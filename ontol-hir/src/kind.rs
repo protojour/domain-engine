@@ -32,9 +32,12 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
 }
 
 #[derive(Clone)]
-pub struct PropVariant<'a, L: Lang> {
-    pub dimension: Dimension,
-    pub attr: Attribute<Box<L::Node<'a>>>,
+pub enum PropVariant<'a, L: Lang> {
+    Present {
+        dimension: Dimension,
+        attr: Attribute<Box<L::Node<'a>>>,
+    },
+    NotPresent,
 }
 
 #[derive(Copy, Clone, Debug)]

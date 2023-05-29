@@ -82,15 +82,20 @@ impl<'a, 'm> HirVisitor<'m, TypedHir> for VarLocator<'a> {
 
     fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant<'m, TypedHir>) {
         self.enter_child(index, |_self| {
-            match &variant.dimension {
-                Dimension::Singular => {
-                    _self.traverse_prop_variant(variant);
+            match variant {
+                PropVariant::Present { dimension, attr: _ } => {
+                    match dimension {
+                        Dimension::Singular => {
+                            _self.traverse_prop_variant(variant);
+                        }
+                        Dimension::Seq(label) => {
+                            // The search stops here for now, sequence mappings are black boxes,
+                            // only register the label:
+                            _self.visit_label(label);
+                        }
+                    }
                 }
-                Dimension::Seq(label) => {
-                    // The search stops here for now, sequence mappings are black boxes,
-                    // only register the label:
-                    _self.visit_label(label);
-                }
+                PropVariant::NotPresent => {}
             }
         });
     }

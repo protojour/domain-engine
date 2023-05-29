@@ -43,12 +43,14 @@ pub fn unify_to_function<'m>(
     var_tracker.visit_node(0, &scope_source);
     var_tracker.visit_node(0, &target);
 
+    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
+
     let unified = Unifier {
         root_source: &scope_source,
         next_variable: var_tracker.next_variable(),
         types: &mut compiler.types,
     }
-    .unify(Tagger::default().tag_node(target), &scope_source)?;
+    .unify(Tagger::new(unit_type).tag_node(target), &scope_source)?;
 
     let body = match unified.nodes.len() {
         0 => panic!("No nodes"),
@@ -275,15 +277,25 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let mut ty = &Type::Tautology;
                 for (index, variant_u_node) in scoping.sub_nodes {
                     debug!("unify_source_arm({index})");
-                    if let Some(typed_match_arm) =
-                        self.unify_prop_variant_to_match_arm(variant_u_node, &variants[index])?
-                    {
-                        if let Type::Tautology = typed_match_arm.ty {
-                            panic!("found Tautology");
-                        }
 
-                        ty = typed_match_arm.ty;
-                        match_arms.push(typed_match_arm.arm);
+                    match &variants[index] {
+                        PropVariant::Present { dimension, attr } => {
+                            if let Some(typed_match_arm) = self.unify_prop_variant_to_match_arm(
+                                variant_u_node,
+                                *dimension,
+                                attr,
+                            )? {
+                                if let Type::Tautology = typed_match_arm.ty {
+                                    panic!("found Tautology");
+                                }
+
+                                ty = typed_match_arm.ty;
+                                match_arms.push(typed_match_arm.arm);
+                            }
+                        }
+                        PropVariant::NotPresent => {
+                            todo!()
+                        }
                     }
                 }
 
@@ -293,7 +305,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         SmallVec::default()
                     } else {
                         if let Type::Tautology = ty {
-                            unreachable!();
+                            panic!();
                         }
 
                         [TypedHirNode {
@@ -345,14 +357,15 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_prop_variant_to_match_arm(
         &mut self,
         u_node: UnificationNode<'m>,
-        scope_source: &PropVariant<'m, TypedHir>,
+        scope_dimension: Dimension,
+        scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         let scoping = u_node.force_into_scoping();
 
         if scoping.expressions.is_empty() {
             // treat this "transparently"
             Ok(self
-                .let_attr(scoping, scope_source)?
+                .let_attr(scoping, scope_attr)?
                 .map(|let_attr| TypedMatchArm {
                     arm: MatchArm {
                         pattern: PropPattern::Attr(let_attr.rel_binding, let_attr.val_binding),
@@ -361,7 +374,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ty: let_attr.ty,
                 }))
         } else if scoping.expressions.len() == 1 {
-            if !matches!(&scope_source.dimension, Dimension::Seq(_)) {
+            if !matches!(scope_dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
             }
 
@@ -371,14 +384,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
             match expr.kind {
                 TaggedKind::Seq(_) => {
                     let mut iterator = expr.children.0.into_iter();
-                    let rel_binding = self.unify_expr_pattern_binding(
-                        iterator.next().unwrap(),
-                        &scope_source.attr.rel,
-                    )?;
-                    let val_binding = self.unify_expr_pattern_binding(
-                        iterator.next().unwrap(),
-                        &scope_source.attr.val,
-                    )?;
+                    let rel_binding =
+                        self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.rel)?;
+                    let val_binding =
+                        self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.val)?;
 
                     let input_seq_var = self.alloc_var();
                     let output_seq_var = self.alloc_var();
@@ -432,16 +441,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             }
                         }))
                 }
-                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
+                TaggedKind::PresentPropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
                     let mut iterator = expr.children.0.into_iter();
-                    let rel_binding = self.unify_expr_pattern_binding(
-                        iterator.next().unwrap(),
-                        &scope_source.attr.rel,
-                    )?;
-                    let val_binding = self.unify_expr_pattern_binding(
-                        iterator.next().unwrap(),
-                        &scope_source.attr.val,
-                    )?;
+                    let rel_binding =
+                        self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.rel)?;
+                    let val_binding =
+                        self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.val)?;
 
                     let input_seq_var = self.alloc_var();
                     let output_seq_var = self.alloc_var();
@@ -491,12 +496,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 kind: NodeKind::Prop(
                                     struct_var,
                                     prop_id,
-                                    vec![PropVariant {
+                                    vec![PropVariant::Present {
+                                        dimension: Dimension::Singular,
                                         attr: Attribute {
                                             rel: Box::new(self.unit_node()),
                                             val: Box::new(gen_node),
                                         },
-                                        dimension: Dimension::Singular,
                                     }],
                                 ),
                                 meta: Meta {
@@ -526,18 +531,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn let_attr(
         &mut self,
         mut scoping: Scoping<'m>,
-        scope_source: &PropVariant<'m, TypedHir>,
+        scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
     ) -> UnifierResult<Option<LetAttr<'m>>> {
-        let rel_binding = self.unify_pattern_binding(
-            Some(0),
-            scoping.sub_nodes.remove(&0),
-            &scope_source.attr.rel,
-        )?;
-        let val_binding = self.unify_pattern_binding(
-            Some(1),
-            scoping.sub_nodes.remove(&1),
-            &scope_source.attr.val,
-        )?;
+        let rel_binding =
+            self.unify_pattern_binding(Some(0), scoping.sub_nodes.remove(&0), &scope_attr.rel)?;
+        let val_binding =
+            self.unify_pattern_binding(Some(1), scoping.sub_nodes.remove(&1), &scope_attr.val)?;
 
         Ok(match (rel_binding.nodes, val_binding.nodes) {
             (None, None) => {
@@ -695,7 +694,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         for expr in std::mem::take(&mut scoping.expressions) {
             match &expr.kind {
-                TaggedKind::PropVariant(variable, property_id, dimension) => {
+                TaggedKind::PresentPropVariant(variable, property_id, dimension) => {
                     property_groups
                         .entry((*variable, *property_id))
                         .or_default()
@@ -719,7 +718,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         rel.meta.ty, val.meta.ty, rel, val
                     );
                 }
-                variants.push(PropVariant {
+                variants.push(PropVariant::Present {
                     dimension,
                     attr: Attribute {
                         rel: Box::new(rel),

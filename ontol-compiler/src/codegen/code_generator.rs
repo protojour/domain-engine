@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
-    kind::{NodeKind, PatternBinding, PropPattern},
+    kind::{NodeKind, PatternBinding, PropPattern, PropVariant},
     Variable,
 };
 use ontol_runtime::{
@@ -175,16 +175,24 @@ impl<'a> CodeGenerator<'a> {
                 self.scope.remove(&binder.0);
             }
             NodeKind::Prop(struct_var, id, variants) => {
-                if let Some(variant) = variants.into_iter().next() {
-                    // FIXME: Don't ignore relation parameters!
-                    // self.generate(*variant.attr.rel, block);
-                    // let rel = self.builder.top();
-                    self.gen_node(*variant.attr.val, block);
+                for variant in variants {
+                    if let PropVariant::Present { dimension: _, attr } = variant {
+                        // FIXME: Don't ignore relation parameters!
+                        // self.generate(*variant.attr.rel, block);
+                        // let rel = self.builder.top();
+                        self.gen_node(*attr.val, block);
 
-                    let struct_local = self.var_local(struct_var);
+                        let struct_local = self.var_local(struct_var);
 
-                    self.builder
-                        .append(block, Ir::PutAttrValue(struct_local, id), Stack(-1), span);
+                        self.builder.append(
+                            block,
+                            Ir::PutAttrValue(struct_local, id),
+                            Stack(-1),
+                            span,
+                        );
+
+                        return;
+                    }
                 }
             }
             NodeKind::MatchProp(struct_var, id, arms) => {

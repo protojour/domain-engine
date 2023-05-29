@@ -529,3 +529,63 @@ fn test_unify_flat_map1() {
     };
     assert_eq!(expected, output);
 }
+
+// BUG:
+#[test]
+fn test_unify_opt_props1() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop $b S:1:9
+                (#u
+                    (struct ($c)
+                        (prop $c S:1:2
+                            (#u $a)
+                            ()
+                        )
+                    )
+                )
+                ()
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d S:1:12
+                (#u
+                    (struct ($e)
+                        (prop $e S:1:5
+                            (#u $a)
+                            ()
+                        )
+                    )
+                )
+                ()
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($d)
+            (match-prop $b S:1:9
+                (($_ $c)
+                    (match-prop $c S:1:2
+                        (($_ $a)
+                            (prop $d S:1:12
+                                (#u
+                                    (struct ($e)
+                                        (prop $e S:1:5
+                                            (#u $a)
+                                            ()
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}

@@ -346,13 +346,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
-                            let prop_variant: PropVariant<'_, TypedHir> = match match_property
-                                .cardinality
-                                .1
-                            {
+                            let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
                                     let node = self.build_node(expr, Some(object_ty), ctx);
-                                    PropVariant {
+                                    PropVariant::Present {
                                         dimension: Dimension::Singular,
                                         attr: Attribute {
                                             rel: Box::new(self.unit_node_no_span()),
@@ -365,7 +362,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let node = self.build_node(inner, Some(object_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
-                                        PropVariant {
+                                        PropVariant::Present {
                                             dimension: Dimension::Seq(label),
                                             attr: Attribute {
                                                 rel: Box::new(self.unit_node_no_span()),
@@ -390,12 +387,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                     PropertyCardinality::Optional => {
                                         if *bind_option {
+                                            vec![prop_variant, PropVariant::NotPresent]
                                         } else {
                                             ctx.partial = true;
                                             panic!("partial unification");
                                         }
-
-                                        vec![prop_variant]
                                     }
                                 };
 

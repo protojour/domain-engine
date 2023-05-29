@@ -11,6 +11,7 @@ use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{
     typed_hir::{Meta, TypedHirNode},
+    types::TypeRef,
     SourceSpan,
 };
 
@@ -25,7 +26,8 @@ pub enum TaggedKind {
     Seq(Label),
     Struct(Binder),
     Prop(Variable, PropertyId),
-    PropVariant(Variable, PropertyId, Dimension),
+    PresentPropVariant(Variable, PropertyId, Dimension),
+    NotPresentPropVariant(Variable, PropertyId),
 }
 
 // Note: This is more granular than typed_hir nodes.
@@ -98,10 +100,10 @@ impl<'m> TaggedNode<'m> {
                     .0
                     .into_iter()
                     .map(|node| match node.kind {
-                        TaggedKind::PropVariant(_, _, dimension) => {
+                        TaggedKind::PresentPropVariant(_, _, dimension) => {
                             let (rel, val) = node.children.into_hir_pair();
 
-                            PropVariant {
+                            PropVariant::Present {
                                 dimension,
                                 attr: Attribute {
                                     rel: Box::new(rel),
@@ -109,7 +111,7 @@ impl<'m> TaggedNode<'m> {
                                 },
                             }
                         }
-                        _ => panic!(),
+                        _ => PropVariant::NotPresent,
                     })
                     .collect(),
             ),
@@ -151,13 +153,21 @@ impl<'m> TaggedNodes<'m> {
     }
 }
 
-#[derive(Default)]
-pub struct Tagger {
+pub struct Tagger<'m> {
     in_scope: BitSet,
     labels: BitSet,
+    unit_type: TypeRef<'m>,
 }
 
-impl Tagger {
+impl<'m> Tagger<'m> {
+    pub fn new(unit_type: TypeRef<'m>) -> Self {
+        Self {
+            in_scope: BitSet::new(),
+            labels: BitSet::new(),
+            unit_type,
+        }
+    }
+
     pub fn enter_binder<T>(&mut self, binder: Binder, func: impl FnOnce(&mut Self) -> T) -> T {
         if !self.in_scope.insert(binder.0 .0 as usize) {
             panic!("Malformed HIR: {binder:?} variable was already in scope");
@@ -167,14 +177,14 @@ impl Tagger {
         value
     }
 
-    pub fn tag_nodes<'m>(
+    pub fn tag_nodes(
         &mut self,
         iterator: impl Iterator<Item = TypedHirNode<'m>>,
     ) -> Vec<TaggedNode<'m>> {
         iterator.map(|child| self.tag_node(child)).collect()
     }
 
-    pub fn tag_node<'m>(&mut self, node: TypedHirNode<'m>) -> TaggedNode<'m> {
+    pub fn tag_node(&mut self, node: TypedHirNode<'m>) -> TaggedNode<'m> {
         let (kind, meta) = node.split();
         match kind {
             NodeKind::VariableRef(var) => {
@@ -228,35 +238,50 @@ impl Tagger {
                 let variants = variants
                     .into_iter()
                     .map(|variant| {
-                        debug!("rel ty: {:?}", variant.attr.rel.meta.ty);
-                        debug!("val ty: {:?}", variant.attr.val.meta.ty);
+                        match variant {
+                            PropVariant::Present { dimension, attr } => {
+                                debug!("rel ty: {:?}", attr.rel.meta.ty);
+                                debug!("val ty: {:?}", attr.val.meta.ty);
 
-                        let rel = self.tag_node(*variant.attr.rel);
-                        let val = self.tag_node(*variant.attr.val);
+                                let rel = self.tag_node(*attr.rel);
+                                let val = self.tag_node(*attr.val);
 
-                        let val_ty = val.meta.ty;
+                                let val_ty = val.meta.ty;
 
-                        let mut variant_variables = BitSet::new();
+                                let mut variant_variables = BitSet::new();
 
-                        variant_variables.union_with(&rel.free_variables);
-                        variant_variables.union_with(&val.free_variables);
+                                variant_variables.union_with(&rel.free_variables);
+                                variant_variables.union_with(&val.free_variables);
 
-                        if let Dimension::Seq(label) = variant.dimension {
-                            self.register_label(label);
-                            variant_variables.insert(label.0 as usize);
-                            free_variables.insert(label.0 as usize);
-                        } else {
-                            free_variables.union_with(&variant_variables);
-                        }
+                                if let Dimension::Seq(label) = dimension {
+                                    self.register_label(label);
+                                    variant_variables.insert(label.0 as usize);
+                                    free_variables.insert(label.0 as usize);
+                                } else {
+                                    free_variables.union_with(&variant_variables);
+                                }
 
-                        TaggedNode {
-                            kind: TaggedKind::PropVariant(struct_var, prop, variant.dimension),
-                            free_variables: variant_variables,
-                            children: TaggedNodes(vec![rel, val]),
-                            meta: Meta {
-                                // BUG: Not correct
-                                ty: val_ty,
-                                span: SourceSpan::none(),
+                                TaggedNode {
+                                    kind: TaggedKind::PresentPropVariant(
+                                        struct_var, prop, dimension,
+                                    ),
+                                    free_variables: variant_variables,
+                                    children: TaggedNodes(vec![rel, val]),
+                                    meta: Meta {
+                                        // BUG: Not correct
+                                        ty: val_ty,
+                                        span: SourceSpan::none(),
+                                    },
+                                }
+                            }
+                            PropVariant::NotPresent => TaggedNode {
+                                kind: TaggedKind::NotPresentPropVariant(struct_var, prop),
+                                free_variables: BitSet::new(),
+                                children: TaggedNodes(vec![]),
+                                meta: Meta {
+                                    ty: self.unit_type,
+                                    span: SourceSpan::none(),
+                                },
                             },
                         }
                     })
@@ -284,7 +309,7 @@ impl Tagger {
         }
     }
 
-    fn make_tagged<'m>(
+    fn make_tagged(
         &mut self,
         kind: TaggedKind,
         children: impl Iterator<Item = TypedHirNode<'m>>,
@@ -323,7 +348,7 @@ mod tests {
     use bit_set::BitSet;
     use ontol_hir::{parse::Parser, Variable};
 
-    use crate::typed_hir::TypedHir;
+    use crate::{typed_hir::TypedHir, types::Type};
 
     fn free_variables(iterator: impl Iterator<Item = Variable>) -> BitSet {
         let mut bit_set = BitSet::new();
@@ -349,7 +374,7 @@ mod tests {
             )
         ";
         let node = Parser::new(TypedHir).parse(src).unwrap().0;
-        let tagged_node = super::Tagger::default().tag_node(node);
+        let tagged_node = super::Tagger::new(&Type::Error).tag_node(node);
         assert_eq!(
             free_variables([Variable(1), Variable(3), Variable(4)].into_iter()),
             tagged_node.free_variables,

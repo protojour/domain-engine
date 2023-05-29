@@ -132,26 +132,31 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
     fn print(
         self,
         _sep: Sep,
-        node: &PropVariant<'a, L>,
+        variant: &PropVariant<'a, L>,
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
-        let sep = if let Dimension::Seq(label) = &node.dimension {
-            write!(f, "seq ({})", label)?;
-            self.indent.indent()
-        } else {
-            Sep::None
-        };
+        match variant {
+            PropVariant::Present { dimension, attr } => {
+                let sep = if let Dimension::Seq(label) = dimension {
+                    write!(f, "seq ({})", label)?;
+                    self.indent.indent()
+                } else {
+                    Sep::None
+                };
 
-        let multi = self.print_all(
-            sep,
-            [node.attr.rel.kind(), node.attr.val.kind()].into_iter(),
-            f,
-        )?;
-        self.print_rparen(multi, f)?;
-        Ok(Multiline(true))
+                let multi =
+                    self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
+            PropVariant::NotPresent => {
+                self.print_rparen(Multiline(false), f)?;
+                Ok(Multiline(true))
+            }
+        }
     }
 }
 

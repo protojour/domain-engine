@@ -119,11 +119,16 @@ macro_rules! visitor_trait {
             }
 
             fn traverse_prop_variant(&mut self, variant: param!($mut PropVariant<'a, L>)) {
-                if let Dimension::Seq(label) = borrow!($mut variant.dimension) {
-                    self.visit_label(label);
+                match variant {
+                    PropVariant::Present { dimension, attr } => {
+                        if let Dimension::Seq(label) = dimension {
+                            self.visit_label(label);
+                        }
+                        self.visit_node(0, borrow!($mut attr.rel));
+                        self.visit_node(1, borrow!($mut attr.val));
+                    }
+                    PropVariant::NotPresent => {}
                 }
-                self.visit_node(0, borrow!($mut variant.attr.rel));
-                self.visit_node(1, borrow!($mut variant.attr.val));
             }
 
             fn traverse_match_arm(&mut self, match_arm: param!($mut MatchArm<'a, L>)) {

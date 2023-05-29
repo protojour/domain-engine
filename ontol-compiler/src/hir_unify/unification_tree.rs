@@ -162,10 +162,8 @@ pub struct Struct<'m> {
 impl<'m> Debug for UnificationNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Scoping(scoping) => {
-                write!(f, "{scoping:?}")
-            }
-            Self::Struct(s) => write!(f, "{s:?}"),
+            Self::Scoping(scoping) => scoping.fmt(f),
+            Self::Struct(s) => s.fmt(f),
         }
     }
 }
