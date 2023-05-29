@@ -127,7 +127,7 @@ macro_rules! visitor_trait {
                         self.visit_node(0, borrow!($mut attr.rel));
                         self.visit_node(1, borrow!($mut attr.val));
                     }
-                    PropVariant::NotPresent => {}
+                    PropVariant::Absent => {}
                 }
             }
 

@@ -387,7 +387,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                     PropertyCardinality::Optional => {
                                         if *bind_option {
-                                            vec![prop_variant, PropVariant::NotPresent]
+                                            vec![prop_variant, PropVariant::Absent]
                                         } else {
                                             ctx.partial = true;
                                             panic!("partial unification");

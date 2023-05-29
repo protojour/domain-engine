@@ -293,10 +293,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 match_arms.push(typed_match_arm.arm);
                             }
                         }
-                        PropVariant::NotPresent => {
-                            todo!()
+                        PropVariant::Absent => {
+                            panic!("NotPresent is not a scoping")
                         }
                     }
+                }
+
+                if variants
+                    .iter()
+                    .any(|variant| matches!(variant, PropVariant::Absent))
+                {
+                    // Optional property
+                    match_arms.push(MatchArm {
+                        pattern: PropPattern::Absent,
+                        nodes: vec![],
+                    });
                 }
 
                 Ok(Unified {

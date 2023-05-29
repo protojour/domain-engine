@@ -111,7 +111,7 @@ impl<'m> TaggedNode<'m> {
                                 },
                             }
                         }
-                        _ => PropVariant::NotPresent,
+                        _ => PropVariant::Absent,
                     })
                     .collect(),
             ),
@@ -274,7 +274,7 @@ impl<'m> Tagger<'m> {
                                     },
                                 }
                             }
-                            PropVariant::NotPresent => TaggedNode {
+                            PropVariant::Absent => TaggedNode {
                                 kind: TaggedKind::NotPresentPropVariant(struct_var, prop),
                                 free_variables: BitSet::new(),
                                 children: TaggedNodes(vec![]),

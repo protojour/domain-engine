@@ -37,7 +37,7 @@ pub enum PropVariant<'a, L: Lang> {
         dimension: Dimension,
         attr: Attribute<Box<L::Node<'a>>>,
     },
-    NotPresent,
+    Absent,
 }
 
 #[derive(Copy, Clone, Debug)]

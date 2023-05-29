@@ -214,7 +214,7 @@ impl<L: Lang> Parser<L> {
         let (dimension, next) = match parse_symbol(next) {
             Err(Error::Unexpected(Class::RParen)) => {
                 let (_, next) = parse_rparen(next)?;
-                return Ok((PropVariant::NotPresent, next));
+                return Ok((PropVariant::Absent, next));
             }
             Ok(("seq", next)) => {
                 let (_, next) = parse_lparen(next)?;

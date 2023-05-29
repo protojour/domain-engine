@@ -210,14 +210,11 @@ impl<'a> CodeGenerator<'a> {
 
                 for arm in arms {
                     match arm.pattern {
-                        PropPattern::Attr(rel_binding, val_binding) => {
-                            self.gen_match_arm(
-                                (rel_local, rel_binding),
-                                (val_local, val_binding),
-                                arm.nodes,
-                                block,
-                            );
-                        }
+                        PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
+                            &[(rel_local, rel_binding), (val_local, val_binding)],
+                            arm.nodes.into_iter(),
+                            block,
+                        ),
                         PropPattern::SeqAttr(rel_binding, val_binding) => {
                             let elem_ty = match ty {
                                 Type::Array(elem_ty) => elem_ty,
@@ -247,11 +244,10 @@ impl<'a> CodeGenerator<'a> {
                             let iter_body_index = {
                                 let mut iter_block = self.builder.new_block(Stack(2), span);
 
-                                self.gen_match_arm(
-                                    (elem_rel_local, rel_binding),
-                                    (elem_val_local, val_binding),
-                                    arm.nodes,
-                                    &mut iter_block,
+                                self.gen_in_scope(
+                                    &[(elem_rel_local, rel_binding), (elem_val_local, val_binding)],
+                                    arm.nodes.into_iter(),
+                                    block,
                                 );
 
                                 self.builder.append(
@@ -288,17 +284,15 @@ impl<'a> CodeGenerator<'a> {
                             );
 
                             self.builder.append_pop_until(block, out_seq, span);
-
-                            // todo!("seq");
                         }
-                        PropPattern::Seq(seq_binding) => {
-                            self.gen_match_arm(
+                        PropPattern::Seq(seq_binding) => self.gen_in_scope(
+                            &[
                                 (rel_local, PatternBinding::Wildcard),
                                 (val_local, seq_binding),
-                                arm.nodes,
-                                block,
-                            );
-                        }
+                            ],
+                            arm.nodes.into_iter(),
+                            block,
+                        ),
                         PropPattern::Absent => {
                             todo!("Arm pattern not present")
                         }
@@ -333,20 +327,15 @@ impl<'a> CodeGenerator<'a> {
                 let iter_body_index = {
                     let mut iter_block = self.builder.new_block(Stack(2), span);
 
-                    if let PatternBinding::Binder(var) = iter_binder.seq {
-                        self.scope.insert(var, out_seq);
-                    }
-
-                    self.gen_match_arm(
-                        (elem_rel_local, iter_binder.rel),
-                        (elem_val_local, iter_binder.val),
-                        nodes,
+                    self.gen_in_scope(
+                        &[
+                            (out_seq, iter_binder.seq),
+                            (elem_rel_local, iter_binder.rel),
+                            (elem_val_local, iter_binder.val),
+                        ],
+                        nodes.into_iter(),
                         &mut iter_block,
                     );
-
-                    if let PatternBinding::Binder(var) = iter_binder.seq {
-                        self.scope.remove(&var);
-                    }
 
                     self.builder
                         .append_pop_until(&mut iter_block, counter, span);
@@ -386,29 +375,28 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn gen_match_arm(
+    fn gen_in_scope<'m>(
         &mut self,
-        (rel_local, rel_binding): (Local, PatternBinding),
-        (val_local, val_binding): (Local, PatternBinding),
-        nodes: Vec<TypedHirNode>,
+        scopes: &[(Local, PatternBinding)],
+        nodes: impl Iterator<Item = TypedHirNode<'m>>,
         block: &mut Block,
     ) {
-        if let PatternBinding::Binder(var) = rel_binding {
-            self.scope.insert(var, rel_local);
-        }
-        if let PatternBinding::Binder(var) = val_binding {
-            self.scope.insert(var, val_local);
+        for (local, binding) in scopes {
+            if let PatternBinding::Binder(var) = binding {
+                if self.scope.insert(*var, *local).is_some() {
+                    panic!("Variable {var} already in scope");
+                }
+            }
         }
 
         for node in nodes {
             self.gen_node(node, block);
         }
 
-        if let PatternBinding::Binder(var) = rel_binding {
-            self.scope.remove(&var);
-        }
-        if let PatternBinding::Binder(var) = val_binding {
-            self.scope.remove(&var);
+        for (_, binding) in scopes {
+            if let PatternBinding::Binder(var) = binding {
+                self.scope.remove(var);
+            }
         }
     }
 

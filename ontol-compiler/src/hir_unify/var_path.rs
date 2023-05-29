@@ -95,7 +95,7 @@ impl<'a, 'm> HirVisitor<'m, TypedHir> for VarLocator<'a> {
                         }
                     }
                 }
-                PropVariant::NotPresent => {}
+                PropVariant::Absent => {}
             }
         });
     }

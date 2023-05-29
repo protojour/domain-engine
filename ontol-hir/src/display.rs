@@ -152,7 +152,7 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            PropVariant::NotPresent => {
+            PropVariant::Absent => {
                 self.print_rparen(Multiline(false), f)?;
                 Ok(Multiline(true))
             }
