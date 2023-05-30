@@ -72,7 +72,7 @@ impl<'l> AbstractVm<'l> {
         &mut self,
         procedure: Procedure,
         stack: &mut S,
-        debug: &mut impl VmDebug<S>,
+        debug: &mut dyn VmDebug<S>,
     ) {
         self.program_counter = procedure.address.0 as usize;
         self.proc_address = procedure.address.0 as usize;

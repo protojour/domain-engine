@@ -84,7 +84,7 @@ fn assert_domain_map(
     };
 
     let mut mapper = test_env.env.new_vm();
-    let value = mapper.trace_eval(procedure, [value]);
+    let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {
         Key::Unit(_) => output_binding.serialize_identity_json(&value),

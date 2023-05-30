@@ -28,18 +28,18 @@ impl<'l> OntolVm<'l> {
     }
 
     pub fn eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
-        self.internal_eval(proc, args, &mut ())
-    }
-
-    pub fn trace_eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
-        self.internal_eval(proc, args, &mut Tracer)
+        if tracing::enabled!(Level::TRACE) {
+            self.internal_eval(proc, args, &mut Tracer)
+        } else {
+            self.internal_eval(proc, args, &mut ())
+        }
     }
 
     pub fn internal_eval(
         &mut self,
         procedure: Procedure,
         args: impl IntoIterator<Item = Value>,
-        debug: &mut impl VmDebug<ValueStack>,
+        debug: &mut dyn VmDebug<ValueStack>,
     ) -> Value {
         for arg in args {
             self.value_stack.stack.push(arg);
@@ -329,7 +329,7 @@ mod tests {
         );
 
         let mut vm = OntolVm::new(&lib);
-        let output = vm.trace_eval(
+        let output = vm.eval(
             proc,
             [Value::new(
                 Data::Struct(
@@ -402,7 +402,7 @@ mod tests {
         );
 
         let mut vm = OntolVm::new(&lib);
-        let output = vm.trace_eval(
+        let output = vm.eval(
             mapping_proc,
             [Value::new(
                 Data::Struct(
@@ -465,7 +465,7 @@ mod tests {
         );
 
         let mut vm = OntolVm::new(&lib);
-        let output = vm.trace_eval(
+        let output = vm.eval(
             proc,
             [Value::new(
                 Data::Sequence(vec![
@@ -522,7 +522,7 @@ mod tests {
         );
 
         let mut vm = OntolVm::new(&lib);
-        let output = vm.trace_eval(
+        let output = vm.eval(
             proc,
             [Value::new(
                 Data::Struct(
@@ -589,7 +589,7 @@ mod tests {
             "{}",
             format!(
                 "{}",
-                ValueDebug(&vm.trace_eval(proc, [Value::new(Data::Struct([].into()), def_id(0))]))
+                ValueDebug(&vm.eval(proc, [Value::new(Data::Struct([].into()), def_id(0))]))
             )
         );
 
@@ -597,7 +597,7 @@ mod tests {
             "{}",
             format!(
                 "{}",
-                ValueDebug(&vm.trace_eval(
+                ValueDebug(&vm.eval(
                     proc,
                     [Value::new(
                         Data::Struct([(prop, Value::unit().into())].into()),
@@ -612,7 +612,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &vm.trace_eval(
+                    &vm.eval(
                         proc,
                         [Value::new(
                             Data::Struct(

@@ -166,10 +166,10 @@ impl WasmMapper {
         let proc = self.env.get_mapper_proc(self.from, self.to).unwrap();
         let mut mapper = self.env.new_vm();
 
-        let output = mapper.eval(proc, [input.value.clone()]);
+        let value = mapper.eval(proc, [input.value.clone()]);
 
         Ok(WasmValue {
-            value: output,
+            value,
             env: self.env.clone(),
         })
     }

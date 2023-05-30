@@ -515,8 +515,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         for (_, property) in properties {
             if let Some(default_const_proc_address) = property.default_const_proc_address {
                 if !property.optional && !attributes.contains_key(&property.property_id) {
-                    let mut mapping_vm = processor.env.new_vm();
-                    let value = mapping_vm.eval(
+                    let value = processor.env.new_vm().eval(
                         Procedure {
                             address: default_const_proc_address,
                             n_params: NParams(0),
