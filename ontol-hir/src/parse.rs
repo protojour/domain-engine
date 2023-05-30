@@ -58,114 +58,10 @@ impl<L: Lang> Parser<L> {
         Self { lang }
     }
 
-    fn make_node<'a>(&self, kind: NodeKind<'a, L>) -> L::Node<'a> {
-        self.lang.make_node(kind)
-    }
-
     pub fn parse<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
         match parse_token(next)? {
             (Token::LParen, next) => {
-                let (node, next) = match parse_symbol(next)? {
-                    ("+", next) => self.parse_binary_call(BuiltinProc::Add, next)?,
-                    ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next)?,
-                    ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next)?,
-                    ("/", next) => self.parse_binary_call(BuiltinProc::Div, next)?,
-                    ("let", next) => {
-                        let (_, next) = parse_lparen(next)?;
-                        let (bind_var, next) = parse_dollar_var(next)?;
-                        let (def, next) = self.parse(next)?;
-                        let (_, next) = parse_rparen(next)?;
-                        let (body, next) = self.parse_many(next, Self::parse)?;
-                        (
-                            self.make_node(NodeKind::Let(Binder(bind_var), Box::new(def), body)),
-                            next,
-                        )
-                    }
-                    ("map", next) => {
-                        let (arg, next) = self.parse(next)?;
-                        (self.make_node(NodeKind::Map(Box::new(arg))), next)
-                    }
-                    ("struct", next) => {
-                        let (binder, next) = parse_binder(next)?;
-                        let (children, next) = self.parse_many(next, Self::parse)?;
-                        (self.make_node(NodeKind::Struct(binder, children)), next)
-                    }
-                    ("prop", next) => {
-                        let (var, next) = parse_dollar_var(next)?;
-                        let (prop, next) = parse_symbol(next)?;
-                        let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
-                        (
-                            self.make_node(NodeKind::Prop(
-                                var,
-                                prop.parse().map_err(|_| {
-                                    Error::Expected(Class::Property, Found(Token::Symbol(prop)))
-                                })?,
-                                variants,
-                            )),
-                            next,
-                        )
-                    }
-                    ("seq", next) => {
-                        let (_, next) = parse_lparen(next)?;
-                        let (label, next) = parse_at_label(next)?;
-                        let (_, next) = parse_rparen(next)?;
-                        let (rel, next) = self.parse(next)?;
-                        let (val, next) = self.parse(next)?;
-                        (
-                            self.make_node(NodeKind::Seq(
-                                label,
-                                Attribute {
-                                    rel: Box::new(rel),
-                                    val: Box::new(val),
-                                },
-                            )),
-                            next,
-                        )
-                    }
-                    ("match-prop", next) => {
-                        let (struct_var, next) = parse_dollar_var(next)?;
-                        let (prop, next) = parse_symbol(next)?;
-                        let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
-                        (
-                            self.make_node(NodeKind::MatchProp(
-                                struct_var,
-                                prop.parse().map_err(|_| {
-                                    Error::Expected(Class::Property, Found(Token::Symbol(prop)))
-                                })?,
-                                arms,
-                            )),
-                            next,
-                        )
-                    }
-                    ("gen", next) => {
-                        let (seq_var, next) = parse_dollar_var(next)?;
-                        let (binder, next) = parse_iter_binder(next)?;
-                        let (body, next) = self.parse_many(next, Self::parse)?;
-                        (self.make_node(NodeKind::Gen(seq_var, binder, body)), next)
-                    }
-                    ("iter", next) => {
-                        let (seq_var, next) = parse_dollar_var(next)?;
-                        let (binder, next) = parse_iter_binder(next)?;
-                        let (body, next) = self.parse_many(next, Self::parse)?;
-                        (self.make_node(NodeKind::Iter(seq_var, binder, body)), next)
-                    }
-                    ("push", next) => {
-                        let (seq_var, next) = parse_dollar_var(next)?;
-                        let (rel, next) = self.parse(next)?;
-                        let (val, next) = self.parse(next)?;
-                        (
-                            self.make_node(NodeKind::Push(
-                                seq_var,
-                                Attribute {
-                                    rel: Box::new(rel),
-                                    val: Box::new(val),
-                                },
-                            )),
-                            next,
-                        )
-                    }
-                    (sym, _) => return Err(Error::InvalidSymbol(sym)),
-                };
+                let (node, next) = self.parse_parenthesized(next)?;
                 let (_, next) = parse_rparen(next)?;
                 Ok((node, next))
             }
@@ -185,6 +81,110 @@ impl<L: Lang> Parser<L> {
             },
             (Token::Int(num), next) => Ok((self.make_node(NodeKind::Int(num)), next)),
             (token, _) => Err(Error::InvalidToken(token)),
+        }
+    }
+
+    pub fn parse_parenthesized<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
+        match parse_symbol(next)? {
+            ("+", next) => self.parse_binary_call(BuiltinProc::Add, next),
+            ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next),
+            ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next),
+            ("/", next) => self.parse_binary_call(BuiltinProc::Div, next),
+            ("let", next) => {
+                let (_, next) = parse_lparen(next)?;
+                let (bind_var, next) = parse_dollar_var(next)?;
+                let (def, next) = self.parse(next)?;
+                let (_, next) = parse_rparen(next)?;
+                let (body, next) = self.parse_many(next, Self::parse)?;
+                Ok((
+                    self.make_node(NodeKind::Let(Binder(bind_var), Box::new(def), body)),
+                    next,
+                ))
+            }
+            ("map", next) => {
+                let (arg, next) = self.parse(next)?;
+                Ok((self.make_node(NodeKind::Map(Box::new(arg))), next))
+            }
+            ("struct", next) => {
+                let (binder, next) = parse_binder(next)?;
+                let (children, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(NodeKind::Struct(binder, children)), next))
+            }
+            ("prop", next) => {
+                let (var, next) = parse_dollar_var(next)?;
+                let (prop, next) = parse_symbol(next)?;
+                let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
+                Ok((
+                    self.make_node(NodeKind::Prop(
+                        var,
+                        prop.parse().map_err(|_| {
+                            Error::Expected(Class::Property, Found(Token::Symbol(prop)))
+                        })?,
+                        variants,
+                    )),
+                    next,
+                ))
+            }
+            ("seq", next) => {
+                let (_, next) = parse_lparen(next)?;
+                let (label, next) = parse_at_label(next)?;
+                let (_, next) = parse_rparen(next)?;
+                let (rel, next) = self.parse(next)?;
+                let (val, next) = self.parse(next)?;
+                Ok((
+                    self.make_node(NodeKind::Seq(
+                        label,
+                        Attribute {
+                            rel: Box::new(rel),
+                            val: Box::new(val),
+                        },
+                    )),
+                    next,
+                ))
+            }
+            ("match-prop", next) => {
+                let (struct_var, next) = parse_dollar_var(next)?;
+                let (prop, next) = parse_symbol(next)?;
+                let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
+                Ok((
+                    self.make_node(NodeKind::MatchProp(
+                        struct_var,
+                        prop.parse().map_err(|_| {
+                            Error::Expected(Class::Property, Found(Token::Symbol(prop)))
+                        })?,
+                        arms,
+                    )),
+                    next,
+                ))
+            }
+            ("gen", next) => {
+                let (seq_var, next) = parse_dollar_var(next)?;
+                let (binder, next) = parse_iter_binder(next)?;
+                let (body, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(NodeKind::Gen(seq_var, binder, body)), next))
+            }
+            ("iter", next) => {
+                let (seq_var, next) = parse_dollar_var(next)?;
+                let (binder, next) = parse_iter_binder(next)?;
+                let (body, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(NodeKind::Iter(seq_var, binder, body)), next))
+            }
+            ("push", next) => {
+                let (seq_var, next) = parse_dollar_var(next)?;
+                let (rel, next) = self.parse(next)?;
+                let (val, next) = self.parse(next)?;
+                Ok((
+                    self.make_node(NodeKind::Push(
+                        seq_var,
+                        Attribute {
+                            rel: Box::new(rel),
+                            val: Box::new(val),
+                        },
+                    )),
+                    next,
+                ))
+            }
+            (sym, _) => Err(Error::InvalidSymbol(sym)),
         }
     }
 
@@ -288,6 +288,10 @@ impl<L: Lang> Parser<L> {
         let (b, next) = self.parse(next)?;
 
         Ok((self.make_node(NodeKind::Call(proc, [a, b].into())), next))
+    }
+
+    fn make_node<'a>(&self, kind: NodeKind<'a, L>) -> L::Node<'a> {
+        self.lang.make_node(kind)
     }
 }
 
