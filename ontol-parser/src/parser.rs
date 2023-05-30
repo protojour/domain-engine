@@ -230,15 +230,13 @@ fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(Unit
 
 fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
-        .then(spanned(variable()).repeated())
         .then(
             spanned(with_unit_or_seq(map_arm()))
                 .then(spanned(with_unit_or_seq(map_arm())))
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|((kw, variables), (first, second))| MapStatement {
+        .map(|(kw, (first, second))| MapStatement {
             kw,
-            variables,
             first,
             second,
         })

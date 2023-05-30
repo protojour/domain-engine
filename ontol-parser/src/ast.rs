@@ -101,7 +101,6 @@ pub struct RelChain {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
     pub kw: Span,
-    pub variables: Vec<Spanned<String>>,
     pub first: Spanned<(UnitOrSeq, MapArm)>,
     pub second: Spanned<(UnitOrSeq, MapArm)>,
 }

@@ -117,18 +117,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Map(ast::MapStatement {
                 kw: _,
-                variables: ast_variables,
                 first,
                 second,
             }) => {
                 let mut var_table = ExprVarTable::default();
                 let mut variables = vec![];
-                for (param, span) in ast_variables.into_iter() {
-                    variables.push((
-                        var_table.new_var_id(param, self.compiler),
-                        self.src.span(&span),
-                    ));
-                }
+                // for (param, span) in ast_variables.into_iter() {
+                //     variables.push((
+                //         var_table.new_var_id(param, self.compiler),
+                //         self.src.span(&span),
+                //     ));
+                // }
 
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
