@@ -10,7 +10,7 @@ fn test_map_simple() {
     pub type bar
     rel foo 'f': string
     rel bar 'b': string
-    map x {
+    map {
         foo { 'f': x }
         bar { 'b': x }
     }
@@ -38,7 +38,7 @@ fn test_meters() {
     pub type millimeters
     rel meters is: int
     rel millimeters is: int
-    map x {
+    map {
         meters: x / 1000
         millimeters: x
     }
@@ -59,7 +59,7 @@ fn test_temperature() {
         rel _ is: int
     }
 
-    map x {
+    map {
         celsius: x
         fahrenheit: x * 9 / 5 + 32
     }
@@ -80,7 +80,7 @@ fn test_optional_attribute() {
         rel _ is: int
     }
 
-    map y {
+    map {
         seconds: y * 60 * 60 * 24 * 365
         years: y
     }
@@ -149,7 +149,7 @@ fn test_map_value_to_map_no_func() {
     pub type two
     rel one is: string
     rel two 'a': string
-    map x {
+    map {
         one: x
         two {
             'a': x
@@ -169,7 +169,7 @@ fn test_map_value_to_map_func() {
     pub type two
     rel one is: int
     rel two 'a': int
-    map x {
+    map {
         one: x
         two {
             'a': x * 2
@@ -210,7 +210,7 @@ fn test_deep_structural_map() {
         rel _ 'c': string
     }
 
-    map a b c {
+    map {
         foo {
             'a': a
             'inner': foo_inner {
@@ -244,7 +244,7 @@ fn test_map_matching_array() {
     pub type bar
     rel foo 'a': [int]
     rel bar 'b': [int]
-    map x {
+    map {
         foo {
             'a': [x]
         }
@@ -276,11 +276,11 @@ type bar { rel _ 'b': string }
 pub type foos { rel _ 'foos': [foo] }
 pub type bars { rel _ 'bars': [bar] }
 
-map x {
+map {
     foos { 'foos': [x] }
     bars { 'bars': [x] }
 }
-map x {
+map {
     foo { 'f': x }
     bar { 'b': x }
 }
@@ -345,7 +345,7 @@ fn test_aggr_cross_parallel() {
     "
     type foo { rel _ 'f': string }
     type bar { rel _ 'b': string }
-    map x {
+    map {
         foo { 'f': x }
         bar { 'b': x }
     }
@@ -358,7 +358,7 @@ fn test_aggr_cross_parallel() {
         rel _ 'b1': [bar]
         rel _ 'b2': [bar]
     }
-    map a b {
+    map {
         foos {
             'f1': [a]
             'f2': [b]
@@ -384,7 +384,7 @@ fn test_aggr_multi_level() {
     "
     type foo { rel _ 'P': string }
     type bar { rel _ 'Q': string }
-    map x {
+    map {
         foo { 'P': x }
         bar { 'Q': x }
     }
@@ -405,7 +405,7 @@ fn test_aggr_multi_level() {
         rel _ 'a': [b0]
         rel _ 'b': [b0]
     }
-    map v0 v1 v2 v3 {
+    map {
         f1 {
             'a': [f0 {
                 'a': [v0]
@@ -457,7 +457,7 @@ fn test_flat_map1() {
         rel _ 'b': string
     }
 
-    map a b {
+    map {
         foo {
             'a': a
             'inner': [foo_inner {
@@ -498,7 +498,7 @@ fn test_map_complex_flow() {
         rel _ 'd': string
     }
 
-    map x y {
+    map {
         one {
             'a': x
             'b': y
@@ -548,7 +548,7 @@ fn test_map_delegation() {
                 rel _ 'length': si.millimeters
             }
 
-            map l {
+            map {
                 car {
                     'length': l
                 }
@@ -568,7 +568,7 @@ fn test_map_delegation() {
                 rel _ is: int
             }
 
-            map m {
+            map {
                 meters: m
                 millimeters: m * 1000
             }
