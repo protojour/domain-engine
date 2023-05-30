@@ -72,7 +72,7 @@ type ArticleFilter {
     rel _ 'offset'?: int
 }
 
-map slug {
+map {
     query { // ERROR type not found
         GET: '/api/articles/:slug'
         'slug': slug
@@ -84,7 +84,7 @@ map slug {
     }
 }
 
-map t a f {
+map {
     query { // ERROR type not found
         GET: '/api/articles'
         'tag': [t]

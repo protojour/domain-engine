@@ -15,7 +15,7 @@ fn test_unify_partial() {
         rel _ 'bar': string
     }
 
-    unify foo {
+    unify {
         Filter { 'foo': foo } // ERROR missing property `bar`
         Foo { 'foo': foo } // ERROR type mismatch: expected `string`, found `string?`// ERROR missing property `bar`
     }

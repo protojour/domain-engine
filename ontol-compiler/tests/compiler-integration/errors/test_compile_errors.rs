@@ -38,7 +38,7 @@ fn lex_error_recovery_works() {
     type bar
     rel foo 'prop': string
     rel bar 'prop': int
-    map x {
+    map {
         foo {
             'prop': x
         }

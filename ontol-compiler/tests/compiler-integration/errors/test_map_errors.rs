@@ -19,7 +19,7 @@ fn map_undeclared_variable() {
 #[ignore = "there are no functions right now, only infix operators"]
 fn map_incorrect_function_arguments() {
     "
-    map x {
+    map {
         (+ ;; ERROR function takes 2 parameters, but 1 was supplied
             x
         )
@@ -33,7 +33,7 @@ fn map_incorrect_function_arguments() {
 fn map_obj_non_domain_type_and_unit_type() {
     "
     type foo
-    map x {
+    map {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
             'prop': x
@@ -52,7 +52,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop1': bar
     rel foo 'prop2': bar
     rel bar is: int
-    map x {
+    map {
         foo: // ERROR expected named property// ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
             x
         bar {} // ERROR expected expression
@@ -67,7 +67,7 @@ fn map_duplicate_unknown_property() {
     type foo
     type bar
     rel foo 'a': bar
-    map x {
+    map {
         foo {
             'a': x
             'a': x // ERROR duplicate property
@@ -86,7 +86,7 @@ fn map_type_mismatch_simple() {
     type bar
     rel foo 'prop': string
     rel bar 'prop': int
-    map x {
+    map {
         foo {
             'prop': x
         }
@@ -108,7 +108,7 @@ fn map_type_mismatch_in_func() {
     type bar
     rel foo 'prop': string
     rel bar 'prop': int
-    map x {
+    map {
         foo {
             'prop': x
         }
@@ -133,7 +133,7 @@ fn map_array_mismatch() {
     rel bar 'a': string
     rel bar 'b': [int]
 
-    map x y {
+    map {
         foo {
             'a': x // ERROR [string] variable must be enclosed in []
             'b': y // ERROR [string] variable must be enclosed in []
@@ -153,7 +153,7 @@ fn array_map_without_brackets() {
     type foo { rel _ 'a': [string] }
     type bar { rel _ 'b': [string] }
 
-    map x {
+    map {
         foo {
             'a': x // ERROR [string] variable must be enclosed in []
         }
@@ -195,7 +195,7 @@ fn unresolved_transitive_map() {
     type c { rel _ 'p0': a }
     type d { rel _ 'p1': b }
 
-    map x {
+    map {
         c {
             'p0':
                 x // ERROR cannot convert this `a` from `b`: These types are not equated.
@@ -223,7 +223,7 @@ fn map_union() {
         rel _ is?: bar
     }
 
-    map x {
+    map {
         foobar {} // ERROR cannot map a union, map each variant instead
         foo {} // ERROR missing property `type`
     }

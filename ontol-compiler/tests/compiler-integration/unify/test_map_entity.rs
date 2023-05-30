@@ -15,7 +15,7 @@ with worker {
     rel _ 'ID': worker_id
     rel worker_id identifies: _
     rel _ 'name': string
-    
+
     rel _ 'technologies': [technology]
 }
 
@@ -59,7 +59,7 @@ fn test_map_invert() {
             use 'work' as work
             use 'dev' as dev
 
-            map p_id p_name tech_id tech_name {
+            map {
                 work.worker {
                     'ID': p_id
                     'name': p_name
@@ -95,7 +95,7 @@ fn artist_etc_routing() {
             use 'ai' as ai
 
             rel gsu route: ai {
-                map id n p {
+                map {
                     gsu.artist {
                         'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
                         'name': n
@@ -108,7 +108,7 @@ fn artist_etc_routing() {
                     }
                 }
 
-                map id t p n {
+                map {
                     gsu.synth {
                         'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
                         'type': t // ERROR unbound variable
