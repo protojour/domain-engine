@@ -63,7 +63,6 @@ impl<L: Lang> Parser<L> {
     }
 
     pub fn parse<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
-        let next = next.trim_start();
         match parse_token(next)? {
             (Token::LParen, next) => {
                 let (node, next) = match parse_symbol(next)? {
