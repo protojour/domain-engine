@@ -565,6 +565,7 @@ fn test_unify_opt_props1() {
         )
         ",
     );
+    // BUG: the first (prop) should be inside only the first (match-prop), not both.
     let expected = indoc! {"
         |$b| (struct ($d)
             (match-prop $b S:1:9

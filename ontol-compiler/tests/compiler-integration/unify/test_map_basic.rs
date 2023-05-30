@@ -71,8 +71,6 @@ fn test_temperature() {
 }
 
 #[test]
-// BUG: implement optional properties
-#[should_panic = "Value at Local(3) is not a map"]
 fn test_optional_attribute() {
     "
     pub type person {
@@ -120,6 +118,13 @@ fn test_optional_attribute() {
             &env,
             ("person_container", "creature_container"),
             json!({}),
+            json!({}),
+        );
+        assert_domain_map(
+            &env,
+            ("person_container", "creature_container"),
+            json!({ "person": {} }),
+            // BUG, see test_unify_opt_props1():
             json!({}),
         );
     });

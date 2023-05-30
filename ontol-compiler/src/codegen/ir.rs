@@ -1,6 +1,6 @@
 use ontol_runtime::{
     value::PropertyId,
-    vm::proc::{BuiltinProc, Local, Procedure},
+    vm::proc::{BuiltinProc, Local, Predicate, Procedure},
     DefId,
 };
 
@@ -9,6 +9,12 @@ pub struct BlockIndex(pub u32);
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockOffset(pub u32);
+
+impl BlockOffset {
+    pub fn plus(self, offset: u32) -> Self {
+        Self(self.0 + offset)
+    }
+}
 
 #[derive(Debug)]
 #[allow(unused)]
@@ -23,9 +29,11 @@ pub enum Ir {
     Iter(Local, Local, BlockIndex),
     /// Take attribute and push two values on the stack: value(top), rel_params
     TakeAttr2(Local, PropertyId),
+    TryTakeAttr2(Local, PropertyId),
     PutAttrValue(Local, PropertyId),
     AppendAttr2(Local),
     Constant(i64, DefId),
+    Cond(Predicate, BlockIndex),
 }
 
 #[derive(Clone, Debug)]

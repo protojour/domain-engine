@@ -1,10 +1,10 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
-    kind::{NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
     Variable,
 };
 use ontol_runtime::{
-    vm::proc::{BuiltinProc, Local, NParams, Procedure},
+    vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
 };
 use tracing::debug;
@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     codegen::{ir::Terminator, proc_builder::Stack},
     error::CompileError,
-    typed_hir::{HirFunc, TypedHirNode},
+    typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
     CompileErrors, SpannedCompileError,
 };
@@ -198,34 +198,65 @@ impl<'a> CodeGenerator<'a> {
             NodeKind::MatchProp(struct_var, id, arms) => {
                 let struct_local = self.var_local(struct_var);
 
-                self.builder
-                    .append(block, Ir::TakeAttr2(struct_local, id), Stack(2), span);
-
-                let val_local = self.builder.top();
-                let rel_local = self.builder.top_minus(1);
-
-                if arms.len() != 1 {
-                    todo!("multiple arms");
-                }
-
-                for arm in arms {
-                    match arm.pattern {
-                        PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
-                            &[(rel_local, rel_binding), (val_local, val_binding)],
-                            arm.nodes.into_iter(),
+                if arms.len() > 1 {
+                    if arms
+                        .iter()
+                        .any(|arm| matches!(arm.pattern, PropPattern::Absent))
+                    {
+                        self.builder.append(
                             block,
-                        ),
-                        PropPattern::Seq(seq_binding) => self.gen_in_scope(
-                            &[
-                                (rel_local, PatternBinding::Wildcard),
-                                (val_local, seq_binding),
-                            ],
-                            arm.nodes.into_iter(),
+                            Ir::TryTakeAttr2(struct_local, id),
+                            // even if three locals are pushed, the `status` one
+                            // is not kept track of here.
+                            Stack(2),
+                            span,
+                        );
+
+                        let status_local = self.builder.top_minus(1);
+                        let post_cond_offset = block.current_offset().plus(1);
+
+                        // These overlaps with the status_local, but that will be removed in the Cond opcode,
+                        // leading into the present block.
+                        let val_local = self.builder.top();
+                        let rel_local = self.builder.top_minus(1);
+
+                        let present_body_index = {
+                            let mut present_block = self.builder.new_block(Stack(0), span);
+
+                            for arm in arms {
+                                if !matches!(arm.pattern, PropPattern::Absent) {
+                                    self.gen_match_arm(
+                                        arm,
+                                        (rel_local, val_local),
+                                        &mut present_block,
+                                    );
+                                }
+                            }
+
+                            self.builder.commit(
+                                present_block,
+                                Terminator::PopGoto(block.index(), post_cond_offset),
+                            )
+                        };
+
+                        self.builder.append(
                             block,
-                        ),
-                        PropPattern::Absent => {
-                            todo!("Arm pattern not present")
-                        }
+                            Ir::Cond(Predicate::YankTrue(status_local), present_body_index),
+                            Stack(0),
+                            span,
+                        );
+                    } else {
+                        todo!();
+                    }
+                } else {
+                    self.builder
+                        .append(block, Ir::TakeAttr2(struct_local, id), Stack(2), span);
+
+                    let val_local = self.builder.top();
+                    let rel_local = self.builder.top_minus(1);
+
+                    for arm in arms {
+                        self.gen_match_arm(arm, (rel_local, val_local), block);
                     }
                 }
             }
@@ -301,6 +332,32 @@ impl<'a> CodeGenerator<'a> {
                     .append(block, Ir::AppendAttr2(seq_local), Stack(-2), span);
 
                 self.builder.append_pop_until(block, top, span);
+            }
+        }
+    }
+
+    fn gen_match_arm(
+        &mut self,
+        arm: MatchArm<TypedHir>,
+        (rel_local, val_local): (Local, Local),
+        block: &mut Block,
+    ) {
+        match arm.pattern {
+            PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
+                &[(rel_local, rel_binding), (val_local, val_binding)],
+                arm.nodes.into_iter(),
+                block,
+            ),
+            PropPattern::Seq(seq_binding) => self.gen_in_scope(
+                &[
+                    (rel_local, PatternBinding::Wildcard),
+                    (val_local, seq_binding),
+                ],
+                arm.nodes.into_iter(),
+                block,
+            ),
+            PropPattern::Absent => {
+                todo!("Arm pattern not present")
             }
         }
     }

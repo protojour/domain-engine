@@ -144,8 +144,22 @@ impl Stack for ValueStack {
                 self.stack.push(attribute.value);
             }
             None => {
-                self.stack.push(Value::unit());
-                self.stack.push(Value::unit());
+                panic!("Attribute {key} not present");
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn try_take_attr2(&mut self, source: Local, key: PropertyId) {
+        let map = self.struct_local_mut(source);
+        match map.remove(&key) {
+            Some(attribute) => {
+                self.stack.push(Value::new(Data::Int(1), DefId::unit()));
+                self.stack.push(attribute.rel_params);
+                self.stack.push(attribute.value);
+            }
+            None => {
+                self.stack.push(Value::new(Data::Int(0), DefId::unit()));
             }
         }
     }
@@ -172,26 +186,15 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn get_discriminant(&mut self, local: Local) {
-        let local = self.local(local);
-        let discriminant = def_id_to_int(local.type_def_id);
-        self.stack
-            .push(Value::new(Data::Int(discriminant), DefId::unit()));
-    }
-
-    #[inline(always)]
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool {
-        if self.eval_predicate(predicate) {
-            self.stack.pop();
-            true
-        } else {
-            false
+        match predicate {
+            Predicate::MatchesDiscriminant(local, def_id) => {
+                let value = self.local(*local);
+                value.type_def_id == *def_id
+            }
+            Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::Int(0)),
         }
     }
-}
-
-fn def_id_to_int(def_id: DefId) -> i64 {
-    (((def_id.0 .0) as i64) << 32) | def_id.1 as i64
 }
 
 impl ValueStack {
@@ -266,6 +269,7 @@ impl ValueStack {
     }
 
     /// Pop n items from stack (NB: returned in reverse order, top of stack is first array item)
+    #[inline(always)]
     fn pop_n<T, const N: usize>(&mut self) -> [T; N]
     where
         Value: Cast<T>,
@@ -274,19 +278,8 @@ impl ValueStack {
     }
 
     #[inline(always)]
-    fn eval_predicate(&mut self, predicate: &Predicate) -> bool {
-        let top = match self.stack.last() {
-            Some(Value {
-                data: Data::Int(int),
-                ..
-            }) => int,
-            _ => panic!(),
-        };
-
-        match predicate {
-            Predicate::MatchesDiscriminant(def_id) => def_id_to_int(*def_id) == *top,
-            Predicate::True => true,
-        }
+    fn yank(&mut self, local: Local) -> Value {
+        self.stack.remove(self.local0_pos + local.0 as usize)
     }
 }
 
@@ -573,17 +566,20 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
-                OpCode::TakeAttr2(Local(0), prop),
-                OpCode::GetDiscriminant(Local(3)),
-                OpCode::Cond(
-                    Predicate::MatchesDiscriminant(inner_def_id),
-                    AddressOffset(5),
-                ),
+                OpCode::TryTakeAttr2(Local(0), prop),
+                OpCode::Cond(Predicate::YankTrue(Local(2)), AddressOffset(4)),
+                // AddressOffset(3):
                 OpCode::Return(Local(1)),
-                // AddressOffset(5):
+                // AddressOffset(4):
+                OpCode::Cond(
+                    Predicate::MatchesDiscriminant(Local(3), inner_def_id),
+                    AddressOffset(6),
+                ),
+                OpCode::Goto(AddressOffset(3)),
+                // AddressOffset(6):
                 OpCode::PushConstant(666, def_id(200)),
                 OpCode::PutUnitAttr(Local(1), prop),
-                OpCode::Return(Local(1)),
+                OpCode::Goto(AddressOffset(3)),
             ],
         );
 
@@ -594,6 +590,20 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(&vm.trace_eval(proc, [Value::new(Data::Struct([].into()), def_id(0))]))
+            )
+        );
+
+        assert_eq!(
+            "{}",
+            format!(
+                "{}",
+                ValueDebug(&vm.trace_eval(
+                    proc,
+                    [Value::new(
+                        Data::Struct([(prop, Value::unit().into())].into()),
+                        def_id(0)
+                    )]
+                ))
             )
         );
 

@@ -46,6 +46,8 @@ pub struct Procedure {
 pub struct NParams(pub u8);
 
 /// ONTOL opcode.
+///
+/// When the documentation mentions the stack, the _leftmost_ value is the top of the stack.
 #[derive(DebugExtras)]
 pub enum OpCode {
     /// Return a specific local
@@ -67,17 +69,20 @@ pub enum OpCode {
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),
-    /// Take attribute and push two values on the stack: value(top), rel_params
+    /// Take attribute and push two values on the stack: [value, rel_params].
+    /// The attribute _must_ be present.
     TakeAttr2(Local, PropertyId),
+    /// Try to take attr, with two outcomes:
+    /// If present, pushes three values on the stack: [value, rel_params, 0].
+    /// If absent, pushes one value on the stack: [0].
+    TryTakeAttr2(Local, PropertyId),
     /// Pop value from stack, and move it into the specified local map.
     PutUnitAttr(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
     /// Push a constant to the stack.
     PushConstant(i64, DefId),
-    /// Extract the discriminant of a local, push onto stack
-    GetDiscriminant(Local),
-    /// Runs predicate agains top of stack. If successful, pops the stack. If unsuccessful, keeps the value.
+    /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
 }
 
@@ -100,6 +105,7 @@ pub enum BuiltinProc {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Predicate {
-    MatchesDiscriminant(DefId),
-    True,
+    MatchesDiscriminant(Local, DefId),
+    /// Test if true. NB: Yanks from stack.
+    YankTrue(Local),
 }

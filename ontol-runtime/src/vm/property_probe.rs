@@ -139,13 +139,20 @@ impl Stack for PropStack {
 
     fn take_attr2(&mut self, source: Local, key: PropertyId) {
         let map = self.get_map_mut(source);
+        let set = map.remove(&key).unwrap();
+        self.stack.push(Props::Set(FnvHashSet::default()));
+        self.stack.push(Props::Set(set));
+    }
+
+    fn try_take_attr2(&mut self, source: Local, key: PropertyId) {
+        let map = self.get_map_mut(source);
         match map.remove(&key) {
             Some(set) => {
+                self.stack.push(Props::Set(FnvHashSet::default()));
                 self.stack.push(Props::Set(FnvHashSet::default()));
                 self.stack.push(Props::Set(set));
             }
             None => {
-                self.stack.push(Props::Set(FnvHashSet::default()));
                 self.stack.push(Props::Set(FnvHashSet::default()));
             }
         }
@@ -164,10 +171,6 @@ impl Stack for PropStack {
 
     fn append_attr2(&mut self, _seq: Local) {
         todo!();
-    }
-
-    fn get_discriminant(&mut self, _local: Local) {
-        self.stack.push(Props::Set(FnvHashSet::default()));
     }
 
     fn cond_predicate(&mut self, _predicate: &Predicate) -> bool {

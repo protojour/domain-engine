@@ -47,10 +47,10 @@ pub trait Stack {
     fn swap(&mut self, a: Local, b: Local);
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
     fn take_attr2(&mut self, source: Local, key: PropertyId);
+    fn try_take_attr2(&mut self, source: Local, key: PropertyId);
     fn put_unit_attr(&mut self, target: Local, key: PropertyId);
     fn push_constant(&mut self, k: i64, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
-    fn get_discriminant(&mut self, local: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
 }
 
@@ -123,6 +123,10 @@ impl<'l> AbstractVm<'l> {
                     stack.take_attr2(*source, *property_id);
                     self.program_counter += 1;
                 }
+                OpCode::TryTakeAttr2(source, property_id) => {
+                    stack.try_take_attr2(*source, *property_id);
+                    self.program_counter += 1;
+                }
                 OpCode::PutUnitAttr(target, property_id) => {
                     stack.put_unit_attr(*target, *property_id);
                     self.program_counter += 1;
@@ -140,10 +144,6 @@ impl<'l> AbstractVm<'l> {
                 }
                 OpCode::AppendAttr2(seq) => {
                     stack.append_attr2(*seq);
-                    self.program_counter += 1;
-                }
-                OpCode::GetDiscriminant(local) => {
-                    stack.get_discriminant(*local);
                     self.program_counter += 1;
                 }
                 OpCode::Cond(predicate, offset) => {

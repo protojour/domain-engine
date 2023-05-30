@@ -31,7 +31,7 @@ impl ProcBuilder {
     }
 
     /// Generate a new block, the stack_delta is the number of locals
-    /// implicitly pushed as the block is transitioned to
+    /// implicitly pushed as the block is transitioned to.
     /// For the first block, this is the number of parameters.
     /// This block "owns" these locals, and they are allowed to be cleared before the block ends.
     pub fn new_block(&mut self, stack_delta: Stack, span: SourceSpan) -> Block {
@@ -143,9 +143,16 @@ impl ProcBuilder {
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
                     Ir::TakeAttr2(local, property_id) => OpCode::TakeAttr2(local, property_id),
+                    Ir::TryTakeAttr2(local, property_id) => {
+                        OpCode::TryTakeAttr2(local, property_id)
+                    }
                     Ir::PutAttrValue(local, property_id) => OpCode::PutUnitAttr(local, property_id),
                     Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
                     Ir::Constant(value, def_id) => OpCode::PushConstant(value, def_id),
+                    Ir::Cond(predicate, block_index) => OpCode::Cond(
+                        predicate,
+                        AddressOffset(block_addresses[block_index.0 as usize]),
+                    ),
                 };
                 output.push((opcode, span));
             }
