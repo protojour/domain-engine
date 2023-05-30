@@ -73,8 +73,8 @@ pub enum OpCode {
     /// The attribute _must_ be present.
     TakeAttr2(Local, PropertyId),
     /// Try to take attr, with two outcomes:
-    /// If present, pushes three values on the stack: [value, rel_params, 0].
-    /// If absent, pushes one value on the stack: [0].
+    /// If present, pushes three values on the stack: [value, rel_params, Int(1)].
+    /// If absent, pushes one value on the stack: [Int(0)].
     TryTakeAttr2(Local, PropertyId),
     /// Pop value from stack, and move it into the specified local map.
     PutUnitAttr(Local, PropertyId),
