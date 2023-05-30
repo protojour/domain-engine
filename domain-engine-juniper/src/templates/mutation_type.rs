@@ -56,7 +56,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
                     let input_attribute = args_wrapper.deserialize_attribute(input, info.env())?;
-                    let query = query_analyzer.analyze_map_query(&look_ahead, field_data);
+                    let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
 
                     debug!("CREATE {input_attribute:#?} -> {query:#?}");
 
@@ -83,7 +83,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                     let id_attribute = args_wrapper.deserialize_attribute(id, info.env())?;
                     let input_attribute = args_wrapper.deserialize_attribute(input, info.env())?;
 
-                    let query = query_analyzer.analyze_map_query(&look_ahead, field_data);
+                    let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
 
                     debug!("UPDATE {id_attribute:?} -> {input_attribute:#?} -> {query:#?}");
                     Ok(juniper::Value::Null)

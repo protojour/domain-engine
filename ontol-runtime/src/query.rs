@@ -6,35 +6,35 @@ use crate::{value::PropertyId, DefId};
 #[derive(Debug)]
 pub enum Query {
     Leaf,
-    Map(MapQuery),
-    MapUnion(DefId, Vec<MapQuery>),
+    Struct(StructQuery),
+    StructUnion(DefId, Vec<StructQuery>),
     Entity(EntityQuery),
 }
 
 #[derive(Debug)]
 pub struct EntityQuery {
-    pub source: MapOrUnionQuery,
+    pub source: StructOrUnionQuery,
     pub limit: u32,
     pub cursor: Option<String>,
 }
 
 #[derive(Debug)]
-pub enum MapOrUnionQuery {
-    Map(MapQuery),
-    Union(DefId, Vec<MapQuery>),
+pub enum StructOrUnionQuery {
+    Struct(StructQuery),
+    Union(DefId, Vec<StructQuery>),
 }
 
-impl MapOrUnionQuery {
+impl StructOrUnionQuery {
     pub fn def_id(&self) -> DefId {
         match self {
-            Self::Map(map) => map.def_id,
+            Self::Struct(struct_) => struct_.def_id,
             Self::Union(def_id, _) => *def_id,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct MapQuery {
+pub struct StructQuery {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, Query>,
 }
