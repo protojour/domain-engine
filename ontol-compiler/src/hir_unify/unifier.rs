@@ -43,6 +43,9 @@ pub fn unify_to_function<'m>(
     var_tracker.visit_node(0, &scope_source);
     var_tracker.visit_node(0, &target);
 
+    let source_ty = scope_source.meta.ty;
+    let target_ty = target.meta.ty;
+
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     let unified = Unifier {
@@ -58,10 +61,14 @@ pub fn unify_to_function<'m>(
         _ => panic!("Too many nodes"),
     };
 
-    Ok(HirFunc {
-        arg: unified.binder.ok_or(UnifierError::NoInputBinder)?,
-        body,
-    })
+    match unified.binder {
+        Some(arg) => {
+            assert_eq!(arg.ty, source_ty);
+            assert_eq!(body.meta.ty, target_ty);
+            Ok(HirFunc { arg, body })
+        }
+        None => Err(UnifierError::NoInputBinder),
+    }
 }
 
 struct Unifier<'a, 'm> {

@@ -5,6 +5,7 @@ use ontol_runtime::{
     DefId, MapKey,
 };
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
 
@@ -34,12 +35,15 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 
     for ((from, to), proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
+        debug!("{:?} -> {:?}", from, to);
+
         let n_params = proc_builder.n_params;
         let opcodes = proc_builder.build();
         spans.extend(opcodes.iter().map(|(_, span)| span));
 
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
+        debug!("got procedure {procedure:?}");
         map_procs.insert((from, to), procedure);
     }
 

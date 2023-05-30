@@ -1,7 +1,7 @@
 use std::{array, collections::BTreeMap};
 
 use smartstring::alias::String;
-use tracing::{trace, Level};
+use tracing::{debug, trace, Level};
 
 use crate::{
     cast::Cast,
@@ -41,6 +41,8 @@ impl<'l> OntolVm<'l> {
         args: impl IntoIterator<Item = Value>,
         debug: &mut dyn VmDebug<ValueStack>,
     ) -> Value {
+        debug!("evaluating {procedure:?}");
+
         for arg in args {
             self.value_stack.stack.push(arg);
         }

@@ -73,16 +73,28 @@ fn test_temperature() {
 #[test]
 fn test_optional_attribute() {
     "
-    pub type person {
-        rel _ 'age'?: int
+    type seconds {
+        rel _ is: int
     }
-    pub type creature {
-        rel _ 'years'?: int
+    type years {
+        rel _ is: int
     }
 
-    unify x {
-        person { 'age'?: x }
-        creature { 'years'?: x }
+    map y {
+        seconds: y * 60 * 60 * 24 * 365
+        years: y
+    }
+
+    pub type person {
+        rel _ 'age'?: years
+    }
+    pub type creature {
+        rel _ 'age'?: seconds
+    }
+
+    unify a {
+        person { 'age'?: a }
+        creature { 'age'?: a }
     }
 
     pub type person_container {
@@ -92,15 +104,15 @@ fn test_optional_attribute() {
         rel _ 'creature'?: creature
     }
 
-    unify x {
+    unify a {
         person_container {
             'person'?: person {
-                'age'?: x
+                'age'?: a
             }
         }
         creature_container {
             'creature'?: creature {
-                'years'?: x
+                'age'?: a
             }
         }
     }
@@ -111,7 +123,7 @@ fn test_optional_attribute() {
             &env,
             ("person", "creature"),
             json!({ "age": 42 }),
-            json!({ "years": 42 }),
+            json!({ "age": 1324512000 }),
         );
 
         assert_domain_map(

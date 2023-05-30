@@ -131,8 +131,11 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 const_codegen(&mut proc_table, node, def_id, &mut compiler.errors);
             }
             CodegenTask::Map(map_task) => {
-                debug!("1st:\n{}", map_task.first);
-                debug!("2nd:\n{}", map_task.second);
+                debug!("1st (ty={:?}):\n{}", map_task.first.meta.ty, map_task.first);
+                debug!(
+                    "2nd (ty={:?}):\n{}",
+                    map_task.second.meta.ty, map_task.second
+                );
 
                 debug!("Forward start");
                 if let Ok(func) =

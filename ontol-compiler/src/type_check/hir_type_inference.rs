@@ -71,6 +71,7 @@ impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
                     kind: NodeKind::Map(Box::new(variable_ref)),
                     meta: node.meta,
                 };
+
                 *node = map;
             }
         }

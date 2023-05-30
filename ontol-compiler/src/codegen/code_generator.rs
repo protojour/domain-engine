@@ -68,8 +68,6 @@ pub(super) fn map_codegen(
 
     match (find_mapping_key(func.arg.ty), find_mapping_key(return_ty)) {
         (Some(from_def), Some(to_def)) => {
-            debug!("Saving proc: {:?} -> {:?}", func.arg.ty, return_ty);
-
             proc_table
                 .map_procedures
                 .insert((from_def, to_def), builder);
