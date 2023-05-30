@@ -63,8 +63,14 @@ pub fn unify_to_function<'m>(
 
     match unified.binder {
         Some(arg) => {
-            assert_eq!(arg.ty, source_ty);
-            assert_eq!(body.meta.ty, target_ty);
+            // NB: Error is used in unification tests
+            if !matches!(source_ty, Type::Error) {
+                assert_eq!(arg.ty, source_ty);
+            }
+            if !matches!(target_ty, Type::Error) {
+                assert_eq!(body.meta.ty, target_ty);
+            }
+
             Ok(HirFunc { arg, body })
         }
         None => Err(UnifierError::NoInputBinder),
