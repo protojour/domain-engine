@@ -92,7 +92,7 @@ pub struct TypeDefParam {
 }
 
 #[derive(Debug)]
-pub struct Variables(pub SmallVec<[(ExprId, SourceSpan); 2]>);
+pub struct Variables(pub SmallVec<[ExprId; 2]>);
 
 #[derive(Debug, Clone)]
 pub struct DefReference {

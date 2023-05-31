@@ -259,10 +259,10 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     group_set.add(explicit_variable.ctrl_group);
                 } else {
-                    let (variable_expr_id, _variable_span) = variables
+                    let variable_expr_id = variables
                         .0
                         .iter()
-                        .find(|(var_expr_id, _)| var_expr_id == expr_id)
+                        .find(|var_expr_id| *var_expr_id == expr_id)
                         .unwrap();
 
                     // Register variable
