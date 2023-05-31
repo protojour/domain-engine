@@ -14,7 +14,7 @@ pub enum NodeKind<'a, L: Lang> {
     Map(Box<L::Node<'a>>),
     Seq(Label, Attribute<Box<L::Node<'a>>>),
     Struct(Binder, Nodes<'a, L>),
-    Prop(Variable, PropertyId, Vec<PropVariant<'a, L>>),
+    Prop(Optional, Variable, PropertyId, Vec<PropVariant<'a, L>>),
     MatchProp(Variable, PropertyId, Vec<MatchArm<'a, L>>),
     Gen(Variable, IterBinder, Nodes<'a, L>),
     Iter(Variable, IterBinder, Nodes<'a, L>),
@@ -31,13 +31,13 @@ impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct Optional(pub bool);
+
 #[derive(Clone)]
-pub enum PropVariant<'a, L: Lang> {
-    Present {
-        dimension: Dimension,
-        attr: Attribute<Box<L::Node<'a>>>,
-    },
-    Absent,
+pub struct PropVariant<'a, L: Lang> {
+    pub dimension: Dimension,
+    pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
 #[derive(Copy, Clone, Debug)]

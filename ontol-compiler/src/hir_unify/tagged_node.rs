@@ -4,7 +4,7 @@ use tracing::debug;
 
 use bit_set::BitSet;
 use ontol_hir::{
-    kind::{Attribute, Dimension, NodeKind, PropVariant},
+    kind::{Attribute, Dimension, NodeKind, Optional, PropVariant},
     Binder, Label, Variable,
 };
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
@@ -25,9 +25,8 @@ pub enum TaggedKind {
     Map,
     Seq(Label),
     Struct(Binder),
-    Prop(Variable, PropertyId),
-    PresentPropVariant(Variable, PropertyId, Dimension),
-    NotPresentPropVariant(Variable, PropertyId),
+    Prop(Optional, Variable, PropertyId),
+    PropVariant(Variable, PropertyId, Dimension),
 }
 
 // Note: This is more granular than typed_hir nodes.
@@ -93,25 +92,26 @@ impl<'m> TaggedNode<'m> {
                 )
             }
             TaggedKind::Struct(binder) => NodeKind::Struct(binder, self.children.into_hir()),
-            TaggedKind::Prop(struct_var, id) => NodeKind::Prop(
+            TaggedKind::Prop(optional, struct_var, id) => NodeKind::Prop(
+                optional,
                 struct_var,
                 id,
                 self.children
                     .0
                     .into_iter()
-                    .map(|node| match node.kind {
-                        TaggedKind::PresentPropVariant(_, _, dimension) => {
+                    .filter_map(|node| match node.kind {
+                        TaggedKind::PropVariant(_, _, dimension) => {
                             let (rel, val) = node.children.into_hir_pair();
 
-                            PropVariant::Present {
+                            Some(PropVariant {
                                 dimension,
                                 attr: Attribute {
                                     rel: Box::new(rel),
                                     val: Box::new(val),
                                 },
-                            }
+                            })
                         }
-                        _ => PropVariant::Absent,
+                        _ => None,
                     })
                     .collect(),
             ),
@@ -156,6 +156,7 @@ impl<'m> TaggedNodes<'m> {
 pub struct Tagger<'m> {
     in_scope: BitSet,
     labels: BitSet,
+    #[allow(unused)]
     unit_type: TypeRef<'m>,
 }
 
@@ -232,56 +233,41 @@ impl<'m> Tagger<'m> {
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 zelf.make_tagged(TaggedKind::Struct(binder), nodes.into_iter(), meta)
             }),
-            NodeKind::Prop(struct_var, prop, variants) => {
+            NodeKind::Prop(optional, struct_var, prop, variants) => {
                 let mut free_variables = BitSet::new();
 
                 let variants = variants
                     .into_iter()
-                    .map(|variant| {
-                        match variant {
-                            PropVariant::Present { dimension, attr } => {
-                                debug!("rel ty: {:?}", attr.rel.meta.ty);
-                                debug!("val ty: {:?}", attr.val.meta.ty);
+                    .map(|PropVariant { dimension, attr }| {
+                        debug!("rel ty: {:?}", attr.rel.meta.ty);
+                        debug!("val ty: {:?}", attr.val.meta.ty);
 
-                                let rel = self.tag_node(*attr.rel);
-                                let val = self.tag_node(*attr.val);
+                        let rel = self.tag_node(*attr.rel);
+                        let val = self.tag_node(*attr.val);
 
-                                let val_ty = val.meta.ty;
+                        let val_ty = val.meta.ty;
 
-                                let mut variant_variables = BitSet::new();
+                        let mut variant_variables = BitSet::new();
 
-                                variant_variables.union_with(&rel.free_variables);
-                                variant_variables.union_with(&val.free_variables);
+                        variant_variables.union_with(&rel.free_variables);
+                        variant_variables.union_with(&val.free_variables);
 
-                                if let Dimension::Seq(label) = dimension {
-                                    self.register_label(label);
-                                    variant_variables.insert(label.0 as usize);
-                                    free_variables.insert(label.0 as usize);
-                                } else {
-                                    free_variables.union_with(&variant_variables);
-                                }
+                        if let Dimension::Seq(label) = dimension {
+                            self.register_label(label);
+                            variant_variables.insert(label.0 as usize);
+                            free_variables.insert(label.0 as usize);
+                        } else {
+                            free_variables.union_with(&variant_variables);
+                        }
 
-                                TaggedNode {
-                                    kind: TaggedKind::PresentPropVariant(
-                                        struct_var, prop, dimension,
-                                    ),
-                                    free_variables: variant_variables,
-                                    children: TaggedNodes(vec![rel, val]),
-                                    meta: Meta {
-                                        // BUG: Not correct
-                                        ty: val_ty,
-                                        span: SourceSpan::none(),
-                                    },
-                                }
-                            }
-                            PropVariant::Absent => TaggedNode {
-                                kind: TaggedKind::NotPresentPropVariant(struct_var, prop),
-                                free_variables: BitSet::new(),
-                                children: TaggedNodes(vec![]),
-                                meta: Meta {
-                                    ty: self.unit_type,
-                                    span: SourceSpan::none(),
-                                },
+                        TaggedNode {
+                            kind: TaggedKind::PropVariant(struct_var, prop, dimension),
+                            free_variables: variant_variables,
+                            children: TaggedNodes(vec![rel, val]),
+                            meta: Meta {
+                                // BUG: Not correct
+                                ty: val_ty,
+                                span: SourceSpan::none(),
                             },
                         }
                     })
@@ -289,7 +275,7 @@ impl<'m> Tagger<'m> {
 
                 TaggedNode {
                     free_variables,
-                    kind: TaggedKind::Prop(struct_var, prop),
+                    kind: TaggedKind::Prop(optional, struct_var, prop),
                     children: TaggedNodes(variants),
                     meta,
                 }

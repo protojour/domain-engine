@@ -82,7 +82,7 @@ macro_rules! visitor_trait {
                             self.visit_node(index, child);
                         }
                     }
-                    NodeKind::Prop(struct_var, id, variants) => {
+                    NodeKind::Prop(_, struct_var, id, variants) => {
                         self.visit_variable(struct_var);
                         self.visit_property_id(id);
                         for (index, variant) in variants.$iter().enumerate() {
@@ -119,16 +119,11 @@ macro_rules! visitor_trait {
             }
 
             fn traverse_prop_variant(&mut self, variant: param!($mut PropVariant<'a, L>)) {
-                match variant {
-                    PropVariant::Present { dimension, attr } => {
-                        if let Dimension::Seq(label) = dimension {
-                            self.visit_label(label);
-                        }
-                        self.visit_node(0, borrow!($mut attr.rel));
-                        self.visit_node(1, borrow!($mut attr.val));
-                    }
-                    PropVariant::Absent => {}
+                if let Dimension::Seq(label) = borrow!($mut variant.dimension) {
+                    self.visit_label(label);
                 }
+                self.visit_node(0, borrow!($mut variant.attr.rel));
+                self.visit_node(1, borrow!($mut variant.attr.val));
             }
 
             fn traverse_match_arm(&mut self, match_arm: param!($mut MatchArm<'a, L>)) {

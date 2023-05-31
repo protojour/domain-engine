@@ -2,8 +2,8 @@ use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
     kind::{
-        Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
-        PropVariant,
+        Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding,
+        PropPattern, PropVariant,
     },
     Binder, Label, Lang, Variable,
 };
@@ -45,6 +45,7 @@ pub enum Token<'s> {
     Hash,
     At,
     Underscore,
+    Questionmark,
 }
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
@@ -110,21 +111,8 @@ impl<L: Lang> Parser<L> {
                 let (children, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(NodeKind::Struct(binder, children)), next))
             }
-            ("prop", next) => {
-                let (var, next) = parse_dollar_var(next)?;
-                let (prop, next) = parse_symbol(next)?;
-                let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
-                Ok((
-                    self.make_node(NodeKind::Prop(
-                        var,
-                        prop.parse().map_err(|_| {
-                            Error::Expected(Class::Property, Found(Token::Symbol(prop)))
-                        })?,
-                        variants,
-                    )),
-                    next,
-                ))
-            }
+            ("prop", next) => self.parse_prop(Optional(false), next),
+            ("prop?", next) => self.parse_prop(Optional(true), next),
             ("seq", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
@@ -188,6 +176,26 @@ impl<L: Lang> Parser<L> {
         }
     }
 
+    pub fn parse_prop<'a, 's>(
+        &self,
+        optional: Optional,
+        next: &'s str,
+    ) -> ParseResult<'s, L::Node<'a>> {
+        let (var, next) = parse_dollar_var(next)?;
+        let (prop, next) = parse_symbol(next)?;
+        let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
+        Ok((
+            self.make_node(NodeKind::Prop(
+                optional,
+                var,
+                prop.parse()
+                    .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(prop))))?,
+                variants,
+            )),
+            next,
+        ))
+    }
+
     fn parse_many<'p, 's, T>(
         &'p self,
         mut next: &'s str,
@@ -211,10 +219,6 @@ impl<L: Lang> Parser<L> {
     fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
         let (_, next) = parse_lparen(next)?;
         let (dimension, next) = match parse_symbol(next) {
-            Err(Error::Unexpected(Class::RParen)) => {
-                let (_, next) = parse_rparen(next)?;
-                return Ok((PropVariant::Absent, next));
-            }
             Ok(("seq", next)) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
@@ -229,7 +233,7 @@ impl<L: Lang> Parser<L> {
         let (_, next) = parse_rparen(next)?;
 
         Ok((
-            PropVariant::Present {
+            PropVariant {
                 dimension,
                 attr: Attribute {
                     rel: Box::new(rel),

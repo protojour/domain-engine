@@ -88,8 +88,12 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Prop(struct_var, id, variants) => {
-                write!(f, "{indent}(prop {struct_var} {id}")?;
+            NodeKind::Prop(optional, struct_var, id, variants) => {
+                write!(
+                    f,
+                    "{indent}(prop{} {struct_var} {id}",
+                    if optional.0 { "?" } else { "" }
+                )?;
                 let multi = self.print_all(Sep::Space, variants.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -132,31 +136,22 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
     fn print(
         self,
         _sep: Sep,
-        variant: &PropVariant<'a, L>,
+        PropVariant { dimension, attr }: &PropVariant<'a, L>,
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
-        match variant {
-            PropVariant::Present { dimension, attr } => {
-                let sep = if let Dimension::Seq(label) = dimension {
-                    write!(f, "seq ({})", label)?;
-                    self.indent.indent()
-                } else {
-                    Sep::None
-                };
+        let sep = if let Dimension::Seq(label) = dimension {
+            write!(f, "seq ({})", label)?;
+            self.indent.indent()
+        } else {
+            Sep::None
+        };
 
-                let multi =
-                    self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
-                self.print_rparen(multi, f)?;
-                Ok(Multiline(true))
-            }
-            PropVariant::Absent => {
-                self.print_rparen(Multiline(false), f)?;
-                Ok(Multiline(true))
-            }
-        }
+        let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
+        self.print_rparen(multi, f)?;
+        Ok(Multiline(true))
     }
 }
 

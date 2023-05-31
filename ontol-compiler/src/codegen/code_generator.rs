@@ -172,25 +172,17 @@ impl<'a> CodeGenerator<'a> {
                 }
                 self.scope.remove(&binder.0);
             }
-            NodeKind::Prop(struct_var, id, variants) => {
-                for variant in variants {
-                    if let PropVariant::Present { dimension: _, attr } = variant {
-                        // FIXME: Don't ignore relation parameters!
-                        // self.generate(*variant.attr.rel, block);
-                        // let rel = self.builder.top();
-                        self.gen_node(*attr.val, block);
+            NodeKind::Prop(_, struct_var, id, variants) => {
+                if let Some(PropVariant { dimension: _, attr }) = variants.into_iter().next() {
+                    // FIXME: Don't ignore relation parameters!
+                    // self.generate(*variant.attr.rel, block);
+                    // let rel = self.builder.top();
+                    self.gen_node(*attr.val, block);
 
-                        let struct_local = self.var_local(struct_var);
+                    let struct_local = self.var_local(struct_var);
 
-                        self.builder.append(
-                            block,
-                            Ir::PutAttrValue(struct_local, id),
-                            Stack(-1),
-                            span,
-                        );
-
-                        return;
-                    }
+                    self.builder
+                        .append(block, Ir::PutAttrValue(struct_local, id), Stack(-1), span);
                 }
             }
             NodeKind::MatchProp(struct_var, id, arms) => {

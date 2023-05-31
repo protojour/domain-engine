@@ -371,31 +371,27 @@ fn test_unify_opt_props1() {
     let output = test_unify(
         "
         (struct ($b)
-            (prop $b S:1:9
+            (prop? $b S:0:0
                 (#u
                     (struct ($c)
-                        (prop $c S:1:2
+                        (prop? $c S:1:1
                             (#u $a)
-                            ()
                         )
                     )
                 )
-                ()
             )
         )
         ",
         "
         (struct ($d)
-            (prop $d S:1:12
+            (prop? $d O:0:0
                 (#u
                     (struct ($e)
-                        (prop $e S:1:5
+                        (prop? $e O:1:1
                             (#u $a)
-                            ()
                         )
                     )
                 )
-                ()
             )
         )
         ",
@@ -403,14 +399,14 @@ fn test_unify_opt_props1() {
     // BUG: the first (prop) should be inside only the first (match-prop), not both.
     let _expected = indoc! {"
         |$b| (struct ($d)
-            (match-prop $b S:1:9
+            (match-prop $b S:0:0
                 (($_ $c)
-                    (prop $d S:1:12
+                    (prop $d O:0:0
                         (#u
                             (struct ($e)
-                                (match-prop $c S:1:2
+                                (match-prop $c S:1:1
                                     (($_ $a)
-                                        (prop $e S:1:5
+                                        (prop? $e O:1:1
                                             (#u $a)
                                         )
                                     )
@@ -426,16 +422,15 @@ fn test_unify_opt_props1() {
     };
     let actual = indoc! {"
         |$b| (struct ($d)
-            (match-prop $b S:1:9
+            (match-prop $b S:0:0
                 (($_ $c)
-                    (match-prop $c S:1:2
+                    (match-prop $c S:1:1
                         (($_ $a)
-                            (prop $d S:1:12
+                            (prop $d O:0:0
                                 (#u
                                     (struct ($e)
-                                        (prop $e S:1:5
+                                        (prop? $e O:1:1
                                             (#u $a)
-                                            ()
                                         )
                                     )
                                 )

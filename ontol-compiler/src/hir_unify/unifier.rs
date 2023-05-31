@@ -1,8 +1,8 @@
 use indexmap::IndexMap;
 use ontol_hir::{
     kind::{
-        Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
-        PropVariant,
+        Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding,
+        PropPattern, PropVariant,
     },
     visitor::HirVisitor,
     Binder, Variable,
@@ -284,39 +284,28 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 debug!("unify_scoping({debug_index:?}, Struct({}))", binder.0);
                 self.unify_struct_scoping(scoping, *binder, nodes, meta)
             }
-            NodeKind::Prop(struct_var, id, variants) => {
+            NodeKind::Prop(optional, struct_var, id, variants) => {
                 debug!("unify_scoping({debug_index:?}, Prop)");
                 let mut match_arms = vec![];
                 let mut ty = &Type::Tautology;
                 for (index, variant_u_node) in scoping.sub_nodes {
                     debug!("unify_source_arm({index})");
 
-                    match &variants[index] {
-                        PropVariant::Present { dimension, attr } => {
-                            if let Some(typed_match_arm) = self.unify_prop_variant_to_match_arm(
-                                variant_u_node,
-                                *dimension,
-                                attr,
-                            )? {
-                                if let Type::Tautology = typed_match_arm.ty {
-                                    panic!("found Tautology");
-                                }
+                    let PropVariant { dimension, attr } = &variants[index];
 
-                                ty = typed_match_arm.ty;
-                                match_arms.push(typed_match_arm.arm);
-                            }
+                    if let Some(typed_match_arm) =
+                        self.unify_prop_variant_to_match_arm(variant_u_node, *dimension, attr)?
+                    {
+                        if let Type::Tautology = typed_match_arm.ty {
+                            panic!("found Tautology");
                         }
-                        PropVariant::Absent => {
-                            panic!("NotPresent is not a scoping")
-                        }
+
+                        ty = typed_match_arm.ty;
+                        match_arms.push(typed_match_arm.arm);
                     }
                 }
 
-                if variants
-                    .iter()
-                    .any(|variant| matches!(variant, PropVariant::Absent))
-                {
-                    // Optional property
+                if optional.0 {
                     match_arms.push(MatchArm {
                         pattern: PropPattern::Absent,
                         nodes: vec![],
@@ -465,7 +454,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             }
                         }))
                 }
-                TaggedKind::PresentPropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
+                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
                     let mut iterator = expr.children.0.into_iter();
                     let rel_binding =
                         self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.rel)?;
@@ -518,9 +507,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 // this node should already be in target_nodes, so what should instead be done
                                 // is to put its variables into scope.
                                 kind: NodeKind::Prop(
+                                    Optional(false),
                                     struct_var,
                                     prop_id,
-                                    vec![PropVariant::Present {
+                                    vec![PropVariant {
                                         dimension: Dimension::Singular,
                                         attr: Attribute {
                                             rel: Box::new(self.unit_node()),
@@ -718,7 +708,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         for expr in std::mem::take(&mut scoping.expressions) {
             match &expr.kind {
-                TaggedKind::PresentPropVariant(variable, property_id, dimension) => {
+                TaggedKind::PropVariant(variable, property_id, dimension) => {
                     property_groups
                         .entry((*variable, *property_id))
                         .or_default()
@@ -742,7 +732,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         rel.meta.ty, val.meta.ty, rel, val
                     );
                 }
-                variants.push(PropVariant::Present {
+                variants.push(PropVariant {
                     dimension,
                     attr: Attribute {
                         rel: Box::new(rel),
@@ -752,7 +742,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
 
             merged.push(TypedHirNode {
-                kind: NodeKind::Prop(variable, property_id, variants),
+                kind: NodeKind::Prop(Optional(false), variable, property_id, variants),
                 meta: Meta {
                     ty,
                     span: SourceSpan::none(),

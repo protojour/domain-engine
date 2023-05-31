@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use ontol_hir::{
-    kind::{Attribute, Dimension, NodeKind, PropVariant},
+    kind::{Attribute, Dimension, NodeKind, Optional, PropVariant},
     Binder,
 };
 use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
@@ -349,7 +349,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
                                     let node = self.build_node(expr, Some(object_ty), ctx);
-                                    PropVariant::Present {
+                                    PropVariant {
                                         dimension: Dimension::Singular,
                                         attr: Attribute {
                                             rel: Box::new(self.unit_node_no_span()),
@@ -362,7 +362,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let node = self.build_node(inner, Some(object_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
-                                        PropVariant::Present {
+                                        PropVariant {
                                             dimension: Dimension::Seq(label),
                                             attr: Attribute {
                                                 rel: Box::new(self.unit_node_no_span()),
@@ -380,6 +380,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 },
                             };
 
+                            let optional = Optional(matches!(
+                                match_property.cardinality.0,
+                                PropertyCardinality::Optional
+                            ));
+
                             let prop_variants: Vec<PropVariant<'_, TypedHir>> = match match_property
                                 .cardinality
                                 .0
@@ -389,7 +394,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                                 PropertyCardinality::Optional => {
                                     if *bind_option {
-                                        vec![prop_variant, PropVariant::Absent]
+                                        vec![prop_variant]
                                     } else {
                                         ctx.partial = true;
                                         self.error(
@@ -403,6 +408,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             hir_props.push(TypedHirNode {
                                 kind: NodeKind::Prop(
+                                    optional,
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
                                     prop_variants,
