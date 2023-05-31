@@ -92,7 +92,7 @@ fn test_optional_attribute() {
         rel _ 'age'?: seconds
     }
 
-    unify a {
+    unify {
         person { 'age'?: a }
         creature { 'age'?: a }
     }
@@ -104,7 +104,7 @@ fn test_optional_attribute() {
         rel _ 'creature'?: creature
     }
 
-    unify a {
+    unify {
         person_container {
             'person'?: person {
                 'age'?: a

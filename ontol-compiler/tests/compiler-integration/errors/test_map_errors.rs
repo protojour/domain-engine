@@ -3,19 +3,6 @@ use pretty_assertions::assert_eq;
 use test_log::test;
 
 #[test]
-fn map_undeclared_variable() {
-    "
-    type foo
-    type bar
-    map {
-        foo: x // ERROR undeclared variable
-        bar {}
-    }
-    "
-    .compile_fail()
-}
-
-#[test]
 #[ignore = "there are no functions right now, only infix operators"]
 fn map_incorrect_function_arguments() {
     "

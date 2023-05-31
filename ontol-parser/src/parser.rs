@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn parse_map() {
         let source = "
-        map x y {
+        map {
             foo: x
             bar {
                 'foo': x
@@ -569,7 +569,7 @@ mod tests {
         }
 
         // comment
-        map x y {
+        map {
             foo: x + 1
             bar {
                 'foo': (x / 3) + 4
