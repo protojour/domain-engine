@@ -235,11 +235,7 @@ fn map_statement() -> impl AstParser<MapStatement> {
                 .then(spanned(with_unit_or_seq(map_arm())))
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(kw, (first, second))| MapStatement {
-            kw,
-            first,
-            second,
-        })
+        .map(|(kw, (first, second))| MapStatement { kw, first, second })
 }
 
 fn map_arm() -> impl AstParser<MapArm> {

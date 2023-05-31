@@ -82,8 +82,6 @@ pub enum CompileError {
     TypeMismatch { actual: String, expected: String },
     #[error("missing property `{0}`")]
     MissingProperty(String),
-    #[error("undeclared variable")]
-    UndeclaredVariable,
     #[error("unbound variable")]
     UnboundVariable,
     #[error("[{0}] variable must be enclosed in []")]
