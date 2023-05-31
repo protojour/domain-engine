@@ -126,7 +126,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let variables = var_table
                     .variables
                     .into_values()
-                    .map(|expr_id| expr_id)
                     .collect();
 
                 Ok(
