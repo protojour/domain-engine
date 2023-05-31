@@ -123,10 +123,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut var_table = ExprVarTable::default();
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
-                let variables = var_table
-                    .variables
-                    .into_values()
-                    .collect();
+                let variables = var_table.variables.into_values().collect();
 
                 Ok(
                     [self.define(DefKind::Mapping(Variables(variables), first, second), &span)]
