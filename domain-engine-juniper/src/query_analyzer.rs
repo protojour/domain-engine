@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
-    query::{EntityQuery, MapOrUnionQuery, MapQuery, Query},
+    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
     DefId, RelationId,
 };
@@ -48,15 +48,15 @@ impl<'a> QueryAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_map_query(
+    pub fn analyze_struct_query(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-    ) -> MapOrUnionQuery {
+    ) -> StructOrUnionQuery {
         match self.analyze(look_ahead, field_data).selection {
-            Query::Map(map) => MapOrUnionQuery::Map(map),
-            Query::MapUnion(def_id, variants) => MapOrUnionQuery::Union(def_id, variants),
-            query => panic!("BUG: not a map query: {query:?}"),
+            Query::Struct(struct_) => StructOrUnionQuery::Struct(struct_),
+            Query::StructUnion(def_id, variants) => StructOrUnionQuery::Union(def_id, variants),
+            query => panic!("BUG: not a struct query: {query:?}"),
         }
     }
 
@@ -103,13 +103,13 @@ impl<'a> QueryAnalyzer<'a> {
                 KeyedPropertySelection {
                     key: property_id.unwrap_or(unit_property()),
                     selection: match selection {
-                        Some(Query::Map(object)) => Query::Entity(EntityQuery {
-                            source: MapOrUnionQuery::Map(object),
+                        Some(Query::Struct(object)) => Query::Entity(EntityQuery {
+                            source: StructOrUnionQuery::Struct(object),
                             limit,
                             cursor,
                         }),
-                        Some(Query::MapUnion(def_id, variants)) => Query::Entity(EntityQuery {
-                            source: MapOrUnionQuery::Union(def_id, variants),
+                        Some(Query::StructUnion(def_id, variants)) => Query::Entity(EntityQuery {
+                            source: StructOrUnionQuery::Union(def_id, variants),
                             limit,
                             cursor,
                         }),
@@ -188,7 +188,7 @@ impl<'a> QueryAnalyzer<'a> {
                         properties.insert(property_id, selection);
                     }
 
-                    Query::Map(MapQuery {
+                    Query::Struct(StructQuery {
                         def_id: node_data.def_id,
                         properties,
                     })
@@ -246,11 +246,11 @@ impl<'a> QueryAnalyzer<'a> {
                     }
                 }
 
-                Query::MapUnion(
+                Query::StructUnion(
                     union_data.union_def_id,
                     union_map
                         .into_iter()
-                        .map(|(def_id, properties)| MapQuery { def_id, properties })
+                        .map(|(def_id, properties)| StructQuery { def_id, properties })
                         .collect(),
                 )
             }

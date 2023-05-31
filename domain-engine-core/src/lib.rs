@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use ontol_runtime::{
     env::Env,
-    query::{EntityQuery, MapOrUnionQuery},
+    query::{EntityQuery, StructOrUnionQuery},
     value::{Attribute, Value},
 };
 
@@ -31,7 +31,7 @@ pub trait EngineAPI: Send + Sync + 'static {
     async fn create_entity(
         &self,
         value: Value,
-        query: MapOrUnionQuery,
+        query: StructOrUnionQuery,
     ) -> Result<Value, DomainError>;
 }
 
@@ -54,7 +54,7 @@ impl EngineAPI for Engine {
     async fn create_entity(
         &self,
         _value: Value,
-        _query: MapOrUnionQuery,
+        _query: StructOrUnionQuery,
     ) -> Result<Value, DomainError> {
         Ok(Value::unit())
     }
