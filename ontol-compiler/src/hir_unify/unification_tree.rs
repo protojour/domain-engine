@@ -2,14 +2,14 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{Binder, Variable};
+use ontol_hir::{kind::Optional, Binder, Variable};
 use tracing::debug;
 
 use crate::typed_hir::Meta;
 
 use super::{
     tagged_node::{TaggedKind, TaggedNode},
-    var_path::Path,
+    var_path::VarPath,
 };
 
 pub enum UnificationNode<'m> {
@@ -18,7 +18,7 @@ pub enum UnificationNode<'m> {
 }
 
 impl<'m> UnificationNode<'m> {
-    pub fn build(node: TaggedNode<'m>, variable_paths: &FnvHashMap<Variable, Path>) -> Self {
+    pub fn build(node: TaggedNode<'m>, variable_paths: &FnvHashMap<Variable, VarPath>) -> Self {
         match &node.kind {
             TaggedKind::Struct(binder) => {
                 let mut struct_node = Struct {
@@ -85,10 +85,15 @@ impl<'m> Scoping<'m> {
     fn add_expr_under_scope(
         &mut self,
         expression: TaggedNode<'m>,
-        variable_paths: &FnvHashMap<Variable, Path>,
+        variable_paths: &FnvHashMap<Variable, VarPath>,
     ) {
         match expression.kind {
-            TaggedKind::Prop(..) => {
+            TaggedKind::Prop(Optional(true), ..) => {
+                for child in expression.children.0 {
+                    self.add_expr_under_scope(child, variable_paths);
+                }
+            }
+            TaggedKind::Prop(Optional(false), ..) => {
                 for child in expression.children.0 {
                     self.add_expr_under_scope(child, variable_paths);
                 }
@@ -105,7 +110,7 @@ impl<'m> Scoping<'m> {
     fn variables_sub_scoping_mut(
         &mut self,
         free_variables: &BitSet,
-        variable_paths: &FnvHashMap<Variable, Path>,
+        variable_paths: &FnvHashMap<Variable, VarPath>,
     ) -> &mut Scoping<'m> {
         let mut scoping = self;
 
@@ -136,7 +141,7 @@ impl<'m> Scoping<'m> {
         scoping
     }
 
-    fn path_sub_scoping_mut(&mut self, path: &Path) -> &mut Scoping<'m> {
+    fn path_sub_scoping_mut(&mut self, path: &VarPath) -> &mut Scoping<'m> {
         let mut scoping = self;
 
         for index in &path.0 {

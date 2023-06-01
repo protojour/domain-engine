@@ -1,7 +1,10 @@
 use ontol_runtime::value::PropertyId;
 
 use crate::{
-    kind::{Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
+    kind::{
+        Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
+        PropVariant,
+    },
     Label, Lang, Node, Variable,
 };
 
@@ -15,6 +18,17 @@ macro_rules! visitor_trait {
             #[allow(unused_variables)]
             fn visit_kind(&mut self, index: usize, kind: param!($mut NodeKind<'a, L>)) {
                 self.traverse_kind(kind);
+            }
+
+            #[allow(unused_variables)]
+            fn visit_prop(
+                &mut self,
+                optional: param!($mut Optional),
+                struct_var: param!($mut Variable),
+                id: param!($mut PropertyId),
+                variants: param!($mut Vec<PropVariant<'a, L>>)
+            ) {
+                self.traverse_prop(struct_var, id, variants);
             }
 
             #[allow(unused_variables)]
@@ -82,12 +96,8 @@ macro_rules! visitor_trait {
                             self.visit_node(index, child);
                         }
                     }
-                    NodeKind::Prop(_, struct_var, id, variants) => {
-                        self.visit_variable(struct_var);
-                        self.visit_property_id(id);
-                        for (index, variant) in variants.$iter().enumerate() {
-                            self.visit_prop_variant(index, variant);
-                        }
+                    NodeKind::Prop(optional, struct_var, id, variants) => {
+                        self.visit_prop(optional, struct_var, id, variants);
                     }
                     NodeKind::MatchProp(struct_var, id, arms) => {
                         self.visit_variable(struct_var);
@@ -115,6 +125,20 @@ macro_rules! visitor_trait {
                         self.visit_node(0, borrow!($mut attr.rel));
                         self.visit_node(1, borrow!($mut attr.val));
                     }
+                }
+            }
+
+            #[allow(unused_variables)]
+            fn traverse_prop(
+                &mut self,
+                struct_var: param!($mut Variable),
+                id: param!($mut PropertyId),
+                variants: param!($mut Vec<PropVariant<'a, L>>),
+            ) {
+                self.visit_variable(struct_var);
+                self.visit_property_id(id);
+                for (index, variant) in variants.$iter().enumerate() {
+                    self.visit_prop_variant(index, variant);
                 }
             }
 

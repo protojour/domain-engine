@@ -9,6 +9,7 @@ pub mod unifier;
 
 mod tagged_node;
 mod unification_tree;
+mod unification_tree2;
 mod var_path;
 
 #[derive(Debug)]

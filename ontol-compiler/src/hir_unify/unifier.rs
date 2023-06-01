@@ -48,6 +48,15 @@ pub fn unify_to_function<'m>(
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
+    {
+        let node = Tagger::new(unit_type).tag_node2(target.clone());
+        let variable_paths = locate_variables(&scope_source, &node.free_variables)?;
+        let mut root_nodes = node.into_nodes();
+        root_nodes.expand_scoping(&scope_source, &variable_paths);
+
+        debug!("target2: {root_nodes:#?}");
+    }
+
     let unified = Unifier {
         root_source: &scope_source,
         next_variable: var_tracker.next_variable(),
@@ -200,7 +209,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             NodeKind::Call(proc, args) => match scoping.sub_nodes.len() {
                 0 => {
                     debug!("unify_scoping({debug_index:?}, Call const)");
-                    let args = self.unify_children(scoping, args)?;
+                    let args = self.unify_sub_scopes(scoping, args)?;
                     Ok(Unified {
                         binder: None,
                         nodes: [TypedHirNode {
@@ -289,16 +298,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let mut match_arms = vec![];
                 let mut ty = &Type::Tautology;
                 for (index, variant_u_node) in scoping.sub_nodes {
-                    debug!("unify_source_arm({index})");
+                    debug!("unify_source_arm(Some({index}))");
 
                     let PropVariant { dimension, attr } = &variants[index];
 
                     if let Some(typed_match_arm) =
                         self.unify_prop_variant_to_match_arm(variant_u_node, *dimension, attr)?
                     {
-                        if let Type::Tautology = typed_match_arm.ty {
-                            panic!("found Tautology");
-                        }
+                        // if let Type::Tautology = typed_match_arm.ty {
+                        //     panic!("found Tautology");
+                        // }
 
                         ty = typed_match_arm.ty;
                         match_arms.push(typed_match_arm.arm);
@@ -317,9 +326,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes: if match_arms.is_empty() {
                         SmallVec::default()
                     } else {
-                        if let Type::Tautology = ty {
-                            panic!();
-                        }
+                        // if let Type::Tautology = ty {
+                        //     panic!("Tautology");
+                        // }
 
                         [TypedHirNode {
                             kind: TypedHirKind::MatchProp(*struct_var, *id, match_arms),
@@ -352,18 +361,22 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_struct_scoping(
         &mut self,
-        scoping: Scoping<'m>,
+        mut scoping: Scoping<'m>,
         binder: Binder,
         nodes: &[TypedHirNode<'m>],
         meta: Meta<'m>,
     ) -> UnifierResult<Unified<'m>> {
-        let nodes = self.unify_children(scoping, nodes)?;
+        let target_nodes = self.merge_target_nodes(&mut scoping)?;
+        let mut sub_scope_nodes = self.unify_sub_scopes(scoping, nodes)?;
+
+        sub_scope_nodes.extend(target_nodes);
+
         Ok(Unified {
             binder: Some(TypedBinder {
                 variable: binder.0,
                 ty: meta.ty,
             }),
-            nodes: nodes.into(),
+            nodes: sub_scope_nodes.into(),
         })
     }
 
@@ -758,7 +771,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         Ok(merged)
     }
 
-    fn unify_children(
+    fn unify_sub_scopes(
         &mut self,
         scoping: Scoping<'m>,
         children: &[TypedHirNode<'m>],
