@@ -42,6 +42,10 @@ impl<'m> TargetNode<'m> {
             dependent_scopes: vec![],
         }
     }
+
+    pub fn into_hir_node(self) -> TypedHirNode<'m> {
+        todo!()
+    }
 }
 
 impl<'m> Nodes<'m> {

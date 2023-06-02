@@ -6,10 +6,12 @@ use ontol_hir::{visitor::HirVisitor, Variable};
 use crate::typed_hir::TypedHir;
 
 pub mod unifier;
+pub mod unifier2;
 
 mod tagged_node;
 mod unification_tree;
 mod unification_tree2;
+mod unified_target_node;
 mod var_path;
 
 #[derive(Debug)]

@@ -27,7 +27,7 @@ use super::{
 
 type UnifiedNodes<'m> = SmallVec<[TypedHirNode<'m>; 1]>;
 
-type UnifierResult<T> = Result<T, UnifierError>;
+pub type UnifierResult<T> = Result<T, UnifierError>;
 
 pub struct Unified<'m> {
     pub binder: Option<TypedBinder<'m>>,
@@ -86,16 +86,16 @@ pub fn unify_to_function<'m>(
     }
 }
 
-struct Unifier<'a, 'm> {
-    root_source: &'a TypedHirNode<'m>,
-    next_variable: Variable,
-    types: &'a mut Types<'m>,
+pub struct Unifier<'a, 'm> {
+    pub root_source: &'a TypedHirNode<'m>,
+    pub next_variable: Variable,
+    pub types: &'a mut Types<'m>,
 }
 
-struct InvertedCall<'m> {
-    let_binder: Variable,
-    def: TypedHirNode<'m>,
-    body: UnifiedNodes<'m>,
+pub struct InvertedCall<'m> {
+    pub let_binder: Variable,
+    pub def: TypedHirNode<'m>,
+    pub body: UnifiedNodes<'m>,
 }
 
 struct UnifyPatternBinding<'m> {
@@ -103,9 +103,9 @@ struct UnifyPatternBinding<'m> {
     nodes: Option<UnifiedNodes<'m>>,
 }
 
-struct TypedMatchArm<'m> {
-    arm: MatchArm<'m, TypedHir>,
-    ty: TypeRef<'m>,
+pub struct TypedMatchArm<'m> {
+    pub arm: MatchArm<'m, TypedHir>,
+    pub ty: TypeRef<'m>,
 }
 
 struct LetAttr<'m> {
@@ -127,7 +127,7 @@ struct UnifiedTypedPatternBinding<'m> {
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
-    fn alloc_var(&mut self) -> Variable {
+    pub fn alloc_var(&mut self) -> Variable {
         let var = self.next_variable;
         self.next_variable.0 += 1;
         var
@@ -823,7 +823,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         })
     }
 
-    fn last_type<'n>(
+    pub fn last_type<'n>(
         &mut self,
         mut iterator: impl Iterator<Item = &'n TypedHirNode<'m>>,
     ) -> TypeRef<'m>
