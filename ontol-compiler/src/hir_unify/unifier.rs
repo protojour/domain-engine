@@ -52,7 +52,7 @@ pub fn unify_to_function<'m>(
         let node = Tagger::new(unit_type).tag_node2(target.clone());
         let variable_paths = locate_variables(&scope_source, &node.free_variables)?;
         let mut root_nodes = node.into_nodes();
-        root_nodes.expand_scoping(&scope_source, &variable_paths);
+        root_nodes.expand_scoping(&variable_paths);
 
         debug!("target2: {root_nodes:#?}");
     }
@@ -467,7 +467,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             }
                         }))
                 }
-                TaggedKind::PropVariant(struct_var, prop_id, Dimension::Seq(_)) => {
+                TaggedKind::PropVariant(_, struct_var, prop_id, Dimension::Seq(_)) => {
                     let mut iterator = expr.children.0.into_iter();
                     let rel_binding =
                         self.unify_expr_pattern_binding(iterator.next().unwrap(), &scope_attr.rel)?;
@@ -721,7 +721,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         for expr in std::mem::take(&mut scoping.expressions) {
             match &expr.kind {
-                TaggedKind::PropVariant(variable, property_id, dimension) => {
+                TaggedKind::PropVariant(_, variable, property_id, dimension) => {
                     property_groups
                         .entry((*variable, *property_id))
                         .or_default()

@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{Binder, Label, Lang, Node, Variable};
@@ -50,6 +52,18 @@ pub enum Dimension {
 pub struct Attribute<T> {
     pub rel: T,
     pub val: T,
+}
+
+impl<T> Index<usize> for Attribute<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.rel,
+            1 => &self.val,
+            _ => panic!("Out of bounds for Attribute"),
+        }
+    }
 }
 
 pub struct MatchArm<'a, L: Lang> {

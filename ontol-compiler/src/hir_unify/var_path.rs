@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{kind, visitor::HirVisitor, Node, Variable};
@@ -8,29 +10,41 @@ use crate::typed_hir::{TypedHir, TypedHirNode};
 
 use super::UnifierError;
 
-#[derive(Clone, Default, Debug)]
-pub struct VarPath(pub SmallVec<[u16; 32]>);
+pub type Path = SmallVec<[u16; 32]>;
 
-pub fn locate_variables(
-    node: &TypedHirNode,
-    variables: &BitSet,
-) -> Result<FnvHashMap<Variable, VarPath>, UnifierError> {
-    let mut locator = VarLocator::new(variables);
+#[derive(Clone)]
+pub struct VarPath<'s, 'm> {
+    pub root: &'s TypedHirNode<'m>,
+    pub path: Path,
+}
+
+impl<'s, 'm> Debug for VarPath<'s, 'm> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.path.fmt(f)
+    }
+}
+
+pub fn locate_variables<'s, 'm, 'b>(
+    node: &'s TypedHirNode<'m>,
+    variables: &'b BitSet,
+) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
+    let mut locator = VarLocator::new(node, variables);
     locator.traverse_kind(node.kind());
     locator.finish()
 }
 
-struct VarLocator<'a> {
-    variables: &'a BitSet,
-    current_path: VarPath,
+struct VarLocator<'s, 'm, 'b> {
+    root: &'s TypedHirNode<'m>,
+    variables: &'b BitSet,
+    current_path: Path,
     option_depth: u16,
 
     duplicates: BitSet,
-    output: FnvHashMap<Variable, VarPath>,
+    output: FnvHashMap<Variable, VarPath<'s, 'm>>,
 }
 
-impl<'a> VarLocator<'a> {
-    fn finish(self) -> Result<FnvHashMap<Variable, VarPath>, UnifierError> {
+impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
+    fn finish(self) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
         if !self.duplicates.is_empty() {
             Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
         } else {
@@ -38,10 +52,11 @@ impl<'a> VarLocator<'a> {
         }
     }
 
-    pub(super) fn new(variables: &'a BitSet) -> Self {
+    pub(super) fn new(root: &'s TypedHirNode<'m>, variables: &'b BitSet) -> Self {
         Self {
+            root,
             variables,
-            current_path: VarPath::default(),
+            current_path: Path::default(),
             option_depth: 0,
             duplicates: BitSet::new(),
             output: FnvHashMap::default(),
@@ -52,9 +67,9 @@ impl<'a> VarLocator<'a> {
         if self.option_depth > 1 {
             func(self);
         } else {
-            self.current_path.0.push(index as u16);
+            self.current_path.push(index as u16);
             func(self);
-            self.current_path.0.pop();
+            self.current_path.pop();
         }
     }
 
@@ -62,7 +77,13 @@ impl<'a> VarLocator<'a> {
         if self.variables.contains(var as usize)
             && self
                 .output
-                .insert(Variable(var), self.current_path.clone())
+                .insert(
+                    Variable(var),
+                    VarPath {
+                        root: self.root,
+                        path: self.current_path.clone(),
+                    },
+                )
                 .is_some()
         {
             self.duplicates.insert(var as usize);
@@ -70,7 +91,7 @@ impl<'a> VarLocator<'a> {
     }
 }
 
-impl<'a, 'm> HirVisitor<'m, TypedHir> for VarLocator<'a> {
+impl<'s, 'm, 'b> HirVisitor<'m, TypedHir> for VarLocator<'s, 'm, 'b> {
     fn visit_variable(&mut self, variable: &Variable) {
         self.register_var(variable.0);
     }
@@ -93,9 +114,9 @@ impl<'a, 'm> HirVisitor<'m, TypedHir> for VarLocator<'a> {
         if optional.0 {
             // self.option_depth += 1;
             if self.option_depth >= 2 {
-                let leaf = self.current_path.0.pop().unwrap();
+                let leaf = self.current_path.pop().unwrap();
                 self.traverse_prop(struct_var, id, variants);
-                self.current_path.0.push(leaf);
+                self.current_path.push(leaf);
             } else {
                 self.traverse_prop(struct_var, id, variants);
             }

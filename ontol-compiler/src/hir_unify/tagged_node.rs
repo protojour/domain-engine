@@ -17,7 +17,7 @@ use crate::{
 
 use super::unification_tree2::{Nodes, TargetNode};
 
-#[derive(DebugExtras)]
+#[derive(DebugExtras, Clone, Copy)]
 pub enum TaggedKind {
     VariableRef(Variable),
     Unit,
@@ -28,7 +28,7 @@ pub enum TaggedKind {
     Seq(Label),
     Struct(Binder),
     Prop(Optional, Variable, PropertyId),
-    PropVariant(Variable, PropertyId, Dimension),
+    PropVariant(Optional, Variable, PropertyId, Dimension),
 }
 
 // Note: This is more granular than typed_hir nodes.
@@ -94,7 +94,7 @@ impl<'m> TaggedNode<'m> {
                     .0
                     .into_iter()
                     .filter_map(|node| match node.kind {
-                        TaggedKind::PropVariant(_, _, dimension) => {
+                        TaggedKind::PropVariant(_, _, _, dimension) => {
                             let (rel, val) = node.children.into_hir_pair();
 
                             Some(PropVariant {
@@ -276,7 +276,7 @@ impl<'m> Tagger<'m> {
                 }
 
                 TargetNode {
-                    kind: TaggedKind::PropVariant(struct_var, id, dimension),
+                    kind: TaggedKind::PropVariant(optional, struct_var, id, dimension),
                     free_variables: variant_variables,
                     sub_nodes: Nodes::new(vec![rel, val]),
                     meta: Meta {
@@ -430,7 +430,7 @@ impl<'m> Tagger<'m> {
                 }
 
                 TaggedNode {
-                    kind: TaggedKind::PropVariant(struct_var, id, dimension),
+                    kind: TaggedKind::PropVariant(optional, struct_var, id, dimension),
                     free_variables: variant_variables,
                     children: TaggedNodes(vec![rel, val]),
                     meta: Meta {

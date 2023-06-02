@@ -141,10 +141,10 @@ impl<'m> Scoping<'m> {
         scoping
     }
 
-    fn path_sub_scoping_mut(&mut self, path: &VarPath) -> &mut Scoping<'m> {
+    fn path_sub_scoping_mut(&mut self, var_path: &VarPath) -> &mut Scoping<'m> {
         let mut scoping = self;
 
-        for index in &path.0 {
+        for index in &var_path.path {
             scoping = scoping
                 .sub_nodes
                 .entry(*index as usize)
