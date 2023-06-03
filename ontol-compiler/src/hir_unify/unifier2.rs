@@ -1,6 +1,9 @@
 use indexmap::IndexMap;
 use ontol_hir::{
-    kind::{Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant},
+    kind::{
+        Attribute, Dimension, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
+        PropVariant,
+    },
     Binder, Variable,
 };
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
@@ -9,7 +12,7 @@ use tracing::{debug, warn};
 use crate::{
     hir_unify::unified_target_node::{UnifiedTargetNode, UnifiedTargetNodes},
     typed_hir::{Meta, TypedBinder, TypedHirKind, TypedHirNode},
-    types::Type,
+    types::{Type, TypeRef},
     SourceSpan,
 };
 
@@ -23,23 +26,32 @@ use super::{
 
 pub struct Unified2<'m> {
     pub binder: Option<TypedBinder<'m>>,
-    pub nodes: UnifiedTargetNodes<'m>,
+    pub target_nodes: UnifiedTargetNodes<'m>,
+}
+
+pub struct UnifyPatternBinding2<'m> {
+    binding: PatternBinding,
+    target_nodes: Option<UnifiedTargetNodes<'m>>,
+}
+
+pub struct LetAttr2<'m> {
+    pub rel_binding: PatternBinding,
+    pub val_binding: PatternBinding,
+    pub target_nodes: UnifiedTargetNodes<'m>,
+    pub ty: TypeRef<'m>,
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
-    fn unify_nodes2(
+    pub fn unify_nodes2(
         &mut self,
         debug_index: Option<usize>,
         mut nodes: Nodes<'m>,
         scope_source: &TypedHirNode<'m>,
     ) -> UnifierResult<Unified2<'m>> {
-        // let mut output = SmallVec::new();
         let unscoped_unified = self.unify_unscoped2(&mut nodes, scope_source)?;
-        let unified = self.unify_scoping2(debug_index, nodes, scope_source)?;
+        let mut unified = self.unify_scoping2(debug_index, nodes, scope_source)?;
 
-        if !unscoped_unified.0.is_empty() {
-            todo!("Merge unscoped");
-        }
+        unified.target_nodes.0.extend(unscoped_unified.0);
 
         Ok(unified)
     }
@@ -61,7 +73,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         variable: *var,
                         ty: meta.ty,
                     }),
-                    nodes: UnifiedTargetNodes(unified.0.to_vec()),
+                    target_nodes: UnifiedTargetNodes(unified.0.to_vec()),
                 })
             }
             NodeKind::Unit => {
@@ -69,7 +81,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let unified = self.unify_unscoped2(&mut nodes, scope_source)?;
                 Ok(Unified2 {
                     binder: None,
-                    nodes: UnifiedTargetNodes(unified.0.to_vec()),
+                    target_nodes: UnifiedTargetNodes(unified.0.to_vec()),
                 })
             }
             NodeKind::Int(_int) => panic!(),
@@ -79,9 +91,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let args = self.unify_sub_scopes2(nodes, args)?;
                     Ok(Unified2 {
                         binder: None,
-                        nodes: UnifiedTargetNodes(
+                        target_nodes: UnifiedTargetNodes(
                             [UnifiedTargetNode::Hir(TypedHirNode {
-                                kind: NodeKind::Call(*proc, args.into_hir_iterator().collect()),
+                                kind: NodeKind::Call(*proc, args.into_hir()),
                                 meta,
                             })]
                             .into(),
@@ -110,7 +122,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             variable: subst_var,
                             ty: meta.ty,
                         }),
-                        nodes: UnifiedTargetNodes(
+                        target_nodes: UnifiedTargetNodes(
                             [UnifiedTargetNode::Hir(TypedHirNode {
                                 kind: NodeKind::Let(
                                     Binder(inverted_call.let_binder),
@@ -135,12 +147,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     debug!("unify_scoping({debug_index:?}, Map const)");
 
                     let unified_arg = self.unify_scoping2(Some(0), nodes, arg)?;
-                    let mut param = unified_arg.nodes.into_hir_one();
+                    let mut param = unified_arg.target_nodes.into_hir_one();
                     let param_ty = param.meta.ty;
                     param.meta.ty = meta.ty;
                     Ok(Unified2 {
                         binder: unified_arg.binder,
-                        nodes: UnifiedTargetNodes(
+                        target_nodes: UnifiedTargetNodes(
                             [UnifiedTargetNode::Hir(TypedHirNode {
                                 kind: NodeKind::Map(Box::new(param)),
                                 meta: Meta {
@@ -176,7 +188,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let PropVariant { dimension, attr } = &variants[index];
 
                     if let Some(typed_match_arm) =
-                        self.unify_prop_variant_to_match_arm2(variant_u_node, *dimension, attr)?
+                        self.unify_prop_variant_scoping(variant_u_node, *dimension, attr)?
                     {
                         // if let Type::Tautology = typed_match_arm.ty {
                         //     panic!("found Tautology");
@@ -196,7 +208,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(Unified2 {
                     binder: None,
-                    nodes: if match_arms.is_empty() {
+                    target_nodes: if match_arms.is_empty() {
                         UnifiedTargetNodes(vec![])
                     } else {
                         // if let Type::Tautology = ty {
@@ -295,7 +307,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         for root_u_node in std::mem::take(&mut nodes.dependent_scopes) {
             // FIXME: root_source is wrong. The root should be in dependent_scopes
             let unified = self.unify_nodes2(None, root_u_node, self.root_source)?;
-            merged.0.extend(unified.nodes.0);
+            merged.0.extend(unified.target_nodes.0);
         }
 
         Ok(merged)
@@ -310,7 +322,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         Ok(UnifiedTaggedNode {
             kind: target_node.kind,
             meta: target_node.meta,
-            children: unified.nodes,
+            children: unified.target_nodes,
         })
     }
 
@@ -323,7 +335,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         for (index, sub_nodes) in nodes.sub_scoping {
             output.extend(
                 self.unify_nodes2(Some(index), sub_nodes, &scope_sources[index])?
-                    .nodes
+                    .target_nodes
                     .0,
             );
         }
@@ -349,7 +361,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 variable: binder.0,
                 ty: meta.ty,
             }),
-            nodes: sub_scope_nodes,
+            target_nodes: sub_scope_nodes,
         })
     }
 
@@ -397,7 +409,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         kind: NodeKind::Call(inverted_proc, new_args),
                         meta,
                     },
-                    body: body.into_hir_iterator().collect(),
+                    body: body.into_hir_iter().collect(),
                 })
             }
             NodeKind::Call(child_proc, child_args) => {
@@ -418,33 +430,32 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn unify_prop_variant_to_match_arm2(
+    fn unify_prop_variant_scoping(
         &mut self,
         nodes: Nodes<'m>,
         scope_dimension: Dimension,
         scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
-        todo!()
-        /*
-        let scoping = u_node.force_into_scoping();
-
-        if scoping.expressions.is_empty() {
+        if nodes.nodes.is_empty() {
             // treat this "transparently"
             Ok(self
-                .let_attr(scoping, scope_attr)?
+                .let_attr2(nodes, scope_attr)?
                 .map(|let_attr| TypedMatchArm {
                     arm: MatchArm {
                         pattern: PropPattern::Attr(let_attr.rel_binding, let_attr.val_binding),
-                        nodes: let_attr.nodes,
+                        nodes: let_attr.target_nodes.into_hir_iter().collect(),
                     },
                     ty: let_attr.ty,
                 }))
-        } else if scoping.expressions.len() == 1 {
+        } else if nodes.nodes.len() == 1 {
+            todo!();
+
+            /*
             if !matches!(scope_dimension, Dimension::Seq(_)) {
                 panic!("BUG: Non-sequence");
             }
 
-            let expr = scoping.expressions.into_iter().next().unwrap();
+            let expr = nodes.nodes.into_iter().next().unwrap();
             let _meta = expr.meta;
 
             match expr.kind {
@@ -590,9 +601,80 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
                 other => panic!("BUG: Unsupported kind: {other:?}"),
             }
+            */
         } else {
             panic!("BUG: Many target nodes for prop variant");
         }
-        */
+    }
+
+    fn let_attr2(
+        &mut self,
+        mut nodes: Nodes<'m>,
+        scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
+    ) -> UnifierResult<Option<LetAttr2<'m>>> {
+        let rel_binding =
+            self.unify_pattern_binding2(Some(0), nodes.sub_scoping.remove(&0), &scope_attr.rel)?;
+        let val_binding =
+            self.unify_pattern_binding2(Some(1), nodes.sub_scoping.remove(&1), &scope_attr.val)?;
+
+        Ok(match (rel_binding.target_nodes, val_binding.target_nodes) {
+            (None, None) => {
+                debug!("No nodes in variant binding");
+                None
+            }
+            (Some(rel), None) => rel.type_iter().last().map(|ty| LetAttr2 {
+                rel_binding: rel_binding.binding,
+                val_binding: PatternBinding::Wildcard,
+                target_nodes: rel,
+                ty,
+            }),
+            (None, Some(val)) => val.type_iter().last().map(|ty| LetAttr2 {
+                rel_binding: PatternBinding::Wildcard,
+                val_binding: val_binding.binding,
+                target_nodes: val,
+                ty,
+            }),
+            (Some(rel), Some(val)) => {
+                let mut concatenated = UnifiedTargetNodes::default();
+                concatenated.0.extend(rel.0);
+                concatenated.0.extend(val.0);
+                concatenated.type_iter().last().map(|ty| LetAttr2 {
+                    rel_binding: rel_binding.binding,
+                    val_binding: val_binding.binding,
+                    target_nodes: concatenated,
+                    ty,
+                })
+            }
+        })
+    }
+
+    fn unify_pattern_binding2(
+        &mut self,
+        debug_index: Option<usize>,
+        nodes: Option<Nodes<'m>>,
+        source: &TypedHirNode<'m>,
+    ) -> UnifierResult<UnifyPatternBinding2<'m>> {
+        let nodes = match nodes {
+            Some(nodes) => nodes,
+            None => {
+                return Ok(UnifyPatternBinding2 {
+                    binding: PatternBinding::Wildcard,
+                    target_nodes: None,
+                })
+            }
+        };
+
+        let Unified2 {
+            target_nodes,
+            binder,
+        } = self.unify_nodes2(debug_index, nodes, source)?;
+        let binding = match binder {
+            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
+            None => PatternBinding::Wildcard,
+        };
+        Ok(UnifyPatternBinding2 {
+            binding,
+            target_nodes: Some(target_nodes),
+        })
     }
 }

@@ -34,6 +34,8 @@ pub struct Unified<'m> {
     pub nodes: UnifiedNodes<'m>,
 }
 
+const UNIFIER_IMPL: u8 = 1;
+
 pub fn unify_to_function<'m>(
     scope_source: TypedHirNode<'m>,
     target: TypedHirNode<'m>,
@@ -54,7 +56,38 @@ pub fn unify_to_function<'m>(
         let mut root_nodes = node.into_nodes();
         root_nodes.expand_scoping(&variable_paths);
 
-        debug!("target2: {root_nodes:#?}");
+        let unified2 = Unifier {
+            root_source: &scope_source,
+            next_variable: var_tracker.next_variable(),
+            types: &mut compiler.types,
+        }
+        .unify_nodes2(None, root_nodes, &scope_source)?;
+
+        let body = unified2.target_nodes.into_hir();
+        let body = match body.len() {
+            0 => panic!("No nodes"),
+            1 => body.into_iter().next().unwrap(),
+            _ => panic!("Too many nodes"),
+        };
+
+        if UNIFIER_IMPL == 2 {
+            return match unified2.binder {
+                Some(arg) => {
+                    // NB: Error is used in unification tests
+                    if !matches!(source_ty, Type::Error) {
+                        assert_eq!(arg.ty, source_ty);
+                    }
+                    if !matches!(target_ty, Type::Error) {
+                        assert_eq!(body.meta.ty, target_ty);
+                    }
+
+                    Ok(HirFunc { arg, body })
+                }
+                None => Err(UnifierError::NoInputBinder),
+            };
+        } else {
+            debug!("body2: {body}");
+        }
     }
 
     let unified = Unifier {
@@ -98,32 +131,32 @@ pub struct InvertedCall<'m> {
     pub body: UnifiedNodes<'m>,
 }
 
-struct UnifyPatternBinding<'m> {
+pub(super) struct UnifyPatternBinding<'m> {
     binding: PatternBinding,
     nodes: Option<UnifiedNodes<'m>>,
 }
 
-pub struct TypedMatchArm<'m> {
+pub(super) struct TypedMatchArm<'m> {
     pub arm: MatchArm<'m, TypedHir>,
     pub ty: TypeRef<'m>,
 }
 
-struct LetAttr<'m> {
-    rel_binding: PatternBinding,
-    val_binding: PatternBinding,
-    nodes: Vec<TypedHirNode<'m>>,
-    ty: TypeRef<'m>,
+pub(super) struct LetAttr<'m> {
+    pub rel_binding: PatternBinding,
+    pub val_binding: PatternBinding,
+    pub nodes: Vec<TypedHirNode<'m>>,
+    pub ty: TypeRef<'m>,
 }
 
-struct LetAttrPair<'m> {
-    rel: UnifiedTypedPatternBinding<'m>,
-    val: UnifiedTypedPatternBinding<'m>,
+pub(super) struct LetAttrPair<'m> {
+    pub rel: UnifiedTypedPatternBinding<'m>,
+    pub val: UnifiedTypedPatternBinding<'m>,
 }
 
-struct UnifiedTypedPatternBinding<'m> {
-    binding: PatternBinding,
-    nodes: Vec<TypedHirNode<'m>>,
-    ty: TypeRef<'m>,
+pub(super) struct UnifiedTypedPatternBinding<'m> {
+    pub binding: PatternBinding,
+    pub nodes: Vec<TypedHirNode<'m>>,
+    pub ty: TypeRef<'m>,
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
@@ -823,7 +856,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         })
     }
 
-    pub fn last_type<'n>(
+    pub(super) fn last_type<'n>(
         &mut self,
         mut iterator: impl Iterator<Item = &'n TypedHirNode<'m>>,
     ) -> TypeRef<'m>
@@ -841,7 +874,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn last_type_opt<'n>(
+    pub(super) fn last_type_opt<'n>(
         mut iterator: impl Iterator<Item = &'n TypedHirNode<'m>>,
     ) -> Option<TypeRef<'m>>
     where
@@ -858,11 +891,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn unit_type(&mut self) -> TypeRef<'m> {
+    pub(super) fn unit_type(&mut self) -> TypeRef<'m> {
         self.types.intern(Type::Unit(DefId::unit()))
     }
 
-    fn unit_node(&mut self) -> TypedHirNode<'m> {
+    pub(super) fn unit_node(&mut self) -> TypedHirNode<'m> {
         TypedHirNode {
             kind: NodeKind::Unit,
             meta: Meta {
@@ -872,7 +905,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         }
     }
 
-    fn single_node_or_unit(
+    pub(super) fn single_node_or_unit(
         &mut self,
         mut iterator: impl Iterator<Item = TypedHirNode<'m>>,
     ) -> TypedHirNode<'m> {

@@ -1,6 +1,9 @@
 use ontol_hir::kind::{Attribute, NodeKind, PropVariant};
 
-use crate::typed_hir::{Meta, TypedHirNode};
+use crate::{
+    typed_hir::{Meta, TypedHirNode},
+    types::TypeRef,
+};
 
 use super::tagged_node::TaggedKind;
 
@@ -27,6 +30,13 @@ impl<'m> UnifiedTaggedNode<'m> {
 }
 
 impl<'m> UnifiedTargetNode<'m> {
+    pub fn ty(&self) -> TypeRef<'m> {
+        match self {
+            Self::Tagged(tagged) => tagged.meta.ty,
+            Self::Hir(hir) => hir.meta.ty,
+        }
+    }
+
     pub fn into_hir_node(self) -> TypedHirNode<'m> {
         match self {
             Self::Tagged(UnifiedTaggedNode {
@@ -65,7 +75,7 @@ impl<'m> UnifiedTargetNode<'m> {
                             .filter_map(|node| match node {
                                 Self::Tagged(UnifiedTaggedNode {
                                     kind: TaggedKind::PropVariant(_, _, _, dimension),
-                                    meta,
+                                    meta: _,
                                     children,
                                 }) => {
                                     let (rel, val) = children.into_hir_pair();
@@ -95,12 +105,16 @@ impl<'m> UnifiedTargetNode<'m> {
 }
 
 impl<'m> UnifiedTargetNodes<'m> {
-    pub fn into_hir_iterator(self) -> impl Iterator<Item = TypedHirNode<'m>> {
-        self.0.into_iter().map(UnifiedTargetNode::into_hir_node)
-    }
-
     pub fn into_hir(self) -> Vec<TypedHirNode<'m>> {
         Self::collect(self.0.into_iter())
+    }
+
+    pub fn type_iter<'a>(&'a self) -> impl Iterator<Item = TypeRef<'m>> + 'a {
+        self.0.iter().map(|target| target.ty())
+    }
+
+    pub fn into_hir_iter(self) -> impl Iterator<Item = TypedHirNode<'m>> {
+        self.0.into_iter().map(UnifiedTargetNode::into_hir_node)
     }
 
     pub fn one_then_rest_into_hir(self) -> (TypedHirNode<'m>, Vec<TypedHirNode<'m>>) {
