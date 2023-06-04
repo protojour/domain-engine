@@ -15,7 +15,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::unification_tree2::{Nodes, TargetNode};
+use super::unification_tree2::{NodeSet, TargetNode};
 
 #[derive(DebugExtras, Clone, Copy)]
 pub enum TaggedKind {
@@ -195,7 +195,7 @@ impl<'m> Tagger<'m> {
                 TargetNode {
                     free_variables: arg.free_variables.clone(),
                     kind: TaggedKind::Map,
-                    sub_nodes: Nodes::new(vec![arg]),
+                    sub_nodes: NodeSet::new(vec![arg]),
                     meta,
                     option_depth: self.option_depth,
                 }
@@ -208,7 +208,7 @@ impl<'m> Tagger<'m> {
                 TargetNode {
                     free_variables: union_free_variables2([&rel, &val]),
                     kind: TaggedKind::Seq(label),
-                    sub_nodes: Nodes::new(vec![rel, val]),
+                    sub_nodes: NodeSet::new(vec![rel, val]),
                     meta,
                     option_depth: self.option_depth,
                 }
@@ -278,7 +278,7 @@ impl<'m> Tagger<'m> {
                 TargetNode {
                     kind: TaggedKind::PropVariant(optional, struct_var, id, dimension),
                     free_variables: variant_variables,
-                    sub_nodes: Nodes::new(vec![rel, val]),
+                    sub_nodes: NodeSet::new(vec![rel, val]),
                     meta: Meta {
                         // BUG: Not correct
                         ty: val_ty,
@@ -292,7 +292,7 @@ impl<'m> Tagger<'m> {
         TargetNode {
             free_variables,
             kind: TaggedKind::Prop(optional, struct_var, id),
-            sub_nodes: Nodes::new(variants),
+            sub_nodes: NodeSet::new(variants),
             meta,
             option_depth: self.option_depth,
         }
@@ -308,7 +308,7 @@ impl<'m> Tagger<'m> {
         TargetNode {
             free_variables: union_free_variables2(unscoped.as_slice()),
             kind,
-            sub_nodes: Nodes::new(unscoped),
+            sub_nodes: NodeSet::new(unscoped),
             meta,
             option_depth: self.option_depth,
         }

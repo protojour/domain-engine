@@ -35,6 +35,7 @@ pub struct Unified<'m> {
 }
 
 const UNIFIER_IMPL: u8 = 1;
+const RUN_2: bool = false;
 
 pub fn unify_to_function<'m>(
     scope_source: TypedHirNode<'m>,
@@ -50,11 +51,13 @@ pub fn unify_to_function<'m>(
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
-    {
+    if RUN_2 {
         let node = Tagger::new(unit_type).tag_node2(target.clone());
         let variable_paths = locate_variables(&scope_source, &node.free_variables)?;
         let mut root_nodes = node.into_nodes();
         root_nodes.expand_scoping(&variable_paths);
+
+        debug!("root_nodes2: {root_nodes:#?}");
 
         let unified2 = Unifier {
             root_source: &scope_source,

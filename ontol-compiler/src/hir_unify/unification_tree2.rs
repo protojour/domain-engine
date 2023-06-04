@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::kind::{NodeKind, Optional};
+use ontol_hir::kind::NodeKind;
 use tracing::debug;
 
 use crate::typed_hir::{Meta, TypedHirNode};
@@ -14,14 +14,14 @@ pub struct TargetNode<'m> {
     pub meta: Meta<'m>,
     pub free_variables: BitSet,
     pub option_depth: u16,
-    pub sub_nodes: Nodes<'m>,
+    pub sub_nodes: NodeSet<'m>,
 }
 
 #[derive(Default)]
-pub struct Nodes<'m> {
-    pub sub_scoping: BTreeMap<usize, Nodes<'m>>,
+pub struct NodeSet<'m> {
+    pub sub_scoping: BTreeMap<usize, NodeSet<'m>>,
     pub nodes: Vec<TargetNode<'m>>,
-    pub dependent_scopes: Vec<Nodes<'m>>,
+    pub dependent_scopes: Vec<NodeSet<'m>>,
 }
 
 impl<'m> TargetNode<'m> {
@@ -35,8 +35,8 @@ impl<'m> TargetNode<'m> {
         self
     }
 
-    pub fn into_nodes(self) -> Nodes<'m> {
-        Nodes {
+    pub fn into_nodes(self) -> NodeSet<'m> {
+        NodeSet {
             sub_scoping: Default::default(),
             nodes: vec![self],
             dependent_scopes: vec![],
@@ -48,7 +48,7 @@ impl<'m> TargetNode<'m> {
     }
 }
 
-impl<'m> Nodes<'m> {
+impl<'m> NodeSet<'m> {
     pub fn new(nodes: Vec<TargetNode<'m>>) -> Self {
         Self {
             sub_scoping: Default::default(),
@@ -101,7 +101,7 @@ impl ScopingCtx {
 
     fn merge_with_scope<'s, 'm>(
         &mut self,
-        parent_nodes: &mut Nodes<'m>,
+        parent_nodes: &mut NodeSet<'m>,
         mut target_node: TargetNode<'m>,
         next_scope: Option<NextScope<'s, 'm>>,
         paths_iterator: &mut PathsIterator<'s, 'm>,
@@ -148,8 +148,12 @@ impl ScopingCtx {
                     );
                 }
             }
-            TaggedKind::PropVariant(Optional(true), ..) => {
-                self.target_option_depth += 1;
+            TaggedKind::PropVariant(optional, ..) => {
+                if optional.0 {
+                    self.target_option_depth += 1;
+                }
+
+                assert_eq!(2, target_node.sub_nodes.nodes.len());
 
                 let cur_scope = self.expand_scope_to_match_optional_depth(
                     parent_nodes,
@@ -165,7 +169,9 @@ impl ScopingCtx {
                     );
                 }
                 cur_scope.parent_nodes.nodes.push(target_node);
-                self.target_option_depth -= 1;
+                if optional.0 {
+                    self.target_option_depth -= 1;
+                }
             }
             _ => {
                 let current_scope =
@@ -185,7 +191,7 @@ impl ScopingCtx {
 
     fn expand_scope_to_match_optional_depth<'s, 'm, 'n>(
         &mut self,
-        parent_nodes: &'n mut Nodes<'m>,
+        parent_nodes: &'n mut NodeSet<'m>,
         next_scope: Option<NextScope<'s, 'm>>,
         paths_iterator: &mut PathsIterator<'s, 'm>,
     ) -> CurrentScope<'s, 'm, 'n> {
@@ -209,7 +215,7 @@ impl ScopingCtx {
 
     fn expand_scope_once<'s, 'm, 'n>(
         &mut self,
-        parent_nodes: &'n mut Nodes<'m>,
+        parent_nodes: &'n mut NodeSet<'m>,
         next_scope: Option<NextScope<'s, 'm>>,
         paths_iterator: &mut PathsIterator<'s, 'm>,
     ) -> CurrentScope<'s, 'm, 'n> {
@@ -285,7 +291,7 @@ impl ScopingCtx {
 
     fn subscope<'s, 'm, 'n>(
         &mut self,
-        parent_nodes: &'n mut Nodes<'m>,
+        parent_nodes: &'n mut NodeSet<'m>,
         parent_scope: &'s TypedHirNode<'m>,
         paths_iterator: &mut PathsIterator<'s, 'm>,
     ) -> CurrentScope<'s, 'm, 'n> {
@@ -298,7 +304,7 @@ impl ScopingCtx {
                 }),
             },
             Some(PathSegment::Root(root_scope, next_subscope_idx)) => {
-                parent_nodes.dependent_scopes.push(Nodes::default());
+                parent_nodes.dependent_scopes.push(NodeSet::default());
                 let dependent_nodes = parent_nodes.dependent_scopes.last_mut().unwrap();
                 CurrentScope {
                     parent_nodes: dependent_nodes,
@@ -317,7 +323,7 @@ impl ScopingCtx {
 }
 
 struct CurrentScope<'s, 'm, 'n> {
-    parent_nodes: &'n mut Nodes<'m>,
+    parent_nodes: &'n mut NodeSet<'m>,
     next_scope: Option<NextScope<'s, 'm>>,
 }
 
@@ -410,7 +416,7 @@ impl<'m> Debug for TargetNode<'m> {
     }
 }
 
-impl<'m> Debug for Nodes<'m> {
+impl<'m> Debug for NodeSet<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("Nodes");
         if !self.sub_scoping.is_empty() {
