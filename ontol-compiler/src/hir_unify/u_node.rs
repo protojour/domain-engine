@@ -160,10 +160,10 @@ impl ScopingCtx {
             UNodeKind::SubScope(..) => panic!("Subscope"),
             _ => {
                 let mut paths = full_var_path(&u_node.free_variables, path_table);
-                let new_node = u_node.steal();
+                let detached_node = u_node.steal();
                 match paths.next() {
                     Some(PathSegment::Root(hir, subscope_idx)) => self.expand(
-                        new_node,
+                        detached_node,
                         ScopeExpansion {
                             parent_scope: ParentScope::ScopeNode(u_node),
                             next_scope: Some(NextScope {
@@ -174,7 +174,9 @@ impl ScopingCtx {
                         &mut paths,
                     ),
                     Some(_) => todo!(),
-                    None => {}
+                    None => {
+                        ParentScope::ScopeNode(u_node).append_unscoped(detached_node);
+                    }
                 }
             }
         }

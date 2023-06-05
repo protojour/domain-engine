@@ -52,7 +52,7 @@ pub fn unify_to_function<'m>(
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
-    if RUN_3 {
+    {
         let mut u_node: UNode = Tagger::new(unit_type)
             .to_u_nodes(target.clone())
             .unwrap_one();
@@ -63,6 +63,35 @@ pub fn unify_to_function<'m>(
         u_node::expand_scoping(&mut u_node, &variable_paths);
 
         debug!("expanded: {u_node:#?}");
+
+        if RUN_3 {
+            let unified2 = Unifier {
+                root_source: &scope_source,
+                next_variable: var_tracker.next_variable(),
+                types: &mut compiler.types,
+            }
+            .unify2(u_node, Some(&scope_source))?;
+
+            let hir_func = match unified2.binder {
+                Some(arg) => {
+                    // NB: Error is used in unification tests
+                    if !matches!(source_ty, Type::Error) {
+                        assert_eq!(arg.ty, source_ty);
+                    }
+                    if !matches!(target_ty, Type::Error) {
+                        assert_eq!(unified2.node.meta.ty, target_ty);
+                    }
+
+                    Ok(HirFunc {
+                        arg,
+                        body: unified2.node,
+                    })
+                }
+                None => Err(UnifierError::NoInputBinder),
+            };
+
+            debug!("unified2 hir func: {}", hir_func.unwrap());
+        }
     }
 
     /*
