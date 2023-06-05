@@ -1,4 +1,5 @@
 use derive_debug_extras::DebugExtras;
+use smallvec::SmallVec;
 use std::fmt::Debug;
 use tracing::debug;
 
@@ -10,12 +11,16 @@ use ontol_hir::{
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{
+    hir_unify::u_node::{AttrUNode, AttrUNodeKind},
     typed_hir::{Meta, TypedHir, TypedHirNode},
     types::TypeRef,
     SourceSpan,
 };
 
-use super::unification_tree2::{NodeSet, TargetNode};
+use super::u_node::{
+    BlockUNode, BlockUNodeKind, ExprUNode, ExprUNodeKind, LeafUNodeKind, UAttr, UBlockBody, UNode,
+    UNodeKind,
+};
 
 #[derive(DebugExtras, Clone, Copy)]
 pub enum TaggedKind {
@@ -157,6 +162,53 @@ pub struct Tagger<'m> {
     unit_type: TypeRef<'m>,
 }
 
+#[derive(Default)]
+struct Union {
+    free_variables: BitSet,
+}
+
+impl Union {
+    fn plus<'m>(&mut self, u_node: UNode<'m>) -> UNode<'m> {
+        self.free_variables.union(&u_node.free_variables);
+        u_node
+    }
+
+    fn plus_vec<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> Vec<UNode<'m>> {
+        for u_node in &u_nodes {
+            self.free_variables.union(&u_node.free_variables);
+        }
+        u_nodes
+    }
+
+    fn plus_block_body<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> UBlockBody<'m> {
+        let u_nodes = self.plus_vec(u_nodes);
+        UBlockBody {
+            sub_scoping: Default::default(),
+            nodes: u_nodes,
+            dependent_scopes: Default::default(),
+        }
+    }
+}
+
+pub struct UNodes<'m>(SmallVec<[UNode<'m>; 1]>);
+
+impl<'m> UNodes<'m> {
+    fn unwrap_one(self) -> UNode<'m> {
+        let mut iterator = self.0.into_iter();
+        let item = iterator.next().unwrap();
+        if iterator.next().is_some() {
+            panic!("More than one UNode");
+        }
+        item
+    }
+}
+
+impl<'m> From<UNode<'m>> for UNodes<'m> {
+    fn from(value: UNode<'m>) -> Self {
+        Self([value].into())
+    }
+}
+
 impl<'m> Tagger<'m> {
     pub fn new(unit_type: TypeRef<'m>) -> Self {
         Self {
@@ -167,6 +219,198 @@ impl<'m> Tagger<'m> {
         }
     }
 
+    pub fn to_u_nodes(&mut self, node: TypedHirNode<'m>) -> UNodes<'m> {
+        let (kind, meta) = node.split();
+        match kind {
+            NodeKind::VariableRef(var) => {
+                let u_node = self.make_leaf(LeafUNodeKind::VariableRef(var), meta);
+
+                if self.in_scope.contains(var.0 as usize) {
+                    u_node
+                } else {
+                    u_node.union_var(var)
+                }
+                .into()
+            }
+            NodeKind::Unit => self.make_leaf(LeafUNodeKind::Unit, meta).into(),
+            NodeKind::Int(int) => self.make_leaf(LeafUNodeKind::Int(int), meta).into(),
+            NodeKind::Let(binder, def, body) => self.enter_binder(binder, |zelf| {
+                let mut union = Union::default();
+                let def = Box::new(union.plus(zelf.to_u_nodes(*def).unwrap_one()));
+                let body = union.plus_block_body(
+                    body.into_iter()
+                        .flat_map(|hir| zelf.to_u_nodes(hir).0.into_iter())
+                        .collect(),
+                );
+                UNode {
+                    free_variables: union.free_variables,
+                    kind: UNodeKind::Block(BlockUNode {
+                        kind: BlockUNodeKind::Let(binder, def),
+                        body,
+                    }),
+                    meta,
+                }
+                .into()
+            }),
+            NodeKind::Call(proc, args) => {
+                self.to_expr_u_nodes(ExprUNodeKind::Call(proc), args, meta)
+            }
+            NodeKind::Map(arg) => self.to_expr_u_nodes(ExprUNodeKind::Map, vec![*arg], meta),
+            NodeKind::Seq(label, attr) => {
+                self.register_label(label);
+
+                let (mut free_variables, attr) = self.to_u_attr(*attr.rel, *attr.val);
+                free_variables.insert(label.0 as usize);
+
+                UNode {
+                    free_variables,
+                    kind: UNodeKind::Attr(AttrUNode {
+                        kind: AttrUNodeKind::Seq(label),
+                        attr,
+                    }),
+                    meta,
+                }
+                .into()
+            }
+            NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
+                let mut union = Union::default();
+                let body = union.plus_block_body(
+                    nodes
+                        .into_iter()
+                        .flat_map(|hir| zelf.to_u_nodes(hir).0.into_iter())
+                        .collect(),
+                );
+                UNode {
+                    free_variables: union.free_variables,
+                    kind: UNodeKind::Block(BlockUNode {
+                        kind: BlockUNodeKind::Struct(binder),
+                        body,
+                    }),
+                    meta,
+                }
+                .into()
+            }),
+            NodeKind::Prop(optional, struct_var, id, variants) => {
+                if optional.0 {
+                    self.enter_option(|zelf| {
+                        zelf.to_prop_variants(optional, struct_var, id, variants, meta)
+                    })
+                } else {
+                    self.to_prop_variants(optional, struct_var, id, variants, meta)
+                }
+            }
+            NodeKind::MatchProp(..) => {
+                unimplemented!("BUG: MatchProp is an output node")
+            }
+            NodeKind::Gen(..) => {
+                todo!()
+            }
+            NodeKind::Iter(..) => {
+                todo!()
+            }
+            NodeKind::Push(..) => {
+                todo!()
+            }
+        }
+    }
+
+    fn to_expr_u_nodes(
+        &mut self,
+        kind: ExprUNodeKind,
+        args: Vec<TypedHirNode<'m>>,
+        meta: Meta<'m>,
+    ) -> UNodes<'m> {
+        let mut union = Union::default();
+        let args = union.plus_vec(
+            args.into_iter()
+                .flat_map(|hir| self.to_u_nodes(hir).0.into_iter())
+                .collect(),
+        );
+        UNode {
+            free_variables: union.free_variables,
+            kind: UNodeKind::Expr(ExprUNode { kind, args }),
+            meta,
+        }
+        .into()
+    }
+
+    fn to_prop_variants(
+        &mut self,
+        optional: Optional,
+        struct_var: Variable,
+        property_id: PropertyId,
+        variants: Vec<PropVariant<'m, TypedHir>>,
+        meta: Meta<'m>,
+    ) -> UNodes<'m> {
+        let variants = variants
+            .into_iter()
+            .map(|PropVariant { dimension, attr }| {
+                debug!("rel ty: {:?}", attr.rel.meta.ty);
+                debug!("val ty: {:?}", attr.val.meta.ty);
+
+                let (mut variant_variables, attr) = self.to_u_attr(*attr.rel, *attr.val);
+
+                let val_ty = attr.val.meta.ty;
+
+                if let Dimension::Seq(label) = dimension {
+                    self.register_label(label);
+                    variant_variables.insert(label.0 as usize);
+                } else {
+                    // free_variables.union_with(&variant_variables);
+                }
+
+                UNode {
+                    free_variables: variant_variables,
+                    kind: UNodeKind::Attr(AttrUNode {
+                        kind: AttrUNodeKind::PropVariant(optional, struct_var, property_id),
+                        attr,
+                    }),
+                    meta: Meta {
+                        // BUG: Not correct
+                        ty: val_ty,
+                        span: SourceSpan::none(),
+                    },
+                }
+            })
+            .collect();
+
+        UNodes(variants)
+    }
+
+    fn to_u_attr(&mut self, rel: TypedHirNode<'m>, val: TypedHirNode<'m>) -> (BitSet, UAttr<'m>) {
+        let mut free_variables = BitSet::new();
+        let rel = self.to_u_nodes(rel).unwrap_one();
+        free_variables.union(&rel.free_variables);
+
+        let val = self.to_u_nodes(val).unwrap_one();
+        free_variables.union(&val.free_variables);
+
+        (
+            free_variables,
+            UAttr {
+                rel: Box::new(rel),
+                val: Box::new(val),
+            },
+        )
+    }
+
+    fn make_leaf(&mut self, kind: LeafUNodeKind, meta: Meta<'m>) -> UNode<'m> {
+        UNode {
+            free_variables: BitSet::new(),
+            kind: UNodeKind::Leaf(kind),
+            meta,
+        }
+    }
+
+    fn make_u_node(&mut self, kind: UNodeKind<'m>, meta: Meta<'m>) -> UNode<'m> {
+        UNode {
+            free_variables: BitSet::new(),
+            kind,
+            meta,
+        }
+    }
+
+    /*
     pub fn tag_node2(&mut self, node: TypedHirNode<'m>) -> TargetNode<'m> {
         let (kind, meta) = node.split();
         match kind {
@@ -313,6 +557,7 @@ impl<'m> Tagger<'m> {
             option_depth: self.option_depth,
         }
     }
+    */
 
     pub fn tag_node(&mut self, node: TypedHirNode<'m>) -> TaggedNode<'m> {
         let (kind, meta) = node.split();
@@ -386,13 +631,6 @@ impl<'m> Tagger<'m> {
                 todo!()
             }
         }
-    }
-
-    fn tag_sub_nodes(
-        &mut self,
-        iterator: impl Iterator<Item = TypedHirNode<'m>>,
-    ) -> Vec<TargetNode<'m>> {
-        iterator.map(|child| self.tag_node2(child)).collect()
     }
 
     fn tag_prop(
@@ -502,16 +740,6 @@ impl<'m> Tagger<'m> {
 
 pub fn union_free_variables<'a, 'm: 'a>(
     collection: impl IntoIterator<Item = &'a TaggedNode<'m>>,
-) -> BitSet {
-    let mut output = BitSet::new();
-    for item in collection.into_iter().map(|node| &node.free_variables) {
-        output.union_with(item);
-    }
-    output
-}
-
-pub fn union_free_variables2<'a, 'm: 'a>(
-    collection: impl IntoIterator<Item = &'a TargetNode<'m>>,
 ) -> BitSet {
     let mut output = BitSet::new();
     for item in collection.into_iter().map(|node| &node.free_variables) {
