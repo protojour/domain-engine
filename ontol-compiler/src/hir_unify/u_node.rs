@@ -38,10 +38,11 @@ impl<'m> UNode<'m> {
 
 impl<'m> Debug for UNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("UNode")
-            .field(&self.free_variables)
-            .field(&self.kind)
-            .finish()
+        self.kind.fmt(f)
+        // f.debug_tuple("UNode")
+        //     .field(&self.free_variables)
+        //     .field(&self.kind)
+        //     .finish()
     }
 }
 
@@ -73,7 +74,7 @@ pub enum BlockUNodeKind<'m> {
 pub struct UBlockBody<'m> {
     pub sub_scoping: BTreeMap<usize, UBlockBody<'m>>,
     pub nodes: Vec<UNode<'m>>,
-    pub dependent_scopes: Vec<UNode<'m>>,
+    pub dependent_scopes: Vec<UBlockBody<'m>>,
 }
 
 #[derive(Debug)]
@@ -187,10 +188,6 @@ impl ScopingCtx {
     ) {
         match &mut u_node.kind {
             UNodeKind::Stolen => panic!("Stolen"),
-            UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)) => {
-                if !u_node.free_variables.is_empty() {}
-            }
-            UNodeKind::Leaf(_) => {}
             UNodeKind::Block(_kind, body) => {
                 for child_node in std::mem::take(&mut body.nodes) {
                     self.expand(
@@ -203,9 +200,17 @@ impl ScopingCtx {
                     );
                 }
             }
-            UNodeKind::Expr(kind, _) => todo!("Expr::{kind:?}"),
-            UNodeKind::Attr(kind, _) => todo!("Attr::{kind:?}"),
-            UNodeKind::SubScope(..) => panic!("Subscope"),
+            _ => {
+                let new_node = u_node.steal();
+                self.expand(
+                    new_node,
+                    ScopeExpansion {
+                        parent_scope: ParentScope::ScopeNode(u_node),
+                        next_scope,
+                    },
+                    paths,
+                )
+            }
         }
     }
 
@@ -376,18 +381,27 @@ impl ScopingCtx {
                     });
                 }
 
-                let sub_scopable = parent_scope.sub_scoping(subscope_idx);
+                let sub_scope = parent_scope.sub_scoping(subscope_idx);
                 if optional.0 {
                     self.scope_option_depth += 1;
                 }
                 let prop_variant = &variant_scopes[subscope_idx];
-                let attr_idx = match paths.next().expect("Needs an attribute scope") {
-                    PathSegment::Sub(idx) => idx,
-                    PathSegment::Root(..) => panic!("Root segment at attribute scope"),
+
+                let attr_idx = match paths.next() {
+                    None => {
+                        // End of scope path expansion, will be further expanded later.
+                        // Probably a Seq.
+                        return Ok(ScopeExpansion {
+                            parent_scope: sub_scope,
+                            next_scope: None,
+                        });
+                    }
+                    Some(PathSegment::Sub(idx)) => idx,
+                    Some(PathSegment::Root(..)) => panic!("Root segment at attribute scope"),
                 };
 
                 let attr_scope = &prop_variant.attr[attr_idx].as_ref();
-                let attr_sub_scopable = sub_scopable.sub_scoping(attr_idx);
+                let attr_sub_scopable = sub_scope.sub_scoping(attr_idx);
 
                 debug!(
                     "prop scope {struct_var} {id} variant_idx: {subscope_idx} attr_idx: {attr_idx}"
@@ -430,17 +444,15 @@ impl ScopingCtx {
                     subscope_idx: next_subscope_idx,
                 }),
             }),
-            Some(PathSegment::Root(_root_scope, _next_subscope_idx)) => {
-                todo!();
-                // parent_nodes.dependent_scopes.push(NodeSet::default());
-                // let dependent_nodes = parent_nodes.dependent_scopes.last_mut().unwrap();
-                // CurrentScope {
-                //     parent_nodes: dependent_nodes,
-                //     next_scope: Some(NextScope {
-                //         parent_scope: root_scope,
-                //         subscope_idx: next_subscope_idx,
-                //     }),
-                // }
+            Some(PathSegment::Root(hir, subscope_idx)) => {
+                let dep_scope = scope.new_dep_scoping();
+                Ok(ScopeExpansion {
+                    parent_scope: dep_scope,
+                    next_scope: Some(NextScope {
+                        parent_hir: hir,
+                        subscope_idx,
+                    }),
+                })
             }
             None => Ok(ScopeExpansion {
                 parent_scope: scope,
@@ -488,6 +500,23 @@ impl<'u, 'm> ParentScope<'u, 'm> {
                     }
                 } else {
                     panic!("ScopeNode is not Void")
+                }
+            }
+        }
+    }
+
+    fn new_dep_scoping(self) -> ParentScope<'u, 'm> {
+        match self {
+            Self::Block(block) => {
+                block.dependent_scopes.push(UBlockBody::default());
+                let dep_body = block.dependent_scopes.last_mut().unwrap();
+                ParentScope::Block(dep_body)
+            }
+            Self::ScopeNode(node) => {
+                node.kind = UNodeKind::Block(BlockUNodeKind::Raw, UBlockBody::default());
+                match &mut node.kind {
+                    UNodeKind::Block(_, block) => Self::Block(block).new_dep_scoping(),
+                    _ => panic!(),
                 }
             }
         }

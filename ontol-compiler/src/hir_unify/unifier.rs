@@ -56,6 +56,9 @@ pub fn unify_to_function<'m>(
         let mut u_node: UNode = Tagger::new(unit_type)
             .to_u_nodes(target.clone())
             .unwrap_one();
+
+        debug!("u_node pre-expand: {u_node:#?}");
+
         let variable_paths = locate_variables(&scope_source, &u_node.free_variables)?;
         u_node::expand_scoping(&mut u_node, &variable_paths);
 
