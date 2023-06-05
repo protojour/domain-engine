@@ -11,14 +11,13 @@ use ontol_hir::{
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{
-    hir_unify::u_node::{AttrUNode, AttrUNodeKind},
     typed_hir::{Meta, TypedHir, TypedHirNode},
     types::TypeRef,
     SourceSpan,
 };
 
 use super::u_node::{
-    BlockUNode, BlockUNodeKind, ExprUNode, ExprUNodeKind, LeafUNodeKind, UAttr, UBlockBody, UNode,
+    AttrUNodeKind, BlockUNodeKind, ExprUNodeKind, LeafUNodeKind, UAttr, UBlockBody, UNode,
     UNodeKind,
 };
 
@@ -169,13 +168,13 @@ struct Union {
 
 impl Union {
     fn plus<'m>(&mut self, u_node: UNode<'m>) -> UNode<'m> {
-        self.free_variables.union(&u_node.free_variables);
+        self.free_variables.union_with(&u_node.free_variables);
         u_node
     }
 
     fn plus_vec<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> Vec<UNode<'m>> {
         for u_node in &u_nodes {
-            self.free_variables.union(&u_node.free_variables);
+            self.free_variables.union_with(&u_node.free_variables);
         }
         u_nodes
     }
@@ -193,7 +192,7 @@ impl Union {
 pub struct UNodes<'m>(SmallVec<[UNode<'m>; 1]>);
 
 impl<'m> UNodes<'m> {
-    fn unwrap_one(self) -> UNode<'m> {
+    pub fn unwrap_one(self) -> UNode<'m> {
         let mut iterator = self.0.into_iter();
         let item = iterator.next().unwrap();
         if iterator.next().is_some() {
@@ -244,10 +243,7 @@ impl<'m> Tagger<'m> {
                 );
                 UNode {
                     free_variables: union.free_variables,
-                    kind: UNodeKind::Block(BlockUNode {
-                        kind: BlockUNodeKind::Let(binder, def),
-                        body,
-                    }),
+                    kind: UNodeKind::Block(BlockUNodeKind::Let(binder, def), body),
                     meta,
                 }
                 .into()
@@ -264,10 +260,7 @@ impl<'m> Tagger<'m> {
 
                 UNode {
                     free_variables,
-                    kind: UNodeKind::Attr(AttrUNode {
-                        kind: AttrUNodeKind::Seq(label),
-                        attr,
-                    }),
+                    kind: UNodeKind::Attr(AttrUNodeKind::Seq(label), attr),
                     meta,
                 }
                 .into()
@@ -282,10 +275,7 @@ impl<'m> Tagger<'m> {
                 );
                 UNode {
                     free_variables: union.free_variables,
-                    kind: UNodeKind::Block(BlockUNode {
-                        kind: BlockUNodeKind::Struct(binder),
-                        body,
-                    }),
+                    kind: UNodeKind::Block(BlockUNodeKind::Struct(binder), body),
                     meta,
                 }
                 .into()
@@ -328,7 +318,7 @@ impl<'m> Tagger<'m> {
         );
         UNode {
             free_variables: union.free_variables,
-            kind: UNodeKind::Expr(ExprUNode { kind, args }),
+            kind: UNodeKind::Expr(kind, args),
             meta,
         }
         .into()
@@ -361,10 +351,10 @@ impl<'m> Tagger<'m> {
 
                 UNode {
                     free_variables: variant_variables,
-                    kind: UNodeKind::Attr(AttrUNode {
-                        kind: AttrUNodeKind::PropVariant(optional, struct_var, property_id),
+                    kind: UNodeKind::Attr(
+                        AttrUNodeKind::PropVariant(optional, struct_var, property_id),
                         attr,
-                    }),
+                    ),
                     meta: Meta {
                         // BUG: Not correct
                         ty: val_ty,
@@ -380,10 +370,10 @@ impl<'m> Tagger<'m> {
     fn to_u_attr(&mut self, rel: TypedHirNode<'m>, val: TypedHirNode<'m>) -> (BitSet, UAttr<'m>) {
         let mut free_variables = BitSet::new();
         let rel = self.to_u_nodes(rel).unwrap_one();
-        free_variables.union(&rel.free_variables);
+        free_variables.union_with(&rel.free_variables);
 
         let val = self.to_u_nodes(val).unwrap_one();
-        free_variables.union(&val.free_variables);
+        free_variables.union_with(&val.free_variables);
 
         (
             free_variables,

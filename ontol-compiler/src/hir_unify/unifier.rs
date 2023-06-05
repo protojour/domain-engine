@@ -21,6 +21,7 @@ use crate::{
 
 use super::{
     tagged_node::{TaggedKind, TaggedNode, Tagger},
+    u_node::{self, UNode},
     unification_tree::{Scoping, UnificationNode},
     UnifierError, VariableTracker,
 };
@@ -52,7 +53,13 @@ pub fn unify_to_function<'m>(
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     if RUN_3 {
-        let u_node = Tagger::new(unit_type).to_u_nodes(target.clone());
+        let mut u_node: UNode = Tagger::new(unit_type)
+            .to_u_nodes(target.clone())
+            .unwrap_one();
+        let variable_paths = locate_variables(&scope_source, &u_node.free_variables)?;
+        u_node::expand_scoping(&mut u_node, &variable_paths);
+
+        debug!("expanded: {u_node:#?}");
     }
 
     /*
