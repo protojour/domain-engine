@@ -24,6 +24,16 @@ impl<'m> UNode<'m> {
         self.free_variables.insert(var.0 as usize);
         self
     }
+
+    fn steal(&mut self) -> Self {
+        let mut kind = UNodeKind::Stolen;
+        std::mem::swap(&mut self.kind, &mut kind);
+        Self {
+            kind,
+            free_variables: self.free_variables.clone(),
+            meta: self.meta,
+        }
+    }
 }
 
 impl<'m> Debug for UNode<'m> {
@@ -37,11 +47,12 @@ impl<'m> Debug for UNode<'m> {
 
 #[derive(Debug)]
 pub enum UNodeKind<'m> {
+    Stolen,
     Leaf(LeafUNodeKind),
     Block(BlockUNodeKind<'m>, UBlockBody<'m>),
     Expr(ExprUNodeKind, Vec<UNode<'m>>),
     Attr(AttrUNodeKind, UAttr<'m>),
-    SubScope(SubScopeUNode<'m>),
+    SubScope(usize, Box<UNode<'m>>),
 }
 
 #[derive(Debug)]
@@ -75,12 +86,6 @@ pub enum AttrUNodeKind {
 pub enum ExprUNodeKind {
     Call(BuiltinProc),
     Map,
-}
-
-#[derive(Debug)]
-pub struct SubScopeUNode<'m> {
-    pub scope_idx: usize,
-    pub sub_node: Box<UNode<'m>>,
 }
 
 #[derive(Debug)]
@@ -119,11 +124,11 @@ impl ScopingCtx {
         u_node: &mut UNode<'m>,
         path_table: &FnvHashMap<ontol_hir::Variable, VarPath<'s, 'm>>,
     ) {
+        if u_node.free_variables.is_empty() {
+            return;
+        }
+
         match &mut u_node.kind {
-            UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)) => {
-                if !u_node.free_variables.is_empty() {}
-            }
-            UNodeKind::Leaf(_) => {}
             UNodeKind::Block(_kind, body) => {
                 for child_node in std::mem::take(&mut body.nodes) {
                     if child_node
@@ -151,9 +156,26 @@ impl ScopingCtx {
                     }
                 }
             }
-            UNodeKind::Expr(kind, _) => todo!("Expr::{kind:?}"),
-            UNodeKind::Attr(kind, _) => todo!("Attr::{kind:?}"),
-            UNodeKind::SubScope(_) => panic!("Subscope"),
+            UNodeKind::SubScope(..) => panic!("Subscope"),
+            _ => {
+                let mut paths = full_var_path(&u_node.free_variables, path_table);
+                let new_node = u_node.steal();
+                match paths.next() {
+                    Some(PathSegment::Root(hir, subscope_idx)) => self.expand(
+                        new_node,
+                        ScopeExpansion {
+                            parent_scope: ParentScope::ScopeNode(u_node),
+                            next_scope: Some(NextScope {
+                                parent_hir: hir,
+                                subscope_idx,
+                            }),
+                        },
+                        &mut paths,
+                    ),
+                    Some(_) => todo!(),
+                    None => {}
+                }
+            }
         }
     }
 
@@ -164,6 +186,7 @@ impl ScopingCtx {
         paths: &mut PathsIterator<'s, 'm>,
     ) {
         match &mut u_node.kind {
+            UNodeKind::Stolen => panic!("Stolen"),
             UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)) => {
                 if !u_node.free_variables.is_empty() {}
             }
@@ -182,7 +205,7 @@ impl ScopingCtx {
             }
             UNodeKind::Expr(kind, _) => todo!("Expr::{kind:?}"),
             UNodeKind::Attr(kind, _) => todo!("Attr::{kind:?}"),
-            UNodeKind::SubScope(_) => panic!("Subscope"),
+            UNodeKind::SubScope(..) => panic!("Subscope"),
         }
     }
 
@@ -439,6 +462,7 @@ struct ScopeExpansion<'s, 'u, 'm> {
 
 pub enum ParentScope<'u, 'm> {
     Block(&'u mut UBlockBody<'m>),
+    ScopeNode(&'u mut UNode<'m>),
 }
 
 impl<'u, 'm> ParentScope<'u, 'm> {
@@ -448,6 +472,24 @@ impl<'u, 'm> ParentScope<'u, 'm> {
                 let block_body = block.sub_scoping.entry(subscope_idx).or_default();
                 ParentScope::Block(block_body)
             }
+            Self::ScopeNode(node) => {
+                if matches!(&node.kind, UNodeKind::Stolen) {
+                    let inner = UNode {
+                        kind: UNodeKind::Stolen,
+                        free_variables: node.free_variables.clone(),
+                        meta: node.meta,
+                    };
+
+                    node.kind = UNodeKind::SubScope(subscope_idx, Box::new(inner));
+
+                    match &mut node.kind {
+                        UNodeKind::SubScope(_, inner) => ParentScope::ScopeNode(inner.as_mut()),
+                        _ => panic!(),
+                    }
+                } else {
+                    panic!("ScopeNode is not Void")
+                }
+            }
         }
     }
 
@@ -455,6 +497,13 @@ impl<'u, 'm> ParentScope<'u, 'm> {
         match self {
             Self::Block(block) => {
                 block.nodes.push(u_node);
+            }
+            Self::ScopeNode(node) => {
+                if matches!(&node.kind, UNodeKind::Stolen) {
+                    **node = u_node;
+                } else {
+                    panic!("ScopeNode is not Void")
+                }
             }
         }
     }
