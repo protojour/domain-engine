@@ -26,7 +26,7 @@ use super::{
     UnifierError, VariableTracker,
 };
 
-type UnifiedNodes<'m> = SmallVec<[TypedHirNode<'m>; 1]>;
+pub type UnifiedNodes<'m> = SmallVec<[TypedHirNode<'m>; 1]>;
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
 
