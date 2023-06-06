@@ -49,6 +49,13 @@ impl<'s, 'm> Unifier<'s, 'm> {
             _ => unimplemented!(),
         }
 
+        if optional.0 {
+            match_arms.push(MatchArm {
+                pattern: PropPattern::Absent,
+                nodes: vec![],
+            });
+        }
+
         Ok(UnifiedNode {
             binder: None,
             node: if match_arms.is_empty() {

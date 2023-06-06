@@ -396,8 +396,7 @@ fn test_unify_opt_props1() {
         )
         ",
     );
-    // BUG: the first (prop) should be inside only the first (match-prop), not both.
-    let _expected = indoc! {"
+    let expected = indoc! {"
         |$b| (struct ($d)
             (match-prop $b S:0:0
                 (($_ $c)
@@ -406,7 +405,7 @@ fn test_unify_opt_props1() {
                             (struct ($e)
                                 (match-prop $c S:1:1
                                     (($_ $a)
-                                        (prop? $e O:1:1
+                                        (prop $e O:1:1
                                             (#u $a)
                                         )
                                     )
@@ -420,28 +419,5 @@ fn test_unify_opt_props1() {
             )
         )"
     };
-    let actual = indoc! {"
-        |$b| (struct ($d)
-            (match-prop $b S:0:0
-                (($_ $c)
-                    (match-prop $c S:1:1
-                        (($_ $a)
-                            (prop $d O:0:0
-                                (#u
-                                    (struct ($e)
-                                        (prop? $e O:1:1
-                                            (#u $a)
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                        (())
-                    )
-                )
-                (())
-            )
-        )"
-    };
-    assert_eq!(actual, output);
+    assert_eq!(expected, output);
 }

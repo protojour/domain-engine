@@ -131,7 +131,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 },
             }),
             (UNodeKind::Block(kind, mut u_block_body), scope_source) => {
-                debug!("unify_unode Block");
+                debug!("unify_unode Block {kind:?}");
                 let mut body = self.unify_u_block_subscopes(&mut u_block_body, scope_source)?;
                 body.extend(
                     self.unify_u_block_nodes(&mut u_block_body, scope_source)?
@@ -192,12 +192,12 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 let val = self.unify_u_node2(*attr.val, scope_source)?;
 
                 match kind {
-                    AttrUNodeKind::PropVariant(optional, struct_var, property_id) => {
+                    AttrUNodeKind::PropVariant(_optional, struct_var, property_id) => {
                         Ok(UnifiedNode {
                             binder: None,
                             node: TypedHirNode {
                                 kind: NodeKind::Prop(
-                                    optional,
+                                    Optional(false),
                                     struct_var,
                                     property_id,
                                     vec![PropVariant {
@@ -309,12 +309,14 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 block: Block(vec![unified_node.node]),
             })
         } else {
+            debug!("unify_u_block: second arm");
             let mut nodes = vec![];
 
             let binder = match scope_source {
                 ScopeSource::Absent => None,
                 ScopeSource::Node(scope_node) => match self.classify_scoping(scope_node)? {
                     Scoping::Binder(binder) => Some(binder),
+                    Scoping::Block(binder, _) => Some(binder),
                     _ => None,
                 },
                 ScopeSource::Block(typed_binder, _) => Some(typed_binder),
@@ -400,7 +402,6 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         scope_source: &'s TypedHirNode<'m>,
     ) -> UnifierResult<Scoping<'s, 'm>> {
-        let debug_index = "n/a";
         let TypedHirNode { kind, meta } = scope_source;
         let meta = *meta;
 
@@ -431,7 +432,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             }
             NodeKind::Seq(_binder, _attr) => Err(UnifierError::SequenceInputNotSupported),
             NodeKind::Struct(binder, child_scopes) => {
-                debug!("unify_scoping({debug_index:?}, Struct({}))", binder.0);
+                debug!("classify_scoping(Struct({}))", binder.0);
                 Ok(Scoping::Block(
                     TypedBinder {
                         variable: binder.0,
@@ -447,15 +448,15 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 unimplemented!("BUG: MatchProp is an output node")
             }
             NodeKind::Gen(..) => {
-                debug!("unify_scoping({debug_index:?}, Gen)");
+                debug!("classify_scoping(Gen)");
                 todo!()
             }
             NodeKind::Iter(..) => {
-                debug!("unify_scoping({debug_index:?}, Iter)");
+                debug!("classify_scoping(Iter)");
                 todo!()
             }
             NodeKind::Push(..) => {
-                debug!("unify_scoping({debug_index:?}, Push)");
+                debug!("classify_scoping(Push)");
                 todo!()
             }
         }
