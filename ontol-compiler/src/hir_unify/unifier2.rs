@@ -53,7 +53,7 @@ impl<'s, 'm> ScopeSource<'s, 'm> {
 
 #[derive(Clone)]
 pub enum Scoping<'s, 'm> {
-    Complete,
+    Fulfilled,
     SubScope(usize, Box<Scoping<'s, 'm>>),
     Binder(TypedBinder<'m>),
     InvertCall(BuiltinProc, &'s [TypedHirNode<'m>], Meta<'m>),
@@ -192,30 +192,28 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 let val = self.unify_u_node2(*attr.val, scope_source)?;
 
                 match kind {
-                    AttrUNodeKind::PropVariant(_optional, struct_var, property_id) => {
-                        Ok(UnifiedNode {
-                            binder: None,
-                            node: TypedHirNode {
-                                kind: NodeKind::Prop(
-                                    Optional(false),
-                                    struct_var,
-                                    property_id,
-                                    vec![PropVariant {
-                                        dimension: Dimension::Singular,
-                                        attr: Attribute {
-                                            rel: Box::new(rel.node),
-                                            val: Box::new(val.node),
-                                        },
-                                    }],
-                                ),
-                                meta,
-                            },
-                        })
-                    }
+                    AttrUNodeKind::PropVariant(_, struct_var, property_id) => Ok(UnifiedNode {
+                        binder: None,
+                        node: TypedHirNode {
+                            kind: NodeKind::Prop(
+                                Optional(false),
+                                struct_var,
+                                property_id,
+                                vec![PropVariant {
+                                    dimension: Dimension::Singular,
+                                    attr: Attribute {
+                                        rel: Box::new(rel.node),
+                                        val: Box::new(val.node),
+                                    },
+                                }],
+                            ),
+                            meta,
+                        },
+                    }),
                     AttrUNodeKind::Seq(_) => todo!(),
                 }
             }
-            (UNodeKind::SubScope(subscope_idx, _), _) => todo!(),
+            (UNodeKind::SubScope(_, _), _) => todo!(),
         }
     }
 
@@ -225,7 +223,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         u_node: UNode<'m>,
     ) -> UnifierResult<UnifiedNode<'m>> {
         match scoping {
-            Scoping::Complete => self.unify_u_node2(u_node, ScopeSource::Absent),
+            Scoping::Fulfilled => self.unify_u_node2(u_node, ScopeSource::Absent),
             Scoping::SubScope(subscope_idx, inner_scoping) => match u_node.kind {
                 UNodeKind::SubScope(actual_idx, inner_u_node) => {
                     assert_eq!(subscope_idx, actual_idx);
@@ -246,7 +244,10 @@ impl<'s, 'm> Unifier<'s, 'm> {
                         },
                     )
                 }
-                _ => panic!("Cannot subscope {u_node:?}"),
+                _ => self.unify_scoping2(*inner_scoping, u_node),
+                // _ => {
+                //     panic!("Cannot subscope {u_node:?}")
+                // }
             },
             Scoping::Binder(typed_binder) => {
                 let unified = self.unify_u_node2(u_node, ScopeSource::Absent)?;
@@ -346,8 +347,6 @@ impl<'s, 'm> Unifier<'s, 'm> {
         let unit_type = self.unit_type();
         let mut output = vec![];
 
-        debug!("sub scoping len: {}", body.sub_scoping.len());
-
         for (subscope_idx, mut sub_body) in std::mem::take(&mut body.sub_scoping) {
             let subscope = scope_source.subscope(subscope_idx);
             match self.classify_scoping(subscope)? {
@@ -415,7 +414,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             }
             NodeKind::Unit => {
                 debug!("classify_scoping(Unit)");
-                Ok(Scoping::Complete)
+                Ok(Scoping::Fulfilled)
             }
             NodeKind::Int(_int) => panic!("Int in scoping"),
             NodeKind::Call(proc, args) => {

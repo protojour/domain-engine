@@ -35,9 +35,6 @@ pub struct Unified<'m> {
     pub nodes: UnifiedNodes<'m>,
 }
 
-const UNIFIER_IMPL: u8 = 1;
-const RUN_3: bool = true;
-
 pub fn unify_to_function<'m>(
     scope_source: TypedHirNode<'m>,
     target: TypedHirNode<'m>,
@@ -89,8 +86,11 @@ pub fn unify_to_function<'m>(
             None => Err(UnifierError::NoInputBinder),
         };
 
-        if RUN_3 {
-            return hir_func;
+        match std::env::var("ONTOL_UNIFIER") {
+            Ok(val) if val == "1" => {}
+            _ => {
+                return hir_func;
+            }
         }
     }
 

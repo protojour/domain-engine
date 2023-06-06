@@ -114,8 +114,6 @@ pub struct UAttr<'m> {
     pub val: Box<UNode<'m>>,
 }
 
-impl<'m> UNode<'m> {}
-
 pub fn expand_scoping<'s, 'm>(
     u_node: &mut UNode<'m>,
     path_table: &FnvHashMap<ontol_hir::Variable, VarPath<'s, 'm>>,
@@ -129,6 +127,7 @@ pub fn expand_scoping<'s, 'm>(
 struct ScopingCtx {
     target_option_depth: u16,
     scope_option_depth: u16,
+    debug_scope_expand_depth: usize,
 }
 
 impl ScopingCtx {
@@ -136,6 +135,7 @@ impl ScopingCtx {
         Self {
             target_option_depth: 0,
             scope_option_depth: 0,
+            debug_scope_expand_depth: 0,
         }
     }
 
@@ -312,7 +312,12 @@ impl ScopingCtx {
                     }
                     current_expansion = expansion;
                 }
-                Err(prev_expansion) => return prev_expansion,
+                Err(prev_expansion) => {
+                    return ScopeExpansion {
+                        parent_scope: prev_expansion.parent_scope,
+                        next_scope: None,
+                    }
+                }
             }
         }
     }
@@ -343,6 +348,12 @@ impl ScopingCtx {
         termination: ExpandTermination,
         paths: &mut PathsIterator<'s, 'm>,
     ) -> Result<ScopeExpansion<'s, 'u, 'm>, ScopeExpansion<'s, 'u, 'm>> {
+        self.debug_scope_expand_depth += 1;
+
+        if self.debug_scope_expand_depth > 50 {
+            panic!("Scope depth exceeded, likely infinite loop");
+        }
+
         let ScopeExpansion {
             parent_scope,
             next_scope,
@@ -361,7 +372,7 @@ impl ScopingCtx {
             }
         };
 
-        debug!("expand scope level {subscope_idx}");
+        debug!("expand scope level, subscope_idx={subscope_idx}");
 
         match &parent_hir.kind {
             NodeKind::Prop(optional, struct_var, id, variant_scopes) => {

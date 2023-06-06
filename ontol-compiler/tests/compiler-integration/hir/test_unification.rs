@@ -86,6 +86,43 @@ fn test_unify_basic_struct() {
 }
 
 #[test]
+fn test_unify_two_prop_struct() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:0:0 (#u $a))
+            (prop $c S:1:1 (#u $b))
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d O:0:0 (#u $a))
+            (prop $d O:1:1 (#u $b))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $a)
+                    (prop $d O:0:0
+                        (#u $a)
+                    )
+                )
+            )
+            (match-prop $c S:1:1
+                (($_ $b)
+                    (prop $d O:1:1
+                        (#u $b)
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_struct_map_prop() {
     let output = test_unify(
         "
@@ -365,9 +402,52 @@ fn test_unify_flat_map1() {
     assert_eq!(expected, output);
 }
 
-// BUG:
 #[test]
 fn test_unify_opt_props1() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop? $b S:1:7
+                (#u (map $a))
+            )
+        )
+        ",
+        "
+        (struct ($c)
+            (prop? $c S:1:7
+                (#u (map $a))
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($d)
+            (match-prop $b S:0:0
+                (($_ $c)
+                    (prop $d O:0:0
+                        (#u
+                            (struct ($e)
+                                (match-prop $c S:1:1
+                                    (($_ $a)
+                                        (prop $e O:1:1
+                                            (#u $a)
+                                        )
+                                    )
+                                    (())
+                                )
+                            )
+                        )
+                    )
+                )
+                (())
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_opt_props2() {
     let output = test_unify(
         "
         (struct ($b)
@@ -418,6 +498,30 @@ fn test_unify_opt_props1() {
                 (())
             )
         )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_opt_rel_and_val1() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop? $c S:1:7
+                ($a $b)
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop? $d S:1:7
+                (#u (+ $a $b))
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        "
     };
     assert_eq!(expected, output);
 }
