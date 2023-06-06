@@ -52,6 +52,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         Ok(UnifiedNode {
             binder: None,
             node: if match_arms.is_empty() {
+                panic!("No match arms");
                 TypedHirNode {
                     kind: NodeKind::Unit,
                     meta: scope_meta,

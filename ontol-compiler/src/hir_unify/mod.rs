@@ -8,6 +8,7 @@ use crate::typed_hir::TypedHir;
 pub mod unifier;
 pub mod unifier2;
 
+mod scope;
 mod tagged_node;
 mod u_node;
 mod unification_tree;

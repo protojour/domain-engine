@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{
+    scope::hir_subscope,
     u_node::{AttrUNodeKind, BlockUNodeKind, ExprUNodeKind, LeafUNodeKind, UBlockBody, UNode},
     unifier::{Unifier, UnifierResult},
     UnifierError,
@@ -38,6 +39,16 @@ pub enum ScopeSource<'s, 'm> {
     Absent,
     Node(&'s TypedHirNode<'m>),
     Block(TypedBinder<'m>, &'s [TypedHirNode<'m>]),
+}
+
+impl<'s, 'm> ScopeSource<'s, 'm> {
+    fn subscope(&self, index: usize) -> &'s TypedHirNode<'m> {
+        match self {
+            Self::Absent => panic!("Cannot subscope Absent scope"),
+            Self::Node(node) => hir_subscope(node, index),
+            Self::Block(_, slice) => &slice[index],
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -118,19 +129,34 @@ impl<'s, 'm> Unifier<'s, 'm> {
                     meta,
                 },
             }),
-            (UNodeKind::Block(kind, mut u_block_body), ScopeSource::Block(scope_binder, scope)) => {
-                let mut body = self.unify_u_block_subscopes(&mut u_block_body, scope)?;
+            (UNodeKind::Block(kind, mut u_block_body), scope_source) => {
+                let mut body = self.unify_u_block_subscopes(&mut u_block_body, scope_source)?;
                 body.extend(
-                    self.unify_u_block_nodes(&mut u_block_body, ScopeSource::Absent)?
+                    self.unify_u_block_nodes(&mut u_block_body, scope_source)?
                         .block
                         .0,
                 );
 
                 match kind {
-                    BlockUNodeKind::Raw => todo!("Raw"),
+                    BlockUNodeKind::Raw => {
+                        if body.len() != 1 {
+                            panic!(
+                                "Raw block should have 1 node, had {} (TODO: (begin) blocks?)",
+                                body.len()
+                            );
+                        }
+
+                        Ok(UnifiedNode {
+                            binder: None,
+                            node: body.into_iter().next().unwrap(),
+                        })
+                    }
                     BlockUNodeKind::Let(..) => todo!("Let"),
                     BlockUNodeKind::Struct(struct_binder) => Ok(UnifiedNode {
-                        binder: Some(scope_binder),
+                        binder: match scope_source {
+                            ScopeSource::Block(binder, _) => Some(binder),
+                            _ => None,
+                        },
                         node: TypedHirNode {
                             kind: NodeKind::Struct(struct_binder, body),
                             meta,
@@ -138,7 +164,6 @@ impl<'s, 'm> Unifier<'s, 'm> {
                     }),
                 }
             }
-            (UNodeKind::Block(..), _) => panic!("Invalid scope source for block u_node"),
             (UNodeKind::Expr(kind, params), _) => {
                 let mut hir_params = vec![];
                 for u_param in params {
@@ -229,17 +254,18 @@ impl<'s, 'm> Unifier<'s, 'm> {
         body: &mut UBlockBody<'m>,
         scope_source: ScopeSource<'s, 'm>,
     ) -> UnifierResult<UnifiedBlock<'m>> {
+        debug!("unify_u_block {body:?}");
+
         let mut nodes = vec![];
+        nodes.extend(self.unify_u_block_subscopes(body, scope_source)?);
+
         let binder = match scope_source {
             ScopeSource::Absent => None,
             ScopeSource::Node(scope_node) => match self.classify_scoping(scope_node)? {
                 Scoping::Binder(binder) => Some(binder),
                 _ => None,
             },
-            ScopeSource::Block(typed_binder, scope_slice) => {
-                nodes.extend(self.unify_u_block_subscopes(body, scope_slice)?);
-                Some(typed_binder)
-            }
+            ScopeSource::Block(typed_binder, _) => Some(typed_binder),
         };
 
         nodes.extend(self.unify_u_block_nodes(body, scope_source)?.block.0);
@@ -253,17 +279,20 @@ impl<'s, 'm> Unifier<'s, 'm> {
     fn unify_u_block_subscopes(
         &mut self,
         body: &mut UBlockBody<'m>,
-        scope_slice: &'s [TypedHirNode<'m>],
+        scope_source: ScopeSource<'s, 'm>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let unit_type = self.unit_type();
         let mut output = vec![];
 
         for (subscope_idx, mut sub_body) in std::mem::take(&mut body.sub_scoping) {
-            let subscope = &scope_slice[subscope_idx];
+            let subscope = scope_source.subscope(subscope_idx);
             match self.classify_scoping(subscope)? {
-                Scoping::Block(_, sub_scope_slice) => {
+                Scoping::Block(typed_binder, sub_scope_slice) => {
                     // BUG: probably not correct?
-                    output.extend(self.unify_u_block_subscopes(&mut sub_body, sub_scope_slice)?)
+                    output.extend(self.unify_u_block_subscopes(
+                        &mut sub_body,
+                        ScopeSource::Block(typed_binder, sub_scope_slice),
+                    )?);
                 }
                 scoping => {
                     let unified = self.unify_scoping2(
@@ -327,7 +356,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             }
             NodeKind::Int(_int) => panic!("Int in scoping"),
             NodeKind::Call(proc, args) => Ok(Scoping::InvertCall(*proc, args, meta)),
-            NodeKind::Map(arg) => todo!(),
+            NodeKind::Map(arg) => self.classify_scoping(arg),
             NodeKind::Let(..) => {
                 unimplemented!("BUG: Let is an output node")
             }

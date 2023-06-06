@@ -7,7 +7,10 @@ use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use tracing::debug;
 
 use crate::{
-    hir_unify::var_path::{full_var_path, PathSegment},
+    hir_unify::{
+        scope::hir_subscope,
+        var_path::{full_var_path, PathSegment},
+    },
     typed_hir::{Meta, TypedHirNode},
 };
 
@@ -361,36 +364,6 @@ impl ScopingCtx {
         debug!("expand scope level {subscope_idx}");
 
         match &parent_hir.kind {
-            NodeKind::VariableRef(..) | NodeKind::Unit | NodeKind::Int(_) => panic!(),
-            NodeKind::Let(_, definition, body) => {
-                let sub_scope = if subscope_idx == 0 {
-                    definition
-                } else {
-                    &body[subscope_idx - 1]
-                };
-                self.expand_path(parent_scope.sub_scoping(subscope_idx), sub_scope, paths)
-            }
-            NodeKind::Call(_, sub_scopes) => self.expand_path(
-                parent_scope.sub_scoping(subscope_idx),
-                &sub_scopes[subscope_idx],
-                paths,
-            ),
-            NodeKind::Map(sub_scope) => {
-                self.expand_path(parent_scope.sub_scoping(subscope_idx), sub_scope, paths)
-            }
-            NodeKind::Seq(_, attr) => self.expand_path(
-                parent_scope.sub_scoping(subscope_idx),
-                &attr[subscope_idx],
-                paths,
-            ),
-            NodeKind::Struct(_, sub_scopes) => {
-                debug!("struct scope");
-                self.expand_path(
-                    parent_scope.sub_scoping(subscope_idx),
-                    &sub_scopes[subscope_idx],
-                    paths,
-                )
-            }
             NodeKind::Prop(optional, struct_var, id, variant_scopes) => {
                 if optional.0 && matches!(termination, ExpandTermination::NoOption) {
                     return Err(ScopeExpansion {
@@ -427,24 +400,10 @@ impl ScopingCtx {
 
                 self.expand_path(attr_sub_scopable, attr_scope, paths)
             }
-            NodeKind::MatchProp(..) => {
-                panic!("match-prop is not a scope")
+            _ => {
+                let sub_scope = hir_subscope(parent_hir, subscope_idx);
+                self.expand_path(parent_scope.sub_scoping(subscope_idx), sub_scope, paths)
             }
-            NodeKind::Gen(_, _, sub_scopes) => self.expand_path(
-                parent_scope.sub_scoping(subscope_idx),
-                &sub_scopes[subscope_idx],
-                paths,
-            ),
-            NodeKind::Iter(_, _, sub_scopes) => self.expand_path(
-                parent_scope.sub_scoping(subscope_idx),
-                &sub_scopes[subscope_idx],
-                paths,
-            ),
-            NodeKind::Push(_, attr) => self.expand_path(
-                parent_scope.sub_scoping(subscope_idx),
-                &attr[subscope_idx],
-                paths,
-            ),
         }
     }
 
