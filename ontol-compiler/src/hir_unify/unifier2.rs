@@ -15,13 +15,21 @@ use super::{
     UnifierError,
 };
 
-pub struct Unified2<'m> {
+pub struct UnifiedNode<'m> {
     pub binder: Option<TypedBinder<'m>>,
     pub node: TypedHirNode<'m>,
 }
 
+pub struct UnifiedBlock<'m> {
+    pub binder: Option<TypedBinder<'m>>,
+    pub block: Block<'m>,
+}
+
+#[derive(Default)]
+pub struct Block<'m>(pub Vec<TypedHirNode<'m>>);
+
 pub enum ScopeUnification<'s, 'm> {
-    Unified(Unified2<'m>),
+    Unified(UnifiedNode<'m>),
     Lazy(UNode<'m>, ScopeSource<'s, 'm>),
 }
 
@@ -49,20 +57,17 @@ pub enum Scoping<'s, 'm> {
 
 pub struct UnifyPatternBinding2<'m> {
     pub binding: PatternBinding,
-    pub target_nodes: Option<Nodes<'m>>,
+    pub block: Option<Block<'m>>,
 }
 
 pub struct LetAttr2<'m> {
     pub rel_binding: PatternBinding,
     pub val_binding: PatternBinding,
-    pub target_nodes: Nodes<'m>,
+    pub target_nodes: Block<'m>,
     pub ty: TypeRef<'m>,
 }
 
-#[derive(Default)]
-pub struct Nodes<'m>(pub Vec<TypedHirNode<'m>>);
-
-impl<'m> Nodes<'m> {
+impl<'m> Block<'m> {
     pub fn type_iter<'a>(&'a self) -> impl Iterator<Item = TypeRef<'m>> + 'a {
         self.0.iter().map(|node| node.meta.ty)
     }
@@ -73,7 +78,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         u_node: UNode<'m>,
         scope_source: ScopeSource<'s, 'm>,
-    ) -> UnifierResult<Unified2<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         match scope_source {
             ScopeSource::Absent => self.unify_u_node2(u_node, scope_source),
             ScopeSource::Node(scope_node) => {
@@ -88,25 +93,25 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         u_node: UNode<'m>,
         scope_source: ScopeSource<'s, 'm>,
-    ) -> UnifierResult<Unified2<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         let meta = u_node.meta;
         match (u_node.kind, scope_source) {
             (UNodeKind::Stolen, _) => panic!("Stolen: Should not happen"),
-            (UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)), _) => Ok(Unified2 {
+            (UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)), _) => Ok(UnifiedNode {
                 binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::VariableRef(var),
                     meta,
                 },
             }),
-            (UNodeKind::Leaf(LeafUNodeKind::Int(int)), _) => Ok(Unified2 {
+            (UNodeKind::Leaf(LeafUNodeKind::Int(int)), _) => Ok(UnifiedNode {
                 binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Int(int),
                     meta,
                 },
             }),
-            (UNodeKind::Leaf(LeafUNodeKind::Unit), _) => Ok(Unified2 {
+            (UNodeKind::Leaf(LeafUNodeKind::Unit), _) => Ok(UnifiedNode {
                 binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Unit,
@@ -115,12 +120,16 @@ impl<'s, 'm> Unifier<'s, 'm> {
             }),
             (UNodeKind::Block(kind, mut u_block_body), ScopeSource::Block(scope_binder, scope)) => {
                 let mut body = self.unify_u_block_subscopes(&mut u_block_body, scope)?;
-                body.extend(self.unify_u_block_nodes(&mut u_block_body, ScopeSource::Absent)?);
+                body.extend(
+                    self.unify_u_block_nodes(&mut u_block_body, ScopeSource::Absent)?
+                        .block
+                        .0,
+                );
 
                 match kind {
                     BlockUNodeKind::Raw => todo!("Raw"),
                     BlockUNodeKind::Let(..) => todo!("Let"),
-                    BlockUNodeKind::Struct(struct_binder) => Ok(Unified2 {
+                    BlockUNodeKind::Struct(struct_binder) => Ok(UnifiedNode {
                         binder: Some(scope_binder),
                         node: TypedHirNode {
                             kind: NodeKind::Struct(struct_binder, body),
@@ -143,7 +152,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                     }
                 };
 
-                Ok(Unified2 {
+                Ok(UnifiedNode {
                     binder: None,
                     node: TypedHirNode {
                         kind: hir_kind,
@@ -156,24 +165,26 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 let val = self.unify_u_node2(*attr.val, scope_source)?;
 
                 match kind {
-                    AttrUNodeKind::PropVariant(optional, struct_var, property_id) => Ok(Unified2 {
-                        binder: None,
-                        node: TypedHirNode {
-                            kind: NodeKind::Prop(
-                                optional,
-                                struct_var,
-                                property_id,
-                                vec![PropVariant {
-                                    dimension: Dimension::Singular,
-                                    attr: Attribute {
-                                        rel: Box::new(rel.node),
-                                        val: Box::new(val.node),
-                                    },
-                                }],
-                            ),
-                            meta,
-                        },
-                    }),
+                    AttrUNodeKind::PropVariant(optional, struct_var, property_id) => {
+                        Ok(UnifiedNode {
+                            binder: None,
+                            node: TypedHirNode {
+                                kind: NodeKind::Prop(
+                                    optional,
+                                    struct_var,
+                                    property_id,
+                                    vec![PropVariant {
+                                        dimension: Dimension::Singular,
+                                        attr: Attribute {
+                                            rel: Box::new(rel.node),
+                                            val: Box::new(val.node),
+                                        },
+                                    }],
+                                ),
+                                meta,
+                            },
+                        })
+                    }
                     AttrUNodeKind::Seq(_) => todo!(),
                 }
             }
@@ -185,12 +196,12 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         scoping: Scoping<'s, 'm>,
         u_node: UNode<'m>,
-    ) -> UnifierResult<Unified2<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         match scoping {
             Scoping::Complete => self.unify_u_node2(u_node, ScopeSource::Absent),
             Scoping::Binder(typed_binder) => {
                 let unified = self.unify_u_node2(u_node, ScopeSource::Absent)?;
-                Ok(Unified2 {
+                Ok(UnifiedNode {
                     binder: Some(typed_binder),
                     node: unified.node,
                 })
@@ -211,6 +222,32 @@ impl<'s, 'm> Unifier<'s, 'm> {
                     u_node,
                 ),
         }
+    }
+
+    pub(super) fn unify_u_block(
+        &mut self,
+        body: &mut UBlockBody<'m>,
+        scope_source: ScopeSource<'s, 'm>,
+    ) -> UnifierResult<UnifiedBlock<'m>> {
+        let mut nodes = vec![];
+        let binder = match scope_source {
+            ScopeSource::Absent => None,
+            ScopeSource::Node(scope_node) => match self.classify_scoping(scope_node)? {
+                Scoping::Binder(binder) => Some(binder),
+                _ => None,
+            },
+            ScopeSource::Block(typed_binder, scope_slice) => {
+                nodes.extend(self.unify_u_block_subscopes(body, scope_slice)?);
+                Some(typed_binder)
+            }
+        };
+
+        nodes.extend(self.unify_u_block_nodes(body, scope_source)?.block.0);
+
+        Ok(UnifiedBlock {
+            binder,
+            block: Block(nodes),
+        })
     }
 
     fn unify_u_block_subscopes(
@@ -253,14 +290,19 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         body: &mut UBlockBody<'m>,
         scope_source: ScopeSource<'s, 'm>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    ) -> UnifierResult<UnifiedBlock<'m>> {
         let mut output = vec![];
 
         for u_node in std::mem::take(&mut body.nodes) {
             output.push(self.unify2(u_node, scope_source)?.node);
         }
 
-        Ok(output)
+        // TODO: dependent scopes
+
+        Ok(UnifiedBlock {
+            binder: None,
+            block: Block(output),
+        })
     }
 
     fn classify_scoping(

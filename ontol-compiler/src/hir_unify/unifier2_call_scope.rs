@@ -6,7 +6,7 @@ use crate::typed_hir::{Meta, TypedBinder, TypedHirKind, TypedHirNode};
 use super::{
     u_node::{UNode, UNodeKind},
     unifier::{InvertedCall, Unifier, UnifierResult},
-    unifier2::{ScopeSource, Unified2},
+    unifier2::{ScopeSource, UnifiedNode},
 };
 
 impl<'s, 'm> Unifier<'s, 'm> {
@@ -15,7 +15,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         scope_call: (BuiltinProc, &'s [TypedHirNode<'m>]),
         scope_meta: Meta<'m>,
         u_node: UNode<'m>,
-    ) -> UnifierResult<Unified2<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         match u_node.kind {
             UNodeKind::SubScope(subscope_idx, child_u_node) => {
                 let binder_var = self.alloc_var();
@@ -32,7 +32,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 )?;
                 let return_ty = self.last_type(inverted_call.body.iter());
 
-                Ok(Unified2 {
+                Ok(UnifiedNode {
                     binder: Some(TypedBinder {
                         variable: binder_var,
                         ty: scope_meta.ty,

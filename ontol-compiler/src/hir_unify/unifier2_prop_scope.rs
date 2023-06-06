@@ -5,15 +5,15 @@ use ontol_runtime::value::PropertyId;
 use tracing::debug;
 
 use crate::{
-    hir_unify::unified_target_node::UnifiedTargetNodes,
-    typed_hir::{Meta, TypedHir, TypedHirNode},
+    hir_unify::unifier2::UnifiedBlock,
+    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode},
     types::Type,
 };
 
 use super::{
     u_node::{UBlockBody, UNode, UNodeKind},
     unifier::{TypedMatchArm, Unifier, UnifierResult},
-    unifier2::{LetAttr2, Nodes, ScopeSource, Unified2, UnifyPatternBinding2},
+    unifier2::{Block, LetAttr2, ScopeSource, UnifiedNode, UnifyPatternBinding2},
 };
 
 impl<'s, 'm> Unifier<'s, 'm> {
@@ -25,7 +25,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         variants: &'s [PropVariant<'m, TypedHir>],
         scope_meta: Meta<'m>,
         u_node: UNode<'m>,
-    ) -> UnifierResult<Unified2<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         let mut match_arms = vec![];
         let mut ty = &Type::Tautology;
 
@@ -49,10 +49,9 @@ impl<'s, 'm> Unifier<'s, 'm> {
             _ => unimplemented!(),
         }
 
-        Ok(Unified2 {
+        Ok(UnifiedNode {
             binder: None,
             node: if match_arms.is_empty() {
-                panic!("No match arms");
                 TypedHirNode {
                     kind: NodeKind::Unit,
                     meta: scope_meta,
@@ -105,13 +104,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         let val_binding =
             self.unify_pattern_binding2(Some(1), u_block.sub_scoping.remove(&1), &scope_attr.val)?;
 
-        debug!(
-            "let_attr2 ({}, {})",
-            rel_binding.target_nodes.is_some(),
-            val_binding.target_nodes.is_some()
-        );
-
-        Ok(match (rel_binding.target_nodes, val_binding.target_nodes) {
+        Ok(match (rel_binding.block, val_binding.block) {
             (None, None) => {
                 debug!("No nodes in variant binding");
                 None
@@ -129,7 +122,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 ty,
             }),
             (Some(rel), Some(val)) => {
-                let mut concatenated = Nodes::default();
+                let mut concatenated = Block::default();
                 concatenated.0.extend(rel.0);
                 concatenated.0.extend(val.0);
                 concatenated.type_iter().last().map(|ty| LetAttr2 {
@@ -153,23 +146,23 @@ impl<'s, 'm> Unifier<'s, 'm> {
             None => {
                 return Ok(UnifyPatternBinding2 {
                     binding: PatternBinding::Wildcard,
-                    target_nodes: None,
+                    block: None,
                 })
             }
         };
 
         debug!("pattern binding scope: {scope}");
 
-        let nodes = self.unify_u_block_nodes(&mut u_block, ScopeSource::Node(scope))?;
+        let UnifiedBlock { binder, block } =
+            self.unify_u_block(&mut u_block, ScopeSource::Node(scope))?;
 
-        // let binding = match binder {
-        //     Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
-        //     None => PatternBinding::Wildcard,
-        // };
-        let binding = PatternBinding::Wildcard;
+        let binding = match binder {
+            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
+            None => PatternBinding::Wildcard,
+        };
         Ok(UnifyPatternBinding2 {
             binding,
-            target_nodes: Some(Nodes(nodes)),
+            block: Some(block),
         })
     }
 }
