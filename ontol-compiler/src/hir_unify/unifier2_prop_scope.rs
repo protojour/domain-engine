@@ -1,20 +1,83 @@
-use ontol_hir::kind::{Attribute, Dimension, MatchArm, PatternBinding, PropPattern};
+use ontol_hir::kind::{
+    Attribute, Dimension, MatchArm, NodeKind, Optional, PatternBinding, PropPattern, PropVariant,
+};
+use ontol_runtime::value::PropertyId;
 use tracing::debug;
 
-use crate::{hir_unify::unified_target_node::UnifiedTargetNodes, typed_hir::TypedHirNode};
+use crate::{
+    hir_unify::unified_target_node::UnifiedTargetNodes,
+    typed_hir::{Meta, TypedHir, TypedHirNode},
+    types::Type,
+};
 
 use super::{
-    u_node::UBlockBody,
+    u_node::{UBlockBody, UNode, UNodeKind},
     unifier::{TypedMatchArm, Unifier, UnifierResult},
-    unifier2::{LetAttr2, UnifyPatternBinding2},
+    unifier2::{LetAttr2, Nodes, ScopeSource, Unified2, UnifyPatternBinding2},
 };
 
 impl<'s, 'm> Unifier<'s, 'm> {
+    pub(super) fn unify_prop_scope(
+        &mut self,
+        optional: Optional,
+        struct_var: ontol_hir::Variable,
+        property_id: PropertyId,
+        variants: &'s [PropVariant<'m, TypedHir>],
+        scope_meta: Meta<'m>,
+        u_node: UNode<'m>,
+    ) -> UnifierResult<Unified2<'m>> {
+        let mut match_arms = vec![];
+        let mut ty = &Type::Tautology;
+
+        match u_node.kind {
+            UNodeKind::Block(_, u_block) => {
+                for (subscope_idx, sub_block) in u_block.sub_scoping {
+                    let PropVariant { dimension, attr } = &variants[subscope_idx];
+
+                    if let Some(typed_match_arm) =
+                        self.unify_prop_variant_scoping(sub_block, *dimension, attr)?
+                    {
+                        // if let Type::Tautology = typed_match_arm.ty {
+                        //     panic!("found Tautology");
+                        // }
+
+                        ty = typed_match_arm.ty;
+                        match_arms.push(typed_match_arm.arm);
+                    }
+                }
+            }
+            _ => unimplemented!(),
+        }
+
+        Ok(Unified2 {
+            binder: None,
+            node: if match_arms.is_empty() {
+                panic!("No match arms");
+                TypedHirNode {
+                    kind: NodeKind::Unit,
+                    meta: scope_meta,
+                }
+            } else {
+                if let Type::Tautology = ty {
+                    panic!("Tautology");
+                }
+
+                TypedHirNode {
+                    kind: NodeKind::MatchProp(struct_var, property_id, match_arms),
+                    meta: Meta {
+                        ty,
+                        span: scope_meta.span,
+                    },
+                }
+            },
+        })
+    }
+
     pub(super) fn unify_prop_variant_scoping(
         &mut self,
         u_block: UBlockBody<'m>,
         _scope_dimension: Dimension,
-        scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
+        scope_attr: &'s Attribute<Box<TypedHirNode<'m>>>,
     ) -> UnifierResult<Option<TypedMatchArm<'m>>> {
         if u_block.nodes.is_empty() {
             // treat this "transparently"
@@ -23,7 +86,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 .map(|let_attr| TypedMatchArm {
                     arm: MatchArm {
                         pattern: PropPattern::Attr(let_attr.rel_binding, let_attr.val_binding),
-                        nodes: let_attr.target_nodes.into_hir_iter().collect(),
+                        nodes: let_attr.target_nodes.0,
                     },
                     ty: let_attr.ty,
                 }))
@@ -35,12 +98,18 @@ impl<'s, 'm> Unifier<'s, 'm> {
     fn let_attr2(
         &mut self,
         mut u_block: UBlockBody<'m>,
-        scope_attr: &Attribute<Box<TypedHirNode<'m>>>,
+        scope_attr: &'s Attribute<Box<TypedHirNode<'m>>>,
     ) -> UnifierResult<Option<LetAttr2<'m>>> {
         let rel_binding =
             self.unify_pattern_binding2(Some(0), u_block.sub_scoping.remove(&0), &scope_attr.rel)?;
         let val_binding =
             self.unify_pattern_binding2(Some(1), u_block.sub_scoping.remove(&1), &scope_attr.val)?;
+
+        debug!(
+            "let_attr2 ({}, {})",
+            rel_binding.target_nodes.is_some(),
+            val_binding.target_nodes.is_some()
+        );
 
         Ok(match (rel_binding.target_nodes, val_binding.target_nodes) {
             (None, None) => {
@@ -60,7 +129,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 ty,
             }),
             (Some(rel), Some(val)) => {
-                let mut concatenated = UnifiedTargetNodes::default();
+                let mut concatenated = Nodes::default();
                 concatenated.0.extend(rel.0);
                 concatenated.0.extend(val.0);
                 concatenated.type_iter().last().map(|ty| LetAttr2 {
@@ -77,9 +146,9 @@ impl<'s, 'm> Unifier<'s, 'm> {
         &mut self,
         debug_index: Option<usize>,
         u_block: Option<UBlockBody<'m>>,
-        source: &TypedHirNode<'m>,
+        scope: &'s TypedHirNode<'m>,
     ) -> UnifierResult<UnifyPatternBinding2<'m>> {
-        let u_block = match u_block {
+        let mut u_block = match u_block {
             Some(u_block) => u_block,
             None => {
                 return Ok(UnifyPatternBinding2 {
@@ -89,20 +158,18 @@ impl<'s, 'm> Unifier<'s, 'm> {
             }
         };
 
-        /*
-        let Unified2 {
-            target_nodes,
-            binder,
-        } = self.unify_nodes2(debug_index, nodes, source)?;
-        let binding = match binder {
-            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
-            None => PatternBinding::Wildcard,
-        };
+        debug!("pattern binding scope: {scope}");
+
+        let nodes = self.unify_u_block_nodes(&mut u_block, ScopeSource::Node(scope))?;
+
+        // let binding = match binder {
+        //     Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
+        //     None => PatternBinding::Wildcard,
+        // };
+        let binding = PatternBinding::Wildcard;
         Ok(UnifyPatternBinding2 {
             binding,
-            target_nodes: Some(target_nodes),
+            target_nodes: Some(Nodes(nodes)),
         })
-        */
-        todo!("u_block: {u_block:?}")
     }
 }

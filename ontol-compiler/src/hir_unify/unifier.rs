@@ -64,33 +64,33 @@ pub fn unify_to_function<'m>(
 
         debug!("expanded: {u_node:#?}");
 
-        if RUN_3 {
-            let unified2 = Unifier {
-                root_source: &scope_source,
-                next_variable: var_tracker.next_variable(),
-                types: &mut compiler.types,
-            }
-            .unify2(u_node, ScopeSource::Node(&scope_source))?;
+        let unified2 = Unifier {
+            root_source: &scope_source,
+            next_variable: var_tracker.next_variable(),
+            types: &mut compiler.types,
+        }
+        .unify2(u_node, ScopeSource::Node(&scope_source))?;
 
-            let hir_func = match unified2.binder {
-                Some(arg) => {
-                    // NB: Error is used in unification tests
-                    if !matches!(source_ty, Type::Error) {
-                        assert_eq!(arg.ty, source_ty);
-                    }
-                    if !matches!(target_ty, Type::Error) {
-                        assert_eq!(unified2.node.meta.ty, target_ty);
-                    }
-
-                    Ok(HirFunc {
-                        arg,
-                        body: unified2.node,
-                    })
+        let hir_func = match unified2.binder {
+            Some(arg) => {
+                // NB: Error is used in unification tests
+                if !matches!(source_ty, Type::Error) {
+                    assert_eq!(arg.ty, source_ty);
                 }
-                None => Err(UnifierError::NoInputBinder),
-            };
+                if !matches!(target_ty, Type::Error) {
+                    assert_eq!(unified2.node.meta.ty, target_ty);
+                }
 
-            debug!("unified2 hir func: {}", hir_func.unwrap());
+                Ok(HirFunc {
+                    arg,
+                    body: unified2.node,
+                })
+            }
+            None => Err(UnifierError::NoInputBinder),
+        };
+
+        if RUN_3 {
+            return hir_func;
         }
     }
 
