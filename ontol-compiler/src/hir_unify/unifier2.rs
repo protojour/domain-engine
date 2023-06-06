@@ -1,6 +1,6 @@
 use ontol_hir::kind::{Attribute, Dimension, NodeKind, Optional, PatternBinding, PropVariant};
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     hir_unify::u_node::UNodeKind,
@@ -51,9 +51,10 @@ impl<'s, 'm> ScopeSource<'s, 'm> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Scoping<'s, 'm> {
     Complete,
+    SubScope(usize, Box<Scoping<'s, 'm>>),
     Binder(TypedBinder<'m>),
     InvertCall(BuiltinProc, &'s [TypedHirNode<'m>], Meta<'m>),
     Block(TypedBinder<'m>, &'s [TypedHirNode<'m>]),
@@ -130,6 +131,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 },
             }),
             (UNodeKind::Block(kind, mut u_block_body), scope_source) => {
+                debug!("unify_unode Block");
                 let mut body = self.unify_u_block_subscopes(&mut u_block_body, scope_source)?;
                 body.extend(
                     self.unify_u_block_nodes(&mut u_block_body, scope_source)?
@@ -224,6 +226,28 @@ impl<'s, 'm> Unifier<'s, 'm> {
     ) -> UnifierResult<UnifiedNode<'m>> {
         match scoping {
             Scoping::Complete => self.unify_u_node2(u_node, ScopeSource::Absent),
+            Scoping::SubScope(subscope_idx, inner_scoping) => match u_node.kind {
+                UNodeKind::SubScope(actual_idx, inner_u_node) => {
+                    assert_eq!(subscope_idx, actual_idx);
+                    self.unify_scoping2(*inner_scoping, *inner_u_node)
+                }
+                UNodeKind::Block(_, mut body) => {
+                    let unit_ty = self.unit_type();
+                    let inner_body = body.sub_scoping.remove(&subscope_idx).unwrap();
+                    self.unify_scoping2(
+                        *inner_scoping,
+                        UNode {
+                            kind: UNodeKind::Block(BlockUNodeKind::Raw, inner_body),
+                            free_variables: Default::default(),
+                            meta: Meta {
+                                ty: unit_ty,
+                                span: SourceSpan::none(),
+                            },
+                        },
+                    )
+                }
+                _ => panic!("Cannot subscope {u_node:?}"),
+            },
             Scoping::Binder(typed_binder) => {
                 let unified = self.unify_u_node2(u_node, ScopeSource::Absent)?;
                 Ok(UnifiedNode {
@@ -251,29 +275,65 @@ impl<'s, 'm> Unifier<'s, 'm> {
 
     pub(super) fn unify_u_block(
         &mut self,
-        body: &mut UBlockBody<'m>,
+        mut block_body: UBlockBody<'m>,
         scope_source: ScopeSource<'s, 'm>,
     ) -> UnifierResult<UnifiedBlock<'m>> {
-        debug!("unify_u_block {body:?}");
+        debug!("unify_u_block {block_body:?}");
 
-        let mut nodes = vec![];
-        nodes.extend(self.unify_u_block_subscopes(body, scope_source)?);
+        if block_body.sub_scoping.len() == 1
+            && block_body.nodes.is_empty()
+            && block_body.dependent_scopes.is_empty()
+        {
+            match &scope_source {
+                ScopeSource::Absent => debug!("unify_u_block(1) Absent scope"),
+                ScopeSource::Block(..) => debug!("unify_u_block(1) Block scope"),
+                ScopeSource::Node(..) => debug!("unify_u_block(1) Node scope"),
+            }
 
-        let binder = match scope_source {
-            ScopeSource::Absent => None,
-            ScopeSource::Node(scope_node) => match self.classify_scoping(scope_node)? {
-                Scoping::Binder(binder) => Some(binder),
-                _ => None,
-            },
-            ScopeSource::Block(typed_binder, _) => Some(typed_binder),
-        };
+            // let (subscope_idx, sub_block) = body.sub_scoping.pop_first().unwrap();
+            let unit_type = self.unit_type();
+            let unified_node = self.unify2(
+                UNode {
+                    kind: UNodeKind::Block(BlockUNodeKind::Raw, block_body),
+                    free_variables: Default::default(),
+                    meta: Meta {
+                        ty: unit_type,
+                        span: SourceSpan::none(),
+                    },
+                },
+                scope_source,
+            )?;
 
-        nodes.extend(self.unify_u_block_nodes(body, scope_source)?.block.0);
+            Ok(UnifiedBlock {
+                binder: unified_node.binder,
+                block: Block(vec![unified_node.node]),
+            })
+        } else {
+            let mut nodes = vec![];
 
-        Ok(UnifiedBlock {
-            binder,
-            block: Block(nodes),
-        })
+            let binder = match scope_source {
+                ScopeSource::Absent => None,
+                ScopeSource::Node(scope_node) => match self.classify_scoping(scope_node)? {
+                    Scoping::Binder(binder) => Some(binder),
+                    _ => None,
+                },
+                ScopeSource::Block(typed_binder, _) => Some(typed_binder),
+            };
+
+            nodes.extend(self.unify_u_block_subscopes(&mut block_body, scope_source)?);
+            nodes.extend(
+                self.unify_u_block_nodes(&mut block_body, scope_source)?
+                    .block
+                    .0,
+            );
+
+            warn!("untested(2)!");
+
+            Ok(UnifiedBlock {
+                binder,
+                block: Block(nodes),
+            })
+        }
     }
 
     fn unify_u_block_subscopes(
@@ -283,6 +343,8 @@ impl<'s, 'm> Unifier<'s, 'm> {
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let unit_type = self.unit_type();
         let mut output = vec![];
+
+        debug!("sub scoping len: {}", body.sub_scoping.len());
 
         for (subscope_idx, mut sub_body) in std::mem::take(&mut body.sub_scoping) {
             let subscope = scope_source.subscope(subscope_idx);
@@ -344,19 +406,26 @@ impl<'s, 'm> Unifier<'s, 'm> {
 
         match kind {
             NodeKind::VariableRef(var) => {
-                debug!("unify_scoping({debug_index:?}, VariableRef)");
+                debug!("classify_scoping(VariableRef)");
                 Ok(Scoping::Binder(TypedBinder {
                     variable: *var,
                     ty: meta.ty,
                 }))
             }
             NodeKind::Unit => {
-                debug!("unify_scoping({debug_index:?}, Unit)");
+                debug!("classify_scoping(Unit)");
                 Ok(Scoping::Complete)
             }
             NodeKind::Int(_int) => panic!("Int in scoping"),
-            NodeKind::Call(proc, args) => Ok(Scoping::InvertCall(*proc, args, meta)),
-            NodeKind::Map(arg) => self.classify_scoping(arg),
+            NodeKind::Call(proc, args) => {
+                debug!("classify_scoping(Call)");
+                Ok(Scoping::InvertCall(*proc, args, meta))
+            }
+            NodeKind::Map(arg) => {
+                debug!("classify_scoping(Map)...");
+                let inner = self.classify_scoping(arg)?;
+                Ok(Scoping::SubScope(0, Box::new(inner)))
+            }
             NodeKind::Let(..) => {
                 unimplemented!("BUG: Let is an output node")
             }
