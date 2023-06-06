@@ -12,6 +12,8 @@ mod tagged_node;
 mod u_node;
 mod unification_tree;
 mod unified_target_node;
+mod unifier2_call_scope;
+mod unifier2_prop_scope;
 mod var_path;
 
 #[derive(Debug)]
