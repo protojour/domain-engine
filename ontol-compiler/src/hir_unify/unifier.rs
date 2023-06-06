@@ -12,7 +12,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    hir_unify::var_path::locate_variables,
+    hir_unify::{unifier2::ScopeSource, var_path::locate_variables},
     mem::Intern,
     typed_hir::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirKind, TypedHirNode},
     types::{Type, TypeRef, Types},
@@ -70,7 +70,7 @@ pub fn unify_to_function<'m>(
                 next_variable: var_tracker.next_variable(),
                 types: &mut compiler.types,
             }
-            .unify2(u_node, Some(&scope_source))?;
+            .unify2(u_node, ScopeSource::Node(&scope_source))?;
 
             let hir_func = match unified2.binder {
                 Some(arg) => {

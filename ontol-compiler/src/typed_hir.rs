@@ -76,7 +76,7 @@ impl<'m> Display for HirFunc<'m> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TypedBinder<'m> {
     pub variable: Variable,
     pub ty: TypeRef<'m>,

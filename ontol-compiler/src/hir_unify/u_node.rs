@@ -70,11 +70,27 @@ pub enum BlockUNodeKind<'m> {
     Let(ontol_hir::Binder, Box<UNode<'m>>),
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct UBlockBody<'m> {
     pub sub_scoping: BTreeMap<usize, UBlockBody<'m>>,
     pub nodes: Vec<UNode<'m>>,
     pub dependent_scopes: Vec<UBlockBody<'m>>,
+}
+
+impl<'m> Debug for UBlockBody<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut dbg = f.debug_struct("UBlockBody");
+        if !self.sub_scoping.is_empty() {
+            dbg.field("sub_scoping", &self.sub_scoping);
+        }
+        if !self.nodes.is_empty() {
+            dbg.field("nodes", &self.nodes);
+        }
+        if !self.dependent_scopes.is_empty() {
+            dbg.field("DEPS", &self.dependent_scopes);
+        }
+        dbg.finish()
+    }
 }
 
 #[derive(Debug)]
