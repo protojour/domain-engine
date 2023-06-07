@@ -11,6 +11,22 @@ use crate::typed_hir::{TypedHir, TypedHirNode};
 
 use super::UnifierError;
 
+#[derive(Clone, Copy)]
+pub enum NodeRef<'s, 'm> {
+    Node(&'s TypedHirNode<'m>),
+    Variant(&'s kind::PropVariant<'m, TypedHir>),
+    MatchArm(&'s kind::MatchArm<'m, TypedHir>),
+    PatternBinding(kind::PatternBinding),
+}
+
+#[derive(Clone, Copy)]
+pub struct ChildRef<'s, 'm> {
+    parent: NodeRef<'s, 'm>,
+    child: usize,
+}
+
+pub type NodePath<'s, 'm> = SmallVec<[ChildRef<'s, 'm>; 16]>;
+
 pub type Path = SmallVec<[u16; 32]>;
 
 #[derive(Clone)]
@@ -31,53 +47,84 @@ pub fn locate_variables<'s, 'm, 'b>(
 ) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
     let mut locator = VarLocator::new(node, variables);
     locator.traverse_kind(node.kind());
-    locator.finish()
+    locator.var_paths()
+}
+
+pub fn variable_node_paths<'s, 'm, 'b>(
+    node: &'s TypedHirNode<'m>,
+    variables: &'b BitSet,
+) -> Result<FnvHashMap<Variable, NodePath<'s, 'm>>, UnifierError> {
+    let mut locator = VarLocator::new(node, variables);
+    locator.traverse_kind(node.kind());
+    locator.node_paths()
 }
 
 struct VarLocator<'s, 'm, 'b> {
     root: &'s TypedHirNode<'m>,
+    parent: NodeRef<'s, 'm>,
     variables: &'b BitSet,
     current_path: Path,
-    option_depth: u16,
+    current_node_path: NodePath<'s, 'm>,
 
     duplicates: BitSet,
-    output: FnvHashMap<Variable, VarPath<'s, 'm>>,
+    var_paths: FnvHashMap<Variable, VarPath<'s, 'm>>,
+    node_paths: FnvHashMap<Variable, NodePath<'s, 'm>>,
 }
 
 impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
-    fn finish(self) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
+    fn var_paths(self) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
         if !self.duplicates.is_empty() {
             Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
         } else {
-            Ok(self.output)
+            Ok(self.var_paths)
+        }
+    }
+
+    fn node_paths(self) -> Result<FnvHashMap<Variable, NodePath<'s, 'm>>, UnifierError> {
+        if !self.duplicates.is_empty() {
+            Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
+        } else {
+            Ok(self.node_paths)
         }
     }
 
     pub(super) fn new(root: &'s TypedHirNode<'m>, variables: &'b BitSet) -> Self {
         Self {
             root,
+            parent: NodeRef::Node(root),
             variables,
             current_path: Path::default(),
-            option_depth: 0,
+            current_node_path: NodePath::default(),
             duplicates: BitSet::new(),
-            output: FnvHashMap::default(),
+            var_paths: FnvHashMap::default(),
+            node_paths: FnvHashMap::default(),
         }
     }
 
-    fn enter_child(&mut self, index: usize, func: impl FnOnce(&mut Self)) {
-        if self.option_depth > 1 {
-            func(self);
-        } else {
-            self.current_path.push(index as u16);
-            func(self);
-            self.current_path.pop();
-        }
+    fn enter_child(
+        &mut self,
+        index: usize,
+        mut node: NodeRef<'s, 'm>,
+        func: impl FnOnce(&mut Self),
+    ) {
+        self.current_node_path.push(ChildRef {
+            parent: self.parent,
+            child: index,
+        });
+        self.current_path.push(index as u16);
+        std::mem::swap(&mut self.parent, &mut node);
+
+        func(self);
+
+        std::mem::swap(&mut node, &mut self.parent);
+        self.current_path.pop();
+        self.current_node_path.pop();
     }
 
     fn register_var(&mut self, var: u32) {
         if self.variables.contains(var as usize)
             && self
-                .output
+                .var_paths
                 .insert(
                     Variable(var),
                     VarPath {
@@ -89,10 +136,25 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
         {
             self.duplicates.insert(var as usize);
         }
+
+        if self.variables.contains(var as usize)
+            && self
+                .node_paths
+                .insert(Variable(var), self.current_node_path.clone())
+                .is_some()
+        {
+            self.duplicates.insert(var as usize);
+        }
     }
 }
 
-impl<'s, 'm, 'b> HirVisitor<'m, TypedHir> for VarLocator<'s, 'm, 'b> {
+impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
+    fn visit_node(&mut self, index: usize, node: &'s TypedHirNode<'m>) {
+        self.enter_child(index, NodeRef::Node(node), |zelf| {
+            zelf.visit_kind(index, node.kind())
+        });
+    }
+
     fn visit_variable(&mut self, variable: &Variable) {
         self.register_var(variable.0);
     }
@@ -101,43 +163,27 @@ impl<'s, 'm, 'b> HirVisitor<'m, TypedHir> for VarLocator<'s, 'm, 'b> {
         self.register_var(label.0);
     }
 
-    fn visit_kind(&mut self, index: usize, kind: &kind::NodeKind<'m, TypedHir>) {
-        self.enter_child(index, |_self| _self.traverse_kind(kind));
-    }
-
     fn visit_prop(
         &mut self,
-        optional: &kind::Optional,
-        struct_var: &Variable,
-        id: &PropertyId,
-        variants: &Vec<kind::PropVariant<'m, TypedHir>>,
+        optional: &'s kind::Optional,
+        struct_var: &'s Variable,
+        id: &'s PropertyId,
+        variants: &'s Vec<kind::PropVariant<'m, TypedHir>>,
     ) {
-        if optional.0 {
-            // self.option_depth += 1;
-            if self.option_depth >= 2 {
-                let leaf = self.current_path.pop().unwrap();
-                self.traverse_prop(struct_var, id, variants);
-                self.current_path.push(leaf);
-            } else {
-                self.traverse_prop(struct_var, id, variants);
-            }
-            // self.option_depth -= 1;
-        } else {
-            self.traverse_prop(struct_var, id, variants);
-        }
+        self.traverse_prop(struct_var, id, variants);
     }
 
-    fn visit_prop_variant(&mut self, index: usize, variant: &kind::PropVariant<'m, TypedHir>) {
-        self.enter_child(index, |_self| {
+    fn visit_prop_variant(&mut self, index: usize, variant: &'s kind::PropVariant<'m, TypedHir>) {
+        self.enter_child(index, NodeRef::Variant(variant), |zelf| {
             let kind::PropVariant { dimension, .. } = variant;
             match dimension {
                 kind::Dimension::Singular => {
-                    _self.traverse_prop_variant(variant);
+                    zelf.traverse_prop_variant(variant);
                 }
                 kind::Dimension::Seq(label) => {
                     // The search stops here for now, sequence mappings are black boxes,
                     // only register the label:
-                    _self.visit_label(label);
+                    zelf.visit_label(label);
                 }
             }
         });
@@ -146,13 +192,21 @@ impl<'s, 'm, 'b> HirVisitor<'m, TypedHir> for VarLocator<'s, 'm, 'b> {
     fn visit_match_arm(
         &mut self,
         index: usize,
-        match_arm: &ontol_hir::kind::MatchArm<'m, TypedHir>,
+        match_arm: &'s ontol_hir::kind::MatchArm<'m, TypedHir>,
     ) {
-        self.enter_child(index, |_self| _self.traverse_match_arm(match_arm));
+        self.enter_child(index, NodeRef::MatchArm(match_arm), |zelf| {
+            zelf.traverse_match_arm(match_arm)
+        });
     }
 
-    fn visit_pattern_binding(&mut self, index: usize, binding: &ontol_hir::kind::PatternBinding) {
-        self.enter_child(index, |_self| _self.traverse_pattern_binding(binding));
+    fn visit_pattern_binding(
+        &mut self,
+        index: usize,
+        binding: &'s ontol_hir::kind::PatternBinding,
+    ) {
+        self.enter_child(index, NodeRef::PatternBinding(*binding), |zelf| {
+            zelf.traverse_pattern_binding(binding)
+        });
     }
 }
 

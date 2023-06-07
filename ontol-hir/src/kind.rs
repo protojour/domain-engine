@@ -95,7 +95,7 @@ pub enum PropPattern {
     Absent,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum PatternBinding {
     Wildcard,
     Binder(Variable),

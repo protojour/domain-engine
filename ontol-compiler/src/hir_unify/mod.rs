@@ -28,7 +28,7 @@ struct VariableTracker {
     largest: Variable,
 }
 
-impl<'a> HirVisitor<'a, TypedHir> for VariableTracker {
+impl<'s, 'm: 's> HirVisitor<'s, 'm, TypedHir> for VariableTracker {
     fn visit_variable(&mut self, variable: &Variable) {
         self.observe(*variable);
     }
