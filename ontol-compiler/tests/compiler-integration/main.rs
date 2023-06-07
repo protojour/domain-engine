@@ -2,6 +2,7 @@ mod errors;
 mod hir;
 mod serde;
 mod test_conduit;
+mod test_demo;
 mod test_entity;
 mod test_faker;
 mod test_geojson;

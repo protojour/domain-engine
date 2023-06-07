@@ -1,0 +1,95 @@
+// -----------------------------------
+// database
+
+type archive_item_id {
+    fmt '' => 'archive_item/' => uuid => _
+}
+type archive_group_id {
+    fmt '' => 'archive_group/' => uuid => _
+}
+type item_type {
+    rel _ is?: 'worthless junk'
+    rel _ is?: 'ancient treasure'
+    rel _ is?: 'alien artifact'
+}
+type archive_item {
+    rel archive_item_id identifies: _
+    rel _ 'created': datetime
+    rel _ 'updated': datetime
+    rel _ 'archived': datetime
+    rel _ 'name': string
+    rel _ 'description': string
+    rel _ 'asset_score': int
+    rel _ 'type': item_type
+}
+type archive_group {
+    rel archive_group_id identifies: _
+    rel _ 'created': datetime
+    rel _ 'updated': datetime
+    rel _ 'archived': datetime
+    rel _ 'name': string
+    rel _ 'description': string
+    rel _ 'start_date': datetime
+    rel _ 'end_date': datetime
+    rel [_] 'archive_items'::'archive_groups' [archive_item]
+}
+
+// -----------------------------------
+// public API
+
+/// ID for an Archive Object
+pub type ArchiveObjectID {
+    fmt '' => 'archive_item/' => uuid => _
+}
+/// ID for an Archive Collection
+pub type ArchiveCollectionID {
+    fmt '' => 'archive_group/' => uuid => _
+}
+/// Common dates for Archive entities
+type ArchiveDates {
+    rel _ 'createdAt': datetime
+    rel _ 'updatedAt': datetime
+    rel _ 'archivedAt': datetime
+}
+/// An Archived Object
+pub type ArchiveObject {
+    rel ArchiveObjectID identifies: _
+    rel _ 'dates': ArchiveDates
+    rel _ 'name': string
+    rel _ 'description': string
+    rel _ 'assetScoreSquared': int
+    rel _ 'kind': item_type
+}
+/// An Archived Object Collection
+pub type ArchiveCollection {
+    rel ArchiveCollectionID identifies: _
+    rel _ 'dates': ArchiveDates
+    rel _ 'name': string
+    rel _ 'description'?: string
+    rel _ 'startDate': datetime
+    rel _ 'endDate': datetime
+    rel [_] 'archiveItems'::'archiveGroups' [ArchiveObject]
+}
+
+map {
+    archive_item {
+        'created': cr
+        'updated':  up
+        'archived': ar
+        'name': n
+        'description': d
+        'asset_score': s
+        'type': t
+    }
+    ArchiveObject {
+        'dates': ArchiveDates {
+            'createdAt': cr
+            'updatedAt': up
+            'archivedAt': ar
+        }
+        'name': n
+        'description': d
+        'assetScoreSquared': s * s
+        'kind': t
+    }
+}

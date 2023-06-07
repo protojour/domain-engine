@@ -390,7 +390,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             vec![prop_variant, PropVariant::Absent]
                                         } else {
                                             ctx.partial = true;
-                                            panic!("partial unification");
+                                            self.error(CompileError::TODO("required to be optional?".into()), &expr.span);
+                                            vec![]
                                         }
                                     }
                                 };
