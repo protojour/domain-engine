@@ -6,6 +6,7 @@ use ontol_test_utils::{TestCompile, TestEnv};
 use unimock::*;
 
 mod test_graphql_basic;
+mod test_graphql_demo;
 mod test_graphql_input;
 
 trait TestCompileSchema {

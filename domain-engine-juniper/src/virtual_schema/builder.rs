@@ -251,6 +251,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
                         let mut type_variants = vec![];
 
+                        let mut needs_scalar = false;
+
                         for variant in variants {
                             match classify_type(self.env, variant.operator_id) {
                                 TypeClassification::Type(_, def_id, _operator_id) => {
@@ -265,7 +267,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 }
                                 TypeClassification::Id => {}
                                 TypeClassification::NativeScalar => {
-                                    panic!("BUG: Scalar in union");
+                                    needs_scalar = true;
                                 }
                             }
                         }
@@ -282,10 +284,16 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 partial_input_typename: Some(
                                     self.namespace.union_partial_input(type_info),
                                 ),
-                                kind: TypeKind::Union(UnionData {
-                                    union_def_id: type_info.def_id,
-                                    variants: type_variants,
-                                }),
+                                kind: if needs_scalar {
+                                    TypeKind::CustomScalar(ScalarData {
+                                        serde_operator_id: operator_id,
+                                    })
+                                } else {
+                                    TypeKind::Union(UnionData {
+                                        union_def_id: type_info.def_id,
+                                        variants: type_variants,
+                                    })
+                                },
                             },
                         )
                     }
