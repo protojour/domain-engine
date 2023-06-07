@@ -380,21 +380,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 },
                             };
 
-                            let prop_variants: Vec<PropVariant<'_, TypedHir>> =
-                                match match_property.cardinality.0 {
-                                    PropertyCardinality::Mandatory => {
-                                        vec![prop_variant]
+                            let prop_variants: Vec<PropVariant<'_, TypedHir>> = match match_property
+                                .cardinality
+                                .0
+                            {
+                                PropertyCardinality::Mandatory => {
+                                    vec![prop_variant]
+                                }
+                                PropertyCardinality::Optional => {
+                                    if *bind_option {
+                                        vec![prop_variant, PropVariant::Absent]
+                                    } else {
+                                        ctx.partial = true;
+                                        self.error(
+                                            CompileError::TODO("required to be optional?".into()),
+                                            &expr.span,
+                                        );
+                                        vec![]
                                     }
-                                    PropertyCardinality::Optional => {
-                                        if *bind_option {
-                                            vec![prop_variant, PropVariant::Absent]
-                                        } else {
-                                            ctx.partial = true;
-                                            self.error(CompileError::TODO("required to be optional?".into()), &expr.span);
-                                            vec![]
-                                        }
-                                    }
-                                };
+                                }
+                            };
 
                             hir_props.push(TypedHirNode {
                                 kind: NodeKind::Prop(
