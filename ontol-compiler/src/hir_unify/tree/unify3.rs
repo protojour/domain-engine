@@ -4,6 +4,7 @@ use ontol_hir::kind::{
     Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
 };
 use ontol_runtime::DefId;
+use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -114,101 +115,13 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     meta: expr.meta,
                 },
             }),
-            // ### "swizzling" cases:
+            // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
-                let mut scope_idx_table: FnvHashMap<ontol_hir::Var, usize> = Default::default();
-
-                for (idx, scope_prop) in struct_scope.1.iter().enumerate() {
-                    for var in &scope_prop.vars {
-                        if let Some(_) = scope_idx_table.insert(var, idx) {
-                            return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));
-                        }
-                    }
-                }
-
-                let mut scoped_props: FnvHashMap<usize, Vec<expr::Prop>> = Default::default();
-                let mut root_scope_indexes = BitSet::new();
-                let mut merged_scope_indexes = BitSet::new();
-                let mut child_scope_table: FnvHashMap<usize, BitSet> = Default::default();
-                let mut constant_props: Vec<expr::Prop> = vec![];
-
-                for expr_prop in struct_expr.1 {
-                    let mut free_var_iter = expr_prop.free_vars.iter();
-                    if let Some(first_free_var) = free_var_iter.next() {
-                        let first_scope_idx = *scope_idx_table.get(&first_free_var).unwrap();
-                        root_scope_indexes.insert(first_scope_idx);
-
-                        for free_var in free_var_iter {
-                            let scope_idx = *scope_idx_table.get(&free_var).unwrap();
-                            if !expr_prop.optional.0 {
-                                merged_scope_indexes.insert(scope_idx);
-                            }
-                            child_scope_table
-                                .entry(first_scope_idx)
-                                .or_default()
-                                .insert(scope_idx);
-                        }
-
-                        scoped_props
-                            .entry(first_scope_idx)
-                            .or_default()
-                            .push(expr_prop);
-                    } else {
-                        constant_props.push(expr_prop);
-                    }
-                }
-
-                let mut input_scopes_by_idx: FnvHashMap<usize, scope::Prop> =
-                    struct_scope.1.into_iter().enumerate().collect();
-
-                let mut nodes = vec![];
-
-                for scope_idx in root_scope_indexes.iter() {
-                    if merged_scope_indexes.contains(scope_idx) {
-                        continue;
-                    }
-
-                    let root_scope = input_scopes_by_idx.remove(&scope_idx).unwrap();
-                    let mut sub_scoped_props = vec![];
-
-                    let mut merged_props = vec![];
-                    if let Some(props) = scoped_props.remove(&scope_idx) {
-                        merged_props.extend(props);
-                    }
-
-                    if let Some(child_scope_indexes) = child_scope_table.remove(&scope_idx) {
-                        for child_scope_idx in child_scope_indexes.into_iter() {
-                            let child_scope = if merged_scope_indexes.contains(child_scope_idx) {
-                                // "safe" to remove, since it is fully merged
-                                input_scopes_by_idx.remove(&child_scope_idx)
-                            } else {
-                                input_scopes_by_idx.get(&child_scope_idx).cloned()
-                            }
-                            .unwrap();
-
-                            // sub_scoped_props.push(child_scope.unwrap());
-
-                            if let Some(props) = scoped_props.remove(&child_scope_idx) {
-                                if !props.is_empty() {
-                                    sub_scoped_props.push(ScopedProps {
-                                        scope: child_scope,
-                                        props,
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    if !merged_props.is_empty() {
-                        nodes.push(self.unify_merged_prop_scope(
-                            ScopedProps {
-                                scope: root_scope,
-                                props: merged_props,
-                            },
-                            sub_scoped_props,
-                        )?);
-                    }
-                }
+                let prop_hiearchy = PropHierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
+                let nodes = prop_hiearchy
+                    .into_iter()
+                    .map(|level| self.unify_merged_prop_scope(level))
+                    .collect::<Result<_, _>>()?;
 
                 Ok(UnifiedNode3 {
                     typed_binder: Some(TypedBinder {
@@ -272,22 +185,22 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unify_merged_prop_scope(
         &mut self,
-        root: ScopedProps<'m>,
-        sub_props: Vec<ScopedProps<'m>>,
+        level: PropHierarchy<'m>,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let prop_exprs: Vec<_> = root
+        let prop_exprs: Vec<_> = level
             .props
             .into_iter()
             .map(|prop| self.mk_prop_expr(prop))
             .collect();
 
-        let sub_nodes = sub_props
+        let sub_nodes = level
+            .children
             .into_iter()
-            .map(|sub_scope| self.unify_merged_prop_scope(sub_scope, vec![]))
+            .map(|sub_level| self.unify_merged_prop_scope(sub_level))
             .collect::<Result<Vec<_>, _>>()?;
 
         // FIXME: re-grouped match arms
-        let match_arm: MatchArm<_> = match root.scope.kind {
+        let match_arm: MatchArm<_> = match level.scope.kind {
             scope::PropKind::Attr(rel_scope, val_scope) => {
                 let hir_rel_binding = rel_scope.hir_pattern_binding();
                 let hir_val_binding = val_scope.hir_pattern_binding();
@@ -322,7 +235,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
         let mut match_arms = vec![match_arm];
 
-        if root.scope.optional.0 {
+        if level.scope.optional.0 {
             match_arms.push(MatchArm {
                 pattern: PropPattern::Absent,
                 nodes: vec![],
@@ -330,7 +243,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         }
 
         Ok(TypedHirNode {
-            kind: NodeKind::MatchProp(root.scope.struct_var, root.scope.prop_id, match_arms),
+            kind: NodeKind::MatchProp(level.scope.struct_var, level.scope.prop_id, match_arms),
             meta: Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
                 span: SourceSpan::none(),
@@ -377,5 +290,125 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unit_type(&mut self) -> TypeRef<'m> {
         self.types.intern(Type::Unit(DefId::unit()))
+    }
+}
+
+struct PropHierarchy<'m> {
+    scope: scope::Prop<'m>,
+    props: Vec<expr::Prop<'m>>,
+    children: Vec<PropHierarchy<'m>>,
+}
+
+struct PropHierarchyBuilder<'m> {
+    scope_props_by_index: FnvHashMap<usize, scope::Prop<'m>>,
+    scope_index_by_var: FnvHashMap<ontol_hir::Var, usize>,
+}
+
+impl<'m> PropHierarchyBuilder<'m> {
+    fn new(scope_props: Vec<scope::Prop<'m>>) -> UnifierResult<Self> {
+        let mut scope_routing_table = FnvHashMap::default();
+
+        for (idx, scope_prop) in scope_props.iter().enumerate() {
+            for var in &scope_prop.vars {
+                if let Some(_) = scope_routing_table.insert(var, idx) {
+                    return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));
+                }
+            }
+        }
+
+        Ok(Self {
+            scope_props_by_index: scope_props.into_iter().enumerate().collect(),
+            scope_index_by_var: scope_routing_table,
+        })
+    }
+
+    fn build(mut self, expr_props: Vec<expr::Prop<'m>>) -> Vec<PropHierarchy<'m>> {
+        let mut scope_assignments: FnvHashMap<usize, Vec<expr::Prop>> = Default::default();
+        let mut scope_routing_table: FnvHashMap<ontol_hir::Var, usize> =
+            self.scope_index_by_var.clone();
+
+        // TODO: Return constant props!
+        let mut constant_props: Vec<expr::Prop> = vec![];
+
+        for expr_prop in expr_props {
+            let mut free_var_iter = expr_prop.free_vars.iter();
+            if let Some(first_free_var) = free_var_iter.next() {
+                let scope_idx = scope_routing_table.get(&first_free_var).cloned().unwrap();
+
+                if !expr_prop.optional.0 {
+                    // re-route all following to the current match arm (scope arm)
+                    for next_free_var in free_var_iter {
+                        scope_routing_table.insert(next_free_var, scope_idx);
+                    }
+                }
+
+                scope_assignments
+                    .entry(scope_idx)
+                    .or_default()
+                    .push(expr_prop);
+            } else {
+                constant_props.push(expr_prop);
+            }
+        }
+
+        if !constant_props.is_empty() {
+            todo!("Constant props!");
+        }
+
+        scope_assignments
+            .into_iter()
+            .map(|(scope_index, expr_props)| {
+                let in_scope = self
+                    .scope_props_by_index
+                    .get(&scope_index)
+                    .unwrap()
+                    .vars
+                    .clone();
+
+                self.build_sub_hierarchy(expr_props, scope_index, in_scope)
+            })
+            .collect()
+    }
+
+    fn build_sub_hierarchy(
+        &mut self,
+        expr_props: Vec<expr::Prop<'m>>,
+        scope_index: usize,
+        in_scope: VarSet,
+    ) -> PropHierarchy<'m> {
+        let mut in_scope_props = vec![];
+        let mut sub_groups: FnvHashMap<ontol_hir::Var, Vec<expr::Prop>> = Default::default();
+
+        for expr_prop in expr_props {
+            let mut difference = expr_prop.free_vars.0.difference(&in_scope.0);
+
+            if let Some(unscoped_var) = difference.next() {
+                sub_groups
+                    .entry(ontol_hir::Var(unscoped_var as u32))
+                    .or_default()
+                    .push(expr_prop);
+            } else {
+                in_scope_props.push(expr_prop);
+            }
+        }
+
+        let children = sub_groups
+            .into_iter()
+            .map(|(var, sub_props)| {
+                // put one more variable in scope
+                let mut sub_in_scope = in_scope.clone();
+                sub_in_scope.0.insert(var.0 as usize);
+
+                let sub_scope_index = *self.scope_index_by_var.get(&var).unwrap();
+
+                self.build_sub_hierarchy(sub_props, sub_scope_index, sub_in_scope)
+            })
+            .collect();
+
+        PropHierarchy {
+            scope: self.scope_props_by_index.get(&scope_index).unwrap().clone(),
+            props: in_scope_props,
+            children,
+        }
     }
 }

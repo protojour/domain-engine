@@ -5,6 +5,7 @@ use ontol_hir::{
 };
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use pretty_assertions::assert_eq;
+use test_log::test;
 
 use crate::{
     hir_unify::{
@@ -154,7 +155,31 @@ fn test_trees<'m>(
                     disjoint_group: 1,
                     kind: scope::PropKind::Attr(
                         scope::PatternBinding::Wildcard,
-                        scope::PatternBinding::Scope(Var(5), ().into()),
+                        scope::PatternBinding::Scope(
+                            Var(5),
+                            scope::Let {
+                                outer_binder: None,
+                                inner_binder: Binder(Var(1)),
+                                def: TypedHirNode {
+                                    kind: NodeKind::Call(
+                                        BuiltinProc::Sub,
+                                        vec![
+                                            TypedHirNode {
+                                                kind: NodeKind::Var(Var(5)),
+                                                meta: meta(),
+                                            },
+                                            TypedHirNode {
+                                                kind: NodeKind::Int(10),
+                                                meta: meta(),
+                                            },
+                                        ],
+                                    ),
+                                    meta: meta(),
+                                },
+                                sub_scope: Box::new(().into()),
+                            }
+                            .into(),
+                        ),
                     ),
                     vars: [Var(1)].into(),
                 },
@@ -224,7 +249,6 @@ fn test_unify3(provider: impl Fn(&()) -> (scope::Scope<'_>, expr::Expr<'_>)) -> 
     out_str
 }
 
-// BUG: wrong
 #[test]
 fn unify3_1_mandatory() {
     let output = test_unify3(|_| test_trees(Optional(false), Optional(false)));
@@ -233,16 +257,18 @@ fn unify3_1_mandatory() {
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (- $e 10))
-                        (prop $d O:2:2
-                            (#u (+ $a $b))
-                        )
                         (prop $d O:3:3
                             (#u (+ $a 20))
                         )
                         (match-prop $c S:1:1
                             (($_ $f)
-                                (prop $d O:4:4
-                                    (#u (+ $b 20))
+                                (let ($b (- $f 10))
+                                    (prop $d O:2:2
+                                        (#u (+ $a $b))
+                                    )
+                                    (prop $d O:4:4
+                                        (#u (+ $b 20))
+                                    )
                                 )
                             )
                         )
@@ -254,25 +280,33 @@ fn unify3_1_mandatory() {
     assert_eq!(expected, output);
 }
 
-// BUG: wrong
 #[test]
 fn unify3_1_option() {
     let output = test_unify3(|_| test_trees(Optional(true), Optional(true)));
     let expected = indoc! {"
         |$c| (struct ($d)
+            (match-prop $c S:1:1
+                (($_ $f)
+                    (let ($b (- $f 10))
+                        (prop $d O:4:4
+                            (#u (+ $b 20))
+                        )
+                    )
+                )
+                (())
+            )
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (- $e 10))
-                        (prop $d O:2:2
-                            (#u (+ $a $b))
-                        )
                         (prop $d O:3:3
                             (#u (+ $a 20))
                         )
                         (match-prop $c S:1:1
                             (($_ $f)
-                                (prop $d O:4:4
-                                    (#u (+ $b 20))
+                                (let ($b (- $f 10))
+                                    (prop $d O:2:2
+                                        (#u (+ $a $b))
+                                    )
                                 )
                             )
                             (())
