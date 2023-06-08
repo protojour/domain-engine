@@ -3,7 +3,7 @@ use std::fmt::Display;
 use ontol_hir::{
     display::{Print, Printer, Sep},
     kind::NodeKind,
-    Variable,
+    Var,
 };
 
 use crate::{
@@ -78,6 +78,6 @@ impl<'m> Display for HirFunc<'m> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct TypedBinder<'m> {
-    pub variable: Variable,
+    pub variable: Var,
     pub ty: TypeRef<'m>,
 }

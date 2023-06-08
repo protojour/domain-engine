@@ -20,7 +20,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
     pub(super) fn unify_prop_scope(
         &mut self,
         optional: Optional,
-        struct_var: ontol_hir::Variable,
+        struct_var: ontol_hir::Var,
         property_id: PropertyId,
         variants: &'s [PropVariant<'m, TypedHir>],
         scope_meta: Meta<'m>,

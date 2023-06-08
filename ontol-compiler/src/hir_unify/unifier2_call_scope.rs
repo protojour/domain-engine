@@ -35,7 +35,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
 
         let binder_var = self.alloc_var();
         let inner_expr = TypedHirNode {
-            kind: TypedHirKind::VariableRef(binder_var),
+            kind: TypedHirKind::Var(binder_var),
             meta: scope_meta,
         };
         let inverted_call =
@@ -90,7 +90,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         let pivot_arg = &scope_args[subscope_idx];
 
         match &pivot_arg.kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 inverted_args.insert(subscope_idx, inner_expr);
                 let u_node = match next_sub_scoping {
                     CallSubScoping::Node(u_node) => u_node,

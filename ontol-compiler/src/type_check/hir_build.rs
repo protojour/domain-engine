@@ -203,7 +203,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(expected_ty) => {
                         let variable = explicit_variable.variable;
                         let variable_ref = TypedHirNode {
-                            kind: NodeKind::VariableRef(variable),
+                            kind: NodeKind::Var(variable),
                             meta: Meta {
                                 ty: expected_ty,
                                 span: expr.span,

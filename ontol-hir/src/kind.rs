@@ -2,13 +2,13 @@ use std::ops::Index;
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
-use crate::{Binder, Label, Lang, Node, Variable};
+use crate::{Binder, Label, Lang, Node, Var};
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
 #[derive(Clone)]
 pub enum NodeKind<'a, L: Lang> {
-    VariableRef(Variable),
+    Var(Var),
     Unit,
     Int(i64),
     Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
@@ -16,11 +16,11 @@ pub enum NodeKind<'a, L: Lang> {
     Map(Box<L::Node<'a>>),
     Seq(Label, Attribute<Box<L::Node<'a>>>),
     Struct(Binder, Nodes<'a, L>),
-    Prop(Optional, Variable, PropertyId, Vec<PropVariant<'a, L>>),
-    MatchProp(Variable, PropertyId, Vec<MatchArm<'a, L>>),
-    Gen(Variable, IterBinder, Nodes<'a, L>),
-    Iter(Variable, IterBinder, Nodes<'a, L>),
-    Push(Variable, Attribute<Box<L::Node<'a>>>),
+    Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
+    MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
+    Gen(Var, IterBinder, Nodes<'a, L>),
+    Iter(Var, IterBinder, Nodes<'a, L>),
+    Push(Var, Attribute<Box<L::Node<'a>>>),
 }
 
 impl<'a, L: Lang> Node<'a, L> for NodeKind<'a, L> {
@@ -48,10 +48,23 @@ pub enum Dimension {
     Seq(Label),
 }
 
-#[derive(Clone)]
+/// An attribute existing of (relation parameter, value)
+#[derive(Clone, Debug)]
 pub struct Attribute<T> {
     pub rel: T,
     pub val: T,
+}
+
+impl<R, V, T> From<(R, V)> for Attribute<T>
+where
+    T: From<R> + From<V>,
+{
+    fn from((rel, val): (R, V)) -> Self {
+        Self {
+            rel: rel.into(),
+            val: val.into(),
+        }
+    }
 }
 
 impl<T> Index<usize> for Attribute<T> {
@@ -98,7 +111,7 @@ pub enum PropPattern {
 #[derive(Clone, Copy, Debug)]
 pub enum PatternBinding {
     Wildcard,
-    Binder(Variable),
+    Binder(Var),
 }
 
 #[derive(Clone)]

@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
     kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
-    Variable,
+    Var,
 };
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
@@ -84,7 +84,7 @@ pub(super) struct CodeGenerator<'a> {
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
 
-    scope: FnvHashMap<Variable, Local>,
+    scope: FnvHashMap<Var, Local>,
 }
 
 impl<'a> CodeGenerator<'a> {
@@ -92,7 +92,7 @@ impl<'a> CodeGenerator<'a> {
         let ty = node.meta.ty;
         let span = node.meta.span;
         match node.kind {
-            NodeKind::VariableRef(var) => match self.scope.get(&var) {
+            NodeKind::Var(var) => match self.scope.get(&var) {
                 Some(local) => {
                     self.builder
                         .append(block, Ir::Clone(*local), Stack(1), span);
@@ -377,7 +377,7 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn var_local(&self, var: Variable) -> Local {
+    fn var_local(&self, var: Var) -> Local {
         *self
             .scope
             .get(&var)

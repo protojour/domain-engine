@@ -44,7 +44,7 @@ impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirArmTypeInference<'c, 'm> {
 }
 
 pub(super) struct HirVariableMapper<'c, 'm> {
-    pub variable_mapping: &'c FnvHashMap<ontol_hir::Variable, VariableMapping<'m>>,
+    pub variable_mapping: &'c FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
     pub arm: Arm,
 }
 
@@ -52,7 +52,7 @@ impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
     fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
         self.visit_kind(index, &mut node.kind);
 
-        if let NodeKind::VariableRef(var) = &node.kind {
+        if let NodeKind::Var(var) = &node.kind {
             if let Some(var_mapping) = self.variable_mapping.get(var) {
                 let arm = self.arm;
                 let mapped_type = match arm {
@@ -61,7 +61,7 @@ impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
                 };
 
                 let variable_ref = TypedHirNode {
-                    kind: NodeKind::VariableRef(*var),
+                    kind: NodeKind::Var(*var),
                     meta: Meta {
                         ty: mapped_type,
                         span: node.meta.span,

@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 use kind::NodeKind;
 
@@ -10,22 +13,44 @@ pub mod parse;
 pub mod visitor;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Variable(pub u32);
+pub struct Var(pub u32);
 
-impl Debug for Variable {
+impl From<u32> for Var {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+impl Debug for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Variable({})", AsAlpha(self.0))
     }
 }
 
-impl Display for Variable {
+impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "${}", AsAlpha(self.0))
     }
 }
 
+impl FromStr for Var {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse::try_alpha_to_u32(s)
+            .map(|int| Var(int))
+            .map_err(|_| ())
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
-pub struct Binder(pub Variable);
+pub struct Binder(pub Var);
+
+impl From<Var> for Binder {
+    fn from(value: Var) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);

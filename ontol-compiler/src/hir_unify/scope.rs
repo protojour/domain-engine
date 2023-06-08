@@ -4,7 +4,7 @@ use crate::typed_hir::TypedHirNode;
 
 pub fn hir_subscope<'s, 'm>(hir: &'s TypedHirNode<'m>, index: usize) -> &'s TypedHirNode<'m> {
     match &hir.kind {
-        NodeKind::VariableRef(..) | NodeKind::Unit | NodeKind::Int(_) => panic!(),
+        NodeKind::Var(..) | NodeKind::Unit | NodeKind::Int(_) => panic!(),
         NodeKind::Let(_, definition, body) => {
             if index == 0 {
                 definition

@@ -45,7 +45,7 @@ impl<'m> UnifiedTargetNode<'m> {
                 children,
             }) => {
                 let kind = match kind {
-                    TaggedKind::VariableRef(var) => NodeKind::VariableRef(var),
+                    TaggedKind::VariableRef(var) => NodeKind::Var(var),
                     TaggedKind::Unit => NodeKind::Unit,
                     TaggedKind::Int(int) => NodeKind::Int(int),
                     TaggedKind::Call(proc) => NodeKind::Call(proc, children.into_hir()),

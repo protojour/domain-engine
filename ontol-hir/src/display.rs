@@ -30,7 +30,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
     fn print(self, sep: Sep, kind: &NodeKind<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         let indent = self.indent;
         match kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 write!(f, "{sep}{}", var)?;
                 Ok(sep.multiline())
             }

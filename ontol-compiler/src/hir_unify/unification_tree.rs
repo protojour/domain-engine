@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{kind::Optional, Binder, Variable};
+use ontol_hir::{kind::Optional, Binder, Var};
 use tracing::debug;
 
 use crate::typed_hir::Meta;
@@ -18,7 +18,7 @@ pub enum UnificationNode<'m> {
 }
 
 impl<'m> UnificationNode<'m> {
-    pub fn build(node: TaggedNode<'m>, variable_paths: &FnvHashMap<Variable, VarPath>) -> Self {
+    pub fn build(node: TaggedNode<'m>, variable_paths: &FnvHashMap<Var, VarPath>) -> Self {
         match &node.kind {
             TaggedKind::Struct(binder) => {
                 let mut struct_node = Struct {
@@ -32,7 +32,7 @@ impl<'m> UnificationNode<'m> {
                     if child
                         .free_variables
                         .iter()
-                        .any(|var| variable_paths.contains_key(&Variable(var as u32)))
+                        .any(|var| variable_paths.contains_key(&Var(var as u32)))
                     {
                         struct_node
                             .sub_scoping
@@ -85,7 +85,7 @@ impl<'m> Scoping<'m> {
     fn add_expr_under_scope(
         &mut self,
         expression: TaggedNode<'m>,
-        variable_paths: &FnvHashMap<Variable, VarPath>,
+        variable_paths: &FnvHashMap<Var, VarPath>,
     ) {
         match expression.kind {
             TaggedKind::Prop(Optional(true), ..) => {
@@ -110,14 +110,14 @@ impl<'m> Scoping<'m> {
     fn variables_sub_scoping_mut(
         &mut self,
         free_variables: &BitSet,
-        variable_paths: &FnvHashMap<Variable, VarPath>,
+        variable_paths: &FnvHashMap<Var, VarPath>,
     ) -> &mut Scoping<'m> {
         let mut scoping = self;
 
         {
             let mut path_iterator = free_variables
                 .iter()
-                .filter_map(|var_index| variable_paths.get(&Variable(var_index as u32)))
+                .filter_map(|var_index| variable_paths.get(&Var(var_index as u32)))
                 .peekable();
 
             while let Some(path) = path_iterator.next() {

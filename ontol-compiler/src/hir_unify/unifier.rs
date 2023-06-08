@@ -5,7 +5,7 @@ use ontol_hir::{
         PropPattern, PropVariant,
     },
     visitor::HirVisitor,
-    Binder, Variable,
+    Binder, Var,
 };
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
@@ -169,12 +169,12 @@ pub fn unify_to_function<'m>(
 
 pub struct Unifier<'a, 'm> {
     pub root_source: &'a TypedHirNode<'m>,
-    pub next_variable: Variable,
+    pub next_variable: Var,
     pub types: &'a mut Types<'m>,
 }
 
 pub struct InvertedCall<'m> {
-    pub let_binder: Variable,
+    pub let_binder: Var,
     pub def: TypedHirNode<'m>,
     pub body: UnifiedNodes<'m>,
 }
@@ -208,7 +208,7 @@ pub(super) struct UnifiedTypedPatternBinding<'m> {
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
-    pub fn alloc_var(&mut self) -> Variable {
+    pub fn alloc_var(&mut self) -> Var {
         let var = self.next_variable;
         self.next_variable.0 += 1;
         var
@@ -267,7 +267,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         let TypedHirNode { kind, meta } = scope_source;
         let meta = *meta;
         match kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 debug!("unify_scoping({debug_index:?}, VariableRef)");
                 let nodes = self.merge_target_nodes(&mut scoping)?;
                 Ok(Unified {
@@ -310,7 +310,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     // That inner variable is the _binder_ of the resulting `let` expression.
                     let subst_var = self.alloc_var();
                     let inner_expr = TypedHirNode {
-                        kind: TypedHirKind::VariableRef(subst_var),
+                        kind: TypedHirKind::Var(subst_var),
                         meta,
                     };
                     let inverted_call =
@@ -764,7 +764,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         let pivot_arg = &args[unification_idx];
 
         match &pivot_arg.kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 new_args.insert(unification_idx, inner_expr);
                 let body = self.merge_target_nodes(&mut sub_scoping)?;
 
@@ -797,7 +797,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn merge_target_nodes(&mut self, scoping: &mut Scoping<'m>) -> UnifierResult<UnifiedNodes<'m>> {
         let mut merged: UnifiedNodes<'m> = Default::default();
-        let mut property_groups: IndexMap<(Variable, PropertyId), Vec<(Dimension, TaggedNode)>> =
+        let mut property_groups: IndexMap<(Var, PropertyId), Vec<(Dimension, TaggedNode)>> =
             Default::default();
 
         for expr in std::mem::take(&mut scoping.expressions) {

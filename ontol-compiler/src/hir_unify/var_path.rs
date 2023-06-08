@@ -2,14 +2,14 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{kind, visitor::HirVisitor, Node, Variable};
+use ontol_hir::{kind, visitor::HirVisitor, Node, Var};
 use ontol_runtime::value::PropertyId;
 use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::typed_hir::{TypedHir, TypedHirNode};
 
-use super::UnifierError;
+use super::{UnifierError, VarSet};
 
 #[derive(Clone, Copy)]
 pub enum NodeRef<'s, 'm> {
@@ -44,7 +44,7 @@ impl<'s, 'm> Debug for VarPath<'s, 'm> {
 pub fn locate_variables<'s, 'm, 'b>(
     node: &'s TypedHirNode<'m>,
     variables: &'b BitSet,
-) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
+) -> Result<FnvHashMap<Var, VarPath<'s, 'm>>, UnifierError> {
     let mut locator = VarLocator::new(node, variables);
     locator.traverse_kind(node.kind());
     locator.var_paths()
@@ -53,7 +53,7 @@ pub fn locate_variables<'s, 'm, 'b>(
 pub fn variable_node_paths<'s, 'm, 'b>(
     node: &'s TypedHirNode<'m>,
     variables: &'b BitSet,
-) -> Result<FnvHashMap<Variable, NodePath<'s, 'm>>, UnifierError> {
+) -> Result<FnvHashMap<Var, NodePath<'s, 'm>>, UnifierError> {
     let mut locator = VarLocator::new(node, variables);
     locator.traverse_kind(node.kind());
     locator.node_paths()
@@ -67,22 +67,26 @@ struct VarLocator<'s, 'm, 'b> {
     current_node_path: NodePath<'s, 'm>,
 
     duplicates: BitSet,
-    var_paths: FnvHashMap<Variable, VarPath<'s, 'm>>,
-    node_paths: FnvHashMap<Variable, NodePath<'s, 'm>>,
+    var_paths: FnvHashMap<Var, VarPath<'s, 'm>>,
+    node_paths: FnvHashMap<Var, NodePath<'s, 'm>>,
 }
 
 impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
-    fn var_paths(self) -> Result<FnvHashMap<Variable, VarPath<'s, 'm>>, UnifierError> {
+    fn var_paths(self) -> Result<FnvHashMap<Var, VarPath<'s, 'm>>, UnifierError> {
         if !self.duplicates.is_empty() {
-            Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
+            Err(UnifierError::NonUniqueVariableDatapoints(VarSet(
+                self.duplicates,
+            )))
         } else {
             Ok(self.var_paths)
         }
     }
 
-    fn node_paths(self) -> Result<FnvHashMap<Variable, NodePath<'s, 'm>>, UnifierError> {
+    fn node_paths(self) -> Result<FnvHashMap<Var, NodePath<'s, 'm>>, UnifierError> {
         if !self.duplicates.is_empty() {
-            Err(UnifierError::NonUniqueVariableDatapoints(self.duplicates))
+            Err(UnifierError::NonUniqueVariableDatapoints(VarSet(
+                self.duplicates,
+            )))
         } else {
             Ok(self.node_paths)
         }
@@ -126,7 +130,7 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
             && self
                 .var_paths
                 .insert(
-                    Variable(var),
+                    Var(var),
                     VarPath {
                         root: self.root,
                         path: self.current_path.clone(),
@@ -140,7 +144,7 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
         if self.variables.contains(var as usize)
             && self
                 .node_paths
-                .insert(Variable(var), self.current_node_path.clone())
+                .insert(Var(var), self.current_node_path.clone())
                 .is_some()
         {
             self.duplicates.insert(var as usize);
@@ -155,8 +159,8 @@ impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
         });
     }
 
-    fn visit_variable(&mut self, variable: &Variable) {
-        self.register_var(variable.0);
+    fn visit_var(&mut self, var: &Var) {
+        self.register_var(var.0);
     }
 
     fn visit_label(&mut self, label: &ontol_hir::Label) {
@@ -166,7 +170,7 @@ impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
     fn visit_prop(
         &mut self,
         optional: &'s kind::Optional,
-        struct_var: &'s Variable,
+        struct_var: &'s Var,
         id: &'s PropertyId,
         variants: &'s Vec<kind::PropVariant<'m, TypedHir>>,
     ) {
@@ -213,12 +217,12 @@ impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
 // TODO: No cloning?
 pub fn full_var_path<'s, 'm>(
     free_variables: &BitSet,
-    variable_paths: &FnvHashMap<ontol_hir::Variable, VarPath<'s, 'm>>,
+    variable_paths: &FnvHashMap<ontol_hir::Var, VarPath<'s, 'm>>,
 ) -> PathsIterator<'s, 'm> {
     PathsIterator::new(
         free_variables
             .iter()
-            .filter_map(|var_index| variable_paths.get(&ontol_hir::Variable(var_index as u32)))
+            .filter_map(|var_index| variable_paths.get(&ontol_hir::Var(var_index as u32)))
             .cloned()
             .collect(),
     )

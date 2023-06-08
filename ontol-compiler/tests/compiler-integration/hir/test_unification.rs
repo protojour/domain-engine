@@ -182,11 +182,17 @@ fn test_unify_struct_simple_arithmetic() {
 
 #[test]
 fn test_struct_arithmetic_property_dependency() {
+    // matrix
+    // scope   0 1
+    // expr  0 X X
+    // expr  1 X
+    // expr  2   X
+
     let output = test_unify(
         "
         (struct ($c)
-            (prop $c S:0:0 (#u (- $a 10)))
-            (prop $c S:1:1 (#u (- $b 10)))
+            (prop $c S:0:0 @0 (#u (- $a 10)))
+            (prop $c S:1:1 @1 (#u (- $b 10)))
         )
         ",
         "

@@ -23,7 +23,7 @@ pub struct UNode<'m> {
 }
 
 impl<'m> UNode<'m> {
-    pub fn union_var(mut self, var: ontol_hir::Variable) -> Self {
+    pub fn union_var(mut self, var: ontol_hir::Var) -> Self {
         self.free_variables.insert(var.0 as usize);
         self
     }
@@ -61,7 +61,7 @@ pub enum UNodeKind<'m> {
 
 #[derive(Debug)]
 pub enum LeafUNodeKind {
-    VariableRef(ontol_hir::Variable),
+    VariableRef(ontol_hir::Var),
     Int(i64),
     Unit,
 }
@@ -99,7 +99,7 @@ impl<'m> Debug for UBlockBody<'m> {
 #[derive(Debug)]
 pub enum AttrUNodeKind {
     Seq(ontol_hir::Label),
-    PropVariant(Optional, ontol_hir::Variable, PropertyId),
+    PropVariant(Optional, ontol_hir::Var, PropertyId),
 }
 
 #[derive(Debug)]
@@ -116,7 +116,7 @@ pub struct UAttr<'m> {
 
 pub fn expand_scoping<'s, 'm>(
     u_node: &mut UNode<'m>,
-    path_table: &FnvHashMap<ontol_hir::Variable, VarPath<'s, 'm>>,
+    path_table: &FnvHashMap<ontol_hir::Var, VarPath<'s, 'm>>,
 ) {
     debug!("path table: {path_table:?}");
 
@@ -142,7 +142,7 @@ impl ScopingCtx {
     fn expand_root<'s, 'm>(
         &mut self,
         u_node: &mut UNode<'m>,
-        path_table: &FnvHashMap<ontol_hir::Variable, VarPath<'s, 'm>>,
+        path_table: &FnvHashMap<ontol_hir::Var, VarPath<'s, 'm>>,
     ) {
         if u_node.free_variables.is_empty() {
             return;
@@ -154,7 +154,7 @@ impl ScopingCtx {
                     if child_node
                         .free_variables
                         .iter()
-                        .any(|var| path_table.contains_key(&ontol_hir::Variable(var as u32)))
+                        .any(|var| path_table.contains_key(&ontol_hir::Var(var as u32)))
                     {
                         let mut paths = full_var_path(&child_node.free_variables, path_table);
                         match paths.next() {

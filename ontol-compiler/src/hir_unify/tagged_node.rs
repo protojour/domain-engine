@@ -6,7 +6,7 @@ use tracing::debug;
 use bit_set::BitSet;
 use ontol_hir::{
     kind::{Attribute, Dimension, NodeKind, Optional, PropVariant},
-    Binder, Label, Variable,
+    Binder, Label, Var,
 };
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
@@ -23,7 +23,7 @@ use super::u_node::{
 
 #[derive(DebugExtras, Clone, Copy)]
 pub enum TaggedKind {
-    VariableRef(Variable),
+    VariableRef(Var),
     Unit,
     Int(i64),
     Let(Binder),
@@ -31,8 +31,8 @@ pub enum TaggedKind {
     Map,
     Seq(Label),
     Struct(Binder),
-    Prop(Optional, Variable, PropertyId),
-    PropVariant(Optional, Variable, PropertyId, Dimension),
+    Prop(Optional, Var, PropertyId),
+    PropVariant(Optional, Var, PropertyId, Dimension),
 }
 
 // Note: This is more granular than typed_hir nodes.
@@ -58,7 +58,7 @@ impl<'m> Debug for TaggedNode<'m> {
 pub struct TaggedNodes<'m>(pub Vec<TaggedNode<'m>>);
 
 impl<'m> TaggedNode<'m> {
-    fn union_var(mut self, var: Variable) -> Self {
+    fn union_var(mut self, var: Var) -> Self {
         self.free_variables.insert(var.0 as usize);
         self
     }
@@ -70,7 +70,7 @@ impl<'m> TaggedNode<'m> {
 
     pub fn into_hir_node(self) -> TypedHirNode<'m> {
         let kind = match self.kind {
-            TaggedKind::VariableRef(var) => NodeKind::VariableRef(var),
+            TaggedKind::VariableRef(var) => NodeKind::Var(var),
             TaggedKind::Unit => NodeKind::Unit,
             TaggedKind::Int(int) => NodeKind::Int(int),
             TaggedKind::Call(proc) => NodeKind::Call(proc, self.children.into_hir()),
@@ -221,7 +221,7 @@ impl<'m> Tagger<'m> {
     pub fn to_u_nodes(&mut self, node: TypedHirNode<'m>) -> UNodes<'m> {
         let (kind, meta) = node.split();
         match kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 let u_node = self.make_leaf(LeafUNodeKind::VariableRef(var), meta);
 
                 if self.in_scope.contains(var.0 as usize) {
@@ -327,7 +327,7 @@ impl<'m> Tagger<'m> {
     fn to_prop_variants(
         &mut self,
         optional: Optional,
-        struct_var: Variable,
+        struct_var: Var,
         property_id: PropertyId,
         variants: Vec<PropVariant<'m, TypedHir>>,
         meta: Meta<'m>,
@@ -552,7 +552,7 @@ impl<'m> Tagger<'m> {
     pub fn tag_node(&mut self, node: TypedHirNode<'m>) -> TaggedNode<'m> {
         let (kind, meta) = node.split();
         match kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 let tagged_node = self.make_tagged(TaggedKind::VariableRef(var), [], meta);
                 if self.in_scope.contains(var.0 as usize) {
                     tagged_node
@@ -626,7 +626,7 @@ impl<'m> Tagger<'m> {
     fn tag_prop(
         &mut self,
         optional: Optional,
-        struct_var: Variable,
+        struct_var: Var,
         id: PropertyId,
         variants: Vec<PropVariant<'m, TypedHir>>,
         meta: Meta<'m>,
@@ -741,11 +741,11 @@ pub fn union_free_variables<'a, 'm: 'a>(
 #[cfg(test)]
 mod tests {
     use bit_set::BitSet;
-    use ontol_hir::{parse::Parser, Variable};
+    use ontol_hir::{parse::Parser, Var};
 
     use crate::{typed_hir::TypedHir, types::Type};
 
-    fn free_variables(iterator: impl Iterator<Item = Variable>) -> BitSet {
+    fn free_variables(iterator: impl Iterator<Item = Var>) -> BitSet {
         let mut bit_set = BitSet::new();
         for var in iterator {
             bit_set.insert(var.0 as usize);
@@ -771,7 +771,7 @@ mod tests {
         let node = Parser::new(TypedHir).parse(src).unwrap().0;
         let tagged_node = super::Tagger::new(&Type::Error).tag_node(node);
         assert_eq!(
-            free_variables([Variable(1), Variable(3), Variable(4)].into_iter()),
+            free_variables([Var(1), Var(3), Var(4)].into_iter()),
             tagged_node.free_variables,
         );
     }

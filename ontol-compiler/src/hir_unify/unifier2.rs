@@ -60,7 +60,7 @@ pub enum Scoping<'s, 'm> {
     Block(TypedBinder<'m>, &'s [TypedHirNode<'m>]),
     Prop(
         Optional,
-        ontol_hir::Variable,
+        ontol_hir::Var,
         PropertyId,
         &'s [PropVariant<'m, TypedHir>],
         Meta<'m>,
@@ -112,7 +112,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             (UNodeKind::Leaf(LeafUNodeKind::VariableRef(var)), _) => Ok(UnifiedNode {
                 binder: None,
                 node: TypedHirNode {
-                    kind: NodeKind::VariableRef(var),
+                    kind: NodeKind::Var(var),
                     meta,
                 },
             }),
@@ -405,7 +405,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
         let meta = *meta;
 
         match kind {
-            NodeKind::VariableRef(var) => {
+            NodeKind::Var(var) => {
                 debug!("classify_scoping(VariableRef)");
                 Ok(Scoping::Binder(TypedBinder {
                     variable: *var,

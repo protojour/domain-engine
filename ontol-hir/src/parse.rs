@@ -5,7 +5,7 @@ use crate::{
         Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding,
         PropPattern, PropVariant,
     },
-    Binder, Label, Lang, Variable,
+    Binder, Label, Lang, Var,
 };
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl<L: Lang> Parser<L> {
             }
             (Token::Dollar, next) => match parse_token(next)? {
                 (Token::Symbol(sym), next) => Ok((
-                    self.make_node(NodeKind::VariableRef(Variable(try_alpha_to_u32(sym)?))),
+                    self.make_node(NodeKind::Var(Var(try_alpha_to_u32(sym)?))),
                     next,
                 )),
                 (token, _) => Err(Error::InvalidToken(token)),
@@ -313,10 +313,10 @@ fn parse_dollar(next: &str) -> ParseResult<()> {
     }
 }
 
-fn parse_dollar_var(next: &str) -> ParseResult<Variable> {
+fn parse_dollar_var(next: &str) -> ParseResult<Var> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((Variable(try_alpha_to_u32(sym)?), next)),
+        (Token::Symbol(sym), next) => Ok((Var(try_alpha_to_u32(sym)?), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
@@ -340,10 +340,9 @@ fn parse_iter_binder(next: &str) -> ParseResult<IterBinder> {
 fn parse_pattern_binding(next: &str) -> ParseResult<PatternBinding> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((
-            PatternBinding::Binder(Variable(try_alpha_to_u32(sym)?)),
-            next,
-        )),
+        (Token::Symbol(sym), next) => {
+            Ok((PatternBinding::Binder(Var(try_alpha_to_u32(sym)?)), next))
+        }
         (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
@@ -423,7 +422,7 @@ fn parse_int(num: &str) -> Result<Token, Error> {
     }
 }
 
-fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
+pub(super) fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
     if sym.is_empty() {
         return Err(Error::InvalidSymbol(sym));
     }

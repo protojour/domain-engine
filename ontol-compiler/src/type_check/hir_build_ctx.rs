@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::{Label, Variable};
+use ontol_hir::{Label, Var};
 
 use crate::{expr::ExprId, types::TypeRef, SourceSpan};
 
@@ -15,14 +15,14 @@ pub struct HirBuildCtx<'m> {
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
-    pub variable_mapping: FnvHashMap<Variable, VariableMapping<'m>>,
+    pub variable_mapping: FnvHashMap<Var, VariableMapping<'m>>,
 
     pub partial: bool,
 
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
     ctrl_flow_depth: CtrlFlowDepth,
-    next_variable: Variable,
+    next_variable: Var,
 }
 
 impl<'m> HirBuildCtx<'m> {
@@ -36,7 +36,7 @@ impl<'m> HirBuildCtx<'m> {
             partial: false,
             arm: Arm::First,
             ctrl_flow_depth: CtrlFlowDepth(0),
-            next_variable: Variable(0),
+            next_variable: Var(0),
         }
     }
 
@@ -52,7 +52,7 @@ impl<'m> HirBuildCtx<'m> {
         ret
     }
 
-    pub fn alloc_variable(&mut self) -> Variable {
+    pub fn alloc_variable(&mut self) -> Var {
         let next = self.next_variable;
         self.next_variable.0 += 1;
         next
@@ -60,7 +60,7 @@ impl<'m> HirBuildCtx<'m> {
 }
 
 pub struct ExplicitVariable {
-    pub variable: Variable,
+    pub variable: Var,
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
