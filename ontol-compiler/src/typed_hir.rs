@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use ontol_hir::{
     display::{Print, Printer, Sep},
@@ -34,6 +34,12 @@ pub type TypedHirKind<'m> = ontol_hir::kind::NodeKind<'m, TypedHir>;
 pub struct TypedHirNode<'m> {
     pub kind: TypedHirKind<'m>,
     pub meta: Meta<'m>,
+}
+
+impl<'m> Debug for TypedHirNode<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl<'m> TypedHirNode<'m> {

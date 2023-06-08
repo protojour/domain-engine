@@ -1,5 +1,8 @@
 use indoc::indoc;
-use ontol_hir::{kind::Optional, Binder, Var};
+use ontol_hir::{
+    kind::{NodeKind, Optional},
+    Binder, Var,
+};
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use pretty_assertions::assert_eq;
 
@@ -9,7 +12,7 @@ use crate::{
         VarSet,
     },
     mem::Mem,
-    typed_hir::{HirFunc, Meta},
+    typed_hir::{HirFunc, Meta, TypedHirNode},
     types::Type,
     Compiler, SourceSpan,
 };
@@ -27,7 +30,7 @@ fn meta() -> Meta<'static> {
     }
 }
 
-fn expr(kind: expr::Kind<'static>, free_vars: impl Into<VarSet>) -> expr::Expr<'static> {
+fn expr<'m>(kind: expr::Kind<'m>, free_vars: impl Into<VarSet>) -> expr::Expr<'m> {
     expr::Expr {
         kind,
         meta: meta(),
@@ -35,7 +38,7 @@ fn expr(kind: expr::Kind<'static>, free_vars: impl Into<VarSet>) -> expr::Expr<'
     }
 }
 
-fn scope(kind: scope::Kind<'static>, vars: impl Into<VarSet>) -> scope::Scope<'static> {
+fn scope<'m>(kind: scope::Kind<'m>, vars: impl Into<VarSet>) -> scope::Scope<'m> {
     scope::Scope {
         kind,
         meta: meta(),
@@ -43,45 +46,51 @@ fn scope(kind: scope::Kind<'static>, vars: impl Into<VarSet>) -> scope::Scope<'s
     }
 }
 
-impl Vars for expr::Struct<'static> {
-    type Output = expr::Expr<'static>;
+impl<'m> Vars for expr::Struct<'m> {
+    type Output = expr::Expr<'m>;
 
     fn vars(self, free_vars: impl Into<VarSet>) -> Self::Output {
         expr(expr::Kind::Struct(self), free_vars)
     }
 }
 
-impl Vars for expr::Call<'static> {
-    type Output = expr::Expr<'static>;
+impl<'m> Vars for expr::Call<'m> {
+    type Output = expr::Expr<'m>;
 
     fn vars(self, free_vars: impl Into<VarSet>) -> Self::Output {
         expr(expr::Kind::Call(self), free_vars)
     }
 }
 
-impl Vars for scope::Struct<'static> {
-    type Output = scope::Scope<'static>;
+impl<'m> Vars for scope::Struct<'m> {
+    type Output = scope::Scope<'m>;
 
     fn vars(self, vars: impl Into<VarSet>) -> Self::Output {
         scope(scope::Kind::Struct(self), vars)
     }
 }
 
-impl From<()> for expr::Expr<'static> {
+impl<'m> From<()> for expr::Expr<'m> {
     fn from(_: ()) -> Self {
         expr(expr::Kind::Unit, VarSet::default())
     }
 }
 
-impl From<()> for scope::Scope<'static> {
+impl<'m> From<()> for scope::Scope<'m> {
     fn from(_: ()) -> Self {
         scope(scope::Kind::Unit, VarSet::default())
     }
 }
 
-impl From<Var> for expr::Expr<'static> {
+impl<'m> From<Var> for expr::Expr<'m> {
     fn from(var: Var) -> Self {
         expr(expr::Kind::Var(var), VarSet::default())
+    }
+}
+
+impl<'m> From<scope::Let<'m>> for scope::Scope<'m> {
+    fn from(let_: scope::Let<'m>) -> Self {
+        scope(scope::Kind::Let(let_), VarSet::default())
     }
 }
 
@@ -95,10 +104,10 @@ fn prop_id(str: &str) -> PropertyId {
     str.parse().unwrap()
 }
 
-fn test_trees(
+fn test_trees<'m>(
     scope_optional: Optional,
     expr_optional: Optional,
-) -> (scope::Scope<'static>, expr::Expr<'static>) {
+) -> (scope::Scope<'m>, expr::Expr<'m>) {
     (
         scope::Struct(
             Binder(Var(2)),
@@ -110,7 +119,31 @@ fn test_trees(
                     disjoint_group: 0,
                     kind: scope::PropKind::Attr(
                         scope::PatternBinding::Wildcard,
-                        scope::PatternBinding::Scope(Var(4), ().into()),
+                        scope::PatternBinding::Scope(
+                            Var(4),
+                            scope::Let {
+                                outer_binder: None,
+                                inner_binder: Binder(Var(0)),
+                                def: TypedHirNode {
+                                    kind: NodeKind::Call(
+                                        BuiltinProc::Sub,
+                                        vec![
+                                            TypedHirNode {
+                                                kind: NodeKind::Var(Var(4)),
+                                                meta: meta(),
+                                            },
+                                            TypedHirNode {
+                                                kind: NodeKind::Int(10),
+                                                meta: meta(),
+                                            },
+                                        ],
+                                    ),
+                                    meta: meta(),
+                                },
+                                sub_scope: Box::new(().into()),
+                            }
+                            .into(),
+                        ),
                     ),
                     vars: [Var(0)].into(),
                 },
@@ -121,7 +154,7 @@ fn test_trees(
                     disjoint_group: 1,
                     kind: scope::PropKind::Attr(
                         scope::PatternBinding::Wildcard,
-                        scope::PatternBinding::Wildcard,
+                        scope::PatternBinding::Scope(Var(5), ().into()),
                     ),
                     vars: [Var(1)].into(),
                 },
@@ -171,9 +204,10 @@ fn test_trees(
     )
 }
 
-fn test_unify3<'m>(scope: scope::Scope<'m>, expr: expr::Expr<'m>) -> String {
+fn test_unify3(provider: impl Fn(&()) -> (scope::Scope<'_>, expr::Expr<'_>)) -> String {
     let mem = Mem::default();
     let mut compiler = Compiler::new(&mem, Default::default());
+    let (scope, expr) = provider(&());
     let unified = Unifier3 {
         types: &mut compiler.types,
     }
@@ -193,17 +227,18 @@ fn test_unify3<'m>(scope: scope::Scope<'m>, expr: expr::Expr<'m>) -> String {
 // BUG: wrong
 #[test]
 fn unify3_1_mandatory() {
-    let (scope, expr) = test_trees(Optional(false), Optional(false));
-    let output = test_unify3(scope, expr);
+    let output = test_unify3(|_| test_trees(Optional(false), Optional(false)));
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
-                    (prop $d O:2:2)
-                    (prop $d O:3:3)
-                    (match-prop $c S:1:1
-                        (($_ $_)
-                            (prop $d O:4:4)
+                    (let ($a (- $e 10))
+                        (prop $d O:2:2)
+                        (prop $d O:3:3)
+                        (match-prop $c S:1:1
+                            (($_ $f)
+                                (prop $d O:4:4)
+                            )
                         )
                     )
                 )
@@ -216,19 +251,20 @@ fn unify3_1_mandatory() {
 // BUG: wrong
 #[test]
 fn unify3_1_option() {
-    let (scope, expr) = test_trees(Optional(true), Optional(true));
-    let output = test_unify3(scope, expr);
+    let output = test_unify3(|_| test_trees(Optional(true), Optional(true)));
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
-                    (prop $d O:2:2)
-                    (prop $d O:3:3)
-                    (match-prop $c S:1:1
-                        (($_ $_)
-                            (prop $d O:4:4)
+                    (let ($a (- $e 10))
+                        (prop $d O:2:2)
+                        (prop $d O:3:3)
+                        (match-prop $c S:1:1
+                            (($_ $f)
+                                (prop $d O:4:4)
+                            )
+                            (())
                         )
-                        (())
                     )
                 )
                 (())

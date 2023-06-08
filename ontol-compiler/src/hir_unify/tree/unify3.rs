@@ -62,6 +62,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     meta: expr.meta,
                 },
             }),
+            // ### "swizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
                 let mut scope_idx_table: FnvHashMap<ontol_hir::Var, usize> = Default::default();
 
@@ -193,24 +194,48 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         }
     }
 
-    fn unify_block(
+    fn fully_wrap_in_scope(
         &mut self,
         scope: scope::Scope<'m>,
-        expressions: Vec<expr::Expr<'m>>,
-    ) -> Result<UnifiedBlock3<'m>, UnifierError> {
+        nodes_func: impl FnOnce(&mut Self) -> UnifierResult<Vec<TypedHirNode<'m>>>,
+    ) -> UnifierResult<UnifiedBlock3<'m>> {
         match scope.kind {
             scope::Kind::Unit => {
-                let mut nodes = vec![];
-                for expr in expressions {
-                    nodes.push(self.unify3(scope.clone(), expr)?.node);
-                }
+                let nodes = nodes_func(self)?;
 
                 Ok(UnifiedBlock3 {
                     typed_binder: None,
                     block: nodes,
                 })
             }
-            _ => todo!(),
+            scope::Kind::Var(_) => todo!(),
+            scope::Kind::Struct(_) => todo!(),
+            scope::Kind::Let(let_scope) => {
+                let inner_block = self.fully_wrap_in_scope(*let_scope.sub_scope, nodes_func)?;
+                let ty = inner_block
+                    .block
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
+
+                let node = TypedHirNode {
+                    kind: NodeKind::Let(
+                        let_scope.inner_binder,
+                        Box::new(let_scope.def),
+                        inner_block.block,
+                    ),
+                    meta: Meta {
+                        ty,
+                        span: SourceSpan::none(),
+                    },
+                };
+
+                Ok(UnifiedBlock3 {
+                    typed_binder: let_scope.outer_binder,
+                    block: vec![node],
+                })
+            }
         }
     }
 
@@ -219,14 +244,19 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         root: ScopedProps<'m>,
         sub_props: Vec<ScopedProps<'m>>,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let prop_exprs = root
+        let prop_exprs: Vec<_> = root
             .props
             .into_iter()
             .map(|prop| self.mk_prop_expr(prop))
             .collect();
 
+        let sub_nodes = sub_props
+            .into_iter()
+            .map(|sub_scope| self.unify_merged_prop_scope(sub_scope, vec![]))
+            .collect::<Result<Vec<_>, _>>()?;
+
         // FIXME: re-grouped match arms
-        let mut match_arm: MatchArm<_> = match root.scope.kind {
+        let match_arm: MatchArm<_> = match root.scope.kind {
             scope::PropKind::Attr(rel_scope, val_scope) => {
                 let hir_rel_binding = rel_scope.hir_pattern_binding();
                 let hir_val_binding = val_scope.hir_pattern_binding();
@@ -237,7 +267,17 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     scope::PatternBinding::Scope(_, scope) => scope,
                 };
 
-                let unified_block = self.unify_block(scope, prop_exprs)?;
+                let unified_block = self.fully_wrap_in_scope(scope, move |zelf| {
+                    let mut nodes = vec![];
+                    let unit_scope = zelf.unit_scope();
+                    for expr in prop_exprs {
+                        nodes.push(zelf.unify3(unit_scope.clone(), expr)?.node);
+                    }
+
+                    nodes.extend(sub_nodes);
+
+                    Ok(nodes)
+                })?;
 
                 MatchArm {
                     pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
@@ -248,10 +288,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 todo!()
             }
         };
-        for sub_scoped_props in sub_props {
-            let unified = self.unify_merged_prop_scope(sub_scoped_props, vec![])?;
-            match_arm.nodes.push(unified);
-        }
 
         let mut match_arms = vec![match_arm];
 

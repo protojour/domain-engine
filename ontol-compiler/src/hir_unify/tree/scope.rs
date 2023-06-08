@@ -1,9 +1,10 @@
-use std::marker::PhantomData;
-
 use ontol_hir::kind::Optional;
 use ontol_runtime::value::PropertyId;
 
-use crate::{hir_unify::VarSet, typed_hir::Meta};
+use crate::{
+    hir_unify::VarSet,
+    typed_hir::{Meta, TypedBinder, TypedHirNode},
+};
 
 #[derive(Clone, Debug)]
 pub struct Scope<'m> {
@@ -17,11 +18,20 @@ pub enum Kind<'m> {
     Unit,
     Var(ontol_hir::Var),
     Struct(Struct<'m>),
+    Let(Let<'m>),
     // Prop(Prop<'m>),
 }
 
 #[derive(Clone, Debug)]
 pub struct Struct<'m>(pub ontol_hir::Binder, pub Vec<Prop<'m>>);
+
+#[derive(Clone, Debug)]
+pub struct Let<'m> {
+    pub outer_binder: Option<TypedBinder<'m>>,
+    pub inner_binder: ontol_hir::Binder,
+    pub def: TypedHirNode<'m>,
+    pub sub_scope: Box<Scope<'m>>,
+}
 
 #[derive(Clone, Debug)]
 pub struct Prop<'m> {
