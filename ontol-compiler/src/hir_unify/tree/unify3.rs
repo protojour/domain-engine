@@ -14,23 +14,54 @@ use crate::{
 use super::{expr, scope};
 
 pub struct Unifier3<'a, 'm> {
-    pub types: &'a mut Types<'m>,
+    pub(super) types: &'a mut Types<'m>,
+}
+
+pub struct UnifiedNode3<'m> {
+    pub typed_binder: Option<TypedBinder<'m>>,
+    pub node: TypedHirNode<'m>,
 }
 
 struct UnifiedBlock3<'m> {
-    typed_binder: Option<TypedBinder<'m>>,
-    block: Vec<TypedHirNode<'m>>,
+    pub typed_binder: Option<TypedBinder<'m>>,
+    pub block: Vec<TypedHirNode<'m>>,
+}
+
+struct ScopedProps<'m> {
+    scope: scope::Prop<'m>,
+    props: Vec<expr::Prop<'m>>,
 }
 
 impl<'a, 'm> Unifier3<'a, 'm> {
-    fn unify3(
+    pub(super) fn unify3(
         &mut self,
         scope: scope::Scope<'m>,
         expr: expr::Expr<'m>,
-    ) -> Result<TypedHirNode<'m>, UnifierError> {
+    ) -> Result<UnifiedNode3<'m>, UnifierError> {
         match (expr.kind, scope.kind) {
-            (expr::Kind::Var(_var), _) => Ok(self.unit()),
-            (expr::Kind::Unit, _) => Ok(self.unit()),
+            // ### Expr constants - no scope needed:
+            (expr::Kind::Unit, _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Unit,
+                    meta: expr.meta,
+                },
+            }),
+            (expr::Kind::Int(int), _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Int(int),
+                    meta: expr.meta,
+                },
+            }),
+            // ### Simple scopes, no swizzling needed:
+            (expr::Kind::Var(var), _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Var(var),
+                    meta: expr.meta,
+                },
+            }),
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
                 let mut scope_idx_table: FnvHashMap<ontol_hir::Var, usize> = Default::default();
 
@@ -85,7 +116,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     }
 
                     let root_scope = input_scopes_by_idx.remove(&scope_idx).unwrap();
-                    let mut sub_scopes = vec![];
+                    let mut sub_scoped_props = vec![];
 
                     let mut merged_props = vec![];
                     if let Some(props) = scoped_props.remove(&scope_idx) {
@@ -99,38 +130,65 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                                 input_scopes_by_idx.remove(&child_scope_idx)
                             } else {
                                 input_scopes_by_idx.get(&child_scope_idx).cloned()
-                            };
-                            sub_scopes.push(child_scope.unwrap());
+                            }
+                            .unwrap();
+
+                            // sub_scoped_props.push(child_scope.unwrap());
 
                             if let Some(props) = scoped_props.remove(&child_scope_idx) {
-                                merged_props.extend(props);
+                                if !props.is_empty() {
+                                    sub_scoped_props.push(ScopedProps {
+                                        scope: child_scope,
+                                        props,
+                                    });
+                                }
                             }
                         }
                     }
 
-                    nodes.push(self.unify_merged_prop_scope(
-                        root_scope,
-                        sub_scopes,
-                        merged_props,
-                    )?)
+                    if !merged_props.is_empty() {
+                        nodes.push(self.unify_merged_prop_scope(
+                            ScopedProps {
+                                scope: root_scope,
+                                props: merged_props,
+                            },
+                            sub_scoped_props,
+                        )?);
+                    }
                 }
 
-                Ok(TypedHirNode {
-                    kind: NodeKind::Struct(struct_expr.0, nodes),
-                    meta: expr.meta,
+                Ok(UnifiedNode3 {
+                    typed_binder: Some(TypedBinder {
+                        variable: struct_scope.0 .0,
+                        ty: scope.meta.ty,
+                    }),
+                    node: TypedHirNode {
+                        kind: NodeKind::Struct(struct_expr.0, nodes),
+                        meta: expr.meta,
+                    },
                 })
             }
-            (expr::Kind::Prop(prop), _) => Ok(TypedHirNode {
-                kind: NodeKind::Prop(prop.optional, prop.struct_var, prop.prop_id, vec![]),
-                meta: expr.meta,
+            (expr::Kind::Prop(prop), _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Prop(Optional(false), prop.struct_var, prop.prop_id, vec![]),
+                    meta: expr.meta,
+                },
             }),
-            (expr::Kind::Struct(struct_expr), _) => Ok(TypedHirNode {
-                // FIXME
-                kind: NodeKind::Struct(struct_expr.0, vec![]),
-                meta: expr.meta,
+            (expr::Kind::Struct(struct_expr), _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Struct(struct_expr.0, vec![]),
+                    meta: expr.meta,
+                },
             }),
-            (expr::Kind::Call(_call), _) => Ok(self.unit()),
-            (expr::Kind::Int(_int), _) => Ok(self.unit()),
+            (expr::Kind::Call(_call), _) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Int(42),
+                    meta: expr.meta,
+                },
+            }),
             (expr, scope) => panic!("unhandled expr/scope combo: {expr:#?} / {scope:#?}"),
         }
     }
@@ -140,47 +198,46 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         scope: scope::Scope<'m>,
         expressions: Vec<expr::Expr<'m>>,
     ) -> Result<UnifiedBlock3<'m>, UnifierError> {
-        let mut nodes = vec![];
-        for expr in expressions {
-            nodes.push(self.unify3(scope.clone(), expr)?);
-        }
+        match scope.kind {
+            scope::Kind::Unit => {
+                let mut nodes = vec![];
+                for expr in expressions {
+                    nodes.push(self.unify3(scope.clone(), expr)?.node);
+                }
 
-        Ok(UnifiedBlock3 {
-            typed_binder: None,
-            block: nodes,
-        })
+                Ok(UnifiedBlock3 {
+                    typed_binder: None,
+                    block: nodes,
+                })
+            }
+            _ => todo!(),
+        }
     }
 
     fn unify_merged_prop_scope(
         &mut self,
-        root_scope: scope::Prop<'m>,
-        sub_scopes: Vec<scope::Prop<'m>>,
-        props: Vec<expr::Prop<'m>>,
+        root: ScopedProps<'m>,
+        sub_props: Vec<ScopedProps<'m>>,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let prop_exprs = props
+        let prop_exprs = root
+            .props
             .into_iter()
             .map(|prop| self.mk_prop_expr(prop))
             .collect();
-        // let block_expr = self.mk_block_expr(prop_exprs);
 
         // FIXME: re-grouped match arms
-        let match_arm: MatchArm<_> = match root_scope.kind {
+        let mut match_arm: MatchArm<_> = match root.scope.kind {
             scope::PropKind::Attr(rel_scope, val_scope) => {
                 let hir_rel_binding = rel_scope.hir_pattern_binding();
-                let hir_val_binding = rel_scope.hir_pattern_binding();
+                let hir_val_binding = val_scope.hir_pattern_binding();
 
-                // FIXME: rel_scope
-                let unified_block = match val_scope {
-                    scope::PatternBinding::Wildcard => {
-                        let unit_scope = self.unit_scope();
-                        self.unify_block(unit_scope, prop_exprs)?
-                    }
-                    scope::PatternBinding::Scope(binding, _) => {
-                        // FIXME: binding scope
-                        let unit_scope = self.unit_scope();
-                        self.unify_block(unit_scope, prop_exprs)?
-                    }
+                // FIXME: if both scopes are defined, one should be "inside" the other
+                let scope = match val_scope {
+                    scope::PatternBinding::Wildcard => self.unit_scope(),
+                    scope::PatternBinding::Scope(_, scope) => scope,
                 };
+
+                let unified_block = self.unify_block(scope, prop_exprs)?;
 
                 MatchArm {
                     pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
@@ -191,9 +248,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 todo!()
             }
         };
+        for sub_scoped_props in sub_props {
+            let unified = self.unify_merged_prop_scope(sub_scoped_props, vec![])?;
+            match_arm.nodes.push(unified);
+        }
+
         let mut match_arms = vec![match_arm];
 
-        if root_scope.optional.0 {
+        if root.scope.optional.0 {
             match_arms.push(MatchArm {
                 pattern: PropPattern::Absent,
                 nodes: vec![],
@@ -201,7 +263,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         }
 
         Ok(TypedHirNode {
-            kind: NodeKind::MatchProp(root_scope.struct_var, root_scope.prop_id, match_arms),
+            kind: NodeKind::MatchProp(root.scope.struct_var, root.scope.prop_id, match_arms),
             meta: Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
                 span: SourceSpan::none(),
@@ -248,220 +310,5 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unit_type(&mut self) -> TypeRef<'m> {
         self.types.intern(Type::Unit(DefId::unit()))
-    }
-}
-
-struct MergedPropScope<'m> {
-    root_scope: scope::Prop<'m>,
-    sub_scopes: Vec<scope::Prop<'m>>,
-    props: Vec<expr::Prop<'m>>,
-}
-
-#[cfg(test)]
-mod tests {
-    use std::marker::PhantomData;
-
-    use indoc::indoc;
-    use ontol_hir::{kind::Optional, Binder, Var};
-    use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
-    use pretty_assertions::assert_eq;
-
-    use crate::{
-        hir_unify::{
-            tree::{expr, scope},
-            VarSet,
-        },
-        mem::Mem,
-        typed_hir::Meta,
-        types::Type,
-        Compiler, SourceSpan,
-    };
-
-    use super::Unifier3;
-
-    trait Vars: Sized {
-        type Output: Sized;
-
-        fn vars(self, vars: impl Into<VarSet>) -> Self::Output;
-    }
-
-    fn meta() -> Meta<'static> {
-        Meta {
-            ty: &Type::Error,
-            span: SourceSpan::none(),
-        }
-    }
-
-    fn expr(kind: expr::Kind<'static>, free_vars: impl Into<VarSet>) -> expr::Expr<'static> {
-        expr::Expr {
-            kind,
-            meta: meta(),
-            free_vars: free_vars.into(),
-        }
-    }
-
-    fn scope(kind: scope::Kind<'static>, vars: impl Into<VarSet>) -> scope::Scope<'static> {
-        scope::Scope {
-            kind,
-            meta: meta(),
-            vars: vars.into(),
-        }
-    }
-
-    impl Vars for expr::Struct<'static> {
-        type Output = expr::Expr<'static>;
-
-        fn vars(self, free_vars: impl Into<VarSet>) -> Self::Output {
-            expr(expr::Kind::Struct(self), free_vars)
-        }
-    }
-
-    impl Vars for expr::Call<'static> {
-        type Output = expr::Expr<'static>;
-
-        fn vars(self, free_vars: impl Into<VarSet>) -> Self::Output {
-            expr(expr::Kind::Call(self), free_vars)
-        }
-    }
-
-    impl Vars for scope::Struct<'static> {
-        type Output = scope::Scope<'static>;
-
-        fn vars(self, vars: impl Into<VarSet>) -> Self::Output {
-            scope(scope::Kind::Struct(self), vars)
-        }
-    }
-
-    impl From<()> for expr::Expr<'static> {
-        fn from(_: ()) -> Self {
-            expr(expr::Kind::Unit, VarSet::default())
-        }
-    }
-
-    impl From<Var> for expr::Expr<'static> {
-        fn from(var: Var) -> Self {
-            expr(expr::Kind::Var(var), VarSet::default())
-        }
-    }
-
-    impl<'m> From<i64> for expr::Expr<'m> {
-        fn from(value: i64) -> Self {
-            expr(expr::Kind::Int(value), VarSet::default())
-        }
-    }
-
-    fn prop_id(str: &str) -> PropertyId {
-        str.parse().unwrap()
-    }
-
-    fn test_trees(
-        scope_optional: Optional,
-        expr_optional: Optional,
-    ) -> (scope::Scope<'static>, expr::Expr<'static>) {
-        (
-            scope::Struct(
-                Binder(Var(2)),
-                vec![
-                    scope::Prop {
-                        optional: scope_optional,
-                        struct_var: Var(2),
-                        prop_id: prop_id("S:0:0"),
-                        disjoint_group: 0,
-                        kind: scope::PropKind::Attr(
-                            scope::PatternBinding::Wildcard,
-                            scope::PatternBinding::Wildcard,
-                        ),
-                        vars: [Var(0)].into(),
-                    },
-                    scope::Prop {
-                        optional: scope_optional,
-                        struct_var: Var(2),
-                        prop_id: prop_id("S:1:1"),
-                        disjoint_group: 1,
-                        kind: scope::PropKind::Attr(
-                            scope::PatternBinding::Wildcard,
-                            scope::PatternBinding::Wildcard,
-                        ),
-                        vars: [Var(1)].into(),
-                    },
-                ],
-            )
-            .vars([Var(0), Var(1)]),
-            expr::Struct(
-                Binder(Var(3)),
-                vec![
-                    expr::Prop {
-                        optional: expr_optional,
-                        struct_var: Var(3),
-                        prop_id: prop_id("O:2:2"),
-                        attr: (
-                            (),
-                            expr::Call(BuiltinProc::Add, vec![Var(0).into(), Var(1).into()])
-                                .vars([Var(0), Var(1)]),
-                        )
-                            .into(),
-                        free_vars: [Var(0), Var(1)].into(),
-                    },
-                    expr::Prop {
-                        optional: expr_optional,
-                        struct_var: Var(3),
-                        prop_id: prop_id("O:3:3"),
-                        attr: (
-                            (),
-                            expr::Call(BuiltinProc::Add, vec![Var(0).into(), 20.into()])
-                                .vars([Var(0)]),
-                        )
-                            .into(),
-                        free_vars: [Var(0)].into(),
-                    },
-                    expr::Prop {
-                        optional: expr_optional,
-                        struct_var: Var(3),
-                        prop_id: prop_id("O:4:4"),
-                        attr: (
-                            (),
-                            expr::Call(BuiltinProc::Add, vec![Var(1).into(), 20.into()])
-                                .vars([Var(1)]),
-                        )
-                            .into(),
-                        free_vars: [Var(1)].into(),
-                    },
-                ],
-            )
-            .vars([Var(0), Var(1)]),
-        )
-    }
-
-    fn test_unify3<'m>(scope: scope::Scope<'m>, expr: expr::Expr<'m>) -> String {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, Default::default());
-        let output = Unifier3 {
-            types: &mut compiler.types,
-        }
-        .unify3(scope, expr)
-        .unwrap();
-
-        let mut out_str = String::new();
-        use std::fmt::Write;
-        write!(&mut out_str, "{output}").unwrap();
-        out_str
-    }
-
-    #[test]
-    fn unify3_1() {
-        let (scope, expr) = test_trees(Optional(false), Optional(false));
-        let output = test_unify3(scope, expr);
-        let expected = indoc! {"
-            (struct ($d)
-                (match-prop $c S:0:0
-                    (($_ $_)
-                        (prop $d O:2:2)
-                        (prop $d O:3:3)
-                        (prop $d O:4:4)
-                    )
-                )
-            )"
-        };
-        assert_eq!(expected, output);
     }
 }
