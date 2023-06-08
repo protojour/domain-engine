@@ -285,16 +285,6 @@ fn unify3_1_option() {
     let output = test_unify3(|_| test_trees(Optional(true), Optional(true)));
     let expected = indoc! {"
         |$c| (struct ($d)
-            (match-prop $c S:1:1
-                (($_ $f)
-                    (let ($b (- $f 10))
-                        (prop $d O:4:4
-                            (#u (+ $b 20))
-                        )
-                    )
-                )
-                (())
-            )
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (- $e 10))
@@ -310,6 +300,16 @@ fn unify3_1_option() {
                                 )
                             )
                             (())
+                        )
+                    )
+                )
+                (())
+            )
+            (match-prop $c S:1:1
+                (($_ $f)
+                    (let ($b (- $f 10))
+                        (prop $d O:4:4
+                            (#u (+ $b 20))
                         )
                     )
                 )
