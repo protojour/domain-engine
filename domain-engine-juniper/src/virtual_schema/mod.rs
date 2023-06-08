@@ -77,6 +77,10 @@ impl VirtualIndexedTypeInfo {
                 .expect("No partial input typename available"),
         }
     }
+
+    pub fn description(&self) -> Option<String> {
+        self.type_data().description(self.env())
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]

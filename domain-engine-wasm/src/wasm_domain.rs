@@ -75,6 +75,13 @@ impl WasmTypeInfo {
         }
     }
 
+    pub fn docs(&self) -> String {
+        match &self.inner.docs {
+            Some(docs) => docs.join("\n").into(),
+            None => "".to_string(),
+        }
+    }
+
     pub fn domain(&self) -> Option<WasmDomain> {
         let package_id = self.inner.def_id.package_id();
         self.env.find_domain(package_id).map(|_| WasmDomain {

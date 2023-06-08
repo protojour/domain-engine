@@ -165,6 +165,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut root_defs: RootDefs = [def_id].into();
 
+        self.compiler.namespaces.docs.insert(def_id, type_stmt.docs);
+
         if let Some((ctx_block, _span)) = type_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context

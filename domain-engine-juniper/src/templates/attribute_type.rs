@@ -106,10 +106,11 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
         match &info.type_data().kind {
             TypeKind::Object(_) => {
                 let fields = reg.get_fields(info.type_index);
-
-                registry
-                    .build_object_type::<Self>(info, &fields)
-                    .into_meta()
+                let mut builder = registry.build_object_type::<Self>(info, &fields);
+                if let Some(description) = info.description() {
+                    builder = builder.description(&description);
+                }
+                builder.into_meta()
             }
             TypeKind::Union(union_data) => {
                 let types: Vec<_> = union_data
@@ -127,9 +128,13 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
 
                 registry.build_union_type::<Self>(info, &types).into_meta()
             }
-            TypeKind::CustomScalar(_) => registry
-                .build_scalar_type::<IndexedInputValue>(info)
-                .into_meta(),
+            TypeKind::CustomScalar(_) => {
+                let mut builder = registry.build_scalar_type::<IndexedInputValue>(info);
+                if let Some(description) = info.description() {
+                    builder = builder.description(&description);
+                }
+                builder.into_meta()
+            }
         }
     }
 }

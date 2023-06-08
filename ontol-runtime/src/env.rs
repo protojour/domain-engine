@@ -68,6 +68,11 @@ impl Env {
         }
     }
 
+    pub fn get_type_docs(&self, def_id: DefId) -> Option<std::string::String> {
+        let docs = self.get_type_info(def_id).docs.as_ref()?;
+        Some(docs.join("\n"))
+    }
+
     pub fn get_string_pattern(&self, def_id: DefId) -> Option<&StringPattern> {
         self.string_patterns.get(&def_id)
     }
@@ -157,6 +162,7 @@ impl Domain {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
             name: None,
+            docs: None,
             entity_info: None,
             operator_id: None,
         });
@@ -172,6 +178,7 @@ pub struct TypeInfo {
     pub public: bool,
 
     pub name: Option<String>,
+    pub docs: Option<Vec<String>>,
 
     /// Some if this type is an entity
     pub entity_info: Option<EntityInfo>,

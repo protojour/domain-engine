@@ -166,6 +166,7 @@ impl<'m> Compiler<'m> {
         let package_ids = self.package_ids();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
+        let mut docs = std::mem::take(&mut self.namespaces.docs);
         let mut serde_generator = self.serde_generator();
 
         let mut builder = Env::builder();
@@ -222,6 +223,7 @@ impl<'m> Compiler<'m> {
                     def_id: type_def_id,
                     public,
                     name: Some(type_name),
+                    docs: docs.remove(&type_def_id),
                     entity_info,
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
@@ -235,6 +237,7 @@ impl<'m> Compiler<'m> {
                     def_id: type_def_id,
                     public: false,
                     name: None,
+                    docs: None,
                     entity_info: None,
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
