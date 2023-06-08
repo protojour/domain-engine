@@ -233,11 +233,17 @@ fn unify3_1_mandatory() {
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (- $e 10))
-                        (prop $d O:2:2)
-                        (prop $d O:3:3)
+                        (prop $d O:2:2
+                            (#u (+ $a $b))
+                        )
+                        (prop $d O:3:3
+                            (#u (+ $a 20))
+                        )
                         (match-prop $c S:1:1
                             (($_ $f)
-                                (prop $d O:4:4)
+                                (prop $d O:4:4
+                                    (#u (+ $b 20))
+                                )
                             )
                         )
                     )
@@ -257,11 +263,17 @@ fn unify3_1_option() {
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (- $e 10))
-                        (prop $d O:2:2)
-                        (prop $d O:3:3)
+                        (prop $d O:2:2
+                            (#u (+ $a $b))
+                        )
+                        (prop $d O:3:3
+                            (#u (+ $a 20))
+                        )
                         (match-prop $c S:1:1
                             (($_ $f)
-                                (prop $d O:4:4)
+                                (prop $d O:4:4
+                                    (#u (+ $b 20))
+                                )
                             )
                             (())
                         )

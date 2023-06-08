@@ -1,6 +1,8 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::kind::{MatchArm, NodeKind, Optional, PropPattern};
+use ontol_hir::kind::{
+    Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
+};
 use ontol_runtime::DefId;
 
 use crate::{
@@ -59,6 +61,56 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Var(var),
+                    meta: expr.meta,
+                },
+            }),
+            // ### Unit scopes:
+            (expr::Kind::Prop(prop), scope::Kind::Unit) => {
+                let unit_scope = self.unit_scope();
+                let rel = self.unify3(unit_scope.clone(), prop.attr.rel)?;
+                let val = self.unify3(unit_scope, prop.attr.val)?;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: None,
+                    node: TypedHirNode {
+                        kind: NodeKind::Prop(
+                            Optional(false),
+                            prop.struct_var,
+                            prop.prop_id,
+                            vec![PropVariant {
+                                dimension: Dimension::Singular,
+                                attr: Attribute {
+                                    rel: Box::new(rel.node),
+                                    val: Box::new(val.node),
+                                },
+                            }],
+                        ),
+                        meta: expr.meta,
+                    },
+                })
+            }
+            (expr::Kind::Call(call), scope::Kind::Unit) => {
+                let unit_scope = self.unit_scope();
+                let args = call
+                    .1
+                    .into_iter()
+                    .map(|arg| {
+                        self.unify3(unit_scope.clone(), arg)
+                            .map(|unified| unified.node)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(UnifiedNode3 {
+                    typed_binder: None,
+                    node: TypedHirNode {
+                        kind: NodeKind::Call(call.0, args),
+                        meta: expr.meta,
+                    },
+                })
+            }
+            (expr::Kind::Struct(struct_expr), scope::Kind::Unit) => Ok(UnifiedNode3 {
+                typed_binder: None,
+                node: TypedHirNode {
+                    kind: NodeKind::Struct(struct_expr.0, vec![]),
                     meta: expr.meta,
                 },
             }),
@@ -169,27 +221,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Prop(prop), _) => Ok(UnifiedNode3 {
-                typed_binder: None,
-                node: TypedHirNode {
-                    kind: NodeKind::Prop(Optional(false), prop.struct_var, prop.prop_id, vec![]),
-                    meta: expr.meta,
-                },
-            }),
-            (expr::Kind::Struct(struct_expr), _) => Ok(UnifiedNode3 {
-                typed_binder: None,
-                node: TypedHirNode {
-                    kind: NodeKind::Struct(struct_expr.0, vec![]),
-                    meta: expr.meta,
-                },
-            }),
-            (expr::Kind::Call(_call), _) => Ok(UnifiedNode3 {
-                typed_binder: None,
-                node: TypedHirNode {
-                    kind: NodeKind::Int(42),
-                    meta: expr.meta,
-                },
-            }),
             (expr, scope) => panic!("unhandled expr/scope combo: {expr:#?} / {scope:#?}"),
         }
     }
