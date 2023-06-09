@@ -35,3 +35,13 @@ pub struct Prop<'m> {
 
 #[derive(Debug)]
 pub struct Call<'m>(pub BuiltinProc, pub Vec<Expr<'m>>);
+
+impl<'m> super::hierarchy::Expression for Prop<'m> {
+    fn free_vars(&self) -> &VarSet {
+        &self.free_vars
+    }
+
+    fn optional(&self) -> bool {
+        self.optional.0
+    }
+}

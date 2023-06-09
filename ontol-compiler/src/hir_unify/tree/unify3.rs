@@ -2,7 +2,6 @@ use ontol_hir::kind::{
     Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
 };
 use ontol_runtime::DefId;
-use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -14,7 +13,7 @@ use crate::{
 
 use super::{
     expr,
-    prop_hierarchy::{PropHierarchy, PropHierarchyBuilder},
+    hierarchy::{Hierarchy, HierarchyBuilder},
     scope,
 };
 
@@ -183,8 +182,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }),
             // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
-                let prop_hierarchy =
-                    PropHierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
+                let prop_hierarchy = HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
                 let mut nodes = Vec::with_capacity(prop_hierarchy.len());
                 for level in prop_hierarchy {
                     nodes.push(self.unify_merged_prop_scope(level)?);
@@ -282,9 +280,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unify_merged_prop_scope(
         &mut self,
-        level: PropHierarchy<'m>,
+        level: Hierarchy<scope::Prop<'m>, expr::Prop<'m>>,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let level_props = level.props;
+        let level_props = level.expressions;
 
         let sub_nodes = level
             .children

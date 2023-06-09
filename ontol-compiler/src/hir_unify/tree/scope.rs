@@ -70,3 +70,9 @@ impl<'m> PatternBinding<'m> {
         }
     }
 }
+
+impl<'m> super::hierarchy::Scope for Prop<'m> {
+    fn vars(&self) -> &VarSet {
+        &self.vars
+    }
+}
