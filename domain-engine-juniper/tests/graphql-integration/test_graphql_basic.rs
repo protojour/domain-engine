@@ -184,6 +184,10 @@ async fn test_docs_introspection() {
                 __type(name: "PublicType") {
                     name
                     description
+                    fields {
+                        name
+                        description
+                    }
                 }
             }
             "#
@@ -193,6 +197,10 @@ async fn test_docs_introspection() {
                 "__type": {
                     "name": "PublicType",
                     "description": "this is a type",
+                    "fields": {
+                        "name": "relation",
+                        "description": "this is a field"
+                    }
                 }
             }))
         );
