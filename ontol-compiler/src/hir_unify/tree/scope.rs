@@ -22,7 +22,7 @@ impl<'m> Scope<'m> {
 
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
-    Unit,
+    Const,
     Var(ontol_hir::Var),
     Struct(Struct<'m>),
     Let(Let<'m>),

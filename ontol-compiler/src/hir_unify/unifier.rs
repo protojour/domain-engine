@@ -51,7 +51,8 @@ pub fn unify_to_function<'m>(
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     {
-        let scope = ScopeBuilder::new(unit_type).build_scope_binder(&scope_source);
+        let scope = ScopeBuilder::new(var_tracker.next_variable(), unit_type)
+            .build_scope_binder(&scope_source)?;
     }
 
     if false {

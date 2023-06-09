@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use bit_set::BitSet;
 use ontol_hir::{visitor::HirVisitor, Var};
 
-use crate::typed_hir::TypedHir;
+use crate::{typed_hir::TypedHir, SourceSpan};
 
 pub mod unifier;
 pub mod unifier2;
@@ -23,6 +23,7 @@ pub enum UnifierError {
     NonUniqueVariableDatapoints(VarSet),
     NoInputBinder,
     SequenceInputNotSupported,
+    MultipleVariablesInExpression(SourceSpan),
 }
 
 struct VariableTracker {

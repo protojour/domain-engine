@@ -67,7 +67,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 },
             }),
             // ### Unit scopes:
-            (expr::Kind::Prop(prop), scope::Kind::Unit) => {
+            (expr::Kind::Prop(prop), scope::Kind::Const) => {
                 let unit_scope = self.unit_scope();
                 let rel = self.unify3(unit_scope.clone(), prop.attr.rel)?;
                 let val = self.unify3(unit_scope, prop.attr.val)?;
@@ -91,7 +91,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Call(call), scope::Kind::Unit) => {
+            (expr::Kind::Call(call), scope::Kind::Const) => {
                 let unit_scope = self.unit_scope();
                 let args = call
                     .1
@@ -109,7 +109,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Struct(struct_expr), scope::Kind::Unit) => Ok(UnifiedNode3 {
+            (expr::Kind::Struct(struct_expr), scope::Kind::Const) => Ok(UnifiedNode3 {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Struct(struct_expr.0, vec![]),
@@ -145,7 +145,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         nodes_func: impl FnOnce(&mut Self) -> UnifierResult<Vec<TypedHirNode<'m>>>,
     ) -> UnifierResult<UnifiedBlock3<'m>> {
         match scope.kind {
-            scope::Kind::Unit => {
+            scope::Kind::Const => {
                 let nodes = nodes_func(self)?;
 
                 Ok(UnifiedBlock3 {
@@ -276,7 +276,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unit_scope(&mut self) -> scope::Scope<'m> {
         scope::Scope {
-            kind: scope::Kind::Unit,
+            kind: scope::Kind::Const,
             meta: self.unit_meta(),
             vars: VarSet::default(),
         }

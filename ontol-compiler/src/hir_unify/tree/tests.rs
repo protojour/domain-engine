@@ -79,7 +79,7 @@ impl<'m> From<()> for expr::Expr<'m> {
 
 impl<'m> From<()> for scope::Scope<'m> {
     fn from(_: ()) -> Self {
-        scope(scope::Kind::Unit, VarSet::default())
+        scope(scope::Kind::Const, VarSet::default())
     }
 }
 
