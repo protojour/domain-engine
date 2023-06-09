@@ -401,36 +401,25 @@ fn test_unify_opt_props1() {
     let output = test_unify(
         "
         (struct ($b)
-            (prop? $b S:1:7
+            (prop? $b S:0:0
                 (#u (map $a))
             )
         )
         ",
         "
         (struct ($c)
-            (prop? $c S:1:7
+            (prop? $c O:1:1
                 (#u (map $a))
             )
         )
         ",
     );
     let expected = indoc! {"
-        |$b| (struct ($d)
+        |$b| (struct ($c)
             (match-prop $b S:0:0
-                (($_ $c)
-                    (prop $d O:0:0
-                        (#u
-                            (struct ($e)
-                                (match-prop $c S:1:1
-                                    (($_ $a)
-                                        (prop $e O:1:1
-                                            (#u $a)
-                                        )
-                                    )
-                                    (())
-                                )
-                            )
-                        )
+                (($_ $a)
+                    (prop $c O:1:1
+                        (#u (map $a))
                     )
                 )
                 (())
