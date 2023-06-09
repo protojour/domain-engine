@@ -198,7 +198,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         block_context: BlockContext,
     ) -> Res<RootDefs> {
         let ast::RelStatement {
-            docs: _,
+            docs,
             kw: _,
             subject: (subject, subject_span),
             relation,
@@ -236,6 +236,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             (object_def, &object_span),
             span,
             ctx_block,
+            docs,
         )
     }
 
@@ -246,6 +247,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         object: (DefReference, &Span),
         span: Span,
         ctx_block: Option<Spanned<Vec<Spanned<ast::Statement>>>>,
+        docs: Vec<String>,
     ) -> Res<RootDefs> {
         let mut root_defs = RootDefs::new();
         let ast::Relation {
@@ -296,6 +298,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+        self.compiler.namespaces.docs.insert(relationship_id, docs);
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some((_, span)) = ctx_block {

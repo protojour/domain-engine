@@ -794,6 +794,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         optional: property_cardinality.is_optional(),
                         default_const_proc_address,
                         rel_params_operator_id,
+                        relationship_id: meta.relationship_id.0,
                     },
                 );
             }

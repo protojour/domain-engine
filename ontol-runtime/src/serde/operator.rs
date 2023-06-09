@@ -207,4 +207,5 @@ pub struct SerdeProperty {
     pub optional: bool,
     pub default_const_proc_address: Option<Address>,
     pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub relationship_id: DefId,
 }

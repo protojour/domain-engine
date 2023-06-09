@@ -109,7 +109,7 @@ impl TypeData {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(nodedata),
                 ..
-            }) => env.get_type_docs(nodedata.def_id),
+            }) => env.get_docs(nodedata.def_id),
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Edge(_),
                 ..
@@ -126,7 +126,7 @@ impl TypeData {
                 kind: ObjectKind::Mutation,
                 ..
             }) => None,
-            TypeKind::Union(uniondata) => env.get_type_docs(uniondata.union_def_id),
+            TypeKind::Union(uniondata) => env.get_docs(uniondata.union_def_id),
             TypeKind::CustomScalar(_) => None,
         }
     }
@@ -221,6 +221,7 @@ pub enum FieldKind {
 pub struct PropertyData {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
+    pub relationship_id: DefId,
 }
 
 #[derive(Debug)]

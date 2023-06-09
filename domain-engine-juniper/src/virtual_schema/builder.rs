@@ -502,6 +502,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                     kind: make_property_field_kind(PropertyData {
                                         property_id: property.property_id,
                                         value_operator_id: property.value_operator_id,
+                                        relationship_id: property.relationship_id,
                                     }),
                                     field_type: TypeRef::mandatory(edge_ref)
                                         .to_array(Optionality::from_optional(property.optional)),
@@ -535,6 +536,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             kind: make_property_field_kind(PropertyData {
                                 property_id: property.property_id,
                                 value_operator_id: property.value_operator_id,
+                                relationship_id: property.relationship_id,
                             }),
                             field_type: TypeRef {
                                 modifier: TypeModifier::new_unit(Optionality::from_optional(
@@ -564,6 +566,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             kind: FieldKind::Property(PropertyData {
                 property_id: property.property_id,
                 value_operator_id: property.value_operator_id,
+                relationship_id: property.relationship_id,
             }),
             field_type: TypeRef {
                 modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),

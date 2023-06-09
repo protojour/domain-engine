@@ -48,7 +48,12 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 .iter()
                 .map(|(name, field_data)| juniper::meta::Field {
                     name: name.clone(),
-                    description: None,
+                    description: match &field_data.kind {
+                        FieldKind::Property(property) => {
+                            self.virtual_schema.env().get_docs(property.relationship_id)
+                        }
+                        _ => None,
+                    },
                     arguments: self.get_arguments_for_field(&field_data.kind),
                     field_type: self
                         .get_type::<AttributeType>(field_data.field_type, TypingPurpose::Selection),

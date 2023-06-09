@@ -28,6 +28,7 @@ pub struct Env {
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
     domains: FnvHashMap<PackageId, Domain>,
+    docs: FnvHashMap<DefId, Vec<String>>,
     lib: Lib,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
@@ -43,6 +44,7 @@ impl Env {
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
                 domains: Default::default(),
+                docs: Default::default(),
                 lib: Lib::default(),
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
@@ -68,9 +70,13 @@ impl Env {
         }
     }
 
-    pub fn get_type_docs(&self, def_id: DefId) -> Option<std::string::String> {
-        let docs = self.get_type_info(def_id).docs.as_ref()?;
-        Some(docs.join("\n"))
+    pub fn get_docs(&self, def_id: DefId) -> Option<std::string::String> {
+        let docs = self.docs.get(&def_id)?;
+        if docs.is_empty() {
+            None
+        } else {
+            Some(docs.join("\n"))
+        }
     }
 
     pub fn get_string_pattern(&self, def_id: DefId) -> Option<&StringPattern> {
@@ -162,7 +168,6 @@ impl Domain {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
             name: None,
-            docs: None,
             entity_info: None,
             operator_id: None,
         });
@@ -174,15 +179,10 @@ impl Domain {
 #[derive(Clone, Debug)]
 pub struct TypeInfo {
     pub def_id: DefId,
-
     pub public: bool,
-
     pub name: Option<String>,
-    pub docs: Option<Vec<String>>,
-
     /// Some if this type is an entity
     pub entity_info: Option<EntityInfo>,
-
     pub operator_id: Option<SerdeOperatorId>,
 }
 
@@ -201,6 +201,11 @@ pub struct EnvBuilder {
 impl EnvBuilder {
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
         self.env.domains.insert(package_id, domain);
+    }
+
+    pub fn docs(mut self, docs: FnvHashMap<DefId, Vec<String>>) -> Self {
+        self.env.docs = docs;
+        self
     }
 
     pub fn lib(mut self, lib: Lib) -> Self {
