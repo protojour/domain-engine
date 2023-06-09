@@ -2,6 +2,7 @@ use ontol_hir::kind::{
     Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
 };
 use ontol_runtime::DefId;
+use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -53,9 +54,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             // ### need to return scope binder
             (kind, scope::Kind::Var(var)) => {
                 // TODO: remove const_scope, have a way to ergonomically re-assemble the scope
-                let unit_scope = self.const_scope();
+                let const_scope = self.const_scope();
                 let unified = self.unify3(
-                    unit_scope,
+                    const_scope,
                     expr::Expr {
                         kind,
                         meta: expr.meta,
@@ -120,9 +121,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }),
             // ### Unit scopes:
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
-                let unit_scope = self.const_scope();
-                let rel = self.unify3(unit_scope.clone(), prop.attr.rel)?;
-                let val = self.unify3(unit_scope, prop.attr.val)?;
+                let const_scope = self.const_scope();
+                let rel = self.unify3(const_scope.clone(), prop.attr.rel)?;
+                let val = self.unify3(const_scope, prop.attr.val)?;
 
                 Ok(UnifiedNode3 {
                     typed_binder: None,
@@ -182,11 +183,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }),
             // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
-                let prop_hiearchy = PropHierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
-                let nodes = prop_hiearchy
-                    .into_iter()
-                    .map(|level| self.unify_merged_prop_scope(level))
-                    .collect::<Result<_, _>>()?;
+                let prop_hierarchy =
+                    PropHierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
+                let mut nodes = Vec::with_capacity(prop_hierarchy.len());
+                for level in prop_hierarchy {
+                    nodes.push(self.unify_merged_prop_scope(level)?);
+                }
 
                 Ok(UnifiedNode3 {
                     typed_binder: Some(TypedBinder {
@@ -206,11 +208,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
     fn fully_wrap_in_scope(
         &mut self,
         scope: scope::Scope<'m>,
-        nodes_func: impl FnOnce(&mut Self) -> UnifierResult<Vec<TypedHirNode<'m>>>,
+        nodes_func: impl FnOnce(&mut Self, scope::Scope<'m>) -> UnifierResult<Vec<TypedHirNode<'m>>>,
     ) -> UnifierResult<UnifiedBlock3<'m>> {
         match scope.kind {
             scope::Kind::Const => {
-                let nodes = nodes_func(self)?;
+                let const_scope = self.const_scope();
+                let nodes = nodes_func(self, const_scope)?;
 
                 Ok(UnifiedBlock3 {
                     typed_binder: None,
@@ -218,7 +221,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 })
             }
             scope::Kind::Var(var) => {
-                let nodes = nodes_func(self)?;
+                let const_scope = self.const_scope();
+                let nodes = nodes_func(self, const_scope)?;
 
                 Ok(UnifiedBlock3 {
                     typed_binder: Some(TypedBinder {
@@ -228,7 +232,25 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     block: nodes,
                 })
             }
-            scope::Kind::Struct(_) => todo!(),
+            scope::Kind::Struct(struct_scope) => {
+                let typed_binder = TypedBinder {
+                    var: struct_scope.0 .0,
+                    ty: scope.meta.ty,
+                };
+                let nodes = nodes_func(
+                    self,
+                    scope::Scope {
+                        kind: scope::Kind::Struct(struct_scope),
+                        vars: scope.vars,
+                        meta: scope.meta,
+                    },
+                )?;
+
+                Ok(UnifiedBlock3 {
+                    typed_binder: Some(typed_binder),
+                    block: nodes,
+                })
+            }
             scope::Kind::Let(let_scope) => {
                 let inner_block = self.fully_wrap_in_scope(*let_scope.sub_scope, nodes_func)?;
                 let ty = inner_block
@@ -262,11 +284,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         &mut self,
         level: PropHierarchy<'m>,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let prop_exprs: Vec<_> = level
-            .props
-            .into_iter()
-            .map(|prop| self.mk_prop_expr(prop))
-            .collect();
+        let level_props = level.props;
 
         let sub_nodes = level
             .children
@@ -280,17 +298,32 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 let hir_rel_binding = rel_scope.hir_pattern_binding();
                 let hir_val_binding = val_scope.hir_pattern_binding();
 
+                // TODO:
+                // level_props must be zwizzled against rel and val scopes (scope index 0 and 1).
+                // this looks a bit like struct prop zwizzling.
+                // all props that share a scope function of the same binding
+                // are grouped into the same scope.
+                // Also we can support scope functions that combine rel and val in some way.
+                // There should be no `fn fully_wrap_in_scope`.
+                // If an output property has _disjoint scope_ for rel and val, there is no point
+                // wrapping it in scope.
+
                 // FIXME: if both scopes are defined, one should be "inside" the other
                 let scope = match val_scope {
                     scope::PatternBinding::Wildcard => self.const_scope(),
                     scope::PatternBinding::Scope(_, scope) => scope,
                 };
 
-                let unified_block = self.fully_wrap_in_scope(scope, move |zelf| {
+                let unified_block = self.fully_wrap_in_scope(scope, move |zelf, scope| {
                     let mut nodes = vec![];
-                    let unit_scope = zelf.const_scope();
+
+                    let prop_exprs: Vec<_> = level_props
+                        .into_iter()
+                        .map(|prop| zelf.mk_prop_expr(prop))
+                        .collect();
+
                     for expr in prop_exprs {
-                        nodes.push(zelf.unify3(unit_scope.clone(), expr)?.node);
+                        nodes.push(zelf.unify3(scope.clone(), expr)?.node);
                     }
 
                     nodes.extend(sub_nodes);
