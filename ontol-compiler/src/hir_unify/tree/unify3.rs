@@ -37,7 +37,11 @@ struct ScopedProps<'m> {
 }
 
 impl<'a, 'm> Unifier3<'a, 'm> {
-    pub(super) fn unify3(
+    pub fn new(types: &'a mut Types<'m>) -> Self {
+        Self { types }
+    }
+
+    pub fn unify3(
         &mut self,
         scope: scope::Scope<'m>,
         expr: expr::Expr<'m>,

@@ -21,7 +21,7 @@ use crate::{
 
 use super::{
     tagged_node::{TaggedKind, TaggedNode, Tagger},
-    tree::scope_builder::ScopeBuilder,
+    tree::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unify3::Unifier3},
     u_node::{self, UNode},
     unification_tree::{Scoping, UnificationNode},
     UnifierError, VariableTracker,
@@ -53,6 +53,30 @@ pub fn unify_to_function<'m>(
     {
         let scope_binder = ScopeBuilder::new(var_tracker.next_variable(), unit_type)
             .build_scope_binder(&scope_source)?;
+        let expr = ExprBuilder::default().hir_to_expr(&target);
+
+        let mut unifier3 = Unifier3::new(&mut compiler.types);
+        let unified3 = unifier3.unify3(scope_binder.scope, expr)?;
+
+        let hir_func = match unified3.typed_binder {
+            Some(arg) => {
+                // NB: Error is used in unification tests
+                if !matches!(source_ty, Type::Error) {
+                    assert_eq!(arg.ty, source_ty);
+                }
+                if !matches!(target_ty, Type::Error) {
+                    assert_eq!(unified3.node.meta.ty, target_ty);
+                }
+
+                Ok(HirFunc {
+                    arg,
+                    body: unified3.node,
+                })
+            }
+            None => Err(UnifierError::NoInputBinder),
+        };
+
+        return hir_func;
 
         // panic!("{:#?}", scope_binder.scope);
     }

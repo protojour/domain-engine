@@ -16,6 +16,7 @@ pub enum Kind<'m> {
     Unit,
     Struct(Struct<'m>),
     Prop(Box<Prop<'m>>),
+    Map(Box<Expr<'m>>),
     Call(Call<'m>),
     Int(i64),
 }
