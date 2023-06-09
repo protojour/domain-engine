@@ -13,6 +13,13 @@ pub struct Scope<'m> {
     pub meta: Meta<'m>,
 }
 
+impl<'m> Scope<'m> {
+    pub fn union_var(mut self, var: ontol_hir::Var) -> Self {
+        self.vars.0.insert(var.0 as usize);
+        self
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
     Unit,

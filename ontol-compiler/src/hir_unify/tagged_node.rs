@@ -162,24 +162,24 @@ pub struct Tagger<'m> {
 }
 
 #[derive(Default)]
-struct Union {
+pub struct UnionBuilder {
     free_variables: BitSet,
 }
 
-impl Union {
-    fn plus<'m>(&mut self, u_node: UNode<'m>) -> UNode<'m> {
+impl UnionBuilder {
+    pub fn plus<'m>(&mut self, u_node: UNode<'m>) -> UNode<'m> {
         self.free_variables.union_with(&u_node.free_variables);
         u_node
     }
 
-    fn plus_vec<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> Vec<UNode<'m>> {
+    pub fn plus_vec<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> Vec<UNode<'m>> {
         for u_node in &u_nodes {
             self.free_variables.union_with(&u_node.free_variables);
         }
         u_nodes
     }
 
-    fn plus_block_body<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> UBlockBody<'m> {
+    pub fn plus_block_body<'m>(&mut self, u_nodes: Vec<UNode<'m>>) -> UBlockBody<'m> {
         let u_nodes = self.plus_vec(u_nodes);
         UBlockBody {
             sub_scoping: Default::default(),
@@ -218,6 +218,10 @@ impl<'m> Tagger<'m> {
         }
     }
 
+    pub fn in_scope(&self) -> &BitSet {
+        &self.in_scope
+    }
+
     pub fn to_u_nodes(&mut self, node: TypedHirNode<'m>) -> UNodes<'m> {
         let (kind, meta) = node.split();
         match kind {
@@ -234,7 +238,7 @@ impl<'m> Tagger<'m> {
             NodeKind::Unit => self.make_leaf(LeafUNodeKind::Unit, meta).into(),
             NodeKind::Int(int) => self.make_leaf(LeafUNodeKind::Int(int), meta).into(),
             NodeKind::Let(binder, def, body) => self.enter_binder(binder, |zelf| {
-                let mut union = Union::default();
+                let mut union = UnionBuilder::default();
                 let def = Box::new(union.plus(zelf.to_u_nodes(*def).unwrap_one()));
                 let body = union.plus_block_body(
                     body.into_iter()
@@ -266,7 +270,7 @@ impl<'m> Tagger<'m> {
                 .into()
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
-                let mut union = Union::default();
+                let mut union = UnionBuilder::default();
                 let body = union.plus_block_body(
                     nodes
                         .into_iter()
@@ -310,7 +314,7 @@ impl<'m> Tagger<'m> {
         args: Vec<TypedHirNode<'m>>,
         meta: Meta<'m>,
     ) -> UNodes<'m> {
-        let mut union = Union::default();
+        let mut union = UnionBuilder::default();
         let args = union.plus_vec(
             args.into_iter()
                 .flat_map(|hir| self.to_u_nodes(hir).0.into_iter())
@@ -703,7 +707,7 @@ impl<'m> Tagger<'m> {
         }
     }
 
-    fn register_label(&mut self, label: ontol_hir::Label) {
+    pub fn register_label(&mut self, label: ontol_hir::Label) {
         if self.labels.contains(label.0 as usize) {
             panic!("Duplicate label: {label}");
         }

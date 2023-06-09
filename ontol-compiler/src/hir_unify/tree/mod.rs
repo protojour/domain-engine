@@ -1,6 +1,8 @@
 pub mod expr;
-mod prop_hierarchy;
 pub mod scope;
+pub mod scope_builder;
+
+mod prop_hierarchy;
 mod unify3;
 
 #[cfg(test)]

@@ -21,6 +21,7 @@ use crate::{
 
 use super::{
     tagged_node::{TaggedKind, TaggedNode, Tagger},
+    tree::scope_builder::ScopeBuilder,
     u_node::{self, UNode},
     unification_tree::{Scoping, UnificationNode},
     UnifierError, VariableTracker,
@@ -50,6 +51,10 @@ pub fn unify_to_function<'m>(
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     {
+        let scope = ScopeBuilder::new(unit_type).build_scope_binder(&scope_source);
+    }
+
+    if false {
         let mut u_node: UNode = Tagger::new(unit_type)
             .to_u_nodes(target.clone())
             .unwrap_one();
