@@ -46,8 +46,11 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         scope: scope::Scope<'m>,
         expr: expr::Expr<'m>,
     ) -> Result<UnifiedNode3<'m>, UnifierError> {
+        // FIXME: This can be a loop instead of forced recursion,
+        // for simple cases where the unified node is returned as-is from the layer below.
+
         match (expr.kind, scope.kind) {
-            // need to return scope binder
+            // ### need to return scope binder
             (kind, scope::Kind::Var(var)) => {
                 let unit_scope = self.unit_scope();
                 let unified = self.unify3(
@@ -82,6 +85,30 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     meta: expr.meta,
                 },
             }),
+            // ### forced scope expansions:
+            (kind, scope::Kind::Let(let_scope)) => {
+                let unified = self.unify3(
+                    *let_scope.sub_scope,
+                    expr::Expr {
+                        kind,
+                        meta: expr.meta,
+                        free_vars: expr.free_vars,
+                    },
+                )?;
+                let expr_meta = unified.node.meta;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: let_scope.outer_binder,
+                    node: TypedHirNode {
+                        kind: NodeKind::Let(
+                            let_scope.inner_binder,
+                            Box::new(let_scope.def),
+                            vec![unified.node],
+                        ),
+                        meta: expr_meta,
+                    },
+                })
+            }
             // ### Simple scopes, no swizzling needed:
             (expr::Kind::Var(var), _) => Ok(UnifiedNode3 {
                 typed_binder: None,
