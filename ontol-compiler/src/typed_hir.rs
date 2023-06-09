@@ -78,12 +78,12 @@ pub struct HirFunc<'m> {
 
 impl<'m> Display for HirFunc<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "|{}| {}", self.arg.variable, self.body)
+        write!(f, "|{}| {}", self.arg.var, self.body)
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct TypedBinder<'m> {
-    pub variable: Var,
+    pub var: Var,
     pub ty: TypeRef<'m>,
 }

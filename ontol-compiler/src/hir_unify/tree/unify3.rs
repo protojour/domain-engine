@@ -47,6 +47,26 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         expr: expr::Expr<'m>,
     ) -> Result<UnifiedNode3<'m>, UnifierError> {
         match (expr.kind, scope.kind) {
+            // need to return scope binder
+            (kind, scope::Kind::Var(var)) => {
+                let unit_scope = self.unit_scope();
+                let unified = self.unify3(
+                    unit_scope,
+                    expr::Expr {
+                        kind,
+                        meta: expr.meta,
+                        free_vars: expr.free_vars,
+                    },
+                )?;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: Some(TypedBinder {
+                        var,
+                        ty: scope.meta.ty,
+                    }),
+                    node: unified.node,
+                })
+            }
             // ### Expr constants - no scope needed:
             (expr::Kind::Unit, _) => Ok(UnifiedNode3 {
                 typed_binder: None,
@@ -130,7 +150,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 Ok(UnifiedNode3 {
                     typed_binder: Some(TypedBinder {
-                        variable: struct_scope.0 .0,
+                        var: struct_scope.0 .0,
                         ty: scope.meta.ty,
                     }),
                     node: TypedHirNode {

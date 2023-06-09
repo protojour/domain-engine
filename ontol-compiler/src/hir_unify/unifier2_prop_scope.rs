@@ -165,7 +165,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             self.unify_u_block(u_block, ScopeSource::Node(scope))?;
 
         let binding = match binder {
-            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
+            Some(TypedBinder { var: variable, .. }) => PatternBinding::Binder(variable),
             None => PatternBinding::Wildcard,
         };
         Ok(UnifyPatternBinding2 {

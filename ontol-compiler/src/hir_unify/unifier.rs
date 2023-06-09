@@ -304,7 +304,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let nodes = self.merge_target_nodes(&mut scoping)?;
                 Ok(Unified {
                     binder: Some(TypedBinder {
-                        variable: *var,
+                        var: *var,
                         ty: meta.ty,
                     }),
                     nodes,
@@ -351,7 +351,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     let return_ty = self.last_type(inverted_call.body.iter());
                     Ok(Unified {
                         binder: Some(TypedBinder {
-                            variable: subst_var,
+                            var: subst_var,
                             ty: meta.ty,
                         }),
                         nodes: [TypedHirNode {
@@ -486,7 +486,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         Ok(Unified {
             binder: Some(TypedBinder {
-                variable: binder.0,
+                var: binder.0,
                 ty: meta.ty,
             }),
             nodes: sub_scope_nodes.into(),
@@ -927,7 +927,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         let Unified { nodes, binder } = self.unify_u_node(debug_index, u_node, source)?;
         let binding = match binder {
-            Some(TypedBinder { variable, .. }) => PatternBinding::Binder(variable),
+            Some(TypedBinder { var: variable, .. }) => PatternBinding::Binder(variable),
             None => PatternBinding::Wildcard,
         };
         Ok(UnifyPatternBinding {

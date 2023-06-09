@@ -44,7 +44,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
 
         Ok(UnifiedNode {
             binder: Some(TypedBinder {
-                variable: binder_var,
+                var: binder_var,
                 ty: scope_meta.ty,
             }),
             node: TypedHirNode {

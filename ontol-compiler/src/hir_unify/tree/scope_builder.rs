@@ -34,7 +34,7 @@ impl<'m> ScopeBinder<'m> {
             scope::Kind::Const => scope::PatternBinding::Wildcard,
             _ => scope::PatternBinding::Scope(
                 match self.binder {
-                    Some(binder) => binder.variable,
+                    Some(binder) => binder.var,
                     None => panic!("missing scope binder: {:?}", self.scope),
                 },
                 self.scope,
@@ -78,7 +78,7 @@ impl<'m> ScopeBuilder<'m> {
                             params,
                             analysis,
                             TypedBinder {
-                                variable: binder_var,
+                                var: binder_var,
                                 ty: node.meta.ty,
                             },
                             TypedHirNode {
@@ -104,7 +104,7 @@ impl<'m> ScopeBuilder<'m> {
 
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
-                        variable: binder.0,
+                        var: binder.0,
                         ty: node.meta.ty,
                     }),
                     scope: scope::Scope {
@@ -254,10 +254,7 @@ impl<'m> ScopeBuilder<'m> {
         };
 
         ScopeBinder {
-            binder: Some(TypedBinder {
-                variable: var,
-                ty: meta.ty,
-            }),
+            binder: Some(TypedBinder { var, ty: meta.ty }),
             scope,
         }
     }

@@ -408,7 +408,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
             NodeKind::Var(var) => {
                 debug!("classify_scoping(VariableRef)");
                 Ok(Scoping::Binder(TypedBinder {
-                    variable: *var,
+                    var: *var,
                     ty: meta.ty,
                 }))
             }
@@ -434,7 +434,7 @@ impl<'s, 'm> Unifier<'s, 'm> {
                 debug!("classify_scoping(Struct({}))", binder.0);
                 Ok(Scoping::Block(
                     TypedBinder {
-                        variable: binder.0,
+                        var: binder.0,
                         ty: meta.ty,
                     },
                     child_scopes,

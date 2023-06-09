@@ -62,7 +62,7 @@ pub(super) fn map_codegen(
         scope: Default::default(),
         errors,
     };
-    generator.scope.insert(func.arg.variable, Local(0));
+    generator.scope.insert(func.arg.var, Local(0));
     generator.gen_node(func.body, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
