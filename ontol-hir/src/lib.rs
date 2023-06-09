@@ -23,7 +23,7 @@ impl From<u32> for Var {
 
 impl Debug for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Variable({})", AsAlpha(self.0))
+        write!(f, "Var({})", AsAlpha(self.0))
     }
 }
 

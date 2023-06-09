@@ -178,16 +178,54 @@ impl<'m> ScopeBuilder<'m> {
         outer_binder: TypedBinder<'m>,
         let_def: TypedHirNode<'m>,
     ) -> UnifierResult<ScopeBinder<'m>> {
-        match analysis.kind {
-            ExprAnalysisKind::Const => unreachable!("Const"),
-            ExprAnalysisKind::Var(scoped_var) => Ok(ScopeBinder {
+        let (var_param_index, next_analysis) = match analysis.kind {
+            ExprAnalysisKind::Const | ExprAnalysisKind::Var(_) => unreachable!(),
+            ExprAnalysisKind::FnCall {
+                var_param_index,
+                child,
+            } => (var_param_index, child),
+        };
+        let next_analysis = *next_analysis;
+
+        // FIXME: Properly check this
+        let inverted_proc = match proc {
+            BuiltinProc::Add => BuiltinProc::Sub,
+            BuiltinProc::Sub => BuiltinProc::Add,
+            BuiltinProc::Mul => BuiltinProc::Div,
+            BuiltinProc::Div => BuiltinProc::Mul,
+            _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
+        };
+
+        let mut inverted_params = vec![];
+
+        for param_index in 0..params.len() {
+            if param_index != var_param_index {
+                inverted_params.push(params[param_index].clone());
+            }
+        }
+        inverted_params.insert(var_param_index, let_def);
+
+        let next_let_def = TypedHirNode {
+            kind: NodeKind::Call(inverted_proc, inverted_params),
+            // Is this correct?
+            meta: analysis.meta,
+        };
+
+        match (&params[var_param_index].kind, next_analysis) {
+            (
+                NodeKind::Var(_),
+                ExprAnalysis {
+                    kind: ExprAnalysisKind::Var(scoped_var),
+                    ..
+                },
+            ) => Ok(ScopeBinder {
                 binder: Some(outer_binder),
                 scope: self
                     .mk_scope(
                         scope::Kind::Let(scope::Let {
                             outer_binder: Some(outer_binder),
                             inner_binder: ontol_hir::Binder(scoped_var),
-                            def: let_def,
+                            def: next_let_def,
                             sub_scope: Box::new(
                                 self.mk_scope(scope::Kind::Const, self.unit_meta()),
                             ),
@@ -196,36 +234,14 @@ impl<'m> ScopeBuilder<'m> {
                     )
                     .union_var(scoped_var),
             }),
-            ExprAnalysisKind::FnCall {
-                var_param_index,
-                child,
-            } => {
-                // FIXME: Properly check this
-                let inverted_proc = match proc {
-                    BuiltinProc::Add => BuiltinProc::Sub,
-                    BuiltinProc::Sub => BuiltinProc::Add,
-                    BuiltinProc::Mul => BuiltinProc::Div,
-                    BuiltinProc::Div => BuiltinProc::Mul,
-                    _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
-                };
-
-                let mut inverted_params = vec![];
-
-                for param_index in 0..params.len() {
-                    if param_index != var_param_index {
-                        inverted_params.push(params[param_index].clone());
-                    }
-                }
-                inverted_params.insert(var_param_index, let_def);
-
-                let next_let_def = TypedHirNode {
-                    kind: NodeKind::Call(inverted_proc, inverted_params),
-                    // Is this correct?
-                    meta: analysis.meta,
-                };
-
-                self.invert_expr(proc, params, *child, outer_binder, next_let_def)
-            }
+            (NodeKind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
+                *next_proc,
+                next_params,
+                child_analysis,
+                outer_binder,
+                next_let_def,
+            ),
+            _ => panic!("invalid: {}", &params[var_param_index]),
         }
     }
 
