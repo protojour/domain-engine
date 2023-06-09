@@ -12,7 +12,6 @@ pub struct Expr<'m> {
 
 #[derive(Debug)]
 pub enum Kind<'m> {
-    // Block(Vec<Expr<'m>>),
     Var(ontol_hir::Var),
     Unit,
     Struct(Struct<'m>),

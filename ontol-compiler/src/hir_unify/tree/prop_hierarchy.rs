@@ -93,18 +93,53 @@ impl<'m> PropHierarchyBuilder<'m> {
         scope_index: usize,
         in_scope: VarSet,
     ) -> IndexedPropHierarchy<'m> {
+        // props in scope:
         let mut in_scope_props = vec![];
+        // props not in scope (yet), needs to use a sub-group (hierarchy level) to put into scope
         let mut sub_groups: FnvHashMap<ontol_hir::Var, Vec<expr::Prop>> = Default::default();
 
         for expr_prop in expr_props {
             let mut difference = expr_prop.free_vars.0.difference(&in_scope.0);
 
-            if let Some(unscoped_var) = difference.next() {
-                sub_groups
-                    .entry(ontol_hir::Var(unscoped_var as u32))
-                    .or_default()
-                    .push(expr_prop);
+            fn next_var(iter: &mut impl Iterator<Item = usize>) -> Option<ontol_hir::Var> {
+                iter.next().map(|val| ontol_hir::Var(val as u32))
+            }
+
+            if let Some(first_unscoped_var) = next_var(&mut difference) {
+                // Needs to assign to a subgroup. Algorithm:
+                // For all unscoped vars, check if there already exists a subgroup already assigned to
+                // put that variable into scope, and reuse that group.
+                // If no such group exists, create a new group using the _first unscoped variable_.
+                //
+                // This algorithm should create fewer code branches.
+
+                if let Some(group) = sub_groups.get_mut(&first_unscoped_var) {
+                    // assign to existing sub group
+                    group.push(expr_prop);
+                } else {
+                    let unassigned_expr_prop = loop {
+                        if let Some(next_unscoped_var) = next_var(&mut difference) {
+                            if let Some(group) = sub_groups.get_mut(&next_unscoped_var) {
+                                // assign to existing sub group
+                                group.push(expr_prop);
+                                break None;
+                            }
+                        } else {
+                            // unable to assign to an existing group
+                            break Some(expr_prop);
+                        }
+                    };
+
+                    if let Some(expr_prop) = unassigned_expr_prop {
+                        // assign to new sub group
+                        sub_groups
+                            .entry(first_unscoped_var)
+                            .or_default()
+                            .push(expr_prop);
+                    }
+                }
             } else {
+                // all variables are in scope
                 in_scope_props.push(expr_prop);
             }
         }

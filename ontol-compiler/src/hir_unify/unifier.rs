@@ -54,7 +54,7 @@ pub fn unify_to_function<'m>(
         let scope_binder = ScopeBuilder::new(var_tracker.next_variable(), unit_type)
             .build_scope_binder(&scope_source)?;
 
-        panic!("{:#?}", scope_binder.scope);
+        // panic!("{:#?}", scope_binder.scope);
     }
 
     if false {
