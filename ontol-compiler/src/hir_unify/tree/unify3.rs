@@ -52,7 +52,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         match (expr.kind, scope.kind) {
             // ### need to return scope binder
             (kind, scope::Kind::Var(var)) => {
-                let unit_scope = self.unit_scope();
+                // TODO: remove const_scope, have a way to ergonomically re-assemble the scope
+                let unit_scope = self.const_scope();
                 let unified = self.unify3(
                     unit_scope,
                     expr::Expr {
@@ -119,7 +120,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }),
             // ### Unit scopes:
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
-                let unit_scope = self.unit_scope();
+                let unit_scope = self.const_scope();
                 let rel = self.unify3(unit_scope.clone(), prop.attr.rel)?;
                 let val = self.unify3(unit_scope, prop.attr.val)?;
 
@@ -143,12 +144,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 })
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {
-                let unit_scope = self.unit_scope();
+                let const_scope = self.const_scope();
                 let args = call
                     .1
                     .into_iter()
                     .map(|arg| {
-                        self.unify3(unit_scope.clone(), arg)
+                        self.unify3(const_scope.clone(), arg)
                             .map(|unified| unified.node)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
@@ -156,6 +157,18 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     typed_binder: None,
                     node: TypedHirNode {
                         kind: NodeKind::Call(call.0, args),
+                        meta: expr.meta,
+                    },
+                })
+            }
+            (expr::Kind::Map(param), scope::Kind::Const) => {
+                let const_scope = self.const_scope();
+                let unified_param = self.unify3(const_scope, *param)?;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: unified_param.typed_binder,
+                    node: TypedHirNode {
+                        kind: NodeKind::Map(Box::new(unified_param.node)),
                         meta: expr.meta,
                     },
                 })
@@ -204,7 +217,17 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     block: nodes,
                 })
             }
-            scope::Kind::Var(_) => todo!(),
+            scope::Kind::Var(var) => {
+                let nodes = nodes_func(self)?;
+
+                Ok(UnifiedBlock3 {
+                    typed_binder: Some(TypedBinder {
+                        var,
+                        ty: scope.meta.ty,
+                    }),
+                    block: nodes,
+                })
+            }
             scope::Kind::Struct(_) => todo!(),
             scope::Kind::Let(let_scope) => {
                 let inner_block = self.fully_wrap_in_scope(*let_scope.sub_scope, nodes_func)?;
@@ -259,13 +282,13 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 // FIXME: if both scopes are defined, one should be "inside" the other
                 let scope = match val_scope {
-                    scope::PatternBinding::Wildcard => self.unit_scope(),
+                    scope::PatternBinding::Wildcard => self.const_scope(),
                     scope::PatternBinding::Scope(_, scope) => scope,
                 };
 
                 let unified_block = self.fully_wrap_in_scope(scope, move |zelf| {
                     let mut nodes = vec![];
-                    let unit_scope = zelf.unit_scope();
+                    let unit_scope = zelf.const_scope();
                     for expr in prop_exprs {
                         nodes.push(zelf.unify3(unit_scope.clone(), expr)?.node);
                     }
@@ -325,7 +348,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         }
     }
 
-    fn unit_scope(&mut self) -> scope::Scope<'m> {
+    fn const_scope(&mut self) -> scope::Scope<'m> {
         scope::Scope {
             kind: scope::Kind::Const,
             meta: self.unit_meta(),
