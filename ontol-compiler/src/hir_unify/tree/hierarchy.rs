@@ -13,6 +13,7 @@ pub trait Expression {
     fn optional(&self) -> bool;
 }
 
+#[derive(Debug)]
 pub struct Hierarchy<S, E> {
     pub scope: S,
     pub expressions: Vec<E>,

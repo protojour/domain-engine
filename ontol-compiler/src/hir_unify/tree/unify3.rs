@@ -2,6 +2,7 @@ use ontol_hir::kind::{
     Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
 };
 use ontol_runtime::DefId;
+use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -29,11 +30,6 @@ pub struct UnifiedNode3<'m> {
 struct UnifiedBlock3<'m> {
     pub typed_binder: Option<TypedBinder<'m>>,
     pub block: Vec<TypedHirNode<'m>>,
-}
-
-struct ScopedProps<'m> {
-    scope: scope::Prop<'m>,
-    props: Vec<expr::Prop<'m>>,
 }
 
 impl<'a, 'm> Unifier3<'a, 'm> {
@@ -308,7 +304,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 // FIXME: if both scopes are defined, one should be "inside" the other
                 let scope = match val_scope {
-                    scope::PatternBinding::Wildcard => self.const_scope(),
+                    scope::PatternBinding::Wildcard(_) => self.const_scope(),
                     scope::PatternBinding::Scope(_, scope) => scope,
                 };
 
@@ -333,6 +329,57 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
                     nodes: unified_block.block,
                 }
+            }
+            scope::PropKind::Seq(binding) => {
+                todo!()
+            }
+        };
+
+        let mut match_arms = vec![match_arm];
+
+        if level.scope.optional.0 {
+            match_arms.push(MatchArm {
+                pattern: PropPattern::Absent,
+                nodes: vec![],
+            });
+        }
+
+        Ok(TypedHirNode {
+            kind: NodeKind::MatchProp(level.scope.struct_var, level.scope.prop_id, match_arms),
+            meta: Meta {
+                ty: self.types.intern(Type::Unit(DefId::unit())),
+                span: SourceSpan::none(),
+            },
+        })
+    }
+
+    fn unify_merged_prop_scope2(
+        &mut self,
+        level: Hierarchy<scope::Prop<'m>, expr::Prop<'m>>,
+    ) -> UnifierResult<TypedHirNode<'m>> {
+        let level_props = level.expressions;
+
+        let sub_nodes = level
+            .children
+            .into_iter()
+            .map(|sub_level| self.unify_merged_prop_scope(sub_level))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // FIXME: re-grouped match arms
+        let match_arm: MatchArm<_> = match level.scope.kind {
+            scope::PropKind::Attr(rel_binding, val_binding) => {
+                let hir_rel_binding = rel_binding.hir_pattern_binding();
+                let hir_val_binding = val_binding.hir_pattern_binding();
+
+                let attr_hierarchy = HierarchyBuilder::new(vec![
+                    rel_binding.into_scope(),
+                    val_binding.into_scope(),
+                ])?
+                .build(level_props);
+
+                debug!("attr_hierarchy: {attr_hierarchy:#?}");
+
+                panic!()
             }
             scope::PropKind::Seq(binding) => {
                 todo!()

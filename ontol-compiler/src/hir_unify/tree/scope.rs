@@ -1,3 +1,4 @@
+use bit_set::BitSet;
 use ontol_hir::kind::Optional;
 use ontol_runtime::value::PropertyId;
 
@@ -58,16 +59,33 @@ pub enum PropKind<'m> {
 
 #[derive(Clone, Debug)]
 pub enum PatternBinding<'m> {
-    Wildcard,
+    Wildcard(Meta<'m>),
     Scope(ontol_hir::Var, Scope<'m>),
 }
 
 impl<'m> PatternBinding<'m> {
     pub fn hir_pattern_binding(&self) -> ontol_hir::kind::PatternBinding {
         match &self {
-            Self::Wildcard => ontol_hir::kind::PatternBinding::Wildcard,
+            Self::Wildcard(_) => ontol_hir::kind::PatternBinding::Wildcard,
             Self::Scope(binder, _) => ontol_hir::kind::PatternBinding::Binder(*binder),
         }
+    }
+
+    pub fn into_scope(self) -> Scope<'m> {
+        match self {
+            Self::Wildcard(meta) => Scope {
+                kind: Kind::Const,
+                vars: VarSet::default(),
+                meta,
+            },
+            Self::Scope(_, scope) => scope,
+        }
+    }
+}
+
+impl<'m> super::hierarchy::Scope for Scope<'m> {
+    fn vars(&self) -> &VarSet {
+        &self.vars
     }
 }
 

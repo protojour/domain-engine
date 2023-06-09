@@ -119,7 +119,7 @@ fn test_trees<'m>(
                     prop_id: prop_id("S:0:0"),
                     disjoint_group: 0,
                     kind: scope::PropKind::Attr(
-                        scope::PatternBinding::Wildcard,
+                        scope::PatternBinding::Wildcard(meta()),
                         scope::PatternBinding::Scope(
                             Var(4),
                             scope::Let {
@@ -154,7 +154,7 @@ fn test_trees<'m>(
                     prop_id: prop_id("S:1:1"),
                     disjoint_group: 1,
                     kind: scope::PropKind::Attr(
-                        scope::PatternBinding::Wildcard,
+                        scope::PatternBinding::Wildcard(meta()),
                         scope::PatternBinding::Scope(
                             Var(5),
                             scope::Let {

@@ -31,7 +31,7 @@ impl<'m> ScopeBinder<'m> {
 
     fn to_scope_pattern_binding(self) -> scope::PatternBinding<'m> {
         match &self.scope.kind {
-            scope::Kind::Const => scope::PatternBinding::Wildcard,
+            scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.meta),
             _ => scope::PatternBinding::Scope(
                 match self.binder {
                     Some(binder) => binder.var,
