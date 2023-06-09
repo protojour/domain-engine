@@ -45,7 +45,7 @@ async fn test_graphql_basic_schema() {
                             prop
                         }
                     }
-                }    
+                }
             }"
             .exec(&schema, &ctx)
             .await,
@@ -155,6 +155,46 @@ async fn test_inner_struct() {
                     }
                 }
             })),
+        );
+    }
+}
+
+#[test(tokio::test)]
+async fn test_docs_introspection() {
+    let (_env, schema) = "
+    type Key {
+        rel _ is: string
+    }
+
+    /// this is a type
+    pub type PublicType {
+        rel Key identifies: _
+        /// this is a field
+        rel _ 'relation': string
+    }
+    "
+    .compile_schema();
+
+    {
+        let ctx = mock_gql_context(());
+
+        assert_eq!(
+            r#"
+            {
+                __type(name: "PublicType") {
+                    name
+                    description
+                }
+            }
+            "#
+            .exec(&schema, &ctx)
+            .await,
+            Ok(graphql_value!({
+                "__type": {
+                    "name": "PublicType",
+                    "description": "this is a type",
+                }
+            }))
         );
     }
 }
