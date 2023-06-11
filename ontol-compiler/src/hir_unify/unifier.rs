@@ -58,6 +58,8 @@ pub fn unify_to_function<'m>(
         let mut unifier3 = Unifier3::new(&mut compiler.types);
         let unified3 = unifier3.unify3(scope_binder.scope, expr)?;
 
+        debug!("unified node {}", unified3.node);
+
         let hir_func = match unified3.typed_binder {
             Some(arg) => {
                 // NB: Error is used in unification tests
@@ -76,7 +78,10 @@ pub fn unify_to_function<'m>(
             None => Err(UnifierError::NoInputBinder),
         };
 
-        return hir_func;
+        return hir_func.map_err(|err| {
+            warn!("unifier error: {err:?}");
+            err
+        });
 
         // panic!("{:#?}", scope_binder.scope);
     }
@@ -927,7 +932,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
         let Unified { nodes, binder } = self.unify_u_node(debug_index, u_node, source)?;
         let binding = match binder {
-            Some(TypedBinder { var: variable, .. }) => PatternBinding::Binder(variable),
+            Some(TypedBinder { var, .. }) => PatternBinding::Binder(var),
             None => PatternBinding::Wildcard,
         };
         Ok(UnifyPatternBinding {

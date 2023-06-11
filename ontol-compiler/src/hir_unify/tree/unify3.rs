@@ -91,15 +91,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     free_vars: expr.free_vars,
                 }],
             ),
-            // ### Simple expressions, no swizzling needed:
-            (expr::Kind::Var(var), _) => Ok(UnifiedNode3 {
+            // ### Const scopes (fully expanded):
+            (expr::Kind::Var(var), scope::Kind::Const) => Ok(UnifiedNode3 {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Var(var),
                     meta: expr.meta,
                 },
             }),
-            // ### Unit scopes:
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
                 let const_scope = self.const_scope();
                 let rel = self.unify3(const_scope.clone(), prop.attr.rel)?;
@@ -126,14 +125,10 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {
                 let const_scope = self.const_scope();
-                let args = call
-                    .1
-                    .into_iter()
-                    .map(|arg| {
-                        self.unify3(const_scope.clone(), arg)
-                            .map(|unified| unified.node)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut args = Vec::with_capacity(call.1.len());
+                for arg in call.1 {
+                    args.push(self.unify3(const_scope.clone(), arg)?.node);
+                }
                 Ok(UnifiedNode3 {
                     typed_binder: None,
                     node: TypedHirNode {
@@ -154,13 +149,36 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Struct(struct_expr), scope::Kind::Const) => Ok(UnifiedNode3 {
-                typed_binder: None,
-                node: TypedHirNode {
-                    kind: NodeKind::Struct(struct_expr.0, vec![]),
-                    meta: expr.meta,
-                },
-            }),
+            (expr::Kind::Struct(struct_expr), kind @ scope::Kind::Const) => {
+                let scope = scope::Scope {
+                    kind,
+                    vars: scope.vars,
+                    meta: scope.meta,
+                };
+                let mut nodes = Vec::with_capacity(struct_expr.1.len());
+                for prop in struct_expr.1 {
+                    let meta = self.unit_meta();
+                    nodes.push(
+                        self.unify3(
+                            scope.clone(),
+                            expr::Expr {
+                                free_vars: prop.free_vars.clone(),
+                                kind: expr::Kind::Prop(Box::new(prop)),
+                                meta,
+                            },
+                        )?
+                        .node,
+                    );
+                }
+
+                Ok(UnifiedNode3 {
+                    typed_binder: None,
+                    node: TypedHirNode {
+                        kind: NodeKind::Struct(struct_expr.0, nodes),
+                        meta: expr.meta,
+                    },
+                })
+            }
             // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
                 let scoped_props: Vec<_> =
@@ -313,18 +331,26 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         scope_prop: scope::Prop<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<UnifiedNode3<'m>> {
-        let match_arm: MatchArm<_> = match scope_prop.kind {
+        let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
                 let hir_rel_binding = rel_binding.hir_pattern_binding();
                 let hir_val_binding = val_binding.hir_pattern_binding();
 
                 let joined_scope = self.join_attr_scope(rel_binding, val_binding);
                 let nodes = self.wrap_sub_scoped_props_in_scope(joined_scope, sub_scoped)?;
+                let ty = nodes
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
 
-                MatchArm {
-                    pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
-                    nodes,
-                }
+                (
+                    MatchArm {
+                        pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
+                        nodes,
+                    },
+                    ty,
+                )
             }
             scope::PropKind::Seq(binding) => {
                 todo!()
@@ -345,7 +371,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             node: TypedHirNode {
                 kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
                 meta: Meta {
-                    ty: self.types.intern(Type::Unit(DefId::unit())),
+                    ty,
                     span: SourceSpan::none(),
                 },
             },
@@ -457,18 +483,26 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         scope_prop: scope::Prop<'m>,
         sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<UnifiedNode3<'m>> {
-        let match_arm: MatchArm<_> = match scope_prop.kind {
+        let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
                 let hir_rel_binding = rel_binding.hir_pattern_binding();
                 let hir_val_binding = val_binding.hir_pattern_binding();
 
                 let joined_scope = self.join_attr_scope(rel_binding, val_binding);
                 let nodes = self.wrap_sub_scoped_expressions_in_scope(joined_scope, sub_scoped)?;
+                let ty = nodes
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
 
-                MatchArm {
-                    pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
-                    nodes,
-                }
+                (
+                    MatchArm {
+                        pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
+                        nodes,
+                    },
+                    ty,
+                )
             }
             scope::PropKind::Seq(binding) => {
                 todo!()
@@ -489,7 +523,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             node: TypedHirNode {
                 kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
                 meta: Meta {
-                    ty: self.types.intern(Type::Unit(DefId::unit())),
+                    ty,
                     span: SourceSpan::none(),
                 },
             },
@@ -502,13 +536,23 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         match scope.kind {
-            scope::Kind::Const | scope::Kind::Var(_) => {
-                let const_scope = self.const_scope();
-                self.unify_sub_scoped_expressions(const_scope, sub_scoped)
-            }
+            kind @ (scope::Kind::Const | scope::Kind::Var(_)) => self.unify_sub_scoped_expressions(
+                scope::Scope {
+                    kind,
+                    meta: scope.meta,
+                    vars: scope.vars,
+                },
+                sub_scoped,
+            ),
             scope::Kind::Let(let_scope) => {
-                let const_scope = self.const_scope();
-                let block = self.unify_sub_scoped_expressions(const_scope, sub_scoped)?;
+                let block = self.unify_sub_scoped_expressions(
+                    scope::Scope {
+                        kind: scope::Kind::Const,
+                        meta: scope.meta,
+                        vars: scope.vars,
+                    },
+                    sub_scoped,
+                )?;
                 let ty = block
                     .iter()
                     .map(|node| node.meta.ty)

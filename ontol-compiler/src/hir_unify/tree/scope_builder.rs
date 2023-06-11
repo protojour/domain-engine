@@ -1,6 +1,5 @@
 use ontol_hir::kind::{Dimension, NodeKind};
 use ontol_runtime::vm::proc::BuiltinProc;
-use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -237,7 +236,6 @@ impl<'m> ScopeBuilder<'m> {
                         )
                         .union_var(scoped_var),
                 };
-                debug!("call scope binder: {scope_binder:?}");
                 Ok(scope_binder)
             }
             (NodeKind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
