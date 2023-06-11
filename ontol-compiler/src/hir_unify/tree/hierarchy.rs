@@ -89,7 +89,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
                 "input len: {input_len}, const len: {}",
                 constant_exprs.len()
             );
-            todo!("Handle constant expressions: {constant_exprs:?}");
+            todo!("Handle constant expressions: {constant_exprs:#?}");
         }
 
         let indexed_hierarchy = scope_assignments

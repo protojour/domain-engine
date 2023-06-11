@@ -352,7 +352,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     ty,
                 )
             }
-            scope::PropKind::Seq(binding) => {
+            scope::PropKind::Seq(rel_binding, val_binding) => {
                 todo!()
             }
         };
@@ -505,7 +505,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     ty,
                 )
             }
-            scope::PropKind::Seq(binding) => {
+            scope::PropKind::Seq(rel_binding, val_binding) => {
                 todo!()
             }
         };

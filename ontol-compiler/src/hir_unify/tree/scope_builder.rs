@@ -153,7 +153,18 @@ impl<'m> ScopeBuilder<'m> {
                             (scope::PropKind::Attr(rel, val), union.vars)
                         }
                         Dimension::Seq(label) => {
-                            todo!("seq prop")
+                            let rel = self
+                                .build_scope_binder(&variant.attr.rel)?
+                                .to_scope_pattern_binding();
+                            let val = self
+                                .build_scope_binder(&variant.attr.val)?
+                                .to_scope_pattern_binding();
+
+                            // Only the label is "visible" to the outside
+                            let mut vars = VarSet::default();
+                            vars.0.insert(label.0 as usize);
+
+                            (scope::PropKind::Seq(rel, val), vars)
                         }
                     };
 

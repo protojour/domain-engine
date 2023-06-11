@@ -29,6 +29,7 @@ pub struct Prop<'m> {
     pub optional: Optional,
     pub struct_var: ontol_hir::Var,
     pub prop_id: PropertyId,
+    pub seq: bool,
     pub attr: Attribute<Expr<'m>>,
     pub free_vars: VarSet,
 }

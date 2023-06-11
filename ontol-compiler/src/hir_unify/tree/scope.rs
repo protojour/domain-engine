@@ -53,13 +53,13 @@ pub struct Prop<'m> {
 #[derive(Clone, Debug)]
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
-    Seq(PatternBinding<'m>),
+    Seq(PatternBinding<'m>, PatternBinding<'m>),
 }
 
 impl<'m> PropKind<'m> {
     pub fn scope(self) -> Scope<'m> {
         match self {
-            Self::Attr(rel, val) => match (rel, val) {
+            Self::Attr(rel, val) | Self::Seq(rel, val) => match (rel, val) {
                 (PatternBinding::Wildcard(meta), PatternBinding::Wildcard(_)) => Scope {
                     kind: Kind::Const,
                     vars: VarSet::default(),
@@ -70,14 +70,6 @@ impl<'m> PropKind<'m> {
                 (PatternBinding::Scope(_, _), PatternBinding::Scope(_, _)) => {
                     todo!()
                 }
-            },
-            Self::Seq(binding) => match binding {
-                PatternBinding::Scope(_, scope) => scope,
-                PatternBinding::Wildcard(meta) => Scope {
-                    kind: Kind::Const,
-                    vars: VarSet::default(),
-                    meta,
-                },
             },
         }
     }

@@ -195,6 +195,7 @@ fn test_trees<'m>(
                     optional: expr_optional,
                     struct_var: Var(3),
                     prop_id: prop_id("O:2:2"),
+                    seq: false,
                     attr: (
                         (),
                         expr::Call(BuiltinProc::Add, vec![Var(0).into(), Var(1).into()])
@@ -207,6 +208,7 @@ fn test_trees<'m>(
                     optional: expr_optional,
                     struct_var: Var(3),
                     prop_id: prop_id("O:3:3"),
+                    seq: false,
                     attr: (
                         (),
                         expr::Call(BuiltinProc::Add, vec![Var(0).into(), 20.into()]).vars([Var(0)]),
@@ -218,6 +220,7 @@ fn test_trees<'m>(
                     optional: expr_optional,
                     struct_var: Var(3),
                     prop_id: prop_id("O:4:4"),
+                    seq: false,
                     attr: (
                         (),
                         expr::Call(BuiltinProc::Add, vec![Var(1).into(), 20.into()]).vars([Var(1)]),

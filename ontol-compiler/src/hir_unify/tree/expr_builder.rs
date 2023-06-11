@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use ontol_hir::kind::{Attribute, NodeKind};
+use ontol_hir::kind::{Attribute, Dimension, NodeKind};
 
 use super::expr;
 use crate::{hir_unify::VarSet, typed_hir::TypedHirNode};
@@ -95,17 +95,35 @@ impl<'m> ExprBuilder<'m> {
         match &node.kind {
             NodeKind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
-                .map(|variant| {
-                    let mut union = UnionBuilder::default();
-                    let rel = union.plus(self.hir_to_expr(&variant.attr.rel));
-                    let val = union.plus(self.hir_to_expr(&variant.attr.val));
+                .map(|variant| match variant.dimension {
+                    Dimension::Singular => {
+                        let mut union = UnionBuilder::default();
+                        let rel = union.plus(self.hir_to_expr(&variant.attr.rel));
+                        let val = union.plus(self.hir_to_expr(&variant.attr.val));
 
-                    expr::Prop {
-                        optional: *optional,
-                        prop_id: *prop_id,
-                        free_vars: union.vars,
-                        struct_var: *struct_var,
-                        attr: Attribute { rel, val },
+                        expr::Prop {
+                            optional: *optional,
+                            prop_id: *prop_id,
+                            free_vars: union.vars,
+                            seq: false,
+                            struct_var: *struct_var,
+                            attr: Attribute { rel, val },
+                        }
+                    }
+                    Dimension::Seq(label) => {
+                        let rel = self.hir_to_expr(&variant.attr.rel);
+                        let val = self.hir_to_expr(&variant.attr.val);
+                        let mut free_vars = VarSet::default();
+                        free_vars.0.insert(label.0 as usize);
+
+                        expr::Prop {
+                            optional: *optional,
+                            prop_id: *prop_id,
+                            free_vars,
+                            seq: true,
+                            struct_var: *struct_var,
+                            attr: Attribute { rel, val },
+                        }
                     }
                 })
                 .collect(),
