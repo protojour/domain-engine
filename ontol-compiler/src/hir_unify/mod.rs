@@ -6,16 +6,10 @@ use ontol_hir::{visitor::HirVisitor, Var};
 use crate::{typed_hir::TypedHir, SourceSpan};
 
 pub mod unifier;
-pub mod unifier2;
 
-mod scope;
 mod tagged_node;
 mod tree;
-mod u_node;
 mod unification_tree;
-mod unified_target_node;
-mod unifier2_call_scope;
-mod unifier2_prop_scope;
 mod var_path;
 
 #[derive(Debug)]

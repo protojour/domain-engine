@@ -12,7 +12,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    hir_unify::{unifier2::ScopeSource, var_path::locate_variables},
+    hir_unify::var_path::locate_variables,
     mem::Intern,
     typed_hir::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirKind, TypedHirNode},
     types::{Type, TypeRef, Types},
@@ -22,7 +22,6 @@ use crate::{
 use super::{
     tagged_node::{TaggedKind, TaggedNode, Tagger},
     tree::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unify3::Unifier3},
-    u_node::{self, UNode},
     unification_tree::{Scoping, UnificationNode},
     UnifierError, VariableTracker,
 };
@@ -85,95 +84,6 @@ pub fn unify_to_function<'m>(
 
         // panic!("{:#?}", scope_binder.scope);
     }
-
-    if false {
-        let mut u_node: UNode = Tagger::new(unit_type)
-            .to_u_nodes(target.clone())
-            .unwrap_one();
-
-        debug!("u_node pre-expand: {u_node:#?}");
-
-        let variable_paths = locate_variables(&scope_source, &u_node.free_variables)?;
-        u_node::expand_scoping(&mut u_node, &variable_paths);
-
-        debug!("expanded: {u_node:#?}");
-
-        let unified2 = Unifier {
-            root_source: &scope_source,
-            next_variable: var_tracker.next_variable(),
-            types: &mut compiler.types,
-        }
-        .unify2(u_node, ScopeSource::Node(&scope_source))?;
-
-        let hir_func = match unified2.binder {
-            Some(arg) => {
-                // NB: Error is used in unification tests
-                if !matches!(source_ty, Type::Error) {
-                    assert_eq!(arg.ty, source_ty);
-                }
-                if !matches!(target_ty, Type::Error) {
-                    assert_eq!(unified2.node.meta.ty, target_ty);
-                }
-
-                Ok(HirFunc {
-                    arg,
-                    body: unified2.node,
-                })
-            }
-            None => Err(UnifierError::NoInputBinder),
-        };
-
-        match std::env::var("ONTOL_UNIFIER") {
-            Ok(val) if val == "1" => {}
-            _ => {
-                return hir_func;
-            }
-        }
-    }
-
-    /*
-    if RUN_2 {
-        let node = Tagger::new(unit_type).tag_node2(target.clone());
-        let variable_paths = locate_variables(&scope_source, &node.free_variables)?;
-        let mut root_nodes = node.into_nodes();
-        root_nodes.expand_scoping(&variable_paths);
-
-        debug!("root_nodes2: {root_nodes:#?}");
-
-        let unified2 = Unifier {
-            root_source: &scope_source,
-            next_variable: var_tracker.next_variable(),
-            types: &mut compiler.types,
-        }
-        .unify_nodes2(None, root_nodes, &scope_source)?;
-
-        let body = unified2.target_nodes.into_hir();
-        let body = match body.len() {
-            0 => panic!("No nodes"),
-            1 => body.into_iter().next().unwrap(),
-            _ => panic!("Too many nodes"),
-        };
-
-        if UNIFIER_IMPL == 2 {
-            return match unified2.binder {
-                Some(arg) => {
-                    // NB: Error is used in unification tests
-                    if !matches!(source_ty, Type::Error) {
-                        assert_eq!(arg.ty, source_ty);
-                    }
-                    if !matches!(target_ty, Type::Error) {
-                        assert_eq!(body.meta.ty, target_ty);
-                    }
-
-                    Ok(HirFunc { arg, body })
-                }
-                None => Err(UnifierError::NoInputBinder),
-            };
-        } else {
-            debug!("body2: {body}");
-        }
-    }
-    */
 
     let unified = Unifier {
         root_source: &scope_source,

@@ -19,14 +19,6 @@ pub enum NodeRef<'s, 'm> {
     PatternBinding(kind::PatternBinding),
 }
 
-#[derive(Clone, Copy)]
-pub struct ChildRef<'s, 'm> {
-    parent: NodeRef<'s, 'm>,
-    child: usize,
-}
-
-pub type NodePath<'s, 'm> = SmallVec<[ChildRef<'s, 'm>; 16]>;
-
 pub type Path = SmallVec<[u16; 32]>;
 
 #[derive(Clone)]
@@ -50,25 +42,14 @@ pub fn locate_variables<'s, 'm, 'b>(
     locator.var_paths()
 }
 
-pub fn variable_node_paths<'s, 'm, 'b>(
-    node: &'s TypedHirNode<'m>,
-    variables: &'b BitSet,
-) -> Result<FnvHashMap<Var, NodePath<'s, 'm>>, UnifierError> {
-    let mut locator = VarLocator::new(node, variables);
-    locator.traverse_kind(node.kind());
-    locator.node_paths()
-}
-
 struct VarLocator<'s, 'm, 'b> {
     root: &'s TypedHirNode<'m>,
     parent: NodeRef<'s, 'm>,
     variables: &'b BitSet,
     current_path: Path,
-    current_node_path: NodePath<'s, 'm>,
 
     duplicates: BitSet,
     var_paths: FnvHashMap<Var, VarPath<'s, 'm>>,
-    node_paths: FnvHashMap<Var, NodePath<'s, 'm>>,
 }
 
 impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
@@ -82,26 +63,14 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
         }
     }
 
-    fn node_paths(self) -> Result<FnvHashMap<Var, NodePath<'s, 'm>>, UnifierError> {
-        if !self.duplicates.is_empty() {
-            Err(UnifierError::NonUniqueVariableDatapoints(VarSet(
-                self.duplicates,
-            )))
-        } else {
-            Ok(self.node_paths)
-        }
-    }
-
     pub(super) fn new(root: &'s TypedHirNode<'m>, variables: &'b BitSet) -> Self {
         Self {
             root,
             parent: NodeRef::Node(root),
             variables,
             current_path: Path::default(),
-            current_node_path: NodePath::default(),
             duplicates: BitSet::new(),
             var_paths: FnvHashMap::default(),
-            node_paths: FnvHashMap::default(),
         }
     }
 
@@ -111,10 +80,6 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
         mut node: NodeRef<'s, 'm>,
         func: impl FnOnce(&mut Self),
     ) {
-        self.current_node_path.push(ChildRef {
-            parent: self.parent,
-            child: index,
-        });
         self.current_path.push(index as u16);
         std::mem::swap(&mut self.parent, &mut node);
 
@@ -122,7 +87,6 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
 
         std::mem::swap(&mut node, &mut self.parent);
         self.current_path.pop();
-        self.current_node_path.pop();
     }
 
     fn register_var(&mut self, var: u32) {
@@ -136,15 +100,6 @@ impl<'s, 'm, 'b> VarLocator<'s, 'm, 'b> {
                         path: self.current_path.clone(),
                     },
                 )
-                .is_some()
-        {
-            self.duplicates.insert(var as usize);
-        }
-
-        if self.variables.contains(var as usize)
-            && self
-                .node_paths
-                .insert(Var(var), self.current_node_path.clone())
                 .is_some()
         {
             self.duplicates.insert(var as usize);
@@ -169,7 +124,7 @@ impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
 
     fn visit_prop(
         &mut self,
-        optional: &'s kind::Optional,
+        _optional: &'s kind::Optional,
         struct_var: &'s Var,
         id: &'s PropertyId,
         variants: &'s Vec<kind::PropVariant<'m, TypedHir>>,
@@ -214,20 +169,6 @@ impl<'s, 'm, 'b> HirVisitor<'s, 'm, TypedHir> for VarLocator<'s, 'm, 'b> {
     }
 }
 
-// TODO: No cloning?
-pub fn full_var_path<'s, 'm>(
-    free_variables: &BitSet,
-    variable_paths: &FnvHashMap<ontol_hir::Var, VarPath<'s, 'm>>,
-) -> PathsIterator<'s, 'm> {
-    PathsIterator::new(
-        free_variables
-            .iter()
-            .filter_map(|var_index| variable_paths.get(&ontol_hir::Var(var_index as u32)))
-            .cloned()
-            .collect(),
-    )
-}
-
 pub struct PathsIterator<'s, 'm> {
     full_var_path: Vec<VarPath<'s, 'm>>,
     outer_index: usize,
@@ -239,15 +180,7 @@ pub enum PathSegment<'s, 'm> {
     Root(&'s TypedHirNode<'m>, usize),
 }
 
-impl<'s, 'm> PathsIterator<'s, 'm> {
-    pub fn new(full_var_path: Vec<VarPath<'s, 'm>>) -> Self {
-        Self {
-            full_var_path,
-            outer_index: 0,
-            inner_index: 0,
-        }
-    }
-}
+impl<'s, 'm> PathsIterator<'s, 'm> {}
 
 impl<'s, 'm> Iterator for PathsIterator<'s, 'm> {
     type Item = PathSegment<'s, 'm>;
