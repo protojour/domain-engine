@@ -415,13 +415,28 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         val: scope::PatternBinding<'m>,
     ) -> scope::Scope<'m> {
         match (rel, val) {
-            (scope::PatternBinding::Wildcard(meta), scope::PatternBinding::Wildcard(_)) => {
+            (scope::PatternBinding::Wildcard(_), scope::PatternBinding::Wildcard(_)) => {
                 self.const_scope()
             }
             (scope::PatternBinding::Scope(_, rel), scope::PatternBinding::Wildcard(_)) => rel,
             (scope::PatternBinding::Wildcard(_), scope::PatternBinding::Scope(_, val)) => val,
-            (scope::PatternBinding::Scope(_, _), scope::PatternBinding::Scope(_, _)) => {
-                todo!()
+            (scope::PatternBinding::Scope(_, rel), scope::PatternBinding::Scope(_, val)) => {
+                match (rel.kind, val.kind) {
+                    (
+                        scope::Kind::Const | scope::Kind::Var(_),
+                        scope::Kind::Const | scope::Kind::Var(_),
+                    ) => {
+                        // attribute scopes are special, we don't need to track the var binders, as
+                        // those are handled outside this function
+                        self.const_scope()
+                    }
+                    (scope::Kind::Let(let_scope), other) | (other, scope::Kind::Let(let_scope)) => {
+                        todo!("merge let scope")
+                    }
+                    (rel_kind, val_kind) => {
+                        todo!("merge attr scopes {rel_kind:?} + {val_kind:?}")
+                    }
+                }
             }
         }
     }

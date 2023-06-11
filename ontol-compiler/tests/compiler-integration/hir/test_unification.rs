@@ -504,7 +504,16 @@ fn test_unify_opt_rel_and_val1() {
         ",
     );
     let expected = indoc! {"
-        "
+        |$c| (struct ($d)
+            (match-prop $c S:1:7
+                (($a $b)
+                    (prop $d S:1:7
+                        (#u (+ $a $b))
+                    )
+                )
+                (())
+            )
+        )"
     };
     assert_eq!(expected, output);
 }
