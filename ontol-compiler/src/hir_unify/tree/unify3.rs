@@ -1,5 +1,6 @@
+use fnv::FnvHashMap;
 use ontol_hir::kind::{
-    Attribute, Dimension, MatchArm, NodeKind, Optional, PatternBinding, PropPattern, PropVariant,
+    Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
 };
 use ontol_runtime::DefId;
 use tracing::debug;
@@ -25,11 +26,6 @@ pub struct Unifier3<'a, 'm> {
 pub struct UnifiedNode3<'m> {
     pub typed_binder: Option<TypedBinder<'m>>,
     pub node: TypedHirNode<'m>,
-}
-
-struct UnifiedBlock3<'m> {
-    pub typed_binder: Option<TypedBinder<'m>>,
-    pub block: Vec<TypedHirNode<'m>>,
 }
 
 impl<'a, 'm> Unifier3<'a, 'm> {
@@ -171,7 +167,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
                 let mut nodes = Vec::with_capacity(scoped_props.len());
                 for (prop_scope, sub_scoped) in scoped_props {
-                    nodes.push(self.unify_match_arm(prop_scope, sub_scoped)?.node);
+                    nodes.push(self.unify_prop_match_arm(prop_scope, sub_scoped)?.node);
                 }
 
                 Ok(UnifiedNode3 {
@@ -183,6 +179,54 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                         kind: NodeKind::Struct(struct_expr.0, nodes),
                         meta: expr.meta,
                     },
+                })
+            }
+            (expr_kind, scope::Kind::Struct(struct_scope)) => {
+                let free_vars = expr.free_vars.clone();
+
+                let expr = expr::Expr {
+                    kind: expr_kind,
+                    meta: expr.meta,
+                    free_vars: expr.free_vars,
+                };
+                let mut sub_scoped: SubScoped<expr::Expr, scope::Prop> = SubScoped {
+                    expressions: vec![expr],
+                    sub_scopes: vec![],
+                };
+
+                let mut scope_idx_by_var: FnvHashMap<ontol_hir::Var, usize> = Default::default();
+
+                for (scope_idx, prop_scope) in struct_scope.1.iter().enumerate() {
+                    for var in &prop_scope.vars {
+                        scope_idx_by_var.insert(var, scope_idx);
+                    }
+                }
+
+                let mut scope_by_idx: FnvHashMap<usize, scope::Prop> =
+                    struct_scope.1.into_iter().enumerate().collect();
+
+                // build recursive scope structure by iterating free variables
+                for var in &free_vars {
+                    if let Some(scope_idx) = scope_idx_by_var.remove(&var) {
+                        if let Some(scope_prop) = scope_by_idx.remove(&scope_idx) {
+                            sub_scoped = SubScoped {
+                                expressions: vec![],
+                                sub_scopes: vec![(scope_prop, sub_scoped)],
+                            };
+                        }
+                    }
+                }
+
+                let (scope_prop, sub_scoped) = sub_scoped.sub_scopes.into_iter().next().unwrap();
+
+                let node = self.unify_expr_match_arm(scope_prop, sub_scoped)?.node;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: Some(TypedBinder {
+                        var: struct_scope.0 .0,
+                        ty: scope.meta.ty,
+                    }),
+                    node,
                 })
             }
             // ### "pre-scoped":
@@ -264,7 +308,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         Ok(nodes)
     }
 
-    fn unify_match_arm(
+    fn unify_prop_match_arm(
         &mut self,
         scope_prop: scope::Prop<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
@@ -275,7 +319,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 let hir_val_binding = val_binding.hir_pattern_binding();
 
                 let joined_scope = self.join_attr_scope(rel_binding, val_binding);
-                let nodes = self.wrap_props_in_scope(joined_scope, sub_scoped)?;
+                let nodes = self.wrap_sub_scoped_props_in_scope(joined_scope, sub_scoped)?;
 
                 MatchArm {
                     pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
@@ -308,7 +352,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         })
     }
 
-    fn wrap_props_in_scope(
+    fn wrap_sub_scoped_props_in_scope(
         &mut self,
         scope: scope::Scope<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
@@ -372,11 +416,10 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     });
                 }
 
+                // TODO: sub_scoped
                 for (sub_prop_scope, sub_scoped_prop) in sub_scoped.sub_scopes {
                     todo!()
                 }
-
-                // TODO: sub_scoped
 
                 Ok(nodes)
             }
@@ -404,7 +447,101 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             );
         }
         for (sub_prop_scope, sub_scoped) in sub_scoped.sub_scopes {
-            nodes.push(self.unify_match_arm(sub_prop_scope, sub_scoped)?.node);
+            nodes.push(self.unify_prop_match_arm(sub_prop_scope, sub_scoped)?.node);
+        }
+        Ok(nodes)
+    }
+
+    fn unify_expr_match_arm(
+        &mut self,
+        scope_prop: scope::Prop<'m>,
+        sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
+    ) -> UnifierResult<UnifiedNode3<'m>> {
+        let match_arm: MatchArm<_> = match scope_prop.kind {
+            scope::PropKind::Attr(rel_binding, val_binding) => {
+                let hir_rel_binding = rel_binding.hir_pattern_binding();
+                let hir_val_binding = val_binding.hir_pattern_binding();
+
+                let joined_scope = self.join_attr_scope(rel_binding, val_binding);
+                let nodes = self.wrap_sub_scoped_expressions_in_scope(joined_scope, sub_scoped)?;
+
+                MatchArm {
+                    pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
+                    nodes,
+                }
+            }
+            scope::PropKind::Seq(binding) => {
+                todo!()
+            }
+        };
+
+        let mut match_arms = vec![match_arm];
+
+        if scope_prop.optional.0 {
+            match_arms.push(MatchArm {
+                pattern: PropPattern::Absent,
+                nodes: vec![],
+            });
+        }
+
+        Ok(UnifiedNode3 {
+            typed_binder: None,
+            node: TypedHirNode {
+                kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
+                meta: Meta {
+                    ty: self.types.intern(Type::Unit(DefId::unit())),
+                    span: SourceSpan::none(),
+                },
+            },
+        })
+    }
+
+    fn wrap_sub_scoped_expressions_in_scope(
+        &mut self,
+        scope: scope::Scope<'m>,
+        sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
+    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+        match scope.kind {
+            scope::Kind::Const | scope::Kind::Var(_) => {
+                let const_scope = self.const_scope();
+                self.unify_sub_scoped_expressions(const_scope, sub_scoped)
+            }
+            scope::Kind::Let(let_scope) => {
+                let const_scope = self.const_scope();
+                let block = self.unify_sub_scoped_expressions(const_scope, sub_scoped)?;
+                let ty = block
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
+
+                let node = TypedHirNode {
+                    kind: NodeKind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                    meta: Meta {
+                        ty,
+                        span: SourceSpan::none(),
+                    },
+                };
+
+                Ok(vec![node])
+            }
+            scope::Kind::Struct(struct_scope) => {
+                todo!()
+            }
+        }
+    }
+
+    fn unify_sub_scoped_expressions(
+        &mut self,
+        inner_scope: scope::Scope<'m>,
+        sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
+    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+        let mut nodes = vec![];
+        for expr in sub_scoped.expressions {
+            nodes.push(self.unify3(inner_scope.clone(), expr)?.node);
+        }
+        for (sub_prop_scope, sub_scoped) in sub_scoped.sub_scopes {
+            nodes.push(self.unify_expr_match_arm(sub_prop_scope, sub_scoped)?.node);
         }
         Ok(nodes)
     }
@@ -432,6 +569,18 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     }
                     (scope::Kind::Let(let_scope), other) | (other, scope::Kind::Let(let_scope)) => {
                         todo!("merge let scope")
+                    }
+                    (scope::Kind::Struct(rel_struct), scope::Kind::Struct(val_struct)) => {
+                        // what binder is used is insignificant here.
+                        let binder = val_struct.0;
+                        let mut merged_props = rel_struct.1;
+                        merged_props.extend(&mut val_struct.1.into_iter());
+
+                        scope::Scope {
+                            kind: scope::Kind::Struct(scope::Struct(binder, merged_props)),
+                            vars: VarSet::default(),
+                            meta: self.unit_meta(),
+                        }
                     }
                     (rel_kind, val_kind) => {
                         todo!("merge attr scopes {rel_kind:?} + {val_kind:?}")

@@ -517,3 +517,47 @@ fn test_unify_opt_rel_and_val1() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_unify_opt_rel_and_val_struct_merge1() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop? $c S:0:0
+                (
+                    (struct ($d) (prop $d S:1:0 (#u $a)))
+                    (struct ($e) (prop $e S:1:1 (#u $b)))
+                )
+            )
+        )
+        ",
+        "
+        (struct ($f)
+            (prop? $f O:0:0
+                (#u (+ $a $b))
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($f)
+            (match-prop $c S:0:0
+                (($d $e)
+                    (prop $f O:0:0
+                        (#u
+                            (match-prop $e S:1:1
+                                (($_ $b)
+                                    (match-prop $d S:1:0
+                                        (($_ $a) (+ $a $b))
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+                (())
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
