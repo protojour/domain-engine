@@ -1,4 +1,3 @@
-use bit_set::BitSet;
 use ontol_hir::kind::Optional;
 use ontol_runtime::value::PropertyId;
 
@@ -27,7 +26,7 @@ pub enum Kind<'m> {
     Var(ontol_hir::Var),
     Struct(Struct<'m>),
     Let(Let<'m>),
-    // Prop(Prop<'m>),
+    // Prop(Box<Prop<'m>>),
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +54,33 @@ pub struct Prop<'m> {
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
     Seq(PatternBinding<'m>),
+}
+
+impl<'m> PropKind<'m> {
+    pub fn scope(self) -> Scope<'m> {
+        match self {
+            Self::Attr(rel, val) => match (rel, val) {
+                (PatternBinding::Wildcard(meta), PatternBinding::Wildcard(_)) => Scope {
+                    kind: Kind::Const,
+                    vars: VarSet::default(),
+                    meta,
+                },
+                (PatternBinding::Scope(_, rel), PatternBinding::Wildcard(_)) => rel,
+                (PatternBinding::Wildcard(_), PatternBinding::Scope(_, val)) => val,
+                (PatternBinding::Scope(_, _), PatternBinding::Scope(_, _)) => {
+                    todo!()
+                }
+            },
+            Self::Seq(binding) => match binding {
+                PatternBinding::Scope(_, scope) => scope,
+                PatternBinding::Wildcard(meta) => Scope {
+                    kind: Kind::Const,
+                    vars: VarSet::default(),
+                    meta,
+                },
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

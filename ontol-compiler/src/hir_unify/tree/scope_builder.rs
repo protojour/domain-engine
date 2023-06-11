@@ -1,5 +1,6 @@
 use ontol_hir::kind::{Dimension, NodeKind};
 use ontol_runtime::vm::proc::BuiltinProc;
+use tracing::debug;
 
 use crate::{
     hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
@@ -16,6 +17,7 @@ pub struct ScopeBuilder<'m> {
     next_var: ontol_hir::Var,
 }
 
+#[derive(Debug)]
 pub struct ScopeBinder<'m> {
     pub binder: Option<TypedBinder<'m>>,
     pub scope: scope::Scope<'m>,
@@ -218,22 +220,26 @@ impl<'m> ScopeBuilder<'m> {
                     kind: ExprAnalysisKind::Var(scoped_var),
                     ..
                 },
-            ) => Ok(ScopeBinder {
-                binder: Some(outer_binder),
-                scope: self
-                    .mk_scope(
-                        scope::Kind::Let(scope::Let {
-                            outer_binder: Some(outer_binder),
-                            inner_binder: ontol_hir::Binder(scoped_var),
-                            def: next_let_def,
-                            sub_scope: Box::new(
-                                self.mk_scope(scope::Kind::Const, self.unit_meta()),
-                            ),
-                        }),
-                        self.unit_meta(),
-                    )
-                    .union_var(scoped_var),
-            }),
+            ) => {
+                let scope_binder = ScopeBinder {
+                    binder: Some(outer_binder),
+                    scope: self
+                        .mk_scope(
+                            scope::Kind::Let(scope::Let {
+                                outer_binder: Some(outer_binder),
+                                inner_binder: ontol_hir::Binder(scoped_var),
+                                def: next_let_def,
+                                sub_scope: Box::new(
+                                    self.mk_scope(scope::Kind::Const, self.unit_meta()),
+                                ),
+                            }),
+                            self.unit_meta(),
+                        )
+                        .union_var(scoped_var),
+                };
+                debug!("call scope binder: {scope_binder:?}");
+                Ok(scope_binder)
+            }
             (NodeKind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
                 *next_proc,
                 next_params,

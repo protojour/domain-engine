@@ -71,7 +71,7 @@ fn test_temperature() {
 }
 
 #[test]
-fn test_optional_attribute() {
+fn test_recursive_optional_attribute() {
     "
     type seconds {
         rel _ is: int
@@ -125,7 +125,6 @@ fn test_optional_attribute() {
             json!({ "age": 42 }),
             json!({ "age": 1324512000 }),
         );
-
         assert_domain_map(
             &env,
             ("person_container", "creature_container"),
@@ -136,8 +135,13 @@ fn test_optional_attribute() {
             &env,
             ("person_container", "creature_container"),
             json!({ "person": {} }),
-            // BUG, see test_unify_opt_props1():
-            json!({}),
+            json!({ "creature": {} }),
+        );
+        assert_domain_map(
+            &env,
+            ("person_container", "creature_container"),
+            json!({ "person": { "age": 42 } }),
+            json!({ "creature": { "age": 1324512000 } }),
         );
     });
 }

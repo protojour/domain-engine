@@ -91,7 +91,9 @@ impl<'m> From<Var> for expr::Expr<'m> {
 
 impl<'m> From<scope::Let<'m>> for scope::Scope<'m> {
     fn from(let_: scope::Let<'m>) -> Self {
-        scope(scope::Kind::Let(let_), VarSet::default())
+        let mut var_set = VarSet::default();
+        var_set.0.insert(let_.inner_binder.0 .0 as usize);
+        scope(scope::Kind::Let(let_), var_set)
     }
 }
 
