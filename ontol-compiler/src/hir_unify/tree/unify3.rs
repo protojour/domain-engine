@@ -457,7 +457,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         inner_scope: scope::Scope<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        let mut nodes = vec![];
+        let mut nodes =
+            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
         for prop in sub_scoped.expressions {
             let unit_meta = self.unit_meta();
             nodes.push(
@@ -580,7 +581,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         inner_scope: scope::Scope<'m>,
         sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        let mut nodes = vec![];
+        let mut nodes =
+            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
+
         for expr in sub_scoped.expressions {
             nodes.push(self.unify3(inner_scope.clone(), expr)?.node);
         }

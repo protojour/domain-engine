@@ -15,13 +15,7 @@ pub trait Expression {
     fn optional(&self) -> bool;
 }
 
-#[derive(Debug)]
-pub struct Hierarchy<S, E> {
-    pub scope: S,
-    pub expressions: Vec<E>,
-    pub children: Vec<Hierarchy<S, E>>,
-}
-
+// TODO: Rename?
 #[derive(Debug)]
 pub struct SubScoped<E, S> {
     pub expressions: Vec<E>,

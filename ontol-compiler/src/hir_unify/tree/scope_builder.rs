@@ -95,7 +95,7 @@ impl<'m> ScopeBuilder<'m> {
                 todo!("seq scope")
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
-                let mut props = vec![];
+                let mut props = Vec::with_capacity(nodes.len());
                 for (disjoint_group, node) in nodes.iter().enumerate() {
                     props.extend(zelf.build_props(node, disjoint_group)?);
                 }
@@ -197,7 +197,7 @@ impl<'m> ScopeBuilder<'m> {
             _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
         };
 
-        let mut inverted_params = vec![];
+        let mut inverted_params = Vec::with_capacity(params.len());
 
         for param_index in 0..params.len() {
             if param_index != var_param_index {
