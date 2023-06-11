@@ -320,13 +320,6 @@ impl UnionBuilder {
         binder
     }
 
-    fn plus_vec<'m>(&mut self, scopes: Vec<scope::Scope<'m>>) -> Vec<scope::Scope<'m>> {
-        for scope in &scopes {
-            self.vars.0.union_with(&scope.vars.0);
-        }
-        scopes
-    }
-
     fn plus_iter<'a>(&mut self, iter: impl Iterator<Item = &'a VarSet>) {
         for var_set in iter {
             self.vars.0.union_with(&var_set.0);

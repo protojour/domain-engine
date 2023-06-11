@@ -247,8 +247,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     node,
                 })
             }
-            // ### "pre-scoped":
-            (expr, scope) => panic!("unhandled expr/scope combo: {expr:#?} / {scope:#?}"),
         }
     }
 
@@ -310,7 +308,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 debug!("expressions: {expressions:#?}");
                 todo!("struct block scope");
             }
-            _ => todo!(),
         }
     }
 
@@ -443,7 +440,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 }
 
                 // TODO: sub_scoped
-                for (sub_prop_scope, sub_scoped_prop) in sub_scoped.sub_scopes {
+                for (_sub_prop_scope, _sub_scoped_prop) in sub_scoped.sub_scopes {
                     todo!()
                 }
 
@@ -570,7 +567,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 Ok(vec![node])
             }
-            scope::Kind::Struct(struct_scope) => {
+            scope::Kind::Struct(_struct_scope) => {
                 todo!()
             }
         }
@@ -614,7 +611,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                         // those are handled outside this function
                         self.const_scope()
                     }
-                    (scope::Kind::Let(let_scope), other) | (other, scope::Kind::Let(let_scope)) => {
+                    (scope::Kind::Let(_let_scope), _other)
+                    | (_other, scope::Kind::Let(_let_scope)) => {
                         todo!("merge let scope")
                     }
                     (scope::Kind::Struct(rel_struct), scope::Kind::Struct(val_struct)) => {

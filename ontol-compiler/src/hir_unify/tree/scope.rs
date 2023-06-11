@@ -56,25 +56,6 @@ pub enum PropKind<'m> {
     Seq(PatternBinding<'m>, PatternBinding<'m>),
 }
 
-impl<'m> PropKind<'m> {
-    pub fn scope(self) -> Scope<'m> {
-        match self {
-            Self::Attr(rel, val) | Self::Seq(rel, val) => match (rel, val) {
-                (PatternBinding::Wildcard(meta), PatternBinding::Wildcard(_)) => Scope {
-                    kind: Kind::Const,
-                    vars: VarSet::default(),
-                    meta,
-                },
-                (PatternBinding::Scope(_, rel), PatternBinding::Wildcard(_)) => rel,
-                (PatternBinding::Wildcard(_), PatternBinding::Scope(_, val)) => val,
-                (PatternBinding::Scope(_, _), PatternBinding::Scope(_, _)) => {
-                    todo!()
-                }
-            },
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub enum PatternBinding<'m> {
     Wildcard(Meta<'m>),
@@ -86,17 +67,6 @@ impl<'m> PatternBinding<'m> {
         match &self {
             Self::Wildcard(_) => ontol_hir::kind::PatternBinding::Wildcard,
             Self::Scope(binder, _) => ontol_hir::kind::PatternBinding::Binder(*binder),
-        }
-    }
-
-    pub fn into_scope(self) -> Scope<'m> {
-        match self {
-            Self::Wildcard(meta) => Scope {
-                kind: Kind::Const,
-                vars: VarSet::default(),
-                meta,
-            },
-            Self::Scope(_, scope) => scope,
         }
     }
 }
