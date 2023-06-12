@@ -22,6 +22,7 @@ use super::{
     expr,
     hierarchy::{HierarchyBuilder, SubScoped},
     scope,
+    unify_props::UnifyProps,
 };
 
 pub fn unify_to_function<'m>(
@@ -379,12 +380,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     Vec::with_capacity(hierarchy.scoped.len() + hierarchy.unscoped.len());
 
                 for (prop_scope, sub_scoped) in hierarchy.scoped {
-                    nodes.push(self.unify_prop_match_arm(prop_scope, sub_scoped)?.node);
+                    nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_scoped)?.node);
                 }
 
                 if !hierarchy.unscoped.is_empty() {
                     let const_scope = self.const_scope();
-                    let unscoped_nodes = self.unify_sub_scoped_props(
+                    let unscoped_nodes = expr::Prop::unify_sub_scoped(
+                        self,
                         const_scope,
                         SubScoped {
                             expressions: hierarchy.unscoped,
@@ -461,7 +463,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }
                 };
 
-                let node = self.unify_expr_match_arm(scope_prop, sub_scoped)?.node;
+                let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;
 
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {

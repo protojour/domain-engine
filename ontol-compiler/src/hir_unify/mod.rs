@@ -12,8 +12,7 @@ mod expr_builder;
 mod hierarchy;
 mod scope;
 mod scope_builder;
-mod unifier_expr_match_arm;
-mod unifier_prop_match_arm;
+mod unify_props;
 
 #[derive(Debug)]
 pub enum UnifierError {
