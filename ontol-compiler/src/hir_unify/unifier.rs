@@ -86,7 +86,7 @@ pub struct Unifier<'a, 'm> {
     next_var: ontol_hir::Var,
 }
 
-pub struct UnifiedNode<'m> {
+struct UnifiedNode<'m> {
     pub typed_binder: Option<TypedBinder<'m>>,
     pub node: TypedHirNode<'m>,
 }
@@ -96,9 +96,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
         Self { types, next_var }
     }
 
-    pub fn unify(
+    fn unify(
         &mut self,
-        scope: scope::Scope<'m>,
+        scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
         expr: expr::Expr<'m>,
     ) -> Result<UnifiedNode<'m>, UnifierError> {
         // FIXME: This can be a loop instead of forced recursion,
@@ -107,10 +107,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
         // debug!(
         //     "unify expr::{} / scope::{}",
         //     expr.debug_short(),
-        //     scope.debug_short()
+        //     scope_kind.debug_short()
         // );
 
-        match (expr.kind, scope.kind) {
+        match (expr.kind, scope_kind) {
             // ### need to return scope binder
             (kind, scope::Kind::Var(var)) => {
                 // TODO: remove const_scope, have a way to ergonomically re-assemble the scope
@@ -127,7 +127,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var,
-                        ty: scope.meta.ty,
+                        ty: scope_meta.hir_meta.ty,
                     }),
                     node: unified.node,
                 })
@@ -149,11 +149,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }),
             // ### forced scope expansions:
             (kind, scope_kind @ scope::Kind::Let(_)) => self.unify_scope_block(
-                scope::Scope {
-                    kind: scope_kind,
-                    vars: scope.vars,
-                    meta: scope.meta,
-                },
+                scope::Scope(scope_kind, scope_meta),
                 vec![expr::Expr {
                     kind,
                     meta: expr.meta,
@@ -338,11 +334,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Push(seq_var, attr), scope_kind) => {
-                let scope = scope::Scope {
-                    kind: scope_kind,
-                    vars: scope.vars,
-                    meta: scope.meta,
-                };
+                let scope = scope::Scope(scope_kind, scope_meta);
                 let rel = self.unify(scope.clone(), attr.rel)?;
                 let val = self.unify(scope, attr.val)?;
 
@@ -363,12 +355,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Struct(struct_expr), kind @ scope::Kind::Const) => {
-                let scope = scope::Scope {
-                    kind,
-                    vars: scope.vars,
-                    meta: scope.meta,
-                };
+            (expr::Kind::Struct(struct_expr), scope_kind @ scope::Kind::Const) => {
+                let scope = scope::Scope(scope_kind, scope_meta);
                 let mut nodes = Vec::with_capacity(struct_expr.1.len());
                 for prop in struct_expr.1 {
                     let meta = self.unit_meta();
@@ -418,7 +406,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: struct_scope.0 .0,
-                        ty: scope.meta.ty,
+                        ty: scope_meta.hir_meta.ty,
                     }),
                     node: TypedHirNode {
                         kind: NodeKind::Struct(struct_expr.0, nodes),
@@ -491,7 +479,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: struct_scope.0 .0,
-                        ty: scope.meta.ty,
+                        ty: scope_meta.hir_meta.ty,
                     }),
                     node,
                 })
@@ -507,10 +495,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn unify_scope_block(
         &mut self,
-        scope: scope::Scope<'m>,
+        scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
         expressions: Vec<expr::Expr<'m>>,
     ) -> UnifierResult<UnifiedNode<'m>> {
-        match scope.kind {
+        match scope_kind {
             scope::Kind::Const => {
                 let block = self.unify_expressions(expressions)?;
                 match block.len() {
@@ -529,7 +517,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     1 => Ok(UnifiedNode {
                         typed_binder: Some(TypedBinder {
                             var,
-                            ty: scope.meta.ty,
+                            ty: scope_meta.hir_meta.ty,
                         }),
                         node: block.into_iter().next().unwrap(),
                     }),
@@ -606,15 +594,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 )
             }
             scope::PropKind::Seq(label, rel_binding, val_binding) => {
-                let gen_scope = scope::Scope {
-                    kind: scope::Kind::Gen(scope::Gen {
+                let gen_scope = scope::Scope(
+                    scope::Kind::Gen(scope::Gen {
                         input_seq: ontol_hir::Var(label.0),
                         output_seq: self.alloc_var(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
-                    meta: self.unit_meta(),
-                    vars: VarSet::default(),
-                };
+                    scope::Meta {
+                        vars: VarSet::default(),
+                        hir_meta: self.unit_meta(),
+                    },
+                );
                 let nodes = self.wrap_sub_scoped_props_in_scope(gen_scope, sub_scoped)?;
                 let ty = nodes
                     .iter()
@@ -655,10 +645,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn wrap_sub_scoped_props_in_scope(
         &mut self,
-        scope: scope::Scope<'m>,
+        scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        match scope.kind {
+        match scope_kind {
             scope::Kind::Const | scope::Kind::Var(_) => {
                 let const_scope = self.const_scope();
                 self.unify_sub_scoped_props(const_scope, sub_scoped)
@@ -682,16 +672,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(vec![node])
             }
-            scope::Kind::Struct(struct_scope) => {
+            scope_kind @ scope::Kind::Struct(_) => {
                 // debug!("struct scope: {struct_scope:#?}");
                 // debug!("expressions: {sub_scoped:#?}");
 
-                let scope = scope::Scope {
-                    kind: scope::Kind::Struct(struct_scope),
-                    meta: scope.meta,
-                    vars: scope.vars,
-                };
-
+                let scope = scope::Scope(scope_kind, scope_meta);
                 let mut nodes =
                     Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
 
@@ -724,14 +709,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(nodes)
             }
-            scope::Kind::Gen(gen) => self.unify_sub_scoped_props(
-                scope::Scope {
-                    kind: scope::Kind::Gen(gen),
-                    meta: scope.meta,
-                    vars: scope.vars,
-                },
-                sub_scoped,
-            ),
+            scope_kind @ scope::Kind::Gen(_) => {
+                self.unify_sub_scoped_props(scope::Scope(scope_kind, scope_meta), sub_scoped)
+            }
         }
     }
 
@@ -789,15 +769,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 )
             }
             scope::PropKind::Seq(label, rel_binding, val_binding) => {
-                let gen_scope = scope::Scope {
-                    kind: scope::Kind::Gen(scope::Gen {
+                let gen_scope = scope::Scope(
+                    scope::Kind::Gen(scope::Gen {
                         input_seq: ontol_hir::Var(label.0),
                         output_seq: self.alloc_var(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
-                    meta: self.unit_meta(),
-                    vars: VarSet::default(),
-                };
+                    scope::Meta {
+                        hir_meta: self.unit_meta(),
+                        vars: VarSet::default(),
+                    },
+                );
                 let nodes = self.wrap_sub_scoped_expressions_in_scope(gen_scope, sub_scoped)?;
                 let ty = nodes
                     .iter()
@@ -838,25 +820,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     fn wrap_sub_scoped_expressions_in_scope(
         &mut self,
-        scope: scope::Scope<'m>,
+        scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
         sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        match scope.kind {
-            kind @ (scope::Kind::Const | scope::Kind::Var(_)) => self.unify_sub_scoped_expressions(
-                scope::Scope {
-                    kind,
-                    meta: scope.meta,
-                    vars: scope.vars,
-                },
-                sub_scoped,
-            ),
+        match scope_kind {
+            scope_kind @ (scope::Kind::Const | scope::Kind::Var(_)) => {
+                self.unify_sub_scoped_expressions(scope::Scope(scope_kind, scope_meta), sub_scoped)
+            }
             scope::Kind::Let(let_scope) => {
                 let block = self.unify_sub_scoped_expressions(
-                    scope::Scope {
-                        kind: scope::Kind::Const,
-                        meta: scope.meta,
-                        vars: scope.vars,
-                    },
+                    scope::Scope(scope::Kind::Const, scope_meta),
                     sub_scoped,
                 )?;
                 let ty = block
@@ -879,11 +852,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 todo!()
             }
             scope::Kind::Gen(gen) => self.unify_sub_scoped_expressions(
-                scope::Scope {
-                    kind: scope::Kind::Gen(gen),
-                    meta: scope.meta,
-                    vars: scope.vars,
-                },
+                scope::Scope(scope::Kind::Gen(gen), scope_meta),
                 sub_scoped,
             ),
         }
@@ -918,7 +887,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             (scope::PatternBinding::Scope(_, rel), scope::PatternBinding::Wildcard(_)) => rel,
             (scope::PatternBinding::Wildcard(_), scope::PatternBinding::Scope(_, val)) => val,
             (scope::PatternBinding::Scope(_, rel), scope::PatternBinding::Scope(_, val)) => {
-                match (rel.kind, val.kind) {
+                match (rel.0, val.0) {
                     (
                         scope::Kind::Const | scope::Kind::Var(_),
                         scope::Kind::Const | scope::Kind::Var(_),
@@ -937,11 +906,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         let mut merged_props = rel_struct.1;
                         merged_props.extend(&mut val_struct.1.into_iter());
 
-                        scope::Scope {
-                            kind: scope::Kind::Struct(scope::Struct(binder, merged_props)),
-                            vars: VarSet::default(),
-                            meta: self.unit_meta(),
-                        }
+                        scope::Scope(
+                            scope::Kind::Struct(scope::Struct(binder, merged_props)),
+                            scope::Meta {
+                                vars: VarSet::default(),
+                                hir_meta: self.unit_meta(),
+                            },
+                        )
                     }
                     (rel_kind, val_kind) => {
                         todo!("merge attr scopes {rel_kind:?} + {val_kind:?}")
@@ -952,11 +923,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
     }
 
     fn const_scope(&mut self) -> scope::Scope<'m> {
-        scope::Scope {
-            kind: scope::Kind::Const,
-            meta: self.unit_meta(),
-            vars: VarSet::default(),
-        }
+        scope::Scope(
+            scope::Kind::Const,
+            scope::Meta {
+                hir_meta: self.unit_meta(),
+                vars: VarSet::default(),
+            },
+        )
     }
 
     fn unit_meta(&mut self) -> Meta<'m> {

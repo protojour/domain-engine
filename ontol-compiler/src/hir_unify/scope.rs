@@ -3,33 +3,36 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{self, TypedBinder, TypedHirNode},
 };
 
 #[derive(Clone, Debug)]
-pub struct Scope<'m> {
-    pub kind: Kind<'m>,
-    pub vars: VarSet,
-    pub meta: Meta<'m>,
-}
+pub struct Scope<'m>(pub Kind<'m>, pub Meta<'m>);
 
 impl<'m> Scope<'m> {
+    pub fn kind(&self) -> &Kind<'m> {
+        &self.0
+    }
+
+    pub fn vars_mut(&mut self) -> &mut VarSet {
+        &mut self.1.vars
+    }
+
     pub fn union_var(mut self, var: ontol_hir::Var) -> Self {
-        self.vars.0.insert(var.0 as usize);
+        self.vars_mut().0.insert(var.0 as usize);
         self
     }
 }
 
-impl<'m> Scope<'m> {
-    #[allow(unused)]
-    pub fn debug_short(&self) -> String {
-        match &self.kind {
-            Kind::Const => "Const".to_string(),
-            Kind::Var(var) => format!("Var({var})"),
-            Kind::Struct(_) => "Struct".to_string(),
-            Kind::Let(let_) => format!("Let({})", let_.inner_binder.0),
-            Kind::Gen(gen) => format!("Gen({})", gen.input_seq),
-        }
+#[derive(Clone, Debug)]
+pub struct Meta<'m> {
+    pub vars: VarSet,
+    pub hir_meta: typed_hir::Meta<'m>,
+}
+
+impl<'m> Meta<'m> {
+    pub fn with_kind(self, kind: Kind<'m>) -> Scope<'m> {
+        Scope(kind, self)
     }
 }
 
@@ -40,6 +43,19 @@ pub enum Kind<'m> {
     Struct(Struct<'m>),
     Let(Let<'m>),
     Gen(Gen<'m>),
+}
+
+impl<'m> Kind<'m> {
+    #[allow(unused)]
+    pub fn debug_short(&self) -> String {
+        match self {
+            Self::Const => "Const".to_string(),
+            Self::Var(var) => format!("Var({var})"),
+            Self::Struct(_) => "Struct".to_string(),
+            Self::Let(let_) => format!("Let({})", let_.inner_binder.0),
+            Self::Gen(gen) => format!("Gen({})", gen.input_seq),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -78,7 +94,7 @@ pub enum PropKind<'m> {
 
 #[derive(Clone, Debug)]
 pub enum PatternBinding<'m> {
-    Wildcard(Meta<'m>),
+    Wildcard(typed_hir::Meta<'m>),
     Scope(ontol_hir::Var, Scope<'m>),
 }
 
@@ -93,7 +109,7 @@ impl<'m> PatternBinding<'m> {
 
 impl<'m> super::hierarchy::Scope for Scope<'m> {
     fn vars(&self) -> &VarSet {
-        &self.vars
+        &self.1.vars
     }
 }
 

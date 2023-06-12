@@ -3,12 +3,12 @@ use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{self, Meta, TypedBinder, TypedHirNode},
     types::TypeRef,
     SourceSpan,
 };
 
-use super::scope;
+use super::{hierarchy::Scope, scope};
 
 pub struct ScopeBuilder<'m> {
     unit_type: TypeRef<'m>,
@@ -31,8 +31,8 @@ impl<'m> ScopeBinder<'m> {
     }
 
     fn into_scope_pattern_binding(self) -> scope::PatternBinding<'m> {
-        match &self.scope.kind {
-            scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.meta),
+        match self.scope.kind() {
+            scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.1.hir_meta),
             _ => scope::PatternBinding::Scope(
                 match self.binder {
                     Some(binder) => binder.var,
@@ -110,11 +110,11 @@ impl<'m> ScopeBuilder<'m> {
                         var: binder.0,
                         ty: node.meta.ty,
                     }),
-                    scope: scope::Scope {
+                    scope: scope::Meta {
                         vars: union.vars,
-                        kind: scope::Kind::Struct(scope::Struct(*binder, props)),
-                        meta: node.meta,
-                    },
+                        hir_meta: node.meta,
+                    }
+                    .with_kind(scope::Kind::Struct(scope::Struct(*binder, props))),
                 })
             }),
             NodeKind::Prop(..) => panic!("standalone prop"),
@@ -262,8 +262,8 @@ impl<'m> ScopeBuilder<'m> {
         }
     }
 
-    fn mk_var_scope(&self, var: ontol_hir::Var, meta: Meta<'m>) -> ScopeBinder<'m> {
-        let scope = self.mk_scope(scope::Kind::Var(var), meta);
+    fn mk_var_scope(&self, var: ontol_hir::Var, hir_meta: typed_hir::Meta<'m>) -> ScopeBinder<'m> {
+        let scope = self.mk_scope(scope::Kind::Var(var), hir_meta);
         let scope = if self.in_scope.0.contains(var.0 as usize) {
             scope
         } else {
@@ -271,17 +271,20 @@ impl<'m> ScopeBuilder<'m> {
         };
 
         ScopeBinder {
-            binder: Some(TypedBinder { var, ty: meta.ty }),
+            binder: Some(TypedBinder {
+                var,
+                ty: hir_meta.ty,
+            }),
             scope,
         }
     }
 
-    fn mk_scope(&self, kind: scope::Kind<'m>, meta: Meta<'m>) -> scope::Scope<'m> {
-        scope::Scope {
-            kind,
+    fn mk_scope(&self, kind: scope::Kind<'m>, hir_meta: typed_hir::Meta<'m>) -> scope::Scope<'m> {
+        scope::Meta {
             vars: VarSet::default(),
-            meta,
+            hir_meta,
         }
+        .with_kind(kind)
     }
 
     fn unit_meta(&self) -> Meta<'m> {
@@ -318,7 +321,7 @@ pub struct UnionBuilder {
 
 impl UnionBuilder {
     fn plus<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.0.union_with(&binder.scope.vars.0);
+        self.vars.0.union_with(&binder.scope.vars().0);
         binder
     }
 
