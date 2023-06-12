@@ -68,8 +68,20 @@ impl<'m> ExprBuilder<'m> {
                     meta: node.meta,
                 }
             }
-            NodeKind::Seq(_label, _attr) => {
-                todo!("seq expr")
+            NodeKind::Seq(label, attr) => {
+                let rel = self.hir_to_expr(&attr.rel);
+                let val = self.hir_to_expr(&attr.val);
+
+                let mut free_vars = VarSet::default();
+                free_vars.0.union_with(&rel.free_vars.0);
+                free_vars.0.union_with(&val.free_vars.0);
+                free_vars.0.insert(label.0 as usize);
+
+                expr::Expr {
+                    kind: expr::Kind::Seq(*label, Box::new(Attribute { rel, val })),
+                    free_vars,
+                    meta: node.meta,
+                }
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 let props: Vec<_> = nodes

@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use indexmap::IndexSet;
 use ontol_hir::kind::{
     Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
     PropVariant,
@@ -42,6 +43,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
     ) -> Result<UnifiedNode3<'m>, UnifierError> {
         // FIXME: This can be a loop instead of forced recursion,
         // for simple cases where the unified node is returned as-is from the layer below.
+
+        // debug!(
+        //     "unify3 expr::{} / scope::{}",
+        //     expr.debug_short(),
+        //     scope.debug_short()
+        // );
 
         match (expr.kind, scope.kind) {
             // ### need to return scope binder
@@ -159,8 +166,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     )?
                 };
 
-                debug!("MADE PUSH!!!!!!!!!!!!!!!");
-
                 let gen_node = TypedHirNode {
                     kind: NodeKind::Gen(
                         gen_scope.input_seq,
@@ -197,6 +202,53 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                         ),
                         meta: expr.meta,
                     },
+                })
+            }
+            (expr::Kind::Seq(_label, attr), scope::Kind::Gen(gen_scope)) => {
+                // FIXME: Array/seq types must take two parameters
+                let seq_ty = self.types.intern(Type::Array(attr.val.meta.ty));
+
+                let (rel_binding, val_binding) = *gen_scope.bindings;
+                let hir_rel_binding = rel_binding.hir_pattern_binding();
+                let hir_val_binding = val_binding.hir_pattern_binding();
+
+                let push_unified = {
+                    let joined_scope = self.join_attr_scope(rel_binding, val_binding);
+                    let unit_meta = self.unit_meta();
+
+                    let mut free_vars = VarSet::default();
+                    free_vars.0.union_with(&attr.rel.free_vars.0);
+                    free_vars.0.union_with(&attr.val.free_vars.0);
+
+                    self.unify3(
+                        joined_scope,
+                        expr::Expr {
+                            kind: expr::Kind::Push(gen_scope.output_seq, attr),
+                            meta: unit_meta,
+                            free_vars,
+                        },
+                    )?
+                };
+
+                let gen_node = TypedHirNode {
+                    kind: NodeKind::Gen(
+                        gen_scope.input_seq,
+                        IterBinder {
+                            seq: PatternBinding::Binder(gen_scope.output_seq),
+                            rel: hir_rel_binding,
+                            val: hir_val_binding,
+                        },
+                        vec![push_unified.node],
+                    ),
+                    meta: Meta {
+                        ty: seq_ty,
+                        span: SourceSpan::none(),
+                    },
+                };
+
+                Ok(UnifiedNode3 {
+                    typed_binder: None,
+                    node: gen_node,
                 })
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {
@@ -284,10 +336,13 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
                 let hierarchy = HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
-                let mut nodes = Vec::with_capacity(hierarchy.scoped.len());
+                let mut nodes =
+                    Vec::with_capacity(hierarchy.scoped.len() + hierarchy.unscoped.len());
+
                 for (prop_scope, sub_scoped) in hierarchy.scoped {
                     nodes.push(self.unify_prop_match_arm(prop_scope, sub_scoped)?.node);
                 }
+
                 if !hierarchy.unscoped.is_empty() {
                     let const_scope = self.const_scope();
                     let unscoped_nodes = self.unify_sub_scoped_props(
@@ -312,9 +367,23 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 })
             }
             (expr_kind, scope::Kind::Struct(struct_scope)) => {
-                let free_vars = expr.free_vars.clone();
+                // When scoping an arbitrariy expression to a struct
+                // it's important that the scoping is expanded in the correct
+                // order. I.e. the variable representing the expression itself
+                // should be the innermost scope expansion.
+                let mut ordered_scope_vars: IndexSet<ontol_hir::Var> = Default::default();
 
-                if free_vars.0.is_empty() {
+                match &expr_kind {
+                    expr::Kind::Seq(label, _) => {
+                        ordered_scope_vars.insert(ontol_hir::Var(label.0));
+                    }
+                    _ => {}
+                }
+                for free_var in &expr.free_vars {
+                    ordered_scope_vars.insert(free_var);
+                }
+
+                if ordered_scope_vars.is_empty() {
                     panic!("No free vars in {expr_kind:#?} with struct scope");
                 }
 
@@ -340,8 +409,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     struct_scope.1.into_iter().enumerate().collect();
 
                 // build recursive scope structure by iterating free variables
-                for var in &free_vars {
-                    if let Some(scope_idx) = scope_idx_by_var.remove(&var) {
+                for var in &ordered_scope_vars {
+                    if let Some(scope_idx) = scope_idx_by_var.remove(var) {
                         if let Some(scope_prop) = scope_by_idx.remove(&scope_idx) {
                             sub_scoped = SubScoped {
                                 expressions: vec![],
@@ -354,7 +423,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 let (scope_prop, sub_scoped) = match sub_scoped.sub_scopes.into_iter().next() {
                     Some(val) => val,
                     None => {
-                        panic!("No sub scoping but free_vars was {free_vars:?}")
+                        panic!("No sub scoping but free_vars was {ordered_scope_vars:?}")
                     }
                 };
 
@@ -367,6 +436,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     }),
                     node,
                 })
+            }
+            (expr::Kind::Seq(_label, _attr), _) => {
+                panic!("Seq without gen scope")
             }
             (expr_kind, scope::Kind::Gen(_)) => {
                 todo!("{expr_kind:#?} with gen scope")

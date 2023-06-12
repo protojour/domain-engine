@@ -20,6 +20,19 @@ impl<'m> Scope<'m> {
     }
 }
 
+impl<'m> Scope<'m> {
+    #[allow(unused)]
+    pub fn debug_short(&self) -> String {
+        match &self.kind {
+            Kind::Const => format!("Const"),
+            Kind::Var(var) => format!("Var({var})"),
+            Kind::Struct(_) => format!("Struct"),
+            Kind::Let(let_) => format!("Let({})", let_.inner_binder.0),
+            Kind::Gen(gen) => format!("Gen({})", gen.input_seq),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
     Const,

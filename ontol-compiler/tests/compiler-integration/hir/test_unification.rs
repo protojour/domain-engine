@@ -371,9 +371,9 @@ fn test_unify_flat_map1() {
         |$c| (match-prop $c S:1:1
             (($_ $b)
                 (match-prop $c S:0:0
-                    ((seq $g)
-                        (gen $g ($h $_ $e)
-                            (push $h #u
+                    ((seq $d)
+                        (gen $d ($g $_ $e)
+                            (push $g #u
                                 (struct ($f)
                                     (match-prop $e S:2:2
                                         (($_ $a)

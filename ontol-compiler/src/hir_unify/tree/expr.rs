@@ -10,6 +10,23 @@ pub struct Expr<'m> {
     pub free_vars: VarSet,
 }
 
+impl<'m> Expr<'m> {
+    #[allow(unused)]
+    pub fn debug_short(&self) -> String {
+        match &self.kind {
+            Kind::Var(var) => format!("Var({var})"),
+            Kind::Unit => format!("Unit"),
+            Kind::Struct(_) => format!("Struct"),
+            Kind::Prop(_) => format!("Prop"),
+            Kind::Map(_) => format!("Map"),
+            Kind::Call(_) => format!("Call"),
+            Kind::Int(int) => format!("Int({int})"),
+            Kind::Seq(label, _) => format!("Seq({label})"),
+            Kind::Push(var, _) => format!("Push({var})"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Kind<'m> {
     Var(ontol_hir::Var),
@@ -19,6 +36,7 @@ pub enum Kind<'m> {
     Map(Box<Expr<'m>>),
     Call(Call<'m>),
     Int(i64),
+    Seq(ontol_hir::Label, Box<Attribute<Expr<'m>>>),
     Push(ontol_hir::Var, Box<Attribute<Expr<'m>>>),
 }
 
