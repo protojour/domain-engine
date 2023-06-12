@@ -1,18 +1,24 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
-use ontol_hir::kind::{
-    Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
-    PropVariant,
+use ontol_hir::{
+    kind::{
+        Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding,
+        PropPattern, PropVariant,
+    },
+    visitor::HirVisitor,
 };
 use ontol_runtime::DefId;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
-    hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
+    hir_unify::{
+        tree::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder},
+        UnifierError, UnifierResult, VarSet, VariableTracker,
+    },
     mem::Intern,
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{HirFunc, Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef, Types},
-    SourceSpan,
+    Compiler, SourceSpan,
 };
 
 use super::{
@@ -20,6 +26,61 @@ use super::{
     hierarchy::{HierarchyBuilder, SubScoped},
     scope,
 };
+
+pub fn unify_to_function<'m>(
+    scope_source: TypedHirNode<'m>,
+    target: TypedHirNode<'m>,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<HirFunc<'m>> {
+    let mut var_tracker = VariableTracker::default();
+    var_tracker.visit_node(0, &scope_source);
+    var_tracker.visit_node(0, &target);
+
+    let source_ty = scope_source.meta.ty;
+    let target_ty = target.meta.ty;
+
+    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
+
+    let (scope_binder, next_var) = {
+        let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
+        let scope_binder = scope_builder.build_scope_binder(&scope_source)?;
+        (scope_binder, scope_builder.next_var())
+    };
+
+    let (expr, next_var) = {
+        let mut expr_builder = ExprBuilder::new(next_var);
+        let expr = expr_builder.hir_to_expr(&target);
+        (expr, expr_builder.next_var())
+    };
+
+    let mut unifier3 = Unifier3::new(&mut compiler.types, next_var);
+    let unified3 = unifier3.unify3(scope_binder.scope, expr)?;
+
+    debug!("unified node {}", unified3.node);
+
+    let hir_func = match unified3.typed_binder {
+        Some(arg) => {
+            // NB: Error is used in unification tests
+            if !matches!(source_ty, Type::Error) {
+                assert_eq!(arg.ty, source_ty);
+            }
+            if !matches!(target_ty, Type::Error) {
+                assert_eq!(unified3.node.meta.ty, target_ty);
+            }
+
+            Ok(HirFunc {
+                arg,
+                body: unified3.node,
+            })
+        }
+        None => Err(UnifierError::NoInputBinder),
+    };
+
+    hir_func.map_err(|err| {
+        warn!("unifier error: {err:?}");
+        err
+    })
+}
 
 pub struct Unifier3<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,

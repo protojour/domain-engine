@@ -4,7 +4,7 @@ use bit_set::BitSet;
 use fnv::FnvHashMap;
 use tracing::debug;
 
-use crate::hir_unify::{unifier::UnifierResult, UnifierError, VarSet};
+use crate::hir_unify::{UnifierError, UnifierResult, VarSet};
 
 pub trait Scope: Clone {
     fn vars(&self) -> &VarSet;

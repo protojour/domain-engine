@@ -2,7 +2,7 @@ use ontol_hir::kind::{Dimension, NodeKind};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    hir_unify::{unifier::UnifierResult, UnifierError, VarSet},
+    hir_unify::{UnifierError, UnifierResult, VarSet},
     typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::TypeRef,
     SourceSpan,

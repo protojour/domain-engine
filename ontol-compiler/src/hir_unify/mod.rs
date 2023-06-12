@@ -5,12 +5,7 @@ use ontol_hir::{visitor::HirVisitor, Label, Var};
 
 use crate::{typed_hir::TypedHir, SourceSpan};
 
-pub mod unifier;
-
-mod tagged_node;
-mod tree;
-mod unification_tree;
-mod var_path;
+pub mod tree;
 
 #[derive(Debug)]
 pub enum UnifierError {
@@ -19,6 +14,8 @@ pub enum UnifierError {
     SequenceInputNotSupported,
     MultipleVariablesInExpression(SourceSpan),
 }
+
+pub type UnifierResult<T> = Result<T, UnifierError>;
 
 struct VariableTracker {
     largest: Var,
