@@ -283,11 +283,21 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }
             // ### "zwizzling" cases:
             (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
-                let scoped_props: Vec<_> =
-                    HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
-                let mut nodes = Vec::with_capacity(scoped_props.len());
-                for (prop_scope, sub_scoped) in scoped_props {
+                let hierarchy = HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
+                let mut nodes = Vec::with_capacity(hierarchy.scoped.len());
+                for (prop_scope, sub_scoped) in hierarchy.scoped {
                     nodes.push(self.unify_prop_match_arm(prop_scope, sub_scoped)?.node);
+                }
+                if !hierarchy.unscoped.is_empty() {
+                    let const_scope = self.const_scope();
+                    let unscoped_nodes = self.unify_sub_scoped_props(
+                        const_scope,
+                        SubScoped {
+                            expressions: hierarchy.unscoped,
+                            sub_scopes: vec![],
+                        },
+                    )?;
+                    nodes.extend(unscoped_nodes);
                 }
 
                 Ok(UnifiedNode3 {
@@ -307,8 +317,6 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 if free_vars.0.is_empty() {
                     panic!("No free vars in {expr_kind:#?} with struct scope");
                 }
-
-                debug!("with struct scope: {expr_kind:#?}");
 
                 let expr = expr::Expr {
                     kind: expr_kind,
@@ -544,8 +552,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 Ok(vec![node])
             }
             scope::Kind::Struct(struct_scope) => {
-                debug!("struct scope: {struct_scope:#?}");
-                debug!("expressions: {sub_scoped:#?}");
+                // debug!("struct scope: {struct_scope:#?}");
+                // debug!("expressions: {sub_scoped:#?}");
 
                 let scope = scope::Scope {
                     kind: scope::Kind::Struct(struct_scope),

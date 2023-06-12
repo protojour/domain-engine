@@ -238,6 +238,12 @@ fn test_deep_structural_map() {
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
         );
+        assert_domain_map(
+            &test_env,
+            ("bar", "foo"),
+            json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
+            json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
+        );
     });
 }
 

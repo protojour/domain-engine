@@ -15,6 +15,11 @@ pub trait Expression {
     fn optional(&self) -> bool;
 }
 
+pub struct Hierarchy<E, S> {
+    pub scoped: Vec<(S, SubScoped<E, S>)>,
+    pub unscoped: Vec<E>,
+}
+
 // TODO: Rename?
 #[derive(Debug)]
 pub struct SubScoped<E, S> {
@@ -28,6 +33,7 @@ pub struct HierarchyBuilder<S> {
     scope_index_by_var: FnvHashMap<ontol_hir::Var, usize>,
 }
 
+#[derive(Debug)]
 struct IndexedHierarchy<E> {
     pub scope_index: usize,
     pub expressions: Vec<E>,
@@ -55,17 +61,12 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         })
     }
 
-    pub fn build<E: Expression + Debug>(
-        mut self,
-        expressions: Vec<E>,
-    ) -> Vec<(S, SubScoped<E, S>)> {
+    pub fn build<E: Expression + Debug>(mut self, expressions: Vec<E>) -> Hierarchy<E, S> {
         // retain scope order by using BTreeMap:
         let mut scope_assignments: BTreeMap<usize, Vec<E>> = Default::default();
 
         let mut scope_routing_table: FnvHashMap<ontol_hir::Var, usize> =
             self.scope_index_by_var.clone();
-
-        let input_len = expressions.len();
 
         let mut constant_exprs: Vec<E> = vec![];
 
@@ -84,14 +85,6 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
 
         debug!("scope routing table: {scope_routing_table:?}");
 
-        if !constant_exprs.is_empty() {
-            debug!(
-                "input len: {input_len}, const len: {}",
-                constant_exprs.len()
-            );
-            todo!("Handle constant expressions: {constant_exprs:#?}");
-        }
-
         let indexed_hierarchy = scope_assignments
             .into_iter()
             .map(|(scope_index, expressions)| {
@@ -101,7 +94,10 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
             })
             .collect();
 
-        self.into_hierarchy(indexed_hierarchy)
+        Hierarchy {
+            scoped: self.into_sub_scoped(indexed_hierarchy),
+            unscoped: constant_exprs,
+        }
     }
 
     fn assign_to_scope_group<E: Expression>(
@@ -220,7 +216,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
     }
 
     // algorithm for avoiding unnecessary scope clones
-    fn into_hierarchy<E: Expression>(
+    fn into_sub_scoped<E: Expression + Debug>(
         self,
         indexed_hierarchy: Vec<IndexedHierarchy<E>>,
     ) -> Vec<(S, SubScoped<E, S>)> {
@@ -234,7 +230,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
 
         indexed_hierarchy
             .into_iter()
-            .map(|indexed| into_hierarchy_rec(indexed, &mut ref_counts, &mut scopes_by_index))
+            .map(|indexed| into_sub_scoped_rec(indexed, &mut ref_counts, &mut scopes_by_index))
             .collect()
     }
 }
@@ -246,7 +242,7 @@ fn count_scopes<E>(indexed: &IndexedHierarchy<E>, ref_counts: &mut FnvHashMap<us
     }
 }
 
-fn into_hierarchy_rec<S: Clone, E>(
+fn into_sub_scoped_rec<S: Clone, E>(
     indexed: IndexedHierarchy<E>,
     ref_counts: &mut FnvHashMap<usize, usize>,
     scopes_by_index: &mut FnvHashMap<usize, S>,
@@ -268,7 +264,7 @@ fn into_hierarchy_rec<S: Clone, E>(
             sub_scopes: indexed
                 .children
                 .into_iter()
-                .map(|child| into_hierarchy_rec(child, ref_counts, scopes_by_index))
+                .map(|child| into_sub_scoped_rec(child, ref_counts, scopes_by_index))
                 .collect(),
         },
     )
