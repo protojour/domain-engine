@@ -31,8 +31,8 @@ pub fn unify_to_function<'m>(
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, &scope);
-    var_tracker.visit_node(0, &expr);
+    var_tracker.visit_node(0, scope);
+    var_tracker.visit_node(0, expr);
 
     let scope_ty = scope.meta.ty;
     let expr_ty = expr.meta.ty;
