@@ -2,16 +2,23 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use ontol_hir::{visitor::HirVisitor, Label, Var};
+use ontol_runtime::DefId;
+use tracing::{debug, warn};
 
-use crate::{typed_hir::TypedHir, SourceSpan};
-
-pub mod unifier;
+use crate::{
+    hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
+    mem::Intern,
+    typed_hir::{HirFunc, TypedHir, TypedHirNode},
+    types::Type,
+    Compiler, SourceSpan,
+};
 
 mod dep_tree;
 mod expr;
 mod expr_builder;
 mod scope;
 mod scope_builder;
+mod unifier;
 mod unify_props;
 
 #[derive(Debug)]
@@ -23,6 +30,60 @@ pub enum UnifierError {
 }
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
+
+pub fn unify_to_function<'m>(
+    scope: &TypedHirNode<'m>,
+    expr: &TypedHirNode<'m>,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<HirFunc<'m>> {
+    let mut var_tracker = VariableTracker::default();
+    var_tracker.visit_node(0, scope);
+    var_tracker.visit_node(0, expr);
+
+    let scope_ty = scope.meta.ty;
+    let expr_ty = expr.meta.ty;
+
+    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
+
+    let (scope_binder, next_var) = {
+        let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
+        let scope_binder = scope_builder.build_scope_binder(scope)?;
+        (scope_binder, scope_builder.next_var())
+    };
+
+    let (expr, next_var) = {
+        let mut expr_builder = ExprBuilder::new(next_var);
+        let expr = expr_builder.hir_to_expr(expr);
+        (expr, expr_builder.next_var())
+    };
+
+    let unified = Unifier::new(&mut compiler.types, next_var).unify(scope_binder.scope, expr)?;
+
+    debug!("unified node {}", unified.node);
+
+    let hir_func = match unified.typed_binder {
+        Some(arg) => {
+            // NB: Error is used in unification tests
+            if !matches!(scope_ty, Type::Error) {
+                assert_eq!(arg.ty, scope_ty);
+            }
+            if !matches!(expr_ty, Type::Error) {
+                assert_eq!(unified.node.meta.ty, expr_ty);
+            }
+
+            Ok(HirFunc {
+                arg,
+                body: unified.node,
+            })
+        }
+        None => Err(UnifierError::NoInputBinder),
+    };
+
+    hir_func.map_err(|err| {
+        warn!("unifier error: {err:?}");
+        err
+    })
+}
 
 struct VariableTracker {
     largest: Var,
@@ -107,21 +168,5 @@ impl<'b> Iterator for VarSetIter<'b> {
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.0.next()?;
         Some(ontol_hir::Var(next.try_into().unwrap()))
-    }
-}
-
-pub struct DebugVariables<'a>(pub &'a BitSet);
-
-impl<'a> Debug for DebugVariables<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[")?;
-        let mut iterator = self.0.iter().peekable();
-        while let Some(var) = iterator.next() {
-            write!(f, "{}", Var(var as u32))?;
-            if iterator.peek().is_some() {
-                write!(f, ", ")?;
-            }
-        }
-        write!(f, "]")
     }
 }

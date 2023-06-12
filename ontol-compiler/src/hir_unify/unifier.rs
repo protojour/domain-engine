@@ -1,21 +1,17 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
-use ontol_hir::{
-    kind::{Attribute, Dimension, IterBinder, NodeKind, Optional, PatternBinding, PropVariant},
-    visitor::HirVisitor,
+use ontol_hir::kind::{
+    Attribute, Dimension, IterBinder, NodeKind, Optional, PatternBinding, PropVariant,
 };
 use ontol_runtime::DefId;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
-    hir_unify::{
-        expr_builder::ExprBuilder, scope_builder::ScopeBuilder, UnifierError, UnifierResult,
-        VarSet, VariableTracker,
-    },
+    hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
-    typed_hir::{HirFunc, Meta, TypedBinder, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef, Types},
-    Compiler, SourceSpan,
+    SourceSpan,
 };
 
 use super::{
@@ -23,60 +19,6 @@ use super::{
     expr, scope,
     unify_props::UnifyProps,
 };
-
-pub fn unify_to_function<'m>(
-    scope: &TypedHirNode<'m>,
-    expr: &TypedHirNode<'m>,
-    compiler: &mut Compiler<'m>,
-) -> UnifierResult<HirFunc<'m>> {
-    let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, scope);
-    var_tracker.visit_node(0, expr);
-
-    let scope_ty = scope.meta.ty;
-    let expr_ty = expr.meta.ty;
-
-    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
-
-    let (scope_binder, next_var) = {
-        let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
-        let scope_binder = scope_builder.build_scope_binder(scope)?;
-        (scope_binder, scope_builder.next_var())
-    };
-
-    let (expr, next_var) = {
-        let mut expr_builder = ExprBuilder::new(next_var);
-        let expr = expr_builder.hir_to_expr(expr);
-        (expr, expr_builder.next_var())
-    };
-
-    let unified = Unifier::new(&mut compiler.types, next_var).unify(scope_binder.scope, expr)?;
-
-    debug!("unified node {}", unified.node);
-
-    let hir_func = match unified.typed_binder {
-        Some(arg) => {
-            // NB: Error is used in unification tests
-            if !matches!(scope_ty, Type::Error) {
-                assert_eq!(arg.ty, scope_ty);
-            }
-            if !matches!(expr_ty, Type::Error) {
-                assert_eq!(unified.node.meta.ty, expr_ty);
-            }
-
-            Ok(HirFunc {
-                arg,
-                body: unified.node,
-            })
-        }
-        None => Err(UnifierError::NoInputBinder),
-    };
-
-    hir_func.map_err(|err| {
-        warn!("unifier error: {err:?}");
-        err
-    })
-}
 
 pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
