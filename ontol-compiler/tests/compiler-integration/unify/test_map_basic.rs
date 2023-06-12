@@ -71,7 +71,7 @@ fn test_temperature() {
 }
 
 #[test]
-fn test_recursive_optional_attribute() {
+fn test_nested_optional_attribute() {
     "
     type seconds {
         rel _ is: int

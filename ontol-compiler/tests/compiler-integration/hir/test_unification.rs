@@ -561,3 +561,27 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+// BUG: We really want this to work
+#[should_panic = "MultipleVariablesInExpression"]
+fn test_unify_dependent_scoping() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop? $c S:0:0 (#u (+ $b $c)))
+            (prop? $c S:1:1 (#u (+ $a $b)))
+            (prop? $c S:2:2 (#u $a))
+        )
+        ",
+        "
+        (struct ($f)
+            (prop? $f O:0:0 (#u $a))
+            (prop? $f O:1:1 (#u $b))
+            (prop? $f O:2:2 (#u $c))
+        )
+        ",
+    );
+    let expected = indoc! {""};
+    assert_eq!(expected, output);
+}
