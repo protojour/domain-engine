@@ -13,7 +13,9 @@ use crate::{
 
 use super::{
     dep_tree::{DepTreeBuilder, SubTree},
-    expr, scope,
+    expr,
+    regroup_match_prop::regroup_match_prop,
+    scope,
     unify_props::UnifyProps,
 };
 
@@ -323,6 +325,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?;
                     nodes.extend(unscoped_nodes);
                 }
+
+                let nodes = regroup_match_prop(nodes);
 
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {

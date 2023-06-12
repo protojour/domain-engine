@@ -16,6 +16,7 @@ use crate::{
 mod dep_tree;
 mod expr;
 mod expr_builder;
+mod regroup_match_prop;
 mod scope;
 mod scope_builder;
 mod unifier;

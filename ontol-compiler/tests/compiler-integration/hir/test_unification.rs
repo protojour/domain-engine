@@ -5,12 +5,14 @@ use ontol_compiler::{
     typed_hir::{TypedHir, TypedHirNode},
     Compiler,
 };
-use ontol_hir::parse::Parser;
 use pretty_assertions::assert_eq;
 use test_log::test;
 
 fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
-    Parser::new(TypedHir).parse(src).unwrap().0
+    ontol_hir::parse::Parser::new(TypedHir)
+        .parse(src)
+        .unwrap()
+        .0
 }
 
 fn test_unify(scope: &str, expr: &str) -> String {
@@ -563,22 +565,70 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
 }
 
 #[test]
+fn test_unify_prop_variants() {
+    let output = test_unify(
+        "
+        (struct ($e)
+            (prop  $e S:0:0 (#u $a) (#u $b))
+            (prop? $e S:1:1 (#u $c) (#u $d))
+        )
+        ",
+        "
+        (struct ($f)
+            (prop  $f O:0:0 (#u $a) (#u $b))
+            (prop? $f O:1:1 (#u $c) (#u $d))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$e| (struct ($f)
+            (match-prop $e S:0:0
+                (($_ $a)
+                    (prop $f O:0:0
+                        (#u $a)
+                    )
+                )
+                (($_ $b)
+                    (prop $f O:0:0
+                        (#u $b)
+                    )
+                )
+            )
+            (match-prop $e S:1:1
+                (($_ $c)
+                    (prop $f O:1:1
+                        (#u $c)
+                    )
+                )
+                (($_ $d)
+                    (prop $f O:1:1
+                        (#u $d)
+                    )
+                )
+                (())
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 // BUG: We really want this to work
 #[should_panic = "MultipleVariablesInExpression"]
 fn test_unify_dependent_scoping() {
     let output = test_unify(
         "
         (struct ($c)
-            (prop? $c S:0:0 (#u (+ $b $c)))
-            (prop? $c S:1:1 (#u (+ $a $b)))
-            (prop? $c S:2:2 (#u $a))
+            (prop $c S:0:0 (#u (+ $b $c)))
+            (prop $c S:1:1 (#u (+ $a $b)))
+            (prop $c S:2:2 (#u $a))
         )
         ",
         "
         (struct ($f)
-            (prop? $f O:0:0 (#u $a))
-            (prop? $f O:1:1 (#u $b))
-            (prop? $f O:2:2 (#u $c))
+            (prop $f O:0:0 (#u $a))
+            (prop $f O:1:1 (#u $b))
+            (prop $f O:2:2 (#u $c))
         )
         ",
     );

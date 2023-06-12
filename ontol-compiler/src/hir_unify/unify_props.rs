@@ -5,7 +5,9 @@ use crate::{
 
 use super::{
     dep_tree::SubTree,
-    expr, scope,
+    expr,
+    regroup_match_prop::regroup_match_prop,
+    scope,
     unifier::{UnifiedNode, Unifier},
     UnifierResult, VarSet,
 };
@@ -171,10 +173,12 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                     .node,
             );
         }
+
         for (sub_prop_scope, sub_scoped) in sub_scoped.sub_trees {
             nodes.push(Self::unify_match_arm(unifier, sub_prop_scope, sub_scoped)?.node);
         }
-        Ok(nodes)
+
+        Ok(regroup_match_prop(nodes))
     }
 
     fn unify_with_struct<'a>(
