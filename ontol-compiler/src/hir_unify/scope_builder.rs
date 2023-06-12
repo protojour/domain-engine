@@ -1,4 +1,3 @@
-use ontol_hir::kind::{Dimension, NodeKind};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
@@ -62,15 +61,15 @@ impl<'m> ScopeBuilder<'m> {
         node: &TypedHirNode<'m>,
     ) -> UnifierResult<ScopeBinder<'m>> {
         match &node.kind {
-            NodeKind::Var(var) => Ok(self.mk_var_scope(*var, node.meta)),
-            NodeKind::Unit => Ok(ScopeBinder::unbound(
+            ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, node.meta)),
+            ontol_hir::Kind::Unit => Ok(ScopeBinder::unbound(
                 self.mk_scope(scope::Kind::Const, node.meta),
             )),
-            NodeKind::Int(_) => Ok(ScopeBinder::unbound(
+            ontol_hir::Kind::Int(_) => Ok(ScopeBinder::unbound(
                 self.mk_scope(scope::Kind::Const, node.meta),
             )),
-            NodeKind::Let(..) => todo!(),
-            NodeKind::Call(proc, params) => {
+            ontol_hir::Kind::Let(..) => todo!(),
+            ontol_hir::Kind::Call(proc, params) => {
                 let analysis = analyze_expr(node)?;
                 match &analysis.kind {
                     ExprAnalysisKind::Const => Ok(ScopeBinder::unbound(
@@ -87,16 +86,16 @@ impl<'m> ScopeBuilder<'m> {
                                 ty: node.meta.ty,
                             },
                             TypedHirNode {
-                                kind: NodeKind::Var(binder_var),
+                                kind: ontol_hir::Kind::Var(binder_var),
                                 meta: node.meta,
                             },
                         )
                     }
                 }
             }
-            NodeKind::Map(arg) => self.build_scope_binder(arg),
-            NodeKind::Seq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
-            NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
+            ontol_hir::Kind::Map(arg) => self.build_scope_binder(arg),
+            ontol_hir::Kind::Seq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
+            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 let mut props = Vec::with_capacity(nodes.len());
                 for (disjoint_group, node) in nodes.iter().enumerate() {
                     props.extend(zelf.build_props(node, disjoint_group)?);
@@ -117,17 +116,17 @@ impl<'m> ScopeBuilder<'m> {
                     .with_kind(scope::Kind::Struct(scope::Struct(*binder, props))),
                 })
             }),
-            NodeKind::Prop(..) => panic!("standalone prop"),
-            NodeKind::MatchProp(..) => {
+            ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
+            ontol_hir::Kind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
-            NodeKind::Gen(..) => {
+            ontol_hir::Kind::Gen(..) => {
                 todo!()
             }
-            NodeKind::Iter(..) => {
+            ontol_hir::Kind::Iter(..) => {
                 todo!()
             }
-            NodeKind::Push(..) => {
+            ontol_hir::Kind::Push(..) => {
                 todo!()
             }
         }
@@ -139,11 +138,11 @@ impl<'m> ScopeBuilder<'m> {
         disjoint_group: usize,
     ) -> UnifierResult<Vec<scope::Prop<'m>>> {
         match &node.kind {
-            NodeKind::Prop(optional, struct_var, prop_id, variants) => variants
+            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| {
                     let (kind, vars) = match variant.dimension {
-                        Dimension::Singular => {
+                        ontol_hir::Dimension::Singular => {
                             let mut union = UnionBuilder::default();
                             let rel = union
                                 .plus(self.build_scope_binder(&variant.attr.rel)?)
@@ -154,7 +153,7 @@ impl<'m> ScopeBuilder<'m> {
 
                             (scope::PropKind::Attr(rel, val), union.vars)
                         }
-                        Dimension::Seq(label) => {
+                        ontol_hir::Dimension::Seq(label) => {
                             let rel = self
                                 .build_scope_binder(&variant.attr.rel)?
                                 .into_scope_pattern_binding();
@@ -220,14 +219,14 @@ impl<'m> ScopeBuilder<'m> {
         inverted_params.insert(var_param_index, let_def);
 
         let next_let_def = TypedHirNode {
-            kind: NodeKind::Call(inverted_proc, inverted_params),
+            kind: ontol_hir::Kind::Call(inverted_proc, inverted_params),
             // Is this correct?
             meta: analysis.meta,
         };
 
         match (&params[var_param_index].kind, next_analysis) {
             (
-                NodeKind::Var(_),
+                ontol_hir::Kind::Var(_),
                 ExprAnalysis {
                     kind: ExprAnalysisKind::Var(scoped_var),
                     ..
@@ -251,7 +250,7 @@ impl<'m> ScopeBuilder<'m> {
                 };
                 Ok(scope_binder)
             }
-            (NodeKind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
+            (ontol_hir::Kind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
                 *next_proc,
                 next_params,
                 child_analysis,
@@ -352,7 +351,7 @@ enum ExprAnalysisKind<'m> {
 
 fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> {
     match &node.kind {
-        NodeKind::Call(_, args) => {
+        ontol_hir::Kind::Call(_, args) => {
             let mut kind = ExprAnalysisKind::Const;
             for (index, param) in args.iter().enumerate() {
                 let child_analysis = analyze_expr(param)?;
@@ -378,7 +377,7 @@ fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> 
                 meta: node.meta,
             })
         }
-        NodeKind::Var(var) => Ok(ExprAnalysis {
+        ontol_hir::Kind::Var(var) => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Var(*var),
             meta: node.meta,
         }),

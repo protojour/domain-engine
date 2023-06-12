@@ -1,4 +1,3 @@
-use ontol_hir::kind::Optional;
 use ontol_runtime::value::PropertyId;
 
 use crate::{
@@ -79,7 +78,7 @@ pub struct Gen<'m> {
 #[derive(Clone, Debug)]
 pub struct Prop<'m> {
     pub struct_var: ontol_hir::Var,
-    pub optional: Optional,
+    pub optional: ontol_hir::Optional,
     pub prop_id: PropertyId,
     pub disjoint_group: usize,
     pub kind: PropKind<'m>,
@@ -99,10 +98,10 @@ pub enum PatternBinding<'m> {
 }
 
 impl<'m> PatternBinding<'m> {
-    pub fn hir_pattern_binding(&self) -> ontol_hir::kind::PatternBinding {
+    pub fn hir_binding(&self) -> ontol_hir::Binding {
         match &self {
-            Self::Wildcard(_) => ontol_hir::kind::PatternBinding::Wildcard,
-            Self::Scope(binder, _) => ontol_hir::kind::PatternBinding::Binder(*binder),
+            Self::Wildcard(_) => ontol_hir::Binding::Wildcard,
+            Self::Scope(binder, _) => ontol_hir::Binding::Binder(*binder),
         }
     }
 }

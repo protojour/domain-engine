@@ -1,12 +1,6 @@
 use ontol_runtime::value::PropertyId;
 
-use crate::{
-    kind::{
-        Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
-        PropVariant,
-    },
-    Label, Lang, Node, Var,
-};
+use crate::*;
 
 macro_rules! visitor_trait_methods {
     ($ref:tt, $kind:ident, $iter:ident) => {
@@ -15,7 +9,7 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn visit_kind(&mut self, index: usize, kind: arg!($ref NodeKind<'l, L>)) {
+        fn visit_kind(&mut self, index: usize, kind: arg!($ref Kind<'l, L>)) {
             self.traverse_kind(kind);
         }
 
@@ -41,7 +35,7 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn visit_pattern_binding(&mut self, index: usize, binding: arg!($ref PatternBinding)) {
+        fn visit_pattern_binding(&mut self, index: usize, binding: arg!($ref Binding)) {
             self.traverse_pattern_binding(binding);
         }
 
@@ -62,64 +56,64 @@ macro_rules! visitor_trait_methods {
         #[allow(unused_variables)]
         fn visit_label(&mut self, label: arg!($ref Label)) {}
 
-        fn traverse_kind(&mut self, kind: arg!($ref NodeKind<'l, L>)) {
+        fn traverse_kind(&mut self, kind: arg!($ref Kind<'l, L>)) {
             match kind {
-                NodeKind::Var(var) => {
+                Kind::Var(var) => {
                     self.visit_var(var);
                 }
-                NodeKind::Int(_) => {}
-                NodeKind::Unit => {}
-                NodeKind::Call(_proc, params) => {
+                Kind::Int(_) => {}
+                Kind::Unit => {}
+                Kind::Call(_proc, params) => {
                     for (index, arg) in params.$iter().enumerate() {
                         self.visit_node(index, arg);
                     }
                 }
-                NodeKind::Map(arg) => {
+                Kind::Map(arg) => {
                     self.visit_node(0, arg);
                 }
-                NodeKind::Let(binder, def, body) => {
+                Kind::Let(binder, def, body) => {
                     self.visit_binder(borrow!($ref binder.0));
                     self.visit_node(0, def);
                     for (index, node) in body.$iter().enumerate() {
                         self.visit_node(index + 1, node);
                     }
                 }
-                NodeKind::Seq(label, spec) => {
+                Kind::Seq(label, spec) => {
                     self.visit_label(label);
                     self.visit_node(0, borrow!($ref spec.rel));
                     self.visit_node(1, borrow!($ref spec.val));
                 }
-                NodeKind::Struct(binder, children) => {
+                Kind::Struct(binder, children) => {
                     self.visit_binder(borrow!($ref binder.0));
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }
                 }
-                NodeKind::Prop(optional, struct_var, id, variants) => {
+                Kind::Prop(optional, struct_var, id, variants) => {
                     self.visit_prop(optional, struct_var, id, variants);
                 }
-                NodeKind::MatchProp(struct_var, id, arms) => {
+                Kind::MatchProp(struct_var, id, arms) => {
                     self.visit_var(struct_var);
                     self.visit_property_id(id);
                     for (index, arm) in arms.$iter().enumerate() {
                         self.visit_match_arm(index, arm);
                     }
                 }
-                NodeKind::Gen(seq_var, binder, children) => {
+                Kind::Gen(seq_var, binder, children) => {
                     self.visit_var(seq_var);
                     self.visit_iter_binder(binder);
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }
                 }
-                NodeKind::Iter(seq_var, binder, children) => {
+                Kind::Iter(seq_var, binder, children) => {
                     self.visit_var(seq_var);
                     self.visit_iter_binder(binder);
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }
                 }
-                NodeKind::Push(seq_var, attr) => {
+                Kind::Push(seq_var, attr) => {
                     self.visit_var(seq_var);
                     self.visit_node(0, borrow!($ref attr.rel));
                     self.visit_node(1, borrow!($ref attr.val));
@@ -162,10 +156,10 @@ macro_rules! visitor_trait_methods {
             }
         }
 
-        fn traverse_pattern_binding(&mut self, binding: arg!($ref PatternBinding)) {
+        fn traverse_pattern_binding(&mut self, binding: arg!($ref Binding)) {
             match binding {
-                PatternBinding::Binder(var) => self.visit_binder(var),
-                PatternBinding::Wildcard => {}
+                Binding::Binder(var) => self.visit_binder(var),
+                Binding::Wildcard => {}
             }
         }
 

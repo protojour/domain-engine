@@ -1,13 +1,13 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    kind::{Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
-    Lang, Node,
+    Binding, Dimension, IterBinder, Kind, Label, Lang, MatchArm, Node, PropPattern, PropVariant,
+    Var,
 };
 
-impl<'a, L: Lang> std::fmt::Display for NodeKind<'a, L> {
+impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Printer::default().print(Sep::None, self, f)?;
         Ok(())
@@ -26,23 +26,23 @@ pub struct Printer<L: Lang> {
     lang: std::marker::PhantomData<L>,
 }
 
-impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
-    fn print(self, sep: Sep, kind: &NodeKind<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
+impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
+    fn print(self, sep: Sep, kind: &Kind<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         let indent = self.indent;
         match kind {
-            NodeKind::Var(var) => {
+            Kind::Var(var) => {
                 write!(f, "{sep}{}", var)?;
                 Ok(sep.multiline())
             }
-            NodeKind::Int(int) => {
+            Kind::Int(int) => {
                 write!(f, "{sep}{int}")?;
                 Ok(sep.multiline())
             }
-            NodeKind::Unit => {
+            Kind::Unit => {
                 write!(f, "{sep}#u")?;
                 Ok(sep.multiline())
             }
-            NodeKind::Let(binder, definition, body) => {
+            Kind::Let(binder, definition, body) => {
                 write!(f, "{indent}(let ({}", binder.0)?;
                 let multi = self.print(Sep::Space, definition.kind(), f)?;
                 self.print_rparen(multi, f)?;
@@ -50,7 +50,7 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Call(proc, args) => {
+            Kind::Call(proc, args) => {
                 let proc = match proc {
                     BuiltinProc::Add => "+",
                     BuiltinProc::Sub => "-",
@@ -63,14 +63,14 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            NodeKind::Map(arg) => {
+            Kind::Map(arg) => {
                 write!(f, "{sep}(map")?;
                 let multi =
                     self.print_all(Sep::Space, [arg.as_ref()].into_iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            NodeKind::Seq(label, attr) => {
+            Kind::Seq(label, attr) => {
                 write!(f, "{indent}(seq ({})", label)?;
                 let multi = self.print_all(
                     Sep::Space,
@@ -82,13 +82,13 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Struct(binder, children) => {
+            Kind::Struct(binder, children) => {
                 write!(f, "{indent}(struct ({})", binder.0)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Prop(optional, struct_var, id, variants) => {
+            Kind::Prop(optional, struct_var, id, variants) => {
                 write!(
                     f,
                     "{indent}(prop{} {struct_var} {id}",
@@ -98,25 +98,25 @@ impl<'a, L: Lang> Print<NodeKind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::MatchProp(struct_var, id, arms) => {
+            Kind::MatchProp(struct_var, id, arms) => {
                 write!(f, "{indent}(match-prop {struct_var} {id}")?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Gen(var, iter_binder, children) => {
+            Kind::Gen(var, iter_binder, children) => {
                 write!(f, "{indent}(gen {var} {iter_binder}",)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Iter(var, iter_binder, children) => {
+            Kind::Iter(var, iter_binder, children) => {
                 write!(f, "{indent}(iter {var} {iter_binder}",)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            NodeKind::Push(seq_var, attr) => {
+            Kind::Push(seq_var, attr) => {
                 write!(f, "{indent}(push {seq_var}",)?;
                 let multi = self.print_all(
                     Sep::Space,
@@ -181,13 +181,13 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
     }
 }
 
-impl<L: Lang> Print<PatternBinding> for Printer<L> {
-    fn print(self, sep: Sep, ast: &PatternBinding, f: &mut std::fmt::Formatter) -> PrintResult {
+impl<L: Lang> Print<Binding> for Printer<L> {
+    fn print(self, sep: Sep, ast: &Binding, f: &mut std::fmt::Formatter) -> PrintResult {
         match ast {
-            PatternBinding::Binder(var) => {
+            Binding::Binder(var) => {
                 write!(f, "{sep}{}", var)?;
             }
-            PatternBinding::Wildcard => {
+            Binding::Wildcard => {
                 write!(f, "{sep}$_")?;
             }
         }
@@ -329,7 +329,7 @@ impl Display for AsAlpha {
     }
 }
 
-impl Display for PatternBinding {
+impl Display for Binding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wildcard => write!(f, "$_"),
@@ -341,6 +341,30 @@ impl Display for PatternBinding {
 impl Display for IterBinder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.seq, self.rel, self.val)
+    }
+}
+
+impl Debug for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Var({})", AsAlpha(self.0))
+    }
+}
+
+impl Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", AsAlpha(self.0))
+    }
+}
+
+impl Debug for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Label({})", AsAlpha(self.0))
+    }
+}
+
+impl Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", AsAlpha(self.0))
     }
 }
 

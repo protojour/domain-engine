@@ -1,12 +1,16 @@
+use std::str::FromStr;
+
 use ontol_runtime::vm::proc::BuiltinProc;
 
-use crate::{
-    kind::{
-        Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding,
-        PropPattern, PropVariant,
-    },
-    Binder, Label, Lang, Var,
-};
+use crate::*;
+
+impl FromStr for Var {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        try_alpha_to_u32(s).map(Var).map_err(|_| ())
+    }
+}
 
 #[derive(Debug)]
 pub enum Error<'s> {
@@ -67,20 +71,19 @@ impl<L: Lang> Parser<L> {
                 Ok((node, next))
             }
             (Token::Dollar, next) => match parse_token(next)? {
-                (Token::Symbol(sym), next) => Ok((
-                    self.make_node(NodeKind::Var(Var(try_alpha_to_u32(sym)?))),
-                    next,
-                )),
+                (Token::Symbol(sym), next) => {
+                    Ok((self.make_node(Kind::Var(Var(try_alpha_to_u32(sym)?))), next))
+                }
                 (token, _) => Err(Error::InvalidToken(token)),
             },
             (Token::Hash, next) => match parse_token(next)? {
                 (Token::Symbol(sym), next) => match sym {
-                    "u" => Ok((self.make_node(NodeKind::Unit), next)),
+                    "u" => Ok((self.make_node(Kind::Unit), next)),
                     sym => Err(Error::InvalidSymbol(sym)),
                 },
                 (token, _) => Err(Error::InvalidToken(token)),
             },
-            (Token::Int(num), next) => Ok((self.make_node(NodeKind::Int(num)), next)),
+            (Token::Int(num), next) => Ok((self.make_node(Kind::Int(num)), next)),
             (token, _) => Err(Error::InvalidToken(token)),
         }
     }
@@ -98,18 +101,18 @@ impl<L: Lang> Parser<L> {
                 let (_, next) = parse_rparen(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(NodeKind::Let(Binder(bind_var), Box::new(def), body)),
+                    self.make_node(Kind::Let(Binder(bind_var), Box::new(def), body)),
                     next,
                 ))
             }
             ("map", next) => {
                 let (arg, next) = self.parse(next)?;
-                Ok((self.make_node(NodeKind::Map(Box::new(arg))), next))
+                Ok((self.make_node(Kind::Map(Box::new(arg))), next))
             }
             ("struct", next) => {
                 let (binder, next) = parse_binder(next)?;
                 let (children, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Struct(binder, children)), next))
+                Ok((self.make_node(Kind::Struct(binder, children)), next))
             }
             ("prop", next) => self.parse_prop(Optional(false), next),
             ("prop?", next) => self.parse_prop(Optional(true), next),
@@ -120,7 +123,7 @@ impl<L: Lang> Parser<L> {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(NodeKind::Seq(
+                    self.make_node(Kind::Seq(
                         label,
                         Attribute {
                             rel: Box::new(rel),
@@ -135,7 +138,7 @@ impl<L: Lang> Parser<L> {
                 let (prop, next) = parse_symbol(next)?;
                 let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
                 Ok((
-                    self.make_node(NodeKind::MatchProp(
+                    self.make_node(Kind::MatchProp(
                         struct_var,
                         prop.parse().map_err(|_| {
                             Error::Expected(Class::Property, Found(Token::Symbol(prop)))
@@ -149,20 +152,20 @@ impl<L: Lang> Parser<L> {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (binder, next) = parse_iter_binder(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Gen(seq_var, binder, body)), next))
+                Ok((self.make_node(Kind::Gen(seq_var, binder, body)), next))
             }
             ("iter", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (binder, next) = parse_iter_binder(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Iter(seq_var, binder, body)), next))
+                Ok((self.make_node(Kind::Iter(seq_var, binder, body)), next))
             }
             ("push", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(NodeKind::Push(
+                    self.make_node(Kind::Push(
                         seq_var,
                         Attribute {
                             rel: Box::new(rel),
@@ -185,7 +188,7 @@ impl<L: Lang> Parser<L> {
         let (prop, next) = parse_symbol(next)?;
         let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
         Ok((
-            self.make_node(NodeKind::Prop(
+            self.make_node(Kind::Prop(
                 optional,
                 var,
                 prop.parse()
@@ -291,10 +294,10 @@ impl<L: Lang> Parser<L> {
         let (a, next) = self.parse(next)?;
         let (b, next) = self.parse(next)?;
 
-        Ok((self.make_node(NodeKind::Call(proc, [a, b].into())), next))
+        Ok((self.make_node(Kind::Call(proc, [a, b].into())), next))
     }
 
-    fn make_node<'a>(&self, kind: NodeKind<'a, L>) -> L::Node<'a> {
+    fn make_node<'a>(&self, kind: Kind<'a, L>) -> L::Node<'a> {
         self.lang.make_node(kind)
     }
 }
@@ -337,13 +340,11 @@ fn parse_iter_binder(next: &str) -> ParseResult<IterBinder> {
     Ok((IterBinder { seq, rel, val }, next))
 }
 
-fn parse_pattern_binding(next: &str) -> ParseResult<PatternBinding> {
+fn parse_pattern_binding(next: &str) -> ParseResult<Binding> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => {
-            Ok((PatternBinding::Binder(Var(try_alpha_to_u32(sym)?)), next))
-        }
-        (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
+        (Token::Symbol(sym), next) => Ok((Binding::Binder(Var(try_alpha_to_u32(sym)?)), next)),
+        (Token::Underscore, next) => Ok((Binding::Wildcard, next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }

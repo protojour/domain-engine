@@ -1,16 +1,13 @@
-use std::{
-    fmt::{Debug, Display},
-    str::FromStr,
-};
+use std::{fmt::Debug, ops::Index};
 
-use kind::NodeKind;
-
-use crate::display::AsAlpha;
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 pub mod display;
-pub mod kind;
 pub mod parse;
 pub mod visitor;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Var(pub u32);
@@ -18,26 +15,6 @@ pub struct Var(pub u32);
 impl From<u32> for Var {
     fn from(value: u32) -> Self {
         Self(value)
-    }
-}
-
-impl Debug for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Var({})", AsAlpha(self.0))
-    }
-}
-
-impl Display for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", AsAlpha(self.0))
-    }
-}
-
-impl FromStr for Var {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse::try_alpha_to_u32(s).map(Var).map_err(|_| ())
     }
 }
 
@@ -53,187 +30,130 @@ impl From<Var> for Binder {
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
-impl Debug for Label {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Label({})", AsAlpha(self.0))
-    }
-}
-
-impl Display for Label {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}", AsAlpha(self.0))
-    }
-}
-
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
 
-    fn make_node<'a>(&self, kind: NodeKind<'a, Self>) -> Self::Node<'a>;
+    fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a>;
 }
 
 pub trait Node<'a, L: Lang> {
-    fn kind(&self) -> &NodeKind<'a, L>;
-    fn kind_mut(&mut self) -> &mut NodeKind<'a, L>;
+    fn kind(&self) -> &Kind<'a, L>;
+    fn kind_mut(&mut self) -> &mut Kind<'a, L>;
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::parse::Parser;
+type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
-    use super::*;
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
+#[derive(Clone)]
+pub enum Kind<'a, L: Lang> {
+    Var(Var),
+    Unit,
+    Int(i64),
+    Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
+    Call(BuiltinProc, Nodes<'a, L>),
+    Map(Box<L::Node<'a>>),
+    Seq(Label, Attribute<Box<L::Node<'a>>>),
+    Struct(Binder, Nodes<'a, L>),
+    Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
+    MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
+    Gen(Var, IterBinder, Nodes<'a, L>),
+    Iter(Var, IterBinder, Nodes<'a, L>),
+    Push(Var, Attribute<Box<L::Node<'a>>>),
+}
 
-    #[derive(Clone, Copy)]
-    struct TestLang;
+impl<'a, L: Lang> Node<'a, L> for Kind<'a, L> {
+    fn kind(&self) -> &Kind<'a, L> {
+        self
+    }
 
-    impl Lang for TestLang {
-        type Node<'a> = NodeKind<'a, Self>;
+    fn kind_mut(&mut self) -> &mut Kind<'a, L> {
+        self
+    }
+}
 
-        fn make_node<'a>(&self, kind: NodeKind<'a, Self>) -> Self::Node<'a> {
-            kind
+#[derive(Clone, Copy, Debug)]
+pub struct Optional(pub bool);
+
+#[derive(Clone)]
+pub struct PropVariant<'a, L: Lang> {
+    pub dimension: Dimension,
+    pub attr: Attribute<Box<L::Node<'a>>>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Dimension {
+    Singular,
+    Seq(Label),
+}
+
+/// An attribute existing of (relation parameter, value)
+#[derive(Clone, Debug)]
+pub struct Attribute<T> {
+    pub rel: T,
+    pub val: T,
+}
+
+impl<R, V, T> From<(R, V)> for Attribute<T>
+where
+    T: From<R> + From<V>,
+{
+    fn from((rel, val): (R, V)) -> Self {
+        Self {
+            rel: rel.into(),
+            val: val.into(),
         }
     }
+}
 
-    fn parse_print(src: &str) -> String {
-        let parser = Parser::new(TestLang);
-        let (node, _) = parser.parse(src).unwrap();
-        let mut out = String::new();
-        use std::fmt::Write;
-        write!(out, "{node}").unwrap();
-        out
-    }
+impl<T> Index<usize> for Attribute<T> {
+    type Output = T;
 
-    #[test]
-    fn test_unit() {
-        let src = "#u";
-        assert_eq!(src, parse_print(src));
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.rel,
+            1 => &self.val,
+            _ => panic!("Out of bounds for Attribute"),
+        }
     }
+}
 
-    #[test]
-    fn test_big_var() {
-        let src = "$abc";
-        assert_eq!(src, parse_print(src));
-    }
+pub struct MatchArm<'a, L: Lang> {
+    pub pattern: PropPattern,
+    pub nodes: Vec<<L as Lang>::Node<'a>>,
+}
 
-    #[test]
-    fn test_fn_call() {
-        let src = "(+ $a 2)";
-        assert_eq!(src, parse_print(src));
+// BUG: Why can't this be derived?
+impl<'a, L: Lang> Clone for MatchArm<'a, L>
+where
+    <L as Lang>::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pattern: self.pattern.clone(),
+            nodes: self.nodes.clone(),
+        }
     }
+}
 
-    #[test]
-    fn test_match_prop1() {
-        let src = indoc! {"
-            (match-prop $a S:10:10
-                (($_ $b) #u)
-                (() #u)
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
+#[derive(Clone)]
+pub enum PropPattern {
+    /// ($rel $val)
+    Attr(Binding, Binding),
+    /// (seq $val)
+    /// The sequence is captured in $val, relation is ignored
+    Seq(Binding),
+    /// The property is absent
+    Absent,
+}
 
-    #[test]
-    fn test_match_prop2() {
-        let src = indoc! {"
-            (match-prop $a S:0:0
-                (($_ $b)
-                    (match-prop $b S:0:1
-                        (($_ $c) #u)
-                        (() #u)
-                    )
-                )
-                (() #u)
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
+#[derive(Clone, Copy, Debug)]
+pub enum Binding {
+    Wildcard,
+    Binder(Var),
+}
 
-    #[test]
-    fn test_struct() {
-        let src = indoc! {"
-            (struct ($a)
-                (prop $a S:0:0
-                    (#u #u)
-                )
-                (prop $a S:0:0
-                    (#u
-                        (struct ($b))
-                    )
-                )
-                (prop $a S:0:0
-                    (
-                        (struct ($c))
-                        #u
-                    )
-                )
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
-
-    #[test]
-    fn test_mixed() {
-        let src = indoc! {"
-            (+ 1
-                (struct ($a))
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
-
-    #[test]
-    fn test_seq() {
-        let src = indoc! {"
-            (struct ($a)
-                (prop $a S:0:0
-                    (#u
-                        (seq (@c) #u $b)
-                    )
-                )
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
-
-    #[test]
-    fn test_seq_prop() {
-        let src = indoc! {"
-            (struct ($a)
-                (prop $a S:0:0
-                    (seq (@c)
-                        #u
-                        $b
-                    )
-                )
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
-
-    #[test]
-    fn test_map_seq() {
-        let src = indoc! {"
-            (struct ($a)
-                (match-prop $b S:0:0
-                    (($_ $c)
-                        (gen $c ($d $e $f) $d)
-                    )
-                )
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
-
-    #[test]
-    fn test_let() {
-        let src = indoc! {"
-            (let ($a (+ 1 2))
-                (prop $b S:0:0
-                    (#u $a)
-                )
-            )"
-        };
-        assert_eq!(src, parse_print(src));
-    }
+#[derive(Clone)]
+pub struct IterBinder {
+    pub seq: Binding,
+    pub rel: Binding,
+    pub val: Binding,
 }

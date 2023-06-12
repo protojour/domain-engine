@@ -1,7 +1,5 @@
 use std::marker::PhantomData;
 
-use ontol_hir::kind::{Attribute, Dimension, NodeKind};
-
 use super::expr;
 use crate::{hir_unify::VarSet, typed_hir::TypedHirNode};
 
@@ -26,7 +24,7 @@ impl<'m> ExprBuilder<'m> {
 
     pub fn hir_to_expr(&mut self, node: &TypedHirNode<'m>) -> expr::Expr<'m> {
         match &node.kind {
-            NodeKind::Var(var) => {
+            ontol_hir::Kind::Var(var) => {
                 let mut free_vars = VarSet::default();
                 free_vars.0.insert(var.0 as usize);
 
@@ -38,22 +36,22 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }
-            NodeKind::Unit => expr::Expr(
+            ontol_hir::Kind::Unit => expr::Expr(
                 expr::Kind::Unit,
                 expr::Meta {
                     hir_meta: node.meta,
                     free_vars: Default::default(),
                 },
             ),
-            NodeKind::Int(int) => expr::Expr(
+            ontol_hir::Kind::Int(int) => expr::Expr(
                 expr::Kind::Int(*int),
                 expr::Meta {
                     hir_meta: node.meta,
                     free_vars: Default::default(),
                 },
             ),
-            NodeKind::Let(..) => panic!(),
-            NodeKind::Call(proc, params) => {
+            ontol_hir::Kind::Let(..) => panic!(),
+            ontol_hir::Kind::Call(proc, params) => {
                 let params: Vec<_> = params.iter().map(|param| self.hir_to_expr(param)).collect();
                 let mut free_vars = VarSet::default();
                 for param in &params {
@@ -68,7 +66,7 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }
-            NodeKind::Map(arg) => {
+            ontol_hir::Kind::Map(arg) => {
                 let arg = self.hir_to_expr(arg);
                 let expr_meta = expr::Meta {
                     free_vars: arg.1.free_vars.clone(),
@@ -76,7 +74,7 @@ impl<'m> ExprBuilder<'m> {
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
-            NodeKind::Seq(label, attr) => {
+            ontol_hir::Kind::Seq(label, attr) => {
                 let rel = self.hir_to_expr(&attr.rel);
                 let val = self.hir_to_expr(&attr.val);
 
@@ -86,14 +84,14 @@ impl<'m> ExprBuilder<'m> {
                 free_vars.0.insert(label.0 as usize);
 
                 expr::Expr(
-                    expr::Kind::Seq(*label, Box::new(Attribute { rel, val })),
+                    expr::Kind::Seq(*label, Box::new(ontol_hir::Attribute { rel, val })),
                     expr::Meta {
                         free_vars,
                         hir_meta: node.meta,
                     },
                 )
             }
-            NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
+            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 let props: Vec<_> = nodes
                     .iter()
                     .flat_map(|node| zelf.node_to_props(node))
@@ -111,17 +109,17 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }),
-            NodeKind::Prop(..) => panic!("standalone prop"),
-            NodeKind::MatchProp(..) => {
+            ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
+            ontol_hir::Kind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
-            NodeKind::Gen(..) => {
+            ontol_hir::Kind::Gen(..) => {
                 todo!()
             }
-            NodeKind::Iter(..) => {
+            ontol_hir::Kind::Iter(..) => {
                 todo!()
             }
-            NodeKind::Push(..) => {
+            ontol_hir::Kind::Push(..) => {
                 todo!()
             }
         }
@@ -129,10 +127,10 @@ impl<'m> ExprBuilder<'m> {
 
     fn node_to_props(&mut self, node: &TypedHirNode<'m>) -> Vec<expr::Prop<'m>> {
         match &node.kind {
-            NodeKind::Prop(optional, struct_var, prop_id, variants) => variants
+            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| match variant.dimension {
-                    Dimension::Singular => {
+                    ontol_hir::Dimension::Singular => {
                         let mut union = UnionBuilder::default();
                         let rel = union.plus(self.hir_to_expr(&variant.attr.rel));
                         let val = union.plus(self.hir_to_expr(&variant.attr.val));
@@ -143,10 +141,10 @@ impl<'m> ExprBuilder<'m> {
                             free_vars: union.vars,
                             seq: None,
                             struct_var: *struct_var,
-                            attr: Attribute { rel, val },
+                            attr: ontol_hir::Attribute { rel, val },
                         }
                     }
-                    Dimension::Seq(label) => {
+                    ontol_hir::Dimension::Seq(label) => {
                         let rel = self.hir_to_expr(&variant.attr.rel);
                         let val = self.hir_to_expr(&variant.attr.val);
                         let mut free_vars = VarSet::default();
@@ -158,7 +156,7 @@ impl<'m> ExprBuilder<'m> {
                             free_vars,
                             seq: Some(label),
                             struct_var: *struct_var,
-                            attr: Attribute { rel, val },
+                            attr: ontol_hir::Attribute { rel, val },
                         }
                     }
                 })

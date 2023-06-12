@@ -1,8 +1,4 @@
 use indexmap::IndexMap;
-use ontol_hir::{
-    kind::{Attribute, Dimension, NodeKind, Optional, PropVariant},
-    Binder,
-};
 use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use tracing::debug;
 
@@ -86,7 +82,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         TypedHirNode {
-                            kind: NodeKind::Call(*proc, parameters),
+                            kind: ontol_hir::Kind::Call(*proc, parameters),
                             meta: Meta {
                                 ty: output,
                                 span: expr.span,
@@ -142,9 +138,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let array_ty = self.types.intern(Type::Array(elem_ty));
 
                 TypedHirNode {
-                    kind: NodeKind::Seq(
+                    kind: ontol_hir::Kind::Seq(
                         label,
-                        Attribute {
+                        ontol_hir::Attribute {
                             rel: Box::new(self.unit_node_no_span()),
                             val: Box::new(inner_node),
                         },
@@ -158,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Constant(k), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
                     TypedHirNode {
-                        kind: NodeKind::Int(*k),
+                        kind: ontol_hir::Kind::Int(*k),
                         meta: Meta {
                             ty: expected_ty,
                             span: expr.span,
@@ -203,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(expected_ty) => {
                         let variable = explicit_variable.variable;
                         let variable_ref = TypedHirNode {
-                            kind: NodeKind::Var(variable),
+                            kind: ontol_hir::Kind::Var(variable),
                             meta: Meta {
                                 ty: expected_ty,
                                 span: expr.span,
@@ -278,7 +274,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.map.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = Binder(ctx.alloc_variable());
+                        let struct_binder = ontol_hir::Binder(ctx.alloc_variable());
 
                         struct MatchProperty {
                             relation_id: RelationId,
@@ -349,9 +345,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
                                     let node = self.build_node(expr, Some(object_ty), ctx);
-                                    PropVariant {
-                                        dimension: Dimension::Singular,
-                                        attr: Attribute {
+                                    ontol_hir::PropVariant {
+                                        dimension: ontol_hir::Dimension::Singular,
+                                        attr: ontol_hir::Attribute {
                                             rel: Box::new(self.unit_node_no_span()),
                                             val: Box::new(node),
                                         },
@@ -362,9 +358,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let node = self.build_node(inner, Some(object_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
-                                        PropVariant {
-                                            dimension: Dimension::Seq(label),
-                                            attr: Attribute {
+                                        ontol_hir::PropVariant {
+                                            dimension: ontol_hir::Dimension::Seq(label),
+                                            attr: ontol_hir::Attribute {
                                                 rel: Box::new(self.unit_node_no_span()),
                                                 val: Box::new(node),
                                             },
@@ -380,34 +376,34 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 },
                             };
 
-                            let optional = Optional(matches!(
+                            let optional = ontol_hir::Optional(matches!(
                                 match_property.cardinality.0,
                                 PropertyCardinality::Optional
                             ));
 
-                            let prop_variants: Vec<PropVariant<'_, TypedHir>> = match match_property
-                                .cardinality
-                                .0
-                            {
-                                PropertyCardinality::Mandatory => {
-                                    vec![prop_variant]
-                                }
-                                PropertyCardinality::Optional => {
-                                    if *bind_option {
+                            let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
+                                match match_property.cardinality.0 {
+                                    PropertyCardinality::Mandatory => {
                                         vec![prop_variant]
-                                    } else {
-                                        ctx.partial = true;
-                                        self.error(
-                                            CompileError::TODO("required to be optional?".into()),
-                                            &expr.span,
-                                        );
-                                        vec![]
                                     }
-                                }
-                            };
+                                    PropertyCardinality::Optional => {
+                                        if *bind_option {
+                                            vec![prop_variant]
+                                        } else {
+                                            ctx.partial = true;
+                                            self.error(
+                                                CompileError::TODO(
+                                                    "required to be optional?".into(),
+                                                ),
+                                                &expr.span,
+                                            );
+                                            vec![]
+                                        }
+                                    }
+                                };
 
                             hir_props.push(TypedHirNode {
-                                kind: NodeKind::Prop(
+                                kind: ontol_hir::Kind::Prop(
                                     optional,
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
@@ -426,13 +422,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        NodeKind::Struct(struct_binder, hir_props)
+                        ontol_hir::Kind::Struct(struct_binder, hir_props)
                     }
                     None => {
                         if !attributes.is_empty() {
                             return self.error_node(CompileError::NoPropertiesExpected, &span);
                         }
-                        NodeKind::Unit
+                        ontol_hir::Kind::Unit
                     }
                 }
             }
@@ -489,7 +485,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn make_error_node(&mut self, span: &SourceSpan) -> TypedHirNode<'m> {
         TypedHirNode {
-            kind: NodeKind::Unit,
+            kind: ontol_hir::Kind::Unit,
             meta: Meta {
                 ty: self.types.intern(Type::Error),
                 span: *span,
@@ -499,7 +495,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn unit_node_no_span(&mut self) -> TypedHirNode<'m> {
         TypedHirNode {
-            kind: NodeKind::Unit,
+            kind: ontol_hir::Kind::Unit,
             meta: Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
                 span: SourceSpan::none(),

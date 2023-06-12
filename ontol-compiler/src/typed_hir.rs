@@ -2,7 +2,6 @@ use std::fmt::{Debug, Display};
 
 use ontol_hir::{
     display::{Print, Printer, Sep},
-    kind::NodeKind,
     Var,
 };
 
@@ -17,7 +16,7 @@ pub struct TypedHir;
 impl ontol_hir::Lang for TypedHir {
     type Node<'m> = TypedHirNode<'m>;
 
-    fn make_node<'m>(&self, kind: NodeKind<'m, Self>) -> Self::Node<'m> {
+    fn make_node<'m>(&self, kind: ontol_hir::Kind<'m, Self>) -> Self::Node<'m> {
         TypedHirNode {
             kind,
             meta: Meta {
@@ -28,7 +27,7 @@ impl ontol_hir::Lang for TypedHir {
     }
 }
 
-pub type TypedHirKind<'m> = ontol_hir::kind::NodeKind<'m, TypedHir>;
+pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
 
 #[derive(Clone)]
 pub struct TypedHirNode<'m> {
@@ -49,11 +48,11 @@ impl<'m> TypedHirNode<'m> {
 }
 
 impl<'m> ontol_hir::Node<'m, TypedHir> for TypedHirNode<'m> {
-    fn kind(&self) -> &NodeKind<'m, TypedHir> {
+    fn kind(&self) -> &ontol_hir::Kind<'m, TypedHir> {
         &self.kind
     }
 
-    fn kind_mut(&mut self) -> &mut NodeKind<'m, TypedHir> {
+    fn kind_mut(&mut self) -> &mut ontol_hir::Kind<'m, TypedHir> {
         &mut self.kind
     }
 }

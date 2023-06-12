@@ -1,7 +1,3 @@
-use ontol_hir::kind::{
-    Attribute, Dimension, MatchArm, NodeKind, Optional, PatternBinding, PropPattern, PropVariant,
-};
-
 use crate::{
     typed_hir::{Meta, TypedHirNode},
     SourceSpan,
@@ -39,8 +35,8 @@ pub(super) trait UnifyProps<'m>: Sized {
     ) -> UnifierResult<UnifiedNode<'m>> {
         let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
-                let hir_rel_binding = rel_binding.hir_pattern_binding();
-                let hir_val_binding = val_binding.hir_pattern_binding();
+                let hir_rel_binding = rel_binding.hir_binding();
+                let hir_val_binding = val_binding.hir_binding();
 
                 let joined_scope = unifier.join_attr_scope(rel_binding, val_binding);
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, joined_scope, sub_scoped)?;
@@ -51,8 +47,8 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .unwrap_or_else(|| unifier.unit_type());
 
                 (
-                    MatchArm {
-                        pattern: PropPattern::Attr(hir_rel_binding, hir_val_binding),
+                    ontol_hir::MatchArm {
+                        pattern: ontol_hir::PropPattern::Attr(hir_rel_binding, hir_val_binding),
                         nodes,
                     },
                     ty,
@@ -78,8 +74,10 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .unwrap_or_else(|| unifier.unit_type());
 
                 (
-                    MatchArm {
-                        pattern: PropPattern::Seq(PatternBinding::Binder(ontol_hir::Var(label.0))),
+                    ontol_hir::MatchArm {
+                        pattern: ontol_hir::PropPattern::Seq(ontol_hir::Binding::Binder(
+                            ontol_hir::Var(label.0),
+                        )),
                         nodes,
                     },
                     ty,
@@ -90,8 +88,8 @@ pub(super) trait UnifyProps<'m>: Sized {
         let mut match_arms = vec![match_arm];
 
         if scope_prop.optional.0 {
-            match_arms.push(MatchArm {
-                pattern: PropPattern::Absent,
+            match_arms.push(ontol_hir::MatchArm {
+                pattern: ontol_hir::PropPattern::Absent,
                 nodes: vec![],
             });
         }
@@ -99,7 +97,11 @@ pub(super) trait UnifyProps<'m>: Sized {
         Ok(UnifiedNode {
             typed_binder: None,
             node: TypedHirNode {
-                kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
+                kind: ontol_hir::Kind::MatchProp(
+                    scope_prop.struct_var,
+                    scope_prop.prop_id,
+                    match_arms,
+                ),
                 meta: Meta {
                     ty,
                     span: SourceSpan::none(),
@@ -128,7 +130,11 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .unwrap_or_else(|| unifier.unit_type());
 
                 let node = TypedHirNode {
-                    kind: NodeKind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                    kind: ontol_hir::Kind::Let(
+                        let_scope.inner_binder,
+                        Box::new(let_scope.def),
+                        block,
+                    ),
                     meta: Meta {
                         ty,
                         span: SourceSpan::none(),
@@ -194,13 +200,13 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
             let val = unifier.unify(scope.clone(), prop.attr.val)?;
 
             nodes.push(TypedHirNode {
-                kind: NodeKind::Prop(
-                    Optional(false),
+                kind: ontol_hir::Kind::Prop(
+                    ontol_hir::Optional(false),
                     prop.struct_var,
                     prop.prop_id,
-                    vec![PropVariant {
-                        dimension: Dimension::Singular,
-                        attr: Attribute {
+                    vec![ontol_hir::PropVariant {
+                        dimension: ontol_hir::Dimension::Singular,
+                        attr: ontol_hir::Attribute {
                             rel: Box::new(rel.node),
                             val: Box::new(val.node),
                         },

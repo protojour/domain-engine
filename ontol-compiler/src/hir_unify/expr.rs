@@ -1,4 +1,3 @@
-use ontol_hir::kind::{Attribute, Optional};
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 
 use crate::{hir_unify::VarSet, typed_hir};
@@ -33,8 +32,8 @@ pub enum Kind<'m> {
     Map(Box<Expr<'m>>),
     Call(Call<'m>),
     Int(i64),
-    Seq(ontol_hir::Label, Box<Attribute<Expr<'m>>>),
-    Push(ontol_hir::Var, Box<Attribute<Expr<'m>>>),
+    Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
+    Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
 }
 
 impl<'m> Kind<'m> {
@@ -59,11 +58,11 @@ pub struct Struct<'m>(pub ontol_hir::Binder, pub Vec<Prop<'m>>);
 
 #[derive(Debug)]
 pub struct Prop<'m> {
-    pub optional: Optional,
+    pub optional: ontol_hir::Optional,
     pub struct_var: ontol_hir::Var,
     pub prop_id: PropertyId,
     pub seq: Option<ontol_hir::Label>,
-    pub attr: Attribute<Expr<'m>>,
+    pub attr: ontol_hir::Attribute<Expr<'m>>,
     pub free_vars: VarSet,
 }
 
