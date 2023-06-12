@@ -15,32 +15,35 @@ pub trait Expression {
     fn optional(&self) -> bool;
 }
 
-pub struct Hierarchy<E, S> {
-    pub scoped: Vec<(S, SubScoped<E, S>)>,
-    pub unscoped: Vec<E>,
+/// A dependency tree of Expressions and Scopes
+pub struct DepTree<E, S> {
+    /// Subtrees that are dependent on some scope S
+    pub trees: Vec<(S, SubTree<E, S>)>,
+
+    /// Expressions that do not depend on anything
+    pub constants: Vec<E>,
 }
 
-// TODO: Rename?
 #[derive(Debug)]
-pub struct SubScoped<E, S> {
+pub struct SubTree<E, S> {
     pub expressions: Vec<E>,
-    pub sub_scopes: Vec<(S, SubScoped<E, S>)>,
+    pub sub_trees: Vec<(S, SubTree<E, S>)>,
 }
 
-pub struct HierarchyBuilder<S> {
+pub struct DepTreeBuilder<S> {
     scopes: Vec<S>,
     scoped_vars: BitSet,
     scope_index_by_var: FnvHashMap<ontol_hir::Var, usize>,
 }
 
 #[derive(Debug)]
-struct IndexedHierarchy<E> {
+struct IndexedNode<E> {
     pub scope_index: usize,
     pub expressions: Vec<E>,
-    pub children: Vec<IndexedHierarchy<E>>,
+    pub children: Vec<IndexedNode<E>>,
 }
 
-impl<S: Scope + Debug> HierarchyBuilder<S> {
+impl<S: Scope + Debug> DepTreeBuilder<S> {
     pub fn new(scopes: Vec<S>) -> UnifierResult<Self> {
         let mut scope_index_by_var = FnvHashMap::default();
         let mut scoped_vars = BitSet::new();
@@ -61,14 +64,14 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         })
     }
 
-    pub fn build<E: Expression + Debug>(mut self, expressions: Vec<E>) -> Hierarchy<E, S> {
+    pub fn build<E: Expression + Debug>(mut self, expressions: Vec<E>) -> DepTree<E, S> {
         // retain scope order by using BTreeMap:
         let mut scope_assignments: BTreeMap<usize, Vec<E>> = Default::default();
 
         let mut scope_routing_table: FnvHashMap<ontol_hir::Var, usize> =
             self.scope_index_by_var.clone();
 
-        let mut constant_exprs: Vec<E> = vec![];
+        let mut constants: Vec<E> = vec![];
 
         for expression in expressions {
             if let Some(scope_idx) =
@@ -79,24 +82,24 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
                     .or_default()
                     .push(expression);
             } else {
-                constant_exprs.push(expression)
+                constants.push(expression)
             }
         }
 
         debug!("scope routing table: {scope_routing_table:?}");
 
-        let indexed_hierarchy = scope_assignments
+        let root_nodes = scope_assignments
             .into_iter()
             .map(|(scope_index, expressions)| {
                 let in_scope = self.scopes.get(scope_index).unwrap().vars().clone();
 
-                self.build_sub_hierarchy(expressions, scope_index, in_scope)
+                self.build_sub_tree(expressions, scope_index, in_scope)
             })
             .collect();
 
-        Hierarchy {
-            scoped: self.into_sub_scoped(indexed_hierarchy),
-            unscoped: constant_exprs,
+        DepTree {
+            trees: self.into_sub_scoped(root_nodes),
+            constants,
         }
     }
 
@@ -122,15 +125,15 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         None
     }
 
-    fn build_sub_hierarchy<E: Expression>(
+    fn build_sub_tree<E: Expression>(
         &mut self,
         expressions: Vec<E>,
         scope_index: usize,
         in_scope: VarSet,
-    ) -> IndexedHierarchy<E> {
+    ) -> IndexedNode<E> {
         // expressions in scope:
         let mut in_scope_exprs = vec![];
-        // expressions not in scope (yet), needs to use a sub-group (hierarchy level) to put into scope
+        // expressions not in scope (yet), needs to use a sub-group (tree level) to put into scope
         let mut sub_groups: FnvHashMap<ontol_hir::Var, Vec<E>> = Default::default();
 
         for expression in expressions {
@@ -192,11 +195,11 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
                 );
                 let sub_scope_index = *self.scope_index_by_var.get(&var).unwrap();
 
-                self.build_sub_hierarchy(sub_expressions, sub_scope_index, sub_in_scope)
+                self.build_sub_tree(sub_expressions, sub_scope_index, sub_in_scope)
             })
             .collect();
 
-        IndexedHierarchy {
+        IndexedNode {
             scope_index,
             expressions: in_scope_exprs,
             children,
@@ -213,36 +216,35 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
     // algorithm for avoiding unnecessary scope clones
     fn into_sub_scoped<E: Expression + Debug>(
         self,
-        indexed_hierarchy: Vec<IndexedHierarchy<E>>,
-    ) -> Vec<(S, SubScoped<E, S>)> {
+        node: Vec<IndexedNode<E>>,
+    ) -> Vec<(S, SubTree<E, S>)> {
         let mut ref_counts: FnvHashMap<usize, usize> = Default::default();
         let mut scopes_by_index: FnvHashMap<usize, S> =
             self.scopes.into_iter().enumerate().collect();
 
-        for indexed in &indexed_hierarchy {
+        for indexed in &node {
             count_scopes(indexed, &mut ref_counts);
         }
 
-        indexed_hierarchy
-            .into_iter()
-            .map(|indexed| into_sub_scoped_rec(indexed, &mut ref_counts, &mut scopes_by_index))
+        node.into_iter()
+            .map(|indexed| into_sub_tree_rec(indexed, &mut ref_counts, &mut scopes_by_index))
             .collect()
     }
 }
 
-fn count_scopes<E>(indexed: &IndexedHierarchy<E>, ref_counts: &mut FnvHashMap<usize, usize>) {
-    *ref_counts.entry(indexed.scope_index).or_default() += 1;
-    for child in &indexed.children {
+fn count_scopes<E>(node: &IndexedNode<E>, ref_counts: &mut FnvHashMap<usize, usize>) {
+    *ref_counts.entry(node.scope_index).or_default() += 1;
+    for child in &node.children {
         count_scopes(child, ref_counts);
     }
 }
 
-fn into_sub_scoped_rec<S: Clone, E>(
-    indexed: IndexedHierarchy<E>,
+fn into_sub_tree_rec<S: Clone, E>(
+    node: IndexedNode<E>,
     ref_counts: &mut FnvHashMap<usize, usize>,
     scopes_by_index: &mut FnvHashMap<usize, S>,
-) -> (S, SubScoped<E, S>) {
-    let scope_index = indexed.scope_index;
+) -> (S, SubTree<E, S>) {
+    let scope_index = node.scope_index;
     let count = ref_counts.get_mut(&scope_index).unwrap();
     *count -= 1;
 
@@ -254,12 +256,12 @@ fn into_sub_scoped_rec<S: Clone, E>(
 
     (
         scope,
-        SubScoped {
-            expressions: indexed.expressions,
-            sub_scopes: indexed
+        SubTree {
+            expressions: node.expressions,
+            sub_trees: node
                 .children
                 .into_iter()
-                .map(|child| into_sub_scoped_rec(child, ref_counts, scopes_by_index))
+                .map(|child| into_sub_tree_rec(child, ref_counts, scopes_by_index))
                 .collect(),
         },
     )

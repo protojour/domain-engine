@@ -19,9 +19,8 @@ use crate::{
 };
 
 use super::{
-    expr,
-    hierarchy::{HierarchyBuilder, SubScoped},
-    scope,
+    dep_tree::{DepTreeBuilder, SubTree},
+    expr, scope,
     unify_props::UnifyProps,
 };
 
@@ -374,23 +373,25 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             // ### "zwizzling" cases:
-            (expr::Kind::Struct(struct_expr), scope::Kind::Struct(struct_scope)) => {
-                let hierarchy = HierarchyBuilder::new(struct_scope.1)?.build(struct_expr.1);
-                let mut nodes =
-                    Vec::with_capacity(hierarchy.scoped.len() + hierarchy.unscoped.len());
+            (
+                expr::Kind::Struct(expr::Struct(expr_binder, props)),
+                scope::Kind::Struct(scope::Struct(scope_binder, scope_props)),
+            ) => {
+                let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
+                let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
 
-                for (prop_scope, sub_scoped) in hierarchy.scoped {
+                for (prop_scope, sub_scoped) in dep_tree.trees {
                     nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_scoped)?.node);
                 }
 
-                if !hierarchy.unscoped.is_empty() {
+                if !dep_tree.constants.is_empty() {
                     let const_scope = self.const_scope();
                     let unscoped_nodes = expr::Prop::unify_sub_scoped(
                         self,
                         const_scope,
-                        SubScoped {
-                            expressions: hierarchy.unscoped,
-                            sub_scopes: vec![],
+                        SubTree {
+                            expressions: dep_tree.constants,
+                            sub_trees: vec![],
                         },
                     )?;
                     nodes.extend(unscoped_nodes);
@@ -398,16 +399,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
-                        var: struct_scope.0 .0,
+                        var: scope_binder.0,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node: TypedHirNode {
-                        kind: NodeKind::Struct(struct_expr.0, nodes),
+                        kind: NodeKind::Struct(expr_binder, nodes),
                         meta: expr_meta.hir_meta,
                     },
                 })
             }
-            (expr_kind, scope::Kind::Struct(struct_scope)) => {
+            (expr_kind, scope::Kind::Struct(scope::Struct(scope_binder, scope_props))) => {
                 // When scoping an arbitrariy expression to a struct
                 // it's important that the scoping is expanded in the correct
                 // order. I.e. the variable representing the expression itself
@@ -428,35 +429,35 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
 
                 let expr = expr::Expr(expr_kind, expr_meta);
-                let mut sub_scoped: SubScoped<expr::Expr, scope::Prop> = SubScoped {
+                let mut sub_scoped: SubTree<expr::Expr, scope::Prop> = SubTree {
                     expressions: vec![expr],
-                    sub_scopes: vec![],
+                    sub_trees: vec![],
                 };
 
                 let mut scope_idx_by_var: FnvHashMap<ontol_hir::Var, usize> = Default::default();
 
-                for (scope_idx, prop_scope) in struct_scope.1.iter().enumerate() {
+                for (scope_idx, prop_scope) in scope_props.iter().enumerate() {
                     for var in &prop_scope.vars {
                         scope_idx_by_var.insert(var, scope_idx);
                     }
                 }
 
                 let mut scope_by_idx: FnvHashMap<usize, scope::Prop> =
-                    struct_scope.1.into_iter().enumerate().collect();
+                    scope_props.into_iter().enumerate().collect();
 
                 // build recursive scope structure by iterating free variables
                 for var in &ordered_scope_vars {
                     if let Some(scope_idx) = scope_idx_by_var.remove(var) {
                         if let Some(scope_prop) = scope_by_idx.remove(&scope_idx) {
-                            sub_scoped = SubScoped {
+                            sub_scoped = SubTree {
                                 expressions: vec![],
-                                sub_scopes: vec![(scope_prop, sub_scoped)],
+                                sub_trees: vec![(scope_prop, sub_scoped)],
                             };
                         }
                     }
                 }
 
-                let (scope_prop, sub_scoped) = match sub_scoped.sub_scopes.into_iter().next() {
+                let (scope_prop, sub_scoped) = match sub_scoped.sub_trees.into_iter().next() {
                     Some(val) => val,
                     None => {
                         panic!("No sub scoping but free_vars was {ordered_scope_vars:?}")
@@ -467,7 +468,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
-                        var: struct_scope.0 .0,
+                        var: scope_binder.0,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node,

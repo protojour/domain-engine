@@ -8,7 +8,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::{hierarchy::Scope, scope};
+use super::{dep_tree::Scope, scope};
 
 pub struct ScopeBuilder<'m> {
     unit_type: TypeRef<'m>,

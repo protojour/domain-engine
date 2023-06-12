@@ -7,9 +7,9 @@ use crate::{typed_hir::TypedHir, SourceSpan};
 
 pub mod unifier;
 
+mod dep_tree;
 mod expr;
 mod expr_builder;
-mod hierarchy;
 mod scope;
 mod scope_builder;
 mod unify_props;

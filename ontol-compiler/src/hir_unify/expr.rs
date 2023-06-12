@@ -70,7 +70,7 @@ pub struct Prop<'m> {
 #[derive(Debug)]
 pub struct Call<'m>(pub BuiltinProc, pub Vec<Expr<'m>>);
 
-impl<'m> super::hierarchy::Expression for Expr<'m> {
+impl<'m> super::dep_tree::Expression for Expr<'m> {
     fn free_vars(&self) -> &VarSet {
         &self.1.free_vars
     }
@@ -80,7 +80,7 @@ impl<'m> super::hierarchy::Expression for Expr<'m> {
     }
 }
 
-impl<'m> super::hierarchy::Expression for Prop<'m> {
+impl<'m> super::dep_tree::Expression for Prop<'m> {
     fn free_vars(&self) -> &VarSet {
         &self.free_vars
     }

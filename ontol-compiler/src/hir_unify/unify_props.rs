@@ -8,9 +8,8 @@ use crate::{
 };
 
 use super::{
-    expr,
-    hierarchy::SubScoped,
-    scope,
+    dep_tree::SubTree,
+    expr, scope,
     unifier::{UnifiedNode, Unifier},
     UnifierResult, VarSet,
 };
@@ -22,21 +21,21 @@ pub(super) trait UnifyProps<'m>: Sized {
     fn unify_sub_scoped<'a>(
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
 
     // Required method
     fn unify_with_struct<'a>(
         unifier: &mut Unifier<'a, 'm>,
         struct_scope: (scope::Struct<'m>, scope::Meta<'m>),
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
 
     // Common logic
     fn unify_match_arm<'a>(
         unifier: &mut Unifier<'a, 'm>,
         scope_prop: scope::Prop<'m>,
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<UnifiedNode<'m>> {
         let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
@@ -113,7 +112,7 @@ pub(super) trait UnifyProps<'m>: Sized {
     fn wrap_sub_scoped_in_scope<'a>(
         unifier: &mut Unifier<'a, 'm>,
         scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         match scope_kind {
             scope::Kind::Const | scope::Kind::Var(_) => {
@@ -153,10 +152,10 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
     fn unify_sub_scoped<'a>(
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
+            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
         for prop in sub_scoped.expressions {
             let unit_meta = unifier.unit_meta();
             nodes.push(
@@ -174,7 +173,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                     .node,
             );
         }
-        for (sub_prop_scope, sub_scoped) in sub_scoped.sub_scopes {
+        for (sub_prop_scope, sub_scoped) in sub_scoped.sub_trees {
             nodes.push(Self::unify_match_arm(unifier, sub_prop_scope, sub_scoped)?.node);
         }
         Ok(nodes)
@@ -183,11 +182,11 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
     fn unify_with_struct<'a>(
         unifier: &mut Unifier<'a, 'm>,
         (struct_scope, scope_meta): (scope::Struct<'m>, scope::Meta<'m>),
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let scope = scope::Scope(scope::Kind::Struct(struct_scope), scope_meta);
         let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
+            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
 
         for prop in sub_scoped.expressions {
             // FIXME: avoid clone by taking scope reference?
@@ -212,7 +211,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
         }
 
         // TODO: sub_scoped
-        for (_sub_prop_scope, _sub_scoped_prop) in sub_scoped.sub_scopes {
+        for (_sub_prop_scope, _sub_scoped_prop) in sub_scoped.sub_trees {
             todo!()
         }
 
@@ -225,15 +224,15 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
     fn unify_sub_scoped<'a>(
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
-        sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
+            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
 
         for expr in sub_scoped.expressions {
             nodes.push(unifier.unify(inner_scope.clone(), expr)?.node);
         }
-        for (sub_prop_scope, sub_scoped) in sub_scoped.sub_scopes {
+        for (sub_prop_scope, sub_scoped) in sub_scoped.sub_trees {
             nodes.push(Self::unify_match_arm(unifier, sub_prop_scope, sub_scoped)?.node);
         }
         Ok(nodes)
@@ -242,7 +241,7 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
     fn unify_with_struct<'a>(
         _unifier: &mut Unifier<'a, 'm>,
         _: (scope::Struct<'m>, scope::Meta<'m>),
-        _sub_scoped: SubScoped<Self, scope::Prop<'m>>,
+        _sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         todo!()
     }

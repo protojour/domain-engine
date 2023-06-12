@@ -107,13 +107,13 @@ impl<'m> PatternBinding<'m> {
     }
 }
 
-impl<'m> super::hierarchy::Scope for Scope<'m> {
+impl<'m> super::dep_tree::Scope for Scope<'m> {
     fn vars(&self) -> &VarSet {
         &self.1.vars
     }
 }
 
-impl<'m> super::hierarchy::Scope for Prop<'m> {
+impl<'m> super::dep_tree::Scope for Prop<'m> {
     fn vars(&self) -> &VarSet {
         &self.vars
     }
