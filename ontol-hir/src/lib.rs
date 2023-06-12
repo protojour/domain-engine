@@ -37,9 +37,7 @@ impl FromStr for Var {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse::try_alpha_to_u32(s)
-            .map(|int| Var(int))
-            .map_err(|_| ())
+        parse::try_alpha_to_u32(s).map(Var).map_err(|_| ())
     }
 }
 

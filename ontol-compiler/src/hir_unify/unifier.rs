@@ -433,12 +433,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 // should be the innermost scope expansion.
                 let mut ordered_scope_vars: IndexSet<ontol_hir::Var> = Default::default();
 
-                match &expr_kind {
-                    expr::Kind::Seq(label, _) => {
-                        ordered_scope_vars.insert(ontol_hir::Var(label.0));
-                    }
-                    _ => {}
+                if let expr::Kind::Seq(label, _) = &expr_kind {
+                    // label is the primary scope locator for a sequence
+                    ordered_scope_vars.insert(ontol_hir::Var(label.0));
                 }
+
                 for free_var in &expr.free_vars {
                     ordered_scope_vars.insert(free_var);
                 }

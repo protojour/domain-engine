@@ -30,7 +30,7 @@ impl<'m> ScopeBinder<'m> {
         }
     }
 
-    fn to_scope_pattern_binding(self) -> scope::PatternBinding<'m> {
+    fn into_scope_pattern_binding(self) -> scope::PatternBinding<'m> {
         match &self.scope.kind {
             scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.meta),
             _ => scope::PatternBinding::Scope(
@@ -147,20 +147,20 @@ impl<'m> ScopeBuilder<'m> {
                             let mut union = UnionBuilder::default();
                             let rel = union
                                 .plus(self.build_scope_binder(&variant.attr.rel)?)
-                                .to_scope_pattern_binding();
+                                .into_scope_pattern_binding();
                             let val = union
                                 .plus(self.build_scope_binder(&variant.attr.val)?)
-                                .to_scope_pattern_binding();
+                                .into_scope_pattern_binding();
 
                             (scope::PropKind::Attr(rel, val), union.vars)
                         }
                         Dimension::Seq(label) => {
                             let rel = self
                                 .build_scope_binder(&variant.attr.rel)?
-                                .to_scope_pattern_binding();
+                                .into_scope_pattern_binding();
                             let val = self
                                 .build_scope_binder(&variant.attr.val)?
-                                .to_scope_pattern_binding();
+                                .into_scope_pattern_binding();
 
                             // Only the label is "visible" to the outside
                             let mut vars = VarSet::default();
@@ -212,9 +212,9 @@ impl<'m> ScopeBuilder<'m> {
 
         let mut inverted_params = Vec::with_capacity(params.len());
 
-        for param_index in 0..params.len() {
+        for (param_index, param) in params.iter().enumerate() {
             if param_index != var_param_index {
-                inverted_params.push(params[param_index].clone());
+                inverted_params.push(param.clone());
             }
         }
         inverted_params.insert(var_param_index, let_def);

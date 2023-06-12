@@ -25,7 +25,7 @@ macro_rules! visitor_trait_methods {
             optional: arg!($ref Optional),
             struct_var: arg!($ref Var),
             id: arg!($ref PropertyId),
-            variants: arg!($ref Vec<PropVariant<'l, L>>)
+            variants: arg!($ref [PropVariant<'l, L>])
         ) {
             self.traverse_prop(struct_var, id, variants);
         }
@@ -132,7 +132,7 @@ macro_rules! visitor_trait_methods {
             &mut self,
             struct_var: arg!($ref Var),
             id: arg!($ref PropertyId),
-            variants: arg!($ref Vec<PropVariant<'l, L>>),
+            variants: arg!($ref [PropVariant<'l, L>]),
         ) {
             self.visit_var(struct_var);
             self.visit_property_id(id);

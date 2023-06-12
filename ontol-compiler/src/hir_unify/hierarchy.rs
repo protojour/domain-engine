@@ -48,7 +48,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         for (idx, scope) in scopes.iter().enumerate() {
             scoped_vars.union_with(&scope.vars().0);
             for var in scope.vars() {
-                if let Some(_) = scope_index_by_var.insert(var, idx) {
+                if scope_index_by_var.insert(var, idx).is_some() {
                     return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));
                 }
             }
@@ -106,7 +106,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         scope_routing_table: &mut FnvHashMap<ontol_hir::Var, usize>,
     ) -> Option<usize> {
         let mut free_var_iter = expression.free_vars().iter();
-        while let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
+        if let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
             let scope_idx = scope_routing_table.get(&next_free_var).cloned().unwrap();
 
             if !expression.optional() {
@@ -207,12 +207,7 @@ impl<S: Scope + Debug> HierarchyBuilder<S> {
         &self,
         iterator: &mut impl Iterator<Item = ontol_hir::Var>,
     ) -> Option<ontol_hir::Var> {
-        while let Some(var) = iterator.next() {
-            if self.scoped_vars.contains(var.0 as usize) {
-                return Some(var);
-            }
-        }
-        None
+        iterator.find(|var| self.scoped_vars.contains(var.0 as usize))
     }
 
     // algorithm for avoiding unnecessary scope clones

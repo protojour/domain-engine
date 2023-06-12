@@ -15,11 +15,11 @@ impl<'m> Expr<'m> {
     pub fn debug_short(&self) -> String {
         match &self.kind {
             Kind::Var(var) => format!("Var({var})"),
-            Kind::Unit => format!("Unit"),
-            Kind::Struct(_) => format!("Struct"),
-            Kind::Prop(_) => format!("Prop"),
-            Kind::Map(_) => format!("Map"),
-            Kind::Call(_) => format!("Call"),
+            Kind::Unit => "Unit".to_string(),
+            Kind::Struct(_) => "Struct".to_string(),
+            Kind::Prop(_) => "Prop".to_string(),
+            Kind::Map(_) => "Map".to_string(),
+            Kind::Call(_) => "Call".to_string(),
             Kind::Int(int) => format!("Int({int})"),
             Kind::Seq(label, _) => format!("Seq({label})"),
             Kind::Push(var, _) => format!("Push({var})"),
