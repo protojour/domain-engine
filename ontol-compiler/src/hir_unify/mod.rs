@@ -5,7 +5,13 @@ use ontol_hir::{visitor::HirVisitor, Label, Var};
 
 use crate::{typed_hir::TypedHir, SourceSpan};
 
-pub mod tree;
+pub mod unifier;
+
+mod expr;
+mod expr_builder;
+mod hierarchy;
+mod scope;
+mod scope_builder;
 
 #[derive(Debug)]
 pub enum UnifierError {

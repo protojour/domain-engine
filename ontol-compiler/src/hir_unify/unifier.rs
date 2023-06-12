@@ -12,8 +12,8 @@ use tracing::{debug, warn};
 
 use crate::{
     hir_unify::{
-        tree::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder},
-        UnifierError, UnifierResult, VarSet, VariableTracker,
+        expr_builder::ExprBuilder, scope_builder::ScopeBuilder, UnifierError, UnifierResult,
+        VarSet, VariableTracker,
     },
     mem::Intern,
     typed_hir::{HirFunc, Meta, TypedBinder, TypedHirNode},
@@ -53,24 +53,23 @@ pub fn unify_to_function<'m>(
         (expr, expr_builder.next_var())
     };
 
-    let mut unifier3 = Unifier3::new(&mut compiler.types, next_var);
-    let unified3 = unifier3.unify3(scope_binder.scope, expr)?;
+    let unified = Unifier::new(&mut compiler.types, next_var).unify(scope_binder.scope, expr)?;
 
-    debug!("unified node {}", unified3.node);
+    debug!("unified node {}", unified.node);
 
-    let hir_func = match unified3.typed_binder {
+    let hir_func = match unified.typed_binder {
         Some(arg) => {
             // NB: Error is used in unification tests
             if !matches!(source_ty, Type::Error) {
                 assert_eq!(arg.ty, source_ty);
             }
             if !matches!(target_ty, Type::Error) {
-                assert_eq!(unified3.node.meta.ty, target_ty);
+                assert_eq!(unified.node.meta.ty, target_ty);
             }
 
             Ok(HirFunc {
                 arg,
-                body: unified3.node,
+                body: unified.node,
             })
         }
         None => Err(UnifierError::NoInputBinder),
@@ -82,31 +81,31 @@ pub fn unify_to_function<'m>(
     })
 }
 
-pub struct Unifier3<'a, 'm> {
+pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
     next_var: ontol_hir::Var,
 }
 
-pub struct UnifiedNode3<'m> {
+pub struct UnifiedNode<'m> {
     pub typed_binder: Option<TypedBinder<'m>>,
     pub node: TypedHirNode<'m>,
 }
 
-impl<'a, 'm> Unifier3<'a, 'm> {
+impl<'a, 'm> Unifier<'a, 'm> {
     pub fn new(types: &'a mut Types<'m>, next_var: ontol_hir::Var) -> Self {
         Self { types, next_var }
     }
 
-    pub fn unify3(
+    pub fn unify(
         &mut self,
         scope: scope::Scope<'m>,
         expr: expr::Expr<'m>,
-    ) -> Result<UnifiedNode3<'m>, UnifierError> {
+    ) -> Result<UnifiedNode<'m>, UnifierError> {
         // FIXME: This can be a loop instead of forced recursion,
         // for simple cases where the unified node is returned as-is from the layer below.
 
         // debug!(
-        //     "unify3 expr::{} / scope::{}",
+        //     "unify expr::{} / scope::{}",
         //     expr.debug_short(),
         //     scope.debug_short()
         // );
@@ -116,7 +115,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             (kind, scope::Kind::Var(var)) => {
                 // TODO: remove const_scope, have a way to ergonomically re-assemble the scope
                 let const_scope = self.const_scope();
-                let unified = self.unify3(
+                let unified = self.unify(
                     const_scope,
                     expr::Expr {
                         kind,
@@ -125,7 +124,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 )?;
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var,
                         ty: scope.meta.ty,
@@ -134,14 +133,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 })
             }
             // ### Expr constants - no scope needed:
-            (expr::Kind::Unit, _) => Ok(UnifiedNode3 {
+            (expr::Kind::Unit, _) => Ok(UnifiedNode {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Unit,
                     meta: expr.meta,
                 },
             }),
-            (expr::Kind::Int(int), _) => Ok(UnifiedNode3 {
+            (expr::Kind::Int(int), _) => Ok(UnifiedNode {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Int(int),
@@ -162,7 +161,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 }],
             ),
             // ### Const scopes (fully expanded):
-            (expr::Kind::Var(var), scope::Kind::Const) => Ok(UnifiedNode3 {
+            (expr::Kind::Var(var), scope::Kind::Const) => Ok(UnifiedNode {
                 typed_binder: None,
                 node: TypedHirNode {
                     kind: NodeKind::Var(var),
@@ -175,10 +174,10 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 }
 
                 let const_scope = self.const_scope();
-                let rel = self.unify3(const_scope.clone(), prop.attr.rel)?;
-                let val = self.unify3(const_scope, prop.attr.val)?;
+                let rel = self.unify(const_scope.clone(), prop.attr.rel)?;
+                let val = self.unify(const_scope, prop.attr.val)?;
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: None,
                     node: TypedHirNode {
                         kind: NodeKind::Prop(
@@ -217,7 +216,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     free_vars.0.union_with(&prop.attr.rel.free_vars.0);
                     free_vars.0.union_with(&prop.attr.val.free_vars.0);
 
-                    self.unify3(
+                    self.unify(
                         joined_scope,
                         expr::Expr {
                             kind: expr::Kind::Push(gen_scope.output_seq, Box::new(prop.attr)),
@@ -243,7 +242,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 };
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: None,
                     node: TypedHirNode {
                         kind: NodeKind::Prop(
@@ -281,7 +280,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     free_vars.0.union_with(&attr.rel.free_vars.0);
                     free_vars.0.union_with(&attr.val.free_vars.0);
 
-                    self.unify3(
+                    self.unify(
                         joined_scope,
                         expr::Expr {
                             kind: expr::Kind::Push(gen_scope.output_seq, attr),
@@ -307,7 +306,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 };
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: None,
                     node: gen_node,
                 })
@@ -316,9 +315,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 let const_scope = self.const_scope();
                 let mut args = Vec::with_capacity(call.1.len());
                 for arg in call.1 {
-                    args.push(self.unify3(const_scope.clone(), arg)?.node);
+                    args.push(self.unify(const_scope.clone(), arg)?.node);
                 }
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: None,
                     node: TypedHirNode {
                         kind: NodeKind::Call(call.0, args),
@@ -328,9 +327,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             }
             (expr::Kind::Map(param), scope::Kind::Const) => {
                 let const_scope = self.const_scope();
-                let unified_param = self.unify3(const_scope, *param)?;
+                let unified_param = self.unify(const_scope, *param)?;
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: unified_param.typed_binder,
                     node: TypedHirNode {
                         kind: NodeKind::Map(Box::new(unified_param.node)),
@@ -344,10 +343,10 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     vars: scope.vars,
                     meta: scope.meta,
                 };
-                let rel = self.unify3(scope.clone(), attr.rel)?;
-                let val = self.unify3(scope, attr.val)?;
+                let rel = self.unify(scope.clone(), attr.rel)?;
+                let val = self.unify(scope, attr.val)?;
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: seq_var,
                         ty: self.unit_type(),
@@ -374,7 +373,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 for prop in struct_expr.1 {
                     let meta = self.unit_meta();
                     nodes.push(
-                        self.unify3(
+                        self.unify(
                             scope.clone(),
                             expr::Expr {
                                 free_vars: prop.free_vars.clone(),
@@ -386,7 +385,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     );
                 }
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: None,
                     node: TypedHirNode {
                         kind: NodeKind::Struct(struct_expr.0, nodes),
@@ -416,7 +415,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     nodes.extend(unscoped_nodes);
                 }
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: struct_scope.0 .0,
                         ty: scope.meta.ty,
@@ -490,7 +489,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 let node = self.unify_expr_match_arm(scope_prop, sub_scoped)?.node;
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: struct_scope.0 .0,
                         ty: scope.meta.ty,
@@ -511,13 +510,13 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         &mut self,
         scope: scope::Scope<'m>,
         expressions: Vec<expr::Expr<'m>>,
-    ) -> UnifierResult<UnifiedNode3<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         match scope.kind {
             scope::Kind::Const => {
                 let block = self.unify_expressions(expressions)?;
                 match block.len() {
                     0 => todo!("empty"),
-                    1 => Ok(UnifiedNode3 {
+                    1 => Ok(UnifiedNode {
                         typed_binder: None,
                         node: block.into_iter().next().unwrap(),
                     }),
@@ -528,7 +527,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 let block = self.unify_expressions(expressions)?;
                 match block.len() {
                     0 => todo!("empty"),
-                    1 => Ok(UnifiedNode3 {
+                    1 => Ok(UnifiedNode {
                         typed_binder: Some(TypedBinder {
                             var,
                             ty: scope.meta.ty,
@@ -554,7 +553,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 };
 
-                Ok(UnifiedNode3 {
+                Ok(UnifiedNode {
                     typed_binder: let_scope.outer_binder,
                     node,
                 })
@@ -576,7 +575,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         let const_scope = self.const_scope();
         let mut nodes = vec![];
         for expr in expressions {
-            nodes.push(self.unify3(const_scope.clone(), expr)?.node);
+            nodes.push(self.unify(const_scope.clone(), expr)?.node);
         }
         Ok(nodes)
     }
@@ -585,7 +584,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         &mut self,
         scope_prop: scope::Prop<'m>,
         sub_scoped: SubScoped<expr::Prop<'m>, scope::Prop<'m>>,
-    ) -> UnifierResult<UnifiedNode3<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
                 let hir_rel_binding = rel_binding.hir_pattern_binding();
@@ -643,7 +642,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             });
         }
 
-        Ok(UnifiedNode3 {
+        Ok(UnifiedNode {
             typed_binder: None,
             node: TypedHirNode {
                 kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
@@ -699,8 +698,8 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 for prop in sub_scoped.expressions {
                     // FIXME: avoid clone by taking scope reference?
-                    let rel = self.unify3(scope.clone(), prop.attr.rel)?;
-                    let val = self.unify3(scope.clone(), prop.attr.val)?;
+                    let rel = self.unify(scope.clone(), prop.attr.rel)?;
+                    let val = self.unify(scope.clone(), prop.attr.val)?;
 
                     nodes.push(TypedHirNode {
                         kind: NodeKind::Prop(
@@ -747,7 +746,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         for prop in sub_scoped.expressions {
             let unit_meta = self.unit_meta();
             nodes.push(
-                self.unify3(
+                self.unify(
                     inner_scope.clone(),
                     expr::Expr {
                         kind: expr::Kind::Prop(Box::new(prop)),
@@ -768,7 +767,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
         &mut self,
         scope_prop: scope::Prop<'m>,
         sub_scoped: SubScoped<expr::Expr<'m>, scope::Prop<'m>>,
-    ) -> UnifierResult<UnifiedNode3<'m>> {
+    ) -> UnifierResult<UnifiedNode<'m>> {
         let (match_arm, ty) = match scope_prop.kind {
             scope::PropKind::Attr(rel_binding, val_binding) => {
                 let hir_rel_binding = rel_binding.hir_pattern_binding();
@@ -826,7 +825,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             });
         }
 
-        Ok(UnifiedNode3 {
+        Ok(UnifiedNode {
             typed_binder: None,
             node: TypedHirNode {
                 kind: NodeKind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
@@ -900,7 +899,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_scopes.len());
 
         for expr in sub_scoped.expressions {
-            nodes.push(self.unify3(inner_scope.clone(), expr)?.node);
+            nodes.push(self.unify(inner_scope.clone(), expr)?.node);
         }
         for (sub_prop_scope, sub_scoped) in sub_scoped.sub_scopes {
             nodes.push(self.unify_expr_match_arm(sub_prop_scope, sub_scoped)?.node);
