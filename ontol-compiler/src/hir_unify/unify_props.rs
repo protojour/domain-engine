@@ -42,7 +42,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, joined_scope, sub_scoped)?;
                 let ty = nodes
                     .iter()
-                    .map(|node| node.meta.ty)
+                    .map(TypedHirNode::ty)
                     .last()
                     .unwrap_or_else(|| unifier.unit_type());
 
@@ -69,7 +69,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, gen_scope, sub_scoped)?;
                 let ty = nodes
                     .iter()
-                    .map(|node| node.meta.ty)
+                    .map(TypedHirNode::ty)
                     .last()
                     .unwrap_or_else(|| unifier.unit_type());
 
@@ -96,17 +96,13 @@ pub(super) trait UnifyProps<'m>: Sized {
 
         Ok(UnifiedNode {
             typed_binder: None,
-            node: TypedHirNode {
-                kind: ontol_hir::Kind::MatchProp(
-                    scope_prop.struct_var,
-                    scope_prop.prop_id,
-                    match_arms,
-                ),
-                meta: Meta {
+            node: TypedHirNode(
+                ontol_hir::Kind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
+                Meta {
                     ty,
                     span: SourceSpan::none(),
                 },
-            },
+            ),
         })
     }
 
@@ -125,21 +121,17 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let block = Self::unify_sub_scoped(unifier, const_scope, sub_scoped)?;
                 let ty = block
                     .iter()
-                    .map(|node| node.meta.ty)
+                    .map(TypedHirNode::ty)
                     .last()
                     .unwrap_or_else(|| unifier.unit_type());
 
-                let node = TypedHirNode {
-                    kind: ontol_hir::Kind::Let(
-                        let_scope.inner_binder,
-                        Box::new(let_scope.def),
-                        block,
-                    ),
-                    meta: Meta {
+                let node = TypedHirNode(
+                    ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                    Meta {
                         ty,
                         span: SourceSpan::none(),
                     },
-                };
+                );
 
                 Ok(vec![node])
             }
@@ -199,8 +191,8 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
             let rel = unifier.unify(scope.clone(), prop.attr.rel)?;
             let val = unifier.unify(scope.clone(), prop.attr.val)?;
 
-            nodes.push(TypedHirNode {
-                kind: ontol_hir::Kind::Prop(
+            nodes.push(TypedHirNode(
+                ontol_hir::Kind::Prop(
                     ontol_hir::Optional(false),
                     prop.struct_var,
                     prop.prop_id,
@@ -212,8 +204,8 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                         },
                     }],
                 ),
-                meta: unifier.unit_meta(),
-            });
+                unifier.unit_meta(),
+            ));
         }
 
         // TODO: sub_scoped

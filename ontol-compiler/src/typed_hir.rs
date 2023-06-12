@@ -10,6 +10,7 @@ use crate::{
     SourceSpan,
 };
 
+/// An ontol_hir language "dialect" with type information and source spans.
 #[derive(Clone, Copy)]
 pub struct TypedHir;
 
@@ -17,23 +18,21 @@ impl ontol_hir::Lang for TypedHir {
     type Node<'m> = TypedHirNode<'m>;
 
     fn make_node<'m>(&self, kind: ontol_hir::Kind<'m, Self>) -> Self::Node<'m> {
-        TypedHirNode {
+        TypedHirNode(
             kind,
-            meta: Meta {
+            Meta {
                 ty: &Type::Error,
                 span: SourceSpan::none(),
             },
-        }
+        )
     }
 }
 
 pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
 
+/// The typed ontol_hir node type.
 #[derive(Clone)]
-pub struct TypedHirNode<'m> {
-    pub kind: TypedHirKind<'m>,
-    pub meta: Meta<'m>,
-}
+pub struct TypedHirNode<'m>(pub TypedHirKind<'m>, pub Meta<'m>);
 
 impl<'m> Debug for TypedHirNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,23 +42,45 @@ impl<'m> Debug for TypedHirNode<'m> {
 
 impl<'m> TypedHirNode<'m> {
     pub fn split(self) -> (TypedHirKind<'m>, Meta<'m>) {
-        (self.kind, self.meta)
+        (self.0, self.1)
+    }
+}
+
+impl<'m> TypedHirNode<'m> {
+    pub fn into_kind(self) -> ontol_hir::Kind<'m, TypedHir> {
+        self.0
+    }
+
+    pub fn meta(&self) -> &Meta<'m> {
+        &self.1
+    }
+
+    pub fn meta_mut(&mut self) -> &mut Meta<'m> {
+        &mut self.1
+    }
+
+    pub fn ty(&self) -> TypeRef<'m> {
+        self.1.ty
+    }
+
+    pub fn span(&self) -> SourceSpan {
+        self.1.span
     }
 }
 
 impl<'m> ontol_hir::Node<'m, TypedHir> for TypedHirNode<'m> {
     fn kind(&self) -> &ontol_hir::Kind<'m, TypedHir> {
-        &self.kind
+        &self.0
     }
 
     fn kind_mut(&mut self) -> &mut ontol_hir::Kind<'m, TypedHir> {
-        &mut self.kind
+        &mut self.0
     }
 }
 
 impl<'m> std::fmt::Display for TypedHirNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Printer::default().print(Sep::None, &self.kind, f)?;
+        Printer::default().print(Sep::None, &self.0, f)?;
         Ok(())
     }
 }

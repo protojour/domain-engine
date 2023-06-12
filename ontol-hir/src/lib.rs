@@ -30,6 +30,10 @@ impl From<Var> for Binder {
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
+/// ontol_hir is a generic language, it does not specify the type of its language nodes.
+///
+/// Implementing this trait makes an ontol_hir "dialect" - the implementor may freely choose
+/// what kind of metadata to attach to each node.
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + Node<'a, Self>;
 
@@ -43,6 +47,7 @@ pub trait Node<'a, L: Lang> {
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 
+/// The syntax kind of a node.
 #[derive(Clone)]
 pub enum Kind<'a, L: Lang> {
     Var(Var),

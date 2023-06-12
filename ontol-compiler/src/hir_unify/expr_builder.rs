@@ -22,8 +22,8 @@ impl<'m> ExprBuilder<'m> {
         self.next_var
     }
 
-    pub fn hir_to_expr(&mut self, node: &TypedHirNode<'m>) -> expr::Expr<'m> {
-        match &node.kind {
+    pub fn hir_to_expr(&mut self, TypedHirNode(kind, meta): &TypedHirNode<'m>) -> expr::Expr<'m> {
+        match kind {
             ontol_hir::Kind::Var(var) => {
                 let mut free_vars = VarSet::default();
                 free_vars.0.insert(var.0 as usize);
@@ -31,7 +31,7 @@ impl<'m> ExprBuilder<'m> {
                 expr::Expr(
                     expr::Kind::Var(*var),
                     expr::Meta {
-                        hir_meta: node.meta,
+                        hir_meta: *meta,
                         free_vars,
                     },
                 )
@@ -39,14 +39,14 @@ impl<'m> ExprBuilder<'m> {
             ontol_hir::Kind::Unit => expr::Expr(
                 expr::Kind::Unit,
                 expr::Meta {
-                    hir_meta: node.meta,
+                    hir_meta: *meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::Int(int) => expr::Expr(
                 expr::Kind::Int(*int),
                 expr::Meta {
-                    hir_meta: node.meta,
+                    hir_meta: *meta,
                     free_vars: Default::default(),
                 },
             ),
@@ -61,7 +61,7 @@ impl<'m> ExprBuilder<'m> {
                 expr::Expr(
                     expr::Kind::Call(expr::Call(*proc, params)),
                     expr::Meta {
-                        hir_meta: node.meta,
+                        hir_meta: *meta,
                         free_vars,
                     },
                 )
@@ -70,7 +70,7 @@ impl<'m> ExprBuilder<'m> {
                 let arg = self.hir_to_expr(arg);
                 let expr_meta = expr::Meta {
                     free_vars: arg.1.free_vars.clone(),
-                    hir_meta: node.meta,
+                    hir_meta: *meta,
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
@@ -87,7 +87,7 @@ impl<'m> ExprBuilder<'m> {
                     expr::Kind::Seq(*label, Box::new(ontol_hir::Attribute { rel, val })),
                     expr::Meta {
                         free_vars,
-                        hir_meta: node.meta,
+                        hir_meta: *meta,
                     },
                 )
             }
@@ -104,7 +104,7 @@ impl<'m> ExprBuilder<'m> {
                 expr::Expr(
                     expr::Kind::Struct(expr::Struct(*binder, props)),
                     expr::Meta {
-                        hir_meta: node.meta,
+                        hir_meta: *meta,
                         free_vars,
                     },
                 )
@@ -125,8 +125,8 @@ impl<'m> ExprBuilder<'m> {
         }
     }
 
-    fn node_to_props(&mut self, node: &TypedHirNode<'m>) -> Vec<expr::Prop<'m>> {
-        match &node.kind {
+    fn node_to_props(&mut self, TypedHirNode(kind, _): &TypedHirNode<'m>) -> Vec<expr::Prop<'m>> {
+        match kind {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| match variant.dimension {

@@ -34,14 +34,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         );
 
         // Save typing result for the final type unification:
-        match node.meta.ty {
+        match node.ty() {
             Type::Error | Type::Infer(_) => {}
             _ => {
                 let type_var = ctx.inference.new_type_variable(expr_id);
-                debug!("Check expr(2) root type result: {:?}", node.meta.ty);
+                debug!("Check expr(2) root type result: {:?}", node.ty());
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(type_var, UnifyValue::Known(node.meta.ty))
+                    .unify_var_value(type_var, UnifyValue::Known(node.ty()))
                     .unwrap();
             }
         }
@@ -81,32 +81,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             parameters.push(node);
                         }
 
-                        TypedHirNode {
-                            kind: ontol_hir::Kind::Call(*proc, parameters),
-                            meta: Meta {
+                        TypedHirNode(
+                            ontol_hir::Kind::Call(*proc, parameters),
+                            Meta {
                                 ty: output,
                                 span: expr.span,
                             },
-                        }
+                        )
                     }
                     _ => self.error_node(CompileError::NotCallable, &expr.span),
                 }
             }
             (ExprKind::Struct(type_path, attributes), expected_ty) => {
                 let struct_node = self.build_struct(type_path, attributes, expr.span, ctx);
+                let meta = *struct_node.meta();
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
-                    Some(Type::Option(Type::Domain(_))) => TypedHirNode {
-                        kind: struct_node.kind,
-                        meta: Meta {
-                            ty: self.types.intern(Type::Option(struct_node.meta.ty)),
-                            span: struct_node.meta.span,
+                    Some(Type::Option(Type::Domain(_))) => TypedHirNode(
+                        struct_node.into_kind(),
+                        Meta {
+                            ty: self.types.intern(Type::Option(meta.ty)),
+                            span: meta.span,
                         },
-                    },
+                    ),
                     Some(expected_ty) => self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
-                            actual: struct_node.meta.ty,
+                            actual: struct_node.meta().ty,
                             expected: expected_ty,
                         }),
                         &expr.span,
@@ -137,29 +138,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                 let array_ty = self.types.intern(Type::Array(elem_ty));
 
-                TypedHirNode {
-                    kind: ontol_hir::Kind::Seq(
+                TypedHirNode(
+                    ontol_hir::Kind::Seq(
                         label,
                         ontol_hir::Attribute {
                             rel: Box::new(self.unit_node_no_span()),
                             val: Box::new(inner_node),
                         },
                     ),
-                    meta: Meta {
+                    Meta {
                         ty: array_ty,
                         span: expr.span,
                     },
-                }
+                )
             }
             (ExprKind::Constant(k), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
-                    TypedHirNode {
-                        kind: ontol_hir::Kind::Int(*k),
-                        meta: Meta {
+                    TypedHirNode(
+                        ontol_hir::Kind::Int(*k),
+                        Meta {
                             ty: expected_ty,
                             span: expr.span,
                         },
-                    }
+                    )
                 } else {
                     self.error_node(
                         CompileError::TODO(smart_format!("Expected integer type")),
@@ -198,13 +199,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ),
                     Some(expected_ty) => {
                         let variable = explicit_variable.variable;
-                        let variable_ref = TypedHirNode {
-                            kind: ontol_hir::Kind::Var(variable),
-                            meta: Meta {
+                        let variable_ref = TypedHirNode(
+                            ontol_hir::Kind::Var(variable),
+                            Meta {
                                 ty: expected_ty,
                                 span: expr.span,
                             },
-                        };
+                        );
 
                         match ctx
                             .inference
@@ -239,14 +240,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
         };
 
-        debug!("expected/meta: {:?} {:?}", expected_ty, node.meta.ty);
+        debug!("expected/meta: {:?} {:?}", expected_ty, node.ty());
 
-        match (expected_ty, node.meta.ty) {
+        match (expected_ty, node.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some(Type::Infer(type_var)), _) => {
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(*type_var, UnifyValue::Known(node.meta.ty))
+                    .unify_var_value(*type_var, UnifyValue::Known(node.ty()))
                     .unwrap();
             }
             _ => {}
@@ -402,18 +403,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                 };
 
-                            hir_props.push(TypedHirNode {
-                                kind: ontol_hir::Kind::Prop(
+                            hir_props.push(TypedHirNode(
+                                ontol_hir::Kind::Prop(
                                     optional,
                                     struct_binder.0,
                                     PropertyId::subject(match_property.relation_id),
                                     prop_variants,
                                 ),
-                                meta: Meta {
+                                Meta {
                                     ty: self.types.intern(Type::Unit(DefId::unit())),
                                     span: *prop_span,
                                 },
-                            });
+                            ));
                         }
 
                         for (prop_name, match_property) in match_properties.into_iter() {
@@ -447,7 +448,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let object_ty = self.check_def(meta.relationship.object.0.def_id);
                         let inner_node = self.build_node(value, Some(object_ty), ctx);
 
-                        inner_node.kind
+                        inner_node.into_kind()
                     }
                     _ => return self.error_node(CompileError::AnonymousPropertyExpected, &span),
                 }
@@ -464,13 +465,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("Struct type: {domain_type:?}");
 
-        TypedHirNode {
-            kind: node_kind,
-            meta: Meta {
+        TypedHirNode(
+            node_kind,
+            Meta {
                 ty: domain_type,
                 span,
             },
-        }
+        )
     }
 
     fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypedHirNode<'m> {
@@ -484,22 +485,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn make_error_node(&mut self, span: &SourceSpan) -> TypedHirNode<'m> {
-        TypedHirNode {
-            kind: ontol_hir::Kind::Unit,
-            meta: Meta {
+        TypedHirNode(
+            ontol_hir::Kind::Unit,
+            Meta {
                 ty: self.types.intern(Type::Error),
                 span: *span,
             },
-        }
+        )
     }
 
     fn unit_node_no_span(&mut self) -> TypedHirNode<'m> {
-        TypedHirNode {
-            kind: ontol_hir::Kind::Unit,
-            meta: Meta {
+        TypedHirNode(
+            ontol_hir::Kind::Unit,
+            Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
                 span: SourceSpan::none(),
             },
-        }
+        )
     }
 }

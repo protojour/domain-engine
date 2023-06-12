@@ -1,3 +1,4 @@
+use ontol_hir::Node;
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
@@ -60,20 +61,21 @@ impl<'m> ScopeBuilder<'m> {
         &mut self,
         node: &TypedHirNode<'m>,
     ) -> UnifierResult<ScopeBinder<'m>> {
-        match &node.kind {
-            ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, node.meta)),
+        let meta = *node.meta();
+        match node.kind() {
+            ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, meta)),
             ontol_hir::Kind::Unit => Ok(ScopeBinder::unbound(
-                self.mk_scope(scope::Kind::Const, node.meta),
+                self.mk_scope(scope::Kind::Const, meta),
             )),
             ontol_hir::Kind::Int(_) => Ok(ScopeBinder::unbound(
-                self.mk_scope(scope::Kind::Const, node.meta),
+                self.mk_scope(scope::Kind::Const, meta),
             )),
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let analysis = analyze_expr(node)?;
                 match &analysis.kind {
                     ExprAnalysisKind::Const => Ok(ScopeBinder::unbound(
-                        self.mk_scope(scope::Kind::Const, node.meta),
+                        self.mk_scope(scope::Kind::Const, meta),
                     )),
                     _ => {
                         let binder_var = self.alloc_var();
@@ -83,12 +85,9 @@ impl<'m> ScopeBuilder<'m> {
                             analysis,
                             TypedBinder {
                                 var: binder_var,
-                                ty: node.meta.ty,
+                                ty: node.ty(),
                             },
-                            TypedHirNode {
-                                kind: ontol_hir::Kind::Var(binder_var),
-                                meta: node.meta,
-                            },
+                            TypedHirNode(ontol_hir::Kind::Var(binder_var), meta),
                         )
                     }
                 }
@@ -107,11 +106,11 @@ impl<'m> ScopeBuilder<'m> {
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
                         var: binder.0,
-                        ty: node.meta.ty,
+                        ty: meta.ty,
                     }),
                     scope: scope::Meta {
                         vars: union.vars,
-                        hir_meta: node.meta,
+                        hir_meta: meta,
                     }
                     .with_kind(scope::Kind::Struct(scope::Struct(*binder, props))),
                 })
@@ -137,7 +136,7 @@ impl<'m> ScopeBuilder<'m> {
         node: &TypedHirNode<'m>,
         disjoint_group: usize,
     ) -> UnifierResult<Vec<scope::Prop<'m>>> {
-        match &node.kind {
+        match node.kind() {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| {
@@ -218,13 +217,13 @@ impl<'m> ScopeBuilder<'m> {
         }
         inverted_params.insert(var_param_index, let_def);
 
-        let next_let_def = TypedHirNode {
-            kind: ontol_hir::Kind::Call(inverted_proc, inverted_params),
+        let next_let_def = TypedHirNode(
+            ontol_hir::Kind::Call(inverted_proc, inverted_params),
             // Is this correct?
-            meta: analysis.meta,
-        };
+            analysis.meta,
+        );
 
-        match (&params[var_param_index].kind, next_analysis) {
+        match (params[var_param_index].kind(), next_analysis) {
             (
                 ontol_hir::Kind::Var(_),
                 ExprAnalysis {
@@ -350,7 +349,7 @@ enum ExprAnalysisKind<'m> {
 }
 
 fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> {
-    match &node.kind {
+    match node.kind() {
         ontol_hir::Kind::Call(_, args) => {
             let mut kind = ExprAnalysisKind::Const;
             for (index, param) in args.iter().enumerate() {
@@ -364,9 +363,7 @@ fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> 
                                 child: Box::new(child_analysis),
                             };
                         } else {
-                            return Err(UnifierError::MultipleVariablesInExpression(
-                                node.meta.span,
-                            ));
+                            return Err(UnifierError::MultipleVariablesInExpression(node.span()));
                         }
                     }
                 }
@@ -374,16 +371,16 @@ fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> 
 
             Ok(ExprAnalysis {
                 kind,
-                meta: node.meta,
+                meta: *node.meta(),
             })
         }
         ontol_hir::Kind::Var(var) => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Var(*var),
-            meta: node.meta,
+            meta: *node.meta(),
         }),
         _ => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Const,
-            meta: node.meta,
+            meta: *node.meta(),
         }),
     }
 }

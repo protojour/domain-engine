@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_hir::Node;
 use ontol_runtime::smart_format;
 
 use crate::{
@@ -26,19 +27,19 @@ impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirArmTypeInfer
             types: self.types,
             eq_relations: self.eq_relations,
         };
-        match infer.infer_recursive(node.meta.ty) {
-            Ok(ty) => node.meta.ty = ty,
+        match infer.infer_recursive(node.ty()) {
+            Ok(ty) => node.meta_mut().ty = ty,
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
                 self.errors.push(
                     CompileError::TODO(smart_format!("Not enough type information"))
-                        .spanned(&node.meta.span),
+                        .spanned(&node.span()),
                 );
             }
             _ => panic!("Unexpected inference error"),
         }
 
-        self.visit_kind(index, &mut node.kind);
+        self.visit_kind(index, node.kind_mut());
     }
 }
 
@@ -49,9 +50,9 @@ pub(super) struct HirVariableMapper<'c, 'm> {
 
 impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
     fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
-        self.visit_kind(index, &mut node.kind);
+        self.visit_kind(index, node.kind_mut());
 
-        if let ontol_hir::Kind::Var(var) = &node.kind {
+        if let ontol_hir::Kind::Var(var) = node.kind() {
             if let Some(var_mapping) = self.variable_mapping.get(var) {
                 let arm = self.arm;
                 let mapped_type = match arm {
@@ -59,17 +60,14 @@ impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirVariableMapp
                     Arm::Second => var_mapping.first_arm_type,
                 };
 
-                let variable_ref = TypedHirNode {
-                    kind: ontol_hir::Kind::Var(*var),
-                    meta: Meta {
+                let variable_ref = TypedHirNode(
+                    ontol_hir::Kind::Var(*var),
+                    Meta {
                         ty: mapped_type,
-                        span: node.meta.span,
+                        span: node.span(),
                     },
-                };
-                let map = TypedHirNode {
-                    kind: ontol_hir::Kind::Map(Box::new(variable_ref)),
-                    meta: node.meta,
-                };
+                );
+                let map = TypedHirNode(ontol_hir::Kind::Map(Box::new(variable_ref)), *node.meta());
 
                 *node = map;
             }

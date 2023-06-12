@@ -64,17 +64,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### Expr constants - no scope needed:
             (expr::Kind::Unit, _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode {
-                    kind: ontol_hir::Kind::Unit,
-                    meta: expr_meta.hir_meta,
-                },
+                node: TypedHirNode(ontol_hir::Kind::Unit, expr_meta.hir_meta),
             }),
             (expr::Kind::Int(int), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode {
-                    kind: ontol_hir::Kind::Int(int),
-                    meta: expr_meta.hir_meta,
-                },
+                node: TypedHirNode(ontol_hir::Kind::Int(int), expr_meta.hir_meta),
             }),
             // ### forced scope expansions:
             (expr_kind, scope_kind @ scope::Kind::Let(_)) => self.unify_scope_block(
@@ -84,10 +78,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### Const scopes (fully expanded):
             (expr::Kind::Var(var), scope::Kind::Const) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode {
-                    kind: ontol_hir::Kind::Var(var),
-                    meta: expr_meta.hir_meta,
-                },
+                node: TypedHirNode(ontol_hir::Kind::Var(var), expr_meta.hir_meta),
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
                 if matches!(prop.seq, Some(_)) {
@@ -100,8 +91,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Prop(
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             prop.struct_var,
                             prop.prop_id,
@@ -113,8 +104,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 },
                             }],
                         ),
-                        meta: expr_meta.hir_meta,
-                    },
+                        expr_meta.hir_meta,
+                    ),
                 })
             }
             (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
@@ -150,8 +141,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?
                 };
 
-                let gen_node = TypedHirNode {
-                    kind: ontol_hir::Kind::Gen(
+                let gen_node = TypedHirNode(
+                    ontol_hir::Kind::Gen(
                         gen_scope.input_seq,
                         ontol_hir::IterBinder {
                             seq: ontol_hir::Binding::Binder(gen_scope.output_seq),
@@ -160,32 +151,32 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         },
                         vec![push_unified.node],
                     ),
-                    meta: Meta {
+                    Meta {
                         ty: seq_ty,
                         span: SourceSpan::none(),
                     },
-                };
+                );
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Prop(
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             prop.struct_var,
                             prop.prop_id,
                             vec![ontol_hir::PropVariant {
                                 dimension: ontol_hir::Dimension::Singular,
                                 attr: ontol_hir::Attribute {
-                                    rel: Box::new(TypedHirNode {
-                                        kind: ontol_hir::Kind::Unit,
-                                        meta: self.unit_meta(),
-                                    }),
+                                    rel: Box::new(TypedHirNode(
+                                        ontol_hir::Kind::Unit,
+                                        self.unit_meta(),
+                                    )),
                                     val: Box::new(gen_node),
                                 },
                             }],
                         ),
-                        meta: expr_meta.hir_meta,
-                    },
+                        expr_meta.hir_meta,
+                    ),
                 })
             }
             (expr::Kind::Seq(_label, attr), scope::Kind::Gen(gen_scope)) => {
@@ -216,8 +207,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?
                 };
 
-                let gen_node = TypedHirNode {
-                    kind: ontol_hir::Kind::Gen(
+                let gen_node = TypedHirNode(
+                    ontol_hir::Kind::Gen(
                         gen_scope.input_seq,
                         ontol_hir::IterBinder {
                             seq: ontol_hir::Binding::Binder(gen_scope.output_seq),
@@ -226,11 +217,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         },
                         vec![push_unified.node],
                     ),
-                    meta: Meta {
+                    Meta {
                         ty: seq_ty,
                         span: SourceSpan::none(),
                     },
-                };
+                );
 
                 Ok(UnifiedNode {
                     typed_binder: None,
@@ -245,10 +236,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Call(call.0, args),
-                        meta: expr_meta.hir_meta,
-                    },
+                    node: TypedHirNode(ontol_hir::Kind::Call(call.0, args), expr_meta.hir_meta),
                 })
             }
             (expr::Kind::Map(param), scope::Kind::Const) => {
@@ -257,10 +245,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: unified_param.typed_binder,
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Map(Box::new(unified_param.node)),
-                        meta: expr_meta.hir_meta,
-                    },
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Map(Box::new(unified_param.node)),
+                        expr_meta.hir_meta,
+                    ),
                 })
             }
             (expr::Kind::Push(seq_var, attr), scope_kind) => {
@@ -273,16 +261,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         var: seq_var,
                         ty: self.unit_type(),
                     }),
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Push(
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Push(
                             seq_var,
                             ontol_hir::Attribute {
                                 rel: Box::new(rel.node),
                                 val: Box::new(val.node),
                             },
                         ),
-                        meta: self.unit_meta(),
-                    },
+                        self.unit_meta(),
+                    ),
                 })
             }
             (expr::Kind::Struct(struct_expr), scope_kind @ scope::Kind::Const) => {
@@ -305,10 +293,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Struct(struct_expr.0, nodes),
-                        meta: expr_meta.hir_meta,
-                    },
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Struct(struct_expr.0, nodes),
+                        expr_meta.hir_meta,
+                    ),
                 })
             }
             // ### "zwizzling" cases:
@@ -341,10 +329,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         var: scope_binder.0,
                         ty: scope_meta.hir_meta.ty,
                     }),
-                    node: TypedHirNode {
-                        kind: ontol_hir::Kind::Struct(expr_binder, nodes),
-                        meta: expr_meta.hir_meta,
-                    },
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Struct(expr_binder, nodes),
+                        expr_meta.hir_meta,
+                    ),
                 })
             }
             (expr_kind, scope::Kind::Struct(scope::Struct(scope_binder, scope_props))) => {
@@ -457,21 +445,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let block = self.unify_expressions(expressions)?;
                 let ty = block
                     .iter()
-                    .map(|node| node.meta.ty)
+                    .map(TypedHirNode::ty)
                     .last()
                     .unwrap_or_else(|| self.unit_type());
 
-                let node = TypedHirNode {
-                    kind: ontol_hir::Kind::Let(
-                        let_scope.inner_binder,
-                        Box::new(let_scope.def),
-                        block,
-                    ),
-                    meta: Meta {
+                let node = TypedHirNode(
+                    ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                    Meta {
                         ty,
                         span: SourceSpan::none(),
                     },
-                };
+                );
 
                 Ok(UnifiedNode {
                     typed_binder: let_scope.outer_binder,

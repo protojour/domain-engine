@@ -40,8 +40,8 @@ pub fn unify_to_function<'m>(
     var_tracker.visit_node(0, scope);
     var_tracker.visit_node(0, expr);
 
-    let scope_ty = scope.meta.ty;
-    let expr_ty = expr.meta.ty;
+    let scope_ty = scope.ty();
+    let expr_ty = expr.ty();
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
@@ -68,7 +68,7 @@ pub fn unify_to_function<'m>(
                 assert_eq!(arg.ty, scope_ty);
             }
             if !matches!(expr_ty, Type::Error) {
-                assert_eq!(unified.node.meta.ty, expr_ty);
+                assert_eq!(unified.node.ty(), expr_ty);
             }
 
             Ok(HirFunc {

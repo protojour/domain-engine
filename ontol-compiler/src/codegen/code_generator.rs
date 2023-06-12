@@ -28,7 +28,7 @@ pub(super) fn const_codegen(
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(0), expr.meta.span);
+    let mut block = builder.new_block(Stack(0), expr.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
@@ -48,10 +48,10 @@ pub(super) fn map_codegen(
 ) -> bool {
     debug!("Generating code for\n{}", func);
 
-    let return_ty = func.body.meta.ty;
+    let return_ty = func.body.ty();
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(1), func.body.meta.span);
+    let mut block = builder.new_block(Stack(1), func.body.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
@@ -84,10 +84,10 @@ pub(super) struct CodeGenerator<'a> {
 }
 
 impl<'a> CodeGenerator<'a> {
-    fn gen_node(&mut self, node: TypedHirNode, block: &mut Block) {
-        let ty = node.meta.ty;
-        let span = node.meta.span;
-        match node.kind {
+    fn gen_node(&mut self, TypedHirNode(kind, meta): TypedHirNode, block: &mut Block) {
+        let ty = meta.ty;
+        let span = meta.span;
+        match kind {
             ontol_hir::Kind::Var(var) => match self.scope.get(&var) {
                 Some(local) => {
                     self.builder
@@ -96,7 +96,7 @@ impl<'a> CodeGenerator<'a> {
                 None => {
                     self.errors.push(SpannedCompileError {
                         error: CompileError::UnboundVariable,
-                        span: node.meta.span,
+                        span,
                     });
                 }
             },
@@ -138,7 +138,7 @@ impl<'a> CodeGenerator<'a> {
                 );
             }
             ontol_hir::Kind::Map(param) => {
-                let from = find_mapping_key(param.meta.ty).unwrap();
+                let from = find_mapping_key(param.ty()).unwrap();
                 let to = find_mapping_key(ty).unwrap();
 
                 self.gen_node(*param, block);
