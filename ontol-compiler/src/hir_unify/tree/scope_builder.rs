@@ -95,9 +95,7 @@ impl<'m> ScopeBuilder<'m> {
                 }
             }
             NodeKind::Map(arg) => self.build_scope_binder(arg),
-            NodeKind::Seq(_label, _attr) => {
-                todo!("seq scope")
-            }
+            NodeKind::Seq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 let mut props = Vec::with_capacity(nodes.len());
                 for (disjoint_group, node) in nodes.iter().enumerate() {
