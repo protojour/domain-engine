@@ -53,6 +53,10 @@ impl<'m> ScopeBuilder<'m> {
         }
     }
 
+    pub fn next_var(self) -> ontol_hir::Var {
+        self.next_var
+    }
+
     pub fn build_scope_binder(
         &mut self,
         node: &TypedHirNode<'m>,
@@ -91,7 +95,7 @@ impl<'m> ScopeBuilder<'m> {
                 }
             }
             NodeKind::Map(arg) => self.build_scope_binder(arg),
-            NodeKind::Seq(label, attr) => {
+            NodeKind::Seq(_label, _attr) => {
                 todo!("seq scope")
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
@@ -115,7 +119,7 @@ impl<'m> ScopeBuilder<'m> {
                     },
                 })
             }),
-            NodeKind::Prop(optional, struct_var, id, variants) => panic!("standalone prop"),
+            NodeKind::Prop(..) => panic!("standalone prop"),
             NodeKind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
@@ -164,7 +168,7 @@ impl<'m> ScopeBuilder<'m> {
                             let mut vars = VarSet::default();
                             vars.0.insert(label.0 as usize);
 
-                            (scope::PropKind::Seq(rel, val), vars)
+                            (scope::PropKind::Seq(label, rel, val), vars)
                         }
                     };
 

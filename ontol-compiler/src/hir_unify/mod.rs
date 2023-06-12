@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use bit_set::BitSet;
-use ontol_hir::{visitor::HirVisitor, Var};
+use ontol_hir::{visitor::HirVisitor, Label, Var};
 
 use crate::{typed_hir::TypedHir, SourceSpan};
 
@@ -31,6 +31,10 @@ impl<'s, 'm: 's> HirVisitor<'s, 'm, TypedHir> for VariableTracker {
 
     fn visit_binder(&mut self, var: &Var) {
         self.observe(*var);
+    }
+
+    fn visit_label(&mut self, label: &Label) {
+        self.observe(Var(label.0))
     }
 }
 

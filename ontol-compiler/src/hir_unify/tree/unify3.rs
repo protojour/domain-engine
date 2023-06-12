@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::kind::{
-    Attribute, Dimension, MatchArm, NodeKind, Optional, PropPattern, PropVariant,
+    Attribute, Dimension, IterBinder, MatchArm, NodeKind, Optional, PatternBinding, PropPattern,
+    PropVariant,
 };
 use ontol_runtime::DefId;
 use tracing::debug;
@@ -21,6 +22,7 @@ use super::{
 
 pub struct Unifier3<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
+    next_var: ontol_hir::Var,
 }
 
 pub struct UnifiedNode3<'m> {
@@ -29,8 +31,8 @@ pub struct UnifiedNode3<'m> {
 }
 
 impl<'a, 'm> Unifier3<'a, 'm> {
-    pub fn new(types: &'a mut Types<'m>) -> Self {
-        Self { types }
+    pub fn new(types: &'a mut Types<'m>, next_var: ontol_hir::Var) -> Self {
+        Self { types, next_var }
     }
 
     pub fn unify3(
@@ -100,6 +102,10 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 },
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
+                if matches!(prop.seq, Some(_)) {
+                    panic!("expected gen scope");
+                }
+
                 let const_scope = self.const_scope();
                 let rel = self.unify3(const_scope.clone(), prop.attr.rel)?;
                 let val = self.unify3(const_scope, prop.attr.val)?;
@@ -116,6 +122,70 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                                 attr: Attribute {
                                     rel: Box::new(rel.node),
                                     val: Box::new(val.node),
+                                },
+                            }],
+                        ),
+                        meta: expr.meta,
+                    },
+                })
+            }
+            (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
+                if matches!(prop.seq, None) {
+                    panic!("unexpected gen scope");
+                }
+
+                // FIXME: Array/seq types must take two parameters
+                let seq_ty = self.types.intern(Type::Array(prop.attr.val.meta.ty));
+
+                let (rel_binding, val_binding) = *gen_scope.bindings;
+                let hir_rel_binding = rel_binding.hir_pattern_binding();
+                let hir_val_binding = val_binding.hir_pattern_binding();
+
+                let push_unified = {
+                    let joined_scope = self.join_attr_scope(rel_binding, val_binding);
+                    let unit_meta = self.unit_meta();
+
+                    self.unify3(
+                        joined_scope,
+                        expr::Expr {
+                            kind: expr::Kind::Push(gen_scope.output_seq, Box::new(prop.attr)),
+                            meta: unit_meta,
+                            free_vars: VarSet::default(),
+                        },
+                    )?
+                };
+
+                let gen_node = TypedHirNode {
+                    kind: NodeKind::Gen(
+                        gen_scope.input_seq,
+                        IterBinder {
+                            seq: PatternBinding::Binder(gen_scope.output_seq),
+                            rel: hir_rel_binding,
+                            val: hir_val_binding,
+                        },
+                        vec![push_unified.node],
+                    ),
+                    meta: Meta {
+                        ty: seq_ty,
+                        span: SourceSpan::none(),
+                    },
+                };
+
+                Ok(UnifiedNode3 {
+                    typed_binder: None,
+                    node: TypedHirNode {
+                        kind: NodeKind::Prop(
+                            Optional(false),
+                            prop.struct_var,
+                            prop.prop_id,
+                            vec![PropVariant {
+                                dimension: Dimension::Singular,
+                                attr: Attribute {
+                                    rel: Box::new(TypedHirNode {
+                                        kind: NodeKind::Unit,
+                                        meta: self.unit_meta(),
+                                    }),
+                                    val: Box::new(gen_node),
                                 },
                             }],
                         ),
@@ -146,6 +216,28 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     node: TypedHirNode {
                         kind: NodeKind::Map(Box::new(unified_param.node)),
                         meta: expr.meta,
+                    },
+                })
+            }
+            (expr::Kind::Push(seq_var, attr), scope::Kind::Const) => {
+                let const_scope = self.const_scope();
+                let rel = self.unify3(const_scope.clone(), attr.rel)?;
+                let val = self.unify3(const_scope, attr.val)?;
+
+                Ok(UnifiedNode3 {
+                    typed_binder: Some(TypedBinder {
+                        var: seq_var,
+                        ty: self.unit_type(),
+                    }),
+                    node: TypedHirNode {
+                        kind: NodeKind::Push(
+                            seq_var,
+                            Attribute {
+                                rel: Box::new(rel.node),
+                                val: Box::new(val.node),
+                            },
+                        ),
+                        meta: self.unit_meta(),
                     },
                 })
             }
@@ -247,6 +339,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     node,
                 })
             }
+            (_, scope::Kind::Gen(_)) => todo!(),
         }
     }
 
@@ -308,6 +401,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 debug!("expressions: {expressions:#?}");
                 todo!("struct block scope");
             }
+            scope::Kind::Gen(_) => todo!(),
         }
     }
 
@@ -349,8 +443,30 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     ty,
                 )
             }
-            scope::PropKind::Seq(rel_binding, val_binding) => {
-                todo!()
+            scope::PropKind::Seq(label, rel_binding, val_binding) => {
+                let gen_scope = scope::Scope {
+                    kind: scope::Kind::Gen(scope::Gen {
+                        input_seq: ontol_hir::Var(label.0),
+                        output_seq: self.alloc_var(),
+                        bindings: Box::new((rel_binding, val_binding)),
+                    }),
+                    meta: self.unit_meta(),
+                    vars: VarSet::default(),
+                };
+                let nodes = self.wrap_sub_scoped_props_in_scope(gen_scope, sub_scoped)?;
+                let ty = nodes
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
+
+                (
+                    MatchArm {
+                        pattern: PropPattern::Seq(PatternBinding::Binder(ontol_hir::Var(label.0))),
+                        nodes,
+                    },
+                    ty,
+                )
             }
         };
 
@@ -446,6 +562,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
                 Ok(nodes)
             }
+            scope::Kind::Gen(gen) => self.unify_sub_scoped_props(
+                scope::Scope {
+                    kind: scope::Kind::Gen(gen),
+                    meta: scope.meta,
+                    vars: scope.vars,
+                },
+                sub_scoped,
+            ),
         }
     }
 
@@ -502,7 +626,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     ty,
                 )
             }
-            scope::PropKind::Seq(rel_binding, val_binding) => {
+            scope::PropKind::Seq(label, rel_binding, val_binding) => {
                 todo!()
             }
         };
@@ -570,6 +694,7 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             scope::Kind::Struct(_struct_scope) => {
                 todo!()
             }
+            scope::Kind::Gen(_) => todo!(),
         }
     }
 
@@ -652,5 +777,11 @@ impl<'a, 'm> Unifier3<'a, 'm> {
 
     fn unit_type(&mut self) -> TypeRef<'m> {
         self.types.intern(Type::Unit(DefId::unit()))
+    }
+
+    fn alloc_var(&mut self) -> ontol_hir::Var {
+        let var = self.next_var;
+        self.next_var.0 += 1;
+        var
     }
 }

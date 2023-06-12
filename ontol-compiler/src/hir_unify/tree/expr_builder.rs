@@ -5,13 +5,25 @@ use ontol_hir::kind::{Attribute, Dimension, NodeKind};
 use super::expr;
 use crate::{hir_unify::VarSet, typed_hir::TypedHirNode};
 
-#[derive(Default)]
 pub struct ExprBuilder<'m> {
     in_scope: VarSet,
     phantom: PhantomData<&'m ()>,
+    next_var: ontol_hir::Var,
 }
 
 impl<'m> ExprBuilder<'m> {
+    pub fn new(next_var: ontol_hir::Var) -> Self {
+        Self {
+            in_scope: Default::default(),
+            phantom: PhantomData,
+            next_var,
+        }
+    }
+
+    pub fn next_var(self) -> ontol_hir::Var {
+        self.next_var
+    }
+
     pub fn hir_to_expr(&mut self, node: &TypedHirNode<'m>) -> expr::Expr<'m> {
         match &node.kind {
             NodeKind::Var(var) => {
@@ -56,7 +68,7 @@ impl<'m> ExprBuilder<'m> {
                     meta: node.meta,
                 }
             }
-            NodeKind::Seq(label, attr) => {
+            NodeKind::Seq(_label, _attr) => {
                 todo!("seq expr")
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
@@ -75,7 +87,7 @@ impl<'m> ExprBuilder<'m> {
                     free_vars,
                 }
             }),
-            NodeKind::Prop(optional, struct_var, id, variants) => panic!("standalone prop"),
+            NodeKind::Prop(..) => panic!("standalone prop"),
             NodeKind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
@@ -105,7 +117,7 @@ impl<'m> ExprBuilder<'m> {
                             optional: *optional,
                             prop_id: *prop_id,
                             free_vars: union.vars,
-                            seq: false,
+                            seq: None,
                             struct_var: *struct_var,
                             attr: Attribute { rel, val },
                         }
@@ -120,7 +132,7 @@ impl<'m> ExprBuilder<'m> {
                             optional: *optional,
                             prop_id: *prop_id,
                             free_vars,
-                            seq: true,
+                            seq: Some(label),
                             struct_var: *struct_var,
                             attr: Attribute { rel, val },
                         }

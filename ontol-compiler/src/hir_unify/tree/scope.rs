@@ -26,7 +26,7 @@ pub enum Kind<'m> {
     Var(ontol_hir::Var),
     Struct(Struct<'m>),
     Let(Let<'m>),
-    // Prop(Box<Prop<'m>>),
+    Gen(Gen<'m>),
 }
 
 #[derive(Clone, Debug)]
@@ -38,6 +38,13 @@ pub struct Let<'m> {
     pub inner_binder: ontol_hir::Binder,
     pub def: TypedHirNode<'m>,
     pub sub_scope: Box<Scope<'m>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gen<'m> {
+    pub input_seq: ontol_hir::Var,
+    pub output_seq: ontol_hir::Var,
+    pub bindings: Box<(PatternBinding<'m>, PatternBinding<'m>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -53,7 +60,7 @@ pub struct Prop<'m> {
 #[derive(Clone, Debug)]
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
-    Seq(PatternBinding<'m>, PatternBinding<'m>),
+    Seq(ontol_hir::Label, PatternBinding<'m>, PatternBinding<'m>),
 }
 
 #[derive(Clone, Debug)]

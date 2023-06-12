@@ -19,6 +19,7 @@ pub enum Kind<'m> {
     Map(Box<Expr<'m>>),
     Call(Call<'m>),
     Int(i64),
+    Push(ontol_hir::Var, Box<Attribute<Expr<'m>>>),
 }
 
 #[derive(Debug)]
@@ -29,7 +30,7 @@ pub struct Prop<'m> {
     pub optional: Optional,
     pub struct_var: ontol_hir::Var,
     pub prop_id: PropertyId,
-    pub seq: bool,
+    pub seq: Option<ontol_hir::Label>,
     pub attr: Attribute<Expr<'m>>,
     pub free_vars: VarSet,
 }
