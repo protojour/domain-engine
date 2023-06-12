@@ -304,7 +304,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### "zwizzling" cases:
             (
                 expr::Kind::Struct(expr::Struct(expr_binder, props)),
-                scope::Kind::Struct(scope::Struct(scope_binder, scope_props)),
+                scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props)),
             ) => {
                 let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
                 let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
@@ -329,8 +329,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let nodes = regroup_match_prop(nodes);
 
                 Ok(UnifiedNode {
-                    typed_binder: Some(TypedBinder {
-                        var: scope_binder.0,
+                    typed_binder: scope_binder.map(|binder| TypedBinder {
+                        var: binder.0,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node: TypedHirNode(
@@ -339,7 +339,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                 })
             }
-            (expr_kind, scope::Kind::Struct(scope::Struct(scope_binder, scope_props))) => {
+            (expr_kind, scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props))) => {
                 // When scoping an arbitrariy expression to a struct
                 // it's important that the scoping is expanded in the correct
                 // order. I.e. the variable representing the expression itself
@@ -398,8 +398,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;
 
                 Ok(UnifiedNode {
-                    typed_binder: Some(TypedBinder {
-                        var: scope_binder.0,
+                    typed_binder: scope_binder.map(|binder| TypedBinder {
+                        var: binder.0,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node,
@@ -467,8 +467,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             // scope::Kind::Prop(scope_prop) => self.unify_scope_prop(*scope_prop, expressions),
-            scope::Kind::Struct(struct_scope) => {
-                debug!("struct scope: {struct_scope:#?}");
+            scope::Kind::PropSet(prop_set) => {
+                debug!("scope prop set: {prop_set:#?}");
                 debug!("expressions: {expressions:#?}");
                 todo!("struct block scope");
             }
@@ -513,14 +513,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     | (_other, scope::Kind::Let(_let_scope)) => {
                         todo!("merge let scope")
                     }
-                    (scope::Kind::Struct(rel_struct), scope::Kind::Struct(val_struct)) => {
-                        // what binder is used is insignificant here.
-                        let binder = val_struct.0;
+                    (scope::Kind::PropSet(rel_struct), scope::Kind::PropSet(val_struct)) => {
                         let mut merged_props = rel_struct.1;
                         merged_props.extend(&mut val_struct.1.into_iter());
 
                         scope::Scope(
-                            scope::Kind::Struct(scope::Struct(binder, merged_props)),
+                            scope::Kind::PropSet(scope::PropSet(None, merged_props)),
                             scope::Meta {
                                 vars: VarSet::default(),
                                 hir_meta: self.unit_meta(),

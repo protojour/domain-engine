@@ -35,12 +35,18 @@ impl<'m> Meta<'m> {
     }
 }
 
+/// The kind of scoping
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
+    /// Constant scope - this node puts no variables into scope.
     Const,
+    /// Puts one variable into scope
     Var(ontol_hir::Var),
-    Struct(Struct<'m>),
+    /// Puts a set of properties into scope - typically a struct or merged structs
+    PropSet(PropSet<'m>),
+    /// Puts a function of another (in scope) variable into scope, binding its result to a new binder
     Let(Let<'m>),
+    /// Puts a sequence generator into scope
     Gen(Gen<'m>),
 }
 
@@ -50,7 +56,7 @@ impl<'m> Kind<'m> {
         match self {
             Self::Const => "Const".to_string(),
             Self::Var(var) => format!("Var({var})"),
-            Self::Struct(_) => "Struct".to_string(),
+            Self::PropSet(_) => "PropSet".to_string(),
             Self::Let(let_) => format!("Let({})", let_.inner_binder.0),
             Self::Gen(gen) => format!("Gen({})", gen.input_seq),
         }
@@ -58,7 +64,7 @@ impl<'m> Kind<'m> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Struct<'m>(pub ontol_hir::Binder, pub Vec<Prop<'m>>);
+pub struct PropSet<'m>(pub Option<ontol_hir::Binder>, pub Vec<Prop<'m>>);
 
 #[derive(Clone, Debug)]
 pub struct Let<'m> {

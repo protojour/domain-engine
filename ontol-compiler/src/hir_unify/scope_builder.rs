@@ -112,7 +112,7 @@ impl<'m> ScopeBuilder<'m> {
                         vars: union.vars,
                         hir_meta: meta,
                     }
-                    .with_kind(scope::Kind::Struct(scope::Struct(*binder, props))),
+                    .with_kind(scope::Kind::PropSet(scope::PropSet(Some(*binder), props))),
                 })
             }),
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),

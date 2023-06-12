@@ -23,9 +23,9 @@ pub(super) trait UnifyProps<'m>: Sized {
     ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
 
     // Required method
-    fn unify_with_struct<'a>(
+    fn unify_with_prop_set<'a>(
         unifier: &mut Unifier<'a, 'm>,
-        struct_scope: (scope::Struct<'m>, scope::Meta<'m>),
+        prop_set_scope: (scope::PropSet<'m>, scope::Meta<'m>),
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
 
@@ -137,8 +137,8 @@ pub(super) trait UnifyProps<'m>: Sized {
 
                 Ok(vec![node])
             }
-            scope::Kind::Struct(struct_scope) => {
-                Self::unify_with_struct(unifier, (struct_scope, scope_meta), sub_scoped)
+            scope::Kind::PropSet(prop_set) => {
+                Self::unify_with_prop_set(unifier, (prop_set, scope_meta), sub_scoped)
             }
             scope_kind @ scope::Kind::Gen(_) => {
                 Self::unify_sub_scoped(unifier, scope::Scope(scope_kind, scope_meta), sub_scoped)
@@ -181,12 +181,12 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
         Ok(regroup_match_prop(nodes))
     }
 
-    fn unify_with_struct<'a>(
+    fn unify_with_prop_set<'a>(
         unifier: &mut Unifier<'a, 'm>,
-        (struct_scope, scope_meta): (scope::Struct<'m>, scope::Meta<'m>),
+        (prop_set, scope_meta): (scope::PropSet<'m>, scope::Meta<'m>),
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        let scope = scope::Scope(scope::Kind::Struct(struct_scope), scope_meta);
+        let scope = scope::Scope(scope::Kind::PropSet(prop_set), scope_meta);
         let mut nodes =
             Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
 
@@ -240,9 +240,9 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
         Ok(nodes)
     }
 
-    fn unify_with_struct<'a>(
+    fn unify_with_prop_set<'a>(
         _unifier: &mut Unifier<'a, 'm>,
-        _: (scope::Struct<'m>, scope::Meta<'m>),
+        _: (scope::PropSet<'m>, scope::Meta<'m>),
         _sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         todo!()
