@@ -30,58 +30,68 @@ impl<'m> ExprBuilder<'m> {
                 let mut free_vars = VarSet::default();
                 free_vars.0.insert(var.0 as usize);
 
-                expr::Expr {
-                    kind: expr::Kind::Var(*var),
-                    meta: node.meta,
-                    free_vars,
-                }
+                expr::Expr(
+                    expr::Kind::Var(*var),
+                    expr::Meta {
+                        hir_meta: node.meta,
+                        free_vars,
+                    },
+                )
             }
-            NodeKind::Unit => expr::Expr {
-                kind: expr::Kind::Unit,
-                meta: node.meta,
-                free_vars: Default::default(),
-            },
-            NodeKind::Int(int) => expr::Expr {
-                kind: expr::Kind::Int(*int),
-                meta: node.meta,
-                free_vars: Default::default(),
-            },
+            NodeKind::Unit => expr::Expr(
+                expr::Kind::Unit,
+                expr::Meta {
+                    hir_meta: node.meta,
+                    free_vars: Default::default(),
+                },
+            ),
+            NodeKind::Int(int) => expr::Expr(
+                expr::Kind::Int(*int),
+                expr::Meta {
+                    hir_meta: node.meta,
+                    free_vars: Default::default(),
+                },
+            ),
             NodeKind::Let(..) => panic!(),
             NodeKind::Call(proc, params) => {
                 let params: Vec<_> = params.iter().map(|param| self.hir_to_expr(param)).collect();
                 let mut free_vars = VarSet::default();
                 for param in &params {
-                    free_vars.0.union_with(&param.free_vars.0);
+                    free_vars.0.union_with(&param.1.free_vars.0);
                 }
 
-                expr::Expr {
-                    kind: expr::Kind::Call(expr::Call(*proc, params)),
-                    meta: node.meta,
-                    free_vars,
-                }
+                expr::Expr(
+                    expr::Kind::Call(expr::Call(*proc, params)),
+                    expr::Meta {
+                        hir_meta: node.meta,
+                        free_vars,
+                    },
+                )
             }
             NodeKind::Map(arg) => {
                 let arg = self.hir_to_expr(arg);
-                expr::Expr {
-                    free_vars: arg.free_vars.clone(),
-                    kind: expr::Kind::Map(Box::new(arg)),
-                    meta: node.meta,
-                }
+                let expr_meta = expr::Meta {
+                    free_vars: arg.1.free_vars.clone(),
+                    hir_meta: node.meta,
+                };
+                expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
             NodeKind::Seq(label, attr) => {
                 let rel = self.hir_to_expr(&attr.rel);
                 let val = self.hir_to_expr(&attr.val);
 
                 let mut free_vars = VarSet::default();
-                free_vars.0.union_with(&rel.free_vars.0);
-                free_vars.0.union_with(&val.free_vars.0);
+                free_vars.0.union_with(&rel.1.free_vars.0);
+                free_vars.0.union_with(&val.1.free_vars.0);
                 free_vars.0.insert(label.0 as usize);
 
-                expr::Expr {
-                    kind: expr::Kind::Seq(*label, Box::new(Attribute { rel, val })),
-                    free_vars,
-                    meta: node.meta,
-                }
+                expr::Expr(
+                    expr::Kind::Seq(*label, Box::new(Attribute { rel, val })),
+                    expr::Meta {
+                        free_vars,
+                        hir_meta: node.meta,
+                    },
+                )
             }
             NodeKind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 let props: Vec<_> = nodes
@@ -93,11 +103,13 @@ impl<'m> ExprBuilder<'m> {
                     free_vars.0.union_with(&prop.free_vars.0);
                 }
 
-                expr::Expr {
-                    kind: expr::Kind::Struct(expr::Struct(*binder, props)),
-                    meta: node.meta,
-                    free_vars,
-                }
+                expr::Expr(
+                    expr::Kind::Struct(expr::Struct(*binder, props)),
+                    expr::Meta {
+                        hir_meta: node.meta,
+                        free_vars,
+                    },
+                )
             }),
             NodeKind::Prop(..) => panic!("standalone prop"),
             NodeKind::MatchProp(..) => {
@@ -177,7 +189,7 @@ struct UnionBuilder {
 
 impl UnionBuilder {
     fn plus<'m>(&mut self, expr: expr::Expr<'m>) -> expr::Expr<'m> {
-        self.vars.0.union_with(&expr.free_vars.0);
+        self.vars.0.union_with(&expr.1.free_vars.0);
         expr
     }
 }
