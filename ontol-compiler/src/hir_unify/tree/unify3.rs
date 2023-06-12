@@ -145,15 +145,21 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     let joined_scope = self.join_attr_scope(rel_binding, val_binding);
                     let unit_meta = self.unit_meta();
 
+                    let mut free_vars = VarSet::default();
+                    free_vars.0.union_with(&prop.attr.rel.free_vars.0);
+                    free_vars.0.union_with(&prop.attr.val.free_vars.0);
+
                     self.unify3(
                         joined_scope,
                         expr::Expr {
                             kind: expr::Kind::Push(gen_scope.output_seq, Box::new(prop.attr)),
                             meta: unit_meta,
-                            free_vars: VarSet::default(),
+                            free_vars,
                         },
                     )?
                 };
+
+                debug!("MADE PUSH!!!!!!!!!!!!!!!");
 
                 let gen_node = TypedHirNode {
                     kind: NodeKind::Gen(
@@ -219,10 +225,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     },
                 })
             }
-            (expr::Kind::Push(seq_var, attr), scope::Kind::Const) => {
-                let const_scope = self.const_scope();
-                let rel = self.unify3(const_scope.clone(), attr.rel)?;
-                let val = self.unify3(const_scope, attr.val)?;
+            (expr::Kind::Push(seq_var, attr), scope_kind) => {
+                let scope = scope::Scope {
+                    kind: scope_kind,
+                    vars: scope.vars,
+                    meta: scope.meta,
+                };
+                let rel = self.unify3(scope.clone(), attr.rel)?;
+                let val = self.unify3(scope, attr.val)?;
 
                 Ok(UnifiedNode3 {
                     typed_binder: Some(TypedBinder {
@@ -294,6 +304,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             (expr_kind, scope::Kind::Struct(struct_scope)) => {
                 let free_vars = expr.free_vars.clone();
 
+                if free_vars.0.is_empty() {
+                    panic!("No free vars in {expr_kind:#?} with struct scope");
+                }
+
+                debug!("with struct scope: {expr_kind:#?}");
+
                 let expr = expr::Expr {
                     kind: expr_kind,
                     meta: expr.meta,
@@ -327,7 +343,12 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     }
                 }
 
-                let (scope_prop, sub_scoped) = sub_scoped.sub_scopes.into_iter().next().unwrap();
+                let (scope_prop, sub_scoped) = match sub_scoped.sub_scopes.into_iter().next() {
+                    Some(val) => val,
+                    None => {
+                        panic!("No sub scoping but free_vars was {free_vars:?}")
+                    }
+                };
 
                 let node = self.unify_expr_match_arm(scope_prop, sub_scoped)?.node;
 
@@ -339,7 +360,9 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                     node,
                 })
             }
-            (_, scope::Kind::Gen(_)) => todo!(),
+            (expr_kind, scope::Kind::Gen(_)) => {
+                todo!("{expr_kind:#?} with gen scope")
+            }
         }
     }
 
@@ -627,7 +650,29 @@ impl<'a, 'm> Unifier3<'a, 'm> {
                 )
             }
             scope::PropKind::Seq(label, rel_binding, val_binding) => {
-                todo!()
+                let gen_scope = scope::Scope {
+                    kind: scope::Kind::Gen(scope::Gen {
+                        input_seq: ontol_hir::Var(label.0),
+                        output_seq: self.alloc_var(),
+                        bindings: Box::new((rel_binding, val_binding)),
+                    }),
+                    meta: self.unit_meta(),
+                    vars: VarSet::default(),
+                };
+                let nodes = self.wrap_sub_scoped_expressions_in_scope(gen_scope, sub_scoped)?;
+                let ty = nodes
+                    .iter()
+                    .map(|node| node.meta.ty)
+                    .last()
+                    .unwrap_or_else(|| self.unit_type());
+
+                (
+                    MatchArm {
+                        pattern: PropPattern::Seq(PatternBinding::Binder(ontol_hir::Var(label.0))),
+                        nodes,
+                    },
+                    ty,
+                )
             }
         };
 
@@ -694,7 +739,14 @@ impl<'a, 'm> Unifier3<'a, 'm> {
             scope::Kind::Struct(_struct_scope) => {
                 todo!()
             }
-            scope::Kind::Gen(_) => todo!(),
+            scope::Kind::Gen(gen) => self.unify_sub_scoped_expressions(
+                scope::Scope {
+                    kind: scope::Kind::Gen(gen),
+                    meta: scope.meta,
+                    vars: scope.vars,
+                },
+                sub_scoped,
+            ),
         }
     }
 
