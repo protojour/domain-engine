@@ -28,28 +28,28 @@ use super::{
 };
 
 pub fn unify_to_function<'m>(
-    scope_source: TypedHirNode<'m>,
-    target: TypedHirNode<'m>,
+    scope: &TypedHirNode<'m>,
+    expr: &TypedHirNode<'m>,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, &scope_source);
-    var_tracker.visit_node(0, &target);
+    var_tracker.visit_node(0, &scope);
+    var_tracker.visit_node(0, &expr);
 
-    let source_ty = scope_source.meta.ty;
-    let target_ty = target.meta.ty;
+    let scope_ty = scope.meta.ty;
+    let expr_ty = expr.meta.ty;
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     let (scope_binder, next_var) = {
         let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
-        let scope_binder = scope_builder.build_scope_binder(&scope_source)?;
+        let scope_binder = scope_builder.build_scope_binder(scope)?;
         (scope_binder, scope_builder.next_var())
     };
 
     let (expr, next_var) = {
         let mut expr_builder = ExprBuilder::new(next_var);
-        let expr = expr_builder.hir_to_expr(&target);
+        let expr = expr_builder.hir_to_expr(expr);
         (expr, expr_builder.next_var())
     };
 
@@ -60,11 +60,11 @@ pub fn unify_to_function<'m>(
     let hir_func = match unified.typed_binder {
         Some(arg) => {
             // NB: Error is used in unification tests
-            if !matches!(source_ty, Type::Error) {
-                assert_eq!(arg.ty, source_ty);
+            if !matches!(scope_ty, Type::Error) {
+                assert_eq!(arg.ty, scope_ty);
             }
-            if !matches!(target_ty, Type::Error) {
-                assert_eq!(unified.node.meta.ty, target_ty);
+            if !matches!(expr_ty, Type::Error) {
+                assert_eq!(unified.node.meta.ty, expr_ty);
             }
 
             Ok(HirFunc {

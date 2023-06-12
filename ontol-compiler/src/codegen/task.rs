@@ -138,14 +138,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 );
 
                 debug!("Forward start");
-                if let Ok(func) =
-                    unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
-                {
+                if let Ok(func) = unify_to_function(&map_task.first, &map_task.second, compiler) {
                     map_codegen(&mut proc_table, func, &mut compiler.errors);
                 }
 
                 debug!("Backward start");
-                if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
+                if let Ok(func) = unify_to_function(&map_task.second, &map_task.first, compiler) {
                     map_codegen(&mut proc_table, func, &mut compiler.errors);
                 }
             }

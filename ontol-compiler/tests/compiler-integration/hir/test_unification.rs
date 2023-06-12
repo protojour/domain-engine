@@ -13,10 +13,10 @@ fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
     Parser::new(TypedHir).parse(src).unwrap().0
 }
 
-fn test_unify(source: &str, target: &str) -> String {
+fn test_unify(scope: &str, expr: &str) -> String {
     let mem = Mem::default();
     let mut compiler = Compiler::new(&mem, Default::default());
-    let func = unify_to_function(parse_typed(source), parse_typed(target), &mut compiler).unwrap();
+    let func = unify_to_function(&parse_typed(scope), &parse_typed(expr), &mut compiler).unwrap();
     let mut output = String::new();
     use std::fmt::Write;
     write!(&mut output, "{func}").unwrap();
