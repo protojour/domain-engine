@@ -15,6 +15,7 @@ use super::{
     TypeError,
 };
 
+/// Perform type inference limited to within one "map arm"
 pub(super) struct HirArmTypeInference<'c, 'm> {
     pub(super) types: &'c mut Types<'m>,
     pub(super) eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
@@ -43,6 +44,8 @@ impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirArmTypeInfer
     }
 }
 
+/// Unify the types of variables in both map arms.
+/// If the types do not match, the variable expression gets changed to a map expression.
 pub(super) struct HirVariableMapper<'c, 'm> {
     pub variable_mapping: &'c FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
     pub arm: Arm,
