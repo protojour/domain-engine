@@ -630,32 +630,31 @@ fn test_unify_dependent_scoping() {
         )
         ",
     );
-    // BUG: Generates code with unbound variables..
-    // Need to generate scope dependency tree and "unflatten" these match-props
+
     let expected = indoc! {"
         |$c| (struct ($f)
-            (match-prop $c S:0:0
-                (($_ $g)
-                    (let ($c (- $b $g))
-                        (prop $f O:2:2
-                            (#u $c)
-                        )
-                    )
-                )
-            )
-            (match-prop $c S:1:1
-                (($_ $h)
-                    (let ($b (- $a $h))
-                        (prop $f O:1:1
-                            (#u $b)
-                        )
-                    )
-                )
-            )
             (match-prop $c S:2:2
                 (($_ $a)
                     (prop $f O:0:0
                         (#u $a)
+                    )
+                    (match-prop $c S:1:1
+                        (($_ $h)
+                            (let ($b (- $a $h))
+                                (prop $f O:1:1
+                                    (#u $b)
+                                )
+                                (match-prop $c S:0:0
+                                    (($_ $g)
+                                        (let ($c (- $b $g))
+                                            (prop $f O:2:2
+                                                (#u $c)
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
                     )
                 )
             )

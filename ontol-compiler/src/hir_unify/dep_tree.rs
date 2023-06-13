@@ -95,12 +95,15 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
             .map(|(scope_index, expressions)| {
                 let in_scope = self.scopes.get(scope_index).unwrap().vars().clone();
 
-                self.build_sub_tree(expressions, scope_index, in_scope)
+                self.build_expr_sub_tree(expressions, scope_index, in_scope)
             })
             .collect();
 
+        // If the scopes themselves are interdependent, group them into hierarchy:
+        let root_nodes = self.make_scope_dependency_tree(root_nodes);
+
         DepTree {
-            trees: self.into_sub_scoped(root_nodes),
+            trees: self.into_sub_trees(root_nodes),
             constants,
         }
     }
@@ -127,7 +130,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         None
     }
 
-    fn build_sub_tree<E: Expression>(
+    fn build_expr_sub_tree<E: Expression>(
         &mut self,
         expressions: Vec<E>,
         scope_index: usize,
@@ -197,7 +200,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                 );
                 let sub_scope_index = *self.scope_index_by_var.get(&var).unwrap();
 
-                self.build_sub_tree(sub_expressions, sub_scope_index, sub_in_scope)
+                self.build_expr_sub_tree(sub_expressions, sub_scope_index, sub_in_scope)
             })
             .collect();
 
@@ -215,8 +218,94 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         iterator.find(|var| self.scoped_vars.contains(var.0 as usize))
     }
 
+    fn make_scope_dependency_tree<E: Expression + Debug>(
+        &mut self,
+        nodes: Vec<IndexedNode<E>>,
+    ) -> Vec<IndexedNode<E>> {
+        let mut parents = FnvHashMap::default();
+        self.compute_scope_dependency_parents(&nodes, &mut parents);
+
+        // debug!("parents: {parents:#?}");
+
+        let mut root_nodes = vec![];
+        let mut child_nodes_by_parent: FnvHashMap<usize, Vec<IndexedNode<E>>> = Default::default();
+
+        for node in nodes {
+            if let Some(parent_idx) = parents.remove(&node.scope_index) {
+                child_nodes_by_parent
+                    .entry(parent_idx)
+                    .or_default()
+                    .push(node);
+            } else {
+                root_nodes.push(node);
+            }
+        }
+
+        for node in root_nodes.iter_mut() {
+            let scope_dep_children = Self::build_scope_dependency_tree_sub_level(
+                &mut child_nodes_by_parent,
+                node.scope_index,
+            );
+
+            node.children.extend(scope_dep_children);
+        }
+
+        root_nodes
+    }
+
+    fn build_scope_dependency_tree_sub_level<E>(
+        child_nodes_by_parent: &mut FnvHashMap<usize, Vec<IndexedNode<E>>>,
+        parent_idx: usize,
+    ) -> Vec<IndexedNode<E>> {
+        if let Some(mut nodes) = child_nodes_by_parent.remove(&parent_idx) {
+            for node in nodes.iter_mut() {
+                node.children
+                    .extend(Self::build_scope_dependency_tree_sub_level(
+                        child_nodes_by_parent,
+                        node.scope_index,
+                    ));
+            }
+
+            nodes
+        } else {
+            vec![]
+        }
+    }
+
+    fn compute_scope_dependency_parents<E>(
+        &mut self,
+        nodes: &[IndexedNode<E>],
+        parents: &mut FnvHashMap<usize, usize>,
+    ) {
+        for (node_idx, node) in nodes.iter().enumerate() {
+            let scope = &self.scopes[node.scope_index];
+            let dependencies = scope.dependencies();
+
+            for var in dependencies {
+                let mut visited = BitSet::new();
+                let mut child_node_idx = node_idx;
+                visited.insert(child_node_idx);
+
+                let parent_node_idx = *self.scope_index_by_var.get(&var).unwrap();
+
+                while let Some(new_parent) = parents.get(&child_node_idx) {
+                    if visited.contains(*new_parent) {
+                        panic!("circular dependency");
+                    } else {
+                        visited.insert(*new_parent);
+                    }
+                    child_node_idx = *new_parent;
+                }
+
+                debug!("inserting parent {child_node_idx} -> {parent_node_idx}");
+
+                parents.insert(child_node_idx, parent_node_idx);
+            }
+        }
+    }
+
     // algorithm for avoiding unnecessary scope clones
-    fn into_sub_scoped<E: Expression + Debug>(
+    fn into_sub_trees<E: Expression + Debug>(
         self,
         node: Vec<IndexedNode<E>>,
     ) -> Vec<(S, SubTree<E, S>)> {
