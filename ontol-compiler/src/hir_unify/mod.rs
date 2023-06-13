@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use bit_set::BitSet;
 use ontol_hir::{visitor::HirVisitor, Label, Var};
 use ontol_runtime::DefId;
-use tracing::{debug, warn};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
@@ -61,9 +60,7 @@ pub fn unify_to_function<'m>(
 
     let unified = Unifier::new(&mut compiler.types, next_var).unify(scope_binder.scope, expr)?;
 
-    debug!("unified node {}", unified.node);
-
-    let hir_func = match unified.typed_binder {
+    match unified.typed_binder {
         Some(arg) => {
             // NB: Error is used in unification tests
             if !matches!(scope_ty, Type::Error) {
@@ -79,12 +76,7 @@ pub fn unify_to_function<'m>(
             })
         }
         None => Err(UnifierError::NoInputBinder),
-    };
-
-    hir_func.map_err(|err| {
-        warn!("unifier error: {err:?}");
-        err
-    })
+    }
 }
 
 struct VariableTracker {

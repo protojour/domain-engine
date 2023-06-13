@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use ontol_hir::{visitor::HirVisitor, Node};
 use ontol_runtime::vm::proc::BuiltinProc;
 use smallvec::SmallVec;
-use tracing::debug;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
@@ -143,7 +142,7 @@ impl<'m> ScopeBuilder<'m> {
                             dep_analyzer.visit_node(index, node);
                         }
                         let prop_analysis = dep_analyzer.prop_analysis()?;
-                        debug!("prop analysis: {prop_analysis:#?}");
+                        // debug!("prop analysis: {prop_analysis:#?}");
                         prop_analysis
                     });
                 }
@@ -435,12 +434,14 @@ impl UnionBuilder {
 // (+ 5 (* 2 (+ 1 a)))
 // (- 1 (/ (- 5 x) 2))
 
+#[derive(Debug)]
 struct ExprAnalysis<'m> {
     kind: ExprAnalysisKind<'m>,
     meta: Meta<'m>,
 }
 
 // Only one variable is supported for now
+#[derive(Debug)]
 enum ExprAnalysisKind<'m> {
     Const,
     Var(ontol_hir::Var),
@@ -497,8 +498,6 @@ fn analyze_expr<'m>(
 
                     kind = new_kind;
                     defining_var = child_var;
-                } else if child_var != defining_var {
-                    return Err(UnifierError::MultipleVariablesInExpression(node.span()));
                 }
             }
 

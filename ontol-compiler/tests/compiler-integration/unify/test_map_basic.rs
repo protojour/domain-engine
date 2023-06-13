@@ -600,3 +600,44 @@ fn test_map_delegation() {
         );
     });
 }
+
+#[test]
+fn test_map_dependent_scoping() {
+    "
+    pub type one {
+        rel _ 'total_weight': int
+        rel _ 'net_weight': int
+    }
+    pub type two {
+        rel _ 'net_weight': int
+        rel _ 'container_weight': int
+    }
+
+    map {
+        one {
+            'total_weight': t
+            'net_weight': n
+        }
+        two {
+            'net_weight': n
+            'container_weight': t - n
+        }
+    }
+    "
+    .compile_ok(|test_env| {
+        // BUG: Forward is not working..
+        // assert_domain_map(
+        //     &test_env,
+        //     ("one", "two"),
+        //     json!({ "total_weight": 100, "net_weight": 75 }),
+        //     json!({ "net_weight": 75, "container_weight": 25 }),
+        // );
+
+        assert_domain_map(
+            &test_env,
+            ("two", "one"),
+            json!({ "net_weight": 75, "container_weight": 25 }),
+            json!({ "total_weight": 100, "net_weight": 75 }),
+        );
+    });
+}

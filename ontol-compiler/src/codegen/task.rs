@@ -135,13 +135,19 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("2nd (ty={:?}):\n{}", map_task.second.ty(), map_task.second);
 
                 debug!("Forward start");
-                if let Ok(func) = unify_to_function(&map_task.first, &map_task.second, compiler) {
-                    map_codegen(&mut proc_table, func, &mut compiler.errors);
+                match unify_to_function(&map_task.first, &map_task.second, compiler) {
+                    Ok(func) => {
+                        map_codegen(&mut proc_table, func, &mut compiler.errors);
+                    }
+                    Err(err) => warn!("unifier error: {err:?}"),
                 }
 
                 debug!("Backward start");
-                if let Ok(func) = unify_to_function(&map_task.second, &map_task.first, compiler) {
-                    map_codegen(&mut proc_table, func, &mut compiler.errors);
+                match unify_to_function(&map_task.second, &map_task.first, compiler) {
+                    Ok(func) => {
+                        map_codegen(&mut proc_table, func, &mut compiler.errors);
+                    }
+                    Err(err) => warn!("unifier error: {err:?}"),
                 }
             }
         }

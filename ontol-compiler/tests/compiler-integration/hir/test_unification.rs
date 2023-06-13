@@ -612,25 +612,26 @@ fn test_unify_prop_variants() {
     assert_eq!(expected, output);
 }
 
-#[test]
-fn test_unify_dependent_scoping() {
-    let output = test_unify(
-        "
-        (struct ($c)
-            (prop $c S:0:0 (#u (+ $b $c)))
-            (prop $c S:1:1 (#u (+ $a $b)))
-            (prop $c S:2:2 (#u $a))
-        )
-        ",
-        "
-        (struct ($f)
-            (prop $f O:0:0 (#u $a))
-            (prop $f O:1:1 (#u $b))
-            (prop $f O:2:2 (#u $c))
-        )
-        ",
-    );
+mod dep_scoping {
+    pub const EXPR_1: &str = "
+    (struct ($c)
+        (prop $c S:0:0 (#u (+ $b $c)))
+        (prop $c S:1:1 (#u (+ $a $b)))
+        (prop $c S:2:2 (#u $a))
+    )";
 
+    pub const EXPR_2: &str = "
+    (struct ($f)
+        (prop $f O:0:0 (#u $a))
+        (prop $f O:1:1 (#u $b))
+        (prop $f O:2:2 (#u $c))
+    )
+    ";
+}
+
+#[test]
+fn test_unify_dependent_scoping_forwards() {
+    let output = test_unify(dep_scoping::EXPR_1, dep_scoping::EXPR_2);
     let expected = indoc! {"
         |$c| (struct ($f)
             (match-prop $c S:2:2
@@ -653,6 +654,42 @@ fn test_unify_dependent_scoping() {
                                         )
                                     )
                                 )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+// BUG
+#[test]
+fn test_unify_dependent_scoping_backwards() {
+    let output = test_unify(dep_scoping::EXPR_2, dep_scoping::EXPR_1);
+    let expected = indoc! {"
+        |$f| (struct ($c)
+            (match-prop $f O:0:0
+                (($_ $a)
+                    (prop $c S:2:2
+                        (#u $a)
+                    )
+                    (match-prop $f O:1:1
+                        (($_ $b)
+                            (prop $c S:1:1
+                                (#u (+ $a $b))
+                            )
+                        )
+                    )
+                )
+            )
+            (match-prop $f O:1:1
+                (($_ $b)
+                    (match-prop $f O:2:2
+                        (($_ $c)
+                            (prop $c S:0:0
+                                (#u (+ $b $c))
                             )
                         )
                     )
