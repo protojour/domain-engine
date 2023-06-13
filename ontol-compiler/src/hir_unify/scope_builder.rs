@@ -1,5 +1,18 @@
-use ontol_hir::Node;
+//!
+//! struct {
+//!     'foo': struct {
+//!         'bar': $a
+//!     }
+//!     'baz': $a + $b
+//! }
+//!
+
+use std::collections::HashMap;
+
+use ontol_hir::{visitor::HirVisitor, Node};
 use ontol_runtime::vm::proc::BuiltinProc;
+use smallvec::SmallVec;
+use tracing::debug;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
@@ -8,13 +21,11 @@ use crate::{
     SourceSpan,
 };
 
-use super::{dep_tree::Scope, scope};
-
-pub struct ScopeBuilder<'m> {
-    unit_type: TypeRef<'m>,
-    in_scope: VarSet,
-    next_var: ontol_hir::Var,
-}
+use super::{
+    dep_tree::Scope,
+    scope,
+    scope_dep_tree::{DepAnalyzer, Path, PropAnalysis},
+};
 
 #[derive(Debug)]
 pub struct ScopeBinder<'m> {
@@ -44,12 +55,22 @@ impl<'m> ScopeBinder<'m> {
     }
 }
 
+pub struct ScopeBuilder<'m> {
+    unit_type: TypeRef<'m>,
+    in_scope: VarSet,
+    next_var: ontol_hir::Var,
+    current_prop_path: SmallVec<[u16; 32]>,
+    current_prop_analysis_map: Option<HashMap<Path, PropAnalysis>>,
+}
+
 impl<'m> ScopeBuilder<'m> {
     pub fn new(next_var: ontol_hir::Var, unit_type: TypeRef<'m>) -> Self {
         Self {
             unit_type,
             in_scope: VarSet::default(),
             next_var,
+            current_prop_path: Default::default(),
+            current_prop_analysis_map: None,
         }
     }
 
@@ -57,22 +78,38 @@ impl<'m> ScopeBuilder<'m> {
         self.next_var
     }
 
-    pub fn build_scope_binder(
-        &mut self,
-        node: &TypedHirNode<'m>,
-    ) -> UnifierResult<ScopeBinder<'m>> {
+    pub fn build(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<ScopeBinder<'m>> {
+        // let prop_variant_deps = {
+        //     let mut dep_analyzer = DepAnalyzer::default();
+        //     dep_analyzer.traverse_kind(node.kind());
+        //     dep_analyzer.prop_variant_deps()
+        // };
+        //
+        // panic!("prop_variant_deps: {prop_variant_deps:?}");
+
+        self.build_scope_binder(node)
+    }
+
+    fn build_scope_binder(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<ScopeBinder<'m>> {
         let meta = *node.meta();
         match node.kind() {
             ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, meta)),
-            ontol_hir::Kind::Unit => Ok(ScopeBinder::unbound(
-                self.mk_scope(scope::Kind::Const, meta),
-            )),
-            ontol_hir::Kind::Int(_) => Ok(ScopeBinder::unbound(
+            ontol_hir::Kind::Unit | ontol_hir::Kind::Int(_) => Ok(ScopeBinder::unbound(
                 self.mk_scope(scope::Kind::Const, meta),
             )),
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
-                let analysis = analyze_expr(node)?;
+                let defined_var = match &self.current_prop_analysis_map {
+                    Some(map) => match map.get(&self.current_prop_path) {
+                        Some(prop_analysis) => prop_analysis.defined_var,
+                        None => {
+                            panic!("Property path not found: {:?}", self.current_prop_path)
+                        }
+                    },
+                    None => None,
+                };
+
+                let analysis = analyze_expr(node, defined_var)?;
                 match &analysis.kind {
                     ExprAnalysisKind::Const => Ok(ScopeBinder::unbound(
                         self.mk_scope(scope::Kind::Const, meta),
@@ -95,9 +132,26 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Map(arg) => self.build_scope_binder(arg),
             ontol_hir::Kind::Seq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
             ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
+                if zelf.current_prop_analysis_map.is_none() {
+                    zelf.current_prop_analysis_map = Some({
+                        let mut dep_analyzer = DepAnalyzer::default();
+                        for (index, node) in nodes.iter().enumerate() {
+                            dep_analyzer.visit_node(index, node);
+                        }
+                        let prop_analysis = dep_analyzer.prop_analysis()?;
+                        debug!("prop analysis: {prop_analysis:#?}");
+                        prop_analysis
+                    });
+                }
+
+                // panic!("prop_analysis: {prop_analysis:#?}");
+
                 let mut props = Vec::with_capacity(nodes.len());
                 for (disjoint_group, node) in nodes.iter().enumerate() {
-                    props.extend(zelf.build_props(node, disjoint_group)?);
+                    zelf.enter_child(disjoint_group, |zelf| -> UnifierResult<()> {
+                        props.extend(zelf.build_props(node, disjoint_group)?);
+                        Ok(())
+                    })?;
                 }
 
                 let mut union = UnionBuilder::default();
@@ -136,28 +190,33 @@ impl<'m> ScopeBuilder<'m> {
         node: &TypedHirNode<'m>,
         disjoint_group: usize,
     ) -> UnifierResult<Vec<scope::Prop<'m>>> {
-        match node.kind() {
-            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
-                .iter()
-                .map(|variant| {
+        if let ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) = node.kind() {
+            let mut props = Vec::with_capacity(variants.len());
+
+            for (variant_idx, variant) in variants.iter().enumerate() {
+                self.enter_child(variant_idx, |zelf| -> UnifierResult<()> {
                     let (kind, vars) = match variant.dimension {
                         ontol_hir::Dimension::Singular => {
                             let mut union = UnionBuilder::default();
                             let rel = union
-                                .plus(self.build_scope_binder(&variant.attr.rel)?)
+                                .plus(zelf.enter_child(0, |zelf| {
+                                    zelf.build_scope_binder(&variant.attr.rel)
+                                })?)
                                 .into_scope_pattern_binding();
                             let val = union
-                                .plus(self.build_scope_binder(&variant.attr.val)?)
+                                .plus(zelf.enter_child(1, |zelf| {
+                                    zelf.build_scope_binder(&variant.attr.val)
+                                })?)
                                 .into_scope_pattern_binding();
 
                             (scope::PropKind::Attr(rel, val), union.vars)
                         }
                         ontol_hir::Dimension::Seq(label) => {
-                            let rel = self
-                                .build_scope_binder(&variant.attr.rel)?
+                            let rel = zelf
+                                .enter_child(0, |zelf| zelf.build_scope_binder(&variant.attr.rel))?
                                 .into_scope_pattern_binding();
-                            let val = self
-                                .build_scope_binder(&variant.attr.val)?
+                            let val = zelf
+                                .enter_child(1, |zelf| zelf.build_scope_binder(&variant.attr.val))?
                                 .into_scope_pattern_binding();
 
                             // Only the label is "visible" to the outside
@@ -168,17 +227,23 @@ impl<'m> ScopeBuilder<'m> {
                         }
                     };
 
-                    Ok(scope::Prop {
+                    props.push(scope::Prop {
                         struct_var: *struct_var,
                         optional: *optional,
                         prop_id: *prop_id,
                         disjoint_group,
+                        dependencies: VarSet::default(),
                         kind,
                         vars,
-                    })
-                })
-                .collect(),
-            _ => panic!("not a prop: {node}"),
+                    });
+
+                    Ok(())
+                })?;
+            }
+
+            Ok(props)
+        } else {
+            panic!("not a prop: {node}");
         }
     }
 
@@ -195,6 +260,7 @@ impl<'m> ScopeBuilder<'m> {
             ExprAnalysisKind::FnCall {
                 var_param_index,
                 child,
+                ..
             } => (var_param_index, child),
         };
         let next_analysis = *next_analysis;
@@ -310,6 +376,13 @@ impl<'m> ScopeBuilder<'m> {
         self.in_scope.0.remove(binder.0 .0 as usize);
         value
     }
+
+    fn enter_child<T>(&mut self, index: usize, func: impl FnOnce(&mut Self) -> T) -> T {
+        self.current_prop_path.push(index.try_into().unwrap());
+        let output = func(self);
+        self.current_prop_path.pop();
+        output
+    }
 }
 
 #[derive(Default)]
@@ -344,28 +417,59 @@ enum ExprAnalysisKind<'m> {
     Var(ontol_hir::Var),
     FnCall {
         var_param_index: usize,
+        defining_var: ontol_hir::Var,
         child: Box<ExprAnalysis<'m>>,
     },
 }
 
-fn analyze_expr<'m>(node: &TypedHirNode<'m>) -> UnifierResult<ExprAnalysis<'m>> {
+fn analyze_expr<'m>(
+    node: &TypedHirNode<'m>,
+    defining_var_hint: Option<ontol_hir::Var>,
+) -> UnifierResult<ExprAnalysis<'m>> {
     match node.kind() {
         ontol_hir::Kind::Call(_, args) => {
             let mut kind = ExprAnalysisKind::Const;
+            let mut defining_var = None;
             for (index, param) in args.iter().enumerate() {
-                let child_analysis = analyze_expr(param)?;
-                match &child_analysis.kind {
-                    ExprAnalysisKind::Const => {}
-                    _ => {
-                        if matches!(kind, ExprAnalysisKind::Const) {
-                            kind = ExprAnalysisKind::FnCall {
-                                var_param_index: index,
-                                child: Box::new(child_analysis),
-                            };
-                        } else {
+                let child_analysis = analyze_expr(param, defining_var_hint)?;
+                let (child_var, new_kind) = match &child_analysis.kind {
+                    ExprAnalysisKind::Const => (None, ExprAnalysisKind::Const),
+                    ExprAnalysisKind::Var(child_var) => (
+                        Some(*child_var),
+                        ExprAnalysisKind::FnCall {
+                            var_param_index: index,
+                            defining_var: *child_var,
+                            child: Box::new(child_analysis),
+                        },
+                    ),
+                    ExprAnalysisKind::FnCall {
+                        defining_var: child_var,
+                        ..
+                    } => (
+                        Some(*child_var),
+                        ExprAnalysisKind::FnCall {
+                            var_param_index: index,
+                            defining_var: *child_var,
+                            child: Box::new(child_analysis),
+                        },
+                    ),
+                };
+
+                if matches!(new_kind, ExprAnalysisKind::Const) {
+                    // nothing to do
+                } else if matches!(kind, ExprAnalysisKind::Const) || child_var == defining_var_hint
+                {
+                    if let Some(defining_var) = defining_var {
+                        if child_var == Some(defining_var) {
+                            // Currently does not support using the same variable twice in an expression.
                             return Err(UnifierError::MultipleVariablesInExpression(node.span()));
                         }
                     }
+
+                    kind = new_kind;
+                    defining_var = child_var;
+                } else if child_var != defining_var {
+                    return Err(UnifierError::MultipleVariablesInExpression(node.span()));
                 }
             }
 

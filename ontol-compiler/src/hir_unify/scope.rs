@@ -87,6 +87,7 @@ pub struct Prop<'m> {
     pub optional: ontol_hir::Optional,
     pub prop_id: PropertyId,
     pub disjoint_group: usize,
+    pub dependencies: VarSet,
     pub kind: PropKind<'m>,
     pub vars: VarSet,
 }

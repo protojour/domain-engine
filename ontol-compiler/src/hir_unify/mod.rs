@@ -19,6 +19,7 @@ mod expr_builder;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
+mod scope_dep_tree;
 mod unifier;
 mod unify_props;
 
@@ -48,7 +49,7 @@ pub fn unify_to_function<'m>(
 
     let (scope_binder, next_var) = {
         let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
-        let scope_binder = scope_builder.build_scope_binder(scope)?;
+        let scope_binder = scope_builder.build(scope)?;
         (scope_binder, scope_builder.next_var())
     };
 
