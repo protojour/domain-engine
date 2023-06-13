@@ -521,6 +521,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             scope::Kind::PropSet(scope::PropSet(None, merged_props)),
                             scope::Meta {
                                 vars: VarSet::default(),
+                                dependencies: VarSet::default(),
                                 hir_meta: self.unit_meta(),
                             },
                         )
@@ -539,6 +540,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             scope::Meta {
                 hir_meta: self.unit_meta(),
                 vars: VarSet::default(),
+                dependencies: VarSet::default(),
             },
         )
     }

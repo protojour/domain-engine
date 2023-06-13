@@ -66,6 +66,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     scope::Meta {
                         hir_meta: unifier.unit_meta(),
                         vars: VarSet::default(),
+                        dependencies: VarSet::default(),
                     },
                 );
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, gen_scope, sub_scoped)?;

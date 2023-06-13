@@ -8,6 +8,7 @@ use crate::hir_unify::{UnifierError, UnifierResult, VarSet};
 
 pub trait Scope: Clone {
     fn vars(&self) -> &VarSet;
+    fn dependencies(&self) -> &VarSet;
 }
 
 pub trait Expression {
@@ -50,6 +51,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
 
         for (idx, scope) in scopes.iter().enumerate() {
             scoped_vars.union_with(&scope.vars().0);
+            debug!("dep tree {idx} scope deps: {:?}", scope.dependencies());
             for var in scope.vars() {
                 if scope_index_by_var.insert(var, idx).is_some() {
                     return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));

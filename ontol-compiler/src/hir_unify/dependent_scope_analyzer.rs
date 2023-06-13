@@ -23,7 +23,7 @@ pub struct PropAnalysis {
 }
 
 #[derive(Default)]
-pub struct DepAnalyzer {
+pub struct DepScopeAnalyzer {
     current_path: Path,
     stack: Vec<StackAtom>,
     prop_variables: VarSet,
@@ -36,7 +36,7 @@ enum StackAtom {
     Node,
 }
 
-impl DepAnalyzer {
+impl DepScopeAnalyzer {
     pub fn prop_analysis(self) -> UnifierResult<HashMap<Path, PropAnalysis>> {
         let prop_variant_deps = self.prop_variant_deps;
 
@@ -120,7 +120,7 @@ impl DepAnalyzer {
     }
 }
 
-impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for DepAnalyzer {
+impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for DepScopeAnalyzer {
     fn visit_node(&mut self, index: usize, node: &'s TypedHirNode<'m>) {
         self.enter_child(index, |zelf| {
             if let Some(StackAtom::Prop) = zelf.stack.last() {

@@ -23,8 +23,8 @@ use crate::{
 
 use super::{
     dep_tree::Scope,
+    dependent_scope_analyzer::{DepScopeAnalyzer, Path, PropAnalysis},
     scope,
-    scope_dep_tree::{DepAnalyzer, Path, PropAnalysis},
 };
 
 #[derive(Debug)]
@@ -99,14 +99,17 @@ impl<'m> ScopeBuilder<'m> {
             )),
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
-                let defined_var = match &self.current_prop_analysis_map {
+                let (defined_var, dependencies) = match &self.current_prop_analysis_map {
                     Some(map) => match map.get(&self.current_prop_path) {
-                        Some(prop_analysis) => prop_analysis.defined_var,
+                        Some(prop_analysis) => (
+                            prop_analysis.defined_var,
+                            prop_analysis.dependencies.clone(),
+                        ),
                         None => {
                             panic!("Property path not found: {:?}", self.current_prop_path)
                         }
                     },
-                    None => None,
+                    None => (None, VarSet::default()),
                 };
 
                 let analysis = analyze_expr(node, defined_var)?;
@@ -125,6 +128,7 @@ impl<'m> ScopeBuilder<'m> {
                                 ty: node.ty(),
                             },
                             TypedHirNode(ontol_hir::Kind::Var(binder_var), meta),
+                            dependencies,
                         )
                     }
                 }
@@ -134,7 +138,7 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
                     zelf.current_prop_analysis_map = Some({
-                        let mut dep_analyzer = DepAnalyzer::default();
+                        let mut dep_analyzer = DepScopeAnalyzer::default();
                         for (index, node) in nodes.iter().enumerate() {
                             dep_analyzer.visit_node(index, node);
                         }
@@ -164,6 +168,7 @@ impl<'m> ScopeBuilder<'m> {
                     }),
                     scope: scope::Meta {
                         vars: union.vars,
+                        dependencies: VarSet::default(),
                         hir_meta: meta,
                     }
                     .with_kind(scope::Kind::PropSet(scope::PropSet(Some(*binder), props))),
@@ -195,21 +200,27 @@ impl<'m> ScopeBuilder<'m> {
 
             for (variant_idx, variant) in variants.iter().enumerate() {
                 self.enter_child(variant_idx, |zelf| -> UnifierResult<()> {
-                    let (kind, vars) = match variant.dimension {
+                    let (kind, vars, dependencies) = match variant.dimension {
                         ontol_hir::Dimension::Singular => {
-                            let mut union = UnionBuilder::default();
-                            let rel = union
-                                .plus(zelf.enter_child(0, |zelf| {
+                            let mut var_union = UnionBuilder::default();
+                            let mut dep_union = UnionBuilder::default();
+
+                            let rel = dep_union
+                                .plus_deps(var_union.plus(zelf.enter_child(0, |zelf| {
                                     zelf.build_scope_binder(&variant.attr.rel)
-                                })?)
+                                })?))
                                 .into_scope_pattern_binding();
-                            let val = union
-                                .plus(zelf.enter_child(1, |zelf| {
+                            let val = dep_union
+                                .plus_deps(var_union.plus(zelf.enter_child(1, |zelf| {
                                     zelf.build_scope_binder(&variant.attr.val)
-                                })?)
+                                })?))
                                 .into_scope_pattern_binding();
 
-                            (scope::PropKind::Attr(rel, val), union.vars)
+                            (
+                                scope::PropKind::Attr(rel, val),
+                                var_union.vars,
+                                dep_union.vars,
+                            )
                         }
                         ontol_hir::Dimension::Seq(label) => {
                             let rel = zelf
@@ -223,7 +234,11 @@ impl<'m> ScopeBuilder<'m> {
                             let mut vars = VarSet::default();
                             vars.0.insert(label.0 as usize);
 
-                            (scope::PropKind::Seq(label, rel, val), vars)
+                            (
+                                scope::PropKind::Seq(label, rel, val),
+                                vars,
+                                VarSet::default(),
+                            )
                         }
                     };
 
@@ -232,7 +247,7 @@ impl<'m> ScopeBuilder<'m> {
                         optional: *optional,
                         prop_id: *prop_id,
                         disjoint_group,
-                        dependencies: VarSet::default(),
+                        dependencies,
                         kind,
                         vars,
                     });
@@ -254,6 +269,7 @@ impl<'m> ScopeBuilder<'m> {
         analysis: ExprAnalysis<'m>,
         outer_binder: TypedBinder<'m>,
         let_def: TypedHirNode<'m>,
+        dependencies: VarSet,
     ) -> UnifierResult<ScopeBinder<'m>> {
         let (var_param_index, next_analysis) = match analysis.kind {
             ExprAnalysisKind::Const | ExprAnalysisKind::Var(_) => unreachable!(),
@@ -299,19 +315,25 @@ impl<'m> ScopeBuilder<'m> {
             ) => {
                 let scope_binder = ScopeBinder {
                     binder: Some(outer_binder),
-                    scope: self
-                        .mk_scope(
-                            scope::Kind::Let(scope::Let {
-                                outer_binder: Some(outer_binder),
-                                inner_binder: ontol_hir::Binder(scoped_var),
-                                def: next_let_def,
-                                sub_scope: Box::new(
-                                    self.mk_scope(scope::Kind::Const, self.unit_meta()),
-                                ),
-                            }),
-                            self.unit_meta(),
-                        )
-                        .union_var(scoped_var),
+                    scope: scope::Scope(
+                        scope::Kind::Let(scope::Let {
+                            outer_binder: Some(outer_binder),
+                            inner_binder: ontol_hir::Binder(scoped_var),
+                            def: next_let_def,
+                            sub_scope: Box::new(
+                                self.mk_scope(scope::Kind::Const, self.unit_meta()),
+                            ),
+                        }),
+                        scope::Meta {
+                            hir_meta: self.unit_meta(),
+                            vars: {
+                                let mut var_set = VarSet::default();
+                                var_set.0.insert(scoped_var.0 as usize);
+                                var_set
+                            },
+                            dependencies,
+                        },
+                    ),
                 };
                 Ok(scope_binder)
             }
@@ -321,6 +343,7 @@ impl<'m> ScopeBuilder<'m> {
                 child_analysis,
                 outer_binder,
                 next_let_def,
+                dependencies,
             ),
             _ => panic!("invalid: {}", &params[var_param_index]),
         }
@@ -346,6 +369,7 @@ impl<'m> ScopeBuilder<'m> {
     fn mk_scope(&self, kind: scope::Kind<'m>, hir_meta: typed_hir::Meta<'m>) -> scope::Scope<'m> {
         scope::Meta {
             vars: VarSet::default(),
+            dependencies: VarSet::default(),
             hir_meta,
         }
         .with_kind(kind)
@@ -393,6 +417,11 @@ pub struct UnionBuilder {
 impl UnionBuilder {
     fn plus<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
         self.vars.0.union_with(&binder.scope.vars().0);
+        binder
+    }
+
+    fn plus_deps<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
+        self.vars.0.union_with(&binder.scope.dependencies().0);
         binder
     }
 

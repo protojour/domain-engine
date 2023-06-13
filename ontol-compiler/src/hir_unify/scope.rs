@@ -26,6 +26,7 @@ impl<'m> Scope<'m> {
 #[derive(Clone, Debug)]
 pub struct Meta<'m> {
     pub vars: VarSet,
+    pub dependencies: VarSet,
     pub hir_meta: typed_hir::Meta<'m>,
 }
 
@@ -117,10 +118,18 @@ impl<'m> super::dep_tree::Scope for Scope<'m> {
     fn vars(&self) -> &VarSet {
         &self.1.vars
     }
+
+    fn dependencies(&self) -> &VarSet {
+        &self.1.dependencies
+    }
 }
 
 impl<'m> super::dep_tree::Scope for Prop<'m> {
     fn vars(&self) -> &VarSet {
         &self.vars
+    }
+
+    fn dependencies(&self) -> &VarSet {
+        &self.dependencies
     }
 }
