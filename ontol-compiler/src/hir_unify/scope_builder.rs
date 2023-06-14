@@ -115,7 +115,7 @@ impl<'m> ScopeBuilder<'m> {
                 match &analysis.kind {
                     ExprAnalysisKind::Const => Ok(ScopeBinder {
                         binder: None,
-                        scope: scope::Scope(scope::Kind::Const, hir_meta.into()),
+                        scope: scope::Scope(scope::Kind::Const, scope::Meta::from(hir_meta)),
                     }),
                     _ => {
                         let binder_var = self.alloc_var();
@@ -318,12 +318,12 @@ impl<'m> ScopeBuilder<'m> {
                             def: next_let_def,
                             sub_scope: Box::new(scope::Scope(
                                 scope::Kind::Const,
-                                self.unit_hir_meta().into(),
+                                scope::Meta::from(self.unit_hir_meta()),
                             )),
                         }),
                         scope::Meta {
                             hir_meta: self.unit_hir_meta(),
-                            vars: [scoped_var].into(),
+                            vars: VarSet::from([scoped_var]),
                             dependencies,
                         },
                     ),
