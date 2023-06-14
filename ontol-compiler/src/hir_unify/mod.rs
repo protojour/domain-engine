@@ -125,6 +125,12 @@ impl VarSet {
     }
 }
 
+impl FromIterator<ontol_hir::Var> for VarSet {
+    fn from_iter<T: IntoIterator<Item = ontol_hir::Var>>(iter: T) -> Self {
+        Self(iter.into_iter().map(|var| var.0 as usize).collect())
+    }
+}
+
 impl Debug for VarSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut set = f.debug_set();

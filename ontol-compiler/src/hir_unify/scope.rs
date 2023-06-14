@@ -12,15 +12,6 @@ impl<'m> Scope<'m> {
     pub fn kind(&self) -> &Kind<'m> {
         &self.0
     }
-
-    pub fn vars_mut(&mut self) -> &mut VarSet {
-        &mut self.1.vars
-    }
-
-    pub fn union_var(mut self, var: ontol_hir::Var) -> Self {
-        self.vars_mut().0.insert(var.0 as usize);
-        self
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -30,9 +21,13 @@ pub struct Meta<'m> {
     pub hir_meta: typed_hir::Meta<'m>,
 }
 
-impl<'m> Meta<'m> {
-    pub fn with_kind(self, kind: Kind<'m>) -> Scope<'m> {
-        Scope(kind, self)
+impl<'m> From<typed_hir::Meta<'m>> for Meta<'m> {
+    fn from(value: typed_hir::Meta<'m>) -> Self {
+        Self {
+            vars: VarSet::default(),
+            dependencies: VarSet::default(),
+            hir_meta: value,
+        }
     }
 }
 

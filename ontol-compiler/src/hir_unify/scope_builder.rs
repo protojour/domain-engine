@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{self, Meta, TypedBinder, TypedHirNode},
+    typed_hir::{self, TypedBinder, TypedHirNode},
     types::TypeRef,
     SourceSpan,
 };
@@ -24,13 +24,6 @@ pub struct ScopeBinder<'m> {
 }
 
 impl<'m> ScopeBinder<'m> {
-    fn unbound(scope: scope::Scope<'m>) -> Self {
-        Self {
-            binder: None,
-            scope,
-        }
-    }
-
     fn into_scope_pattern_binding(self) -> scope::PatternBinding<'m> {
         match self.scope.kind() {
             scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.1.hir_meta),
@@ -72,12 +65,37 @@ impl<'m> ScopeBuilder<'m> {
         &mut self,
         node: &TypedHirNode<'m>,
     ) -> UnifierResult<ScopeBinder<'m>> {
-        let meta = *node.meta();
+        let hir_meta = *node.meta();
         match node.kind() {
-            ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, meta)),
-            ontol_hir::Kind::Unit | ontol_hir::Kind::Int(_) => Ok(ScopeBinder::unbound(
-                self.mk_scope(scope::Kind::Const, meta),
-            )),
+            ontol_hir::Kind::Var(var) => Ok(ScopeBinder {
+                binder: Some(TypedBinder {
+                    var: *var,
+                    ty: hir_meta.ty,
+                }),
+                scope: scope::Scope(
+                    scope::Kind::Var(*var),
+                    scope::Meta {
+                        vars: if self.in_scope.0.contains(var.0 as usize) {
+                            VarSet::default()
+                        } else {
+                            VarSet::from([*var])
+                        },
+                        dependencies: VarSet::default(),
+                        hir_meta,
+                    },
+                ),
+            }),
+            ontol_hir::Kind::Unit | ontol_hir::Kind::Int(_) => Ok(ScopeBinder {
+                binder: None,
+                scope: scope::Scope(
+                    scope::Kind::Const,
+                    scope::Meta {
+                        vars: VarSet::default(),
+                        dependencies: VarSet::default(),
+                        hir_meta,
+                    },
+                ),
+            }),
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let (defined_var, dependencies) = match &self.current_prop_analysis_map {
@@ -95,9 +113,10 @@ impl<'m> ScopeBuilder<'m> {
 
                 let analysis = analyze_expr(node, defined_var)?;
                 match &analysis.kind {
-                    ExprAnalysisKind::Const => Ok(ScopeBinder::unbound(
-                        self.mk_scope(scope::Kind::Const, meta),
-                    )),
+                    ExprAnalysisKind::Const => Ok(ScopeBinder {
+                        binder: None,
+                        scope: scope::Scope(scope::Kind::Const, hir_meta.into()),
+                    }),
                     _ => {
                         let binder_var = self.alloc_var();
                         self.invert_expr(
@@ -108,7 +127,7 @@ impl<'m> ScopeBuilder<'m> {
                                 var: binder_var,
                                 ty: node.ty(),
                             },
-                            TypedHirNode(ontol_hir::Kind::Var(binder_var), meta),
+                            TypedHirNode(ontol_hir::Kind::Var(binder_var), hir_meta),
                             dependencies,
                         )
                     }
@@ -143,14 +162,16 @@ impl<'m> ScopeBuilder<'m> {
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
                         var: binder.0,
-                        ty: meta.ty,
+                        ty: hir_meta.ty,
                     }),
-                    scope: scope::Meta {
-                        vars: union.vars,
-                        dependencies: VarSet::default(),
-                        hir_meta: meta,
-                    }
-                    .with_kind(scope::Kind::PropSet(scope::PropSet(Some(*binder), props))),
+                    scope: scope::Scope(
+                        scope::Kind::PropSet(scope::PropSet(Some(*binder), props)),
+                        scope::Meta {
+                            vars: union.vars,
+                            dependencies: VarSet::default(),
+                            hir_meta,
+                        },
+                    ),
                 })
             }),
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
@@ -209,13 +230,9 @@ impl<'m> ScopeBuilder<'m> {
                                 .enter_child(1, |zelf| zelf.build_scope_binder(&variant.attr.val))?
                                 .into_scope_pattern_binding();
 
-                            // Only the label is "visible" to the outside
-                            let mut vars = VarSet::default();
-                            vars.0.insert(label.0 as usize);
-
                             (
                                 scope::PropKind::Seq(label, rel, val),
-                                vars,
+                                VarSet::from([ontol_hir::Var(label.0)]),
                                 VarSet::default(),
                             )
                         }
@@ -281,7 +298,7 @@ impl<'m> ScopeBuilder<'m> {
         let next_let_def = TypedHirNode(
             ontol_hir::Kind::Call(inverted_proc, inverted_params),
             // Is this correct?
-            analysis.meta,
+            analysis.hir_meta,
         );
 
         match (params[var_param_index].kind(), next_analysis) {
@@ -299,17 +316,14 @@ impl<'m> ScopeBuilder<'m> {
                             outer_binder: Some(outer_binder),
                             inner_binder: ontol_hir::Binder(scoped_var),
                             def: next_let_def,
-                            sub_scope: Box::new(
-                                self.mk_scope(scope::Kind::Const, self.unit_meta()),
-                            ),
+                            sub_scope: Box::new(scope::Scope(
+                                scope::Kind::Const,
+                                self.unit_hir_meta().into(),
+                            )),
                         }),
                         scope::Meta {
-                            hir_meta: self.unit_meta(),
-                            vars: {
-                                let mut var_set = VarSet::default();
-                                var_set.0.insert(scoped_var.0 as usize);
-                                var_set
-                            },
+                            hir_meta: self.unit_hir_meta(),
+                            vars: [scoped_var].into(),
                             dependencies,
                         },
                     ),
@@ -328,34 +342,8 @@ impl<'m> ScopeBuilder<'m> {
         }
     }
 
-    fn mk_var_scope(&self, var: ontol_hir::Var, hir_meta: typed_hir::Meta<'m>) -> ScopeBinder<'m> {
-        let scope = self.mk_scope(scope::Kind::Var(var), hir_meta);
-        let scope = if self.in_scope.0.contains(var.0 as usize) {
-            scope
-        } else {
-            scope.union_var(var)
-        };
-
-        ScopeBinder {
-            binder: Some(TypedBinder {
-                var,
-                ty: hir_meta.ty,
-            }),
-            scope,
-        }
-    }
-
-    fn mk_scope(&self, kind: scope::Kind<'m>, hir_meta: typed_hir::Meta<'m>) -> scope::Scope<'m> {
-        scope::Meta {
-            vars: VarSet::default(),
-            dependencies: VarSet::default(),
-            hir_meta,
-        }
-        .with_kind(kind)
-    }
-
-    fn unit_meta(&self) -> Meta<'m> {
-        Meta {
+    fn unit_hir_meta(&self) -> typed_hir::Meta<'m> {
+        typed_hir::Meta {
             ty: self.unit_type,
             span: SourceSpan::none(),
         }
@@ -417,7 +405,7 @@ impl UnionBuilder {
 #[derive(Debug)]
 struct ExprAnalysis<'m> {
     kind: ExprAnalysisKind<'m>,
-    meta: Meta<'m>,
+    hir_meta: typed_hir::Meta<'m>,
 }
 
 // Only one variable is supported for now
@@ -483,16 +471,16 @@ fn analyze_expr<'m>(
 
             Ok(ExprAnalysis {
                 kind,
-                meta: *node.meta(),
+                hir_meta: *node.meta(),
             })
         }
         ontol_hir::Kind::Var(var) => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Var(*var),
-            meta: *node.meta(),
+            hir_meta: *node.meta(),
         }),
         _ => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Const,
-            meta: *node.meta(),
+            hir_meta: *node.meta(),
         }),
     }
 }
