@@ -1,6 +1,3 @@
-// 0. $a $b
-// 1. $b
-
 use std::collections::HashMap;
 
 use ontol_hir::Node;
