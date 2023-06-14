@@ -30,8 +30,9 @@ pub enum ExprKind {
 #[derive(Debug)]
 pub struct ExprStructAttr {
     pub key: PropertyKey,
+    pub rel: Option<Expr>,
     pub bind_option: bool,
-    pub expr: Expr,
+    pub object: Expr,
 }
 
 #[derive(Debug)]

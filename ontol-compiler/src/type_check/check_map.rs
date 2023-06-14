@@ -180,14 +180,14 @@ impl<'c, 'm> MapCheck<'c, 'm> {
             ExprKind::Struct(_, attributes) => {
                 for attr in attributes.iter() {
                     group_set.join(self.analyze_arm(
-                        &attr.expr,
+                        &attr.object,
                         variables,
                         parent_aggr_group,
                         ctx,
                     )?);
                 }
             }
-            ExprKind::Seq(expr_id, inner) => {
+            ExprKind::Seq(expr_id, object) => {
                 if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
@@ -200,7 +200,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     let result = ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx| {
                         self.analyze_arm(
-                            inner,
+                            object,
                             variables,
                             Some(CtrlFlowGroup {
                                 label,
@@ -216,7 +216,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         let inner_aggr_group =
-                            self.analyze_arm(inner, variables, None, ctx).unwrap();
+                            self.analyze_arm(object, variables, None, ctx).unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {

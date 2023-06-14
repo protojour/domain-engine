@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::{
     compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, PropertyCardinality, ValueCardinality},
+    def::{Cardinality, Def, DefKind, PropertyCardinality, RelParams, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     mem::Intern,
@@ -279,6 +279,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         struct MatchProperty {
                             relation_id: RelationId,
                             cardinality: Cardinality,
+                            rel_params_def: Option<DefId>,
                             object_def: DefId,
                             used: bool,
                         }
@@ -302,6 +303,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         MatchProperty {
                                             relation_id: property_id.relation_id,
                                             cardinality: meta.relationship.subject_cardinality,
+                                            rel_params_def: match &meta.relationship.rel_params {
+                                                RelParams::Type(def_reference) => {
+                                                    Some(def_reference.def_id)
+                                                }
+                                                _ => None,
+                                            },
                                             object_def: meta.relationship.object.0.def_id,
                                             used: false,
                                         },
@@ -315,8 +322,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for ExprStructAttr {
                             key: (def, prop_span),
+                            rel,
                             bind_option,
-                            expr,
+                            object,
                         } in attributes
                         {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
@@ -339,37 +347,49 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                             match_property.used = true;
 
+                            let rel_params_ty = match match_property.rel_params_def {
+                                Some(rel_def_id) => self.check_def(rel_def_id),
+                                None => self.unit_type(),
+                            };
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let node = self.build_node(expr, Some(object_ty), ctx);
+                                    let rel_node = self.unit_node_no_span();
+                                    let val_node = self.build_node(object, Some(object_ty), ctx);
                                     ontol_hir::PropVariant {
                                         dimension: ontol_hir::Dimension::Singular,
                                         attr: ontol_hir::Attribute {
-                                            rel: Box::new(self.unit_node_no_span()),
-                                            val: Box::new(node),
+                                            rel: Box::new(rel_node),
+                                            val: Box::new(val_node),
                                         },
                                     }
                                 }
-                                ValueCardinality::Many => match &expr.kind {
-                                    ExprKind::Seq(aggr_expr_id, inner) => {
-                                        let node = self.build_node(inner, Some(object_ty), ctx);
+                                ValueCardinality::Many => match &object.kind {
+                                    ExprKind::Seq(aggr_expr_id, object) => {
+                                        let rel_node = match rel {
+                                            Some(rel) => {
+                                                self.build_node(rel, Some(rel_params_ty), ctx)
+                                            }
+                                            None => self.unit_node_no_span(),
+                                        };
+                                        let val_node =
+                                            self.build_node(object, Some(object_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
                                         ontol_hir::PropVariant {
                                             dimension: ontol_hir::Dimension::Seq(label),
                                             attr: ontol_hir::Attribute {
-                                                rel: Box::new(self.unit_node_no_span()),
-                                                val: Box::new(node),
+                                                rel: Box::new(rel_node),
+                                                val: Box::new(val_node),
                                             },
                                         }
                                     }
                                     _ => {
                                         self.type_error(
                                             TypeError::VariableMustBeSequenceEnclosed(object_ty),
-                                            &expr.span,
+                                            &object.span,
                                         );
                                         continue;
                                     }
@@ -395,7 +415,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 CompileError::TODO(
                                                     "required to be optional?".into(),
                                                 ),
-                                                &expr.span,
+                                                &object.span,
                                             );
                                             vec![]
                                         }
@@ -437,8 +457,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match attributes.next() {
                     Some(ExprStructAttr {
                         key: (def, _),
+                        rel: _,
                         bind_option: _,
-                        expr: value,
+                        object: value,
                     }) if def.def_id == DefId::unit() => {
                         let meta = self
                             .get_relationship_meta(*relationship_id)

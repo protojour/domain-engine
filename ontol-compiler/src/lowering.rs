@@ -659,8 +659,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 },
                 [ExprStructAttr {
                     key,
+                    rel: None,
                     bind_option: false,
-                    expr,
+                    object: expr,
                 }]
                 .into(),
             ),
@@ -691,8 +692,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 inner_expr.map(|expr| ExprStructAttr {
                     key: (def, self.src.span(&relation.1)),
+                    rel: None,
                     bind_option: option.is_some(),
-                    expr,
+                    object: expr,
                 })
             })
             .collect::<Result<_, _>>()?;
