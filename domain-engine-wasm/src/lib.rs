@@ -17,7 +17,6 @@ use wasm_graphql::WasmGraphqlSchema;
 pub mod wasm_domain;
 pub mod wasm_error;
 pub mod wasm_graphql;
-
 mod wasm_util;
 
 #[wasm_bindgen]

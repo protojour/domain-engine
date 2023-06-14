@@ -17,10 +17,7 @@ use crate::TestEnv;
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
-///
-/// Currently we can't run these in the test suite because of missing implementation in the validator:
-/// https://github.com/Stranger6667/jsonschema-rs/issues/288
-const TEST_JSON_SCHEMA_VALIDATION: bool = false;
+const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
