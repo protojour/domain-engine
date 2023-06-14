@@ -108,8 +108,8 @@ pub(super) fn find_mapping_key(ty: TypeRef) -> Option<MapKey> {
             def_id: *def_id,
             seq: false,
         }),
-        Type::Array(element) => {
-            let def_id = element.get_single_def_id()?;
+        Type::Seq(_, val_ty) => {
+            let def_id = val_ty.get_single_def_id()?;
             Some(MapKey { def_id, seq: true })
         }
         other => {

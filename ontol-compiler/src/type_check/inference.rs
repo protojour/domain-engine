@@ -102,9 +102,12 @@ impl<'c, 'm> Infer<'c, 'm> {
                 UnifyValue::Known(ty) => Ok(ty),
                 UnifyValue::Unknown => Err(TypeError::NotEnoughInformation),
             },
-            Type::Array(elem) => self
-                .infer_recursive(elem)
-                .map(|elem| self.types.intern(Type::Array(elem))),
+            Type::Seq(rel, val) => {
+                let rel = self.infer_recursive(rel)?;
+                let val = self.infer_recursive(val)?;
+
+                Ok(self.types.intern(Type::Seq(rel, val)))
+            }
             Type::Option(item) => self
                 .infer_recursive(item)
                 .map(|item| self.types.intern(Type::Option(item))),

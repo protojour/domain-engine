@@ -250,17 +250,17 @@ impl<'a> CodeGenerator<'a> {
             }
             ontol_hir::Kind::Gen(seq_var, iter_binder, nodes) => {
                 let seq_local = self.var_local(seq_var);
-                let elem_ty = match ty {
-                    Type::Array(elem_ty) => elem_ty,
+                let val_ty = match ty {
+                    Type::Seq(_, val_ty) => val_ty,
                     _ => panic!("Not an array"),
                 };
                 let out_seq = self.builder.append(
                     block,
                     Ir::CallBuiltin(
                         BuiltinProc::NewSeq,
-                        elem_ty
+                        val_ty
                             .get_single_def_id()
-                            .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
+                            .unwrap_or_else(|| panic!("val_ty: {val_ty:?}")),
                     ),
                     Stack(1),
                     span,

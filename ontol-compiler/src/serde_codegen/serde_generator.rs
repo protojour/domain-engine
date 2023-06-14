@@ -325,7 +325,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
             }
-            Type::Array(_) => {
+            Type::Seq(..) => {
                 panic!("Array not handled here")
             }
             Type::Option(_) => {

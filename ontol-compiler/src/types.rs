@@ -33,7 +33,7 @@ pub enum Type<'m> {
     StringConstant(DefId),
     Regex(DefId),
     StringLike(DefId, StringLikeType),
-    Array(TypeRef<'m>),
+    Seq(TypeRef<'m>, TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
@@ -64,7 +64,7 @@ impl<'m> Type<'m> {
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::StringLike(def_id, _) => Some(*def_id),
-            Self::Array(ty) => ty.get_single_def_id(),
+            Self::Seq(_, _) => None,
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
@@ -187,8 +187,13 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             }
             Type::StringLike(_, StringLikeType::Uuid) => write!(f, "uuid"),
             Type::StringLike(_, StringLikeType::DateTime) => write!(f, "datetime"),
-            Type::Array(ty) => {
-                write!(f, "[{}]", FormatType(ty, defs, primitives))
+            Type::Seq(rel, val) => {
+                write!(
+                    f,
+                    "[{}: {}]",
+                    FormatType(rel, defs, primitives),
+                    FormatType(val, defs, primitives)
+                )
             }
             Type::Option(ty) => {
                 write!(f, "{}?", FormatType(ty, defs, primitives))

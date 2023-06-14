@@ -115,8 +115,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     panic!("unexpected gen scope");
                 }
 
-                // FIXME: Array/seq types must take two parameters
-                let seq_ty = self.types.intern(Type::Array(prop.attr.val.hir_meta().ty));
+                let seq_ty = self.types.intern(Type::Seq(
+                    prop.attr.rel.hir_meta().ty,
+                    prop.attr.val.hir_meta().ty,
+                ));
 
                 let (rel_binding, val_binding) = *gen_scope.bindings;
                 let hir_rel_binding = rel_binding.hir_binding();
@@ -182,8 +184,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Seq(_label, attr), scope::Kind::Gen(gen_scope)) => {
-                // FIXME: Array/seq types must take two parameters
-                let seq_ty = self.types.intern(Type::Array(attr.val.hir_meta().ty));
+                let seq_ty = self
+                    .types
+                    .intern(Type::Seq(attr.rel.hir_meta().ty, attr.val.hir_meta().ty));
 
                 let (rel_binding, val_binding) = *gen_scope.bindings;
                 let hir_rel_binding = rel_binding.hir_binding();

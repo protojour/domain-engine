@@ -116,27 +116,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
-                let elem_ty = match expected_ty {
-                    Some(Type::Array(elem_ty)) => elem_ty,
+                let (rel_ty, val_ty) = match expected_ty {
+                    Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
                     Some(other_ty) => {
                         self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
-                        self.types.intern(Type::Error)
+                        (self.unit_type(), self.types.intern(Type::Error))
                     }
                     None => {
                         let expr_id = self.expressions.alloc_expr_id();
-
-                        let ty = self
+                        let val_ty = self
                             .types
                             .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
 
-                        debug!("Infer seq type: {ty:?}");
-                        ty
+                        debug!("Infer seq val type: {val_ty:?}");
+                        (self.unit_type(), val_ty)
                     }
                 };
 
-                let inner_node = self.build_node(inner, Some(elem_ty), ctx);
+                let inner_node = self.build_node(inner, Some(val_ty), ctx);
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
-                let array_ty = self.types.intern(Type::Array(elem_ty));
+                let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 TypedHirNode(
                     ontol_hir::Kind::Seq(
@@ -147,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         },
                     ),
                     Meta {
-                        ty: array_ty,
+                        ty: seq_ty,
                         span: expr.span,
                     },
                 )
@@ -193,8 +192,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let type_var = ctx.inference.new_type_variable(arm_expr_id);
 
                 match expected_ty {
-                    Some(Type::Array(elem_ty)) => self.type_error_node(
-                        TypeError::VariableMustBeSequenceEnclosed(elem_ty),
+                    Some(Type::Seq(_rel_ty, val_ty)) => self.type_error_node(
+                        TypeError::VariableMustBeSequenceEnclosed(val_ty),
                         &expr.span,
                     ),
                     Some(expected_ty) => {
@@ -502,5 +501,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 span: SourceSpan::none(),
             },
         )
+    }
+
+    fn unit_type(&mut self) -> TypeRef<'m> {
+        self.types.intern(Type::Unit(DefId::unit()))
     }
 }
