@@ -50,7 +50,7 @@ macro_rules! assert_json_io_matches {
 pub struct TestEnv {
     pub env: Arc<Env>,
     pub root_package: PackageId,
-    pub test_json_schema: bool,
+    pub compile_json_schema: bool,
 }
 
 pub trait TestCompile: Sized {
@@ -154,7 +154,7 @@ impl TestPackages {
                     env: Arc::new(env),
                     root_package,
                     // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
-                    test_json_schema: false,
+                    compile_json_schema: false,
                 })
             }
             Err(error) => Err(error),

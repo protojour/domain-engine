@@ -50,7 +50,7 @@ impl<'e> TypeBinding<'e> {
             ))
         );
 
-        let json_schema = if test_env.test_json_schema {
+        let json_schema = if test_env.compile_json_schema {
             Some(compile_json_schema(env, &type_info))
         } else {
             None

@@ -17,7 +17,7 @@ impl<T: TestCompile> TestCompileSchema for T {
     fn compile_schema(self) -> (TestEnv, Schema) {
         let mut test_env = self.compile_ok(|_| {});
         // Don't want JSON schema noise in GraphQL tests:
-        test_env.test_json_schema = false;
+        test_env.compile_json_schema = false;
         (
             test_env.clone(),
             create_graphql_schema(test_env.root_package, test_env.env).unwrap(),
