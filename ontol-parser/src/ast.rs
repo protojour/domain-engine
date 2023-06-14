@@ -59,7 +59,6 @@ pub struct RelStatement {
     pub subject: Spanned<Option<Type>>,
     pub relation: Relation,
     pub object: Spanned<Option<TypeOrPattern>>,
-    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -75,6 +74,7 @@ pub struct Relation {
     pub ty: RelType,
     pub subject_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
     pub object_cardinality: Option<Cardinality>,
 }
 

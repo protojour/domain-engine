@@ -4,7 +4,7 @@ use std::{
 };
 
 use fnv::FnvHashMap;
-use ontol_parser::{ast, Span, Spanned};
+use ontol_parser::{ast, Span};
 use ontol_runtime::{DefId, DefParamId, RelationId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -203,7 +203,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             subject: (subject, subject_span),
             relation,
             object: (object, object_span),
-            ctx_block,
         } = rel;
 
         let subject_def =
@@ -235,7 +234,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             relation,
             (object_def, &object_span),
             span,
-            ctx_block,
             docs,
         )
     }
@@ -246,7 +244,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ast_relation: ast::Relation,
         object: (DefReference, &Span),
         span: Span,
-        ctx_block: Option<Spanned<Vec<Spanned<ast::Statement>>>>,
         docs: Vec<String>,
     ) -> Res<RootDefs> {
         let mut root_defs = RootDefs::new();
@@ -254,6 +251,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ty: relation_ty,
             subject_cardinality,
             object_prop_ident,
+            ctx_block,
             object_cardinality,
         } = ast_relation;
 

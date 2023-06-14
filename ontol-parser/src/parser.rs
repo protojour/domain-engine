@@ -115,8 +115,6 @@ fn with_statement(
 }
 
 fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
-    let ctx_block = stmt_parser.repeated().delimited_by(open('{'), close('}'));
-
     let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_underscore())
         .map(|(unit_or_seq, (opt_ty, span))| (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span)))
         .or(sigil('=').ignore_then(
@@ -129,31 +127,29 @@ fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
         // subject
         .then(with_unit_or_seq(spanned_ty_or_underscore()))
         // relation
-        .then(relation())
+        .then(relation(stmt_parser))
         // object
         .then(object_type_or_pattern)
-        .then(spanned(ctx_block).or_not())
+        // .then(spanned(ctx_block).or_not())
         .map(
-            |(
-                ((((docs, kw), (obj_unit_or_seq, subject)), relation), (subj_unit_or_seq, object)),
-                ctx_block,
-            )| RelStatement {
-                docs,
-                kw,
-                subject,
-                relation: Relation {
-                    subject_cardinality: compose_cardinality(
-                        relation.subject_cardinality,
-                        subj_unit_or_seq,
-                    ),
-                    object_cardinality: compose_cardinality(
-                        relation.object_cardinality,
-                        obj_unit_or_seq,
-                    ),
-                    ..relation
-                },
-                object,
-                ctx_block,
+            |((((docs, kw), (obj_unit_or_seq, subject)), relation), (subj_unit_or_seq, object))| {
+                RelStatement {
+                    docs,
+                    kw,
+                    subject,
+                    relation: Relation {
+                        subject_cardinality: compose_cardinality(
+                            relation.subject_cardinality,
+                            subj_unit_or_seq,
+                        ),
+                        object_cardinality: compose_cardinality(
+                            relation.object_cardinality,
+                            obj_unit_or_seq,
+                        ),
+                        ..relation
+                    },
+                    object,
+                }
             },
         )
 }
@@ -170,14 +166,17 @@ fn compose_cardinality(
     }
 }
 
-fn relation() -> impl AstParser<Relation> {
+fn relation(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<Relation> {
     let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
     let rel_ty_type = spanned(ty()).map(RelType::Type);
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
+    let rel_params_block = stmt_parser.repeated().delimited_by(open('('), close(')'));
+
     // type
     rel_ty
+        .then(spanned(rel_params_block).or_not())
         .then(sigil('?').or_not())
         .then_ignore(colon())
         // object prop and cardinality
@@ -186,7 +185,7 @@ fn relation() -> impl AstParser<Relation> {
                 .ignore_then(spanned(string_literal()).then(sigil('?').or_not()))
                 .or_not(),
         )
-        .map(|((ty, subject_optional), object)| {
+        .map(|(((ty, ctx_block), subject_optional), object)| {
             let (object_prop_ident, object_cardinality) = match object {
                 Some((prop, object_optional)) => {
                     (Some(prop), object_optional.map(|_| Cardinality::Optional))
@@ -198,6 +197,7 @@ fn relation() -> impl AstParser<Relation> {
                 ty,
                 subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
                 object_prop_ident,
+                ctx_block,
                 object_cardinality,
             }
         })

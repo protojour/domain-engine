@@ -246,9 +246,7 @@ fn test_serde_datetime() {
 fn test_num_default() {
     "
     pub type foo {
-        rel _ 'bar': int {
-            rel _ default := 42
-        }
+        rel _ 'bar'(rel _ default := 42): int
     }
     "
     .compile_ok(|env| {

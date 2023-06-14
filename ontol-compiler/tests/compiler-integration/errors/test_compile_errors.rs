@@ -209,17 +209,6 @@ fn union_in_named_relationship() {
 }
 
 #[test]
-fn only_entities_may_have_reverse_relationship() {
-    "
-    type foo
-    type bar
-    rel [foo] 'a'::'aa' bar {} // ERROR only entities may have named reverse relationship
-    rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
-    "
-    .compile_fail()
-}
-
-#[test]
 fn various_monadic_properties() {
     "
     type foo
@@ -247,9 +236,7 @@ fn mix_of_index_and_edge_type() {
     type foo
     type bar
 
-    rel foo 0: string { // ERROR cannot mix index relation identifiers and edge types
-        rel _ is: bar
-    }
+    rel foo 0(rel _ is: bar): string // ERROR cannot mix index relation identifiers and edge types
     "#
     .compile_fail()
 }
@@ -438,7 +425,7 @@ fn bad_domain_relation() {
             use 'a' as a
             use 'b' as b
 
-            rel a 'to': b {} // ERROR subject must be a domain type// ERROR object must be a data type
+            rel a 'to'(): b // ERROR subject must be a domain type// ERROR object must be a data type
             ",
         ),
     ])

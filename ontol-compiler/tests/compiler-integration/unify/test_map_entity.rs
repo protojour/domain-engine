@@ -94,7 +94,7 @@ fn artist_etc_routing() {
             use 'gsu' as gsu
             use 'ai' as ai
 
-            rel gsu route: ai {
+            rel gsu route(
                 map {
                     gsu.artist {
                         'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
@@ -119,7 +119,7 @@ fn artist_etc_routing() {
                         'name': n // ERROR unbound variable
                     }
                 }
-            }
+            ): ai
             ",
         ),
     ])
