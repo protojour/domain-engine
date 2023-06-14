@@ -36,15 +36,13 @@ pub fn regroup_match_prop(nodes: Vec<TypedHirNode>) -> Vec<TypedHirNode> {
 
     let mut output = Vec::with_capacity(regroup_map.len() + other_nodes.len());
 
-    for ((struct_var, prop_id), regrouped) in regroup_map {
-        let mut match_arms = regrouped.match_arms;
-
+    for ((struct_var, prop_id), mut regrouped) in regroup_map {
         if let Some(absent_arm) = regrouped.absent_arm {
-            match_arms.push(absent_arm);
+            regrouped.match_arms.push(absent_arm);
         }
 
         output.push(TypedHirNode(
-            ontol_hir::Kind::MatchProp(struct_var, prop_id, match_arms),
+            ontol_hir::Kind::MatchProp(struct_var, prop_id, regrouped.match_arms),
             regrouped.first_meta,
         ));
     }

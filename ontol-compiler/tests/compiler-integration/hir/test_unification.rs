@@ -664,7 +664,6 @@ fn test_unify_dependent_scoping_forwards() {
     assert_eq!(expected, output);
 }
 
-// BUG
 #[test]
 fn test_unify_dependent_scoping_backwards() {
     let output = test_unify(dep_scoping::EXPR_2, dep_scoping::EXPR_1);
@@ -680,16 +679,12 @@ fn test_unify_dependent_scoping_backwards() {
                             (prop $c S:1:1
                                 (#u (+ $a $b))
                             )
-                        )
-                    )
-                )
-            )
-            (match-prop $f O:1:1
-                (($_ $b)
-                    (match-prop $f O:2:2
-                        (($_ $c)
-                            (prop $c S:0:0
-                                (#u (+ $b $c))
+                            (match-prop $f O:2:2
+                                (($_ $c)
+                                    (prop $c S:0:0
+                                        (#u (+ $b $c))
+                                    )
+                                )
                             )
                         )
                     )

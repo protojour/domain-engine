@@ -625,13 +625,12 @@ fn test_map_dependent_scoping() {
     }
     "
     .compile_ok(|test_env| {
-        // BUG: Forward is not working..
-        // assert_domain_map(
-        //     &test_env,
-        //     ("one", "two"),
-        //     json!({ "total_weight": 100, "net_weight": 75 }),
-        //     json!({ "net_weight": 75, "container_weight": 25 }),
-        // );
+        assert_domain_map(
+            &test_env,
+            ("one", "two"),
+            json!({ "total_weight": 100, "net_weight": 75 }),
+            json!({ "net_weight": 75, "container_weight": 25 }),
+        );
 
         assert_domain_map(
             &test_env,

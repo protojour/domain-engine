@@ -40,7 +40,7 @@ impl DepScopeAnalyzer {
     pub fn prop_analysis(self) -> UnifierResult<HashMap<Path, PropAnalysis>> {
         let prop_variant_deps = self.prop_variant_deps;
 
-        debug!("prop variant deps: {prop_variant_deps:#?}");
+        debug!("prop variant deps: {prop_variant_deps:?}");
 
         struct Pending {
             var_set: VarSet,

@@ -1,12 +1,3 @@
-//!
-//! struct {
-//!     'foo': struct {
-//!         'bar': $a
-//!     }
-//!     'baz': $a + $b
-//! }
-//!
-
 use std::collections::HashMap;
 
 use ontol_hir::{visitor::HirVisitor, Node};

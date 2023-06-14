@@ -51,7 +51,11 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
 
         for (idx, scope) in scopes.iter().enumerate() {
             scoped_vars.union_with(&scope.vars().0);
-            debug!("dep tree {idx} scope deps: {:?}", scope.dependencies());
+            debug!(
+                "dep tree {idx} scope vars={:?}, deps={:?}",
+                scope.vars(),
+                scope.dependencies()
+            );
             for var in scope.vars() {
                 if scope_index_by_var.insert(var, idx).is_some() {
                     return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));
@@ -75,16 +79,26 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
 
         let mut constants: Vec<E> = vec![];
 
+        for (expr_idx, expression) in expressions.iter().enumerate() {
+            debug!(
+                "assigning expr_idx={expr_idx}, free_vars={:?} routing={scope_routing_table:?}",
+                expression.free_vars()
+            );
+            self.register_scope_routing(expression, &mut scope_routing_table);
+        }
+
         for expression in expressions {
-            if let Some(scope_idx) =
-                self.assign_to_scope_group(&expression, &mut scope_routing_table)
-            {
-                scope_assignments
-                    .entry(scope_idx)
-                    .or_default()
-                    .push(expression);
-            } else {
-                constants.push(expression)
+            match self.next_unscoped_var(&mut expression.free_vars().iter()) {
+                Some(first_free_var) => {
+                    let scope_idx = scope_routing_table.get(&first_free_var).cloned().unwrap();
+                    scope_assignments
+                        .entry(scope_idx)
+                        .or_default()
+                        .push(expression);
+                }
+                None => {
+                    constants.push(expression);
+                }
             }
         }
 
@@ -108,26 +122,56 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         }
     }
 
-    fn assign_to_scope_group<E: Expression>(
+    fn register_scope_routing<E: Expression>(
         &self,
         expression: &E,
         scope_routing_table: &mut FnvHashMap<ontol_hir::Var, usize>,
     ) -> Option<usize> {
         let mut free_var_iter = expression.free_vars().iter();
-        if let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
-            let scope_idx = scope_routing_table.get(&next_free_var).cloned().unwrap();
 
-            if !expression.optional() {
-                // re-route all following to the current scope arm
-                while let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
-                    scope_routing_table.insert(next_free_var, scope_idx);
+        if let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
+            let mut scope_idx_candidate = scope_routing_table.get(&next_free_var).cloned().unwrap();
+
+            if expression.optional() {
+                Some(scope_idx_candidate)
+            } else {
+                for next_free_var in &mut free_var_iter {
+                    let next_candidate = scope_routing_table.get(&next_free_var).cloned().unwrap();
+                    if next_candidate < scope_idx_candidate {
+                        scope_idx_candidate = next_candidate;
+                    }
+                }
+
+                // re-route all following to the current scope candidate
+                for free_var in expression.free_vars() {
+                    Self::reroute(scope_routing_table, free_var, scope_idx_candidate);
+                }
+
+                Some(scope_idx_candidate)
+            }
+        } else {
+            None
+        }
+    }
+
+    fn reroute(
+        scope_routing_table: &mut FnvHashMap<ontol_hir::Var, usize>,
+        free_var: ontol_hir::Var,
+        scope_idx: usize,
+    ) {
+        debug!("    routing all {free_var:?} to {scope_idx}");
+
+        if let Some(existing_scope_idx) = scope_routing_table.insert(free_var, scope_idx) {
+            if existing_scope_idx != scope_idx {
+                debug!("        re-routing all {existing_scope_idx} to {scope_idx}");
+                // if was overwritten, rewrite all other pointing to the same scope_idx.
+                for (_, idx) in scope_routing_table.iter_mut() {
+                    if *idx == existing_scope_idx {
+                        *idx = scope_idx;
+                    }
                 }
             }
-
-            return Some(scope_idx);
         }
-
-        None
     }
 
     fn build_expr_sub_tree<E: Expression>(
