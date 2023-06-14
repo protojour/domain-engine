@@ -68,19 +68,10 @@ impl<'m> ScopeBuilder<'m> {
         self.next_var
     }
 
-    pub fn build(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<ScopeBinder<'m>> {
-        // let prop_variant_deps = {
-        //     let mut dep_analyzer = DepAnalyzer::default();
-        //     dep_analyzer.traverse_kind(node.kind());
-        //     dep_analyzer.prop_variant_deps()
-        // };
-        //
-        // panic!("prop_variant_deps: {prop_variant_deps:?}");
-
-        self.build_scope_binder(node)
-    }
-
-    fn build_scope_binder(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<ScopeBinder<'m>> {
+    pub fn build_scope_binder(
+        &mut self,
+        node: &TypedHirNode<'m>,
+    ) -> UnifierResult<ScopeBinder<'m>> {
         let meta = *node.meta();
         match node.kind() {
             ontol_hir::Kind::Var(var) => Ok(self.mk_var_scope(*var, meta)),
@@ -132,9 +123,7 @@ impl<'m> ScopeBuilder<'m> {
                         for (index, node) in nodes.iter().enumerate() {
                             dep_analyzer.visit_node(index, node);
                         }
-                        let prop_analysis = dep_analyzer.prop_analysis()?;
-                        // debug!("prop analysis: {prop_analysis:#?}");
-                        prop_analysis
+                        dep_analyzer.prop_analysis()?
                     });
                 }
 

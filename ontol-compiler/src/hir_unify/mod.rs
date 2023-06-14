@@ -48,7 +48,7 @@ pub fn unify_to_function<'m>(
 
     let (scope_binder, next_var) = {
         let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
-        let scope_binder = scope_builder.build(scope)?;
+        let scope_binder = scope_builder.build_scope_binder(scope)?;
         (scope_binder, scope_builder.next_var())
     };
 
