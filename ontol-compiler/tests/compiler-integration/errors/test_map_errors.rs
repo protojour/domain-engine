@@ -217,3 +217,21 @@ fn map_union() {
     "
     .compile_fail();
 }
+
+#[test]
+fn map_invalid_unit_rel_params() {
+    "
+    type foo { rel _ 'foo': string }
+    type bar { rel _ 'bar': string }
+
+    map {
+        foo {
+            'foo'
+                ('bug': b) // ERROR no relation parameters expected
+                : s
+        }
+        bar { 'bar': s }
+    }
+    "
+    .compile_fail();
+}

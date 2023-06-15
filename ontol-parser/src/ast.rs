@@ -93,12 +93,6 @@ pub enum Cardinality {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct RelChain {
-    pub subject: Option<Spanned<Type>>,
-    pub connection: Relation,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
     pub kw: Span,
     pub first: Spanned<(UnitOrSeq, MapArm)>,
@@ -137,8 +131,8 @@ pub struct StructPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
+    pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
     pub option: Option<Spanned<()>>,
-    pub relation_struct: Option<Spanned<StructPattern>>,
     pub object: Spanned<Pattern>,
 }
 

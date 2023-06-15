@@ -26,13 +26,14 @@ mod hir_type_inference;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {
+    // Another error is the cause of this error
+    Propagated,
     Mismatch(TypeEquation<'m>),
     MustBeSequence(TypeRef<'m>),
     VariableMustBeSequenceEnclosed(TypeRef<'m>),
     NotEnoughInformation,
-    // Another error is the cause of this error
-    Propagated,
     NotConvertibleFromNumber(TypeRef<'m>),
+    NoRelationParametersExpected,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -65,6 +66,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         match error {
+            TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::Mismatch(equation) => self.error(
                 CompileError::TypeMismatch {
                     actual: smart_format!(
@@ -96,7 +98,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::TODO(smart_format!("Not enough information to infer type")),
                 span,
             ),
-            TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::NotConvertibleFromNumber(ty) => self.error(
                 CompileError::TODO(smart_format!(
                     "Type {} cannot be represented as a number",
@@ -104,6 +105,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )),
                 span,
             ),
+            TypeError::NoRelationParametersExpected => {
+                self.error(CompileError::NoRelationParametersExpected, span)
+            }
         }
     }
 }

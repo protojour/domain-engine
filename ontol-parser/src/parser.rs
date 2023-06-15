@@ -239,7 +239,7 @@ fn map_statement() -> impl AstParser<MapStatement> {
 }
 
 fn map_arm() -> impl AstParser<MapArm> {
-    let struct_arm = struct_pattern(pattern()).map(MapArm::Struct);
+    let struct_arm = braced_struct_pattern(pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
         .then(expr_pattern())
@@ -250,14 +250,16 @@ fn map_arm() -> impl AstParser<MapArm> {
 
 fn pattern() -> impl AstParser<Pattern> {
     recursive(|pattern| {
-        spanned(with_unit_or_seq(struct_pattern(pattern)))
+        spanned(with_unit_or_seq(braced_struct_pattern(pattern)))
             .map(Pattern::Struct)
             .or(with_unit_or_seq(expr_pattern())
                 .map(|(unit_or_seq, (expr, span))| Pattern::Expr(((unit_or_seq, expr), span))))
     })
 }
 
-fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<StructPattern> {
+fn braced_struct_pattern(
+    pattern: impl AstParser<Pattern> + Clone + 'static,
+) -> impl AstParser<StructPattern> {
     spanned(path())
         .then(
             spanned(struct_pattern_attr(pattern))
@@ -269,18 +271,30 @@ fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<St
 }
 
 fn struct_pattern_attr(
-    pattern: impl AstParser<Pattern> + Clone,
+    pattern: impl AstParser<Pattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternAttr> {
-    spanned(ty())
-        .then(spanned(sigil('?')).or_not())
-        .then_ignore(colon())
-        .then(spanned(pattern))
-        .map_with_span(|((relation, option), object), _span| StructPatternAttr {
-            relation,
-            option: option.map(|(_, span)| ((), span)),
-            relation_struct: None,
-            object,
-        })
+    recursive(|struct_pattern_attr| {
+        spanned(ty())
+            .then(
+                spanned(
+                    spanned(struct_pattern_attr)
+                        .repeated()
+                        .delimited_by(open('('), close(')')),
+                )
+                .or_not(),
+            )
+            .then(spanned(sigil('?')).or_not())
+            .then_ignore(colon())
+            .then(spanned(pattern))
+            .map_with_span(|(((relation, relation_attrs), option), object), _span| {
+                StructPatternAttr {
+                    relation,
+                    relation_attrs,
+                    option: option.map(|(_, span)| ((), span)),
+                    object,
+                }
+            })
+    })
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {

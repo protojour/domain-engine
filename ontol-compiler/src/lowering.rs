@@ -675,29 +675,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
         let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
-        let attributes = struct_pat
-            .attributes
-            .into_iter()
-            .map(|(struct_attr, _span)| {
-                let ast::StructPatternAttr {
-                    relation,
-                    option,
-                    object: (object, object_span),
-                    ..
-                } = struct_attr;
-
-                let def = self.resolve_type_reference(relation.0, &relation.1)?;
-
-                let inner_expr = self.lower_pattern((object, object_span), var_table);
-
-                inner_expr.map(|expr| ExprStructAttr {
-                    key: (def, self.src.span(&relation.1)),
-                    rel: None,
-                    bind_option: option.is_some(),
-                    object: expr,
-                })
-            })
-            .collect::<Result<_, _>>()?;
+        let attributes = self.lower_struct_attrs(struct_pat.attributes, var_table)?;
 
         Ok(self.expr(
             ExprKind::Struct(
@@ -709,6 +687,42 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ),
             &span,
         ))
+    }
+
+    fn lower_struct_attrs(
+        &mut self,
+        attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
+        var_table: &mut ExprVarTable,
+    ) -> Res<Box<[ExprStructAttr]>> {
+        Ok(attributes
+            .into_iter()
+            .map(|(struct_attr, _span)| {
+                let ast::StructPatternAttr {
+                    relation,
+                    relation_attrs,
+                    option,
+                    object: (object, object_span),
+                } = struct_attr;
+
+                let def = self.resolve_type_reference(relation.0, &relation.1)?;
+
+                let rel = match relation_attrs {
+                    Some((attrs, span)) => {
+                        let attributes = self.lower_struct_attrs(attrs, var_table)?;
+                        Some(self.expr(ExprKind::AnonStruct(attributes), &span))
+                    }
+                    None => None,
+                };
+                let object_expr = self.lower_pattern((object, object_span), var_table);
+
+                object_expr.map(|object_expr| ExprStructAttr {
+                    key: (def, self.src.span(&relation.1)),
+                    rel,
+                    bind_option: option.is_some(),
+                    object: object_expr,
+                })
+            })
+            .collect::<Result<_, _>>()?)
     }
 
     fn lower_pattern(

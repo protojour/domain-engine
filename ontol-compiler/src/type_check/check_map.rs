@@ -177,7 +177,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.join(self.analyze_arm(arg, variables, parent_aggr_group, ctx)?);
                 }
             }
-            ExprKind::Struct(_, attributes) => {
+            ExprKind::Struct(_, attributes) | ExprKind::AnonStruct(attributes) => {
                 for attr in attributes.iter() {
                     group_set.join(self.analyze_arm(
                         &attr.object,

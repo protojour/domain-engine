@@ -130,6 +130,8 @@ pub enum CompileError {
     UnknownTypeParameter,
     #[error("cannot map a union, map each variant instead")]
     CannotMapUnion,
+    #[error("no relation parameters expected")]
+    NoRelationParametersExpected,
     #[error("TODO: {0}")]
     TODO(String),
 }

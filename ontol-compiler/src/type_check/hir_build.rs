@@ -115,6 +115,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => struct_node,
                 }
             }
+            (ExprKind::AnonStruct(attributes), Some(Type::Domain(def_id))) => {
+                let domain_type = self.check_def(*def_id);
+                panic!("Anon struct OK: {domain_type:?}");
+            }
+            (ExprKind::AnonStruct(_), _) => {
+                self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span)
+            }
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
@@ -351,12 +358,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 Some(rel_def_id) => self.check_def(rel_def_id),
                                 None => self.unit_type(),
                             };
+                            debug!("rel_params_ty: {rel_params_ty:?}");
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let rel_node = self.unit_node_no_span();
+                                    let rel_node = match rel {
+                                        Some(rel) => self.build_node(rel, Some(rel_params_ty), ctx),
+                                        None => self.unit_node_no_span(),
+                                    };
                                     let val_node = self.build_node(object, Some(object_ty), ctx);
                                     ontol_hir::PropVariant {
                                         dimension: ontol_hir::Dimension::Singular,
