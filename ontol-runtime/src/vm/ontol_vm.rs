@@ -87,9 +87,9 @@ impl Processor for OntolProcessor {
 
     #[inline(always)]
     fn bump(&mut self, source: Local) {
+        let top = self.stack.len();
         self.stack.push(Value::unit());
-        let stack_len = self.stack.len();
-        self.stack.swap(source.0 as usize, stack_len - 1);
+        self.stack.swap(source.0 as usize, top);
     }
 
     #[inline(always)]

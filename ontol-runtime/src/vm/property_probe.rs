@@ -111,9 +111,9 @@ impl Processor for PropProcessor {
     }
 
     fn bump(&mut self, source: Local) {
+        let top = self.stack.len();
         self.stack.push(Props::Set(Default::default()));
-        let stack_len = self.stack.len();
-        self.stack.swap(source.0 as usize, stack_len - 1);
+        self.stack.swap(source.0 as usize, top);
     }
 
     fn pop_until(&mut self, local: Local) {
