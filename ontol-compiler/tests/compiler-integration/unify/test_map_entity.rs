@@ -1,8 +1,77 @@
+use crate::unify::assert_domain_map;
 use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use serde_json::json;
 use test_log::test;
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../../examples/artist_and_instrument.on");
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth_union.on");
+
+#[test]
+fn test_map_rel_params() {
+    "
+    pub type a1_id { fmt '' => 'a1/' => uuid => _ }
+    pub type a2_id { fmt '' => 'a2/' => uuid => _ }
+    pub type b1_id { fmt '' => 'b1/' => uuid => _ }
+    pub type b2_id { fmt '' => 'b2/' => uuid => _ }
+
+    type a2 {
+        rel a2_id identifies: _
+        rel _ 'foo': string
+    }
+    type b2 {
+        rel b2_id identifies: _
+        rel _ 'foo': string
+        rel _ 'bar': string
+    }
+
+    type a_edge {
+        rel _ 'bar': string
+    }
+
+    pub type a1 {
+        rel a1_id identifies: _
+        rel _ 'foreign'(rel _ is: a_edge): a2
+    }
+    pub type b1 {
+        rel b1_id identifies: _
+        rel _ 'foreign': b2
+    }
+
+    map {
+        a1 {
+            'foreign'('bar': b): a2 {
+                'foo': f
+            }
+        }
+        b1 {
+            'foreign': b2 {
+                'foo': f
+                'bar': b
+            }
+        }
+    }
+    "
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("a1", "b1"),
+            json!({
+                "foreign": {
+                    "foo": "FOO",
+                    "_edge": {
+                        "bar": "BAR"
+                    }
+                }
+            }),
+            json!({
+                "foreign": {
+                    "foo": "FOO",
+                    "bar": "BAR",
+                }
+            }),
+        );
+    });
+}
 
 const WORK: &str = "
 pub type worker_id { fmt '' => 'worker/' => uuid => _ }

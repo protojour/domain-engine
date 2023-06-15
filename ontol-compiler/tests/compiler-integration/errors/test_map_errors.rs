@@ -42,7 +42,7 @@ fn map_attribute_mismatch() {
     map {
         foo: // ERROR expected named property// ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
             x
-        bar {} // ERROR expected expression
+        bar {} // ERROR expected expression attribute
     }
     "
     .compile_fail()

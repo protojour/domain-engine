@@ -694,7 +694,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
         var_table: &mut ExprVarTable,
     ) -> Res<Box<[ExprStructAttr]>> {
-        Ok(attributes
+        attributes
             .into_iter()
             .map(|(struct_attr, _span)| {
                 let ast::StructPatternAttr {
@@ -722,7 +722,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     object: object_expr,
                 })
             })
-            .collect::<Result<_, _>>()?)
+            .collect()
     }
 
     fn lower_pattern(

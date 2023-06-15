@@ -70,8 +70,8 @@ pub enum CompileError {
     CannotMixIndexedRelationIdentsAndEdgeTypes,
     #[error("no properties expected")]
     NoPropertiesExpected,
-    #[error("expected expression")]
-    AnonymousPropertyExpected,
+    #[error("expected expression attribute")]
+    ExpectedExpressionAttribute,
     #[error("expected named property")]
     NamedPropertyExpected,
     #[error("unknown property")]

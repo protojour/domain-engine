@@ -164,7 +164,8 @@ impl Domain {
         let index = type_info.def_id.1 as usize;
 
         // pad the vector
-        self.info.resize_with(index + 1, || TypeInfo {
+        let new_size = std::cmp::max(self.info.len(), index + 1);
+        self.info.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
             name: None,

@@ -6,7 +6,7 @@ use crate::{
     compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, DefKind, PropertyCardinality, RelParams, ValueCardinality},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
     relation::Constructor,
     type_check::{
@@ -93,7 +93,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::Struct(type_path, attributes), expected_ty) => {
-                let struct_node = self.build_struct(type_path, attributes, expr.span, ctx);
+                let struct_ty = self.check_def(type_path.def_id);
+                match struct_ty {
+                    Type::Domain(def_id) => {
+                        assert_eq!(*def_id, type_path.def_id);
+                    }
+                    _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
+                };
+                let struct_node =
+                    self.build_struct(type_path.def_id, struct_ty, attributes, expr.span, ctx);
+
                 let meta = *struct_node.meta();
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
@@ -115,9 +124,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => struct_node,
                 }
             }
-            (ExprKind::AnonStruct(attributes), Some(Type::Domain(def_id))) => {
-                let domain_type = self.check_def(*def_id);
-                panic!("Anon struct OK: {domain_type:?}");
+            (
+                ExprKind::AnonStruct(attributes),
+                Some(expected_struct_ty @ Type::Anonymous(def_id)),
+            ) => {
+                let actual_ty = self.check_def(*def_id);
+                if actual_ty != expected_struct_ty {
+                    return self.type_error_node(
+                        TypeError::Mismatch(TypeEquation {
+                            actual: actual_ty,
+                            expected: expected_struct_ty,
+                        }),
+                        &expr.span,
+                    );
+                }
+
+                self.build_struct(*def_id, actual_ty, attributes, expr.span, ctx)
             }
             (ExprKind::AnonStruct(_), _) => {
                 self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span)
@@ -264,18 +286,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct(
         &mut self,
-        type_path: &TypePath,
+        struct_def_id: DefId,
+        struct_ty: TypeRef<'m>,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let domain_type = self.check_def(type_path.def_id);
-        let subject_id = match domain_type {
-            Type::Domain(subject_id) => subject_id,
-            _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
-        };
-
-        let properties = self.relations.properties_by_type(type_path.def_id);
+        let properties = self.relations.properties_by_type(struct_def_id);
 
         let node_kind = match properties.map(|props| &props.constructor) {
             Some(Constructor::Struct) | None => {
@@ -296,7 +313,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 Role::Subject => {
                                     let meta = self
                                         .property_meta_by_subject(
-                                            *subject_id,
+                                            struct_def_id,
                                             property_id.relation_id,
                                         )
                                         .expect("BUG: problem getting property meta");
@@ -464,24 +481,37 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             Some(Constructor::Value(relationship_id, _, _)) => {
-                let mut attributes = attributes.iter();
-                match attributes.next() {
-                    Some(ExprStructAttr {
-                        key: (def, _),
-                        rel: _,
-                        bind_option: _,
-                        object: value,
-                    }) if def.def_id == DefId::unit() => {
-                        let meta = self
-                            .get_relationship_meta(*relationship_id)
-                            .expect("BUG: problem getting anonymous property meta");
+                let meta = self
+                    .get_relationship_meta(*relationship_id)
+                    .expect("BUG: problem getting anonymous property meta");
 
-                        let object_ty = self.check_def(meta.relationship.object.0.def_id);
-                        let inner_node = self.build_node(value, Some(object_ty), ctx);
+                let value_object_ty = self.check_def(meta.relationship.object.0.def_id);
+                debug!("value_object_ty: {value_object_ty:?}");
 
-                        inner_node.into_kind()
+                match value_object_ty {
+                    Type::Domain(def_id) => {
+                        return self.build_struct(*def_id, value_object_ty, attributes, span, ctx);
                     }
-                    _ => return self.error_node(CompileError::AnonymousPropertyExpected, &span),
+                    _ => {
+                        let mut attributes = attributes.iter();
+                        match attributes.next() {
+                            Some(ExprStructAttr {
+                                key: (def, _),
+                                rel: _,
+                                bind_option: _,
+                                object: value,
+                            }) if def.def_id == DefId::unit() => {
+                                let object_ty = self.check_def(meta.relationship.object.0.def_id);
+                                let inner_node = self.build_node(value, Some(object_ty), ctx);
+
+                                inner_node.into_kind()
+                            }
+                            _ => {
+                                return self
+                                    .error_node(CompileError::ExpectedExpressionAttribute, &span);
+                            }
+                        }
+                    }
                 }
             }
             Some(Constructor::Intersection(_)) => {
@@ -494,12 +524,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::StringFmt(_)) => todo!(),
         };
 
-        debug!("Struct type: {domain_type:?}");
+        debug!("Struct type: {struct_ty:?}");
 
         TypedHirNode(
             node_kind,
             Meta {
-                ty: domain_type,
+                ty: struct_ty,
                 span,
             },
         )
