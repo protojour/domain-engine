@@ -180,13 +180,7 @@ impl Stack for ValueStack {
         let [rel_params, value]: [Value; 2] = self.pop_n();
         if !matches!(value.data, Data::Unit) {
             let map = self.struct_local_mut(target);
-            map.insert(
-                key,
-                Attribute {
-                    value: value,
-                    rel_params,
-                },
-            );
+            map.insert(key, Attribute { value, rel_params });
         }
     }
 
