@@ -87,9 +87,7 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
                     let mut next_stack: Vec<P::Value> = Default::default();
 
                     let params_start = current_stack.len() - (procedure.n_params.0 as usize);
-                    for param in current_stack.drain(params_start..) {
-                        next_stack.push(param);
-                    }
+                    next_stack.extend(current_stack.drain(params_start..));
 
                     std::mem::swap(current_stack, &mut next_stack);
 
