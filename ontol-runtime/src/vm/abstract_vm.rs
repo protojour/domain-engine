@@ -40,7 +40,6 @@ pub trait Processor {
     fn size(&self) -> usize;
     fn stack_mut(&mut self) -> &mut Vec<Self::Value>;
 
-    fn truncate(&mut self, n_locals: usize);
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId);
     fn clone(&mut self, source: Local);
     fn bump(&mut self, source: Local);
@@ -170,8 +169,6 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
 
 macro_rules! return0 {
     ($vm:ident, $processor:ident) => {
-        $processor.truncate(1);
-
         match $vm.call_stack.pop() {
             Some(CallStackFrame {
                 mut stack,

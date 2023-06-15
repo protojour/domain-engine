@@ -51,9 +51,6 @@ impl<'l> OntolVm<'l> {
             .execute(procedure, &mut self.processor, debug);
 
         let value_stack = std::mem::take(&mut self.processor);
-        if value_stack.stack.len() != 1 {
-            panic!("Stack did not contain one value");
-        }
         value_stack.stack.into_iter().next().unwrap()
     }
 }
@@ -74,11 +71,6 @@ impl Processor for OntolProcessor {
     #[inline(always)]
     fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
         &mut self.stack
-    }
-
-    #[inline(always)]
-    fn truncate(&mut self, n_locals: usize) {
-        self.stack.truncate(n_locals);
     }
 
     #[inline(always)]

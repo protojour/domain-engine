@@ -92,10 +92,6 @@ impl Processor for PropProcessor {
         &mut self.stack
     }
 
-    fn truncate(&mut self, n_locals: usize) {
-        self.stack.truncate(n_locals);
-    }
-
     fn call_builtin(&mut self, proc: BuiltinProc, _: DefId) {
         let value = match proc {
             BuiltinProc::NewStruct => Props::Map(Default::default()),
