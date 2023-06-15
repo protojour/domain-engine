@@ -5,7 +5,7 @@ use crate::{
     env::{Env, TypeInfo},
     serde::operator::SerdeOperator,
     value::PropertyId,
-    vm::abstract_vm::{AbstractVm, Stack, VmDebug},
+    vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Lib, Local},
     DefId,
 };
@@ -13,15 +13,15 @@ use crate::{
 use super::proc::Predicate;
 
 pub struct PropertyProbe<'l> {
-    abstract_vm: AbstractVm<'l>,
-    prop_stack: PropStack,
+    abstract_vm: AbstractVm<'l, PropProcessor>,
+    prop_stack: PropProcessor,
 }
 
 impl<'l> PropertyProbe<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             abstract_vm: AbstractVm::new(lib),
-            prop_stack: PropStack::default(),
+            prop_stack: PropProcessor::default(),
         }
     }
 
@@ -76,26 +76,24 @@ enum Props {
 }
 
 #[derive(Default)]
-struct PropStack {
-    local0_pos: usize,
+struct PropProcessor {
     stack: Vec<Props>,
 }
 
-impl Stack for PropStack {
+impl Processor for PropProcessor {
+    type Value = Props;
+
     fn size(&self) -> usize {
         self.stack.len()
     }
 
-    fn local0_pos(&self) -> usize {
-        self.local0_pos
-    }
-
-    fn local0_pos_mut(&mut self) -> &mut usize {
-        &mut self.local0_pos
+    #[inline(always)]
+    fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
+        &mut self.stack
     }
 
     fn truncate(&mut self, n_locals: usize) {
-        self.stack.truncate(self.local0_pos + n_locals);
+        self.stack.truncate(n_locals);
     }
 
     fn call_builtin(&mut self, proc: BuiltinProc, _: DefId) {
@@ -119,18 +117,15 @@ impl Stack for PropStack {
     fn bump(&mut self, source: Local) {
         self.stack.push(Props::Set(Default::default()));
         let stack_len = self.stack.len();
-        self.stack
-            .swap(self.local0_pos + source.0 as usize, stack_len - 1);
+        self.stack.swap(source.0 as usize, stack_len - 1);
     }
 
     fn pop_until(&mut self, local: Local) {
-        self.stack.truncate(self.local0_pos + local.0 as usize + 1);
+        self.stack.truncate(local.0 as usize + 1);
     }
 
     fn swap(&mut self, a: Local, b: Local) {
-        let local0_pos = self.local0_pos;
-        self.stack
-            .swap(local0_pos + a.0 as usize, local0_pos + b.0 as usize);
+        self.stack.swap(a.0 as usize, b.0 as usize);
     }
 
     fn iter_next(&mut self, _seq: Local, _index: Local) -> bool {
@@ -187,15 +182,15 @@ impl Stack for PropStack {
     }
 }
 
-impl PropStack {
+impl PropProcessor {
     #[inline(always)]
     fn local(&self, local: Local) -> &Props {
-        &self.stack[self.local0_pos + local.0 as usize]
+        &self.stack[local.0 as usize]
     }
 
     #[inline(always)]
     fn local_mut(&mut self, local: Local) -> &mut Props {
-        &mut self.stack[self.local0_pos + local.0 as usize]
+        &mut self.stack[local.0 as usize]
     }
 
     #[inline(always)]
@@ -217,8 +212,8 @@ impl PropStack {
 
 struct Tracer;
 
-impl VmDebug<PropStack> for Tracer {
-    fn tick(&mut self, vm: &AbstractVm, stack: &PropStack) {
+impl VmDebug<PropProcessor> for Tracer {
+    fn tick(&mut self, vm: &AbstractVm<PropProcessor>, stack: &PropProcessor) {
         debug!("   -> {:?}", stack.stack);
         debug!("{:?}", vm.pending_opcode());
     }

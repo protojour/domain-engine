@@ -6,7 +6,7 @@ use tracing::{debug, trace, Level};
 use crate::{
     cast::Cast,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
-    vm::abstract_vm::{AbstractVm, Stack, VmDebug},
+    vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Lib, Local, Procedure},
     DefId,
 };
@@ -15,15 +15,15 @@ use super::proc::Predicate;
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
-    abstract_vm: AbstractVm<'l>,
-    value_stack: ValueStack,
+    abstract_vm: AbstractVm<'l, OntolProcessor>,
+    processor: OntolProcessor,
 }
 
 impl<'l> OntolVm<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             abstract_vm: AbstractVm::new(lib),
-            value_stack: ValueStack::default(),
+            processor: OntolProcessor::default(),
         }
     }
 
@@ -39,18 +39,18 @@ impl<'l> OntolVm<'l> {
         &mut self,
         procedure: Procedure,
         args: impl IntoIterator<Item = Value>,
-        debug: &mut dyn VmDebug<ValueStack>,
+        debug: &mut dyn VmDebug<OntolProcessor>,
     ) -> Value {
         debug!("evaluating {procedure:?}");
 
         for arg in args {
-            self.value_stack.stack.push(arg);
+            self.processor.stack.push(arg);
         }
 
         self.abstract_vm
-            .execute(procedure, &mut self.value_stack, debug);
+            .execute(procedure, &mut self.processor, debug);
 
-        let value_stack = std::mem::take(&mut self.value_stack);
+        let value_stack = std::mem::take(&mut self.processor);
         if value_stack.stack.len() != 1 {
             panic!("Stack did not contain one value");
         }
@@ -59,30 +59,26 @@ impl<'l> OntolVm<'l> {
 }
 
 #[derive(Default)]
-pub struct ValueStack {
-    local0_pos: usize,
+pub struct OntolProcessor {
     stack: Vec<Value>,
 }
 
-impl Stack for ValueStack {
+impl Processor for OntolProcessor {
+    type Value = Value;
+
     #[inline(always)]
     fn size(&self) -> usize {
         self.stack.len()
     }
 
     #[inline(always)]
-    fn local0_pos(&self) -> usize {
-        self.local0_pos
-    }
-
-    #[inline(always)]
-    fn local0_pos_mut(&mut self) -> &mut usize {
-        &mut self.local0_pos
+    fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
+        &mut self.stack
     }
 
     #[inline(always)]
     fn truncate(&mut self, n_locals: usize) {
-        self.stack.truncate(self.local0_pos + n_locals);
+        self.stack.truncate(n_locals);
     }
 
     #[inline(always)]
@@ -101,20 +97,17 @@ impl Stack for ValueStack {
     fn bump(&mut self, source: Local) {
         self.stack.push(Value::unit());
         let stack_len = self.stack.len();
-        self.stack
-            .swap(self.local0_pos + source.0 as usize, stack_len - 1);
+        self.stack.swap(source.0 as usize, stack_len - 1);
     }
 
     #[inline(always)]
     fn pop_until(&mut self, local: Local) {
-        self.stack.truncate(self.local0_pos + local.0 as usize + 1);
+        self.stack.truncate(local.0 as usize + 1);
     }
 
     #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
-        let stack_pos = self.local0_pos;
-        self.stack
-            .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
+        self.stack.swap(a.0 as usize, b.0 as usize);
     }
 
     #[inline(always)]
@@ -208,7 +201,7 @@ impl Stack for ValueStack {
     }
 }
 
-impl ValueStack {
+impl OntolProcessor {
     fn eval_builtin(&mut self, proc: BuiltinProc) -> Data {
         match proc {
             BuiltinProc::Add => {
@@ -239,12 +232,12 @@ impl ValueStack {
 
     #[inline(always)]
     fn local(&self, local: Local) -> &Value {
-        &self.stack[self.local0_pos + local.0 as usize]
+        &self.stack[local.0 as usize]
     }
 
     #[inline(always)]
     fn local_mut(&mut self, local: Local) -> &mut Value {
-        &mut self.stack[self.local0_pos + local.0 as usize]
+        &mut self.stack[local.0 as usize]
     }
 
     #[inline(always)]
@@ -290,16 +283,16 @@ impl ValueStack {
 
     #[inline(always)]
     fn yank(&mut self, local: Local) -> Value {
-        self.stack.remove(self.local0_pos + local.0 as usize)
+        self.stack.remove(local.0 as usize)
     }
 }
 
 struct Tracer;
 
-impl VmDebug<ValueStack> for Tracer {
-    fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
+impl VmDebug<OntolProcessor> for Tracer {
+    fn tick(&mut self, vm: &AbstractVm<OntolProcessor>, stack: &OntolProcessor) {
         if tracing::enabled!(Level::TRACE) {
-            for (index, value) in stack.stack.iter().skip(stack.local0_pos).enumerate() {
+            for (index, value) in stack.stack.iter().enumerate() {
                 trace!("    Local({index}): {}", ValueDebug(value));
             }
         }
