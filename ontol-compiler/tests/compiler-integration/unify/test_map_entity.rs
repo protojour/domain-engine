@@ -70,6 +70,25 @@ fn test_map_rel_params() {
                 }
             }),
         );
+
+        assert_domain_map(
+            &test_env,
+            ("b1", "a1"),
+            json!({
+                "foreign": {
+                    "foo": "FOO",
+                    "bar": "BAR",
+                }
+            }),
+            json!({
+                "foreign": {
+                    "foo": "FOO",
+                    "_edge": {
+                        "bar": "BAR"
+                    }
+                }
+            }),
+        );
     });
 }
 

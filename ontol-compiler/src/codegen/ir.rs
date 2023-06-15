@@ -30,7 +30,8 @@ pub enum Ir {
     /// Take attribute and push two values on the stack: value(top), rel_params
     TakeAttr2(Local, PropertyId),
     TryTakeAttr2(Local, PropertyId),
-    PutAttrValue(Local, PropertyId),
+    PutAttr1(Local, PropertyId),
+    PutAttr2(Local, PropertyId),
     AppendAttr2(Local),
     Constant(i64, DefId),
     Cond(Predicate, BlockIndex),

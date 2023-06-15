@@ -76,8 +76,10 @@ pub enum OpCode {
     /// If present, pushes three values on the stack: [value, rel_params, Int(1)].
     /// If absent, pushes one value on the stack: [Int(0)].
     TryTakeAttr2(Local, PropertyId),
-    /// Pop value from stack, and move it into the specified local map.
-    PutUnitAttr(Local, PropertyId),
+    /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
+    PutAttr1(Local, PropertyId),
+    /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
+    PutAttr2(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
     /// Push a constant to the stack.

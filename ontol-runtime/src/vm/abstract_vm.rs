@@ -48,7 +48,8 @@ pub trait Stack {
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
     fn take_attr2(&mut self, source: Local, key: PropertyId);
     fn try_take_attr2(&mut self, source: Local, key: PropertyId);
-    fn put_unit_attr(&mut self, target: Local, key: PropertyId);
+    fn put_attr1(&mut self, target: Local, key: PropertyId);
+    fn put_attr2(&mut self, target: Local, key: PropertyId);
     fn push_constant(&mut self, k: i64, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
@@ -127,8 +128,12 @@ impl<'l> AbstractVm<'l> {
                     stack.try_take_attr2(*source, *property_id);
                     self.program_counter += 1;
                 }
-                OpCode::PutUnitAttr(target, property_id) => {
-                    stack.put_unit_attr(*target, *property_id);
+                OpCode::PutAttr1(target, property_id) => {
+                    stack.put_attr1(*target, *property_id);
+                    self.program_counter += 1;
+                }
+                OpCode::PutAttr2(target, property_id) => {
+                    stack.put_attr2(*target, *property_id);
                     self.program_counter += 1;
                 }
                 OpCode::PushConstant(k, result_type) => {

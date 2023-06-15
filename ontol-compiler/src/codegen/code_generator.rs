@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_hir::Node;
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
@@ -172,15 +173,34 @@ impl<'a> CodeGenerator<'a> {
                 if let Some(ontol_hir::PropVariant { dimension: _, attr }) =
                     variants.into_iter().next()
                 {
-                    // FIXME: Don't ignore relation parameters!
-                    // self.generate(*variant.attr.rel, block);
-                    // let rel = self.builder.top();
-                    self.gen_node(*attr.val, block);
-
                     let struct_local = self.var_local(struct_var);
 
-                    self.builder
-                        .append(block, Ir::PutAttrValue(struct_local, id), Stack(-1), span);
+                    match attr.rel.kind() {
+                        ontol_hir::Kind::Unit => {
+                            self.gen_node(*attr.val, block);
+                            self.builder.append(
+                                block,
+                                Ir::PutAttr1(struct_local, id),
+                                Stack(-1),
+                                span,
+                            );
+                        }
+                        _ => {
+                            self.gen_node(*attr.rel, block);
+                            let rel_local = self.builder.top();
+                            self.gen_node(*attr.val, block);
+
+                            self.builder
+                                .append(block, Ir::Clone(rel_local), Stack(1), span);
+
+                            self.builder.append(
+                                block,
+                                Ir::PutAttr2(struct_local, id),
+                                Stack(-2),
+                                span,
+                            );
+                        }
+                    }
                 }
             }
             ontol_hir::Kind::MatchProp(struct_var, id, arms) => {

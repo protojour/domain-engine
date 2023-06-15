@@ -167,11 +167,26 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
+    fn put_attr1(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
         if !matches!(value.data, Data::Unit) {
             let map = self.struct_local_mut(target);
             map.insert(key, value.to_unit_attr());
+        }
+    }
+
+    #[inline(always)]
+    fn put_attr2(&mut self, target: Local, key: PropertyId) {
+        let [rel_params, value]: [Value; 2] = self.pop_n();
+        if !matches!(value.data, Data::Unit) {
+            let map = self.struct_local_mut(target);
+            map.insert(
+                key,
+                Attribute {
+                    value: value,
+                    rel_params,
+                },
+            );
         }
     }
 
@@ -323,9 +338,9 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(3)))),
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(4)))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -390,7 +405,7 @@ mod tests {
                 // 2, 3:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
                 OpCode::Call(double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(4)))),
                 // 3, 4:
                 OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
                 // 5, 6:
@@ -398,7 +413,7 @@ mod tests {
                 OpCode::Clone(Local(4)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(5)))),
+                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(5)))),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -513,9 +528,9 @@ mod tests {
                 // New object -> Local(9)
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 OpCode::Clone(Local(2)),
-                OpCode::PutUnitAttr(Local(9), prop_a),
+                OpCode::PutAttr1(Local(9), prop_a),
                 OpCode::Bump(Local(8)),
-                OpCode::PutUnitAttr(Local(9), prop_b),
+                OpCode::PutAttr1(Local(9), prop_b),
                 OpCode::Bump(Local(7)),
                 OpCode::AppendAttr2(Local(6)),
                 OpCode::PopUntil(Local(6)),
@@ -580,7 +595,7 @@ mod tests {
                 OpCode::Goto(AddressOffset(3)),
                 // AddressOffset(6):
                 OpCode::PushConstant(666, def_id(200)),
-                OpCode::PutUnitAttr(Local(1), prop),
+                OpCode::PutAttr1(Local(1), prop),
                 OpCode::Goto(AddressOffset(3)),
             ],
         );

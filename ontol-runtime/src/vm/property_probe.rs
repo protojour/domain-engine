@@ -158,8 +158,17 @@ impl Stack for PropStack {
         }
     }
 
-    fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
+    fn put_attr1(&mut self, target: Local, key: PropertyId) {
         let source_set = self.pop_set();
+        let map = self.get_map_mut(target);
+        let target_set = map.entry(key).or_default();
+        target_set.extend(source_set.into_iter());
+    }
+
+    fn put_attr2(&mut self, target: Local, key: PropertyId) {
+        let mut source_set = self.pop_set();
+        source_set.extend(self.pop_set());
+
         let map = self.get_map_mut(target);
         let target_set = map.entry(key).or_default();
         target_set.extend(source_set.into_iter());
