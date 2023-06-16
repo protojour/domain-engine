@@ -62,7 +62,7 @@ pub enum CompileError {
     ObjectMustBeDataType,
     #[error("fmt needs at least two transitions: `fmt a => b => c`")]
     FmtTooFewTransitions,
-    #[error("fmt only supports `_` at the final target position")]
+    #[error("fmt only supports `.` at the final target position")]
     FmtMisplacedWildcard,
     #[error("invalid mix of relationship type for subject")]
     InvalidMixOfRelationshipTypeForSubject,

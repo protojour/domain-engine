@@ -276,7 +276,7 @@ fn invalid_fmt_semantics() {
     "
     fmt () // ERROR fmt needs at least two transitions: `fmt a => b => c`
     fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
-    fmt () => . => 'bar' // ERROR fmt only supports `_` at the final target position
+    fmt () => . => 'bar' // ERROR fmt only supports `.` at the final target position
     "
     .compile_fail()
 }
