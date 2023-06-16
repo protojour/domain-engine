@@ -5,7 +5,8 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_parser::parse_statements;
-use std::{collections::HashMap, fs};
+use ontol_runtime::json_schema::build_openapi_schemas;
+use std::{collections::HashMap, fs, print};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -35,9 +36,6 @@ struct Check {
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 struct Generate {
-    /// Generate GraphQL schema from public types
-    #[arg(short, long)]
-    graphql: bool,
     /// Generate JSON schema from public types
     #[arg(short, long)]
     json_schema: bool,
@@ -69,7 +67,7 @@ fn check(args: &Check) {
             println!("No errors found!");
         } else {
             for _error in errors {
-                println!("{}", "1 error");
+                eprintln!("{}", "1 error");
             }
         }
     }
@@ -83,7 +81,7 @@ fn generate(args: &Generate) {
         let mut sources = Sources::default();
         let mut source_code_registry = SourceCodeRegistry::default();
         let mut package_graph_builder = PackageGraphBuilder::new(filename.clone().into());
-        let mut _root_package = None;
+        let mut root_package = None;
 
         let topology = loop {
             match package_graph_builder.transition().unwrap() {
@@ -96,7 +94,7 @@ fn generate(args: &Generate) {
                         };
 
                         if source_name == filename {
-                            _root_package = Some(request.package_id);
+                            root_package = Some(request.package_id);
                         }
 
                         if let Some(source_text) = sources_by_name.get(source_name) {
@@ -107,7 +105,7 @@ fn generate(args: &Generate) {
                                 &mut source_code_registry,
                             ));
                         } else {
-                            println!("Could not load `{source_name}`");
+                            eprintln!("Could not load `{source_name}`");
                         }
                     }
                 }
@@ -118,6 +116,21 @@ fn generate(args: &Generate) {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
         compiler.compile_package_topology(topology).unwrap();
-        let _env = compiler.into_env();
+
+        let env = compiler.into_env();
+        if let Some(package_id) = root_package {
+            let domain = env.find_domain(package_id).unwrap();
+            let schemas = build_openapi_schemas(&env, package_id, domain);
+
+            if args.json_schema {
+                let schemas_json = serde_json::to_string_pretty(&schemas).unwrap();
+                print!("{}", schemas_json);
+            }
+
+            if args.yaml_schema {
+                let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
+                print!("{}", schemas_yaml);
+            }
+        }
     }
 }
