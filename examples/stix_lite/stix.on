@@ -1,33 +1,33 @@
 type spec_version {
-    rel _ is?: '2.0'
-    rel _ is?: '2.1'
+    rel .is?: '2.0'
+    rel .is?: '2.1'
 }
 
 // FIXME: should probably be defined in core
 type url {
-    rel _ is: string
+    rel .is: string
 }
 
 /// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
 type lang-rfc5646 {
-    rel _ is: string
+    rel .is: string
 }
 
 type confidence {
     // BUG: Must be an integer percentage between 0 and 100
-    rel _ is: int
+    rel .is: int
 }
 
 type attack-pattern-id {
-    fmt '' => 'attack-pattern--' => uuid => _
+    fmt '' => 'attack-pattern--' => uuid => .
 }
 
 type identity-id {
-    fmt '' => 'identity--' => uuid => _
+    fmt '' => 'identity--' => uuid => .
 }
 
 type marking-definition-id {
-    fmt '' => 'marking-definition--' => uuid => _
+    fmt '' => 'marking-definition--' => uuid => .
 }
 
 /// The `Hashes` type represents one or more cryptographic hashes, as a special set of key/value pairs.
@@ -51,28 +51,28 @@ type marking-definition-id {
 /// ```
 type Hashes {
     // FIXME: Dictionary support:
-    // rel _ /(a-zA-Z0-9-_){3,250}/: string
+    // rel ./(a-zA-Z0-9-_){3,250}/: string
 }
 
 type external-reference {
     /// The name of the source that the external-reference is defined within (system, registry, organization, etc.).
-    rel _ 'source_name': string
+    rel .'source_name': string
 
     /// A human readable description.
-    rel _ 'description'?: string
+    rel .'description'?: string
 
     /// A URL reference to an external resource [[RFC3986](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.vaucl8w7ov0y)].
-    rel _ 'url'?: url
+    rel .'url'?: url
 
     /// Specifies a dictionary of hashes for the contents of the **url**. This **SHOULD** be provided when the **url** property is present.
     ///
     /// Dictionary keys **MUST** come from one of the entries listed in the `hash-algorithm-ov` open vocabulary.
     ///
     /// As stated in Section [2.7](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_odoabbtwuxyd), to ensure interoperability, a SHA-256 hash **SHOULD** be included whenever possible.
-    rel _ 'hashes'?: Hashes
+    rel .'hashes'?: Hashes
 
     /// An identifier for the external reference content.
-    rel _ 'external_id'?: string
+    rel .'external_id'?: string
 }
 
 // FIXME: This type has union-like properties:
@@ -81,13 +81,13 @@ type granular-marking {
     /// The value of the lang property, if present, **MUST** be an [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code.
     ///
     /// If the **marking_ref** property is not present, this property **MUST** be present. If the marking_ref property is present, this property **MUST NOT** be present.
-    rel _ 'lang'?: lang-rfc5646
+    rel .'lang'?: lang-rfc5646
 
     /// The **marking_ref** property specifies the ID of the `marking-definition` object that describes the marking.
     ///
     /// If the **lang** property is not present, this property **MUST** be present.
     /// If the **lang** property is present, this property **MUST NOT** be present.
-    rel _ 'marking_ref'?: marking-definition-id
+    rel .'marking_ref'?: marking-definition-id
 
     /// The selectors property specifies a list of selectors for content contained within the STIX Object in which this property appears.
     /// Selectors **MUST** conform to the syntax defined below.
@@ -95,17 +95,17 @@ type granular-marking {
     /// The `marking-definition` referenced in the **marking_ref** property is applied to the content selected by the selectors in this list.
     ///
     /// The [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code specified by the lang property is applied to the content selected by the selectors in this list.
-    rel _ 'selectors': [string]
+    rel .'selectors': [string]
 }
 
 type kill-chain-phase {
     /// The name of the kill chain.
     /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
-    rel _ 'kill_chain_name': string
+    rel .'kill_chain_name': string
 
     /// The name of the phase in the kill chain.
     /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
-    rel _ 'phase_name': string
+    rel .'phase_name': string
 }
 
 /// Base type for SDO and SRO
@@ -116,12 +116,12 @@ type stix_domain_relationship_object {
     ///
     /// If objects are found where this property is not present, the implicit value for all STIX Objects other than SCOs is `2.0`.
     /// Since SCOs are now top-level objects in STIX 2.1, the default value for SCOs is `2.1`.
-    rel _ 'spec_version': spec_version
+    rel .'spec_version': spec_version
 
     /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
     ///
     /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
-    rel _ 'created_by_ref'?: identity-id
+    rel .'created_by_ref'?: identity-id
 
     /// The **created** property represents the time at which the object was originally created.
     ///
@@ -130,7 +130,7 @@ type stix_domain_relationship_object {
     /// The **created** property **MUST NOT** be changed when creating a new version of the object.
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
-    rel _ 'created': datetime
+    rel .'created': datetime
 
     /// The **modified** property is only used by STIX Objects that support versioning and represents the time that this particular version of the object was last modified.
     ///
@@ -142,7 +142,7 @@ type stix_domain_relationship_object {
     /// Object creators **MUST** set the **modified** property when creating a new version of an object if the **created** property was set.
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
-    rel _ 'modified': datetime
+    rel .'modified': datetime
 
     /// The **revoked** property is only used by STIX Objects that support versioning and indicates whether the object has been revoked.
     ///
@@ -153,7 +153,7 @@ type stix_domain_relationship_object {
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
     // FIXME: Default value `false`
-    rel _ 'revoked'?: bool
+    rel .'revoked'?: bool
 
     /// The **labels** property specifies a set of terms used to describe this object.
     /// The terms are user-defined or trust-group defined and their meaning is outside the scope of this specification and **MAY** be ignored.
@@ -161,7 +161,7 @@ type stix_domain_relationship_object {
     /// Where an object has a specific property defined in the specification for characterizing subtypes of that object, the labels property **MUST NOT** be used for that purpose.
     ///
     /// For example, the Malware SDO has a property **malware_types** that contains a list of Malware subtypes (dropper, RAT, etc.). In this example, the labels property cannot be used to describe these Malware subtypes.
-    rel _ 'labels'?: [string]
+    rel .'labels'?: [string]
 
     /// The **confidence** property identifies the confidence that the creator has in the correctness of their data.
     /// The confidence value **MUST** be a number in the range of 0-100.
@@ -169,7 +169,7 @@ type stix_domain_relationship_object {
     /// [Appendix A](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_1v6elyto0uqg) contains a table of normative mappings to other confidence scales that MUST be used when presenting the confidence value in one of those scales.
     ///
     /// If the confidence property is not present, then the confidence of the content is unspecified.
-    rel _ 'confidence'?: confidence
+    rel .'confidence'?: confidence
 
     /// The **lang** property identifies the language of the text content in this object.
     /// When present, it **MUST** be a language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
@@ -178,11 +178,11 @@ type stix_domain_relationship_object {
     /// This property **SHOULD** be present if the object type contains translatable text properties (e.g. name, description).
     ///
     /// The language of individual fields in this object **MAY** be overridden by the **lang** property in granular markings (see section 7.2.3).
-    rel _ 'lang'?: lang-rfc5646
+    rel .'lang'?: lang-rfc5646
 
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
-    rel _ 'external_references'?: [external-reference]
+    rel .'external_references'?: [external-reference]
 }
 
 type stix_markings_object {
@@ -192,7 +192,7 @@ type stix_markings_object {
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel _ 'object_marking_refs'?: [marking-definition-id]
+    rel .'object_marking_refs'?: [marking-definition-id]
 
     /// The **granular_markings** property specifies a list of granular markings applied to this object.
     ///
@@ -200,7 +200,7 @@ type stix_markings_object {
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel _ 'granular_markings'?: [granular-marking]
+    rel .'granular_markings'?: [granular-marking]
 }
 
 /// STIX defines a set of STIX Domain Objects (SDOs): Attack Pattern, Campaign, Course of Action, Grouping, Identity, Indicator, Infrastructure, Intrusion Set, Location, Malware, Malware Analysis, Note, Observed Data, Opinion, Report, Threat Actor, Tool, and Vulnerability.
@@ -208,13 +208,13 @@ type stix_markings_object {
 ///
 /// STIX Domain Objects are defined in section 4.
 type stix_domain_object {
-    rel _ is: stix_domain_relationship_object
-    rel _ is: stix_markings_object
+    rel .is: stix_domain_relationship_object
+    rel .is: stix_markings_object
 }
 
 type stix_relationship_object {
-    rel _ is: stix_domain_relationship_object
-    rel _ is: stix_markings_object
+    rel .is: stix_domain_relationship_object
+    rel .is: stix_markings_object
 }
 
 /// STIX defines a set of STIX Cyber-observable Objects (SCOs) for characterizing host-based and network-based information.
@@ -231,40 +231,40 @@ type stix_relationship_object {
 /// It is still possible to represent Cyber-observable Objects in this way, but this method has been deprecated.
 /// See section 2.13.
 type stix_cyber_observable_object {
-    rel _ is: stix_markings_object
+    rel .is: stix_markings_object
 
     /// This property defines whether or not the data contained within the object has been defanged.
     ///
     /// The default value for this property is `false`.
     ///
     /// This property **MUST NOT** be used on any STIX Objects other than SCOs.
-    rel _ 'defanged'?: bool
+    rel .'defanged'?: bool
 }
 
 /// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
 pub type attack-pattern {
-    rel _ 'type': 'attack-pattern'
-    rel _ 'id': attack-pattern-id
-    rel attack-pattern-id identifies: _
-    rel _ is: stix_domain_object
+    rel .'type': 'attack-pattern'
+    rel .'id': attack-pattern-id
+    rel attack-pattern-id identifies: .
+    rel .is: stix_domain_object
 
     /// A name used to identify the Attack Pattern.
-    rel _ 'name': string
+    rel .'name': string
 
     /// A description that provides more details and context about the Attack Pattern, potentially including its purpose and its key characteristics.
-    rel _ 'description'?: string
+    rel .'description'?: string
 
     /// Alternative names used to identify this Attack Pattern.
-    rel _ 'aliases'?: [string]
+    rel .'aliases'?: [string]
 
     /// The list of Kill Chain Phases for which this Attack Pattern is used.
-    rel _ 'kill_chain_phases'?: [kill-chain-phase]
+    rel .'kill_chain_phases'?: [kill-chain-phase]
 }
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, or groups.
 pub type identity {
-    rel _ 'type': 'identity'
-    rel _ 'id': identity-id
-    rel identity-id identifies: _
-    rel _ is: stix_domain_object
+    rel .'type': 'identity'
+    rel .'id': identity-id
+    rel identity-id identifies: .
+    rel .is: stix_domain_object
 }

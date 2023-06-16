@@ -137,8 +137,8 @@ fn map_array_mismatch() {
 #[test]
 fn array_map_without_brackets() {
     "
-    type foo { rel _ 'a': [string] }
-    type bar { rel _ 'b': [string] }
+    type foo { rel .'a': [string] }
+    type bar { rel .'b': [string] }
 
     map {
         foo {
@@ -176,11 +176,11 @@ fn only_entities_may_have_reverse_relationship() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a { rel _ is?: int }
-    type b { rel _ is?: int }
+    type a { rel .is?: int }
+    type b { rel .is?: int }
 
-    type c { rel _ 'p0': a }
-    type d { rel _ 'p1': b }
+    type c { rel .'p0': a }
+    type d { rel .'p1': b }
 
     map {
         c {
@@ -200,14 +200,14 @@ fn unresolved_transitive_map() {
 fn map_union() {
     "
     type foo {
-        rel _ 'type': 'foo'
+        rel .'type': 'foo'
     }
     type bar {
-        rel _ 'type': 'bar'
+        rel .'type': 'bar'
     }
     type foobar {
-        rel _ is?: foo
-        rel _ is?: bar
+        rel .is?: foo
+        rel .is?: bar
     }
 
     map {
@@ -221,8 +221,8 @@ fn map_union() {
 #[test]
 fn map_invalid_unit_rel_params() {
     "
-    type foo { rel _ 'foo': string }
-    type bar { rel _ 'bar': string }
+    type foo { rel .'foo': string }
+    type bar { rel .'bar': string }
 
     map {
         foo {

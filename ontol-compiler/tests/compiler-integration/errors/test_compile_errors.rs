@@ -91,8 +91,8 @@ fn map_union_unit_type() {
     type foo
     type bar
     type u {
-        rel _ is?: foo // ERROR unit type `foo` cannot be part of a union
-        rel _ is?: bar // ERROR unit type `bar` cannot be part of a union
+        rel .is?: foo // ERROR unit type `foo` cannot be part of a union
+        rel .is?: bar // ERROR unit type `bar` cannot be part of a union
     }
     "
     .compile_fail()
@@ -120,8 +120,8 @@ fn map_union_non_uniform_discriminators() {
     rel foo 'a': 'constant'
     rel bar 'b': 'other-constant'
     type u { // ERROR no uniform discriminator found for union variants
-        rel _ is?: foo
-        rel _ is?: bar
+        rel .is?: foo
+        rel .is?: bar
     }
     "
     .compile_fail()
@@ -131,8 +131,8 @@ fn map_union_non_uniform_discriminators() {
 fn non_disjoint_string_union() {
     "
     type u1 {
-        rel _ is?: 'a'
-        rel _ is?: 'a' // ERROR duplicate anonymous relationship
+        rel .is?: 'a'
+        rel .is?: 'a' // ERROR duplicate anonymous relationship
     }
     "
     .compile_fail()
@@ -142,16 +142,16 @@ fn non_disjoint_string_union() {
 fn union_tree() {
     "
     type u1 {
-        rel _ is?: '1a'
-        rel _ is?: '1b'
+        rel .is?: '1a'
+        rel .is?: '1b'
     }
     type u2 {
-        rel _ is?: '2a'
-        rel _ is?: '2b'
+        rel .is?: '2a'
+        rel .is?: '2b'
     }
     type u3 {
-        rel _ is?: u1 // ERROR union tree not supported
-        rel _ is?: u2 // ERROR union tree not supported
+        rel .is?: u1 // ERROR union tree not supported
+        rel .is?: u2 // ERROR union tree not supported
     }
     "
     .compile_fail()
@@ -161,8 +161,8 @@ fn union_tree() {
 fn sequence_mix1() {
     "
     type u {
-        rel _ is?: int
-        rel _ 0: string // ERROR invalid mix of relationship type for subject
+        rel .is?: int
+        rel .0: string // ERROR invalid mix of relationship type for subject
     }
     "
     .compile_fail();
@@ -236,7 +236,7 @@ fn mix_of_index_and_edge_type() {
     type foo
     type bar
 
-    rel foo 0(rel _ is: bar): string // ERROR cannot mix index relation identifiers and edge types
+    rel foo 0(rel .is: bar): string // ERROR cannot mix index relation identifiers and edge types
     "#
     .compile_fail()
 }
@@ -276,7 +276,7 @@ fn invalid_fmt_semantics() {
     "
     fmt () // ERROR fmt needs at least two transitions: `fmt a => b => c`
     fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
-    fmt () => _ => 'bar' // ERROR fmt only supports `_` at the final target position
+    fmt () => . => 'bar' // ERROR fmt only supports `_` at the final target position
     "
     .compile_fail()
 }
@@ -295,19 +295,19 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 #[test]
 fn complains_about_non_disambiguatable_string_id() {
     "
-    type animal_id { fmt '' => string => _ }
-    type plant_id { fmt '' => string => _ }
+    type animal_id { fmt '' => string => . }
+    type plant_id { fmt '' => string => . }
     type animal {
-        rel animal_id identifies: _
-        rel _ 'class': 'animal'
+        rel animal_id identifies: .
+        rel .'class': 'animal'
     }
     type plant {
-        rel plant_id identifies: _
-        rel _ 'class': 'plant'
+        rel plant_id identifies: .
+        rel .'class': 'plant'
     }
     type lifeform { // ERROR entity variants of the union are not uniquely identifiable
-        rel _ is?: animal
-        rel _ is?: plant
+        rel .is?: animal
+        rel .is?: plant
     }
     "
     .compile_fail();
@@ -350,7 +350,7 @@ fn compile_error_in_dependency() {
 fn rel_wildcard_span() {
     "
     with int {
-        rel _ // ERROR subject must be a domain type
+        rel . // ERROR subject must be a domain type
             'likes': int
     }
     "
@@ -366,7 +366,7 @@ fn fail_import_private_type() {
             "
             use 'dep' as dep
             pub type bar {
-                rel _ 'foo': dep.foo // ERROR private type
+                rel . 'foo': dep.foo // ERROR private type
             }
             ",
         ),
@@ -396,7 +396,7 @@ fn domain_named_relation() {
 fn namespace_not_found() {
     "
     type foo {
-        rel _ 'prop':
+        rel .'prop':
             dep // ERROR namespace not found
             .foo
     }
@@ -408,7 +408,7 @@ fn namespace_not_found() {
 fn constant_in_weird_place() {
     "
     type foo {
-        rel _ 'prop' := 42 // ERROR object must be a data type
+        rel .'prop' := 42 // ERROR object must be a data type
     }
     "
     .compile_fail();

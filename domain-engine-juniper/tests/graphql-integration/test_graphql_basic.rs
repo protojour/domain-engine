@@ -25,10 +25,10 @@ fn test_graphql_empty_schema() {
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
     let (env, schema) = "
-    pub type foo_id { fmt '' => string => _ }
+    pub type foo_id { fmt '' => string => . }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'prop': int
+        rel foo_id identifies: .
+        rel .'prop': int
     }
     "
     .compile_schema();
@@ -88,13 +88,13 @@ async fn test_graphql_basic_schema() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (env, schema) = "
-    pub type foo_id { fmt '' => string => _ }
+    pub type foo_id { fmt '' => string => . }
     type inner {
-        rel _ 'prop': string
+        rel .'prop': string
     }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'inner': inner
+        rel foo_id identifies: .
+        rel .'inner': inner
     }
     "
     .compile_schema();
@@ -163,14 +163,14 @@ async fn test_inner_struct() {
 async fn test_docs_introspection() {
     let (_env, schema) = "
     type Key {
-        rel _ is: string
+        rel .is: string
     }
 
     /// this is a type
     pub type PublicType {
-        rel Key identifies: _
+        rel Key identifies: .
         /// this is a field
-        rel _ 'relation': string
+        rel .'relation': string
     }
     "
     .compile_schema();

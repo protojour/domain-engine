@@ -1,12 +1,12 @@
 /// A position is the fundamental geometry construct.
 type position {
-    rel _ 0..2: int
+    rel .0..2: int
 }
 
 /// A list of two positions or more.
 type position-list {
-    rel _ ..2: position
-    rel _ 2..: position
+    rel . ..2: position
+    rel . 2..: position
 }
 
 /// To specify a constraint specific to Polygons, it is useful to
@@ -23,59 +23,59 @@ type position-list {
 ///   holes are clockwise.
 ///
 type position-ring {
-    rel _ ..4: position
-    rel _ 4..: position
+    rel . ..4: position
+    rel . 4..: position
 }
 
 /// For type "Point", the "coordinates" member is a single position.
 pub type Point {
-    rel _ 'type': 'Point'
-    rel _ 'coordinates': position
+    rel . 'type': 'Point'
+    rel . 'coordinates': position
 }
 
 /// For type "MultiPoint", the "coordinates" member is an array of
 /// positions.
 pub type MultiPoint {
-    rel _ 'type': 'MultiPoint'
-    rel _ 'coordinates': [position]
+    rel . 'type': 'MultiPoint'
+    rel . 'coordinates': [position]
 }
 
 /// For type "LineString", the "coordinates" member is an array of two or
 /// more positions.
 pub type LineString {
-    rel _ 'type': 'LineString'
-    rel _ 'coordinates': position-list
+    rel . 'type': 'LineString'
+    rel . 'coordinates': position-list
 }
 
 /// For type "MultiLineString", the "coordinates" member is an array of
 /// LineString coordinate arrays.
 pub type MultiLineString {
-    rel _ 'type': 'MultiLineString'
-    rel _ 'coordinates': [position-list]
+    rel . 'type': 'MultiLineString'
+    rel . 'coordinates': [position-list]
 }
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
 /// linear ring coordinate arrays.
 pub type Polygon {
-    rel _ 'type': 'Polygon'
-    rel _ 'coordinates': position-ring
+    rel . 'type': 'Polygon'
+    rel . 'coordinates': position-ring
 }
 
 /// For type "MultiPolygon", the "coordinates" member is an array of
 /// Polygon coordinate arrays.
 pub type MultiPolygon {
-    rel _ 'type': 'MultiPolygon'
-    rel _ 'coordinates': [position-ring]
+    rel . 'type': 'MultiPolygon'
+    rel . 'coordinates': [position-ring]
 }
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
 pub type LeafGeometry {
-    rel _ is?: Point
-    rel _ is?: MultiPoint
-    rel _ is?: LineString
-    rel _ is?: MultiLineString
-    rel _ is?: Polygon
-    rel _ is?: MultiPolygon
+    rel . is?: Point
+    rel . is?: MultiPoint
+    rel . is?: LineString
+    rel . is?: MultiLineString
+    rel . is?: Polygon
+    rel . is?: MultiPolygon
 }
 
 
@@ -84,8 +84,8 @@ pub type LeafGeometry {
 /// value of "geometries" is an array.  Each element of this array is a
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
 pub type GeometryCollection {
-    rel _ 'type': 'GeometryCollection'
-    rel _ 'geometries': [LeafGeometry]
+    rel . 'type': 'GeometryCollection'
+    rel . 'geometries': [LeafGeometry]
 }
 
 /// A Geometry object represents points, curves, and surfaces in
@@ -94,18 +94,18 @@ pub type GeometryCollection {
 ///
 /// Note: Geometry is an extension of LeafGeometry + GeometryCollection.
 pub type Geometry {
-    rel _ is?: Point
-    rel _ is?: MultiPoint
-    rel _ is?: LineString
-    rel _ is?: MultiLineString
-    rel _ is?: Polygon
-    rel _ is?: MultiPolygon
-    rel _ is?: GeometryCollection
+    rel . is?: Point
+    rel . is?: MultiPoint
+    rel . is?: LineString
+    rel . is?: MultiLineString
+    rel . is?: Polygon
+    rel . is?: MultiPolygon
+    rel . is?: GeometryCollection
 }
 
 type GeometryOrNull {
     // TODO: Not supported yet (union tree):
-    rel _ is: Geometry
+    rel . is: Geometry
     // rel _ is?: ()
 }
 

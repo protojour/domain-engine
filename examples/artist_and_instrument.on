@@ -1,8 +1,8 @@
 pub type artist-id {
-    fmt '' => 'artist/' => uuid => _
+    fmt '' => 'artist/' => uuid => .
 }
 pub type instrument-id {
-    fmt '' => 'instrument/' => uuid => _
+    fmt '' => 'instrument/' => uuid => .
 }
 
 pub type artist
@@ -14,12 +14,12 @@ pub type record
 rel record 'name': string
 
 pub type instrument {
-    rel instrument-id identifies: _
-    rel _ 'ID': instrument-id
-    rel _ 'name': string
+    rel instrument-id identifies: .
+    rel .'ID': instrument-id
+    rel .'name': string
 }
 
 pub type plays
 rel plays 'how_much': string
 
-rel [artist] 'plays'(rel _ is: plays)::'played_by' [instrument]
+rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]

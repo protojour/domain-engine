@@ -11,8 +11,8 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 fn test_fake_primitives() {
     "
     pub type foo {
-        rel _ 's': string
-        rel _ 'i': int
+        rel .'s': string
+        rel .'i': int
     }
     "
     .compile_ok(|test_env| {
@@ -32,8 +32,8 @@ fn test_fake_primitives() {
 fn test_fake_string_like_types() {
     "
     pub type foo {
-        rel _ 'id': uuid
-        rel _ 'created_at': datetime
+        rel .'id': uuid
+        rel .'created_at': datetime
     }
     "
     .compile_ok(|test_env| {

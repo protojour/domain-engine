@@ -2,36 +2,36 @@
 // database
 
 type archive_item_id {
-    fmt '' => 'archive_item/' => uuid => _
+    fmt '' => 'archive_item/' => uuid => .
 }
 type archive_group_id {
-    fmt '' => 'archive_group/' => uuid => _
+    fmt '' => 'archive_group/' => uuid => .
 }
 type item_type {
-    rel _ is?: 'worthless junk'
-    rel _ is?: 'ancient treasure'
-    rel _ is?: 'alien artifact'
+    rel .is?: 'worthless junk'
+    rel .is?: 'ancient treasure'
+    rel .is?: 'alien artifact'
 }
 type archive_item {
-    rel archive_item_id identifies: _
-    rel _ 'created': datetime
-    rel _ 'updated': datetime
-    rel _ 'archived': datetime
-    rel _ 'name': string
-    rel _ 'description': string
-    rel _ 'asset_score': int
-    rel _ 'type': item_type
+    rel archive_item_id identifies: .
+    rel .'created': datetime
+    rel .'updated': datetime
+    rel .'archived': datetime
+    rel .'name': string
+    rel .'description': string
+    rel .'asset_score': int
+    rel .'type': item_type
 }
 type archive_group {
-    rel archive_group_id identifies: _
-    rel _ 'created': datetime
-    rel _ 'updated': datetime
-    rel _ 'archived': datetime
-    rel _ 'name': string
-    rel _ 'description': string
-    rel _ 'start_date': datetime
-    rel _ 'end_date': datetime
-    rel [_] 'archive_items'::'archive_groups' [archive_item]
+    rel archive_group_id identifies: .
+    rel .'created': datetime
+    rel .'updated': datetime
+    rel .'archived': datetime
+    rel .'name': string
+    rel .'description': string
+    rel .'start_date': datetime
+    rel .'end_date': datetime
+    rel [.] 'archive_items'::'archive_groups' [archive_item]
 }
 
 // -----------------------------------
@@ -39,36 +39,36 @@ type archive_group {
 
 /// ID for an Archive Object
 pub type ArchiveObjectID {
-    fmt '' => 'archive_item/' => uuid => _
+    fmt '' => 'archive_item/' => uuid => .
 }
 /// ID for an Archive Collection
 pub type ArchiveCollectionID {
-    fmt '' => 'archive_group/' => uuid => _
+    fmt '' => 'archive_group/' => uuid => .
 }
 /// Common dates for Archive entities
 type ArchiveDates {
-    rel _ 'createdAt': datetime
-    rel _ 'updatedAt': datetime
-    rel _ 'archivedAt': datetime
+    rel .'createdAt': datetime
+    rel .'updatedAt': datetime
+    rel .'archivedAt': datetime
 }
 /// An Archived Object
 pub type ArchiveObject {
-    rel ArchiveObjectID identifies: _
-    rel _ 'dates': ArchiveDates
-    rel _ 'name': string
-    rel _ 'description': string
-    rel _ 'assetScoreSquared': int
-    rel _ 'kind': item_type
+    rel ArchiveObjectID identifies: .
+    rel .'dates': ArchiveDates
+    rel .'name': string
+    rel .'description': string
+    rel .'assetScoreSquared': int
+    rel .'kind': item_type
 }
 /// An Archived Object Collection
 pub type ArchiveCollection {
-    rel ArchiveCollectionID identifies: _
-    rel _ 'dates': ArchiveDates
-    rel _ 'name': string
-    rel _ 'description'?: string
-    rel _ 'startDate': datetime
-    rel _ 'endDate': datetime
-    rel [_] 'archiveItems'::'archiveGroups' [ArchiveObject]
+    rel ArchiveCollectionID identifies: .
+    rel .'dates': ArchiveDates
+    rel .'name': string
+    rel .'description'?: string
+    rel .'startDate': datetime
+    rel .'endDate': datetime
+    rel [.] 'archiveItems'::'archiveGroups' [ArchiveObject]
 }
 
 map {

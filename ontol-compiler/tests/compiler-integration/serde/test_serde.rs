@@ -29,9 +29,9 @@ fn test_serde_value_type() {
 #[test]
 fn test_serde_booleans() {
     "
-    pub type f { rel _ is: false }
-    pub type t { rel _ is: true }
-    pub type b { rel _ is: bool }
+    pub type f { rel .is: false }
+    pub type t { rel .is: true }
+    pub type b { rel .is: bool }
     "
     .compile_ok(|env| {
         let [f, t, b] = ["f", "t", "b"].map(|n| TypeBinding::new(&env, n));
@@ -147,8 +147,8 @@ fn test_serde_noop_intersection() {
     "
     type bar
     pub type foo {
-        rel _ is: bar
-        rel _ 'foobar': bar
+        rel .is: bar
+        rel .'foobar': bar
     }
     "
     .compile_ok(|env| {
@@ -246,7 +246,7 @@ fn test_serde_datetime() {
 fn test_num_default() {
     "
     pub type foo {
-        rel _ 'bar'(rel _ default := 42): int
+        rel .'bar'(rel .default := 42): int
     }
     "
     .compile_ok(|env| {
@@ -264,8 +264,8 @@ fn test_jsonml() {
     type attributes
 
     pub type element {
-        rel _ is?: tag
-        rel _ is?: string
+        rel .is?: tag
+        rel .is?: string
     }
 
     rel tag 0: tag_name

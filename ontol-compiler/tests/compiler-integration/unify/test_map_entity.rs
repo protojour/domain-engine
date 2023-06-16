@@ -9,32 +9,32 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth
 #[test]
 fn test_extract_rel_params() {
     "
-    pub type a1_id { fmt '' => 'a1/' => uuid => _ }
-    pub type a2_id { fmt '' => 'a2/' => uuid => _ }
-    pub type b1_id { fmt '' => 'b1/' => uuid => _ }
-    pub type b2_id { fmt '' => 'b2/' => uuid => _ }
+    pub type a1_id { fmt '' => 'a1/' => uuid => . }
+    pub type a2_id { fmt '' => 'a2/' => uuid => . }
+    pub type b1_id { fmt '' => 'b1/' => uuid => . }
+    pub type b2_id { fmt '' => 'b2/' => uuid => . }
 
     type a2 {
-        rel a2_id identifies: _
-        rel _ 'foo': string
+        rel a2_id identifies: .
+        rel .'foo': string
     }
     type b2 {
-        rel b2_id identifies: _
-        rel _ 'foo': string
-        rel _ 'bar': string
+        rel b2_id identifies: .
+        rel .'foo': string
+        rel .'bar': string
     }
 
     type a_edge {
-        rel _ 'bar': string
+        rel .'bar': string
     }
 
     pub type a1 {
-        rel a1_id identifies: _
-        rel _ 'foreign'(rel _ is: a_edge): a2
+        rel a1_id identifies: .
+        rel .'foreign'(rel .is: a_edge): a2
     }
     pub type b1 {
-        rel b1_id identifies: _
-        rel _ 'foreign': b2
+        rel b1_id identifies: .
+        rel .'foreign': b2
     }
 
     map {
@@ -95,30 +95,30 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
-    pub type a_id { fmt '' => 'a/' => uuid => _ }
-    pub type b_id { fmt '' => 'a/' => uuid => _ }
-    pub type a_inner_id { fmt '' => 'a_inner/' => uuid => _ }
-    pub type b_inner_id { fmt '' => 'b_inner/' => uuid => _ }
+    pub type a_id { fmt '' => 'a/' => uuid => . }
+    pub type b_id { fmt '' => 'a/' => uuid => . }
+    pub type a_inner_id { fmt '' => 'a_inner/' => uuid => . }
+    pub type b_inner_id { fmt '' => 'b_inner/' => uuid => . }
 
     type a_inner {
-        rel a_inner_id identifies: _
-        rel _ 'a_prop': string
+        rel a_inner_id identifies: .
+        rel .'a_prop': string
     }
     type b_inner {
-        rel b_inner_id identifies: _
-        rel _ 'b_prop': string
+        rel b_inner_id identifies: .
+        rel .'b_prop': string
     }
 
-    type a_edge { rel _ 'aa': string }
-    type b_edge { rel _ 'bb': string }
+    type a_edge { rel .'aa': string }
+    type b_edge { rel .'bb': string }
 
     pub type a {
-        rel a_id identifies: _
-        rel _ 'foreign'(rel _ is: a_edge): a_inner
+        rel a_id identifies: .
+        rel .'foreign'(rel .is: a_edge): a_inner
     }
     pub type b {
-        rel b_id identifies: _
-        rel _ 'foreign'(rel _ is: b_edge): b_inner
+        rel b_id identifies: .
+        rel .'foreign'(rel .is: b_edge): b_inner
     }
 
     map {
@@ -159,46 +159,46 @@ fn test_rel_params_implicit_map() {
 }
 
 const WORK: &str = "
-pub type worker_id { fmt '' => 'worker/' => uuid => _ }
-pub type tech_id { fmt '' => 'tech/' => uuid => _ }
+pub type worker_id { fmt '' => 'worker/' => uuid => . }
+pub type tech_id { fmt '' => 'tech/' => uuid => . }
 
 pub type worker
 pub type technology
 
 with worker {
-    rel _ 'ID': worker_id
-    rel worker_id identifies: _
-    rel _ 'name': string
+    rel .'ID': worker_id
+    rel worker_id identifies: .
+    rel .'name': string
 
-    rel _ 'technologies': [technology]
+    rel .'technologies': [technology]
 }
 
 with technology {
-    rel _ 'ID': tech_id
-    rel tech_id identifies: _
-    rel _ 'name': string
+    rel .'ID': tech_id
+    rel tech_id identifies: .
+    rel .'name': string
 }
 ";
 
 const DEV: &str = "
-pub type lang_id { fmt '' => uuid => _ }
-pub type dev_id { fmt '' => uuid => _ }
+pub type lang_id { fmt '' => uuid => . }
+pub type dev_id { fmt '' => uuid => . }
 
 pub type language
 pub type developer
 
 with language {
-    rel _ 'id': lang_id
-    rel lang_id identifies: _
+    rel .'id': lang_id
+    rel lang_id identifies: .
 
-    rel _ 'name': string
-    rel _ 'developers': [developer]
+    rel .'name': string
+    rel .'developers': [developer]
 }
 
 with developer {
-    rel _ 'id': dev_id
-    rel dev_id identifies: _
-    rel _ 'name': string
+    rel .'id': dev_id
+    rel dev_id identifies: .
+    rel .'name': string
 }
 ";
 

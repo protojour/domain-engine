@@ -14,8 +14,8 @@ fn id_cannot_identify_two_things() {
     type foo
     type bar
     type id {
-        rel _ identifies: foo
-        rel _ identifies: bar // ERROR already identifies another type
+        rel .identifies: foo
+        rel .identifies: bar // ERROR already identifies another type
     }
     "
     .compile_fail();
@@ -24,10 +24,10 @@ fn id_cannot_identify_two_things() {
 #[test]
 fn entity_without_inherent_id() {
     "
-    pub type some_id { fmt '' => string => _ }
+    pub type some_id { fmt '' => string => . }
     pub type entity {
-        rel some_id identifies: _
-        rel _ 'foo': string
+        rel some_id identifies: .
+        rel .'foo': string
     }
     "
     .compile_ok(|env| {
@@ -39,11 +39,11 @@ fn entity_without_inherent_id() {
 #[test]
 fn identifier_as_property() {
     "
-    type foo_id { rel _ is: string }
+    type foo_id { rel . is: string }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'key': foo_id
-        rel _ 'children': [foo]
+        rel foo_id identifies: .
+        rel .'key': foo_id
+        rel .'children': [foo]
     }
     "
     .compile_ok(|env| {
@@ -196,11 +196,11 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    pub type node_id { fmt '' => string => _ }
+    pub type node_id { fmt '' => string => . }
     pub type node {
-        rel node_id identifies: _
-        rel _ 'name': string
-        rel _ 'children'::'parent'? [node]
+        rel node_id identifies: .
+        rel .'name': string
+        rel .'children'::'parent'? [node]
     }
     "
     .compile_ok(|env| {
@@ -245,10 +245,10 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    pub type node_id { fmt '' => string => _ }
+    pub type node_id { fmt '' => string => . }
     pub type node {
-        rel node_id identifies: _
-        rel _ 'children'::'parent' [_]
+        rel node_id identifies: .
+        rel .'children'::'parent' [.]
     }
     "
     .compile_ok(|env| {
@@ -338,16 +338,16 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub type lang_id { fmt '' => string => _ }
-    pub type prog_id { fmt '' => string => _ }
+    pub type lang_id { fmt '' => string => . }
+    pub type prog_id { fmt '' => string => . }
     pub type language {
-        rel lang_id identifies: _
-        rel _ 'lang-id': lang_id
+        rel lang_id identifies: .
+        rel .'lang-id': lang_id
     }
     pub type programmer {
-        rel prog_id identifies: _
-        rel _ 'name': string
-        rel _ 'favorite-language': language
+        rel prog_id identifies: .
+        rel .'name': string
+        rel .'favorite-language': language
     }
     "
     .compile_ok(|env| {
@@ -362,27 +362,27 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    pub type animal_id { fmt '' => 'animal/' => string => _ }
-    pub type plant_id { fmt '' => 'plant/' => string => _ }
-    pub type owner_id { fmt '' => string => _ }
+    pub type animal_id { fmt '' => 'animal/' => string => . }
+    pub type plant_id { fmt '' => 'plant/' => string => . }
+    pub type owner_id { fmt '' => string => . }
 
     pub type lifeform
     pub type animal {
-        rel animal_id identifies: _
-        rel _ 'class': 'animal'
-        rel _ 'eats': [lifeform]
+        rel animal_id identifies: .
+        rel .'class': 'animal'
+        rel .'eats': [lifeform]
     }
     pub type plant {
-        rel plant_id identifies: _
-        rel _ 'class': 'plant'
+        rel plant_id identifies: .
+        rel .'class': 'plant'
     }
     rel lifeform is?: animal
     rel lifeform is?: plant
 
     pub type owner {
-        rel owner_id identifies: _
-        rel _ 'name': string
-        rel _ 'owns': [lifeform]
+        rel owner_id identifies: .
+        rel .'name': string
+        rel .'owns': [lifeform]
     }
     "
     .compile_ok(|env| {

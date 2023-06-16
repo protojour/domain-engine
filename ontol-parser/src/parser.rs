@@ -115,7 +115,7 @@ fn with_statement(
 }
 
 fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
-    let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_underscore())
+    let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_dot())
         .map(|(unit_or_seq, (opt_ty, span))| (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span)))
         .or(sigil('=').ignore_then(
             spanned(pattern())
@@ -125,7 +125,7 @@ fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
     doc_comments()
         .then(keyword(Token::Rel))
         // subject
-        .then(with_unit_or_seq(spanned_ty_or_underscore()))
+        .then(with_unit_or_seq(spanned_ty_or_dot()))
         // relation
         .then(relation(stmt_parser))
         // object
@@ -211,7 +211,7 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         // transitions
         .then(
             just(Token::FatArrow)
-                .ignore_then(spanned_ty_or_underscore())
+                .ignore_then(spanned_ty_or_dot())
                 .repeated(),
         )
         .map(|(((docs, kw), origin), transitions)| FmtStatement {
@@ -345,8 +345,8 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     .labelled("expression pattern")
 }
 
-fn spanned_ty_or_underscore() -> impl AstParser<Spanned<Option<Type>>> {
-    spanned(ty().map(Some).or(sigil('_').map(|_| None)))
+fn spanned_ty_or_dot() -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(ty().map(Some).or(sigil('.').map(|_| None)))
 }
 
 /// Type parser
@@ -553,8 +553,8 @@ mod tests {
         /// doc comment
         type bar {
             rel a '': b
-            rel _ lol: c
-            fmt a => _ => _
+            rel .lol: c
+            fmt a => . => .
         }
         ";
 

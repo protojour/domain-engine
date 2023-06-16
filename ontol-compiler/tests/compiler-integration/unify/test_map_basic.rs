@@ -53,10 +53,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     pub type celsius {
-        rel _ is: int
+        rel .is: int
     }
     pub type fahrenheit {
-        rel _ is: int
+        rel .is: int
     }
 
     map {
@@ -74,10 +74,10 @@ fn test_temperature() {
 fn test_nested_optional_attribute() {
     "
     type seconds {
-        rel _ is: int
+        rel .is: int
     }
     type years {
-        rel _ is: int
+        rel .is: int
     }
 
     map {
@@ -86,10 +86,10 @@ fn test_nested_optional_attribute() {
     }
 
     pub type person {
-        rel _ 'age'?: years
+        rel .'age'?: years
     }
     pub type creature {
-        rel _ 'age'?: seconds
+        rel .'age'?: seconds
     }
 
     unify {
@@ -98,10 +98,10 @@ fn test_nested_optional_attribute() {
     }
 
     pub type person_container {
-        rel _ 'person'?: person
+        rel .'person'?: person
     }
     pub type creature_container {
-        rel _ 'creature'?: creature
+        rel .'creature'?: creature
     }
 
     unify {
@@ -193,25 +193,25 @@ fn test_deep_structural_map() {
     type foo_inner
 
     with foo {
-        rel _ 'a': string
-        rel _ 'inner': foo_inner
+        rel .'a': string
+        rel .'inner': foo_inner
     }
     with foo_inner {
-        rel _ 'b': string
-        rel _ 'c': string
+        rel .'b': string
+        rel .'c': string
     }
 
     pub type bar
     type bar_inner
 
     with bar {
-        rel _ 'a': string
-        rel _ 'b': string
-        rel _ 'inner': bar_inner
+        rel .'a': string
+        rel .'b': string
+        rel .'inner': bar_inner
     }
 
     with bar_inner {
-        rel _ 'c': string
+        rel .'c': string
     }
 
     map {
@@ -281,10 +281,10 @@ fn test_map_matching_array() {
 
 // map call inside array
 const MAP_IN_ARRAY: &str = "
-type foo { rel _ 'f': string }
-type bar { rel _ 'b': string }
-pub type foos { rel _ 'foos': [foo] }
-pub type bars { rel _ 'bars': [bar] }
+type foo { rel .'f': string }
+type bar { rel .'b': string }
+pub type foos { rel .'foos': [foo] }
+pub type bars { rel .'bars': [bar] }
 
 map {
     foos { 'foos': [x] }
@@ -353,20 +353,20 @@ fn test_map_in_array_item_many() {
 #[test]
 fn test_aggr_cross_parallel() {
     "
-    type foo { rel _ 'f': string }
-    type bar { rel _ 'b': string }
+    type foo { rel .'f': string }
+    type bar { rel .'b': string }
     map {
         foo { 'f': x }
         bar { 'b': x }
     }
 
     pub type foos {
-        rel _ 'f1': [foo]
-        rel _ 'f2': [foo]
+        rel .'f1': [foo]
+        rel .'f2': [foo]
     }
     pub type bars {
-        rel _ 'b1': [bar]
-        rel _ 'b2': [bar]
+        rel .'b1': [bar]
+        rel .'b2': [bar]
     }
     map {
         foos {
@@ -392,28 +392,28 @@ fn test_aggr_cross_parallel() {
 #[test]
 fn test_aggr_multi_level() {
     "
-    type foo { rel _ 'P': string }
-    type bar { rel _ 'Q': string }
+    type foo { rel .'P': string }
+    type bar { rel .'Q': string }
     map {
         foo { 'P': x }
         bar { 'Q': x }
     }
 
     pub type f0 {
-        rel _ 'a': [foo]
-        rel _ 'b': [foo]
+        rel .'a': [foo]
+        rel .'b': [foo]
     }
     pub type f1 {
-        rel _ 'a': [f0]
-        rel _ 'b': [f0]
+        rel .'a': [f0]
+        rel .'b': [f0]
     }
     pub type b0 {
-        rel _ 'a': [bar]
-        rel _ 'b': [bar]
+        rel .'a': [bar]
+        rel .'b': [bar]
     }
     pub type b1 {
-        rel _ 'a': [b0]
-        rel _ 'b': [b0]
+        rel .'a': [b0]
+        rel .'b': [b0]
     }
     map {
         f1 {
@@ -456,15 +456,15 @@ fn test_flat_map1() {
     pub type bar
 
     with foo {
-        rel _ 'a': string
-        rel _ 'inner': [foo_inner]
+        rel .'a': string
+        rel .'inner': [foo_inner]
     }
     with foo_inner {
-        rel _ 'b': string
+        rel .'b': string
     }
     with bar {
-        rel _ 'a': string
-        rel _ 'b': string
+        rel .'a': string
+        rel .'b': string
     }
 
     map {
@@ -498,14 +498,14 @@ fn test_map_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     pub type one {
-        rel _ 'a': string
-        rel _ 'b': string
+        rel .'a': string
+        rel .'b': string
     }
     pub type two {
-        rel _ 'a': string
-        rel _ 'b': string
-        rel _ 'c': string
-        rel _ 'd': string
+        rel .'a': string
+        rel .'b': string
+        rel .'c': string
+        rel .'d': string
     }
 
     map {
@@ -552,10 +552,10 @@ fn test_map_delegation() {
             use 'si' as si
 
             pub type car {
-                rel _ 'length': si.meters
+                rel .'length': si.meters
             }
             pub type vehicle {
-                rel _ 'length': si.millimeters
+                rel .'length': si.millimeters
             }
 
             map {
@@ -572,10 +572,10 @@ fn test_map_delegation() {
             SourceName("si"),
             "
             pub type meters {
-                rel _ is: int
+                rel .is: int
             }
             pub type millimeters {
-                rel _ is: int
+                rel .is: int
             }
 
             map {
@@ -605,12 +605,12 @@ fn test_map_delegation() {
 fn test_map_dependent_scoping() {
     "
     pub type one {
-        rel _ 'total_weight': int
-        rel _ 'net_weight': int
+        rel .'total_weight': int
+        rel .'net_weight': int
     }
     pub type two {
-        rel _ 'net_weight': int
-        rel _ 'container_weight': int
+        rel .'net_weight': int
+        rel .'container_weight': int
     }
 
     map {

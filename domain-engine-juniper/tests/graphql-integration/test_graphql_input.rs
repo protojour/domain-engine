@@ -6,10 +6,10 @@ use crate::{mock_gql_context, Exec, TestCompileSchema};
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
     let (_, schema) = "
-    pub type foo_id { fmt '' => string => _ }
+    pub type foo_id { fmt '' => string => . }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'prop': 'const'
+        rel foo_id identifies: .
+        rel .'prop': 'const'
     }
     "
     .compile_schema();
