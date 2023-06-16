@@ -176,6 +176,7 @@ macro_rules! return0 {
                 $vm.program_counter = program_counter;
                 $vm.proc_address = proc_address;
                 let returning_stack = $processor.stack_mut();
+                returning_stack.truncate(1);
                 let value = returning_stack.drain(0..1).next().unwrap();
                 stack.push(value);
                 std::mem::swap(returning_stack, &mut stack);
