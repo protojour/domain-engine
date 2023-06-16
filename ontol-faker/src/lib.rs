@@ -84,8 +84,10 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 *def_id,
             ),
             SerdeOperator::String(def_id) => {
-                let string: std::string::String =
-                    fake::faker::name::en::Name().fake_with_rng(self.rng);
+                let mut string: std::string::String =
+                    fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);
+                // Remove the last dot
+                string.pop();
                 Value::new(Data::String(string.into()), *def_id)
             }
             SerdeOperator::StringConstant(s, def_id) => {

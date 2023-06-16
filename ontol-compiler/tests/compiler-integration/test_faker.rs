@@ -21,8 +21,8 @@ fn test_fake_primitives() {
         assert_eq!(
             foo.serialize_identity_json(&foo.new_fake(ProcessorMode::Create)),
             json!({
-                "s": "Patricia McClure",
-                "i": -1732221745,
+                "s": "mollitia sit porro tenetur",
+                "i": 2117826670,
             })
         );
     });
@@ -78,14 +78,14 @@ fn test_fake_guitar_synth() {
         assert_eq!(
             artist.serialize_identity_json(&artist.new_fake(ProcessorMode::Create)),
             json!({
-                "name": "Demarco Price",
+                "name": "amet consectetur tempore",
                 "plays": [
                     {
                         "type": "guitar",
                         "string_count": -1732221745,
                         "played-by": [
                             {
-                                "name": "Chyna Wuckert",
+                                "name": "et repudiandae ut molestiae earum",
                                 "plays": [
                                     {
                                         "instrument-id": "guitar/552e9fe5-a078-ccaa-f029-bcccb1436ec3"
