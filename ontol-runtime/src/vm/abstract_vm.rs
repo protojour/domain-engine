@@ -165,21 +165,27 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
     }
 }
 
+/// Return Local(0) from a function, yielding control to the next pushed stack frame,
+/// or returning from the VM if there are no more frames.
 macro_rules! return0 {
     ($vm:ident, $processor:ident) => {
         match $vm.call_stack.pop() {
             Some(CallStackFrame {
-                mut stack,
+                stack: mut next_stack,
                 program_counter,
                 proc_address,
             }) => {
                 $vm.program_counter = program_counter;
                 $vm.proc_address = proc_address;
                 let returning_stack = $processor.stack_mut();
+
+                // transfer return value to next stack frame
                 returning_stack.truncate(1);
-                let value = returning_stack.drain(0..1).next().unwrap();
-                stack.push(value);
-                std::mem::swap(returning_stack, &mut stack);
+                next_stack.push(returning_stack.drain(0..1).next().unwrap());
+
+                // swap stacks so that the processor's stack is now `next_stack`
+                // instead of `returning_stack`.
+                std::mem::swap(returning_stack, &mut next_stack);
             }
             None => {
                 return;
