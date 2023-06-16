@@ -8,6 +8,7 @@ members = [
     "ontol-runtime",
     "ontol-compiler",
     "ontol-parser",
+    "ontol-cli",
     "ontol-test-utils"
 ]
 

@@ -1,0 +1,29 @@
+[package]
+name = "ontol-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ontol-compiler.path = "../ontol-compiler"
+ontol-runtime.path = "../ontol-runtime"
+ontol-parser.path = "../ontol-parser"
+tracing.workspace = true
+tracing-subscriber.workspace = true
+smartstring.workspace = true
+indexmap.workspace = true
+fnv.workspace = true
+chumsky = "0.9"
+clap = { version = "4.3.4", features = ["derive"] }
+
+[dev-dependencies]
+ontol-test-utils.path = "../ontol-test-utils"
+serde_json.workspace = true
+tracing-subscriber.workspace = true
+test-log.workspace = true
+assert_matches = "1"
+pretty_assertions = "1"
+indoc = "2"
+
+[[bin]]
+name = "ontol"
+path = "src/main.rs"
