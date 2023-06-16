@@ -551,7 +551,7 @@ mod tests {
         );
 
         assert_eq!(
-            "[{subj(0, 0): 'a', subj(0, 1): 'b0'}, {subj(0, 0): 'a', subj(0, 1): 'b1'}]",
+            "[{S:0:0 -> 'a', S:0:1 -> 'b0'}, {S:0:0 -> 'a', S:0:1 -> 'b1'}]",
             format!("{}", ValueDebug(&output))
         );
     }
@@ -609,7 +609,7 @@ mod tests {
         );
 
         assert_eq!(
-            "{subj(0, 42): int(666)}",
+            "{S:0:42 -> int(666)}",
             format!(
                 "{}",
                 ValueDebug(
