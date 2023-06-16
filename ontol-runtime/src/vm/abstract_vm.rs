@@ -53,6 +53,7 @@ pub trait Processor {
     fn push_constant(&mut self, k: i64, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
+    fn type_pun(&mut self, local: Local, def_id: DefId);
 }
 
 impl<'l, P: Processor> AbstractVm<'l, P> {
@@ -159,6 +160,10 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
                     } else {
                         self.program_counter += 1;
                     }
+                }
+                OpCode::TypePun(local, def_id) => {
+                    processor.type_pun(*local, *def_id);
+                    self.program_counter += 1;
                 }
             }
         }

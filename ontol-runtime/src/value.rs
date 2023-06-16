@@ -244,18 +244,7 @@ impl<'v> Display for ValueDebug<'v> {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {
-                    match prop.role {
-                        Role::Subject => write!(f, "subj")?,
-                        Role::Object => write!(f, "obj")?,
-                    }
-
-                    write!(
-                        f,
-                        "({}, {}): {}",
-                        prop.relation_id.0 .0 .0,
-                        prop.relation_id.0 .1,
-                        AttrDebug(attr),
-                    )?;
+                    write!(f, "{prop} -> {}", AttrDebug(attr),)?;
 
                     if iter.peek().is_some() {
                         write!(f, ", ")?;
@@ -287,7 +276,7 @@ impl<'a> Display for AttrDebug<'a> {
         write!(f, "{}", ValueDebug(&attr.value))?;
 
         if !attr.rel_params.is_unit() {
-            write!(f, "~{}", ValueDebug(&attr.rel_params))?;
+            write!(f, "::{}", ValueDebug(&attr.rel_params))?;
         }
 
         Ok(())

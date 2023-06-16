@@ -159,6 +159,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
 
                 self.builder.append(block, Ir::Call(proc), Delta(0), span);
+                if let Some(alias) = to.alias {
+                    let local = self.builder.top();
+                    self.builder
+                        .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                }
             }
             ontol_hir::Kind::Seq(_label, _attr) => {
                 todo!("seq");

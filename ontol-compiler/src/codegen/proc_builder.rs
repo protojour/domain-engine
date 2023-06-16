@@ -154,6 +154,7 @@ impl ProcBuilder {
                         predicate,
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
+                    Ir::TypePun(local, def_id) => OpCode::TypePun(local, def_id),
                 };
                 output.push((opcode, span));
             }

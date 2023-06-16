@@ -86,6 +86,8 @@ pub enum OpCode {
     PushConstant(i64, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
+    /// Overwrite runtime type info with a new type
+    TypePun(Local, DefId),
 }
 
 /// A reference to a local on the value stack during procedure execution.

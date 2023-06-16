@@ -87,9 +87,9 @@ impl Processor for OntolProcessor {
 
     #[inline(always)]
     fn bump(&mut self, source: Local) {
-        let top = self.stack.len();
+        let last = self.stack.len();
         self.stack.push(Value::unit());
-        self.stack.swap(source.0 as usize, top);
+        self.stack.swap(source.0 as usize, last);
     }
 
     #[inline(always)]
@@ -190,6 +190,11 @@ impl Processor for OntolProcessor {
             }
             Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::Int(0)),
         }
+    }
+
+    #[inline(always)]
+    fn type_pun(&mut self, local: Local, def_id: DefId) {
+        self.local_mut(local).type_def_id = def_id;
     }
 }
 

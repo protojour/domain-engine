@@ -35,6 +35,7 @@ pub enum Ir {
     AppendAttr2(Local),
     Constant(i64, DefId),
     Cond(Predicate, BlockIndex),
+    TypePun(Local, DefId),
 }
 
 #[derive(Clone, Debug)]

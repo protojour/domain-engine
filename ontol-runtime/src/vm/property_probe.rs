@@ -176,6 +176,8 @@ impl Processor for PropProcessor {
     fn cond_predicate(&mut self, _predicate: &Predicate) -> bool {
         false
     }
+
+    fn type_pun(&mut self, _local: Local, _def_id: DefId) {}
 }
 
 impl PropProcessor {
