@@ -258,7 +258,7 @@ fn artist_etc_routing() {
                     ai.artist {
                         'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
                         'name': n
-                        'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        'plays': [p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                 }
 

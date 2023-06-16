@@ -391,42 +391,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ),
                                 (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
                                 (ty, None) => {
-                                    match &object.kind {
-                                        ExprKind::Variable(object_expr_id) => {
-                                            // implicit mapping; for now the object needs to be a variable
-
-                                            let edge_expr_id = ctx
-                                                .object_to_edge_expr_id
-                                                .entry(*object_expr_id)
-                                                .or_insert_with(|| {
-                                                    let edge_expr_id =
-                                                        self.expressions.alloc_expr_id();
-                                                    ctx.expr_variables.insert(
-                                                        edge_expr_id,
-                                                        ExpressionVariable {
-                                                            variable: ctx.var_allocator.alloc(),
-                                                            ctrl_group: None,
-                                                            hir_arms: Default::default(),
-                                                        },
-                                                    );
-                                                    edge_expr_id
-                                                });
-
-                                            self.build_node(
-                                                &Expr {
-                                                    id: *edge_expr_id,
-                                                    kind: ExprKind::Variable(*edge_expr_id),
-                                                    span: *prop_span,
-                                                },
-                                                Some(ty),
-                                                ctx,
-                                            )
-                                        }
-                                        _ => self.error_node(
-                                            CompileError::TODO(smart_format!("")),
-                                            prop_span,
-                                        ),
-                                    }
+                                    self.build_implicit_rel_node(ty, object, *prop_span, ctx)
                                 }
                             };
 
@@ -577,6 +542,47 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 span,
             },
         )
+    }
+
+    fn build_implicit_rel_node(
+        &mut self,
+        ty: TypeRef<'m>,
+        object: &Expr,
+        prop_span: SourceSpan,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> TypedHirNode<'m> {
+        match &object.kind {
+            ExprKind::Variable(object_expr_id) => {
+                // implicit mapping; for now the object needs to be a variable
+                let edge_expr_id = ctx
+                    .object_to_edge_expr_id
+                    .entry(*object_expr_id)
+                    .or_insert_with(|| {
+                        let edge_expr_id = self.expressions.alloc_expr_id();
+                        ctx.expr_variables.insert(
+                            edge_expr_id,
+                            ExpressionVariable {
+                                variable: ctx.var_allocator.alloc(),
+                                ctrl_group: None,
+                                hir_arms: Default::default(),
+                            },
+                        );
+                        edge_expr_id
+                    });
+
+                self.build_node(
+                    &Expr {
+                        id: *edge_expr_id,
+                        kind: ExprKind::Variable(*edge_expr_id),
+                        span: prop_span,
+                    },
+                    Some(ty),
+                    ctx,
+                )
+            }
+            ExprKind::Seq(_, expr) => self.build_implicit_rel_node(ty, expr, prop_span, ctx),
+            _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
+        }
     }
 
     fn type_error_node(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypedHirNode<'m> {
