@@ -6,20 +6,20 @@ use crate::{hir_unify::VarSet, typed_hir::TypedHirNode};
 pub struct ExprBuilder<'m> {
     in_scope: VarSet,
     phantom: PhantomData<&'m ()>,
-    next_var: ontol_hir::Var,
+    var_allocator: ontol_hir::VarAllocator,
 }
 
 impl<'m> ExprBuilder<'m> {
-    pub fn new(next_var: ontol_hir::Var) -> Self {
+    pub fn new(var_allocator: ontol_hir::VarAllocator) -> Self {
         Self {
             in_scope: Default::default(),
             phantom: PhantomData,
-            next_var,
+            var_allocator,
         }
     }
 
-    pub fn next_var(self) -> ontol_hir::Var {
-        self.next_var
+    pub fn var_allocator(self) -> ontol_hir::VarAllocator {
+        self.var_allocator
     }
 
     pub fn hir_to_expr(&mut self, TypedHirNode(kind, meta): &TypedHirNode<'m>) -> expr::Expr<'m> {

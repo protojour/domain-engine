@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExplicitVariable, HirBuildCtx},
+    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExpressionVariable, HirBuildCtx},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -104,7 +104,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second: &mut TypedHirNode<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        for explicit_var in &mut ctx.explicit_variables.values_mut() {
+        for explicit_var in &mut ctx.expr_variables.values_mut() {
             let first_arm = explicit_var.hir_arms.get(&Arm::First);
             let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
@@ -120,7 +120,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Ok(_) => {}
                     Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
                         match (actual, expected) {
-                            (Type::Domain(_), Type::Domain(_)) => {
+                            (
+                                Type::Domain(_) | Type::Anonymous(_),
+                                Type::Domain(_) | Type::Anonymous(_),
+                            ) => {
                                 ctx.variable_mapping.insert(
                                     explicit_var.variable,
                                     VariableMapping {
@@ -192,7 +195,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
-                    let label = Label(ctx.alloc_variable().0);
+                    let label = Label(ctx.var_allocator.alloc().0);
                     debug!("first arm seq: expr_id={expr_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
@@ -246,7 +249,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 }
             }
             ExprKind::Variable(expr_id) => {
-                if let Some(explicit_variable) = ctx.explicit_variables.get(expr_id) {
+                if let Some(explicit_variable) = ctx.expr_variables.get(expr_id) {
                     // Variable is used more than once
                     if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                         self.error(
@@ -266,13 +269,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .unwrap();
 
                     // Register variable
-                    let syntax_var = ctx.alloc_variable();
+                    let variable = ctx.var_allocator.alloc();
 
                     if ctx.arm.is_first() {
-                        ctx.explicit_variables.insert(
+                        ctx.expr_variables.insert(
                             *variable_expr_id,
-                            ExplicitVariable {
-                                variable: syntax_var,
+                            ExpressionVariable {
+                                variable,
                                 ctrl_group: parent_aggr_group,
                                 hir_arms: Default::default(),
                             },
@@ -280,13 +283,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                         group_set.add(parent_aggr_group);
                     } else {
-                        match ctx.explicit_variables.entry(*variable_expr_id) {
+                        match ctx.expr_variables.entry(*variable_expr_id) {
                             Entry::Occupied(_occ) => {
                                 todo!();
                             }
                             Entry::Vacant(vac) => {
-                                vac.insert(ExplicitVariable {
-                                    variable: syntax_var,
+                                vac.insert(ExpressionVariable {
+                                    variable,
                                     ctrl_group: parent_aggr_group,
                                     hir_arms: Default::default(),
                                 });
@@ -308,20 +311,17 @@ impl<'c, 'm> MapCheck<'c, 'm> {
     }
 }
 
-#[derive(Clone, Copy)]
-struct FirstArm(bool);
-
-struct AggrGroupSet {
-    set: FnvHashSet<Option<Label>>,
-    tallest_depth: u16,
-}
-
 #[derive(Debug)]
 pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
     TooManyLeaves(Vec<Label>),
+}
+
+struct AggrGroupSet {
+    set: FnvHashSet<Option<Label>>,
+    tallest_depth: u16,
 }
 
 impl AggrGroupSet {

@@ -252,7 +252,7 @@ impl<'e> SerdeProcessor<'e> {
                 )?;
             }
             (None, Some(_)) => {
-                panic!("Must serialize edge params, but attribute did not contain anything")
+                panic!("Must serialize edge params, but was not present in attribute")
             }
             (Some(rel_params), None) => {
                 panic!("Attribute had rel params {rel_params:#?}, but no serializer operator available: {self:#?}")

@@ -21,7 +21,7 @@ use super::{
 
 pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
-    next_var: ontol_hir::Var,
+    pub(super) var_allocator: ontol_hir::VarAllocator,
 }
 
 pub(super) struct UnifiedNode<'m> {
@@ -30,8 +30,11 @@ pub(super) struct UnifiedNode<'m> {
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
-    pub fn new(types: &'a mut Types<'m>, next_var: ontol_hir::Var) -> Self {
-        Self { types, next_var }
+    pub fn new(types: &'a mut Types<'m>, var_allocator: ontol_hir::VarAllocator) -> Self {
+        Self {
+            types,
+            var_allocator,
+        }
     }
 
     pub(super) fn unify(
@@ -557,11 +560,5 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     pub(super) fn unit_type(&mut self) -> TypeRef<'m> {
         self.types.intern(Type::Unit(DefId::unit()))
-    }
-
-    pub(super) fn alloc_var(&mut self) -> ontol_hir::Var {
-        let var = self.next_var;
-        self.next_var.0 += 1;
-        var
     }
 }

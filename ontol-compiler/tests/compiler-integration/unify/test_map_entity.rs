@@ -7,7 +7,7 @@ const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../../examples/artist_an
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth_union.on");
 
 #[test]
-fn test_map_rel_params() {
+fn test_extract_rel_params() {
     "
     pub type a1_id { fmt '' => 'a1/' => uuid => _ }
     pub type a2_id { fmt '' => 'a2/' => uuid => _ }
@@ -86,6 +86,70 @@ fn test_map_rel_params() {
                     "_edge": {
                         "bar": "BAR"
                     }
+                }
+            }),
+        );
+    });
+}
+
+#[test]
+fn test_rel_params_implicit_map() {
+    "
+    pub type a_id { fmt '' => 'a/' => uuid => _ }
+    pub type b_id { fmt '' => 'a/' => uuid => _ }
+    pub type a_inner_id { fmt '' => 'a_inner/' => uuid => _ }
+    pub type b_inner_id { fmt '' => 'b_inner/' => uuid => _ }
+
+    type a_inner {
+        rel a_inner_id identifies: _
+        rel _ 'a_prop': string
+    }
+    type b_inner {
+        rel b_inner_id identifies: _
+        rel _ 'b_prop': string
+    }
+
+    type a_edge { rel _ 'aa': string }
+    type b_edge { rel _ 'bb': string }
+
+    pub type a {
+        rel a_id identifies: _
+        rel _ 'foreign'(rel _ is: a_edge): a_inner
+    }
+    pub type b {
+        rel b_id identifies: _
+        rel _ 'foreign'(rel _ is: b_edge): b_inner
+    }
+
+    map {
+        a_inner { 'a_prop': x }
+        b_inner { 'b_prop': x }
+    }
+    map {
+        a_edge { 'aa': x }
+        b_edge { 'bb': x }
+    }
+    map {
+        a { 'foreign': x }
+        b { 'foreign': x }
+    }
+    "
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("a", "b"),
+            json!({
+                "foreign": {
+                    "a_prop": "PROP",
+                    "_edge": {
+                        "aa": "EDGE"
+                    }
+                }
+            }),
+            json!({
+                "foreign": {
+                    "foo": "FOO",
+                    "bar": "BAR",
                 }
             }),
         );

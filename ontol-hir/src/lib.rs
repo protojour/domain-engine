@@ -162,3 +162,27 @@ pub struct IterBinder {
     pub rel: Binding,
     pub val: Binding,
 }
+
+pub struct VarAllocator {
+    next: Var,
+}
+
+impl Default for VarAllocator {
+    fn default() -> Self {
+        Self { next: Var(0) }
+    }
+}
+
+impl From<Var> for VarAllocator {
+    fn from(value: Var) -> Self {
+        Self { next: value }
+    }
+}
+
+impl VarAllocator {
+    pub fn alloc(&mut self) -> Var {
+        let next = self.next;
+        self.next.0 += 1;
+        next
+    }
+}

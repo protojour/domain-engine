@@ -60,7 +60,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let gen_scope = scope::Scope(
                     scope::Kind::Gen(scope::Gen {
                         input_seq: ontol_hir::Var(label.0),
-                        output_seq: unifier.alloc_var(),
+                        output_seq: unifier.var_allocator.alloc(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
                     scope::Meta {

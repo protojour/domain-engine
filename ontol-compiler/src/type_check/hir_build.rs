@@ -10,7 +10,7 @@ use crate::{
     mem::Intern,
     relation::Constructor,
     type_check::{
-        hir_build_ctx::{Arm, ExplicitVariableArm},
+        hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
     },
     typed_hir::{Meta, TypedHir, TypedHirNode},
@@ -199,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let arm = ctx.arm;
                 let explicit_variable = ctx
-                    .explicit_variables
+                    .expr_variables
                     .get_mut(expr_id)
                     .expect("variable not found");
 
@@ -298,7 +298,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.map.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = ontol_hir::Binder(ctx.alloc_variable());
+                        let struct_binder = ontol_hir::Binder(ctx.var_allocator.alloc());
 
                         struct MatchProperty {
                             relation_id: RelationId,
@@ -376,15 +376,65 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 None => self.unit_type(),
                             };
                             debug!("rel_params_ty: {rel_params_ty:?}");
+
+                            let rel_node = match (rel_params_ty, rel) {
+                                (Type::Unit(_), Some(rel)) => self.error_node(
+                                    CompileError::NoRelationParametersExpected,
+                                    &rel.span,
+                                ),
+                                (ty @ Type::Unit(_), None) => TypedHirNode(
+                                    ontol_hir::Kind::Unit,
+                                    Meta {
+                                        ty,
+                                        span: *prop_span,
+                                    },
+                                ),
+                                (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
+                                (ty, None) => {
+                                    match &object.kind {
+                                        ExprKind::Variable(object_expr_id) => {
+                                            // implicit mapping; for now the object needs to be a variable
+
+                                            let edge_expr_id = ctx
+                                                .object_to_edge_expr_id
+                                                .entry(*object_expr_id)
+                                                .or_insert_with(|| {
+                                                    let edge_expr_id =
+                                                        self.expressions.alloc_expr_id();
+                                                    ctx.expr_variables.insert(
+                                                        edge_expr_id,
+                                                        ExpressionVariable {
+                                                            variable: ctx.var_allocator.alloc(),
+                                                            ctrl_group: None,
+                                                            hir_arms: Default::default(),
+                                                        },
+                                                    );
+                                                    edge_expr_id
+                                                });
+
+                                            self.build_node(
+                                                &Expr {
+                                                    id: *edge_expr_id,
+                                                    kind: ExprKind::Variable(*edge_expr_id),
+                                                    span: *prop_span,
+                                                },
+                                                Some(ty),
+                                                ctx,
+                                            )
+                                        }
+                                        _ => self.error_node(
+                                            CompileError::TODO(smart_format!("")),
+                                            prop_span,
+                                        ),
+                                    }
+                                }
+                            };
+
                             let object_ty = self.check_def(match_property.object_def);
                             debug!("object_ty: {object_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let rel_node = match rel {
-                                        Some(rel) => self.build_node(rel, Some(rel_params_ty), ctx),
-                                        None => self.unit_node_no_span(),
-                                    };
                                     let val_node = self.build_node(object, Some(object_ty), ctx);
                                     ontol_hir::PropVariant {
                                         dimension: ontol_hir::Dimension::Singular,
@@ -396,12 +446,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                                 ValueCardinality::Many => match &object.kind {
                                     ExprKind::Seq(aggr_expr_id, object) => {
-                                        let rel_node = match rel {
-                                            Some(rel) => {
-                                                self.build_node(rel, Some(rel_params_ty), ctx)
-                                            }
-                                            None => self.unit_node_no_span(),
-                                        };
                                         let val_node =
                                             self.build_node(object, Some(object_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();

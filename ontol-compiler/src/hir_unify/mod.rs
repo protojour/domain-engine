@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use bit_set::BitSet;
-use ontol_hir::{visitor::HirVisitor, Label, Var};
+use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::DefId;
 
 use crate::{
@@ -46,19 +46,20 @@ pub fn unify_to_function<'m>(
 
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
-    let (scope_binder, next_var) = {
-        let mut scope_builder = ScopeBuilder::new(var_tracker.next_variable(), unit_type);
+    let (scope_binder, var_allocator) = {
+        let mut scope_builder = ScopeBuilder::new(var_tracker.var_allocator(), unit_type);
         let scope_binder = scope_builder.build_scope_binder(scope)?;
-        (scope_binder, scope_builder.next_var())
+        (scope_binder, scope_builder.var_allocator())
     };
 
-    let (expr, next_var) = {
-        let mut expr_builder = ExprBuilder::new(next_var);
+    let (expr, var_allocator) = {
+        let mut expr_builder = ExprBuilder::new(var_allocator);
         let expr = expr_builder.hir_to_expr(expr);
-        (expr, expr_builder.next_var())
+        (expr, expr_builder.var_allocator())
     };
 
-    let unified = Unifier::new(&mut compiler.types, next_var).unify(scope_binder.scope, expr)?;
+    let unified =
+        Unifier::new(&mut compiler.types, var_allocator).unify(scope_binder.scope, expr)?;
 
     match unified.typed_binder {
         Some(arg) => {
@@ -80,39 +81,41 @@ pub fn unify_to_function<'m>(
 }
 
 struct VariableTracker {
-    largest: Var,
+    largest: ontol_hir::Var,
 }
 
-impl<'s, 'm: 's> HirVisitor<'s, 'm, TypedHir> for VariableTracker {
-    fn visit_var(&mut self, var: &Var) {
+impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for VariableTracker {
+    fn visit_var(&mut self, var: &ontol_hir::Var) {
         self.observe(*var);
     }
 
-    fn visit_binder(&mut self, var: &Var) {
+    fn visit_binder(&mut self, var: &ontol_hir::Var) {
         self.observe(*var);
     }
 
-    fn visit_label(&mut self, label: &Label) {
-        self.observe(Var(label.0))
+    fn visit_label(&mut self, label: &ontol_hir::Label) {
+        self.observe(ontol_hir::Var(label.0))
     }
 }
 
 impl Default for VariableTracker {
     fn default() -> Self {
-        Self { largest: Var(0) }
+        Self {
+            largest: ontol_hir::Var(0),
+        }
     }
 }
 
 impl VariableTracker {
-    fn observe(&mut self, var: Var) {
+    fn observe(&mut self, var: ontol_hir::Var) {
         if var.0 > self.largest.0 {
             self.largest.0 = var.0;
         }
     }
 
-    fn next_variable(&self) -> Var {
+    fn var_allocator(&self) -> ontol_hir::VarAllocator {
         let idx = self.largest.0 + 1;
-        Var(idx)
+        ontol_hir::Var(idx).into()
     }
 }
 
@@ -144,7 +147,7 @@ impl Debug for VarSet {
 
 impl<I> From<I> for VarSet
 where
-    I: IntoIterator<Item = Var>,
+    I: IntoIterator<Item = ontol_hir::Var>,
 {
     fn from(value: I) -> Self {
         Self(value.into_iter().map(|var| var.0 as usize).collect())
@@ -152,7 +155,7 @@ where
 }
 
 impl<'a> IntoIterator for &'a VarSet {
-    type Item = Var;
+    type Item = ontol_hir::Var;
     type IntoIter = VarSetIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {

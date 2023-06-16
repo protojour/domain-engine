@@ -41,24 +41,24 @@ impl<'m> ScopeBinder<'m> {
 pub struct ScopeBuilder<'m> {
     unit_type: TypeRef<'m>,
     in_scope: VarSet,
-    next_var: ontol_hir::Var,
+    var_allocator: ontol_hir::VarAllocator,
     current_prop_path: SmallVec<[u16; 32]>,
     current_prop_analysis_map: Option<HashMap<Path, PropAnalysis>>,
 }
 
 impl<'m> ScopeBuilder<'m> {
-    pub fn new(next_var: ontol_hir::Var, unit_type: TypeRef<'m>) -> Self {
+    pub fn new(var_allocator: ontol_hir::VarAllocator, unit_type: TypeRef<'m>) -> Self {
         Self {
             unit_type,
             in_scope: VarSet::default(),
-            next_var,
+            var_allocator,
             current_prop_path: Default::default(),
             current_prop_analysis_map: None,
         }
     }
 
-    pub fn next_var(self) -> ontol_hir::Var {
-        self.next_var
+    pub fn var_allocator(self) -> ontol_hir::VarAllocator {
+        self.var_allocator
     }
 
     pub fn build_scope_binder(
@@ -118,7 +118,7 @@ impl<'m> ScopeBuilder<'m> {
                         scope: scope::Scope(scope::Kind::Const, scope::Meta::from(hir_meta)),
                     }),
                     _ => {
-                        let binder_var = self.alloc_var();
+                        let binder_var = self.var_allocator.alloc();
                         self.invert_expr(
                             *proc,
                             params,
@@ -347,12 +347,6 @@ impl<'m> ScopeBuilder<'m> {
             ty: self.unit_type,
             span: SourceSpan::none(),
         }
-    }
-
-    fn alloc_var(&mut self) -> ontol_hir::Var {
-        let var = self.next_var;
-        self.next_var.0 += 1;
-        var
     }
 
     fn enter_binder<T>(
