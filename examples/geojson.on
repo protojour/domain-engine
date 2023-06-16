@@ -29,22 +29,22 @@ type position-ring {
 
 /// For type "Point", the "coordinates" member is a single position.
 pub type Point {
-    rel . 'type': 'Point'
-    rel . 'coordinates': position
+    rel .'type': 'Point'
+    rel .'coordinates': position
 }
 
 /// For type "MultiPoint", the "coordinates" member is an array of
 /// positions.
 pub type MultiPoint {
-    rel . 'type': 'MultiPoint'
-    rel . 'coordinates': [position]
+    rel .'type': 'MultiPoint'
+    rel .'coordinates': [position]
 }
 
 /// For type "LineString", the "coordinates" member is an array of two or
 /// more positions.
 pub type LineString {
-    rel . 'type': 'LineString'
-    rel . 'coordinates': position-list
+    rel .'type': 'LineString'
+    rel .'coordinates': position-list
 }
 
 /// For type "MultiLineString", the "coordinates" member is an array of
@@ -57,25 +57,25 @@ pub type MultiLineString {
 /// For type "Polygon", the "coordinates" member MUST be an array of
 /// linear ring coordinate arrays.
 pub type Polygon {
-    rel . 'type': 'Polygon'
-    rel . 'coordinates': position-ring
+    rel .'type': 'Polygon'
+    rel .'coordinates': position-ring
 }
 
 /// For type "MultiPolygon", the "coordinates" member is an array of
 /// Polygon coordinate arrays.
 pub type MultiPolygon {
-    rel . 'type': 'MultiPolygon'
-    rel . 'coordinates': [position-ring]
+    rel .'type': 'MultiPolygon'
+    rel .'coordinates': [position-ring]
 }
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
 pub type LeafGeometry {
-    rel . is?: Point
-    rel . is?: MultiPoint
-    rel . is?: LineString
-    rel . is?: MultiLineString
-    rel . is?: Polygon
-    rel . is?: MultiPolygon
+    rel .is?: Point
+    rel .is?: MultiPoint
+    rel .is?: LineString
+    rel .is?: MultiLineString
+    rel .is?: Polygon
+    rel .is?: MultiPolygon
 }
 
 
@@ -84,8 +84,8 @@ pub type LeafGeometry {
 /// value of "geometries" is an array.  Each element of this array is a
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
 pub type GeometryCollection {
-    rel . 'type': 'GeometryCollection'
-    rel . 'geometries': [LeafGeometry]
+    rel .'type': 'GeometryCollection'
+    rel .'geometries': [LeafGeometry]
 }
 
 /// A Geometry object represents points, curves, and surfaces in
@@ -94,18 +94,18 @@ pub type GeometryCollection {
 ///
 /// Note: Geometry is an extension of LeafGeometry + GeometryCollection.
 pub type Geometry {
-    rel . is?: Point
-    rel . is?: MultiPoint
-    rel . is?: LineString
-    rel . is?: MultiLineString
-    rel . is?: Polygon
-    rel . is?: MultiPolygon
-    rel . is?: GeometryCollection
+    rel .is?: Point
+    rel .is?: MultiPoint
+    rel .is?: LineString
+    rel .is?: MultiLineString
+    rel .is?: Polygon
+    rel .is?: MultiPolygon
+    rel .is?: GeometryCollection
 }
 
 type GeometryOrNull {
     // TODO: Not supported yet (union tree):
-    rel . is: Geometry
+    rel .is: Geometry
     // rel _ is?: ()
 }
 
