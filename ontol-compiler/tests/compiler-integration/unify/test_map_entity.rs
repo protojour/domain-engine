@@ -148,8 +148,10 @@ fn test_rel_params_implicit_map() {
             }),
             json!({
                 "foreign": {
-                    "foo": "FOO",
-                    "bar": "BAR",
+                    "b_prop": "PROP",
+                    "_edge": {
+                        "bb": "EDGE"
+                    }
                 }
             }),
         );

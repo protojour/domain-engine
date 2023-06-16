@@ -8,7 +8,7 @@ use crate::{codegen::optimize::optimize, SourceSpan};
 use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
 /// How an instruction influences the size of the stack
-pub struct Stack(pub i32);
+pub struct Delta(pub i32);
 
 #[derive(Default)]
 pub struct Scope {
@@ -34,7 +34,7 @@ impl ProcBuilder {
     /// implicitly pushed as the block is transitioned to.
     /// For the first block, this is the number of parameters.
     /// This block "owns" these locals, and they are allowed to be cleared before the block ends.
-    pub fn new_block(&mut self, stack_delta: Stack, span: SourceSpan) -> Block {
+    pub fn new_block(&mut self, stack_delta: Delta, span: SourceSpan) -> Block {
         let stack_start = self.stack_size as u32;
         self.stack_size += stack_delta.0;
 
@@ -80,7 +80,7 @@ impl ProcBuilder {
         &mut self,
         block: &mut Block,
         ir: Ir,
-        stack_delta: Stack,
+        stack_delta: Delta,
         span: SourceSpan,
     ) -> Local {
         let local = Local(self.stack_size as u16);
@@ -90,7 +90,7 @@ impl ProcBuilder {
     }
 
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
-        let stack_delta = Stack(local.0 as i32 - self.top().0 as i32);
+        let stack_delta = Delta(local.0 as i32 - self.top().0 as i32);
         if stack_delta.0 != 0 {
             if let Some((Ir::PopUntil(last_local), _)) = block.ir.last_mut() {
                 // peephole optimization: No need for consecutive PopUntil

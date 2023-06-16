@@ -7,7 +7,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    codegen::{ir::Terminator, proc_builder::Stack},
+    codegen::{ir::Terminator, proc_builder::Delta},
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
@@ -17,24 +17,27 @@ use crate::{
 use super::{
     ir::Ir,
     proc_builder::{Block, ProcBuilder},
-    task::{find_mapping_key, ProcTable},
+    task::ProcTable,
+    type_mapper::TypeMapper,
 };
 
-pub(super) fn const_codegen(
+pub(super) fn const_codegen<'m>(
     proc_table: &mut ProcTable,
-    expr: TypedHirNode,
+    expr: TypedHirNode<'m>,
     def_id: DefId,
+    type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) {
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(0), expr.span());
+    let mut block = builder.new_block(Delta(0), expr.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
         errors,
+        type_mapper,
     };
     generator.gen_node(expr, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
@@ -42,9 +45,10 @@ pub(super) fn const_codegen(
     proc_table.const_procedures.insert(def_id, builder);
 }
 
-pub(super) fn map_codegen(
+pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
-    func: HirFunc,
+    func: HirFunc<'m>,
+    type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) -> bool {
     debug!("Generating code for\n{}", func);
@@ -52,47 +56,52 @@ pub(super) fn map_codegen(
     let return_ty = func.body.ty();
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(1), func.body.span());
+    let mut block = builder.new_block(Delta(1), func.body.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
         errors,
+        type_mapper,
     };
     generator.scope.insert(func.arg.var, Local(0));
     generator.gen_node(func.body, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
-    match (find_mapping_key(func.arg.ty), find_mapping_key(return_ty)) {
-        (Some(from_def), Some(to_def)) => {
+    match (
+        type_mapper.find_mapping_info(func.arg.ty),
+        type_mapper.find_mapping_info(return_ty),
+    ) {
+        (Some(from_info), Some(to_info)) => {
             proc_table
                 .map_procedures
-                .insert((from_def, to_def), builder);
+                .insert((from_info.key, to_info.key), builder);
             true
         }
-        (from_def, to_def) => {
-            panic!("Problem finding def ids: ({from_def:?}, {to_def:?})");
+        (from_info, to_info) => {
+            panic!("Problem finding def ids: ({from_info:?}, {to_info:?})");
         }
     }
 }
 
-pub(super) struct CodeGenerator<'a> {
+pub(super) struct CodeGenerator<'a, 'm> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
+    pub type_mapper: TypeMapper<'a, 'm>,
 
     scope: FnvHashMap<ontol_hir::Var, Local>,
 }
 
-impl<'a> CodeGenerator<'a> {
-    fn gen_node(&mut self, TypedHirNode(kind, meta): TypedHirNode, block: &mut Block) {
+impl<'a, 'm> CodeGenerator<'a, 'm> {
+    fn gen_node(&mut self, TypedHirNode(kind, meta): TypedHirNode<'m>, block: &mut Block) {
         let ty = meta.ty;
         let span = meta.span;
         match kind {
             ontol_hir::Kind::Var(var) => match self.scope.get(&var) {
                 Some(local) => {
                     self.builder
-                        .append(block, Ir::Clone(*local), Stack(1), span);
+                        .append(block, Ir::Clone(*local), Delta(1), span);
                 }
                 None => {
                     self.errors.push(SpannedCompileError {
@@ -105,7 +114,7 @@ impl<'a> CodeGenerator<'a> {
                 self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
             }
@@ -113,7 +122,7 @@ impl<'a> CodeGenerator<'a> {
                 self.builder.append(
                     block,
                     Ir::Constant(int, ty.get_single_def_id().unwrap()),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
             }
@@ -126,7 +135,7 @@ impl<'a> CodeGenerator<'a> {
                 self.scope.remove(&binder.0);
             }
             ontol_hir::Kind::Call(proc, params) => {
-                let stack_delta = Stack(-(params.len() as i32) + 1);
+                let stack_delta = Delta(-(params.len() as i32) + 1);
                 for param in params {
                     self.gen_node(param, block);
                 }
@@ -139,17 +148,17 @@ impl<'a> CodeGenerator<'a> {
                 );
             }
             ontol_hir::Kind::Map(param) => {
-                let from = find_mapping_key(param.ty()).unwrap();
-                let to = find_mapping_key(ty).unwrap();
+                let from = self.type_mapper.find_mapping_info(param.ty()).unwrap();
+                let to = self.type_mapper.find_mapping_info(ty).unwrap();
 
                 self.gen_node(*param, block);
 
                 let proc = Procedure {
-                    address: self.proc_table.gen_mapping_addr(from, to),
+                    address: self.proc_table.gen_mapping_addr(from.key, to.key),
                     n_params: NParams(1),
                 };
 
-                self.builder.append(block, Ir::Call(proc), Stack(0), span);
+                self.builder.append(block, Ir::Call(proc), Delta(0), span);
             }
             ontol_hir::Kind::Seq(_label, _attr) => {
                 todo!("seq");
@@ -159,7 +168,7 @@ impl<'a> CodeGenerator<'a> {
                 let local = self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewStruct, def_id),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
                 self.scope.insert(binder.0, local);
@@ -181,7 +190,7 @@ impl<'a> CodeGenerator<'a> {
                             self.builder.append(
                                 block,
                                 Ir::PutAttr1(struct_local, id),
-                                Stack(-1),
+                                Delta(-1),
                                 span,
                             );
                         }
@@ -191,12 +200,12 @@ impl<'a> CodeGenerator<'a> {
                             self.gen_node(*attr.val, block);
 
                             self.builder
-                                .append(block, Ir::Clone(rel_local), Stack(1), span);
+                                .append(block, Ir::Clone(rel_local), Delta(1), span);
 
                             self.builder.append(
                                 block,
                                 Ir::PutAttr2(struct_local, id),
-                                Stack(-2),
+                                Delta(-2),
                                 span,
                             );
                         }
@@ -216,7 +225,7 @@ impl<'a> CodeGenerator<'a> {
                             Ir::TryTakeAttr2(struct_local, id),
                             // even if three locals are pushed, the `status` one
                             // is not kept track of here.
-                            Stack(2),
+                            Delta(2),
                             span,
                         );
 
@@ -229,7 +238,7 @@ impl<'a> CodeGenerator<'a> {
                         let rel_local = self.builder.top_minus(1);
 
                         let present_body_index = {
-                            let mut present_block = self.builder.new_block(Stack(0), span);
+                            let mut present_block = self.builder.new_block(Delta(0), span);
 
                             for arm in arms {
                                 if !matches!(arm.pattern, ontol_hir::PropPattern::Absent) {
@@ -250,7 +259,7 @@ impl<'a> CodeGenerator<'a> {
                         self.builder.append(
                             block,
                             Ir::Cond(Predicate::YankTrue(status_local), present_body_index),
-                            Stack(0),
+                            Delta(0),
                             span,
                         );
                     } else {
@@ -258,7 +267,7 @@ impl<'a> CodeGenerator<'a> {
                     }
                 } else {
                     self.builder
-                        .append(block, Ir::TakeAttr2(struct_local, id), Stack(2), span);
+                        .append(block, Ir::TakeAttr2(struct_local, id), Delta(2), span);
 
                     let val_local = self.builder.top();
                     let rel_local = self.builder.top_minus(1);
@@ -282,19 +291,19 @@ impl<'a> CodeGenerator<'a> {
                             .get_single_def_id()
                             .unwrap_or_else(|| panic!("val_ty: {val_ty:?}")),
                     ),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
                 let counter =
                     self.builder
-                        .append(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
+                        .append(block, Ir::Constant(0, DefId::unit()), Delta(1), span);
 
                 let iter_offset = block.current_offset();
                 let elem_rel_local = self.builder.top_plus(1);
                 let elem_val_local = self.builder.top_plus(2);
 
                 let iter_body_index = {
-                    let mut iter_block = self.builder.new_block(Stack(2), span);
+                    let mut iter_block = self.builder.new_block(Delta(2), span);
 
                     self.gen_in_scope(
                         &[
@@ -316,7 +325,7 @@ impl<'a> CodeGenerator<'a> {
                 self.builder.append(
                     block,
                     Ir::Iter(seq_local, counter, iter_body_index),
-                    Stack(0),
+                    Delta(0),
                     span,
                 );
 
@@ -334,10 +343,10 @@ impl<'a> CodeGenerator<'a> {
                 self.gen_node(*attr.val, block);
 
                 self.builder
-                    .append(block, Ir::Clone(rel_local), Stack(1), span);
+                    .append(block, Ir::Clone(rel_local), Delta(1), span);
 
                 self.builder
-                    .append(block, Ir::AppendAttr2(seq_local), Stack(-2), span);
+                    .append(block, Ir::AppendAttr2(seq_local), Delta(-2), span);
 
                 self.builder.append_pop_until(block, top, span);
             }
@@ -346,7 +355,7 @@ impl<'a> CodeGenerator<'a> {
 
     fn gen_match_arm(
         &mut self,
-        arm: ontol_hir::MatchArm<TypedHir>,
+        arm: ontol_hir::MatchArm<'m, TypedHir>,
         (rel_local, val_local): (Local, Local),
         block: &mut Block,
     ) {
@@ -370,7 +379,7 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn gen_in_scope<'m>(
+    fn gen_in_scope(
         &mut self,
         scopes: &[(Local, ontol_hir::Binding)],
         nodes: impl Iterator<Item = TypedHirNode<'m>>,

@@ -9,10 +9,9 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen,
+    codegen::{code_generator::map_codegen, type_mapper::TypeMapper},
     hir_unify::unify_to_function,
     typed_hir::TypedHirNode,
-    types::{Type, TypeRef},
     Compiler, SourceSpan,
 };
 
@@ -102,27 +101,6 @@ pub(super) struct MapCall {
     pub mapping: (MapKey, MapKey),
 }
 
-pub(super) fn find_mapping_key(ty: TypeRef) -> Option<MapKey> {
-    match ty {
-        Type::Domain(def_id) => Some(MapKey {
-            def_id: *def_id,
-            seq: false,
-        }),
-        Type::Anonymous(def_id) => Some(MapKey {
-            def_id: *def_id,
-            seq: false,
-        }),
-        Type::Seq(_, val_ty) => {
-            let def_id = val_ty.get_single_def_id()?;
-            Some(MapKey { def_id, seq: true })
-        }
-        other => {
-            warn!("unable to get mapping key: {other:?}");
-            None
-        }
-    }
-}
-
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let tasks = std::mem::take(&mut compiler.codegen_tasks.tasks);
@@ -132,7 +110,14 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for task in tasks {
         match task {
             CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
-                const_codegen(&mut proc_table, node, def_id, &mut compiler.errors);
+                let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+                const_codegen(
+                    &mut proc_table,
+                    node,
+                    def_id,
+                    type_mapper,
+                    &mut compiler.errors,
+                );
             }
             CodegenTask::Map(map_task) => {
                 debug!("1st (ty={:?}):\n{}", map_task.first.ty(), map_task.first);
@@ -141,7 +126,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("Forward start");
                 match unify_to_function(&map_task.first, &map_task.second, compiler) {
                     Ok(func) => {
-                        map_codegen(&mut proc_table, func, &mut compiler.errors);
+                        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+                        map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
                     }
                     Err(err) => warn!("unifier error: {err:?}"),
                 }
@@ -149,7 +135,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                 debug!("Backward start");
                 match unify_to_function(&map_task.second, &map_task.first, compiler) {
                     Ok(func) => {
-                        map_codegen(&mut proc_table, func, &mut compiler.errors);
+                        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+                        map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
                     }
                     Err(err) => warn!("unifier error: {err:?}"),
                 }
