@@ -202,12 +202,28 @@ impl<'e> SchemaCtx<'e> {
         }
     }
 
+    fn type_name(&self, def_variant: DefVariant) -> Option<String> {
+        match self.env.find_domain(def_variant.def_id.0) {
+            Some(domain) => domain.type_info(def_variant.def_id).name.to_owned(),
+            None => None,
+        }
+    }
+
+    // TODO: Ensure possible name collisions are handled,
+    // e.g. by prefixing imported types with their namespace/domain name.
+
     fn format_key(&self, def_variant: DefVariant) -> String {
-        smart_format!("{}", Key(def_variant))
+        match self.type_name(def_variant) {
+            Some(name) => name,
+            None => smart_format!("{}", Key(def_variant)),
+        }
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
-        smart_format!("{}{}", self.link_anchor, Key(def_variant))
+        match self.type_name(def_variant) {
+            Some(name) => format!("{}{}", self.link_anchor, name).into(),
+            None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
+        }
     }
 }
 
@@ -410,7 +426,7 @@ fn serialize_schema_inline<S: Serializer>(
             map.serialize_entry(
                 "properties",
                 &MapProperties {
-                    ctx: ctx.with_rel_params(None).with_docs(None),
+                    ctx: ctx.with_rel_params(None),
                     map_type: struct_op,
                 },
             )?;
