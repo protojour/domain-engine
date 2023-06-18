@@ -109,7 +109,7 @@ impl<'e> TypeBinding<'e> {
 
     pub fn json_schema(&self, processor_mode: ProcessorMode) -> serde_json::Value {
         let schema = build_standalone_schema(self.env, &self.type_info, processor_mode).unwrap();
-        serde_json::to_value(&schema).unwrap()
+        serde_json::to_value(schema).unwrap()
     }
 
     pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {

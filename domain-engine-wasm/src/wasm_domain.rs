@@ -62,14 +62,14 @@ impl WasmDomain {
 
     pub fn serialize_json_types(&self) -> Result<String, WasmError> {
         let domain = self.env.find_domain(self.package_id).unwrap();
-        let schemas = build_openapi_schemas(self.env.as_ref(), self.package_id, &domain);
+        let schemas = build_openapi_schemas(self.env.as_ref(), self.package_id, domain);
         let schemas_json = serde_json::to_string_pretty(&schemas).unwrap();
         Ok(schemas_json)
     }
 
     pub fn serialize_yaml_types(&self) -> Result<String, WasmError> {
         let domain = self.env.find_domain(self.package_id).unwrap();
-        let schemas = build_openapi_schemas(self.env.as_ref(), self.package_id, &domain);
+        let schemas = build_openapi_schemas(self.env.as_ref(), self.package_id, domain);
         let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
         Ok(schemas_yaml)
     }
