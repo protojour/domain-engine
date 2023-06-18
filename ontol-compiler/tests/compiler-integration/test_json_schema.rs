@@ -7,10 +7,20 @@ use test_log::test;
 #[test]
 fn json_schema_from_simple_entity() {
     "
-    pub type some_id { fmt '' => string => _ }
+    type some_id { fmt '' => string => _ }
+
+    /// This is type entity
     pub type entity {
         rel some_id identifies: _
+
+        /// This is property 'foo'
         rel _ 'foo': string
+
+        /// This is property 'bar'
+        rel _ 'bar': true
+
+        // This is just a regular comment
+        rel _ 'baz': int
     }
     "
     .compile_ok(|env| {
@@ -18,15 +28,28 @@ fn json_schema_from_simple_entity() {
             json!({
                 "$defs": {
                     "1_4": {
+                        "type": "object",
+                        "description": "This is type entity",
                         "properties": {
                             "foo": {
                                 "type": "string",
+                                "description": "This is property 'foo'",
+                            },
+                            "bar": {
+                                "type": "boolean",
+                                "enum": [true],
+                                "description": "This is property 'bar'",
+                            },
+                            "baz": {
+                                "type": "integer",
+                                "format": "int64",
                             },
                         },
                         "required": [
                             "foo",
+                            "bar",
+                            "baz"
                         ],
-                        "type": "object",
                     },
                 },
                 "allOf": [
