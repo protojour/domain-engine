@@ -7,20 +7,20 @@ use test_log::test;
 #[test]
 fn json_schema_from_simple_entity() {
     "
-    type some_id { fmt '' => string => _ }
+    type some_id { fmt '' => string => . }
 
     /// This is type entity
     pub type entity {
-        rel some_id identifies: _
+        rel some_id identifies: .
 
         /// This is property 'foo'
-        rel _ 'foo': string
+        rel .'foo': string
 
         /// This is property 'bar'
-        rel _ 'bar': true
+        rel .'bar': true
 
         // This is just a regular comment
-        rel _ 'baz': int
+        rel .'baz': int
     }
     "
     .compile_ok(|env| {
