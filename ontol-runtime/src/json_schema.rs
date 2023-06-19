@@ -214,14 +214,14 @@ impl<'e> SchemaCtx<'e> {
 
     fn format_key(&self, def_variant: DefVariant) -> String {
         match self.type_name(def_variant) {
-            Some(name) => name,
+            Some(name) => smart_format!("{}", name),
             None => smart_format!("{}", Key(def_variant)),
         }
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
         match self.type_name(def_variant) {
-            Some(name) => format!("{}{}", self.link_anchor, name).into(),
+            Some(name) => smart_format!("{}{}", self.link_anchor, name).into(),
             None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
         }
     }
