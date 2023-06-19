@@ -57,7 +57,7 @@ pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub subject: Spanned<Option<Type>>,
-    pub relation: Relation,
+    pub relations: Vec<Relation>,
     pub object: Spanned<Option<TypeOrPattern>>,
 }
 
@@ -116,7 +116,7 @@ pub enum Pattern {
     Struct(Spanned<(UnitOrSeq, StructPattern)>),
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum UnitOrSeq {
     Unit,
     Seq,

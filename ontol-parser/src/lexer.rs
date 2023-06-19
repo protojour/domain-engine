@@ -68,7 +68,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 
     doc_comment()
         .or(just("=>").map(|_| Token::FatArrow))
-        .or(one_of(".,:?_+-*=<>").map(Token::Sigil))
+        .or(one_of(".,:?_+-*=<>|").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
         .or(num().map(Token::Number))

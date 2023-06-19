@@ -201,7 +201,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             docs,
             kw: _,
             subject: (subject, subject_span),
-            relation,
+            relations,
             object: (object, object_span),
         } = rel;
 
@@ -229,13 +229,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        self.def_relationship(
-            (subject_def, &subject_span),
-            relation,
-            (object_def, &object_span),
-            span,
-            docs,
-        )
+        let mut relation_iter = relations.into_iter().peekable();
+        let mut root_defs = RootDefs::default();
+        let mut docs = Some(docs);
+
+        while let Some(relation) = relation_iter.next() {
+            root_defs.extend(self.def_relationship(
+                (subject_def.clone(), &subject_span),
+                relation,
+                (object_def.clone(), &object_span),
+                span.clone(),
+                if relation_iter.peek().is_some() {
+                    docs.clone().unwrap()
+                } else {
+                    docs.take().unwrap()
+                },
+            )?);
+        }
+        Ok(root_defs)
     }
 
     fn def_relationship(

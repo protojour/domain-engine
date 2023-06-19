@@ -124,30 +124,56 @@ fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
 
     doc_comments()
         .then(keyword(Token::Rel))
-        // subject
+        // subject:
         .then(with_unit_or_seq(spanned_ty_or_dot()))
-        // relation
-        .then(relation(stmt_parser))
-        // object
+        // forward relations:
+        .then(forward_relation(stmt_parser.clone()).separated_by(sigil('|')))
+        // colon separator:
+        .then_ignore(colon())
+        // backward relations:
+        .then(
+            colon()
+                .ignore_then(backward_relation().separated_by(sigil('|')))
+                .or_not(),
+        )
+        // object:
         .then(object_type_or_pattern)
-        // .then(spanned(ctx_block).or_not())
         .map(
-            |((((docs, kw), (obj_unit_or_seq, subject)), relation), (subj_unit_or_seq, object))| {
+            |(
+                ((((docs, kw), (obj_unit_or_seq, subject)), forward_relations), backward_relations),
+                (subj_unit_or_seq, object),
+            )| {
+                let relations = forward_relations
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, forward): (usize, ForwardRelation)| {
+                        let backward_relation = backward_relations
+                            .as_ref()
+                            .and_then(|backward_vec| backward_vec.get(idx));
+
+                        Relation {
+                            ty: forward.ty,
+                            subject_cardinality: compose_cardinality(
+                                forward.subject_cardinality,
+                                subj_unit_or_seq,
+                            ),
+                            ctx_block: forward.ctx_block,
+                            object_prop_ident: backward_relation
+                                .map(|backward| backward.object_prop_ident.clone()),
+                            object_cardinality: compose_cardinality(
+                                backward_relation
+                                    .and_then(|backward| backward.object_cardinality.clone()),
+                                obj_unit_or_seq,
+                            ),
+                        }
+                    })
+                    .collect();
+
                 RelStatement {
                     docs,
                     kw,
                     subject,
-                    relation: Relation {
-                        subject_cardinality: compose_cardinality(
-                            relation.subject_cardinality,
-                            subj_unit_or_seq,
-                        ),
-                        object_cardinality: compose_cardinality(
-                            relation.object_cardinality,
-                            obj_unit_or_seq,
-                        ),
-                        ..relation
-                    },
+                    relations,
                     object,
                 }
             },
@@ -166,7 +192,20 @@ fn compose_cardinality(
     }
 }
 
-fn relation(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<Relation> {
+struct ForwardRelation {
+    pub ty: RelType,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
+    pub subject_cardinality: Option<Cardinality>,
+}
+
+struct BackwardRelation {
+    pub object_prop_ident: Spanned<String>,
+    pub object_cardinality: Option<Cardinality>,
+}
+
+fn forward_relation(
+    stmt_parser: impl AstParser<Spanned<Statement>>,
+) -> impl AstParser<ForwardRelation> {
     let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
     let rel_ty_type = spanned(ty()).map(RelType::Type);
 
@@ -174,33 +213,27 @@ fn relation(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<R
 
     let rel_params_block = stmt_parser.repeated().delimited_by(open('('), close(')'));
 
-    // type
     rel_ty
         .then(spanned(rel_params_block).or_not())
         .then(sigil('?').or_not())
-        .then_ignore(colon())
-        // object prop and cardinality
-        .then(
-            colon()
-                .ignore_then(spanned(string_literal()).then(sigil('?').or_not()))
-                .or_not(),
-        )
-        .map(|(((ty, ctx_block), subject_optional), object)| {
-            let (object_prop_ident, object_cardinality) = match object {
-                Some((prop, object_optional)) => {
-                    (Some(prop), object_optional.map(|_| Cardinality::Optional))
-                }
-                None => (None, None),
-            };
+        .map(|((ty, ctx_block), subject_optional)| ForwardRelation {
+            ty,
+            ctx_block,
+            subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
+        })
+}
 
-            Relation {
-                ty,
-                subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
+fn backward_relation() -> impl AstParser<BackwardRelation> {
+    spanned(string_literal()).then(sigil('?').or_not()).map(
+        |(object_prop_ident, object_optional)| {
+            let object_cardinality = object_optional.map(|_| Cardinality::Optional);
+
+            BackwardRelation {
                 object_prop_ident,
-                ctx_block,
                 object_cardinality,
             }
-        })
+        },
+    )
 }
 
 fn fmt_statement() -> impl AstParser<FmtStatement> {

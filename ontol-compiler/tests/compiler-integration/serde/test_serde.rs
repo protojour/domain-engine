@@ -257,6 +257,23 @@ fn test_num_default() {
 }
 
 #[test]
+#[should_panic]
+fn test_prop_union() {
+    "
+    pub type vec3 {
+        /// A vector component
+        rel .'x'|'y'|'z': {
+            rel .is: int
+        }
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "vec3");
+        assert_json_io_matches!(foo, json!({ "x": 1, "y": 2, "z": 3 }));
+    });
+}
+
+#[test]
 fn test_jsonml() {
     "
     type tag
