@@ -30,7 +30,7 @@ pub enum CompileError {
     Parse(ParseError),
     #[error("package not found")]
     PackageNotFound,
-    #[error("using `_` requires a contextual block")]
+    #[error("using `.` requires a contextual block")]
     WildcardNeedsContextualBlock,
     #[error("invalid expression")]
     InvalidExpression,
