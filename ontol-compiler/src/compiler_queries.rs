@@ -58,13 +58,13 @@ pub trait GetPropertyMeta<'m> {
         relationship_id: RelationshipId,
     ) -> Result<RelationshipMeta<'m>, ()>;
 
-    fn property_meta_by_subject(
+    fn relationship_meta_by_subject(
         &self,
         subject_id: DefId,
         relation_id: RelationId,
     ) -> Result<RelationshipMeta<'m>, ()>;
 
-    fn property_meta_by_object(
+    fn relationship_meta_by_object(
         &self,
         object_id: DefId,
         relation_id: RelationId,
@@ -82,7 +82,7 @@ where
         get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 
-    fn property_meta_by_subject(
+    fn relationship_meta_by_subject(
         &self,
         subject_id: DefId,
         relation_id: RelationId,
@@ -96,7 +96,7 @@ where
         get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 
-    fn property_meta_by_object(
+    fn relationship_meta_by_object(
         &self,
         object_id: DefId,
         relation_id: RelationId,

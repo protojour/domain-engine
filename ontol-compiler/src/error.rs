@@ -96,7 +96,7 @@ pub enum CompileError {
     NoUniformDiscriminatorFound,
     #[error("variants of the union have prefixes that are prefixes of other variants")]
     SharedPrefixInPatternUnion,
-    #[error("already identifies another type")]
+    #[error("already identifies a type")]
     AlreadyIdentifiesAType,
     #[error("already identified by another type; secondary ids not supported (yet)")]
     AlreadyIdentified,

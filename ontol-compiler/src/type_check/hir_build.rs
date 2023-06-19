@@ -312,7 +312,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .filter_map(|(property_id, _cardinality)| match property_id.role {
                                 Role::Subject => {
                                     let meta = self
-                                        .property_meta_by_subject(
+                                        .relationship_meta_by_subject(
                                             struct_def_id,
                                             property_id.relation_id,
                                         )

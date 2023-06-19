@@ -185,7 +185,7 @@ impl<'m> Compiler<'m> {
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
                         if let Some(id_relation_id) = &properties.identified_by {
                             let identifies_meta = self
-                                .property_meta_by_object(type_def_id, *id_relation_id)
+                                .relationship_meta_by_object(type_def_id, *id_relation_id)
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
@@ -270,7 +270,8 @@ impl<'m> Compiler<'m> {
         let relation_id = RelationId(self.primitives.identifies_relation);
         let _property = map.get(&(PropertyId::subject(relation_id)))?;
 
-        self.property_meta_by_subject(entity_id, relation_id).ok()
+        self.relationship_meta_by_subject(entity_id, relation_id)
+            .ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

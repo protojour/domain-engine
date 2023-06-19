@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("check union {:?}", meta.relationship);
 
             let variant_def = match &meta.relation.kind {
-                RelationKind::Named(def) | RelationKind::FmtTransition(def) => def.def_id,
+                RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => def.def_id,
                 _ => meta.relationship.object.0.def_id,
             };
 
@@ -82,7 +82,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             if let Some(properties) = self.relations.properties_by_type(variant_def) {
                 if let Some(id_relation_id) = &properties.identified_by {
                     let identifies_meta = self
-                        .property_meta_by_object(variant_def, *id_relation_id)
+                        .relationship_meta_by_object(variant_def, *id_relation_id)
                         .expect("BUG: problem getting property meta");
 
                     self.add_variant_to_builder(
@@ -257,7 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (property_id, _cardinality) in property_set {
             let meta = self
-                .property_meta_by_subject(variant_def, property_id.relation_id)
+                .relationship_meta_by_subject(variant_def, property_id.relation_id)
                 .expect("BUG: problem getting property meta");
 
             let (object_reference, _) = &meta.relationship.object;

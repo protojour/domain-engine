@@ -12,8 +12,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefParamBinding, DefReference, PropertyCardinality, RelParams, Relation,
-        RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
+        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, PropertyCardinality, RelParams,
+        Relation, RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -44,6 +44,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     pub fn finish(self) -> Vec<DefId> {
+        debug!("Lowering finish: {:?}", self.root_defs);
         self.root_defs
     }
 
@@ -365,7 +366,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             RelParams::Unit
         };
 
-        let relationship = Relationship {
+        let mut relationship = Relationship {
             relation_id,
             subject: (subject.0, self.src.span(subject.1)),
             subject_cardinality: subject_cardinality
@@ -387,6 +388,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }),
             rel_params,
         };
+
+        // HACK(for now): invert relationship
+        if relation_id.0 == self.compiler.primitives.id_relation {
+            relationship = Relationship {
+                relation_id: RelationId(self.compiler.primitives.identifies_relation),
+                subject: relationship.object,
+                subject_cardinality: relationship.object_cardinality,
+                object: relationship.subject,
+                object_cardinality: relationship.subject_cardinality,
+                rel_params: relationship.rel_params,
+            };
+        }
 
         self.set_def_kind(relationship_id, DefKind::Relationship(relationship), &span);
         root_defs.push(relationship_id);
@@ -443,6 +456,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 (origin_def, &origin_span),
                 (transition, span.clone()),
                 (target_def.clone(), &span),
+                FmtFinalState(false),
                 span.clone(),
             )?);
 
@@ -463,6 +477,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             (origin_def, &origin_span),
             (transition, transition_span),
             (end_def, &target.1),
+            FmtFinalState(true),
             span,
         )?);
 
@@ -474,10 +489,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         from: (DefReference, &Span),
         transition: (ast::Type, Span),
         to: (DefReference, &Span),
+        final_state: FmtFinalState,
         span: Span,
     ) -> Res<DefId> {
         let transition_def = self.resolve_type_reference(transition.0, &transition.1, None)?;
-        let relation_key = RelationKey::FmtTransition(transition_def);
+        let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used
         let relation_id = match self.define_relation_if_undefined(relation_key) {
@@ -551,7 +567,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
-                    let rel_def = self.define_anonymous_type(
+                    let def = self.define_anonymous_type(
                         TypeDef {
                             public: false,
                             ident: None,
@@ -564,10 +580,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     // This type needs to be part of the anonymous part of the namespace
                     self.compiler
                         .namespaces
-                        .add_anonymous(self.src.package_id, rel_def.def_id);
-                    root_defs.push(rel_def.def_id);
+                        .add_anonymous(self.src.package_id, def.def_id);
+                    root_defs.push(def.def_id);
 
-                    let context_fn = || rel_def.clone();
+                    let context_fn = || def.clone();
 
                     for spanned_stmt in ctx_block {
                         match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
@@ -581,7 +597,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     }
 
                     Ok(DefReference {
-                        def_id: rel_def.def_id,
+                        def_id: def.def_id,
                         pattern_bindings: Default::default(),
                     })
                 } else {
@@ -961,10 +977,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
                 }
             }
-            RelationKey::FmtTransition(def_ref) => {
+            RelationKey::FmtTransition(def_ref, final_state) => {
                 match self.compiler.relations.relations.entry(def_ref.def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(
-                        RelationKind::FmtTransition(def_ref),
+                        RelationKind::FmtTransition(def_ref, final_state),
                         *vacant.insert(RelationId(
                             self.compiler.defs.alloc_def_id(self.src.package_id),
                         )),
@@ -1021,7 +1037,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
 enum RelationKey {
     Named(DefReference),
-    FmtTransition(DefReference),
+    FmtTransition(DefReference, FmtFinalState),
     Builtin(DefId),
     Indexed,
 }

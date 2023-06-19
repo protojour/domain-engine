@@ -15,7 +15,7 @@ fn id_cannot_identify_two_things() {
     type bar
     type id {
         rel .identifies: foo
-        rel .identifies: bar // ERROR already identifies another type
+        rel .identifies: bar // ERROR already identifies a type
     }
     "
     .compile_fail();
@@ -26,7 +26,7 @@ fn entity_without_inherent_id() {
     "
     pub type some_id { fmt '' => string => . }
     pub type entity {
-        rel some_id identifies: .
+        rel .id: some_id
         rel .'foo': string
     }
     "
@@ -41,7 +41,7 @@ fn identifier_as_property() {
     "
     type foo_id { rel . is: string }
     pub type foo {
-        rel foo_id identifies: .
+        rel . id: foo_id
         rel .'key': foo_id
         rel .'children': [foo]
     }
@@ -50,6 +50,30 @@ fn identifier_as_property() {
         let foo = TypeBinding::new(&env, "foo");
         assert_json_io_matches!(foo, json!({ "children": [{ "key": "some_key" }] }));
     });
+}
+
+#[test]
+fn id_and_inherent_property_inline_type() {
+    "
+    pub type foo {
+        rel .'key'|id: { rel . is: string }
+        rel .'children': [foo]
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        assert_json_io_matches!(foo, json!({ "children": [{ "key": "some_key" }] }));
+    });
+}
+
+#[test]
+fn entity_id_inline_fmt() {
+    "
+    pub type foo {
+        rel .'key'|id: { fmt '' => 'foo/' => uuid => . }
+    }
+    "
+    .compile_ok(|_| {});
 }
 
 #[test]

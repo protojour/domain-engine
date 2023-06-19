@@ -40,7 +40,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match property_id.role {
                 Role::Subject => {
                     let meta = self
-                        .property_meta_by_subject(def_id, property_id.relation_id)
+                        .relationship_meta_by_subject(def_id, property_id.relation_id)
                         .unwrap();
                     let object_properties = self
                         .relations
@@ -50,7 +50,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     // Check if the property is the primary id
                     if let Some(id_relation) = object_properties.identifies {
                         let id_meta = self
-                            .property_meta_by_subject(
+                            .relationship_meta_by_subject(
                                 meta.relationship.object.0.def_id,
                                 id_relation,
                             )
@@ -85,7 +85,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                             let variant_def = match &meta.relation.kind {
                                                 RelationKind::Named(def)
-                                                | RelationKind::FmtTransition(def) => def.def_id,
+                                                | RelationKind::FmtTransition(def, _) => def.def_id,
                                                 _ => meta.relationship.object.0.def_id,
                                             };
 
@@ -117,7 +117,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     } else {
                         let meta = self
-                            .property_meta_by_object(def_id, property_id.relation_id)
+                            .relationship_meta_by_object(def_id, property_id.relation_id)
                             .unwrap();
                         let subject_properties = self
                             .relations
@@ -145,7 +145,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("perform action {action:?}");
             match action {
                 Action::ReportNonEntityInObjectRelationship(def_id, relation_id) => {
-                    let meta = self.property_meta_by_object(def_id, relation_id).unwrap();
+                    let meta = self
+                        .relationship_meta_by_object(def_id, relation_id)
+                        .unwrap();
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,

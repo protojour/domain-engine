@@ -24,6 +24,7 @@ impl<'m> Compiler<'m> {
 
         self.register_named_builtin_relation(self.primitives.is_relation, "is");
         self.register_named_builtin_relation(self.primitives.identifies_relation, "identifies");
+        self.register_named_builtin_relation(self.primitives.id_relation, "id");
         self.register_named_builtin_relation(self.primitives.min_relation, "min");
         self.register_named_builtin_relation(self.primitives.max_relation, "max");
         self.register_named_builtin_relation(self.primitives.default_relation, "default");

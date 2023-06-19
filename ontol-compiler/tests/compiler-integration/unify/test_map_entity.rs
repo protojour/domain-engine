@@ -251,12 +251,12 @@ fn artist_etc_routing() {
             rel gsu route(
                 map {
                     gsu.artist {
-                        'artist-id': id // ERROR cannot convert this `artist_id` from `artist-id`: These types are not equated.
+                        'artist-id': id // ERROR cannot convert this `artist_id` from `anonymous`: These types are not equated.
                         'name': n
                         'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                     ai.artist {
-                        'ID': id // ERROR cannot convert this `artist-id` from `artist_id`: These types are not equated.
+                        'ID': id // ERROR cannot convert this `anonymous` from `artist_id`: These types are not equated.
                         'name': n
                         'plays': [p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }

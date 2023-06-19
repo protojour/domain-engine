@@ -162,7 +162,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
                 let meta = self
-                    .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
+                    .relationship_meta_by_subject(def_variant.def_id, property_id.relation_id)
                     .expect("Problem getting property meta");
 
                 let property_name = meta.relation.subject_prop(self.defs)?;
@@ -479,7 +479,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let map_def_variant = def_variant.remove_modifier(union_id);
 
             let identifies_meta = self
-                .property_meta_by_object(def_variant.def_id, identifies_relation_id)
+                .relationship_meta_by_object(def_variant.def_id, identifies_relation_id)
                 .expect("Problem getting subject property meta");
 
             // Create a union between { '_id' } and the map properties itself
@@ -717,7 +717,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }
 
                         let meta = self
-                            .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
+                            .relationship_meta_by_subject(
+                                def_variant.def_id,
+                                property_id.relation_id,
+                            )
                             .expect("Problem getting subject property meta");
                         let object = meta.relationship.object.0.def_id;
 
@@ -730,7 +733,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let meta = self
-                            .property_meta_by_object(def_variant.def_id, property_id.relation_id)
+                            .relationship_meta_by_object(
+                                def_variant.def_id,
+                                property_id.relation_id,
+                            )
                             .expect("Problem getting object property meta");
                         let subject = meta.relationship.subject.0.def_id;
 

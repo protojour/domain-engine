@@ -33,6 +33,7 @@ pub struct Primitives {
     pub bool: DefId,
     pub is_relation: DefId,
     pub identifies_relation: DefId,
+    pub id_relation: DefId,
     pub indexed_relation: DefId,
     pub min_relation: DefId,
     pub max_relation: DefId,
@@ -63,6 +64,7 @@ impl Primitives {
 
             is_relation: defs.add_builtin_relation(BuiltinRelationKind::Is),
             identifies_relation: defs.add_builtin_relation(BuiltinRelationKind::Identifies),
+            id_relation: defs.add_builtin_relation(BuiltinRelationKind::Id),
             indexed_relation: defs.add_builtin_relation(BuiltinRelationKind::Indexed),
             min_relation: defs.add_builtin_relation(BuiltinRelationKind::Min),
             max_relation: defs.add_builtin_relation(BuiltinRelationKind::Max),

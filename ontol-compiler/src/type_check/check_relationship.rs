@@ -3,8 +3,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        BuiltinRelationKind, Def, DefKind, DefReference, PropertyCardinality, Relation,
-        RelationKind, Relationship, TypeDef,
+        BuiltinRelationKind, Def, DefKind, DefReference, FmtFinalState, PropertyCardinality,
+        Relation, RelationKind, Relationship, TypeDef,
     },
     error::CompileError,
     mem::Intern,
@@ -34,7 +34,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match &relation.kind {
-            RelationKind::Named(def) | RelationKind::FmtTransition(def) => {
+            RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => {
                 self.check_def(def.def_id);
             }
             _ => {}
@@ -169,6 +169,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 object_ty
             }
+            RelationKind::Builtin(BuiltinRelationKind::Id) => {
+                panic!("This should not have been lowered");
+            }
             RelationKind::Builtin(BuiltinRelationKind::Indexed) => {
                 let subject_ty = self.check_def(subject.0.def_id);
                 let object_ty = self.check_def(object.0.def_id);
@@ -241,7 +244,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 object_ty
             }
-            RelationKind::FmtTransition(_) => {
+            RelationKind::FmtTransition(_, _) => {
                 let subject_ty = self.check_def(subject.0.def_id);
                 let _ = self.check_def(object.0.def_id);
 
@@ -324,7 +327,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def(object.0.def_id);
         let subject_ty = self.check_def(subject.0.def_id);
 
-        if matches!(&relation.1.kind, RelationKind::FmtTransition(_)) {
+        if let RelationKind::FmtTransition(_, final_state) = &relation.1.kind {
             match subject_ty {
                 Type::StringConstant(subject_def_id)
                     if *subject_def_id == self.primitives.empty_string =>
@@ -334,12 +337,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         object.0.def_id,
                         object_ty,
                         StringPatternSegment::EmptyString,
+                        *final_state,
                         span,
                     ) {
                         return e;
                     }
                 }
                 Type::Anonymous(_) => {
+                    debug!("Fmt subject anonymous object: {:?}", object.0.def_id);
                     let subject_constructor = self
                         .relations
                         .properties_by_type(subject.0.def_id)
@@ -352,6 +357,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 object.0.def_id,
                                 object_ty,
                                 subject_pattern.clone(),
+                                *final_state,
                                 span,
                             ) {
                                 return e;
@@ -450,10 +456,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object_def: DefId,
         object_ty: TypeRef<'m>,
         origin: StringPatternSegment,
+        final_state: FmtFinalState,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let rel_def = match &relation.1.kind {
-            RelationKind::FmtTransition(def) | RelationKind::Named(def) => def,
+            RelationKind::FmtTransition(def, _) | RelationKind::Named(def) => def,
             _ => todo!(),
         };
 
@@ -492,7 +499,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_properties.constructor =
                     Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
 
-                if !object_ty.is_anonymous() {
+                if final_state.0 || !object_ty.is_anonymous() {
                     // constructors of unnamable types do not need to be processed..
                     // Register pattern processing for later:
                     self.relations

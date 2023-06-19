@@ -137,14 +137,18 @@ impl<'m> Relation<'m> {
 #[derive(Clone, Debug)]
 pub enum RelationKind {
     Named(DefReference),
-    FmtTransition(DefReference),
+    FmtTransition(DefReference, FmtFinalState),
     Builtin(BuiltinRelationKind),
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct FmtFinalState(pub bool);
 
 #[derive(Clone, Debug)]
 pub enum BuiltinRelationKind {
     Is,
     Identifies,
+    Id,
     Indexed,
     Min,
     Max,
