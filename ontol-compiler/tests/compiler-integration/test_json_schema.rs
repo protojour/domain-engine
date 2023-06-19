@@ -27,7 +27,7 @@ fn json_schema_from_simple_entity() {
         assert_eq!(
             json!({
                 "$defs": {
-                    "entity": {
+                    "1_entity": {
                         "type": "object",
                         "description": "This is type entity",
                         "properties": {
@@ -54,7 +54,7 @@ fn json_schema_from_simple_entity() {
                 },
                 "allOf": [
                     {
-                        "$ref": "#/$defs/entity",
+                        "$ref": "#/$defs/1_entity",
                     },
                 ],
                 "unevaluatedProperties": false,

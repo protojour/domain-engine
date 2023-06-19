@@ -210,19 +210,18 @@ impl<'e> SchemaCtx<'e> {
         }
     }
 
-    // TODO: Ensure possible name collisions are handled,
-    // e.g. by prefixing imported types with their namespace/domain name.
-
     fn format_key(&self, def_variant: DefVariant) -> String {
+        let package_id = def_variant.def_id.0;
         match self.type_name(def_variant) {
-            Some(name) => smart_format!("{}", encode(&name)),
+            Some(name) => smart_format!("{}_{}", package_id.0, encode(&name)),
             None => smart_format!("{}", Key(def_variant)),
         }
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
+        let package_id = def_variant.def_id.0;
         match self.type_name(def_variant) {
-            Some(name) => smart_format!("{}{}", self.link_anchor, encode(&name)),
+            Some(name) => smart_format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
             None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
         }
     }
