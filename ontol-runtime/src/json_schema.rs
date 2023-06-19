@@ -5,6 +5,7 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
+use urlencoding::encode;
 
 use crate::env::TypeInfo;
 use crate::serde::operator::{
@@ -214,14 +215,14 @@ impl<'e> SchemaCtx<'e> {
 
     fn format_key(&self, def_variant: DefVariant) -> String {
         match self.type_name(def_variant) {
-            Some(name) => smart_format!("{}", name),
+            Some(name) => smart_format!("{}", encode(&name)),
             None => smart_format!("{}", Key(def_variant)),
         }
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
         match self.type_name(def_variant) {
-            Some(name) => smart_format!("{}{}", self.link_anchor, name).into(),
+            Some(name) => smart_format!("{}{}", self.link_anchor, encode(&name)),
             None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
         }
     }

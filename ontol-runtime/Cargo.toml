@@ -24,6 +24,7 @@ chrono = { version = "0.4" , features = ["serde"] }
 uuid = "1"
 regex = "1"
 bitflags = "2"
+urlencoding = "2"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
