@@ -257,7 +257,6 @@ fn test_num_default() {
 }
 
 #[test]
-#[should_panic]
 fn test_prop_union() {
     "
     pub type vec3 {

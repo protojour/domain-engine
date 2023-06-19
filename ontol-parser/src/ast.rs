@@ -158,6 +158,7 @@ pub enum TypeOrPattern {
 pub enum Type {
     Unit,
     Path(Path, Option<Spanned<Vec<Spanned<TypeParamPattern>>>>),
+    AnonymousStruct(Spanned<Vec<Spanned<Statement>>>),
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),

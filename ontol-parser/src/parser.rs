@@ -78,7 +78,11 @@ fn type_statement(
 
     fn generic_param() -> impl AstParser<TypeParam> {
         spanned(ident())
-            .then(just(Token::Sigil('=')).ignore_then(spanned(ty())).or_not())
+            .then(
+                just(Token::Sigil('='))
+                    .ignore_then(spanned(named_type()))
+                    .or_not(),
+            )
             .map(|(ident, default)| TypeParam { ident, default })
     }
 
@@ -107,27 +111,35 @@ fn with_statement(
     stmt_parser: impl AstParser<Spanned<Statement>>,
 ) -> impl AstParser<WithStatement> {
     keyword(Token::With)
-        .then(spanned(ty()))
+        .then(spanned(named_type()))
         .then(spanned(
             stmt_parser.repeated().delimited_by(open('{'), close('}')),
         ))
         .map(|((kw, ty), statements)| WithStatement { kw, ty, statements })
 }
 
-fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
-    let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_dot())
-        .map(|(unit_or_seq, (opt_ty, span))| (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span)))
-        .or(sigil('=').ignore_then(
-            spanned(pattern())
-                .map(|(pat, span)| (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))),
-        ));
+fn rel_statement(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<RelStatement> {
+    let object_type_or_pattern =
+        with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
+            .map(|(unit_or_seq, (opt_ty, span))| {
+                (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span))
+            })
+            .or(sigil('=').ignore_then(
+                spanned(pattern()).map(|(pat, span)| {
+                    (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))
+                }),
+            ));
 
     doc_comments()
         .then(keyword(Token::Rel))
         // subject:
-        .then(with_unit_or_seq(spanned_ty_or_dot()))
+        .then(with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(
+            stmt_parser.clone(),
+        )))
         // forward relations:
-        .then(forward_relation(stmt_parser.clone()).separated_by(sigil('|')))
+        .then(forward_relation(stmt_parser).separated_by(sigil('|')))
         // colon separator:
         .then_ignore(colon())
         // backward relations:
@@ -204,10 +216,11 @@ struct BackwardRelation {
 }
 
 fn forward_relation(
-    stmt_parser: impl AstParser<Spanned<Statement>>,
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
 ) -> impl AstParser<ForwardRelation> {
     let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
-    let rel_ty_type = spanned(ty()).map(RelType::Type);
+    let rel_ty_type =
+        spanned(named_type().or(anonymous_type(stmt_parser.clone()))).map(RelType::Type);
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
@@ -240,11 +253,11 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
     doc_comments()
         .then(keyword(Token::Fmt))
         // origin
-        .then(spanned(ty()))
+        .then(spanned(named_type()))
         // transitions
         .then(
             just(Token::FatArrow)
-                .ignore_then(spanned_ty_or_dot())
+                .ignore_then(spanned_named_type_or_dot())
                 .repeated(),
         )
         .map(|(((docs, kw), origin), transitions)| FmtStatement {
@@ -307,7 +320,7 @@ fn struct_pattern_attr(
     pattern: impl AstParser<Pattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternAttr> {
     recursive(|struct_pattern_attr| {
-        spanned(ty())
+        spanned(named_type())
             .then(
                 spanned(
                     spanned(struct_pattern_attr)
@@ -378,12 +391,22 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     .labelled("expression pattern")
 }
 
-fn spanned_ty_or_dot() -> impl AstParser<Spanned<Option<Type>>> {
-    spanned(ty().map(Some).or(sigil('.').map(|_| None)))
+fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(named_type().map(Some).or(sigil('.').map(|_| None)))
+}
+
+fn spanned_named_or_anonymous_type_or_dot(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(
+        (named_type().or(anonymous_type(stmt_parser)))
+            .map(Some)
+            .or(sigil('.').map(|_| None)),
+    )
 }
 
 /// Type parser
-fn ty() -> impl AstParser<Type> {
+fn named_type() -> impl AstParser<Type> {
     recursive(|ty| {
         let binding = just(Token::Sigil('='))
             .ignore_then(spanned(ty))
@@ -421,6 +444,14 @@ fn ty() -> impl AstParser<Type> {
             .or(regex)
             .labelled("type")
     })
+}
+
+fn anonymous_type(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<Type> {
+    spanned(stmt_parser.repeated().delimited_by(open('{'), close('}')))
+        .boxed()
+        .map(Type::AnonymousStruct)
 }
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
