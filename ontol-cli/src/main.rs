@@ -1,3 +1,4 @@
+use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use clap::{Args, Parser, Subcommand};
 use ontol_compiler::{
     mem::Mem,
@@ -6,11 +7,11 @@ use ontol_compiler::{
 };
 use ontol_parser::parse_statements;
 use ontol_runtime::json_schema::build_openapi_schemas;
-use std::{collections::HashMap, fs, print};
+use std::{collections::HashMap, fs};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// ONTOL – ONTOlogy Language compiler
+/// ontool – ONTOlogy Language tool
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help(true))]
 struct Cli {
@@ -54,20 +55,35 @@ fn main() {
     match &cli.command {
         Some(Commands::Check(args)) => check(args),
         Some(Commands::Generate(args)) => generate(args),
-        None => {}
+        None => (),
     }
 }
 
 fn check(args: &Check) {
-    for file in &args.files {
-        let source = fs::read_to_string(file).expect("File not found");
+    for filename in &args.files {
+        let source = fs::read_to_string(filename).expect("File not found");
+        let (_stmts, errors) = parse_statements(&source);
 
-        let (_statements, errors) = parse_statements(&source);
-        if errors.len() == 0 {
-            println!("No errors found!");
+        if errors.is_empty() {
+            println!("{}: no errors found.", filename);
         } else {
-            for _error in errors {
-                eprintln!("{}", "1 error");
+            let mut colors = ColorGenerator::new();
+            for error in errors {
+                let (span, message) = match error {
+                    ontol_parser::Error::Lex(err) => (err.span(), format!("lex error: {}", err)),
+                    ontol_parser::Error::Parse(err) => {
+                        (err.span(), format!("parse error: {}", err))
+                    }
+                };
+                Report::build(ReportKind::Error, filename, span.start)
+                    .with_label(
+                        Label::new((filename, span))
+                            .with_message(message)
+                            .with_color(colors.next()),
+                    )
+                    .finish()
+                    .eprint((filename, Source::from(&source)))
+                    .unwrap();
             }
         }
     }
@@ -77,7 +93,7 @@ fn generate(args: &Generate) {
     for filename in &args.files {
         let source = fs::read_to_string(filename).expect("File not found");
 
-        let sources_by_name: HashMap<String, String> = [(filename.clone(), source)].into();
+        let sources_by_name: HashMap<String, String> = [(filename.clone(), source.clone())].into();
         let mut sources = Sources::default();
         let mut source_code_registry = SourceCodeRegistry::default();
         let mut package_graph_builder = PackageGraphBuilder::new(filename.clone().into());
@@ -115,21 +131,39 @@ fn generate(args: &Generate) {
 
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
-        compiler.compile_package_topology(topology).unwrap();
+        match compiler.compile_package_topology(topology) {
+            Ok(_) => {
+                let env = compiler.into_env();
+                if let Some(package_id) = root_package {
+                    let domain = env.find_domain(package_id).unwrap();
+                    let schemas = build_openapi_schemas(&env, package_id, domain);
 
-        let env = compiler.into_env();
-        if let Some(package_id) = root_package {
-            let domain = env.find_domain(package_id).unwrap();
-            let schemas = build_openapi_schemas(&env, package_id, domain);
+                    if args.json_schema {
+                        let schemas_json = serde_json::to_string_pretty(&schemas).unwrap();
+                        println!("{}", schemas_json);
+                    }
 
-            if args.json_schema {
-                let schemas_json = serde_json::to_string_pretty(&schemas).unwrap();
-                print!("{}", schemas_json);
+                    if args.yaml_schema {
+                        let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
+                        println!("{}", schemas_yaml);
+                    }
+                }
             }
-
-            if args.yaml_schema {
-                let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
-                print!("{}", schemas_yaml);
+            Err(err) => {
+                let mut colors = ColorGenerator::new();
+                for error in err.errors {
+                    let span = error.span.start as usize..error.span.end as usize;
+                    let message = error.error.to_string();
+                    Report::build(ReportKind::Error, filename, span.start)
+                        .with_label(
+                            Label::new((filename, span))
+                                .with_message(message)
+                                .with_color(colors.next()),
+                        )
+                        .finish()
+                        .eprint((filename, Source::from(&source)))
+                        .unwrap();
+                }
             }
         }
     }
