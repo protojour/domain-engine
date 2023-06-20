@@ -51,15 +51,15 @@ struct Generate {
 #[derive(Debug, Error)]
 enum OntoolError {
     #[error("Parse error")]
-    ParseError,
+    Parse,
     #[error("Compile error")]
-    CompileError,
+    Compile,
     #[error("{0:?}")]
-    SerdeJsonError(#[from] serde_json::Error),
+    SerdeJson(#[from] serde_json::Error),
     #[error("{0:?}")]
-    SerdeYamlError(#[from] serde_yaml::Error),
+    SerdeYaml(#[from] serde_yaml::Error),
     #[error("{0}")]
-    IOError(#[from] std::io::Error),
+    IO(#[from] std::io::Error),
 }
 
 fn main() -> Result<(), OntoolError> {
@@ -99,7 +99,7 @@ fn check(args: &Check) -> Result<(), OntoolError> {
                     .finish()
                     .eprint((filename, Source::from(&source)))?;
             }
-            return Err(OntoolError::ParseError);
+            return Err(OntoolError::Parse);
         }
     }
     Ok(())
@@ -179,7 +179,7 @@ fn generate(args: &Generate) -> Result<(), OntoolError> {
                         .finish()
                         .eprint((filename, Source::from(&source)))?;
                 }
-                return Err(OntoolError::CompileError);
+                return Err(OntoolError::Compile);
             }
         }
     }
