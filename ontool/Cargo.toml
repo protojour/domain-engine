@@ -8,22 +8,14 @@ domain-engine-juniper.path = "../domain-engine-juniper"
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
 ontol-runtime.path = "../ontol-runtime"
-indexmap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-smartstring.workspace = true
-tracing-subscriber.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 ariadne = { version = "0.3.0", features = ["auto-color"] }
 clap = { version = "4.3.4", features = ["derive"] }
-
-[dev-dependencies]
-ontol-test-utils.path = "../ontol-test-utils"
-test-log.workspace = true
-assert_matches = "1"
-pretty_assertions = "1"
-indoc = "2"
 
 [[bin]]
 name = "ontool"

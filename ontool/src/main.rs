@@ -8,6 +8,7 @@ use ontol_compiler::{
 use ontol_parser::parse_statements;
 use ontol_runtime::json_schema::build_openapi_schemas;
 use std::{collections::HashMap, fs};
+use thiserror::Error;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -47,7 +48,21 @@ struct Generate {
     files: Vec<String>,
 }
 
-fn main() {
+#[derive(Debug, Error)]
+enum OntoolError {
+    #[error("Parse error")]
+    ParseError,
+    #[error("Compile error")]
+    CompileError,
+    #[error("{0:?}")]
+    SerdeJsonError(#[from] serde_json::Error),
+    #[error("{0:?}")]
+    SerdeYamlError(#[from] serde_yaml::Error),
+    #[error("{0}")]
+    IOError(#[from] std::io::Error),
+}
+
+fn main() -> Result<(), OntoolError> {
     tracing_subscriber::fmt().with_target(false).init();
 
     let cli = Cli::parse();
@@ -55,13 +70,13 @@ fn main() {
     match &cli.command {
         Some(Commands::Check(args)) => check(args),
         Some(Commands::Generate(args)) => generate(args),
-        None => (),
+        None => Ok(()),
     }
 }
 
-fn check(args: &Check) {
+fn check(args: &Check) -> Result<(), OntoolError> {
     for filename in &args.files {
-        let source = fs::read_to_string(filename).expect("File not found");
+        let source = fs::read_to_string(filename)?;
         let (_stmts, errors) = parse_statements(&source);
 
         if errors.is_empty() {
@@ -82,16 +97,17 @@ fn check(args: &Check) {
                             .with_color(colors.next()),
                     )
                     .finish()
-                    .eprint((filename, Source::from(&source)))
-                    .unwrap();
+                    .eprint((filename, Source::from(&source)))?;
             }
+            return Err(OntoolError::ParseError);
         }
     }
+    Ok(())
 }
 
-fn generate(args: &Generate) {
+fn generate(args: &Generate) -> Result<(), OntoolError> {
     for filename in &args.files {
-        let source = fs::read_to_string(filename).expect("File not found");
+        let source = fs::read_to_string(filename)?;
 
         let sources_by_name: HashMap<String, String> = [(filename.clone(), source.clone())].into();
         let mut sources = Sources::default();
@@ -139,19 +155,19 @@ fn generate(args: &Generate) {
                     let schemas = build_openapi_schemas(&env, package_id, domain);
 
                     if args.json_schema {
-                        let schemas_json = serde_json::to_string_pretty(&schemas).unwrap();
+                        let schemas_json = serde_json::to_string_pretty(&schemas)?;
                         println!("{}", schemas_json);
                     }
 
                     if args.yaml_schema {
-                        let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
+                        let schemas_yaml = serde_yaml::to_string(&schemas)?;
                         println!("{}", schemas_yaml);
                     }
                 }
             }
             Err(err) => {
                 let mut colors = ColorGenerator::new();
-                for error in err.errors {
+                for error in err.errors.iter() {
                     let span = error.span.start as usize..error.span.end as usize;
                     let message = error.error.to_string();
                     Report::build(ReportKind::Error, filename, span.start)
@@ -161,10 +177,11 @@ fn generate(args: &Generate) {
                                 .with_color(colors.next()),
                         )
                         .finish()
-                        .eprint((filename, Source::from(&source)))
-                        .unwrap();
+                        .eprint((filename, Source::from(&source)))?;
                 }
+                return Err(OntoolError::CompileError);
             }
         }
     }
+    Ok(())
 }
