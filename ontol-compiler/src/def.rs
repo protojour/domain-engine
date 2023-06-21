@@ -4,6 +4,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId, PackageId, RelationId,
+    RelationshipId,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -16,7 +17,6 @@ use crate::{
     package::CORE_PKG,
     primitive::PrimitiveKind,
     regex_util::parse_literal_regex_to_hir,
-    relation::RelationshipId,
     source::SourceSpan,
     strings::Strings,
     types::Type,

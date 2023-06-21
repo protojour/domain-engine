@@ -1,10 +1,10 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::{DefId, RelationId};
+use ontol_runtime::{DefId, RelationId, RelationshipId};
 
 use crate::{
     def::{Defs, Relation, Relationship},
-    relation::{Relations, RelationshipId},
+    relation::Relations,
     types::{DefTypes, TypeRef},
     SpannedBorrow,
 };

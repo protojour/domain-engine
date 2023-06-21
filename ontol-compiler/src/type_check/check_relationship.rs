@@ -1,4 +1,4 @@
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, RelationshipId};
 use tracing::debug;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
-    relation::{Constructor, Properties, Property, RelationshipId},
+    relation::{Constructor, Properties, Property},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,

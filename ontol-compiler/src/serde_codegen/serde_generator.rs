@@ -9,7 +9,7 @@ use ontol_runtime::{
         ValueUnionVariant,
     },
     serde::SerdeKey,
-    DataModifier, DefId, DefVariant, Role,
+    DataModifier, DefId, DefVariant, RelationshipId, Role,
 };
 use tracing::debug;
 
@@ -19,7 +19,7 @@ use crate::{
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
-    relation::{Constructor, Properties, Relations, RelationshipId},
+    relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type, TypeRef},
     SourceSpan,

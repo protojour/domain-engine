@@ -147,3 +147,6 @@ pub enum Role {
     Subject,
     Object,
 }
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub struct RelationshipId(pub DefId);
