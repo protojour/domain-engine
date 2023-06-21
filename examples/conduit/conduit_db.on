@@ -1,15 +1,41 @@
+pub type user_id { rel .is: uuid }
+pub type slug { rel.is: string }
+pub type tag { rel.is: string }
+
 pub type User {
-    rel uuid identifies: _
+    rel .'user_id'|id: user_id
+    rel .'username': string
+    rel .'email': string
+    rel .'bio'(rel .default := ''): string // ERROR invalid expression
+    rel .'image'?: string
+    rel .'password_hash': string
+
+    // TODO(constraint): User cannot follow itself
+    rel .'following'::'followed_by' [User]
 }
 
 pub type Article {
-    rel string identifies: _
-    rel _ 'slug': string
-    rel _ 'title': string
-    rel _ 'description': string
-    rel _ 'body': string
-    rel _ 'createdAt': datetime
-    rel _ 'updatedAt': datetime
-    rel _ 'favorited_by'::'favorited' [User]
-    rel _ 'author': User
+    rel .'id'|id: { rel .is: uuid }
+    // TODO(constraint): slug is unique
+    rel .'slug': slug
+    rel .'title': string
+    rel .'description': string
+    rel .'body': string
+    rel .'createdAt': datetime
+    rel .'updatedAt': datetime
 }
+
+pub type Comment {
+    rel .'id'|id: { rel .is: int }
+    rel .'body': string
+}
+
+pub type TagEntity {
+    rel .'tag'|id: tag
+}
+
+rel Article 'written_by'::'wrote_articles' [User]
+rel Article 'favorited_by'::'favorited' [User]
+rel TagEntity 'tags'::'tagged_with' [Article]
+rel Comment 'comment_on'::'has_comments' [Article]
+rel Comment 'written_by'::'wrote_comments' [User] // ERROR union in named relationship is not supported yet. Make a union type instead.
