@@ -12,7 +12,7 @@ use ontol_runtime::{
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, PackageId, RelationId,
+    DataModifier, DefId, DefVariant, PackageId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
@@ -189,7 +189,6 @@ impl<'m> Compiler<'m> {
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
-                                id_relation_id: RelationId(self.primitives.identifies_relation),
                                 id_relationship_id: *id_relationship_id,
                                 id_value_def_id: identifies_meta.relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
@@ -267,11 +266,16 @@ impl<'m> Compiler<'m> {
         _entity_id: DefId,
         properties: &Properties,
     ) -> Option<RelationshipMeta<'m>> {
-        let relationship_id = properties.identified_by.clone()?;
+        let id_relationship_id = properties.identified_by.clone()?;
+        let inherent_id = self
+            .relations
+            .inherent_id_map
+            .get(&id_relationship_id)
+            .cloned()?;
         let map = properties.map.as_ref()?;
-        let _property = map.get(&PropertyId::subject(relationship_id))?;
+        let _property = map.get(&PropertyId::subject(inherent_id))?;
 
-        self.get_relationship_meta(relationship_id).ok()
+        self.get_relationship_meta(inherent_id).ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

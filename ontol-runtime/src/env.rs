@@ -17,7 +17,7 @@ use crate::{
         proc::{Lib, Procedure},
         property_probe::PropertyProbe,
     },
-    DefId, MapKey, PackageId, RelationId, RelationshipId,
+    DefId, MapKey, PackageId, RelationshipId,
 };
 
 /// Runtime environment
@@ -189,7 +189,6 @@ pub struct TypeInfo {
 
 #[derive(Clone, Debug)]
 pub struct EntityInfo {
-    pub id_relation_id: RelationId,
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,

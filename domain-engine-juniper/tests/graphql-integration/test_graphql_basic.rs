@@ -86,6 +86,38 @@ async fn test_graphql_basic_schema() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_basic_inherent_id() {
+    let (_, schema) = "
+    pub type foo {
+        rel .'id'|id: { rel .is: string }
+    }
+    "
+    .compile_schema();
+
+    {
+        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
+        assert_eq!(
+            "{
+                fooList {
+                    edges {
+                        node {
+                            id
+                        }
+                    }
+                }
+            }"
+            .exec(&schema, &ctx)
+            .await,
+            Ok(graphql_value!({
+                "fooList": {
+                    "edges": [],
+                },
+            })),
+        );
+    }
+}
+
+#[test(tokio::test)]
 async fn test_inner_struct() {
     let (env, schema) = "
     pub type foo_id { fmt '' => string => . }

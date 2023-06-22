@@ -16,7 +16,11 @@ enum Action {
     ReportNonEntityInObjectRelationship(DefId, RelationshipId),
     /// Many(*) value cardinality between two entities are always considered optional
     AdjustEntityPropertyCardinality(DefId, PropertyId),
-    RedefineAsPrimaryId(DefId, PropertyId),
+    RedefineAsPrimaryId {
+        def_id: DefId,
+        inherent_property_id: PropertyId,
+        identifies_relationship_id: RelationshipId,
+    },
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -66,7 +70,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let id_meta = self.get_relationship_meta(id_relationship_id).unwrap();
 
                         if id_meta.relationship.object.0.def_id == def_id {
-                            actions.push(Action::RedefineAsPrimaryId(def_id, *property_id));
+                            debug!(
+                                "redefine as primary id: {id_relationship_id:?} <-> {:?}",
+                                property_id.relationship_id
+                            );
+
+                            actions.push(Action::RedefineAsPrimaryId {
+                                def_id,
+                                inherent_property_id: *property_id,
+                                identifies_relationship_id: id_relationship_id,
+                            });
                         }
                     }
 
@@ -168,12 +181,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         adjust_entity_prop_cardinality(cardinality);
                     }
                 }
-                Action::RedefineAsPrimaryId(def_id, property_id) => {
+                Action::RedefineAsPrimaryId {
+                    def_id,
+                    inherent_property_id,
+                    identifies_relationship_id,
+                } => {
+                    self.relations.inherent_id_map.insert(
+                        identifies_relationship_id,
+                        inherent_property_id.relationship_id,
+                    );
                     let properties = self.relations.properties_by_type_mut(def_id);
 
                     if let Some(map) = &mut properties.map {
                         map.insert(
-                            property_id,
+                            inherent_property_id,
                             Property {
                                 cardinality: (
                                     PropertyCardinality::Mandatory,

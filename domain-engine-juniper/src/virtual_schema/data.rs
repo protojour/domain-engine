@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::Env, serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationId,
-    RelationshipId,
+    env::Env, serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationshipId,
 };
 use smartstring::alias::String;
 
@@ -227,7 +226,6 @@ pub struct PropertyData {
 
 #[derive(Debug)]
 pub struct IdPropertyData {
-    pub relation_id: RelationId,
     pub relationship_id: RelationshipId,
     pub operator_id: SerdeOperatorId,
 }

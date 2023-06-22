@@ -3,7 +3,7 @@ use juniper::LookAheadMethods;
 use ontol_runtime::{
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
-    DefId, RelationId, RelationshipId,
+    DefId, RelationshipId,
 };
 use smartstring::alias::String;
 use tracing::debug;

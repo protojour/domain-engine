@@ -322,8 +322,8 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
                 OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
-                OpCode::PutAttr1(Local(1), "S:0:2".parse().unwrap()),
-                OpCode::TakeAttr2(Local(0), "S:0:3".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "S:0:3".parse().unwrap()),
+                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
                 OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
