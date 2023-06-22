@@ -163,7 +163,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let meta = self
                     .get_relationship_meta(property_id.relationship_id)
-                    .expect("Problem getting property meta");
+                    .expect("Problem getting relationship meta");
 
                 let property_name = meta.relation.subject_prop(self.defs)?;
 
@@ -455,15 +455,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let union_id = DataModifier::UNION | DataModifier::PRIMARY_ID;
 
         if def_variant.modifier.contains(union_id) {
-            let identifies_relation_id = match properties.identified_by {
-                Some(id) => id,
-                None => {
-                    return Some(OperatorAllocation::Redirect(
-                        def_variant.remove_modifier(union_id),
-                    ));
-                }
-            };
-            let identifies_relationship_id = match properties.identified_by2 {
+            let identifies_relationship_id = match properties.identified_by {
                 Some(id) => id,
                 None => {
                     return Some(OperatorAllocation::Redirect(
@@ -487,8 +479,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let map_def_variant = def_variant.remove_modifier(union_id);
 
             let identifies_meta = self
-                .relationship_meta_by_object(def_variant.def_id, identifies_relation_id)
-                .expect("Problem getting subject property meta");
+                .get_relationship_meta(identifies_relationship_id)
+                .expect("Problem getting relationship meta");
 
             // Create a union between { '_id' } and the map properties itself
             let map_properties_operator_id = self
@@ -573,7 +565,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let mut intersection_keys = BTreeSet::new();
                 for (relationship_id, _, _cardinality) in items {
                     let Ok(meta) = self.get_relationship_meta(*relationship_id) else {
-                        panic!("Problem getting property meta");
+                        panic!("Problem getting relationship meta");
                     };
 
                     intersection_keys.insert(SerdeKey::Def(DefVariant::new(
@@ -602,7 +594,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let (relationship_id, _, cardinality) = items[0];
 
             let Ok(meta) = self.get_relationship_meta(relationship_id) else {
-                panic!("Problem getting property meta");
+                panic!("Problem getting relationship meta");
             };
 
             let value_def = meta.relationship.object.0.def_id;
@@ -726,7 +718,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                         let meta = self
                             .get_relationship_meta(property_id.relationship_id)
-                            .expect("Problem getting subject property meta");
+                            .expect("Problem getting subject relationship meta");
                         let object = meta.relationship.object.0.def_id;
 
                         let prop_key = meta
@@ -739,7 +731,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     Role::Object => {
                         let meta = self
                             .get_relationship_meta(property_id.relationship_id)
-                            .expect("Problem getting object property meta");
+                            .expect("Problem getting object relationship meta");
                         let subject = meta.relationship.subject.0.def_id;
 
                         let prop_key = meta

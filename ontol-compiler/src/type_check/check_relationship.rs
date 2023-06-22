@@ -151,7 +151,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::MustIdentifyWithinDomain, span);
                 }
 
-                properties.identifies = Some(RelationId(self.primitives.identifies_relation));
+                properties.identifies = Some(relationship.0);
                 let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
                 match object_properties.identified_by {
                     Some(id) => {
@@ -161,10 +161,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
                         return self.error(CompileError::AlreadyIdentified, span);
                     }
-                    None => {
-                        object_properties.identified_by =
-                            Some(RelationId(self.primitives.identifies_relation))
-                    }
+                    None => object_properties.identified_by = Some(relationship.0),
                 }
 
                 object_ty
@@ -228,17 +225,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
                     }
                     Some(map) => {
-                        let prev = map.insert(
+                        map.insert(
                             PropertyId::subject(relationship.0),
                             Property {
                                 cardinality: relationship.1.subject_cardinality,
                                 is_entity_id: false,
                             },
                         );
-                        if prev.is_some() {
-                            return self
-                                .error(CompileError::UnionInNamedRelationshipNotSupported, span);
-                        }
                     }
                 }
 

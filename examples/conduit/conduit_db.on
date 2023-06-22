@@ -38,4 +38,4 @@ rel Article 'written_by'::'wrote_articles' [User]
 rel Article 'favorited_by'::'favorited' [User]
 rel TagEntity 'tags'::'tagged_with' [Article]
 rel Comment 'comment_on'::'has_comments' [Article]
-rel Comment 'written_by'::'wrote_comments' [User] // ERROR union in named relationship is not supported yet. Make a union type instead.
+rel Comment 'written_by'::'wrote_comments' [User]

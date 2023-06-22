@@ -153,16 +153,6 @@ fn array_map_without_brackets() {
 }
 
 #[test]
-fn union_in_named_relationship() {
-    "
-    type foo
-    rel foo 'a': string
-    rel foo 'a': int // ERROR union in named relationship is not supported yet. Make a union type instead.
-    "
-    .compile_fail();
-}
-
-#[test]
 fn only_entities_may_have_reverse_relationship() {
     "
     type foo

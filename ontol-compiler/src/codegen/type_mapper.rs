@@ -43,7 +43,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                 }) => {
                     let meta = self
                         .get_relationship_meta(*relationship_id)
-                        .expect("BUG: problem getting anonymous property meta");
+                        .expect("BUG: problem getting anonymous relationship meta");
 
                     Some(MapInfo {
                         key: MapKey {

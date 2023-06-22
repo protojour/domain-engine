@@ -78,19 +78,14 @@ fn test_fake_guitar_synth() {
         assert_eq!(
             artist.serialize_identity_json(&artist.new_fake(ProcessorMode::Create)),
             json!({
-                "name": "amet consectetur tempore",
+                "name": "mollitia sit porro tenetur",
                 "plays": [
                     {
                         "type": "guitar",
-                        "string_count": -1732221745,
+                        "string_count": 428606290,
                         "played-by": [
                             {
-                                "name": "et repudiandae ut molestiae earum",
-                                "plays": [
-                                    {
-                                        "instrument-id": "guitar/552e9fe5-a078-ccaa-f029-bcccb1436ec3"
-                                    }
-                                ]
+                                "artist-id": "est molestiae labore voluptatum architecto",
                             }
                         ]
                     }

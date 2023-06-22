@@ -11,6 +11,7 @@ use namespace::Namespaces;
 use ontol_runtime::{
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
+    value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId, RelationId,
 };
 use package::{PackageTopology, Packages};
@@ -182,7 +183,7 @@ impl<'m> Compiler<'m> {
             for (type_name, type_def_id) in type_namespace {
                 let entity_info =
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
-                        if let Some(id_relationship_id) = &properties.identified_by2 {
+                        if let Some(id_relationship_id) = &properties.identified_by {
                             let identifies_meta = self
                                 .get_relationship_meta(*id_relationship_id)
                                 .expect("BUG: problem getting property meta");
@@ -263,16 +264,14 @@ impl<'m> Compiler<'m> {
 
     fn find_inherent_primary_id(
         &self,
-        entity_id: DefId,
+        _entity_id: DefId,
         properties: &Properties,
     ) -> Option<RelationshipMeta<'m>> {
-        todo!()
-        // let map = properties.map.as_ref()?;
-        // let relation_id = RelationId(self.primitives.identifies_relation);
-        // let _property = map.get(&(PropertyId::subject(relation_id)))?;
-        //
-        // self.relationship_meta_by_subject(entity_id, relation_id)
-        //     .ok()
+        let relationship_id = properties.identified_by.clone()?;
+        let map = properties.map.as_ref()?;
+        let _property = map.get(&PropertyId::subject(relationship_id))?;
+
+        self.get_relationship_meta(relationship_id).ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

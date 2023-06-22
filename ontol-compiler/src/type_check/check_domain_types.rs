@@ -1,3 +1,4 @@
+use fnv::FnvHashSet;
 use ontol_runtime::{value::PropertyId, DefId, RelationId, RelationshipId, Role};
 use tracing::debug;
 
@@ -29,10 +30,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_type(def_id)?;
+        let map = properties.map.as_ref()?;
 
         let mut actions = vec![];
-
-        let map = properties.map.as_ref()?;
+        let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
 
         for (property_id, cardinality) in map {
             debug!("check {def_id:?} {property_id:?} {cardinality:?}");
@@ -42,19 +43,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let meta = self
                         .get_relationship_meta(property_id.relationship_id)
                         .unwrap();
+
+                    // Check that the same relation_id is not reused for subject properties
+                    if !subject_relation_set.insert(meta.relationship.relation_id) {
+                        let spanned_relationship_def = self
+                            .defs
+                            .get_spanned_def_kind(meta.relationship_id.0)
+                            .unwrap();
+                        self.errors.push(
+                            CompileError::UnionInNamedRelationshipNotSupported
+                                .spanned(spanned_relationship_def.span),
+                        );
+                    }
+
                     let object_properties = self
                         .relations
                         .properties_by_type(meta.relationship.object.0.def_id)
                         .unwrap();
 
                     // Check if the property is the primary id
-                    if let Some(id_relation) = object_properties.identifies {
-                        let id_meta = self
-                            .relationship_meta_by_subject(
-                                meta.relationship.object.0.def_id,
-                                id_relation,
-                            )
-                            .unwrap();
+                    if let Some(id_relationship_id) = object_properties.identifies {
+                        let id_meta = self.get_relationship_meta(id_relationship_id).unwrap();
 
                         if id_meta.relationship.object.0.def_id == def_id {
                             actions.push(Action::RedefineAsPrimaryId(def_id, *property_id));
@@ -81,7 +90,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         relationships.iter().all(|(relationship_id, _span)| {
                                             let meta = self
                                                 .get_relationship_meta(*relationship_id)
-                                                .expect("BUG: problem getting property meta");
+                                                .expect("BUG: problem getting relationship meta");
 
                                             let variant_def = match &meta.relation.kind {
                                                 RelationKind::Named(def)
@@ -144,7 +153,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for action in actions {
             debug!("perform action {action:?}");
             match action {
-                Action::ReportNonEntityInObjectRelationship(def_id, relationship_id) => {
+                Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
                     let meta = self.get_relationship_meta(relationship_id).unwrap();
 
                     self.error(
@@ -160,25 +169,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 Action::RedefineAsPrimaryId(def_id, property_id) => {
-                    let identifies_relation = self.primitives.identifies_relation;
-                    let relationship_id = property_id.relationship_id;
-                    let relationship_id = self
-                        .relations
-                        .relationships_by_subject
-                        .remove(&(def_id, RelationId(identifies_relation)))
-                        .unwrap();
-
-                    self.relations
-                        .relationships_by_subject
-                        .insert((def_id, RelationId(identifies_relation)), relationship_id);
-
                     let properties = self.relations.properties_by_type_mut(def_id);
 
                     if let Some(map) = &mut properties.map {
-                        map.remove(&property_id);
                         map.insert(
-                            // PropertyId::subject(RelationId(self.primitives.identifies_relation)),
-                            todo!(),
+                            property_id,
                             Property {
                                 cardinality: (
                                     PropertyCardinality::Mandatory,

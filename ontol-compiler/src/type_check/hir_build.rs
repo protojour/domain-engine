@@ -313,7 +313,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 Role::Subject => {
                                     let meta = self
                                         .get_relationship_meta(property_id.relationship_id)
-                                        .expect("BUG: problem getting property meta");
+                                        .expect("BUG: problem getting relationship meta");
                                     let property_name = meta
                                         .relation
                                         .subject_prop(self.defs)
@@ -490,7 +490,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Value(relationship_id, _, _)) => {
                 let meta = self
                     .get_relationship_meta(*relationship_id)
-                    .expect("BUG: problem getting anonymous property meta");
+                    .expect("BUG: problem getting anonymous relationship meta");
 
                 let value_object_ty = self.check_def(meta.relationship.object.0.def_id);
                 debug!("value_object_ty: {value_object_ty:?}");
