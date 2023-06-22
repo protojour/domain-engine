@@ -218,7 +218,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     None => {
                         properties.map = Some(
                             [(
-                                PropertyId::subject(relation.0),
+                                PropertyId::subject(relationship.0),
                                 Property {
                                     cardinality: relationship.1.subject_cardinality,
                                     is_entity_id: false,
@@ -229,7 +229,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Some(map) => {
                         let prev = map.insert(
-                            PropertyId::subject(relation.0),
+                            PropertyId::subject(relationship.0),
                             Property {
                                 cardinality: relationship.1.subject_cardinality,
                                 is_entity_id: false,
@@ -333,6 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if *subject_def_id == self.primitives.empty_string =>
                 {
                     if let Err(e) = self.extend_string_pattern_fmt_constructor(
+                        relationship,
                         relation,
                         object.0.def_id,
                         object_ty,
@@ -353,6 +354,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     match subject_constructor {
                         Some(Constructor::StringFmt(subject_pattern)) => {
                             if let Err(e) = self.extend_string_pattern_fmt_constructor(
+                                relationship,
                                 relation,
                                 object.0.def_id,
                                 object_ty,
@@ -383,7 +385,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (Some(_), Type::Domain(_), None) => {
                     object_properties.map = Some(
                         [(
-                            PropertyId::object(relation.0),
+                            PropertyId::object(relationship.0),
                             Property {
                                 cardinality: relationship.1.object_cardinality,
                                 is_entity_id: false,
@@ -395,7 +397,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (Some(_), Type::Domain(_), Some(map)) => {
                     if map
                         .insert(
-                            PropertyId::object(relation.0),
+                            PropertyId::object(relationship.0),
                             Property {
                                 cardinality: relationship.1.object_cardinality,
                                 is_entity_id: false,
@@ -452,6 +454,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn extend_string_pattern_fmt_constructor(
         &mut self,
+        relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
         object_def: DefId,
         object_ty: TypeRef<'m>,
@@ -481,7 +484,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .map(Properties::constructor)
                 {
                     Some(Constructor::StringFmt(rel_segment)) => StringPatternSegment::Property {
-                        property_id: PropertyId::subject(relation.0),
+                        property_id: PropertyId::subject(relationship.0),
                         type_def_id: rel_def.def_id,
                         segment: Box::new(rel_segment.clone()),
                     },

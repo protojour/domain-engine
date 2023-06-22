@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId, Role};
 use tracing::debug;
 
 use crate::{
@@ -301,7 +301,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let struct_binder = ontol_hir::Binder(ctx.var_allocator.alloc());
 
                         struct MatchProperty {
-                            relation_id: RelationId,
+                            relationship_id: RelationshipId,
                             cardinality: Cardinality,
                             rel_params_def: Option<DefId>,
                             object_def: DefId,
@@ -312,10 +312,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .filter_map(|(property_id, _cardinality)| match property_id.role {
                                 Role::Subject => {
                                     let meta = self
-                                        .relationship_meta_by_subject(
-                                            struct_def_id,
-                                            property_id.relation_id,
-                                        )
+                                        .get_relationship_meta(property_id.relationship_id)
                                         .expect("BUG: problem getting property meta");
                                     let property_name = meta
                                         .relation
@@ -325,7 +322,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     Some((
                                         property_name,
                                         MatchProperty {
-                                            relation_id: property_id.relation_id,
+                                            // relation_id: property_id.relationship_id,
+                                            relationship_id: property_id.relationship_id,
                                             cardinality: meta.relationship.subject_cardinality,
                                             rel_params_def: match &meta.relationship.rel_params {
                                                 RelParams::Type(def_reference) => {
@@ -463,7 +461,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ontol_hir::Kind::Prop(
                                     optional,
                                     struct_binder.0,
-                                    PropertyId::subject(match_property.relation_id),
+                                    PropertyId::subject(match_property.relationship_id),
                                     prop_variants,
                                 ),
                                 Meta {

@@ -384,6 +384,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     FieldData {
                         kind: FieldKind::Id(IdPropertyData {
                             relation_id: entity_info.id_relation_id,
+                            relationship_id: entity_info.id_relationship_id,
                             operator_id: entity_info.id_operator_id,
                         }),
                         field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(

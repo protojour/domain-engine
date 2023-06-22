@@ -148,5 +148,6 @@ pub enum Role {
     Object,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
 pub struct RelationshipId(pub DefId);

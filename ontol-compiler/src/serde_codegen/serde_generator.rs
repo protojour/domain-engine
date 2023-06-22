@@ -162,7 +162,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
                 let meta = self
-                    .relationship_meta_by_subject(def_variant.def_id, property_id.relation_id)
+                    .get_relationship_meta(property_id.relationship_id)
                     .expect("Problem getting property meta");
 
                 let property_name = meta.relation.subject_prop(self.defs)?;
@@ -463,6 +463,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ));
                 }
             };
+            let identifies_relationship_id = match properties.identified_by2 {
+                Some(id) => id,
+                None => {
+                    return Some(OperatorAllocation::Redirect(
+                        def_variant.remove_modifier(union_id),
+                    ));
+                }
+            };
 
             let id_operator_id = match self.gen_operator_id(SerdeKey::Def(
                 def_variant.with_local_mod(DataModifier::PRIMARY_ID),
@@ -502,7 +510,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
-                                    identifies_relation_id,
+                                    identifies_relationship_id,
                                     id_property_name,
                                 ),
                                 purpose: VariantPurpose::Identification,
@@ -712,15 +720,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
-                        if property_id.relation_id.0 == self.primitives.identifies_relation {
+                        if property_id.relationship_id.0 == self.primitives.identifies_relation {
                             // panic!();
                         }
 
                         let meta = self
-                            .relationship_meta_by_subject(
-                                def_variant.def_id,
-                                property_id.relation_id,
-                            )
+                            .get_relationship_meta(property_id.relationship_id)
                             .expect("Problem getting subject property meta");
                         let object = meta.relationship.object.0.def_id;
 
@@ -733,10 +738,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let meta = self
-                            .relationship_meta_by_object(
-                                def_variant.def_id,
-                                property_id.relation_id,
-                            )
+                            .get_relationship_meta(property_id.relationship_id)
                             .expect("Problem getting object property meta");
                         let subject = meta.relationship.subject.0.def_id;
 

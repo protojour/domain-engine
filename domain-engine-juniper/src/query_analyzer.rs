@@ -3,7 +3,7 @@ use juniper::LookAheadMethods;
 use ontol_runtime::{
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
-    DefId, RelationId,
+    DefId, RelationId, RelationshipId,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -159,7 +159,7 @@ impl<'a> QueryAnalyzer<'a> {
                 selection: Query::Leaf,
             },
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => KeyedPropertySelection {
-                key: PropertyId::subject(id_property_data.relation_id),
+                key: PropertyId::subject(id_property_data.relationship_id),
                 selection: Query::Leaf,
             },
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
@@ -263,5 +263,5 @@ impl<'a> QueryAnalyzer<'a> {
 }
 
 const fn unit_property() -> PropertyId {
-    PropertyId::subject(RelationId(DefId::unit()))
+    PropertyId::subject(RelationshipId(DefId::unit()))
 }

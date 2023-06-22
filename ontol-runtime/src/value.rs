@@ -6,7 +6,7 @@ use std::{
 
 use smartstring::alias::String;
 
-use crate::{cast::Cast, DefId, PackageId, RelationId, Role};
+use crate::{cast::Cast, DefId, PackageId, RelationshipId, Role};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -133,7 +133,7 @@ impl<'d> Display for FormatStringData<'d> {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PropertyId {
     pub role: Role,
-    pub relation_id: RelationId,
+    pub relationship_id: RelationshipId,
 }
 
 impl Display for PropertyId {
@@ -145,8 +145,8 @@ impl Display for PropertyId {
                 Role::Subject => 'S',
                 Role::Object => 'O',
             },
-            self.relation_id.0 .0 .0,
-            self.relation_id.0 .1,
+            self.relationship_id.0 .0 .0,
+            self.relationship_id.0 .1,
         )
     }
 }
@@ -170,7 +170,7 @@ impl FromStr for PropertyId {
 
         Ok(PropertyId {
             role,
-            relation_id: RelationId(DefId(package_id, def_idx)),
+            relationship_id: RelationshipId(DefId(package_id, def_idx)),
         })
     }
 }
@@ -182,17 +182,17 @@ impl Debug for PropertyId {
 }
 
 impl PropertyId {
-    pub const fn subject(relation_id: RelationId) -> Self {
+    pub const fn subject(relationship_id: RelationshipId) -> Self {
         Self {
             role: Role::Subject,
-            relation_id,
+            relationship_id,
         }
     }
 
-    pub const fn object(relation_id: RelationId) -> Self {
+    pub const fn object(relationship_id: RelationshipId) -> Self {
         Self {
             role: Role::Object,
-            relation_id,
+            relationship_id,
         }
     }
 }
@@ -309,18 +309,18 @@ mod tests {
         assert_eq!(40, std::mem::size_of::<Value>());
         assert_eq!(16, std::mem::size_of::<[u8; 16]>());
 
-        assert_eq!(24, std::mem::size_of::<BTreeMap<RelationId, Value>>());
+        assert_eq!(24, std::mem::size_of::<BTreeMap<RelationshipId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
         assert_eq!(32, std::mem::size_of::<SmallVec<[u32; 0]>>());
-        assert_eq!(48, std::mem::size_of::<HashMap<RelationId, Value>>());
-        assert_eq!(72, std::mem::size_of::<IndexMap<RelationId, Value>>());
+        assert_eq!(48, std::mem::size_of::<HashMap<RelationshipId, Value>>());
+        assert_eq!(72, std::mem::size_of::<IndexMap<RelationshipId, Value>>());
     }
 
     #[test]
     fn attributes() {
         let mut map = BTreeMap::new();
         map.insert(
-            RelationId(DefId(PackageId(0), 666)),
+            RelationshipId(DefId(PackageId(0), 666)),
             Value::new(Data::Int(42), DefId(PackageId(0), 42)).to_unit_attr(),
         );
     }

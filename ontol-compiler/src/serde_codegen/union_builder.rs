@@ -51,7 +51,7 @@ impl UnionBuilder {
                 Discriminant::MapFallback => {
                     panic!("MapFallback should have been filtered already");
                 }
-                Discriminant::IsSingletonProperty(relation_id, prop) => {
+                Discriminant::IsSingletonProperty(relationship_id, prop) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
                     let operator = generator.gen_operator(SerdeKey::no_modifier(result_type));
@@ -60,7 +60,7 @@ impl UnionBuilder {
                         // convert this
                         candidate.discriminator.discriminant =
                             Discriminant::HasAttributeMatchingStringPattern(
-                                *relation_id,
+                                *relationship_id,
                                 prop.clone(),
                                 *def_id,
                             );

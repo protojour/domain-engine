@@ -11,7 +11,6 @@ use namespace::Namespaces;
 use ontol_runtime::{
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
-    value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId, RelationId,
 };
 use package::{PackageTopology, Packages};
@@ -183,13 +182,14 @@ impl<'m> Compiler<'m> {
             for (type_name, type_def_id) in type_namespace {
                 let entity_info =
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
-                        if let Some(id_relation_id) = &properties.identified_by {
+                        if let Some(id_relationship_id) = &properties.identified_by2 {
                             let identifies_meta = self
-                                .relationship_meta_by_object(type_def_id, *id_relation_id)
+                                .get_relationship_meta(*id_relationship_id)
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
-                                id_relation_id: *id_relation_id,
+                                id_relation_id: RelationId(self.primitives.identifies_relation),
+                                id_relationship_id: *id_relationship_id,
                                 id_value_def_id: identifies_meta.relationship.subject.0.def_id,
                                 id_operator_id: serde_generator
                                     .gen_operator_id(SerdeKey::Def(DefVariant::new(
@@ -266,12 +266,13 @@ impl<'m> Compiler<'m> {
         entity_id: DefId,
         properties: &Properties,
     ) -> Option<RelationshipMeta<'m>> {
-        let map = properties.map.as_ref()?;
-        let relation_id = RelationId(self.primitives.identifies_relation);
-        let _property = map.get(&(PropertyId::subject(relation_id)))?;
-
-        self.relationship_meta_by_subject(entity_id, relation_id)
-            .ok()
+        todo!()
+        // let map = properties.map.as_ref()?;
+        // let relation_id = RelationId(self.primitives.identifies_relation);
+        // let _property = map.get(&(PropertyId::subject(relation_id)))?;
+        //
+        // self.relationship_meta_by_subject(entity_id, relation_id)
+        //     .ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

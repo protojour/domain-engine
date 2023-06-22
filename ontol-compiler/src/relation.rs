@@ -36,6 +36,7 @@ pub struct Properties {
     pub map: Option<IndexMap<PropertyId, Property>>,
     pub identifies: Option<RelationId>,
     pub identified_by: Option<RelationId>,
+    pub identified_by2: Option<RelationshipId>,
 }
 
 impl Properties {

@@ -1,6 +1,6 @@
 use smartstring::alias::String;
 
-use crate::{DefId, DefVariant, RelationId};
+use crate::{DefId, DefVariant, RelationshipId};
 
 #[derive(Debug)]
 pub struct UnionDiscriminator {
@@ -31,7 +31,7 @@ pub enum Discriminant {
     /// Matches any map
     MapFallback,
     /// Matches a map that has a single property, and only that property will be used for information
-    IsSingletonProperty(RelationId, String),
-    HasStringAttribute(RelationId, String, String),
-    HasAttributeMatchingStringPattern(RelationId, String, DefId),
+    IsSingletonProperty(RelationshipId, String),
+    HasStringAttribute(RelationshipId, String, String),
+    HasAttributeMatchingStringPattern(RelationshipId, String, DefId),
 }

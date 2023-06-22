@@ -254,7 +254,7 @@ impl<'v> AttributeType<'v> {
             }
             (FieldKind::Id(id_property_data), Data::Struct(attrs)) => Self::resolve_property(
                 attrs,
-                PropertyId::subject(id_property_data.relation_id),
+                PropertyId::subject(id_property_data.relationship_id),
                 field_type,
                 virtual_schema,
                 executor,

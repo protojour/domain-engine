@@ -257,7 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (property_id, _cardinality) in property_set {
             let meta = self
-                .relationship_meta_by_subject(variant_def, property_id.relation_id)
+                .get_relationship_meta(property_id.relationship_id)
                 .expect("BUG: problem getting property meta");
 
             let (object_reference, _) = &meta.relationship.object;
@@ -281,7 +281,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         PropertyDiscriminatorCandidate {
                             relation_id: meta.relationship.relation_id,
                             discriminant: Discriminant::HasStringAttribute(
-                                property_id.relation_id,
+                                property_id.relationship_id,
                                 property_name.into(),
                                 string_literal.into(),
                             ),

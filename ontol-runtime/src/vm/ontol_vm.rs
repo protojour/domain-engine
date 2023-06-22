@@ -305,7 +305,7 @@ mod tests {
     use crate::{
         value::Value,
         vm::proc::{AddressOffset, NParams, OpCode},
-        DefId, PackageId, RelationId,
+        DefId, PackageId,
     };
 
     use super::*;
@@ -321,10 +321,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
-                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(3)))),
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
-                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "S:0:2".parse().unwrap()),
+                OpCode::TakeAttr2(Local(0), "S:0:3".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -336,11 +336,11 @@ mod tests {
                 Data::Struct(
                     [
                         (
-                            PropertyId::subject(RelationId(def_id(1))),
+                            "S:0:1".parse().unwrap(),
                             Value::new(Data::String("foo".into()), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(2))),
+                            "S:0:2".parse().unwrap(),
                             Value::new(Data::String("bar".into()), def_id(0)).into(),
                         ),
                     ]
@@ -355,10 +355,7 @@ mod tests {
         };
         let properties = attrs.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
-            FnvHashSet::from_iter([
-                PropertyId::subject(RelationId(def_id(3))),
-                PropertyId::subject(RelationId(def_id(4)))
-            ]),
+            FnvHashSet::from_iter(["S:0:3".parse().unwrap(), "S:0:4".parse().unwrap(),]),
             properties
         );
     }
@@ -387,17 +384,17 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
+                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
                 OpCode::Call(double),
-                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
                 // 5, 6:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::TakeAttr2(Local(0), "S:0:3".parse().unwrap()),
                 OpCode::Clone(Local(4)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutAttr1(Local(1), PropertyId::subject(RelationId(def_id(5)))),
+                OpCode::PutAttr1(Local(1), "S:0:5".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -409,15 +406,15 @@ mod tests {
                 Data::Struct(
                     [
                         (
-                            PropertyId::subject(RelationId(def_id(1))),
+                            "S:0:1".parse().unwrap(),
                             Value::new(Data::Int(333), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(2))),
+                            "S:0:2".parse().unwrap(),
                             Value::new(Data::Int(10), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(3))),
+                            "S:0:3".parse().unwrap(),
                             Value::new(Data::Int(11), def_id(0)).into(),
                         ),
                     ]
@@ -430,10 +427,10 @@ mod tests {
         let Data::Struct(mut attrs) = output.data else {
             panic!();
         };
-        let Data::Int(a) = attrs.remove(&PropertyId::subject(RelationId(def_id(4)))).unwrap().value.data else {
+        let Data::Int(a) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = attrs.remove(&PropertyId::subject(RelationId(def_id(5)))).unwrap().value.data else {
+        let Data::Int(b) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);
@@ -492,8 +489,8 @@ mod tests {
     fn flat_map_object() {
         let mut lib = Lib::default();
 
-        let prop_a = PropertyId::subject(RelationId(def_id(0)));
-        let prop_b = PropertyId::subject(RelationId(def_id(1)));
+        let prop_a: PropertyId = "S:0:0".parse().unwrap();
+        let prop_b: PropertyId = "S:0:1".parse().unwrap();
 
         let proc = lib.append_procedure(
             NParams(1),
@@ -560,7 +557,7 @@ mod tests {
     fn discriminant_cond() {
         let mut lib = Lib::default();
 
-        let prop = PropertyId::subject(RelationId(def_id(42)));
+        let prop: PropertyId = "S:0:42".parse().unwrap();
         let inner_def_id = def_id(100);
 
         let proc = lib.append_procedure(

@@ -1,4 +1,4 @@
-use ontol_runtime::{value::PropertyId, DefId, RelationId, Role};
+use ontol_runtime::{value::PropertyId, DefId, RelationId, RelationshipId, Role};
 use tracing::debug;
 
 use crate::{
@@ -12,7 +12,7 @@ use super::TypeCheck;
 
 #[derive(Debug)]
 enum Action {
-    ReportNonEntityInObjectRelationship(DefId, RelationId),
+    ReportNonEntityInObjectRelationship(DefId, RelationshipId),
     /// Many(*) value cardinality between two entities are always considered optional
     AdjustEntityPropertyCardinality(DefId, PropertyId),
     RedefineAsPrimaryId(DefId, PropertyId),
@@ -40,7 +40,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match property_id.role {
                 Role::Subject => {
                     let meta = self
-                        .relationship_meta_by_subject(def_id, property_id.relation_id)
+                        .get_relationship_meta(property_id.relationship_id)
                         .unwrap();
                     let object_properties = self
                         .relations
@@ -111,13 +111,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 // it is illegal to specify an object property to something that is not an entity (has no id)
                                 actions.push(Action::ReportNonEntityInObjectRelationship(
                                     def_id,
-                                    property_id.relation_id,
+                                    property_id.relationship_id,
                                 ));
                             }
                         }
                     } else {
                         let meta = self
-                            .relationship_meta_by_object(def_id, property_id.relation_id)
+                            .get_relationship_meta(property_id.relationship_id)
                             .unwrap();
                         let subject_properties = self
                             .relations
@@ -144,10 +144,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for action in actions {
             debug!("perform action {action:?}");
             match action {
-                Action::ReportNonEntityInObjectRelationship(def_id, relation_id) => {
-                    let meta = self
-                        .relationship_meta_by_object(def_id, relation_id)
-                        .unwrap();
+                Action::ReportNonEntityInObjectRelationship(def_id, relationship_id) => {
+                    let meta = self.get_relationship_meta(relationship_id).unwrap();
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,
@@ -163,11 +161,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 Action::RedefineAsPrimaryId(def_id, property_id) => {
                     let identifies_relation = self.primitives.identifies_relation;
-                    let relation_id = property_id.relation_id;
+                    let relationship_id = property_id.relationship_id;
                     let relationship_id = self
                         .relations
                         .relationships_by_subject
-                        .remove(&(def_id, relation_id))
+                        .remove(&(def_id, RelationId(identifies_relation)))
                         .unwrap();
 
                     self.relations
@@ -179,7 +177,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if let Some(map) = &mut properties.map {
                         map.remove(&property_id);
                         map.insert(
-                            PropertyId::subject(RelationId(self.primitives.identifies_relation)),
+                            // PropertyId::subject(RelationId(self.primitives.identifies_relation)),
+                            todo!(),
                             Property {
                                 cardinality: (
                                     PropertyCardinality::Mandatory,

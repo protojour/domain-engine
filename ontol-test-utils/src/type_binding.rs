@@ -305,7 +305,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
             ))
             .unwrap();
 
-        self.merge_attribute(PropertyId::subject(entity_info.id_relation_id), id)
+        self.merge_attribute(PropertyId::subject(entity_info.id_relationship_id), id)
     }
 
     fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {
