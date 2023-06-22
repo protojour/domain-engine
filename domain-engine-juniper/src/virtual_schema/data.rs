@@ -221,7 +221,6 @@ pub enum FieldKind {
 pub struct PropertyData {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
-    pub relationship_id: DefId,
 }
 
 #[derive(Debug)]
