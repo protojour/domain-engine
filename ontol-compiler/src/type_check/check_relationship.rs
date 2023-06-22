@@ -317,8 +317,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if *subject_def_id == self.primitives.empty_string =>
                 {
                     if let Err(e) = self.extend_string_pattern_fmt_constructor(
-                        relationship,
                         relation,
+                        relationship,
                         object.0.def_id,
                         object_ty,
                         StringPatternSegment::EmptyString,
@@ -338,8 +338,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     match subject_constructor {
                         Some(Constructor::StringFmt(subject_pattern)) => {
                             if let Err(e) = self.extend_string_pattern_fmt_constructor(
-                                relationship,
                                 relation,
+                                relationship,
                                 object.0.def_id,
                                 object_ty,
                                 subject_pattern.clone(),
@@ -436,10 +436,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn extend_string_pattern_fmt_constructor(
         &mut self,
-        relationship: (RelationshipId, &Relationship),
         relation: (RelationId, &Relation),
+        relationship: (RelationshipId, &Relationship),
         object_def: DefId,
         object_ty: TypeRef<'m>,
         origin: StringPatternSegment,

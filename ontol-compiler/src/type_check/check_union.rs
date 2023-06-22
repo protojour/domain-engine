@@ -13,7 +13,6 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
     def::{Def, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
     patterns::StringPatternSegment,
@@ -58,7 +57,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (relationship_id, span) in relationship_ids {
             let meta = self
-                .get_relationship_meta(*relationship_id)
+                .defs
+                .lookup_relationship_meta(*relationship_id)
                 .expect("BUG: problem getting relationship meta");
 
             debug!("check union {:?}", meta.relationship);
@@ -82,7 +82,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             if let Some(properties) = self.relations.properties_by_type(variant_def) {
                 if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self
-                        .get_relationship_meta(*id_relationship_id)
+                        .defs
+                        .lookup_relationship_meta(*id_relationship_id)
                         .expect("BUG: problem getting relationship meta");
 
                     self.add_variant_to_builder(
@@ -213,7 +214,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                     ) => {
                         let meta = self
-                            .get_relationship_meta(*relationship_id)
+                            .defs
+                            .lookup_relationship_meta(*relationship_id)
                             .expect("BUG: problem getting realtionship meta");
 
                         def_id = meta.relationship.object.0.def_id;
@@ -257,7 +259,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (property_id, _cardinality) in property_set {
             let meta = self
-                .get_relationship_meta(property_id.relationship_id)
+                .defs
+                .lookup_relationship_meta(property_id.relationship_id)
                 .expect("BUG: problem getting relationship meta");
 
             let (object_reference, _) = &meta.relationship.object;

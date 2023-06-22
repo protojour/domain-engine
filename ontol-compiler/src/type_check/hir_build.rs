@@ -3,7 +3,6 @@ use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId, Role
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
     def::{Cardinality, Def, DefKind, PropertyCardinality, RelParams, ValueCardinality},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
@@ -312,7 +311,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .filter_map(|(property_id, _cardinality)| match property_id.role {
                                 Role::Subject => {
                                     let meta = self
-                                        .get_relationship_meta(property_id.relationship_id)
+                                        .defs
+                                        .lookup_relationship_meta(property_id.relationship_id)
                                         .expect("BUG: problem getting relationship meta");
                                     let property_name = meta
                                         .relation
@@ -489,7 +489,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             Some(Constructor::Value(relationship_id, _, _)) => {
                 let meta = self
-                    .get_relationship_meta(*relationship_id)
+                    .defs
+                    .lookup_relationship_meta(*relationship_id)
                     .expect("BUG: problem getting anonymous relationship meta");
 
                 let value_object_ty = self.check_def(meta.relationship.object.0.def_id);

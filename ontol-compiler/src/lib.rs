@@ -1,6 +1,5 @@
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use compiler_queries::{GetPropertyMeta, RelationshipMeta};
-use def::{DefKind, Defs, TypeDef};
+use def::{DefKind, Defs, RelationshipMeta, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
@@ -185,7 +184,8 @@ impl<'m> Compiler<'m> {
                     if let Some(properties) = self.relations.properties_by_type(type_def_id) {
                         if let Some(id_relationship_id) = &properties.identified_by {
                             let identifies_meta = self
-                                .get_relationship_meta(*id_relationship_id)
+                                .defs
+                                .lookup_relationship_meta(*id_relationship_id)
                                 .expect("BUG: problem getting property meta");
 
                             Some(EntityInfo {
@@ -266,7 +266,7 @@ impl<'m> Compiler<'m> {
         _entity_id: DefId,
         properties: &Properties,
     ) -> Option<RelationshipMeta<'m>> {
-        let id_relationship_id = properties.identified_by.clone()?;
+        let id_relationship_id = properties.identified_by?;
         let inherent_id = self
             .relations
             .inherent_id_map
@@ -275,7 +275,7 @@ impl<'m> Compiler<'m> {
         let map = properties.map.as_ref()?;
         let _property = map.get(&PropertyId::subject(inherent_id))?;
 
-        self.get_relationship_meta(inherent_id).ok()
+        self.defs.lookup_relationship_meta(inherent_id).ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

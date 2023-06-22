@@ -1,12 +1,10 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::{DefId, RelationshipId};
+use ontol_runtime::DefId;
 
 use crate::{
-    def::{Defs, Relation, Relationship},
-    relation::Relations,
+    def::Defs,
     types::{DefTypes, TypeRef},
-    SpannedBorrow,
 };
 
 fn get<T: AsRef<U>, U>(owner: &T) -> &U {
@@ -43,30 +41,5 @@ where
                 }
             },
         }
-    }
-}
-
-pub struct RelationshipMeta<'m> {
-    pub relationship_id: RelationshipId,
-    pub relationship: SpannedBorrow<'m, Relationship>,
-    pub relation: SpannedBorrow<'m, Relation<'m>>,
-}
-
-pub trait GetPropertyMeta<'m> {
-    fn get_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
-}
-
-impl<'m, T> GetPropertyMeta<'m> for T
-where
-    T: AsRef<Relations> + AsRef<Defs<'m>>,
-{
-    fn get_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 }

@@ -15,7 +15,7 @@ use tracing::debug;
 
 use crate::{
     codegen::task::CodegenTasks,
-    compiler_queries::{GetDefType, GetPropertyMeta},
+    compiler_queries::GetDefType,
     def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
@@ -162,7 +162,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
                 let meta = self
-                    .get_relationship_meta(property_id.relationship_id)
+                    .defs
+                    .lookup_relationship_meta(property_id.relationship_id)
                     .expect("Problem getting relationship meta");
 
                 let property_name = meta.relation.subject_prop(self.defs)?;
@@ -412,7 +413,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .unwrap(),
                         Some(relationship_id) => {
                             let meta = self
-                                .get_relationship_meta(relationship_id)
+                                .defs
+                                .lookup_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
                             self.gen_operator_id(SerdeKey::Def(
@@ -479,7 +481,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let map_def_variant = def_variant.remove_modifier(union_id);
 
             let identifies_meta = self
-                .get_relationship_meta(identifies_relationship_id)
+                .defs
+                .lookup_relationship_meta(identifies_relationship_id)
                 .expect("Problem getting relationship meta");
 
             // Create a union between { '_id' } and the map properties itself
@@ -564,7 +567,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             } else {
                 let mut intersection_keys = BTreeSet::new();
                 for (relationship_id, _, _cardinality) in items {
-                    let Ok(meta) = self.get_relationship_meta(*relationship_id) else {
+                    let Ok(meta) = self.defs.lookup_relationship_meta(*relationship_id) else {
                         panic!("Problem getting relationship meta");
                     };
 
@@ -593,7 +596,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             let (relationship_id, _, cardinality) = items[0];
 
-            let Ok(meta) = self.get_relationship_meta(relationship_id) else {
+            let Ok(meta) = self.defs.lookup_relationship_meta(relationship_id) else {
                 panic!("Problem getting relationship meta");
             };
 
@@ -717,7 +720,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }
 
                         let meta = self
-                            .get_relationship_meta(property_id.relationship_id)
+                            .defs
+                            .lookup_relationship_meta(property_id.relationship_id)
                             .expect("Problem getting subject relationship meta");
                         let object = meta.relationship.object.0.def_id;
 
@@ -730,7 +734,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let meta = self
-                            .get_relationship_meta(property_id.relationship_id)
+                            .defs
+                            .lookup_relationship_meta(property_id.relationship_id)
                             .expect("Problem getting object relationship meta");
                         let subject = meta.relationship.subject.0.def_id;
 

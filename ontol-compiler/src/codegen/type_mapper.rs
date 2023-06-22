@@ -2,7 +2,6 @@ use ontol_runtime::{DefId, MapKey};
 use tracing::warn;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
     def::Defs,
     relation::{Constructor, Properties, Relations},
     types::{Type, TypeRef},
@@ -42,7 +41,8 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                     ..
                 }) => {
                     let meta = self
-                        .get_relationship_meta(*relationship_id)
+                        .defs
+                        .lookup_relationship_meta(*relationship_id)
                         .expect("BUG: problem getting anonymous relationship meta");
 
                     Some(MapInfo {

@@ -3,7 +3,6 @@ use ontol_runtime::{value::PropertyId, DefId, RelationId, RelationshipId, Role};
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
     def::{Def, DefKind, PropertyCardinality, RelationKind, ValueCardinality},
     error::CompileError,
     relation::{Constructor, Property},
@@ -45,7 +44,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match property_id.role {
                 Role::Subject => {
                     let meta = self
-                        .get_relationship_meta(property_id.relationship_id)
+                        .defs
+                        .lookup_relationship_meta(property_id.relationship_id)
                         .unwrap();
 
                     // Check that the same relation_id is not reused for subject properties
@@ -67,7 +67,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     // Check if the property is the primary id
                     if let Some(id_relationship_id) = object_properties.identifies {
-                        let id_meta = self.get_relationship_meta(id_relationship_id).unwrap();
+                        let id_meta = self
+                            .defs
+                            .lookup_relationship_meta(id_relationship_id)
+                            .unwrap();
 
                         if id_meta.relationship.object.0.def_id == def_id {
                             debug!(
@@ -102,7 +105,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     let all_entities =
                                         relationships.iter().all(|(relationship_id, _span)| {
                                             let meta = self
-                                                .get_relationship_meta(*relationship_id)
+                                                .defs
+                                                .lookup_relationship_meta(*relationship_id)
                                                 .expect("BUG: problem getting relationship meta");
 
                                             let variant_def = match &meta.relation.kind {
@@ -139,7 +143,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     } else {
                         let meta = self
-                            .get_relationship_meta(property_id.relationship_id)
+                            .defs
+                            .lookup_relationship_meta(property_id.relationship_id)
                             .unwrap();
                         let subject_properties = self
                             .relations
@@ -167,7 +172,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("perform action {action:?}");
             match action {
                 Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
-                    let meta = self.get_relationship_meta(relationship_id).unwrap();
+                    let meta = self.defs.lookup_relationship_meta(relationship_id).unwrap();
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,

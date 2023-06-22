@@ -10,7 +10,6 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    compiler_queries::RelationshipMeta,
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
@@ -204,6 +203,12 @@ pub enum ValueCardinality {
     One,
     Many,
     // ManyInRange(Option<u16>, Option<u16>),
+}
+
+pub struct RelationshipMeta<'m> {
+    pub relationship_id: RelationshipId,
+    pub relationship: SpannedBorrow<'m, Relationship>,
+    pub relation: SpannedBorrow<'m, Relation<'m>>,
 }
 
 #[derive(Debug)]
