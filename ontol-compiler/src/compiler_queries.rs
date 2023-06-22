@@ -1,6 +1,6 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::{DefId, RelationId, RelationshipId};
+use ontol_runtime::{DefId, RelationshipId};
 
 use crate::{
     def::{Defs, Relation, Relationship},
@@ -57,18 +57,6 @@ pub trait GetPropertyMeta<'m> {
         &self,
         relationship_id: RelationshipId,
     ) -> Result<RelationshipMeta<'m>, ()>;
-
-    fn relationship_meta_by_subject(
-        &self,
-        subject_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
-
-    fn relationship_meta_by_object(
-        &self,
-        object_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
 }
 
 impl<'m, T> GetPropertyMeta<'m> for T
@@ -79,34 +67,6 @@ where
         &self,
         relationship_id: RelationshipId,
     ) -> Result<RelationshipMeta<'m>, ()> {
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
-    }
-
-    fn relationship_meta_by_subject(
-        &self,
-        subject_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        let relationship_id = get::<_, Relations>(self)
-            .relationships_by_subject
-            .get(&(subject_id, relation_id))
-            .cloned()
-            .ok_or(())?;
-
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
-    }
-
-    fn relationship_meta_by_object(
-        &self,
-        object_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        let relationship_id = get::<_, Relations>(self)
-            .relationships_by_object
-            .get(&(object_id, relation_id))
-            .cloned()
-            .ok_or(())?;
-
         get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 }

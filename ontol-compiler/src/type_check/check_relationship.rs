@@ -40,15 +40,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => {}
         };
 
-        self.relations.relationships_by_subject.insert(
-            (relationship.subject.0.def_id, relationship.relation_id),
-            RelationshipId(def_id),
-        );
-        self.relations.relationships_by_object.insert(
-            (relationship.object.0.def_id, relationship.relation_id),
-            RelationshipId(def_id),
-        );
-
         self.check_subject_property(
             (RelationshipId(def_id), relationship),
             (relationship.relation_id, relation),

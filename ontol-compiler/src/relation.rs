@@ -10,8 +10,6 @@ use crate::{def::Cardinality, patterns::StringPatternSegment, sequence::Sequence
 pub struct Relations {
     pub relations: FnvHashMap<DefId, RelationId>,
     pub properties_by_type: FnvHashMap<DefId, Properties>,
-    pub relationships_by_subject: FnvHashMap<(DefId, RelationId), RelationshipId>,
-    pub relationships_by_object: FnvHashMap<(DefId, RelationId), RelationshipId>,
     /// A map from "idenfities" relationship to named relationship:
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
 
