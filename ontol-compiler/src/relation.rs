@@ -1,10 +1,13 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
-use ontol_runtime::{
-    discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId, RelationshipId,
-};
+use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationshipId};
 
-use crate::{def::Cardinality, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
+use crate::{
+    def::{Cardinality, RelationId},
+    patterns::StringPatternSegment,
+    sequence::Sequence,
+    SourceSpan,
+};
 
 #[derive(Default, Debug)]
 pub struct Relations {

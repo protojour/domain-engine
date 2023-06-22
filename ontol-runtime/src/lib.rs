@@ -138,10 +138,6 @@ pub enum DefParam {
     Const(Value),
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
-#[debug_single_tuple_inline]
-pub struct RelationId(pub DefId);
-
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Role {
     Subject,

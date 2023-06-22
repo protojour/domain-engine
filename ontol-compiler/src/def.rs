@@ -1,9 +1,10 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
+use derive_debug_extras::DebugExtras;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId, PackageId, RelationId,
+    string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId, PackageId,
     RelationshipId,
 };
 use smallvec::SmallVec;
@@ -156,6 +157,10 @@ pub enum BuiltinRelationKind {
     Doc,
     Example,
 }
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
+pub struct RelationId(pub DefId);
 
 /// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]

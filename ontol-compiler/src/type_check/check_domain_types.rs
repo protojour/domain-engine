@@ -1,9 +1,9 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{value::PropertyId, DefId, RelationId, RelationshipId, Role};
+use ontol_runtime::{value::PropertyId, DefId, RelationshipId, Role};
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, PropertyCardinality, RelationKind, ValueCardinality},
+    def::{Def, DefKind, PropertyCardinality, RelationId, RelationKind, ValueCardinality},
     error::CompileError,
     relation::{Constructor, Property},
 };

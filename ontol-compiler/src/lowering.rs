@@ -5,7 +5,7 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
-use ontol_runtime::{smart_format, DefId, DefParamId, RelationId, RelationshipId};
+use ontol_runtime::{smart_format, DefId, DefParamId, RelationshipId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -13,7 +13,8 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, DefParamBinding, DefReference, FmtFinalState, PropertyCardinality, RelParams,
-        Relation, RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality, Variables,
+        Relation, RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality,
+        Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},

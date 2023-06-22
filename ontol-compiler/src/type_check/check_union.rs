@@ -6,14 +6,14 @@ use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
     smart_format,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, RelationId,
+    DataModifier, DefId, DefVariant,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, PropertyCardinality, RelationKind, ValueCardinality},
+    def::{Def, PropertyCardinality, RelationId, RelationKind, ValueCardinality},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},

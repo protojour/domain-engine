@@ -1,10 +1,10 @@
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, RelationshipId};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId};
 use tracing::debug;
 
 use crate::{
     def::{
         BuiltinRelationKind, Def, DefKind, DefReference, FmtFinalState, PropertyCardinality,
-        Relation, RelationKind, Relationship, TypeDef,
+        Relation, RelationId, RelationKind, Relationship, TypeDef,
     },
     error::CompileError,
     mem::Intern,
