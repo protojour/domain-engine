@@ -149,7 +149,8 @@ impl ProcBuilder {
                     Ir::PutAttr1(local, property_id) => OpCode::PutAttr1(local, property_id),
                     Ir::PutAttr2(local, property_id) => OpCode::PutAttr2(local, property_id),
                     Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
-                    Ir::Constant(value, def_id) => OpCode::PushConstant(value, def_id),
+                    Ir::I64(value, def_id) => OpCode::I64(value, def_id),
+                    Ir::String(value, def_id) => OpCode::String(value, def_id),
                     Ir::Cond(predicate, block_index) => OpCode::Cond(
                         predicate,
                         AddressOffset(block_addresses[block_index.0 as usize]),

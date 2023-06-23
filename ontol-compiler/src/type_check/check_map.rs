@@ -180,8 +180,10 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.join(self.analyze_arm(arg, variables, parent_aggr_group, ctx)?);
                 }
             }
-            ExprKind::Struct(_, attributes) | ExprKind::AnonStruct(attributes) => {
-                for attr in attributes.iter() {
+            ExprKind::Struct {
+                attributes: attrs, ..
+            } => {
+                for attr in attrs.iter() {
                     group_set.join(self.analyze_arm(
                         &attr.object,
                         variables,
@@ -299,7 +301,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     }
                 }
             }
-            ExprKind::Constant(_) => {}
+            ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
         };
 
         Ok(group_set)

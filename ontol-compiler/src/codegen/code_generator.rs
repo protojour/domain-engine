@@ -121,7 +121,15 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::Int(int) => {
                 self.builder.append(
                     block,
-                    Ir::Constant(int, ty.get_single_def_id().unwrap()),
+                    Ir::I64(int, ty.get_single_def_id().unwrap()),
+                    Delta(1),
+                    span,
+                );
+            }
+            ontol_hir::Kind::String(string) => {
+                self.builder.append(
+                    block,
+                    Ir::String(string, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
                 );
@@ -299,9 +307,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     Delta(1),
                     span,
                 );
-                let counter =
-                    self.builder
-                        .append(block, Ir::Constant(0, DefId::unit()), Delta(1), span);
+                let counter = self
+                    .builder
+                    .append(block, Ir::I64(0, DefId::unit()), Delta(1), span);
 
                 let iter_offset = block.current_offset();
                 let elem_rel_local = self.builder.top_plus(1);

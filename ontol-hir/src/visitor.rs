@@ -61,8 +61,7 @@ macro_rules! visitor_trait_methods {
                 Kind::Var(var) => {
                     self.visit_var(var);
                 }
-                Kind::Int(_) => {}
-                Kind::Unit => {}
+                Kind::Unit | Kind::Int(_) | Kind::String(_) => {}
                 Kind::Call(_proc, params) => {
                     for (index, arg) in params.$iter().enumerate() {
                         self.visit_node(index, arg);

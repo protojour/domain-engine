@@ -11,5 +11,5 @@ fn test_compile_conduit_public() {
 
 #[test]
 fn test_compile_conduit_db() {
-    CONDUIT_DB.compile_fail();
+    CONDUIT_DB.compile_ok(|_env| {});
 }

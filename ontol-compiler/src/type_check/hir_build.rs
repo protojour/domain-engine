@@ -91,7 +91,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => self.error_node(CompileError::NotCallable, &expr.span),
                 }
             }
-            (ExprKind::Struct(type_path, attributes), expected_ty) => {
+            (
+                ExprKind::Struct {
+                    type_path: Some(type_path),
+                    attributes,
+                },
+                expected_ty,
+            ) => {
                 let struct_ty = self.check_def(type_path.def_id);
                 match struct_ty {
                     Type::Domain(def_id) => {
@@ -124,7 +130,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                ExprKind::AnonStruct(attributes),
+                ExprKind::Struct {
+                    type_path: None,
+                    attributes,
+                },
                 Some(expected_struct_ty @ Type::Anonymous(def_id)),
             ) => {
                 let actual_ty = self.check_def(*def_id);
@@ -140,9 +149,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.build_struct(*def_id, actual_ty, attributes, expr.span, ctx)
             }
-            (ExprKind::AnonStruct(_), _) => {
-                self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span)
-            }
+            (
+                ExprKind::Struct {
+                    type_path: None, ..
+                },
+                _,
+            ) => self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span),
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
@@ -179,22 +191,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 )
             }
-            (ExprKind::Constant(k), Some(expected_ty)) => {
+            (ExprKind::ConstI64(int), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
                     TypedHirNode(
-                        ontol_hir::Kind::Int(*k),
+                        ontol_hir::Kind::Int(*int),
                         Meta {
                             ty: expected_ty,
                             span: expr.span,
                         },
                     )
                 } else {
-                    self.error_node(
-                        CompileError::TODO(smart_format!("Expected integer type")),
-                        &expr.span,
-                    )
+                    self.error_node(CompileError::IncompatibleLiteral, &expr.span)
                 }
             }
+            (ExprKind::ConstString(string), Some(expected_ty)) => match expected_ty {
+                Type::String(_) => TypedHirNode(
+                    ontol_hir::Kind::String(string.clone()),
+                    Meta {
+                        ty: expected_ty,
+                        span: expr.span,
+                    },
+                ),
+                Type::StringConstant(def_id) => match self.defs.get_def_kind(*def_id) {
+                    Some(DefKind::StringLiteral(lit)) if string == lit => TypedHirNode(
+                        ontol_hir::Kind::String(string.clone()),
+                        Meta {
+                            ty: expected_ty,
+                            span: expr.span,
+                        },
+                    ),
+                    _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                },
+                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+            },
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let arm = ctx.arm;
                 let explicit_variable = ctx

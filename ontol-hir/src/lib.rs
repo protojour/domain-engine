@@ -1,6 +1,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
+use smartstring::alias::String;
 
 pub mod display;
 pub mod parse;
@@ -53,6 +54,7 @@ pub enum Kind<'a, L: Lang> {
     Var(Var),
     Unit,
     Int(i64),
+    String(String),
     Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Map(Box<L::Node<'a>>),

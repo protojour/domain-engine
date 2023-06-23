@@ -745,19 +745,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         Ok(self.expr(
             // FIXME: This ExprKind shouldn't really be struct..
-            ExprKind::Struct(
-                TypePath {
+            ExprKind::Struct {
+                type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
-                },
-                [ExprStructAttr {
+                }),
+                attributes: [ExprStructAttr {
                     key,
                     rel: None,
                     bind_option: false,
                     object: expr,
                 }]
                 .into(),
-            ),
+            },
             &span,
         ))
     }
@@ -768,16 +768,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
         let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
-        let attributes = self.lower_struct_pattern_attrs(struct_pat.attributes, var_table)?;
+        let attrs = self.lower_struct_pattern_attrs(struct_pat.attributes, var_table)?;
 
         Ok(self.expr(
-            ExprKind::Struct(
-                TypePath {
+            ExprKind::Struct {
+                type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&struct_pat.path.1),
-                },
-                attributes,
-            ),
+                }),
+                attributes: attrs,
+            },
             &span,
         ))
     }
@@ -801,8 +801,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let rel = match relation_attrs {
                     Some((attrs, span)) => {
-                        let attributes = self.lower_struct_pattern_attrs(attrs, var_table)?;
-                        Some(self.expr(ExprKind::AnonStruct(attributes), &span))
+                        let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
+                        Some(self.expr(
+                            ExprKind::Struct {
+                                type_path: None,
+                                attributes: attrs,
+                            },
+                            &span,
+                        ))
                     }
                     None => None,
                 };
@@ -853,7 +859,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
-                Ok(self.expr(ExprKind::Constant(int), &span))
+                Ok(self.expr(ExprKind::ConstI64(int), &span))
+            }
+            ast::ExprPattern::StringLiteral(string) => {
+                Ok(self.expr(ExprKind::ConstString(string), &span))
             }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
@@ -873,7 +882,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::ExprPattern::Variable(var_ident) => {
                 self.lower_expr_variable(var_ident, span, var_table)
             }
-            _ => Err((CompileError::InvalidExpression, span)),
         }
     }
 

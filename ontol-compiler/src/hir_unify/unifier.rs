@@ -75,6 +75,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 typed_binder: None,
                 node: TypedHirNode(ontol_hir::Kind::Int(int), expr_meta.hir_meta),
             }),
+            (expr::Kind::String(string), _) => Ok(UnifiedNode {
+                typed_binder: None,
+                node: TypedHirNode(ontol_hir::Kind::String(string), expr_meta.hir_meta),
+            }),
             // ### forced scope expansions:
             (expr_kind, scope_kind @ scope::Kind::Let(_)) => self.unify_scope_block(
                 scope::Scope(scope_kind, scope_meta),

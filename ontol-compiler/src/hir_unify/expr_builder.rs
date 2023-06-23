@@ -50,6 +50,13 @@ impl<'m> ExprBuilder<'m> {
                     free_vars: Default::default(),
                 },
             ),
+            ontol_hir::Kind::String(string) => expr::Expr(
+                expr::Kind::String(string.clone()),
+                expr::Meta {
+                    hir_meta: *meta,
+                    free_vars: Default::default(),
+                },
+            ),
             ontol_hir::Kind::Let(..) => panic!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let params: Vec<_> = params.iter().map(|param| self.hir_to_expr(param)).collect();

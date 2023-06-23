@@ -165,7 +165,11 @@ impl Processor for PropProcessor {
         target_set.extend(source_set.into_iter());
     }
 
-    fn push_constant(&mut self, _k: i64, _: DefId) {
+    fn push_i64(&mut self, _: i64, _: DefId) {
+        self.stack.push(Props::Set(FnvHashSet::default()));
+    }
+
+    fn push_string(&mut self, _: &str, _: DefId) {
         self.stack.push(Props::Set(FnvHashSet::default()));
     }
 

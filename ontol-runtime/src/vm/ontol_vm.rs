@@ -170,8 +170,14 @@ impl Processor for OntolProcessor {
     }
 
     #[inline(always)]
-    fn push_constant(&mut self, k: i64, result_type: DefId) {
+    fn push_i64(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
+    }
+
+    #[inline(always)]
+    fn push_string(&mut self, k: &str, result_type: DefId) {
+        self.stack
+            .push(Value::new(Data::String(k.into()), result_type));
     }
 
     #[inline(always)]
@@ -447,12 +453,12 @@ mod tests {
                 // result sequence
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
                 // index counter
-                OpCode::PushConstant(0, def_id(0)),
+                OpCode::I64(0, def_id(0)),
                 // Offset(2): for each in Local(0)
                 OpCode::Iter(Local(0), Local(2), AddressOffset(4)),
                 OpCode::Return(Local(1)),
                 // Offset(4): map item
-                OpCode::PushConstant(2, def_id(0)),
+                OpCode::I64(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
                 // add rel params
                 OpCode::CallBuiltin(BuiltinProc::NewUnit, def_id(0)),
@@ -500,7 +506,7 @@ mod tests {
                 // [b] -> Local(4):
                 OpCode::TakeAttr2(Local(0), prop_b),
                 // counter -> Local(5):
-                OpCode::PushConstant(0, def_id(0)),
+                OpCode::I64(0, def_id(0)),
                 // output -> Local(6):
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
                 OpCode::Iter(Local(4), Local(5), AddressOffset(6)),
@@ -575,7 +581,7 @@ mod tests {
                 ),
                 OpCode::Goto(AddressOffset(3)),
                 // AddressOffset(6):
-                OpCode::PushConstant(666, def_id(200)),
+                OpCode::I64(666, def_id(200)),
                 OpCode::PutAttr1(Local(1), prop),
                 OpCode::Goto(AddressOffset(3)),
             ],

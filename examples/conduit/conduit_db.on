@@ -6,7 +6,7 @@ pub type User {
     rel .'user_id'|id: user_id
     rel .'username': string
     rel .'email': string
-    rel .'bio'(rel .default := ''): string // ERROR invalid expression
+    rel .'bio'(rel .default := ''): string
     rel .'image'?: string
     rel .'password_hash': string
 

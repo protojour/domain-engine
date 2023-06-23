@@ -132,6 +132,8 @@ pub enum CompileError {
     CannotMapUnion,
     #[error("no relation parameters expected")]
     NoRelationParametersExpected,
+    #[error("Incompatible literal")]
+    IncompatibleLiteral,
     #[error("TODO: {0}")]
     TODO(String),
 }

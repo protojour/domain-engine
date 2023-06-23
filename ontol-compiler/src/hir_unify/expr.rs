@@ -1,4 +1,5 @@
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
+use smartstring::alias::String;
 
 use crate::{hir_unify::VarSet, typed_hir};
 
@@ -32,13 +33,14 @@ pub enum Kind<'m> {
     Map(Box<Expr<'m>>),
     Call(Call<'m>),
     Int(i64),
+    String(String),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
 }
 
 impl<'m> Kind<'m> {
     #[allow(unused)]
-    pub fn debug_short(&self) -> String {
+    pub fn debug_short(&self) -> std::string::String {
         match self {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
@@ -47,6 +49,7 @@ impl<'m> Kind<'m> {
             Self::Map(_) => "Map".to_string(),
             Self::Call(_) => "Call".to_string(),
             Self::Int(int) => format!("Int({int})"),
+            Self::String(string) => format!("String({string})"),
             Self::Seq(label, _) => format!("Seq({label})"),
             Self::Push(var, _) => format!("Push({var})"),
         }

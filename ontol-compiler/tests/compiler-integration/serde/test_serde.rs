@@ -257,6 +257,20 @@ fn test_num_default() {
 }
 
 #[test]
+fn test_string_default() {
+    "
+    pub type foo {
+        rel .'bar'(rel .default := 'baz'): string
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        assert_json_io_matches!(foo, json!({ "bar": "yay" }), json!({ "bar": "yay" }));
+        assert_json_io_matches!(foo, json!({}), json!({ "bar": "baz" }));
+    });
+}
+
+#[test]
 fn test_prop_union() {
     "
     pub type vec3 {

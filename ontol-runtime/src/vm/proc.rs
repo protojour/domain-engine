@@ -1,4 +1,5 @@
 use derive_debug_extras::DebugExtras;
+use smartstring::alias::String;
 
 use crate::{value::PropertyId, DefId};
 
@@ -82,8 +83,10 @@ pub enum OpCode {
     PutAttr2(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
-    /// Push a constant to the stack.
-    PushConstant(i64, DefId),
+    /// Push a constant i64 to the stack.
+    I64(i64, DefId),
+    /// Push a constant string to the stack.
+    String(String, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
     /// Overwrite runtime type info with a new type

@@ -50,7 +50,8 @@ pub trait Processor {
     fn try_take_attr2(&mut self, source: Local, key: PropertyId);
     fn put_attr1(&mut self, target: Local, key: PropertyId);
     fn put_attr2(&mut self, target: Local, key: PropertyId);
-    fn push_constant(&mut self, k: i64, result_type: DefId);
+    fn push_i64(&mut self, k: i64, result_type: DefId);
+    fn push_string(&mut self, k: &str, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn type_pun(&mut self, local: Local, def_id: DefId);
@@ -139,8 +140,12 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
                     processor.put_attr2(*target, *property_id);
                     self.program_counter += 1;
                 }
-                OpCode::PushConstant(k, result_type) => {
-                    processor.push_constant(*k, *result_type);
+                OpCode::I64(k, result_type) => {
+                    processor.push_i64(*k, *result_type);
+                    self.program_counter += 1;
+                }
+                OpCode::String(k, result_type) => {
+                    processor.push_string(k, *result_type);
                     self.program_counter += 1;
                 }
                 OpCode::Iter(seq, index, offset) => {

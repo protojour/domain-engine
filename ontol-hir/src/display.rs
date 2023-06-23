@@ -34,12 +34,16 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 write!(f, "{sep}{}", var)?;
                 Ok(sep.multiline())
             }
+            Kind::Unit => {
+                write!(f, "{sep}#u")?;
+                Ok(sep.multiline())
+            }
             Kind::Int(int) => {
                 write!(f, "{sep}{int}")?;
                 Ok(sep.multiline())
             }
-            Kind::Unit => {
-                write!(f, "{sep}#u")?;
+            Kind::String(string) => {
+                write!(f, "{sep}'{string}'")?;
                 Ok(sep.multiline())
             }
             Kind::Let(binder, definition, body) => {
