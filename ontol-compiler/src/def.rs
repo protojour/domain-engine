@@ -4,8 +4,8 @@ use derive_debug_extras::DebugExtras;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId, PackageId,
-    RelationshipId,
+    env::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
+    PackageId, RelationshipId,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -183,31 +183,6 @@ pub enum RelParams {
     Unit,
     Type(DefReference),
     IndexRange(Range<Option<u16>>),
-}
-
-pub type Cardinality = (PropertyCardinality, ValueCardinality);
-
-#[derive(Clone, Copy, Debug)]
-pub enum PropertyCardinality {
-    Optional,
-    Mandatory,
-}
-
-impl PropertyCardinality {
-    pub fn is_mandatory(&self) -> bool {
-        matches!(self, Self::Mandatory)
-    }
-
-    pub fn is_optional(&self) -> bool {
-        matches!(self, Self::Optional)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ValueCardinality {
-    One,
-    Many,
-    // ManyInRange(Option<u16>, Option<u16>),
 }
 
 pub struct RelationshipMeta<'m> {

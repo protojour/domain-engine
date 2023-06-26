@@ -11,7 +11,7 @@ use ontol_runtime::{
     DefId,
 };
 use serde::de::DeserializeSeed;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::TestEnv;
 
@@ -39,7 +39,7 @@ impl<'e> TypeBinding<'e> {
             panic!("`{:?}` is not public!", type_info.name);
         }
 
-        debug!(
+        trace!(
             "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
             operator_id = type_info.operator_id,
             processor = type_info.operator_id.map(|id| env.new_serde_processor(

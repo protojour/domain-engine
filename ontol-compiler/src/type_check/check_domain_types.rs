@@ -1,9 +1,13 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{value::PropertyId, DefId, RelationshipId, Role};
-use tracing::debug;
+use ontol_runtime::{
+    env::{PropertyCardinality, ValueCardinality},
+    value::PropertyId,
+    DefId, RelationshipId, Role,
+};
+use tracing::{debug, trace};
 
 use crate::{
-    def::{Def, DefKind, PropertyCardinality, RelationId, RelationKind, ValueCardinality},
+    def::{Def, DefKind, RelationId, RelationKind},
     error::CompileError,
     relation::{Constructor, Property},
 };
@@ -39,7 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
 
         for (property_id, cardinality) in map {
-            debug!("check {def_id:?} {property_id:?} {cardinality:?}");
+            trace!("check {def_id:?} {property_id:?} {cardinality:?}");
 
             match property_id.role {
                 Role::Subject => {
@@ -169,7 +173,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn perform_actions(&mut self, actions: Vec<Action>) {
         for action in actions {
-            debug!("perform action {action:?}");
+            trace!("perform action {action:?}");
             match action {
                 Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
                     let meta = self.defs.lookup_relationship_meta(relationship_id).unwrap();

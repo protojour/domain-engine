@@ -13,6 +13,7 @@ use crate::{
     },
     string_pattern::StringPattern,
     string_types::StringLikeType,
+    value::PropertyId,
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
@@ -200,6 +201,13 @@ pub struct EntityInfo {
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
     pub id_inherent_property_name: Option<String>,
+    pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EntityRelationship {
+    pub cardinality: Cardinality,
+    pub target: DefId,
 }
 
 pub struct EnvBuilder {
@@ -266,4 +274,29 @@ impl EnvBuilder {
     pub fn build(self) -> Env {
         self.env
     }
+}
+
+pub type Cardinality = (PropertyCardinality, ValueCardinality);
+
+#[derive(Clone, Copy, Debug)]
+pub enum PropertyCardinality {
+    Optional,
+    Mandatory,
+}
+
+impl PropertyCardinality {
+    pub fn is_mandatory(&self) -> bool {
+        matches!(self, Self::Mandatory)
+    }
+
+    pub fn is_optional(&self) -> bool {
+        matches!(self, Self::Optional)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ValueCardinality {
+    One,
+    Many,
+    // ManyInRange(Option<u16>, Option<u16>),
 }

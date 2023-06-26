@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, future::Future, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -57,9 +57,16 @@ pub struct TestEnv {
     pub compile_json_schema: bool,
 }
 
+#[async_trait::async_trait]
 pub trait TestCompile: Sized {
     /// Compile
     fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv;
+
+    /// Compile (async validator)
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv;
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -70,9 +77,19 @@ pub trait TestCompile: Sized {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
+#[async_trait::async_trait]
 impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv {
         TestPackages::with_root(self).compile_ok(validator)
+    }
+
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv {
+        TestPackages::with_root(self)
+            .compile_ok_async(validator)
+            .await
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
@@ -180,15 +197,10 @@ impl TestPackages {
             Err(error) => Err(error),
         }
     }
-}
 
-impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
+    fn compile_topology_ok(&mut self) -> TestEnv {
         match self.compile_topology() {
-            Ok(test_env) => {
-                validator(test_env.clone());
-                test_env
-            }
+            Ok(test_env) => test_env,
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
@@ -198,6 +210,25 @@ impl TestCompile for TestPackages {
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl TestCompile for TestPackages {
+    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
+        let test_env = self.compile_topology_ok();
+        validator(test_env.clone());
+        test_env
+    }
+
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        mut self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv {
+        let test_env = self.compile_topology_ok();
+        let fut = validator(test_env.clone());
+        fut.await;
+        test_env
     }
 
     fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {

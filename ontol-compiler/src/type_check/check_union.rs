@@ -4,6 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
+    env::{PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
     DataModifier, DefId, DefVariant,
@@ -13,7 +14,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, PropertyCardinality, RelationId, RelationKind, ValueCardinality},
+    def::{Def, RelationId, RelationKind},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},

@@ -5,15 +5,16 @@ use error::{CompileError, ParseError, UnifiedCompileError};
 pub use error::*;
 use expr::Expressions;
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    env::{Domain, EntityInfo, Env, TypeInfo},
+    env::{Domain, EntityInfo, EntityRelationship, Env, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, PackageId,
+    DataModifier, DefId, DefVariant, PackageId, Role,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
@@ -200,6 +201,38 @@ impl<'m> Compiler<'m> {
                                 .lookup_relationship_meta(*id_relationship_id)
                                 .expect("BUG: problem getting property meta");
 
+                            let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
+                                IndexMap::default();
+
+                            if let Some(map) = &properties.map {
+                                for (property_id, property) in map {
+                                    let meta = self
+                                        .defs
+                                        .lookup_relationship_meta(property_id.relationship_id)
+                                        .unwrap();
+
+                                    let relationship_target = match property_id.role {
+                                        Role::Subject => &meta.relationship.object,
+                                        Role::Object => &meta.relationship.subject,
+                                    };
+
+                                    if let Some(target_properties) = self
+                                        .relations
+                                        .properties_by_type(relationship_target.0.def_id)
+                                    {
+                                        if target_properties.identified_by.is_some() {
+                                            entity_relationships.insert(
+                                                *property_id,
+                                                EntityRelationship {
+                                                    cardinality: property.cardinality,
+                                                    target: relationship_target.0.def_id,
+                                                },
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
                             Some(EntityInfo {
                                 id_relationship_id: *id_relationship_id,
                                 id_value_def_id: identifies_meta.relationship.subject.0.def_id,
@@ -218,6 +251,7 @@ impl<'m> Compiler<'m> {
                                         .map(|name| name.into()),
                                     None => None,
                                 },
+                                entity_relationships,
                             })
                         } else {
                             None

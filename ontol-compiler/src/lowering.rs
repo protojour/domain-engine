@@ -5,16 +5,18 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
-use ontol_runtime::{smart_format, DefId, DefParamId, RelationshipId};
+use ontol_runtime::{
+    env::{PropertyCardinality, ValueCardinality},
+    smart_format, DefId, DefParamId, RelationshipId,
+};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, PropertyCardinality, RelParams,
-        Relation, RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, ValueCardinality,
-        Variables,
+        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, RelParams, Relation,
+        RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -44,7 +46,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     pub fn finish(self) -> Vec<DefId> {
-        debug!("Lowering finish: {:?}", self.root_defs);
         self.root_defs
     }
 

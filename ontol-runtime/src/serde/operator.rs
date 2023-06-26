@@ -33,7 +33,7 @@ pub enum SerdeOperator {
     /// Always deserializes into a string, ignores capture groups:
     StringPattern(DefId),
 
-    /// Deserializes into a Map if there are capture groups:
+    /// Deserializes into a Struct if there are capture groups:
     CapturingStringPattern(DefId),
 
     /// Special operator for serialization, can serialize a sequence of anything,

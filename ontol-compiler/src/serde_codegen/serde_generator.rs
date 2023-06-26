@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    env::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
         ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
         SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
@@ -11,12 +12,12 @@ use ontol_runtime::{
     serde::SerdeKey,
     DataModifier, DefId, DefVariant, RelationshipId, Role,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
-    def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
+    def::{DefKind, Defs, RelParams, TypeDef},
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
     relation::{Constructor, Properties, Relations},
@@ -61,7 +62,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         match self.alloc_serde_operator_from_key(key.clone()) {
             Some(OperatorAllocation::Allocated(operator_id, operator)) => {
-                debug!("CREATED {operator_id:?} {key:?} {operator:?}");
+                trace!("CREATED {operator_id:?} {key:?} {operator:?}");
                 self.operators_by_id[operator_id.0 as usize] = operator;
                 Some(operator_id)
             }

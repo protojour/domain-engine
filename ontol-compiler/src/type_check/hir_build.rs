@@ -1,9 +1,14 @@
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId, Role};
+use ontol_runtime::{
+    env::{Cardinality, PropertyCardinality, ValueCardinality},
+    smart_format,
+    value::PropertyId,
+    DefId, RelationshipId, Role,
+};
 use tracing::debug;
 
 use crate::{
-    def::{Cardinality, Def, DefKind, PropertyCardinality, RelParams, ValueCardinality},
+    def::{Def, DefKind, RelParams},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,

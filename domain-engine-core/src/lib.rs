@@ -9,10 +9,12 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, StructOrUnionQuery},
     value::{Attribute, Value},
+    DefId,
 };
 
 pub mod data_source;
 
+mod entity_id_utils;
 mod in_memory;
 
 #[cfg(test)]
@@ -29,12 +31,26 @@ impl Default for Config {
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum DomainError {}
+pub enum DomainError {
+    #[error("No data source")]
+    NoDataSource,
+    #[error("Not an entity")]
+    NotAnEntity(DefId),
+    #[error("Entity must be a struct")]
+    EntityMustBeStruct,
+    #[error("Invalid id")]
+    InvalidId,
+    #[error("Type cannot be used for id generation")]
+    TypeCannotBeUsedForIdGeneration,
+}
 
 #[unimock::unimock(api = EngineAPIMock)]
 #[async_trait::async_trait]
 pub trait EngineAPI: Send + Sync + 'static {
     fn get_config(&self) -> &Config;
+
+    /// Store an entity. Returns the entity id.
+    async fn store_entity(&self, entity: Value) -> Result<Value, DomainError>;
 
     async fn query_entities(&self, query: EntityQuery) -> Result<Vec<Attribute>, DomainError>;
 
@@ -57,10 +73,10 @@ impl DomainEngine {
     pub fn new(env: Arc<Env>) -> Self {
         let mut data_source: Option<Box<dyn DataSourceAPI + Send + Sync>> = None;
 
-        for (package_id, domain) in env.domains() {
+        for (package_id, _) in env.domains() {
             if let Some(config) = env.get_package_config(*package_id) {
                 if let Some(DataSourceConfig::InMemory) = config.data_source {
-                    data_source = Some(Box::new(InMemory::from_domain(*package_id, domain)))
+                    data_source = Some(Box::new(InMemory::new(&env, *package_id)))
                 }
             }
         }
@@ -71,12 +87,23 @@ impl DomainEngine {
             data_source,
         }
     }
+
+    async fn store_entity_inner(&self, entity: Value) -> Result<Value, DomainError> {
+        // TODO: Domain translation by finding optimal mapping path
+        let data_source = self.data_source.as_ref().ok_or(DomainError::NoDataSource)?;
+
+        data_source.store_entity(&self.env, entity).await
+    }
 }
 
 #[async_trait::async_trait]
 impl EngineAPI for DomainEngine {
     fn get_config(&self) -> &Config {
         &self.config
+    }
+
+    async fn store_entity(&self, entity: Value) -> Result<Value, DomainError> {
+        self.store_entity_inner(entity).await
     }
 
     async fn query_entities(&self, _query: EntityQuery) -> Result<Vec<Attribute>, DomainError> {

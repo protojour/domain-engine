@@ -11,7 +11,7 @@ pub type User {
     rel .'password_hash': string
 
     // TODO(constraint): User cannot follow itself
-    rel .'following'::'followed_by' [User]
+    rel .'following'::'followed_by'? [User]
 }
 
 pub type Article {
@@ -28,14 +28,16 @@ pub type Article {
 pub type Comment {
     rel .'id'|id: { rel .is: int }
     rel .'body': string
+    rel .'createdAt': datetime
+    rel .'updatedAt': datetime
 }
 
 pub type TagEntity {
     rel .'tag'|id: tag
 }
 
-rel Article 'written_by'::'wrote_articles' [User]
-rel Article 'favorited_by'::'favorited' [User]
-rel TagEntity 'tags'::'tagged_with' [Article]
-rel Comment 'comment_on'::'has_comments' [Article]
-rel Comment 'written_by'::'wrote_comments' [User]
+rel Article 'written_by'::'wrote_articles'? [User]
+rel Article 'favorited_by'::'favorited'? [User]
+rel TagEntity 'tags'::'tagged_with'? [Article]
+rel Comment 'comment_on'::'has_comments'? [Article]
+rel Comment 'written_by'::'wrote_comments'? [User]
