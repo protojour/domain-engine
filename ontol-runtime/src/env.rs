@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use smartstring::alias::String;
 
 use crate::{
+    config::PackageConfig,
     serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -27,7 +28,8 @@ pub struct Env {
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
-    domains: FnvHashMap<PackageId, Domain>,
+    domain_table: FnvHashMap<PackageId, Domain>,
+    package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
     lib: Lib,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
@@ -43,7 +45,8 @@ impl Env {
                 mapper_proc_table: Default::default(),
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
-                domains: Default::default(),
+                domain_table: Default::default(),
+                package_config_table: Default::default(),
                 docs: Default::default(),
                 lib: Lib::default(),
                 serde_operators_per_def: Default::default(),
@@ -88,11 +91,15 @@ impl Env {
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
-        self.domains.iter()
+        self.domain_table.iter()
     }
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
-        self.domains.get(&package_id)
+        self.domain_table.get(&package_id)
+    }
+
+    pub fn get_package_config(&self, package_id: PackageId) -> Option<&PackageConfig> {
+        self.package_config_table.get(&package_id)
     }
 
     pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
@@ -201,7 +208,11 @@ pub struct EnvBuilder {
 
 impl EnvBuilder {
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
-        self.env.domains.insert(package_id, domain);
+        self.env.domain_table.insert(package_id, domain);
+    }
+
+    pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
+        self.env.package_config_table.insert(package_id, config);
     }
 
     pub fn docs(mut self, docs: FnvHashMap<DefId, Vec<String>>) -> Self {

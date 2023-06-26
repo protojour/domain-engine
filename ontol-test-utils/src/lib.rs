@@ -7,7 +7,11 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
-use ontol_runtime::{env::Env, PackageId};
+use ontol_runtime::{
+    config::{DataSourceConfig, PackageConfig},
+    env::Env,
+    PackageId,
+};
 
 pub mod diagnostics;
 pub mod type_binding;
@@ -89,6 +93,7 @@ pub struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
+    data_source: Option<(SourceName, DataSourceConfig)>,
 }
 
 impl TestPackages {
@@ -106,7 +111,13 @@ impl TestPackages {
                 .collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
+            data_source: None,
         }
+    }
+
+    pub fn with_data_source(mut self, name: SourceName, config: DataSourceConfig) -> Self {
+        self.data_source = Some((name, config));
+        self
     }
 
     fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
@@ -127,10 +138,19 @@ impl TestPackages {
                             root_package = Some(request.package_id);
                         }
 
+                        let mut package_config = PackageConfig::default();
+
+                        if let Some((db_source_name, data_source_config)) = &self.data_source {
+                            if source_name == db_source_name.0 {
+                                package_config.data_source = Some(data_source_config.clone());
+                            }
+                        }
+
                         if let Some(source_text) = self.sources_by_name.get(source_name) {
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
                                 source_text,
+                                package_config,
                                 &mut self.sources,
                                 &mut self.source_code_registry,
                             ));

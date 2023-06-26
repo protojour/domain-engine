@@ -6,7 +6,7 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_parser::parse_statements;
-use ontol_runtime::json_schema::build_openapi_schemas;
+use ontol_runtime::{config::PackageConfig, json_schema::build_openapi_schemas};
 use std::{collections::HashMap, fs};
 use thiserror::Error;
 
@@ -133,6 +133,7 @@ fn generate(args: &Generate) -> Result<(), OntoolError> {
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
                                 source_text,
+                                PackageConfig::default(),
                                 &mut sources,
                                 &mut source_code_registry,
                             ));

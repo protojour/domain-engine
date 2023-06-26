@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use fnv::FnvHashMap;
 use ontol_parser::ast;
 use ontol_parser::Spanned;
+use ontol_runtime::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
 use smartstring::alias::String;
@@ -57,6 +58,7 @@ pub enum PackageReference {
 pub struct ParsedPackage {
     pub package_id: PackageId,
     pub reference: PackageReference,
+    pub config: PackageConfig,
     pub src: Src,
     pub statements: Vec<Spanned<ast::Statement>>,
     pub parser_errors: Vec<ontol_parser::Error>,
@@ -66,6 +68,7 @@ impl ParsedPackage {
     pub fn parse(
         request: PackageRequest,
         text: &str,
+        config: PackageConfig,
         sources: &mut Sources,
         source_code_registry: &mut SourceCodeRegistry,
     ) -> Self {
@@ -82,6 +85,7 @@ impl ParsedPackage {
         Self {
             package_id: src.package_id,
             reference: request.reference,
+            config,
             src,
             statements,
             parser_errors,

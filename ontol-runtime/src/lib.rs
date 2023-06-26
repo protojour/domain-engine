@@ -4,6 +4,7 @@ use derive_debug_extras::DebugExtras;
 use value::Value;
 
 pub mod cast;
+pub mod config;
 pub mod discriminator;
 pub mod env;
 pub mod format_utils;

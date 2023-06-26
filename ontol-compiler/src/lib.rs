@@ -4,10 +4,12 @@ use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
 use expr::Expressions;
+use fnv::FnvHashMap;
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
+    config::PackageConfig,
     env::{Domain, EntityInfo, Env, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
@@ -54,6 +56,7 @@ pub struct Compiler<'m> {
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
+    pub(crate) package_config_table: FnvHashMap<PackageId, PackageConfig>,
     pub(crate) primitives: Primitives,
     pub(crate) expressions: Expressions,
 
@@ -78,6 +81,7 @@ impl<'m> Compiler<'m> {
             packages: Default::default(),
             namespaces: Default::default(),
             defs,
+            package_config_table: Default::default(),
             primitives,
             expressions: Default::default(),
             strings: Strings::new(mem),
@@ -129,6 +133,9 @@ impl<'m> Compiler<'m> {
                 .loaded_packages
                 .insert(parsed_package.reference, package_def_id);
 
+            self.package_config_table
+                .insert(parsed_package.package_id, parsed_package.config);
+
             let mut lowering = Lowering::new(self, &src);
 
             for stmt in parsed_package.statements {
@@ -165,6 +172,7 @@ impl<'m> Compiler<'m> {
         let package_ids = self.package_ids();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
+        let mut package_config_map = std::mem::take(&mut self.package_config_table);
         let docs = std::mem::take(&mut self.namespaces.docs);
         let mut serde_generator = self.serde_generator();
 
@@ -178,6 +186,10 @@ impl<'m> Compiler<'m> {
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
+
+            if let Some(package_config) = package_config_map.remove(&package_id) {
+                builder.add_package_config(package_id, package_config);
+            }
 
             for (type_name, type_def_id) in type_namespace {
                 let entity_info =
