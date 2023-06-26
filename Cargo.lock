@@ -421,13 +421,19 @@ name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "fnv",
+ "indexmap",
  "ontol-compiler",
  "ontol-runtime",
+ "ontol-test-utils",
  "serde",
  "serde_json",
  "smartstring",
+ "test-log",
  "thiserror",
+ "tokio",
  "tracing",
+ "tracing-subscriber",
  "unimock",
 ]
 

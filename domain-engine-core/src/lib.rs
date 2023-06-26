@@ -15,6 +15,9 @@ pub mod data_source;
 
 mod in_memory;
 
+#[cfg(test)]
+mod tests;
+
 pub struct Config {
     pub default_limit: u32,
 }
@@ -57,7 +60,7 @@ impl DomainEngine {
         for (package_id, domain) in env.domains() {
             if let Some(config) = env.get_package_config(*package_id) {
                 if let Some(DataSourceConfig::InMemory) = config.data_source {
-                    data_source = Some(Box::new(InMemory::from_domain(domain)))
+                    data_source = Some(Box::new(InMemory::from_domain(*package_id, domain)))
                 }
             }
         }

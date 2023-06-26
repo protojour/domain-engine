@@ -24,7 +24,7 @@ convert_case = "0.6"
 ontol-test-utils.path = "../ontol-test-utils"
 tracing-subscriber.workspace = true
 test-log.workspace = true
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio.workspace = true
 async-trait = "0.1"
 pretty_assertions = "1"
 unimock = "0.5"
