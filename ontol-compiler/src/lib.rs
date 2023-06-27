@@ -20,6 +20,7 @@ use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Relations};
+use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
@@ -193,83 +194,14 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
-                let entity_info =
-                    if let Some(properties) = self.relations.properties_by_type(type_def_id) {
-                        if let Some(id_relationship_id) = &properties.identified_by {
-                            let identifies_meta = self
-                                .defs
-                                .lookup_relationship_meta(*id_relationship_id)
-                                .expect("BUG: problem getting property meta");
-
-                            let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
-                                IndexMap::default();
-
-                            if let Some(map) = &properties.map {
-                                for (property_id, property) in map {
-                                    let meta = self
-                                        .defs
-                                        .lookup_relationship_meta(property_id.relationship_id)
-                                        .unwrap();
-
-                                    let relationship_target = match property_id.role {
-                                        Role::Subject => &meta.relationship.object,
-                                        Role::Object => &meta.relationship.subject,
-                                    };
-
-                                    if let Some(target_properties) = self
-                                        .relations
-                                        .properties_by_type(relationship_target.0.def_id)
-                                    {
-                                        if target_properties.identified_by.is_some() {
-                                            entity_relationships.insert(
-                                                *property_id,
-                                                EntityRelationship {
-                                                    cardinality: property.cardinality,
-                                                    target: relationship_target.0.def_id,
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-
-                            Some(EntityInfo {
-                                id_relationship_id: *id_relationship_id,
-                                id_value_def_id: identifies_meta.relationship.subject.0.def_id,
-                                id_operator_id: serde_generator
-                                    .gen_operator_id(SerdeKey::Def(DefVariant::new(
-                                        identifies_meta.relationship.subject.0.def_id,
-                                        DataModifier::NONE,
-                                    )))
-                                    .unwrap(),
-                                id_inherent_property_name: match self
-                                    .find_inherent_primary_id(type_def_id, properties)
-                                {
-                                    Some(meta) => meta
-                                        .relation
-                                        .subject_prop(&self.defs)
-                                        .map(|name| name.into()),
-                                    None => None,
-                                },
-                                entity_relationships,
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                let public = match self.defs.get_def_kind(type_def_id) {
-                    Some(DefKind::Type(TypeDef { public, .. })) => *public,
-                    _ => true,
-                };
-
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    public,
+                    public: match self.defs.get_def_kind(type_def_id) {
+                        Some(DefKind::Type(TypeDef { public, .. })) => *public,
+                        _ => true,
+                    },
                     name: Some(type_name),
-                    entity_info,
+                    entity_info: self.entity_info(type_def_id, &mut serde_generator),
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
                         DataModifier::default(),
@@ -305,6 +237,72 @@ impl<'m> Compiler<'m> {
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()
+    }
+
+    fn entity_info(
+        &self,
+        type_def_id: DefId,
+        serde_generator: &mut SerdeGenerator,
+    ) -> Option<EntityInfo> {
+        let properties = self.relations.properties_by_type(type_def_id)?;
+        let id_relationship_id = properties.identified_by?;
+
+        let identifies_meta = self
+            .defs
+            .lookup_relationship_meta(id_relationship_id)
+            .expect("BUG: problem getting property meta");
+
+        let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
+            IndexMap::default();
+
+        if let Some(map) = &properties.map {
+            for (property_id, property) in map {
+                let meta = self
+                    .defs
+                    .lookup_relationship_meta(property_id.relationship_id)
+                    .unwrap();
+
+                let relationship_target = match property_id.role {
+                    Role::Subject => &meta.relationship.object,
+                    Role::Object => &meta.relationship.subject,
+                };
+
+                if let Some(target_properties) = self
+                    .relations
+                    .properties_by_type(relationship_target.0.def_id)
+                {
+                    if target_properties.identified_by.is_some() {
+                        entity_relationships.insert(
+                            *property_id,
+                            EntityRelationship {
+                                cardinality: property.cardinality,
+                                target: relationship_target.0.def_id,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        Some(EntityInfo {
+            id_relationship_id,
+            id_value_def_id: identifies_meta.relationship.subject.0.def_id,
+            id_operator_id: serde_generator
+                .gen_operator_id(SerdeKey::Def(DefVariant::new(
+                    identifies_meta.relationship.subject.0.def_id,
+                    DataModifier::NONE,
+                )))
+                .unwrap(),
+            id_inherent_property_name: match self.find_inherent_primary_id(type_def_id, properties)
+            {
+                Some(meta) => meta
+                    .relation
+                    .subject_prop(&self.defs)
+                    .map(|name| name.into()),
+                None => None,
+            },
+            entity_relationships,
+        })
     }
 
     fn find_inherent_primary_id(

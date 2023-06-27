@@ -13,11 +13,8 @@ async fn test_conduit_db_in_memory_data_source() {
         .with_data_source(SourceName::root(), DataSourceConfig::InMemory)
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
-
-            let user = TypeBinding::new(&test_env, "User");
-            let article = TypeBinding::new(&test_env, "Article");
-            let comment = TypeBinding::new(&test_env, "Comment");
-            let tag_entity = TypeBinding::new(&test_env, "TagEntity");
+            let [user, article, comment, tag_entity] =
+                TypeBinding::new_n(&test_env, ["User", "Article", "Comment", "TagEntity"]);
 
             let _user_id1 = domain_engine
                 .store_entity(

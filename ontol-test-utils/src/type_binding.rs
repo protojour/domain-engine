@@ -26,6 +26,10 @@ pub struct TypeBinding<'e> {
 }
 
 impl<'e> TypeBinding<'e> {
+    pub fn new_n<const N: usize>(test_env: &'e TestEnv, type_names: [&str; N]) -> [Self; N] {
+        type_names.map(|type_name| Self::new(test_env, type_name))
+    }
+
     pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
         let env = &test_env.env;
         let domain = env.find_domain(test_env.root_package).unwrap();
