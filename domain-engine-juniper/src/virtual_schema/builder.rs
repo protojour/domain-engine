@@ -242,11 +242,11 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 },
             ),
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Select, ProcessorLevel::Root) {
+                match union_op.variants(ProcessorMode::Read, ProcessorLevel::Root) {
                     FilteredVariants::Single(operator_id) => {
                         self.make_node_type_inner(type_info, operator_id)
                     }
-                    FilteredVariants::Multi(variants) => {
+                    FilteredVariants::Union(variants) => {
                         let node_index =
                             self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
                         let mut type_variants = vec![];
@@ -503,8 +503,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                         property_id: property.property_id,
                                         value_operator_id: property.value_operator_id,
                                     }),
-                                    field_type: TypeRef::mandatory(edge_ref)
-                                        .to_array(Optionality::from_optional(property.optional)),
+                                    field_type: TypeRef::mandatory(edge_ref).to_array(
+                                        Optionality::from_optional(property.is_optional()),
+                                    ),
                                 },
                             );
                         }
@@ -538,7 +539,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             }),
                             field_type: TypeRef {
                                 modifier: TypeModifier::new_unit(Optionality::from_optional(
-                                    property.optional,
+                                    property.is_optional(),
                                 )),
                                 unit: scalar_ref,
                             },
@@ -566,7 +567,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 value_operator_id: property.value_operator_id,
             }),
             field_type: TypeRef {
-                modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
+                modifier: TypeModifier::new_unit(Optionality::from_optional(
+                    property.is_optional(),
+                )),
                 unit: unit_ref,
             },
         }

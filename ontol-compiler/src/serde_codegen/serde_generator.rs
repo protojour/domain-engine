@@ -9,7 +9,7 @@ use ontol_runtime::{
         SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
         ValueUnionVariant,
     },
-    serde::SerdeKey,
+    serde::{operator::SerdePropertyFlags, SerdeKey},
     DataModifier, DefId, DefVariant, RelationshipId, Role,
 };
 use tracing::{debug, trace};
@@ -799,15 +799,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     n_mandatory_properties += 1;
                 }
 
+                let mut flags = SerdePropertyFlags::default();
+
+                if property_cardinality.is_optional() {
+                    flags |= SerdePropertyFlags::OPTIONAL;
+                }
+
                 serde_properties.insert(
                     prop_key.into(),
                     SerdeProperty {
                         property_id: *property_id,
                         value_operator_id,
-                        optional: property_cardinality.is_optional(),
+                        flags,
                         default_const_proc_address,
                         rel_params_operator_id,
-                        relationship_id: meta.relationship_id.0,
                     },
                 );
             }

@@ -192,7 +192,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 FilteredVariants::Single(operator_id) => {
                     self.narrow(operator_id).deserialize(deserializer)
                 }
-                FilteredVariants::Multi(variants) => deserializer.deserialize_any(
+                FilteredVariants::Union(variants) => deserializer.deserialize_any(
                     UnionMatcher {
                         typename: union_op.typename(),
                         variants,
@@ -469,7 +469,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
                     )
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                if !serde_property.optional {
+                if !serde_property.is_optional() {
                     n_mandatory_properties += 1;
                 }
 
@@ -501,7 +501,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
                     serde_property.rel_params_operator_id,
                 ))?;
 
-                if !serde_property.optional {
+                if !serde_property.is_optional() {
                     n_mandatory_properties += 1;
                 }
 
@@ -514,7 +514,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         // Generate default values if missing
         for (_, property) in properties {
             if let Some(default_const_proc_address) = property.default_const_proc_address {
-                if !property.optional && !attributes.contains_key(&property.property_id) {
+                if !property.is_optional() && !attributes.contains_key(&property.property_id) {
                     let value = processor.env.new_vm().eval(
                         Procedure {
                             address: default_const_proc_address,
@@ -545,14 +545,16 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         for prop in properties {
             debug!(
                 "    prop {:?} '{}' optional={}",
-                prop.1.property_id, prop.0, prop.1.optional
+                prop.1.property_id,
+                prop.0,
+                prop.1.is_optional()
             );
         }
 
         let mut items: Vec<DoubleQuote<String>> = properties
             .iter()
             .filter(|(_, property)| {
-                !property.optional && !attributes.contains_key(&property.property_id)
+                !property.is_optional() && !attributes.contains_key(&property.property_id)
             })
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();

@@ -152,7 +152,7 @@ impl UnionOperator {
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
         match (mode, level) {
-            (ProcessorMode::Select, _) | (_, ProcessorLevel::Root) => {
+            (ProcessorMode::Read, _) | (_, ProcessorLevel::Root) => {
                 let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
                     variant.discriminator.purpose > VariantPurpose::Identification
                 });
@@ -171,7 +171,7 @@ impl UnionOperator {
         if variants.len() == 1 {
             FilteredVariants::Single(variants[0].operator_id)
         } else {
-            FilteredVariants::Multi(variants)
+            FilteredVariants::Union(variants)
         }
     }
 
@@ -182,7 +182,8 @@ impl UnionOperator {
 
 pub enum FilteredVariants<'e> {
     Single(SerdeOperatorId),
-    Multi(&'e [ValueUnionVariant]),
+    /// Should serialize one of the union members
+    Union(&'e [ValueUnionVariant]),
 }
 
 #[derive(Clone, Debug)]
@@ -204,8 +205,22 @@ pub struct StructOperator {
 pub struct SerdeProperty {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
-    pub optional: bool,
+    pub flags: SerdePropertyFlags,
     pub default_const_proc_address: Option<Address>,
     pub rel_params_operator_id: Option<SerdeOperatorId>,
-    pub relationship_id: DefId,
+}
+
+impl SerdeProperty {
+    pub fn is_optional(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::OPTIONAL)
+    }
+}
+
+bitflags::bitflags! {
+    /// Modifier for (de)serializers.
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct SerdePropertyFlags: u32 {
+        const OPTIONAL       = 0b00000001;
+        const READ_ONLY      = 0b00000010;
+    }
 }

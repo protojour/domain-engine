@@ -19,8 +19,7 @@ fn test_fake_primitives() {
         let foo = TypeBinding::new(&test_env, "foo");
 
         assert_eq!(
-            foo.ser_create()
-                .identity_json(&foo.new_fake(ProcessorMode::Create)),
+            foo.ser_create().json(&foo.new_fake(ProcessorMode::Create)),
             json!({
                 "s": "mollitia sit porro tenetur",
                 "i": 2117826670,
@@ -41,8 +40,7 @@ fn test_fake_string_like_types() {
         let foo = TypeBinding::new(&test_env, "foo");
 
         assert_eq!(
-            foo.ser_create()
-                .identity_json(&foo.new_fake(ProcessorMode::Create)),
+            foo.ser_create().json(&foo.new_fake(ProcessorMode::Create)),
             json!({
                 "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
                 "created_at": "1943-07-25T19:00:15.149284864+00:00",
@@ -59,7 +57,7 @@ fn test_fake_geojson() {
         assert_eq!(
             geometry
                 .ser_create()
-                .identity_json(&geometry.new_fake(ProcessorMode::Create)),
+                .json(&geometry.new_fake(ProcessorMode::Create)),
             json!({
                 "type": "Polygon",
                 "coordinates": [
@@ -82,7 +80,7 @@ fn test_fake_guitar_synth() {
         assert_eq!(
             artist
                 .ser_create()
-                .identity_json(&artist.new_fake(ProcessorMode::Create)),
+                .json(&artist.new_fake(ProcessorMode::Create)),
             json!({
                 "name": "mollitia sit porro tenetur",
                 "plays": [

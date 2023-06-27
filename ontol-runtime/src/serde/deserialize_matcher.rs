@@ -523,7 +523,7 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Union(union_op) => {
                         match union_op.variants(self.mode, self.level) {
                             FilteredVariants::Single(_) => todo!(),
-                            FilteredVariants::Multi(variants) => MapMatcher {
+                            FilteredVariants::Union(variants) => MapMatcher {
                                 variants,
                                 rel_params_operator_id: self.rel_params_operator_id,
                                 env: self.env,

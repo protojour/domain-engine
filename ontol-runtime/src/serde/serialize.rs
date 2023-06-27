@@ -80,7 +80,7 @@ impl<'e> SerdeProcessor<'e> {
                 FilteredVariants::Single(id) => self
                     .narrow(id)
                     .serialize_value(value, rel_params, serializer),
-                FilteredVariants::Multi(variants) => {
+                FilteredVariants::Union(variants) => {
                     let variant = variants.iter().find(|discriminator| {
                         value.type_def_id == discriminator.discriminator.def_variant.def_id
                     });
@@ -205,7 +205,7 @@ impl<'e> SerdeProcessor<'e> {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
-                    if serde_prop.optional {
+                    if serde_prop.is_optional() {
                         continue;
                     } else {
                         panic!(

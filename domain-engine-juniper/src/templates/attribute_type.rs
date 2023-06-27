@@ -299,7 +299,7 @@ impl<'v> AttributeType<'v> {
                     .new_serde_processor(
                         scalar_ref.operator_id,
                         None,
-                        ProcessorMode::Select,
+                        ProcessorMode::Read,
                         ProcessorLevel::Root,
                     )
                     .serialize_value(&attribute.value, None, GqlScalarSerializer)?;

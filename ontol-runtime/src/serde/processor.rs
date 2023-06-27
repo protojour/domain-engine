@@ -11,8 +11,8 @@ use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
 #[derive(Copy, Clone, Debug)]
 pub enum ProcessorMode {
     Create,
+    Read,
     Update,
-    Select,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -97,7 +97,7 @@ impl<'e> SerdeProcessor<'e> {
                 FilteredVariants::Single(operator_id) => {
                     self.narrow(operator_id).find_property(prop)
                 }
-                FilteredVariants::Multi(variants) => {
+                FilteredVariants::Union(variants) => {
                     for variant in variants {
                         if let Some(property_id) =
                             self.narrow(variant.operator_id).find_property(prop)

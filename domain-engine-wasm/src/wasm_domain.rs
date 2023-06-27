@@ -30,7 +30,7 @@ impl JsonFormat {
         match self {
             Self::Create => ProcessorMode::Create,
             Self::Update => ProcessorMode::Update,
-            Self::Select => ProcessorMode::Select,
+            Self::Select => ProcessorMode::Read,
         }
     }
 }

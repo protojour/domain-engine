@@ -87,7 +87,7 @@ fn assert_domain_map(
     let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {
-        Key::Unit(_) => output_binding.ser_create().identity_json(&value),
+        Key::Unit(_) => output_binding.ser_create().json(&value),
         Key::Seq(_) => output_binding.ser_create().dynamic_sequence_json(&value),
     };
 

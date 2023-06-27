@@ -622,7 +622,10 @@ impl<'e> Serialize for MapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         for (key, property) in &self.map_type.properties {
-            let docs = self.ctx.env.get_docs(property.relationship_id);
+            let docs = self
+                .ctx
+                .env
+                .get_docs(property.property_id.relationship_id.0);
             map.serialize_entry(
                 key,
                 &self
@@ -645,7 +648,7 @@ impl<'e> Serialize for RequiredMapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
         for (key, property) in &self.map_type.properties {
-            if !property.optional {
+            if !property.is_optional() {
                 seq.serialize_element(key)?;
             }
         }

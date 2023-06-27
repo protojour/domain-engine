@@ -111,7 +111,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     FilteredVariants::Single(operator_id) => {
                         self.collect_operator_arguments(operator_id, output, typing_purpose);
                     }
-                    FilteredVariants::Multi(variants) => {
+                    FilteredVariants::Union(variants) => {
                         warn!("Multiple variants in union: {variants:#?}");
                         for variant in variants {
                             self.collect_operator_arguments(

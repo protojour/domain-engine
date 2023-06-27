@@ -133,6 +133,14 @@ impl<'e> TypeBinding<'e> {
             level: ProcessorLevel::Root,
         }
     }
+
+    pub fn ser_read(&self) -> Serializer<'_, 'e> {
+        Serializer {
+            binding: self,
+            mode: ProcessorMode::Read,
+            level: ProcessorLevel::Root,
+        }
+    }
 }
 
 pub struct Deserializer<'b, 'e> {
@@ -223,19 +231,19 @@ pub struct Serializer<'b, 'e> {
 }
 
 impl<'b, 'e> Serializer<'b, 'e> {
-    pub fn data_json(&self, data: &Data) -> serde_json::Value {
-        self.identity_json(&Value::new(data.clone(), self.binding.type_info.def_id))
+    pub fn json(&self, value: &Value) -> serde_json::Value {
+        self.serialize_json(value, false)
     }
 
-    pub fn identity_json(&self, value: &Value) -> serde_json::Value {
-        self.json(value, false)
+    pub fn data_json(&self, data: &Data) -> serde_json::Value {
+        self.json(&Value::new(data.clone(), self.binding.type_info.def_id))
     }
 
     pub fn dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
-        self.json(value, true)
+        self.serialize_json(value, true)
     }
 
-    fn json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
+    fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.binding
             .env

@@ -1,3 +1,4 @@
+use ontol_runtime::value::Value;
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
 };
@@ -37,18 +38,45 @@ fn entity_without_inherent_id() {
 }
 
 #[test]
-fn inherent_id_autogen() {
+fn inherent_id_no_autogen() {
     "
     type foo_id { rel .is: string }
     pub type foo {
         rel .id: foo_id
-        rel .'key'(rel .gen: auto): foo_id
+        rel .'key': foo_id
         rel .'children': [foo]
     }
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        assert_json_io_matches!(foo, Create, { "children": [{ "key": "some_key" }] });
+        assert_json_io_matches!(foo, Create, { "key": "id", "children": [{ "key": "foreign_id" }] });
+
+        let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
+        assert_eq!(
+            json!({ "key": "id" }),
+            foo.ser_read().json(&entity),
+        );
+    });
+}
+
+#[test]
+fn inherent_id_autogen() {
+    "
+    type foo_id { rel .is: string }
+    pub type foo {
+        rel .'key'(rel .gen: auto)|id: foo_id
+        rel .'children': [foo]
+    }
+    "
+    .compile_ok(|env| {
+        let foo = TypeBinding::new(&env, "foo");
+        assert_json_io_matches!(foo, Create, { "children": [{ "key": "foreign_id" }] });
+
+        let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
+        assert_eq!(
+            json!({ "key": "generated_id" }),
+            foo.ser_read().json(&entity)
+        );
     });
 }
 
@@ -177,7 +205,7 @@ fn artist_and_instrument_id_as_relation_object() {
 
         // The value of the `plays` attribute is an `artist-id`
         assert_eq!(
-            instrument_id.ser_create().identity_json(&plays_attributes[0].value),
+            instrument_id.ser_create().json(&plays_attributes[0].value),
             json!(example_id)
         );
 

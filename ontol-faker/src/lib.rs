@@ -168,7 +168,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::Union(union_op) => {
                 return match union_op.variants(self.processor_mode, processor.level()) {
                     FilteredVariants::Single(id) => self.fake_attribute(processor.narrow(id)),
-                    FilteredVariants::Multi(variants) => {
+                    FilteredVariants::Union(variants) => {
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];
 

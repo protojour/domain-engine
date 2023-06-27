@@ -44,7 +44,7 @@ macro_rules! assert_json_io_matches {
             Err(err) => panic!("deserialize failed: {err}"),
         };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = $binding.ser_create().identity_json(&value);
+        let output = $binding.ser_create().json(&value);
 
         pretty_assertions::assert_eq!(serde_json::json!($expected_output), output);
     };
