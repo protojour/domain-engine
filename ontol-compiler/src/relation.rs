@@ -14,6 +14,7 @@ pub struct Relations {
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
 
     pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
+    pub value_generators: FnvHashMap<RelationshipId, DefId>,
 
     pub value_unions: FnvHashSet<DefId>,
     pub string_pattern_constructors: FnvHashSet<DefId>,

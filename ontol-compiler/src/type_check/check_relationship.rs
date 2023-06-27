@@ -287,6 +287,55 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ),
                 }
             }
+            RelationKind::Builtin(BuiltinRelationKind::Gen) => {
+                let _subject_ty = self.check_def(subject.0.def_id);
+                let object_ty = self.check_def(object.0.def_id);
+
+                let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
+
+                let value_generator_def_id = match object_ty {
+                    Type::ValueGenerator(def_id) => *def_id,
+                    _ => {
+                        return self.error(
+                            CompileError::TODO(smart_format!("Not a value generator")),
+                            &object.1,
+                        )
+                    }
+                };
+
+                match subject_def_kind {
+                    DefKind::Type(TypeDef {
+                        rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                        ..
+                    }) => match self.defs.get_def_kind(*outer_relationship_id) {
+                        Some(DefKind::Relationship(Relationship {
+                            object: outer_object,
+                            ..
+                        })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
+                            Some(_outer_object_ty) => {
+                                self.relations.value_generators.insert(
+                                    RelationshipId(*outer_relationship_id),
+                                    value_generator_def_id,
+                                );
+                                object_ty
+                            }
+                            None => self.error(
+                                CompileError::TODO(smart_format!(
+                                    "the type of the gen relation has not been checked"
+                                )),
+                                span,
+                            ),
+                        },
+                        _ => unreachable!(),
+                    },
+                    _ => self.error(
+                        CompileError::TODO(smart_format!(
+                            "gen not supported here, must be on a relation type"
+                        )),
+                        span,
+                    ),
+                }
+            }
             RelationKind::Builtin(
                 BuiltinRelationKind::Min
                 | BuiltinRelationKind::Max
@@ -422,6 +471,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             | Type::Function { .. }
             | Type::Package
             | Type::Infer(_)
+            | Type::ValueGenerator(_)
             | Type::Error => {
                 self.error(CompileError::ObjectMustBeDataType, span);
             }

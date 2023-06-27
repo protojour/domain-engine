@@ -422,6 +422,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     },
                                 ),
                                 (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
+                                (ty @ Type::Anonymous(def_id), None) => {
+                                    match self.relations.properties_by_type(*def_id) {
+                                        Some(_) => self
+                                            .build_implicit_rel_node(ty, object, *prop_span, ctx),
+                                        // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
+                                        None => TypedHirNode(
+                                            ontol_hir::Kind::Unit,
+                                            Meta {
+                                                ty,
+                                                span: *prop_span,
+                                            },
+                                        ),
+                                    }
+                                }
                                 (ty, None) => {
                                     self.build_implicit_rel_node(ty, object, *prop_span, ctx)
                                 }

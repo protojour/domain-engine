@@ -44,6 +44,8 @@ pub enum Type<'m> {
     // User-defined data type from a domain:
     Domain(DefId),
     Anonymous(DefId),
+    // A builtin function for generating values
+    ValueGenerator(DefId),
     Package,
     BuiltinRelation,
     Infer(TypeVar<'m>),
@@ -69,6 +71,7 @@ impl<'m> Type<'m> {
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
             Self::Anonymous(def_id) => Some(*def_id),
+            Self::ValueGenerator(def_id) => Some(*def_id),
             Self::Package => None,
             Self::BuiltinRelation => None,
             Self::Infer(_) => None,
@@ -210,6 +213,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Anonymous(_) => {
                 write!(f, "anonymous")
             }
+            Type::ValueGenerator(_) => write!(f, "value_generator"),
             Type::Package => write!(f, "package"),
             Type::BuiltinRelation => write!(f, "relation"),
             Type::Infer(_) => write!(f, "?infer"),

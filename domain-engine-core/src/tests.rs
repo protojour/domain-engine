@@ -52,8 +52,6 @@ async fn test_conduit_db_in_memory_data_source() {
                             "title": "Foo",
                             "description": "An article",
                             "body": "The body",
-                            "createdAt": "2023-01-25T19:00:15.149284864+00:00",
-                            "updatedAt": "2033-01-25T19:00:15.149284864+00:00",
                         }))
                         .unwrap(),
                 )

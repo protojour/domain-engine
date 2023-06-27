@@ -153,6 +153,7 @@ pub enum BuiltinRelationKind {
     Min,
     Max,
     Default,
+    Gen,
     Route,
     Doc,
     Example,

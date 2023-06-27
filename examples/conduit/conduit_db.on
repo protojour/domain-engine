@@ -3,7 +3,7 @@ pub type slug { rel.is: string }
 pub type tag { rel.is: string }
 
 pub type User {
-    rel .'user_id'|id: user_id
+    rel .'user_id'(rel .gen: auto)|id: user_id
     rel .'username': string
     rel .'email': string
     rel .'bio'(rel .default := ''): string
@@ -15,25 +15,25 @@ pub type User {
 }
 
 pub type Article {
-    rel .'id'|id: { rel .is: uuid }
+    rel .'id'(rel .gen: auto)|id: { rel .is: uuid }
     // TODO(constraint): slug is unique
     rel .'slug': slug
     rel .'title': string
     rel .'description': string
     rel .'body': string
-    rel .'createdAt': datetime
-    rel .'updatedAt': datetime
+    rel .'createdAt'(rel .gen: create_time): datetime
+    rel .'updatedAt'(rel .gen: update_time): datetime
 }
 
 pub type Comment {
-    rel .'id'|id: { rel .is: int }
+    rel .'id'(rel .gen: auto)|id: { rel .is: int }
     rel .'body': string
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
 }
 
 pub type TagEntity {
-    rel .'tag'|id: tag
+    rel .'tag'(rel .gen: auto)|id: tag
 }
 
 rel Article 'written_by'::'wrote_articles'? [User]

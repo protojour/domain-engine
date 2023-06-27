@@ -338,7 +338,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             Type::Function { .. } => None,
             Type::Anonymous(_) => None,
-            Type::Package | Type::BuiltinRelation => None,
+            Type::Package | Type::BuiltinRelation | Type::ValueGenerator(_) => None,
             Type::Tautology | Type::Infer(_) | Type::Error => {
                 panic!("crap: {:?}", self.get_def_type(def_variant.def_id));
             }
@@ -710,14 +710,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if let Some(map) = &properties.map {
             for (property_id, property) in map {
-                // TODO: Proper handling of different entity id semantics
-                if property.is_entity_id {
+                if self
+                    .relations
+                    .value_generators
+                    .get(&property_id.relationship_id)
+                    .is_some()
+                {
+                    // BUG(?): Ignored only for Create/Update
                     continue;
                 }
 
                 let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
-                        if property_id.relationship_id.0 == self.primitives.identifies_relation {
+                        if property_id.relationship_id.0 == self.primitives.relations.identifies {
                             // panic!();
                         }
 
@@ -765,6 +770,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                     None
                                 }
                             }
+                            Some(SerdeOperator::Unit) => None,
                             Some(_) => self.gen_operator_id(key),
                             _ => None,
                         }

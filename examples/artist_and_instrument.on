@@ -1,5 +1,5 @@
 pub type artist {
-    rel .'ID'|id: { fmt '' => 'artist/' => uuid => . }
+    rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
     rel .'name': string
 }
 
@@ -11,7 +11,7 @@ pub type instrument-id {
 }
 
 pub type instrument
-rel instrument 'ID'|id: instrument-id
+rel instrument 'ID'(rel .gen: auto)|id: instrument-id
 rel instrument 'name': string
 
 pub type plays

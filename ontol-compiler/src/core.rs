@@ -22,13 +22,14 @@ impl<'m> Compiler<'m> {
         self.register_type(self.primitives.unit, Type::Unit);
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
-        self.register_named_builtin_relation(self.primitives.is_relation, "is");
-        self.register_named_builtin_relation(self.primitives.identifies_relation, "identifies");
-        self.register_named_builtin_relation(self.primitives.id_relation, "id");
-        self.register_named_builtin_relation(self.primitives.min_relation, "min");
-        self.register_named_builtin_relation(self.primitives.max_relation, "max");
-        self.register_named_builtin_relation(self.primitives.default_relation, "default");
-        self.register_named_builtin_relation(self.primitives.route_relation, "route");
+        self.register_named_builtin_relation(self.primitives.relations.is, "is");
+        self.register_named_builtin_relation(self.primitives.relations.identifies, "identifies");
+        self.register_named_builtin_relation(self.primitives.relations.id, "id");
+        self.register_named_builtin_relation(self.primitives.relations.min, "min");
+        self.register_named_builtin_relation(self.primitives.relations.max, "max");
+        self.register_named_builtin_relation(self.primitives.relations.default, "default");
+        self.register_named_builtin_relation(self.primitives.relations.gen, "gen");
+        self.register_named_builtin_relation(self.primitives.relations.route, "route");
 
         self.register_named_type(self.primitives.false_value, "false", Type::Bool);
         self.register_named_type(self.primitives.true_value, "true", Type::Bool);
@@ -66,6 +67,22 @@ impl<'m> Compiler<'m> {
 
         self.def_uuid();
         self.def_datetime();
+
+        self.register_named_type(
+            self.primitives.generators.auto,
+            "auto",
+            Type::ValueGenerator,
+        );
+        self.register_named_type(
+            self.primitives.generators.create_time,
+            "create_time",
+            Type::ValueGenerator,
+        );
+        self.register_named_type(
+            self.primitives.generators.update_time,
+            "update_time",
+            Type::ValueGenerator,
+        );
 
         self
     }

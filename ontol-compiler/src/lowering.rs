@@ -333,7 +333,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some((ctx_block, _)) = ctx_block {
-            let rel_def = self.define_anonymous_type(
+            let rel_def = self.define_anonymous(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -391,9 +391,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         // HACK(for now): invert relationship
-        if relation_id.0 == self.compiler.primitives.id_relation {
+        if relation_id.0 == self.compiler.primitives.relations.id {
             relationship = Relationship {
-                relation_id: RelationId(self.compiler.primitives.identifies_relation),
+                relation_id: RelationId(self.compiler.primitives.relations.identifies),
                 subject: relationship.object,
                 subject_cardinality: relationship.object_cardinality,
                 object: relationship.subject,
@@ -443,7 +443,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            let target_def = self.define_anonymous_type(
+            let target_def = self.define_anonymous(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -568,7 +568,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
-                    let def = self.define_anonymous_type(
+                    let def = self.define_anonymous(
                         TypeDef {
                             public: false,
                             ident: None,
@@ -964,7 +964,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
+    fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         DefReference {
@@ -999,7 +999,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             RelationKey::Builtin(def_id) => ImplicitRelationId::Reused(RelationId(def_id)),
             RelationKey::Indexed => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.indexed_relation))
+                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.relations.indexed))
             }
         }
     }

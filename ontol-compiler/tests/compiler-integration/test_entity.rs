@@ -41,8 +41,8 @@ fn identifier_as_property() {
     "
     type foo_id { rel . is: string }
     pub type foo {
-        rel . id: foo_id
-        rel .'key': foo_id
+        rel .id: foo_id
+        rel .'key'(rel .gen: auto): foo_id
         rel .'children': [foo]
     }
     "
@@ -62,7 +62,17 @@ fn id_and_inherent_property_inline_type() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        assert_create_json_io_matches!(foo, json!({ "children": [{ "key": "some_key" }] }));
+        assert_create_json_io_matches!(
+            foo,
+            json!({ "key": "outer", "children": [{ "key": "inner" }] })
+        );
+        // Since there is no `.rel gen: auto` for the id, it is required:
+        assert_error_msg!(
+            foo.de_create().data(json!({
+                "children": [{ "key": "inner" }]
+            })),
+            r#"missing properties, expected "key" at line 1 column 30"#
+        );
     });
 }
 

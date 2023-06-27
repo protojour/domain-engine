@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::vm::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
-use tracing::{debug, Level};
+use tracing::{debug, trace, Level};
 
 use crate::{codegen::optimize::optimize, SourceSpan};
 
@@ -174,7 +174,7 @@ impl ProcBuilder {
             }
         }
 
-        if tracing::enabled!(Level::DEBUG) {
+        if tracing::enabled!(Level::TRACE) {
             debug_output(self.n_params, &output);
         }
 
@@ -196,7 +196,7 @@ impl ProcBuilder {
 }
 
 fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
-    debug!(
+    trace!(
         "Built proc: {:?} {:#?}",
         n_params,
         output

@@ -86,10 +86,10 @@ async fn test_graphql_basic_schema() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_basic_inherent_id() {
+async fn test_graphql_basic_inherent_auto_id() {
     let (_, schema) = "
     pub type foo {
-        rel .'id'|id: { rel .is: string }
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
     "
     .compile_schema();
