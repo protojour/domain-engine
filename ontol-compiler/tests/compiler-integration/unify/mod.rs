@@ -62,7 +62,7 @@ fn assert_domain_map(
     let input_binding = TypeBinding::new(test_env, from.typename());
     let output_binding = TypeBinding::new(test_env, to.typename());
 
-    let value = input_binding.deserialize_value(input).unwrap();
+    let value = input_binding.de_create().value(input).unwrap();
 
     fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
         let seq = matches!(key, Key::Seq(_));
@@ -87,8 +87,8 @@ fn assert_domain_map(
     let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {
-        Key::Unit(_) => output_binding.serialize_identity_json(&value),
-        Key::Seq(_) => output_binding.serialize_dynamic_sequence_json(&value),
+        Key::Unit(_) => output_binding.ser_create().identity_json(&value),
+        Key::Seq(_) => output_binding.ser_create().dynamic_sequence_json(&value),
     };
 
     assert_eq!(expected, output_json);

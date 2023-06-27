@@ -11,15 +11,15 @@ fn deserialize_empty_type() {
     "pub type foo".compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_error_msg!(
-            foo.deserialize_data(json!(42)),
+            foo.de_create().data(json!(42)),
             "invalid type: integer `42`, expected type `foo` at line 1 column 2"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!({ "bar": 5 })),
+            foo.de_create().data(json!({ "bar": 5 })),
             "unknown property `bar` at line 1 column 6"
         );
         assert_matches!(
-            foo.deserialize_data(json!({})),
+            foo.de_create().data(json!({})),
             Ok(Data::Struct(attrs)) if attrs.is_empty()
         );
     });
@@ -33,15 +33,15 @@ fn deserialize_int() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        assert_matches!(foo.deserialize_data_variant(json!(42)), Ok(Data::Int(42)));
-        assert_matches!(foo.deserialize_data_variant(json!(-42)), Ok(Data::Int(-42)));
+        assert_matches!(foo.de_create().data_variant(json!(42)), Ok(Data::Int(42)));
+        assert_matches!(foo.de_create().data_variant(json!(-42)), Ok(Data::Int(-42)));
 
         assert_error_msg!(
-            foo.deserialize_data(json!({})),
+            foo.de_create().data(json!({})),
             "invalid type: map, expected integer at line 1 column 0"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!("boom")),
+            foo.de_create().data(json!("boom")),
             "invalid type: string \"boom\", expected integer at line 1 column 6"
         );
     });
@@ -56,12 +56,12 @@ fn deserialize_string() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data_variant(json!("hei")),
+            foo.de_create().data_variant(json!("hei")),
             Ok(Data::String(s)) if s == "hei"
         );
 
         assert_error_msg!(
-            foo.deserialize_data(json!({})),
+            foo.de_create().data(json!({})),
             "invalid type: map, expected string at line 1 column 0"
         );
     });
@@ -77,20 +77,22 @@ fn deserialize_object_properties() {
     .compile_ok(|env| {
         let obj = TypeBinding::new(&env, "obj");
         assert_matches!(
-            obj.deserialize_data(json!({ "a": "hei", "b": 42 })),
+            obj.de_create().data(json!({ "a": "hei", "b": 42 })),
             Ok(Data::Struct(_))
         );
 
         assert_error_msg!(
-            obj.deserialize_data(json!({ "a": "hei", "b": 42, "c": false })),
+            obj.de_create()
+                .data(json!({ "a": "hei", "b": 42, "c": false })),
             "unknown property `c` at line 1 column 21"
         );
         assert_error_msg!(
-            obj.deserialize_data(json!({ "a": "hei", "b": 42, "_edge": { "param": 42 } })),
+            obj.de_create()
+                .data(json!({ "a": "hei", "b": 42, "_edge": { "param": 42 } })),
             "`_edge` property not accepted here at line 1 column 8"
         );
         assert_error_msg!(
-            obj.deserialize_data(json!({})),
+            obj.de_create().data(json!({})),
             r#"missing properties, expected "a" and "b" at line 1 column 2"#
         );
     });
@@ -110,7 +112,7 @@ fn deserialize_nested() {
     .compile_ok(|env| {
         let one = TypeBinding::new(&env, "one");
         assert_matches!(
-            one.deserialize_data(json!({
+            one.de_create().data(json!({
                 "x": {
                     "y": "a"
                 },
@@ -132,7 +134,7 @@ fn deserialize_recursive() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_error_msg!(
-            foo.deserialize_data(json!({
+            foo.de_create().data(json!({
                 "b": {
                     "f": {
                         "b": 42
@@ -154,12 +156,12 @@ fn deserialize_union_of_primitives() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data_variant(json!(42)),
+            foo.de_create().data_variant(json!(42)),
             Ok(Data::Int(42))
         );
-        assert_matches!(foo.deserialize_data_variant(json!("qux")), Ok(Data::String(s)) if s == "qux");
+        assert_matches!(foo.de_create().data_variant(json!("qux")), Ok(Data::String(s)) if s == "qux");
         assert_error_msg!(
-            foo.deserialize_data(json!({})),
+            foo.de_create().data(json!({})),
             "invalid type: map, expected `foo` (`int` or `string`) at line 1 column 2"
         );
     });
@@ -174,15 +176,15 @@ fn deserialize_string_constant() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data_variant(json!("my_value")),
+            foo.de_create().data_variant(json!("my_value")),
             Ok(Data::String(s)) if s == "my_value"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!("other value")),
+            foo.de_create().data(json!("other value")),
             r#"invalid type: string "other value", expected "my_value" at line 1 column 13"#
         );
         assert_error_msg!(
-            foo.deserialize_data(json!(42)),
+            foo.de_create().data(json!(42)),
             r#"invalid type: integer `42`, expected "my_value" at line 1 column 2"#
         );
     });
@@ -198,19 +200,19 @@ fn deserialize_finite_non_uniform_sequence() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data(json!([42, "a"])),
+            foo.de_create().data(json!([42, "a"])),
             Ok(Data::Sequence(vec)) if vec.len() == 2
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([77])),
+            foo.de_create().data(json!([77])),
             "invalid length 1, expected sequence with length 2 at line 1 column 4"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([11, "a", "boom"])),
+            foo.de_create().data(json!([11, "a", "boom"])),
             "trailing characters at line 1 column 9"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([14, "b"])),
+            foo.de_create().data(json!([14, "b"])),
             r#"invalid type: string "b", expected "a" at line 1 column 7"#
         );
     });
@@ -225,19 +227,19 @@ fn deserialize_finite_uniform_sequence() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data(json!([42, 42])),
+            foo.de_create().data(json!([42, 42])),
             Ok(Data::Sequence(vector)) if vector.len() == 2
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([77])),
+            foo.de_create().data(json!([77])),
             "invalid length 1, expected sequence with length 2 at line 1 column 4"
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([11, "a"])),
+            foo.de_create().data(json!([11, "a"])),
             r#"invalid type: string "a", expected integer at line 1 column 7"#
         );
         assert_error_msg!(
-            foo.deserialize_data(json!([14, 15, 16])),
+            foo.de_create().data(json!([14, 15, 16])),
             r#"trailing characters at line 1 column 8"#
         );
     });
@@ -253,11 +255,11 @@ fn deserialize_string_union() {
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
         assert_matches!(
-            foo.deserialize_data_variant(json!("a")),
+            foo.de_create().data_variant(json!("a")),
             Ok(Data::String(a)) if a == "a"
         );
         assert_error_msg!(
-            foo.deserialize_data_variant(json!("junk")),
+            foo.de_create().data_variant(json!("junk")),
             r#"invalid type: string "junk", expected `foo` ("a" or "b") at line 1 column 6"#
         );
     });
@@ -279,23 +281,23 @@ fn deserialize_map_union() {
     .compile_ok(|env| {
         let union = TypeBinding::new(&env, "union");
         assert_matches!(
-            union.deserialize_data_variant(json!({ "variant": "foo" })),
+            union.de_create().data_variant(json!({ "variant": "foo" })),
             Ok(Data::Struct(attrs)) if attrs.len() == 1
         );
         assert_matches!(
-            union.deserialize_data_variant(json!({ "variant": "bar", "prop": 42 })),
+            union.de_create().data_variant(json!({ "variant": "bar", "prop": 42 })),
             Ok(Data::Struct(attrs)) if attrs.len() == 2
         );
         assert_matches!(
-            union.deserialize_data_variant(json!({ "prop": 42, "variant": "bar" })),
+            union.de_create().data_variant(json!({ "prop": 42, "variant": "bar" })),
             Ok(Data::Struct(attrs)) if attrs.len() == 2
         );
         assert_error_msg!(
-            union.deserialize_data_variant(json!("junk")),
+            union.de_create().data_variant(json!("junk")),
             r#"invalid type: string "junk", expected `union` (`foo` or `bar`) at line 1 column 6"#
         );
         assert_error_msg!(
-            union.deserialize_data_variant(json!({ "variant": "bar" })),
+            union.de_create().data_variant(json!({ "variant": "bar" })),
             r#"missing properties, expected "prop" at line 1 column 17"#
         );
     });

@@ -33,18 +33,18 @@ macro_rules! assert_error_msg {
 /// When passing one JSON parameter, the assertion means that input and output must match exactly.
 /// With passing two JSON parameters, the left one is the input and the right one is the expected output.
 #[macro_export]
-macro_rules! assert_json_io_matches {
+macro_rules! assert_create_json_io_matches {
     ($binding:expr, $json:expr) => {
-        assert_json_io_matches!($binding, $json, $json);
+        assert_create_json_io_matches!($binding, $json, $json);
     };
     ($binding:expr, $input:expr, $expected_output:expr) => {
         let input = $input;
-        let value = match $binding.deserialize_value(input.clone()) {
+        let value = match $binding.de_create().value(input.clone()) {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = $binding.serialize_identity_json(&value);
+        let output = $binding.ser_create().identity_json(&value);
 
         pretty_assertions::assert_eq!($expected_output, output);
     };

@@ -18,12 +18,13 @@ async fn test_conduit_db_in_memory_data_source() {
 
             let _user_id1 = domain_engine
                 .store_entity(
-                    user.deserialize_value(json!({
-                        "username": "u",
-                        "email": "a@b",
-                        "password_hash": "s3cr3t",
-                    }))
-                    .unwrap(),
+                    user.de_create()
+                        .value(json!({
+                            "username": "u",
+                            "email": "a@b",
+                            "password_hash": "s3cr3t",
+                        }))
+                        .unwrap(),
                 )
                 .await
                 .unwrap();
@@ -45,7 +46,8 @@ async fn test_conduit_db_in_memory_data_source() {
             let _article_id1 = domain_engine
                 .store_entity(
                     article
-                        .deserialize_value(json!({
+                        .de_create()
+                        .value(json!({
                             "slug": "foo",
                             "title": "Foo",
                             "description": "An article",
@@ -61,7 +63,8 @@ async fn test_conduit_db_in_memory_data_source() {
             let _comment_id1 = domain_engine
                 .store_entity(
                     comment
-                        .deserialize_value(json!({
+                        .de_create()
+                        .value(json!({
                             "body": "Comment body",
                             "createdAt": "2023-01-25T19:00:15.149284864+00:00",
                             "updatedAt": "2033-01-25T19:00:15.149284864+00:00",
@@ -72,7 +75,7 @@ async fn test_conduit_db_in_memory_data_source() {
                 .unwrap();
 
             let _tag_id1 = domain_engine
-                .store_entity(tag_entity.deserialize_value(json!({})).unwrap())
+                .store_entity(tag_entity.de_create().value(json!({})).unwrap())
                 .await
                 .unwrap();
         })

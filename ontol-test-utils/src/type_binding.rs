@@ -116,18 +116,44 @@ impl<'e> TypeBinding<'e> {
         serde_json::to_value(schema).unwrap()
     }
 
-    pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.type_info.def_id);
+    /// Make a deserializer for the data creation processor mode
+    pub fn de_create(&self) -> Deserializer<'_, 'e> {
+        Deserializer {
+            binding: self,
+            mode: ProcessorMode::Create,
+            level: ProcessorLevel::Root,
+        }
+    }
+
+    /// Make a serializer for the data creation processor mode
+    pub fn ser_create(&self) -> Serializer<'_, 'e> {
+        Serializer {
+            binding: self,
+            mode: ProcessorMode::Create,
+            level: ProcessorLevel::Root,
+        }
+    }
+}
+
+pub struct Deserializer<'b, 'e> {
+    binding: &'b TypeBinding<'e>,
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'b, 'e> Deserializer<'b, 'e> {
+    pub fn data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
+        let value = self.value(json)?;
+        assert_eq!(value.type_def_id, self.binding.type_info.def_id);
         Ok(value.data)
     }
 
-    pub fn deserialize_data_map(
+    pub fn data_map(
         &self,
         json: serde_json::Value,
     ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.type_info.def_id);
+        let value = self.value(json)?;
+        assert_eq!(value.type_def_id, self.binding.type_info.def_id);
         match value.data {
             Data::Struct(attrs) => Ok(attrs),
             other => panic!("not a map: {other:?}"),
@@ -137,29 +163,27 @@ impl<'e> TypeBinding<'e> {
     /// Deserialize data, but expect that the resulting type DefId
     /// is not the same as the nominal one for the TypeBinding.
     /// (i.e. it should deserialize to a _variant_ of the type)
-    pub fn deserialize_data_variant(
-        &self,
-        json: serde_json::Value,
-    ) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_ne!(value.type_def_id, self.type_info.def_id);
+    pub fn data_variant(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
+        let value = self.value(json)?;
+        assert_ne!(value.type_def_id, self.binding.type_info.def_id);
         Ok(value.data)
     }
 
-    pub fn deserialize_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+    pub fn value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
 
         let attribute_result = self
+            .binding
             .env
             .new_serde_processor(
-                self.serde_operator_id(),
+                self.binding.serde_operator_id(),
                 None,
-                ProcessorMode::Create,
-                ProcessorLevel::Root,
+                self.mode,
+                self.level,
             )
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
-        match self.json_schema.as_ref() {
+        match self.binding.json_schema.as_ref() {
             Some(json_schema) if TEST_JSON_SCHEMA_VALIDATION => {
                 let json_schema_result = json_schema.validate(&json);
 
@@ -190,31 +214,40 @@ impl<'e> TypeBinding<'e> {
             }),
         }
     }
+}
 
-    pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
-        self.serialize_identity_json(&Value::new(data.clone(), self.type_info.def_id))
+pub struct Serializer<'b, 'e> {
+    binding: &'b TypeBinding<'e>,
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'b, 'e> Serializer<'b, 'e> {
+    pub fn data_json(&self, data: &Data) -> serde_json::Value {
+        self.identity_json(&Value::new(data.clone(), self.binding.type_info.def_id))
     }
 
-    pub fn serialize_identity_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, false)
+    pub fn identity_json(&self, value: &Value) -> serde_json::Value {
+        self.json(value, false)
     }
 
-    pub fn serialize_dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, true)
+    pub fn dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
+        self.json(value, true)
     }
 
-    fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
+    fn json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
-        self.env
+        self.binding
+            .env
             .new_serde_processor(
                 if dynamic_seq {
-                    self.env.dynamic_sequence_operator_id()
+                    self.binding.env.dynamic_sequence_operator_id()
                 } else {
-                    self.serde_operator_id()
+                    self.binding.serde_operator_id()
                 },
                 None,
-                ProcessorMode::Create,
-                ProcessorLevel::Root,
+                self.mode,
+                self.level,
             )
             .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
@@ -269,7 +302,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
-        let value = self.binding.deserialize_value(json).unwrap();
+        let value = self.binding.de_create().value(json).unwrap();
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {
                 self.value = value;

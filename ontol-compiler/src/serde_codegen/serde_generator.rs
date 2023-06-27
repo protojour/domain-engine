@@ -710,6 +710,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if let Some(map) = &properties.map {
             for (property_id, property) in map {
+                // TODO: Proper handling of different entity id semantics
                 if property.is_entity_id {
                     continue;
                 }

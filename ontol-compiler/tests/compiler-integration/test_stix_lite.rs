@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
+    assert_create_json_io_matches, assert_error_msg, type_binding::TypeBinding, TestCompile,
 };
 use serde_json::json;
 use test_log::test;
@@ -11,7 +11,7 @@ fn test_stix_lite() {
     STIX_ON.compile_ok(|env| {
         let attack_pattern = TypeBinding::new(&env, "attack-pattern");
         assert_error_msg!(
-            attack_pattern.deserialize_data(json!({
+            attack_pattern.de_create().data(json!({
                 "type": "attack-pattern",
             })),
             r#"missing properties, expected all of "spec_version", "created", "modified", "name" at line 1 column 25"#
@@ -19,7 +19,7 @@ fn test_stix_lite() {
 
         // BUG: In this domain at least, the ID is allocated externally.
         // the "POST" body is currently a UNION of (id OR data), instead of an intersection
-        assert_json_io_matches!(
+        assert_create_json_io_matches!(
             attack_pattern,
             json!({
                 "type": "attack-pattern",
@@ -30,7 +30,7 @@ fn test_stix_lite() {
             })
         );
 
-        assert_json_io_matches!(
+        assert_create_json_io_matches!(
             attack_pattern,
             json!({
                 "type": "attack-pattern",
