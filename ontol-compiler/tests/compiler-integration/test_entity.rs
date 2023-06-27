@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    assert_create_json_io_matches, assert_error_msg, type_binding::TypeBinding, TestCompile,
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -32,14 +32,14 @@ fn entity_without_inherent_id() {
     "
     .compile_ok(|env| {
         let entity = TypeBinding::new(&env, "entity");
-        assert_create_json_io_matches!(entity, json!({ "foo": "foo" }));
+        assert_json_io_matches!(entity, Create, { "foo": "foo" });
     });
 }
 
 #[test]
-fn identifier_as_property() {
+fn inherent_id_autogen() {
     "
-    type foo_id { rel . is: string }
+    type foo_id { rel .is: string }
     pub type foo {
         rel .id: foo_id
         rel .'key'(rel .gen: auto): foo_id
@@ -48,7 +48,7 @@ fn identifier_as_property() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        assert_create_json_io_matches!(foo, json!({ "children": [{ "key": "some_key" }] }));
+        assert_json_io_matches!(foo, Create, { "children": [{ "key": "some_key" }] });
     });
 }
 
@@ -62,10 +62,10 @@ fn id_and_inherent_property_inline_type() {
     "
     .compile_ok(|env| {
         let foo = TypeBinding::new(&env, "foo");
-        assert_create_json_io_matches!(
-            foo,
-            json!({ "key": "outer", "children": [{ "key": "inner" }] })
-        );
+        assert_json_io_matches!(foo, Create, {
+            "key": "outer",
+            "children": [{ "key": "inner" }]
+        });
         // Since there is no `.rel gen: auto` for the id, it is required:
         assert_error_msg!(
             foo.de_create().data(json!({
@@ -90,20 +90,17 @@ fn entity_id_inline_fmt() {
 fn artist_and_instrument_io_artist() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let artist = TypeBinding::new(&env, "artist");
-        assert_create_json_io_matches!(
-            artist,
-            json!({
-                "name": "Zappa",
-                "plays": [
-                    {
-                        "name": "guitar",
-                        "_edge": {
-                            "how_much": "a lot"
-                        }
+        assert_json_io_matches!(artist, Create, {
+            "name": "Zappa",
+            "plays": [
+                {
+                    "name": "guitar",
+                    "_edge": {
+                        "how_much": "a lot"
                     }
-                ]
-            })
-        );
+                }
+            ]
+        });
     });
 }
 
@@ -111,20 +108,17 @@ fn artist_and_instrument_io_artist() {
 fn artist_and_instrument_io_instrument() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
         let instrument = TypeBinding::new(&env, "instrument");
-        assert_create_json_io_matches!(
-            instrument,
-            json!({
-                "name": "guitar",
-                "played_by": [
-                    {
-                        "name": "Zappa",
-                        "_edge": {
-                            "how_much": "a lot"
-                        }
+        assert_json_io_matches!(instrument, Create, {
+            "name": "guitar",
+            "played_by": [
+                {
+                    "name": "Zappa",
+                    "_edge": {
+                        "how_much": "a lot"
                     }
-                ]
-            })
-        );
+                }
+            ]
+        });
     });
 }
 
@@ -151,20 +145,17 @@ fn artist_and_instrument_id_as_relation_object() {
         let instrument_id = TypeBinding::new(&env, "instrument-id");
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
-        assert_create_json_io_matches!(
-            artist,
-            json!({
-                "name": "Jimi Hendrix",
-                "plays": [
-                    {
-                        "ID": example_id,
-                        "_edge": {
-                            "how_much": "all the time"
-                        }
+        assert_json_io_matches!(artist, Create, {
+            "name": "Jimi Hendrix",
+            "plays": [
+                {
+                    "ID": example_id,
+                    "_edge": {
+                        "how_much": "all the time"
                     }
-                ]
-            })
-        );
+                }
+            ]
+        });
 
         let john = artist.de_create().value(
             json!({
@@ -245,34 +236,24 @@ fn test_entity_self_relationship_optional_object() {
             r#"missing properties, expected "name" at line 1 column 2"#
         );
 
-        assert_create_json_io_matches!(node, json!({ "name": "a" }));
+        assert_json_io_matches!(node, Create, { "name": "a" });
 
-        assert_create_json_io_matches!(
-            node,
-            json!({
-                "name": "a",
-                "children": [
-                    {
-                        "name": "b",
-                    }
-                ]
-            })
-        );
-
-        assert_create_json_io_matches!(
-            node,
-            json!({
+        assert_json_io_matches!(node, Create, {
+            "name": "a",
+            "children": [{
                 "name": "b",
-                "parent": {
-                    "name": "a",
-                },
-                "children": [
-                    {
-                        "name": "c",
-                    }
-                ]
-            })
-        );
+            }]
+        });
+
+        assert_json_io_matches!(node, Create, {
+            "name": "b",
+            "parent": {
+                "name": "a",
+            },
+            "children": [{
+                "name": "c",
+            }]
+        });
     });
 }
 
@@ -300,12 +281,13 @@ fn entity_union_simple() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let instrument = TypeBinding::new(&env, "instrument");
 
-        assert_create_json_io_matches!(
+        assert_json_io_matches!(
             instrument,
-            json!({
+            Create,
+            {
                 "type": "synth",
                 "polyphony": 8,
-            })
+            }
         );
     });
 }
@@ -315,18 +297,13 @@ fn entity_union_with_object_relation() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let instrument = TypeBinding::new(&env, "instrument");
 
-        assert_create_json_io_matches!(
-            instrument,
-            json!({
-                "type": "synth",
-                "polyphony": 8,
-                "played-by": [
-                    {
-                        "artist-id": "some_artist"
-                    }
-                ]
-            })
-        );
+        assert_json_io_matches!(instrument, Create, {
+            "type": "synth",
+            "polyphony": 8,
+            "played-by": [{
+                "artist-id": "some_artist"
+            }]
+        });
     });
 }
 
@@ -351,7 +328,13 @@ fn entity_union_in_relation_with_ids() {
             ]
         });
 
-        assert_create_json_io_matches!(artist, json.clone());
+        assert_json_io_matches!(artist, Create, {
+            "name": "Someone",
+            "plays": [
+                { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+                { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+            ]
+        });
 
         let artist_value = artist.de_create().value(json.clone()).unwrap();
 
@@ -386,10 +369,10 @@ fn entity_relationship_without_reverse() {
     "
     .compile_ok(|env| {
         let programmer = TypeBinding::new(&env, "programmer");
-        assert_create_json_io_matches!(
-            programmer,
-            json!({ "name": "audun", "favorite-language": { "lang-id": "rust" }})
-        );
+        assert_json_io_matches!(programmer, Create, {
+            "name": "audun",
+            "favorite-language": { "lang-id": "rust" }
+        });
     });
 }
 
@@ -421,15 +404,12 @@ fn recursive_entity_union() {
     "
     .compile_ok(|env| {
         let lifeform = TypeBinding::new(&env, "lifeform");
-        assert_create_json_io_matches!(
-            lifeform,
-            json!({
-                "class": "animal",
-                "eats": [
-                    { "class": "plant" },
-                    { "class": "animal", "eats": [] },
-                ]
-            })
-        );
+        assert_json_io_matches!(lifeform, Create, {
+            "class": "animal",
+            "eats": [
+                { "class": "plant" },
+                { "class": "animal", "eats": [] },
+            ]
+        });
     });
 }

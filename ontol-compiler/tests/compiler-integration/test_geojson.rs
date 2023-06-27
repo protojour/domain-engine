@@ -1,6 +1,6 @@
 use ontol_test_utils::{
-    assert_create_json_io_matches, assert_error_msg, type_binding::TypeBinding, SourceName,
-    TestCompile, TestPackages,
+    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile,
+    TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -11,33 +11,29 @@ pub const GEOJSON: &str = include_str!("../../../examples/geojson.on");
 fn test_geojson() {
     GEOJSON.compile_ok(|env| {
         let geometry = TypeBinding::new(&env, "Geometry");
-        assert_create_json_io_matches!(
-            geometry,
-            json!({ "type": "Point", "coordinates": [1, 2]})
-        );
-        assert_create_json_io_matches!(
-            geometry,
-            json!({ "type": "Polygon", "coordinates": [[1, 2], [3, 4], [5, 6], [1, 2]]})
-        );
-        assert_create_json_io_matches!(
-            geometry,
-            json!({ "type": "MultiPolygon", "coordinates": [
+        assert_json_io_matches!(geometry, Create, {
+            "type": "Point",
+            "coordinates": [1, 2]
+        });
+        assert_json_io_matches!(geometry, Create, {
+            "type": "Polygon",
+            "coordinates": [[1, 2], [3, 4], [5, 6], [1, 2]]
+        });
+        assert_json_io_matches!(geometry, Create, {
+            "type": "MultiPolygon", "coordinates": [
                 [[1, 2], [3, 4], [5, 6], [1, 2]],
                 [[2, 3], [4, 5], [6, 7], [2, 3]],
-            ]})
-        );
-        assert_create_json_io_matches!(
-            geometry,
-            json!({
-                "type": "GeometryCollection",
-                "geometries": [
-                    {
-                        "type": "Point",
-                        "coordinates": [1, 2],
-                    }
-                ]
-            })
-        );
+            ]
+        });
+        assert_json_io_matches!(geometry, Create, {
+            "type": "GeometryCollection",
+            "geometries": [
+                {
+                    "type": "Point",
+                    "coordinates": [1, 2],
+                }
+            ]
+        });
         assert_error_msg!(
             geometry.de_create().data_variant(json!({ "type": "Point", "coordinates": [[1, 2]] })),
             "invalid type: sequence, expected integer at line 1 column 38"

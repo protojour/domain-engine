@@ -1,7 +1,6 @@
 use ontol_test_utils::{
-    assert_create_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
+    assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
 };
-use serde_json::json;
 use test_log::test;
 
 #[test]
@@ -38,14 +37,11 @@ fn load_package() {
     ])
     .compile_ok(|env| {
         let bar = TypeBinding::new(&env, "bar");
-        assert_create_json_io_matches!(
-            bar,
-            json!({
-                "foo": {
-                    "prop": 42
-                }
-            })
-        );
+        assert_json_io_matches!(bar, Create, {
+            "foo": {
+                "prop": 42
+            }
+        });
     });
 }
 
@@ -89,12 +85,9 @@ fn dependency_dag() {
         assert_eq!(5, env.env.domains().count());
 
         let bar = TypeBinding::new(&env, "foobar");
-        assert_create_json_io_matches!(
-            bar,
-            json!({
-                "a": { "c": 42 },
-                "b": { "c": 43 }
-            })
-        );
+        assert_json_io_matches!(bar, Create, {
+            "a": { "c": 42 },
+            "b": { "c": 43 }
+        });
     });
 }
