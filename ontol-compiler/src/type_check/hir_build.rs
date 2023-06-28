@@ -325,7 +325,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let properties = self.relations.properties_by_type(struct_def_id);
+        let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let node_kind = match properties.map(|props| &props.constructor) {
             Some(Constructor::Struct) | None => {
@@ -423,7 +423,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ),
                                 (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
                                 (ty @ Type::Anonymous(def_id), None) => {
-                                    match self.relations.properties_by_type(*def_id) {
+                                    match self.relations.properties_by_def_id(*def_id) {
                                         Some(_) => self
                                             .build_implicit_rel_node(ty, object, *prop_span, ctx),
                                         // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:

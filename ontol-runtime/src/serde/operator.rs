@@ -8,7 +8,7 @@ use smartstring::alias::String;
 use crate::{
     discriminator::{VariantDiscriminator, VariantPurpose},
     value::PropertyId,
-    vm::proc::Address,
+    value_generator::ValueGenerator,
     DefId, DefVariant,
 };
 
@@ -213,15 +213,17 @@ impl StructOperator {
 #[derive(Clone, Default, Debug)]
 pub struct PropertiesMeta {
     // These number _include_ required properties with _default fallback values_.
-    pub required_count_for_create_update: usize,
-    pub required_count_for_read: usize,
+    pub required_count_for_create_update: u32,
+    pub required_count_for_read: u32,
 }
 
 impl PropertiesMeta {
     pub fn required_count(&self, mode: ProcessorMode) -> usize {
         match mode {
-            ProcessorMode::Create | ProcessorMode::Update => self.required_count_for_create_update,
-            ProcessorMode::Read => self.required_count_for_read,
+            ProcessorMode::Create | ProcessorMode::Update => {
+                self.required_count_for_create_update as usize
+            }
+            ProcessorMode::Read => self.required_count_for_read as usize,
         }
     }
 
@@ -233,10 +235,18 @@ impl PropertiesMeta {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
+    /// The ID of this property
     pub property_id: PropertyId,
+
+    /// The operator id for the value of this property
     pub value_operator_id: SerdeOperatorId,
+
+    /// Various flags
     pub flags: SerdePropertyFlags,
-    pub default_const_proc_address: Option<Address>,
+
+    /// Value generator
+    pub value_generator: Option<ValueGenerator>,
+
     pub rel_params_operator_id: Option<SerdeOperatorId>,
 }
 
@@ -262,7 +272,6 @@ impl SerdeProperty {
 }
 
 bitflags::bitflags! {
-    /// Modifier for (de)serializers.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct SerdePropertyFlags: u32 {
         const OPTIONAL       = 0b00000001;

@@ -75,7 +75,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
 
                 match (
                     relationship.1.subject_cardinality.0,
@@ -135,7 +135,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
 
                 if properties.identifies.is_some() {
                     return self.error(CompileError::AlreadyIdentifiesAType, span);
@@ -145,7 +145,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 properties.identifies = Some(relationship.0);
-                let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
+                let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
                 match object_properties.identified_by {
                     Some(id) => {
                         debug!(
@@ -168,7 +168,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
                 match (&properties.map, &mut properties.constructor) {
                     (None, Constructor::Struct) => {
                         let mut sequence = Sequence::default();
@@ -203,7 +203,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
 
-                let properties = self.relations.properties_by_type_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
                 match &mut properties.map {
                     None => {
                         properties.map = Some(
@@ -313,7 +313,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ..
                         })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
                             Some(_outer_object_ty) => {
-                                self.relations.value_generators.insert(
+                                self.relations.value_generators_unchecked.insert(
                                     RelationshipId(*outer_relationship_id),
                                     value_generator_def_id,
                                 );
@@ -383,7 +383,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     debug!("Fmt subject anonymous object: {:?}", object.0.def_id);
                     let subject_constructor = self
                         .relations
-                        .properties_by_type(subject.0.def_id)
+                        .properties_by_def_id(subject.0.def_id)
                         .map(|props| &props.constructor);
 
                     match subject_constructor {
@@ -410,7 +410,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
         } else {
-            let object_properties = self.relations.properties_by_type_mut(object.0.def_id);
+            let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
 
             match (
                 &relation.1.object_prop,
@@ -517,7 +517,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => {
                 match self
                     .relations
-                    .properties_by_type(rel_def.def_id)
+                    .properties_by_def_id(rel_def.def_id)
                     .map(Properties::constructor)
                 {
                     Some(Constructor::StringFmt(rel_segment)) => StringPatternSegment::Property {
@@ -532,7 +532,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         };
 
-        let object_properties = self.relations.properties_by_type_mut(object_def);
+        let object_properties = self.relations.properties_by_def_id_mut(object_def);
 
         match &mut object_properties.constructor {
             Constructor::Struct => {

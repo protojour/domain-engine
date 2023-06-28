@@ -1,15 +1,21 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
     env::{PropertyCardinality, ValueCardinality},
+    smart_format,
+    string_types::StringLikeType,
     value::PropertyId,
+    value_generator::ValueGenerator,
     DefId, RelationshipId, Role,
 };
-use tracing::{debug, trace};
+use tracing::{debug, instrument, trace};
 
 use crate::{
     def::{Def, DefKind, RelationId, RelationKind},
     error::CompileError,
+    patterns::StringPatternSegment,
     relation::{Constructor, Property},
+    types::Type,
+    SourceSpan,
 };
 
 use super::TypeCheck;
@@ -24,6 +30,12 @@ enum Action {
         inherent_property_id: PropertyId,
         identifies_relationship_id: RelationshipId,
     },
+    CheckValueGenerator {
+        relationship_id: RelationshipId,
+        generator_def_id: DefId,
+        object_def_id: DefId,
+        span: SourceSpan,
+    },
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -36,7 +48,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
-        let properties = self.relations.properties_by_type(def_id)?;
+        let properties = self.relations.properties_by_def_id.get(&def_id)?;
         let map = properties.map.as_ref()?;
 
         let mut actions = vec![];
@@ -66,7 +78,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let object_properties = self
                         .relations
-                        .properties_by_type(meta.relationship.object.0.def_id)
+                        .properties_by_def_id(meta.relationship.object.0.def_id)
                         .unwrap();
 
                     // Check if the property is the primary id
@@ -98,6 +110,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             *property_id,
                         ));
                     }
+
+                    if let Some(generator_def_id) = self
+                        .relations
+                        .value_generators_unchecked
+                        .get(&property_id.relationship_id)
+                    {
+                        actions.push(Action::CheckValueGenerator {
+                            relationship_id: property_id.relationship_id,
+                            generator_def_id: *generator_def_id,
+                            object_def_id: meta.relationship.object.0.def_id,
+                            span: *meta.relationship.span,
+                        });
+                    }
                 }
                 Role::Object => {
                     if properties.identified_by.is_none() {
@@ -121,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                             let subject_properties = self
                                                 .relations
-                                                .properties_by_type(variant_def)
+                                                .properties_by_def_id(variant_def)
                                                 .unwrap();
 
                                             subject_properties.identified_by.is_some()
@@ -152,7 +177,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .unwrap();
                         let subject_properties = self
                             .relations
-                            .properties_by_type(meta.relationship.subject.0.def_id)
+                            .properties_by_def_id(meta.relationship.subject.0.def_id)
                             .unwrap();
 
                         if subject_properties.identified_by.is_some() {
@@ -184,7 +209,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
-                    let properties = self.relations.properties_by_type_mut(def_id);
+                    let properties = self.relations.properties_by_def_id_mut(def_id);
                     if let Some(map) = &mut properties.map {
                         let cardinality = map.get_mut(&property_id).unwrap();
                         adjust_entity_prop_cardinality(cardinality);
@@ -199,7 +224,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         identifies_relationship_id,
                         inherent_property_id.relationship_id,
                     );
-                    let properties = self.relations.properties_by_type_mut(def_id);
+                    let properties = self.relations.properties_by_def_id_mut(def_id);
 
                     if let Some(map) = &mut properties.map {
                         map.insert(
@@ -214,7 +239,112 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
                     }
                 }
+                Action::CheckValueGenerator {
+                    relationship_id,
+                    generator_def_id,
+                    object_def_id,
+                    span,
+                } => match self.determine_value_generator(generator_def_id, object_def_id) {
+                    Ok(value_generator) => {
+                        self.relations
+                            .value_generators
+                            .insert(relationship_id, value_generator);
+                    }
+                    Err(_) => {
+                        self.error(
+                            CompileError::TODO(smart_format!("Invalid gen for object type")),
+                            &span,
+                        );
+                    }
+                },
             }
+        }
+    }
+
+    #[instrument(level = "trace", skip(self, generator_def_id))]
+    fn determine_value_generator(
+        &self,
+        generator_def_id: DefId,
+        object_def_id: DefId,
+    ) -> Result<ValueGenerator, ()> {
+        let properties = self.relations.properties_by_def_id.get(&object_def_id);
+        let constructor = properties.map(|p| &p.constructor);
+
+        if let Some(Constructor::Value(value_relationship_id, ..)) = constructor {
+            let relationship_meta = self
+                .defs
+                .lookup_relationship_meta(*value_relationship_id)
+                .unwrap();
+            return self.determine_value_generator(
+                generator_def_id,
+                relationship_meta.relationship.object.0.def_id,
+            );
+        }
+
+        let generators = &self.primitives.generators;
+
+        // Now looking at a primitive type
+        match generator_def_id {
+            _ if generator_def_id == generators.auto => {
+                match self.def_types.map.get(&object_def_id) {
+                    Some(Type::Int(_)) => Ok(ValueGenerator::Autoincrement),
+                    Some(Type::String(_)) => Ok(ValueGenerator::UuidV4),
+                    Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
+                    _ => match constructor {
+                        Some(Constructor::StringFmt(segment)) => {
+                            self.auto_generator_for_string_pattern_segment(segment)
+                        }
+                        _ => Err(()),
+                    },
+                }
+            }
+            _ if generator_def_id == generators.create_time => {
+                match self.def_types.map.get(&object_def_id) {
+                    Some(Type::StringLike(_, StringLikeType::DateTime)) => {
+                        Ok(ValueGenerator::CreatedAtTime)
+                    }
+                    _ => Err(()),
+                }
+            }
+            _ if generator_def_id == generators.update_time => {
+                match self.def_types.map.get(&object_def_id) {
+                    Some(Type::StringLike(_, StringLikeType::DateTime)) => {
+                        Ok(ValueGenerator::UpdatedAtTime)
+                    }
+                    _ => Err(()),
+                }
+            }
+            _ => Err(()),
+        }
+    }
+
+    fn auto_generator_for_string_pattern_segment(
+        &self,
+        segment: &StringPatternSegment,
+    ) -> Result<ValueGenerator, ()> {
+        match segment {
+            StringPatternSegment::AllStrings => Ok(ValueGenerator::UuidV4),
+            StringPatternSegment::Concat(segments) => {
+                let mut output_generator = None;
+                for concat_segment in segments {
+                    match self.auto_generator_for_string_pattern_segment(concat_segment) {
+                        Ok(generator) => {
+                            if output_generator.is_some() {
+                                return Err(());
+                            }
+                            output_generator = Some(generator);
+                        }
+                        _ => {}
+                    }
+                }
+
+                output_generator.ok_or(())
+            }
+            StringPatternSegment::Property { type_def_id, .. } => {
+                return self
+                    .determine_value_generator(self.primitives.generators.auto, *type_def_id);
+            }
+            _ => Err(()),
         }
     }
 }

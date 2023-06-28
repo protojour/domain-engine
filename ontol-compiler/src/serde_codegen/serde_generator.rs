@@ -10,6 +10,7 @@ use ontol_runtime::{
         ValueOperator, ValueUnionVariant,
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
+    value_generator::ValueGenerator,
     DataModifier, DefId, DefVariant, RelationshipId, Role,
 };
 use tracing::{debug, trace};
@@ -156,7 +157,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
                 let map = self
                     .relations
-                    .properties_by_type
+                    .properties_by_def_id
                     .get(&def_variant.def_id)?
                     .map
                     .as_ref()?;
@@ -238,7 +239,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_def_type_operator(&mut self, def_variant: DefVariant) -> Option<OperatorAllocation> {
         match self.get_def_type(def_variant.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
-                let properties = self.relations.properties_by_type.get(def_id);
+                let properties = self.relations.properties_by_def_id.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(TypeDef {
                         ident: Some(ident), ..
@@ -770,7 +771,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     _ => todo!(),
                 };
 
-                let mut default_const_proc_address = None;
+                let mut value_generator: Option<ValueGenerator> = None;
+                let mut flags = SerdePropertyFlags::default();
 
                 if let Some(default_const_def) = self
                     .relations
@@ -783,22 +785,23 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .get(default_const_def)
                         .unwrap_or_else(|| panic!());
 
-                    default_const_proc_address = Some(proc.address);
+                    value_generator = Some(ValueGenerator::DefaultProc(proc.address));
                 }
 
-                let mut flags = SerdePropertyFlags::default();
-
-                if property_cardinality.is_optional() {
-                    flags |= SerdePropertyFlags::OPTIONAL;
-                }
-
-                if self
+                if let Some(explicit_value_generator) = self
                     .relations
                     .value_generators
                     .get(&property_id.relationship_id)
-                    .is_some()
                 {
                     flags |= SerdePropertyFlags::READ_ONLY;
+                    if value_generator.is_some() {
+                        panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
+                    }
+                    value_generator = Some(*explicit_value_generator);
+                }
+
+                if property_cardinality.is_optional() {
+                    flags |= SerdePropertyFlags::OPTIONAL;
                 }
 
                 if property.is_entity_id {
@@ -818,7 +821,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         property_id: *property_id,
                         value_operator_id,
                         flags,
-                        default_const_proc_address,
+                        value_generator,
                         rel_params_operator_id,
                     },
                 );

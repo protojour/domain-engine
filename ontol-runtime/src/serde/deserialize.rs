@@ -12,6 +12,7 @@ use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
+    value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
     DefId,
 };
@@ -535,11 +536,12 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     if observed_required_count < expected_required_count {
         // Generate default values if missing
         for (_, property) in properties {
-            if let Some(default_const_proc_address) = property.default_const_proc_address {
+            // Only _default values_ are handled in the deserializer:
+            if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                 if !property.is_optional() && !attributes.contains_key(&property.property_id) {
                     let value = processor.env.new_vm().eval(
                         Procedure {
-                            address: default_const_proc_address,
+                            address,
                             n_params: NParams(0),
                         },
                         [],

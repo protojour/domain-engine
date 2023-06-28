@@ -35,7 +35,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                 },
                 alias: None,
             }),
-            Type::Anonymous(def_id) => match self.relations.properties_by_type(*def_id) {
+            Type::Anonymous(def_id) => match self.relations.properties_by_def_id(*def_id) {
                 Some(Properties {
                     constructor: Constructor::Value(relationship_id, ..),
                     ..

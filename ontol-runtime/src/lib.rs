@@ -15,6 +15,7 @@ pub mod serde;
 pub mod string_pattern;
 pub mod string_types;
 pub mod value;
+pub mod value_generator;
 pub mod vm;
 
 /// Identifies one "package" of ONTOL code.

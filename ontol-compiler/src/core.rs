@@ -93,7 +93,7 @@ impl<'m> Compiler<'m> {
         });
         let segment = StringPatternSegment::Regex(regex_util::uuid());
         store_string_pattern_segment(&mut self.patterns, uuid, &segment);
-        self.relations.properties_by_type_mut(uuid).constructor = Constructor::StringFmt(segment);
+        self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::StringFmt(segment);
         self.defs
             .string_like_types
             .insert(uuid, StringLikeType::Uuid);
@@ -105,8 +105,9 @@ impl<'m> Compiler<'m> {
         });
         let segment = StringPatternSegment::Regex(regex_util::datetime_rfc3339());
         store_string_pattern_segment(&mut self.patterns, datetime, &segment);
-        self.relations.properties_by_type_mut(datetime).constructor =
-            Constructor::StringFmt(segment.clone());
+        self.relations
+            .properties_by_def_id_mut(datetime)
+            .constructor = Constructor::StringFmt(segment.clone());
         self.defs
             .string_like_types
             .insert(datetime, StringLikeType::DateTime);

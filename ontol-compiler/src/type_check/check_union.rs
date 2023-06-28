@@ -44,7 +44,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let properties = self
             .relations
-            .properties_by_type(value_union_def_id)
+            .properties_by_def_id(value_union_def_id)
             .unwrap();
         let Constructor::Union(relationship_ids) = &properties.constructor else {
             panic!("not a union");
@@ -80,7 +80,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
 
-            if let Some(properties) = self.relations.properties_by_type(variant_def) {
+            if let Some(properties) = self.relations.properties_by_def_id(variant_def) {
                 if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self
                         .defs
@@ -199,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         mut def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
         loop {
-            match self.relations.properties_by_type(def_id) {
+            match self.relations.properties_by_def_id(def_id) {
                 Some(properties) => match &properties.constructor {
                     Constructor::Struct => match &properties.map {
                         Some(property_set) => {

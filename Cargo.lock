@@ -426,6 +426,7 @@ dependencies = [
  "ontol-compiler",
  "ontol-runtime",
  "ontol-test-utils",
+ "pretty_assertions",
  "serde",
  "serde_json",
  "smartstring",

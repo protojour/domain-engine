@@ -244,7 +244,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         serde_generator: &mut SerdeGenerator,
     ) -> Option<EntityInfo> {
-        let properties = self.relations.properties_by_type(type_def_id)?;
+        let properties = self.relations.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
         let identifies_meta = self
@@ -269,7 +269,7 @@ impl<'m> Compiler<'m> {
 
                 if let Some(target_properties) = self
                     .relations
-                    .properties_by_type(relationship_target.0.def_id)
+                    .properties_by_def_id(relationship_target.0.def_id)
                 {
                     if target_properties.identified_by.is_some() {
                         entity_relationships.insert(
