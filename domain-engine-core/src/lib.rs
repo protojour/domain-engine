@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use data_store::DataStoreAPI;
 use in_memory_store::api::InMemoryDb;
+use smartstring::alias::String;
 use thiserror::Error;
 
 use ontol_runtime::{
@@ -39,6 +40,8 @@ pub enum DomainError {
     InvalidId,
     #[error("Type cannot be used for id generation")]
     TypeCannotBeUsedForIdGeneration,
+    #[error("Unresolved foreign key: {0}")]
+    UnresolvedForeignKey(String),
 }
 
 #[unimock::unimock(api = EngineAPIMock)]

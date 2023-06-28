@@ -1,6 +1,6 @@
 use ontol_runtime::config::DataStoreConfig;
 use ontol_test_utils::{
-    expect_eq, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
+    assert_error_msg, expect_eq, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -61,6 +61,9 @@ async fn test_conduit_db_in_memory_id_generation() {
                             "title": "Foo",
                             "description": "An article",
                             "body": "The body",
+                            "author": {
+                                "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                            }
                         }))
                         .unwrap(),
                 )
@@ -73,6 +76,9 @@ async fn test_conduit_db_in_memory_id_generation() {
                         .de_create()
                         .value(json!({
                             "body": "Comment body",
+                            "author": {
+                                "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                            },
                             "createdAt": "2023-01-25T19:00:15.149284864+00:00",
                             "updatedAt": "2033-01-25T19:00:15.149284864+00:00",
                         }))
@@ -85,6 +91,37 @@ async fn test_conduit_db_in_memory_id_generation() {
                 .store_entity(tag_entity.de_create().value(json!({})).unwrap())
                 .await
                 .unwrap();
+        })
+        .await;
+}
+
+#[test(tokio::test)]
+async fn test_conduit_db_unresolved_foreign_key() {
+    TestPackages::with_sources([(SourceName::root(), CONDUIT_DB)])
+        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+        .compile_ok_async(|test_env| async move {
+            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let article = TypeBinding::new(&test_env, "Article");
+
+            assert_error_msg!(
+                domain_engine
+                    .store_entity(
+                        article
+                            .de_create()
+                            .value(json!({
+                                "slug": "foo",
+                                "title": "Foo",
+                                "description": "An article",
+                                "body": "The body",
+                                "author": {
+                                    "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                                }
+                            }))
+                            .unwrap(),
+                    )
+                    .await,
+                r#"Unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
+            );
         })
         .await;
 }

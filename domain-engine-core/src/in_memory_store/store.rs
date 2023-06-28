@@ -4,12 +4,15 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::Env,
-    serde::operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
+    serde::{
+        operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     smart_format,
     string_types::StringLikeType,
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
-    DefId, RelationshipId,
+    DefId, RelationshipId, Role,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -28,6 +31,13 @@ pub struct InMemoryStore {
     pub int_id_counter: i64,
 }
 
+#[derive(Debug, Clone)]
+enum DynamicKey {
+    String(String),
+    Uuid(Uuid),
+    Int(i64),
+}
+
 #[derive(Debug)]
 pub enum EntityCollection {
     String(EntityTable<String>),
@@ -39,14 +49,15 @@ pub type EntityTable<K> = IndexMap<K, BTreeMap<PropertyId, Attribute>>;
 
 #[derive(Debug)]
 pub struct EdgeCollection {
-    pub _edges: Vec<Edge>,
+    pub edges: Vec<Edge>,
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Edge {
-    _from: Value,
-    _to: Value,
-    _params: Value,
+    from: DynamicKey,
+    to: DynamicKey,
+    params: Value,
 }
 
 impl InMemoryStore {
@@ -79,49 +90,132 @@ impl InMemoryStore {
 
         let mut raw_props: BTreeMap<PropertyId, Attribute> = Default::default();
 
+        let entity_key = Self::extract_dynamic_key(&id.data)?;
+
         for (property_id, attribute) in struct_map {
             if let Some(entity_relationship) = entity_info.entity_relationships.get(&property_id) {
-                debug!(
-                    "entity relationships: {:#?}",
-                    entity_info.entity_relationships
-                );
+                debug!("entity rel attribute: {attribute:?}");
 
-                todo!("{entity_relationship:?}");
+                let value = attribute.value;
+                let rel_params = attribute.rel_params;
+
+                let foreign_key = if value.type_def_id == entity_relationship.target {
+                    todo!("Post relationship: {entity_relationship:?}");
+                } else {
+                    let foreign_key = Self::extract_dynamic_key(&value.data)?;
+                    if self
+                        .look_up_entity(entity_relationship.target, &foreign_key)
+                        .is_none()
+                    {
+                        let type_info = env.get_type_info(value.type_def_id);
+                        let repr = if let Some(operator_id) = type_info.operator_id {
+                            // TODO: Easier way to report values in "human readable"/JSON format
+
+                            let processor = env.new_serde_processor(
+                                operator_id,
+                                None,
+                                ProcessorMode::Read,
+                                ProcessorLevel::new_root(),
+                            );
+
+                            let mut buf: Vec<u8> = vec![];
+                            processor
+                                .serialize_value(
+                                    &value,
+                                    None,
+                                    &mut serde_json::Serializer::new(&mut buf),
+                                )
+                                .unwrap();
+                            String::from(std::str::from_utf8(&buf).unwrap())
+                        } else {
+                            smart_format!("N/A")
+                        };
+
+                        return Err(DomainError::UnresolvedForeignKey(repr));
+                    }
+
+                    foreign_key
+                };
+
+                let edge_collection = self
+                    .edge_collections
+                    .get_mut(&property_id.relationship_id)
+                    .expect("No edge collection");
+
+                match property_id.role {
+                    Role::Subject => {
+                        edge_collection.edges.push(Edge {
+                            from: entity_key.clone(),
+                            to: foreign_key,
+                            params: rel_params,
+                        });
+                    }
+                    Role::Object => {
+                        edge_collection.edges.push(Edge {
+                            from: foreign_key,
+                            to: entity_key.clone(),
+                            params: rel_params,
+                        });
+                    }
+                }
             } else {
                 raw_props.insert(property_id, attribute);
             }
         }
 
         let collection = self.collections.get_mut(&entity.type_def_id).unwrap();
-        Self::store_in_collection(collection, &id.data, raw_props)?;
+        Self::store_in_collection(collection, entity_key, raw_props)?;
 
         Ok(id)
     }
 
-    fn store_in_collection(
-        collection: &mut EntityCollection,
-        id_data: &Data,
-        raw_props: BTreeMap<PropertyId, Attribute>,
-    ) -> Result<(), DomainError> {
-        match (collection, id_data) {
-            (collection, Data::Struct(struct_map)) => {
+    fn extract_dynamic_key(id_data: &Data) -> Result<DynamicKey, DomainError> {
+        match id_data {
+            Data::Struct(struct_map) => {
                 if struct_map.len() != 1 {
                     return Err(DomainError::InvalidId);
                 }
 
                 let attribute = struct_map.iter().next().unwrap();
-                Self::store_in_collection(collection, &attribute.1.value.data, raw_props)
+                Self::extract_dynamic_key(&attribute.1.value.data)
             }
-            (EntityCollection::String(table), Data::String(string)) => {
-                table.insert(string.clone(), raw_props);
+            Data::String(string) => Ok(DynamicKey::String(string.clone())),
+            Data::Uuid(uuid) => Ok(DynamicKey::Uuid(*uuid)),
+            Data::Int(int) => Ok(DynamicKey::Int(*int)),
+            _ => Err(DomainError::InvalidId),
+        }
+    }
+
+    fn look_up_entity(
+        &self,
+        def_id: DefId,
+        dynamic_key: &DynamicKey,
+    ) -> Option<&BTreeMap<PropertyId, Attribute>> {
+        let collection = self.collections.get(&def_id)?;
+        match (collection, dynamic_key) {
+            (EntityCollection::String(table), DynamicKey::String(string)) => table.get(string),
+            (EntityCollection::Uuid(table), DynamicKey::Uuid(uuid)) => table.get(uuid),
+            (EntityCollection::Int(table), DynamicKey::Int(int)) => table.get(int),
+            _ => None,
+        }
+    }
+
+    fn store_in_collection(
+        collection: &mut EntityCollection,
+        dynamic_key: DynamicKey,
+        raw_props: BTreeMap<PropertyId, Attribute>,
+    ) -> Result<(), DomainError> {
+        match (collection, dynamic_key) {
+            (EntityCollection::String(table), DynamicKey::String(string)) => {
+                table.insert(string, raw_props);
                 Ok(())
             }
-            (EntityCollection::Uuid(table), Data::Uuid(uuid)) => {
-                table.insert(*uuid, raw_props);
+            (EntityCollection::Uuid(table), DynamicKey::Uuid(uuid)) => {
+                table.insert(uuid, raw_props);
                 Ok(())
             }
-            (EntityCollection::Int(table), Data::Int(int)) => {
-                table.insert(*int, raw_props);
+            (EntityCollection::Int(table), DynamicKey::Int(int)) => {
+                table.insert(int, raw_props);
                 Ok(())
             }
             _ => Err(DomainError::InvalidId),

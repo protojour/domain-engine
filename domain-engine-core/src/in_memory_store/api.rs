@@ -55,7 +55,7 @@ impl InMemoryDb {
                     let relationship_id = property_id.relationship_id;
                     edge_collections
                         .entry(relationship_id)
-                        .or_insert_with(|| EdgeCollection { _edges: vec![] });
+                        .or_insert_with(|| EdgeCollection { edges: vec![] });
                 }
             }
         }
