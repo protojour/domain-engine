@@ -1,5 +1,6 @@
 use ontol_test_utils::{
-    assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
+    assert_json_io_matches, expect_eq, type_binding::TypeBinding, SourceName, TestCompile,
+    TestPackages,
 };
 use test_log::test;
 
@@ -82,7 +83,7 @@ fn dependency_dag() {
     ])
     .compile_ok(|env| {
         // four user domains, plus core:
-        assert_eq!(5, env.env.domains().count());
+        expect_eq!(actual = env.env.domains().count(), expected = 5);
 
         let bar = TypeBinding::new(&env, "foobar");
         assert_json_io_matches!(bar, Create, {

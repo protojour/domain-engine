@@ -1,5 +1,4 @@
-use ontol_test_utils::{SourceName, TestCompile, TestPackages};
-use pretty_assertions::assert_eq;
+use ontol_test_utils::{expect_eq, SourceName, TestCompile, TestPackages};
 use test_log::test;
 
 // BUG: This should recognize the `//` comment token
@@ -288,7 +287,7 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
     rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
     "#
     .compile_fail_then(|errors| {
-        assert_eq!("4", errors[0].span_text);
+        expect_eq!(actual = errors[0].span_text, expected = "4");
     })
 }
 

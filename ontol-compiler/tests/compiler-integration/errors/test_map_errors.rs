@@ -1,5 +1,4 @@
-use ontol_test_utils::TestCompile;
-use pretty_assertions::assert_eq;
+use ontol_test_utils::{expect_eq, TestCompile};
 use test_log::test;
 
 #[test]
@@ -84,7 +83,7 @@ fn map_type_mismatch_simple() {
     }
     "
     .compile_fail_then(|errors| {
-        assert_eq!("x", errors[0].span_text);
+        expect_eq!(actual = errors[0].span_text, expected = "x");
     })
 }
 

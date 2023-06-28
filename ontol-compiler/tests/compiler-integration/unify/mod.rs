@@ -1,5 +1,5 @@
 use ontol_runtime::MapKey;
-use ontol_test_utils::{type_binding::TypeBinding, TestEnv};
+use ontol_test_utils::{expect_eq, type_binding::TypeBinding, TestEnv};
 
 mod test_map_basic;
 mod test_unify_partial;
@@ -91,5 +91,5 @@ fn assert_domain_map(
         Key::Seq(_) => output_binding.ser_create().dynamic_sequence_json(&value),
     };
 
-    assert_eq!(expected, output_json);
+    expect_eq!(actual = output_json, expected = expected);
 }

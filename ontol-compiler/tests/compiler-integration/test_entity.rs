@@ -1,8 +1,7 @@
 use ontol_runtime::value::Value;
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
+    assert_error_msg, assert_json_io_matches, expect_eq, type_binding::TypeBinding, TestCompile,
 };
-use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 
@@ -52,9 +51,9 @@ fn inherent_id_no_autogen() {
         assert_json_io_matches!(foo, Create, { "key": "id", "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
-        assert_eq!(
-            json!({ "key": "id" }),
-            foo.ser_read().json(&entity),
+        expect_eq!(
+            actual = foo.ser_read().json(&entity),
+            expected = json!({ "key": "id" }),
         );
     });
 }
@@ -73,9 +72,9 @@ fn inherent_id_autogen() {
         assert_json_io_matches!(foo, Create, { "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
-        assert_eq!(
-            json!({ "key": "generated_id" }),
-            foo.ser_read().json(&entity)
+        expect_eq!(
+            actual = foo.ser_read().json(&entity),
+            expected = json!({ "key": "generated_id" }),
         );
     });
 }
@@ -204,9 +203,9 @@ fn artist_and_instrument_id_as_relation_object() {
             .cast_ref::<Vec<_>>();
 
         // The value of the `plays` attribute is an `artist-id`
-        assert_eq!(
-            instrument_id.ser_create().json(&plays_attributes[0].value),
-            json!(example_id)
+        expect_eq!(
+            actual = instrument_id.ser_create().json(&plays_attributes[0].value),
+            expected = json!(example_id)
         );
 
         assert_error_msg!(

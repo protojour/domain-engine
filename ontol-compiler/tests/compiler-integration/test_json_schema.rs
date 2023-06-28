@@ -1,6 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode::*;
-use ontol_test_utils::{type_binding::TypeBinding, TestCompile};
-use pretty_assertions::assert_eq;
+use ontol_test_utils::{expect_eq, type_binding::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -24,8 +23,9 @@ fn json_schema_from_simple_entity() {
     }
     "
     .compile_ok(|env| {
-        assert_eq!(
-            json!({
+        expect_eq!(
+            actual = TypeBinding::new(&env, "entity").json_schema(Create),
+            expected = json!({
                 "$defs": {
                     "1_entity": {
                         "type": "object",
@@ -59,7 +59,6 @@ fn json_schema_from_simple_entity() {
                 ],
                 "unevaluatedProperties": false,
             }),
-            TypeBinding::new(&env, "entity").json_schema(Create)
         )
     });
 }
