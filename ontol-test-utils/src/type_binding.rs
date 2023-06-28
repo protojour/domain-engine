@@ -67,6 +67,14 @@ impl<'e> TypeBinding<'e> {
         }
     }
 
+    pub fn from_def_id(def_id: DefId, env: &'e Env) -> Self {
+        Self {
+            type_info: env.get_type_info(def_id).clone(),
+            json_schema: None,
+            env,
+        }
+    }
+
     pub fn env(&self) -> &Env {
         self.env
     }

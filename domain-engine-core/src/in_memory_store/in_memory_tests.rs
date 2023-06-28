@@ -95,9 +95,18 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
-            let [artist, _instrument] = TypeBinding::new_n(&test_env, ["artist", "instrument"]);
+            let artist = TypeBinding::new(&test_env, "artist");
+            let artist_id = TypeBinding::from_def_id(
+                artist
+                    .type_info
+                    .entity_info
+                    .as_ref()
+                    .unwrap()
+                    .id_value_def_id,
+                &test_env.env,
+            );
 
-            let _artist_id = domain_engine
+            let generated_id = domain_engine
                 .store_entity(
                     artist
                         .de_create()
@@ -106,6 +115,27 @@ async fn test_artist_and_instrument_fmt_id_generation() {
                 )
                 .await
                 .unwrap();
+
+            let generated_id_json = artist_id.ser_read().json(&generated_id);
+            assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
+
+            let explicit_id = domain_engine
+                .store_entity(
+                    artist
+                        .de_read()
+                        .value(json!({
+                            "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
+                            "name": "Karlheinz Stockhausen"
+                        }))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+
+            expect_eq!(
+                actual = artist_id.ser_read().json(&explicit_id),
+                expected = json!("artist/67e55044-10b1-426f-9247-bb680e5fe0c8")
+            );
         })
         .await;
 }
