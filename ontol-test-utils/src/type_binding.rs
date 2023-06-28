@@ -134,6 +134,15 @@ impl<'e> TypeBinding<'e> {
         }
     }
 
+    /// Make a deserializer for the data creation processor mode
+    pub fn de_read(&self) -> Deserializer<'_, 'e> {
+        Deserializer {
+            binding: self,
+            mode: ProcessorMode::Read,
+            level: ProcessorLevel::new_root(),
+        }
+    }
+
     pub fn ser_read(&self) -> Serializer<'_, 'e> {
         Serializer {
             binding: self,
