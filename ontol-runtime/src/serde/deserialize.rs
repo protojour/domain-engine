@@ -648,16 +648,14 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
 
                 if serde_property.filter(self.processor_mode).is_some() {
                     Ok(MapKey::Property(*serde_property))
+                } else if serde_property.is_read_only()
+                    && !matches!(self.processor_mode, ProcessorMode::Read)
+                {
+                    Err(Error::custom(format!("property `{v}` is read-only")))
                 } else {
-                    if serde_property.is_read_only()
-                        && !matches!(self.processor_mode, ProcessorMode::Read)
-                    {
-                        Err(Error::custom(format!("property `{v}` is read-only")))
-                    } else {
-                        Err(Error::custom(format!(
-                            "property `{v}` not available in this context"
-                        )))
-                    }
+                    Err(Error::custom(format!(
+                        "property `{v}` not available in this context"
+                    )))
                 }
             }
         }

@@ -4,6 +4,7 @@ use ontol_test_utils::{
 };
 use serde_json::json;
 use test_log::test;
+use uuid::Uuid;
 
 use crate::{DomainEngine, EngineAPI};
 
@@ -64,7 +65,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                 expected = "Uuid(67e55044-10b1-426f-9247-bb680e5fe0c8)"
             );
 
-            domain_engine
+            let article_id: Uuid = domain_engine
                 .store_entity(
                     article
                         .de_create()
@@ -80,7 +81,8 @@ async fn test_conduit_db_in_memory_id_generation() {
                         .unwrap(),
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .cast_into();
 
             domain_engine
                 .store_entity(
@@ -91,6 +93,9 @@ async fn test_conduit_db_in_memory_id_generation() {
                             "author": {
                                 "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
                             },
+                            "comment_on": {
+                                "article_id": article_id.to_string()
+                            }
                         }))
                         .unwrap(),
                 )
@@ -99,6 +104,65 @@ async fn test_conduit_db_in_memory_id_generation() {
 
             domain_engine
                 .store_entity(tag_entity.de_create().value(json!({})).unwrap())
+                .await
+                .unwrap();
+        })
+        .await;
+}
+
+#[test(tokio::test)]
+async fn test_conduit_db_store_entity_tree() {
+    conduit_db()
+        .compile_ok_async(|test_env| async move {
+            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let [user, article] = TypeBinding::new_n(&test_env, ["User", "Article"]);
+
+            let pre_existing_user_id: Uuid = domain_engine
+                .store_entity(
+                    user.de_create()
+                        .value(json!({
+                            "username": "pre-existing",
+                            "email": "pre@existing",
+                            "password_hash": "s3cr3t",
+                        }))
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+                .cast_into();
+
+            domain_engine
+                .store_entity(
+                    article
+                        .de_create()
+                        .value(json!({
+                            "slug": "foo",
+                            "title": "Foo",
+                            "description": "An article",
+                            "body": "The body",
+                            "author": {
+                                "username": "new_user",
+                                "email": "new@user",
+                                "password_hash": "s3cr3t",
+                                "following": [
+                                    {
+                                        "user_id": pre_existing_user_id.to_string(),
+                                    }
+                                ]
+                            },
+                            // BUG: This still requires `comment_on` even if that's obvious given
+                            // that the comment is embedded inside the article which is the subject of this relationship.
+                            // "comments": [
+                            //     {
+                            //         "body": "First post!",
+                            //         "author": {
+                            //             "user_id": pre_existing_user_id.to_string()
+                            //         }
+                            //     },
+                            // ]
+                        }))
+                        .unwrap(),
+                )
                 .await
                 .unwrap();
         })

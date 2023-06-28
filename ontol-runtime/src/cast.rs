@@ -1,4 +1,5 @@
 use smartstring::alias::String;
+use uuid::Uuid;
 
 use crate::value::{Attribute, Data, Value};
 
@@ -115,6 +116,24 @@ impl Cast<Vec<Attribute>> for Value {
         match &self.data {
             Data::Sequence(v) => v.as_slice(),
             _ => panic!("not a vector"),
+        }
+    }
+}
+
+impl Cast<Uuid> for Value {
+    type Ref = Uuid;
+
+    fn cast_into(self) -> Uuid {
+        match self.data {
+            Data::Uuid(u) => u,
+            _ => panic!("not an uuid"),
+        }
+    }
+
+    fn cast_ref(&self) -> &Self::Ref {
+        match &self.data {
+            Data::Uuid(u) => u,
+            _ => panic!("not an uuid"),
         }
     }
 }

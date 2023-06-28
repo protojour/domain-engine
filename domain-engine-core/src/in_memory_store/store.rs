@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::Env,
+    env::{EntityRelationship, Env, ValueCardinality},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
         processor::{ProcessorLevel, ProcessorMode},
@@ -94,68 +94,31 @@ impl InMemoryStore {
 
         for (property_id, attribute) in struct_map {
             if let Some(entity_relationship) = entity_info.entity_relationships.get(&property_id) {
-                debug!("entity rel attribute: {attribute:?}");
-
-                let value = attribute.value;
-                let rel_params = attribute.rel_params;
-
-                let foreign_key = if value.type_def_id == entity_relationship.target {
-                    todo!("Post relationship: {entity_relationship:?}");
-                } else {
-                    let foreign_key = Self::extract_dynamic_key(&value.data)?;
-                    if self
-                        .look_up_entity(entity_relationship.target, &foreign_key)
-                        .is_none()
-                    {
-                        let type_info = env.get_type_info(value.type_def_id);
-                        let repr = if let Some(operator_id) = type_info.operator_id {
-                            // TODO: Easier way to report values in "human readable"/JSON format
-
-                            let processor = env.new_serde_processor(
-                                operator_id,
-                                None,
-                                ProcessorMode::Read,
-                                ProcessorLevel::new_root(),
-                            );
-
-                            let mut buf: Vec<u8> = vec![];
-                            processor
-                                .serialize_value(
-                                    &value,
-                                    None,
-                                    &mut serde_json::Serializer::new(&mut buf),
-                                )
-                                .unwrap();
-                            String::from(std::str::from_utf8(&buf).unwrap())
-                        } else {
-                            smart_format!("N/A")
+                match entity_relationship.cardinality.1 {
+                    ValueCardinality::One => {
+                        self.insert_entity_relationship(
+                            env,
+                            &entity_key,
+                            property_id,
+                            attribute,
+                            entity_relationship,
+                        )?;
+                    }
+                    ValueCardinality::Many => {
+                        let attributes = match attribute.value.data {
+                            Data::Sequence(attributes) => attributes,
+                            _ => panic!("Expected sequence for ValueCardinality::Many"),
                         };
 
-                        return Err(DomainError::UnresolvedForeignKey(repr));
-                    }
-
-                    foreign_key
-                };
-
-                let edge_collection = self
-                    .edge_collections
-                    .get_mut(&property_id.relationship_id)
-                    .expect("No edge collection");
-
-                match property_id.role {
-                    Role::Subject => {
-                        edge_collection.edges.push(Edge {
-                            from: entity_key.clone(),
-                            to: foreign_key,
-                            params: rel_params,
-                        });
-                    }
-                    Role::Object => {
-                        edge_collection.edges.push(Edge {
-                            from: foreign_key,
-                            to: entity_key.clone(),
-                            params: rel_params,
-                        });
+                        for attribute in attributes {
+                            self.insert_entity_relationship(
+                                env,
+                                &entity_key,
+                                property_id,
+                                attribute,
+                                entity_relationship,
+                            )?;
+                        }
                     }
                 }
             } else {
@@ -167,6 +130,79 @@ impl InMemoryStore {
         Self::store_in_collection(collection, entity_key, raw_props)?;
 
         Ok(id)
+    }
+
+    fn insert_entity_relationship(
+        &mut self,
+        env: &Env,
+        entity_key: &DynamicKey,
+        property_id: PropertyId,
+        attribute: Attribute,
+        entity_relationship: &EntityRelationship,
+    ) -> Result<(), DomainError> {
+        debug!("entity rel attribute: {attribute:?}");
+
+        let value = attribute.value;
+        let rel_params = attribute.rel_params;
+
+        let foreign_key = if value.type_def_id == entity_relationship.target {
+            let foreign_id = self.write_entity(env, value)?;
+            Self::extract_dynamic_key(&foreign_id.data)?
+        } else {
+            let foreign_key = Self::extract_dynamic_key(&value.data)?;
+            if self
+                .look_up_entity(entity_relationship.target, &foreign_key)
+                .is_none()
+            {
+                let type_info = env.get_type_info(value.type_def_id);
+                let repr = if let Some(operator_id) = type_info.operator_id {
+                    // TODO: Easier way to report values in "human readable"/JSON format
+
+                    let processor = env.new_serde_processor(
+                        operator_id,
+                        None,
+                        ProcessorMode::Read,
+                        ProcessorLevel::new_root(),
+                    );
+
+                    let mut buf: Vec<u8> = vec![];
+                    processor
+                        .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
+                        .unwrap();
+                    String::from(std::str::from_utf8(&buf).unwrap())
+                } else {
+                    smart_format!("N/A")
+                };
+
+                return Err(DomainError::UnresolvedForeignKey(repr));
+            }
+
+            foreign_key
+        };
+
+        let edge_collection = self
+            .edge_collections
+            .get_mut(&property_id.relationship_id)
+            .expect("No edge collection");
+
+        match property_id.role {
+            Role::Subject => {
+                edge_collection.edges.push(Edge {
+                    from: entity_key.clone(),
+                    to: foreign_key,
+                    params: rel_params,
+                });
+            }
+            Role::Object => {
+                edge_collection.edges.push(Edge {
+                    from: foreign_key,
+                    to: entity_key.clone(),
+                    params: rel_params,
+                });
+            }
+        }
+
+        Ok(())
     }
 
     fn extract_dynamic_key(id_data: &Data) -> Result<DynamicKey, DomainError> {

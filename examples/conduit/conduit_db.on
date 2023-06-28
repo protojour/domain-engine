@@ -15,7 +15,7 @@ pub type User {
 }
 
 pub type Article {
-    rel .'id'(rel .gen: auto)|id: { rel .is: uuid }
+    rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
     // TODO(constraint): slug is unique
     rel .'slug': slug
     rel .'title': string
@@ -39,5 +39,5 @@ pub type TagEntity {
 rel [Article] 'author'::'authored_articles'? User
 rel Article 'favorited_by'::'favorited'? [User]
 rel TagEntity 'tags'::'tagged_with'? [Article]
-rel Comment 'comment_on'::'has_comments'? [Article]
+rel [Comment] 'comment_on'::'comments'? Article
 rel [Comment] 'author'::'authored_comments'? User

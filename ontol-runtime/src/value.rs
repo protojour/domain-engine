@@ -77,6 +77,13 @@ impl Value {
     {
         <Self as Cast<T>>::cast_ref(self)
     }
+
+    pub fn cast_into<T>(self) -> T
+    where
+        Self: Cast<T>,
+    {
+        <Self as Cast<T>>::cast_into(self)
+    }
 }
 
 #[derive(Clone, Debug)]
