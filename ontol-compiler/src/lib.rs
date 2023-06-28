@@ -286,12 +286,22 @@ impl<'m> Compiler<'m> {
 
         let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
 
+        let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
+            self.relations
+                .value_generators
+                .get(&inherent_primary_id_meta.relationship_id)
+                .cloned()
+        } else {
+            None
+        };
+
         Some(EntityInfo {
             id_relationship_id: match inherent_primary_id_meta {
                 Some(inherent_meta) => inherent_meta.relationship_id,
                 None => id_relationship_id,
             },
             id_value_def_id: identifies_meta.relationship.subject.0.def_id,
+            id_value_generator,
             id_operator_id: serde_generator
                 .gen_operator_id(SerdeKey::Def(DefVariant::new(
                     identifies_meta.relationship.subject.0.def_id,

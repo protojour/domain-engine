@@ -14,6 +14,7 @@ use crate::{
     string_pattern::StringPattern,
     string_types::StringLikeType,
     value::PropertyId,
+    value_generator::ValueGenerator,
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
@@ -200,6 +201,7 @@ pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
+    pub id_value_generator: Option<ValueGenerator>,
     pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
 }
 

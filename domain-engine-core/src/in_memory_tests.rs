@@ -8,6 +8,7 @@ use test_log::test;
 use crate::{DomainEngine, EngineAPI};
 
 const CONDUIT_DB: &str = include_str!("../../examples/conduit/conduit_db.on");
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../examples/artist_and_instrument.on");
 
 #[test(tokio::test)]
 async fn test_conduit_db_in_memory_data_source() {
@@ -82,6 +83,27 @@ async fn test_conduit_db_in_memory_data_source() {
 
             let _tag_id1 = domain_engine
                 .store_entity(tag_entity.de_create().value(json!({})).unwrap())
+                .await
+                .unwrap();
+        })
+        .await;
+}
+
+#[test(tokio::test)]
+async fn test_artist_and_instrument_fmt_id_generation() {
+    TestPackages::with_sources([(SourceName::root(), ARTIST_AND_INSTRUMENT)])
+        .with_data_source(SourceName::root(), DataSourceConfig::InMemory)
+        .compile_ok_async(|test_env| async move {
+            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let [artist, _instrument] = TypeBinding::new_n(&test_env, ["artist", "instrument"]);
+
+            let _artist_id = domain_engine
+                .store_entity(
+                    artist
+                        .de_create()
+                        .value(json!({"name": "Igor Stravinskij" }))
+                        .unwrap(),
+                )
                 .await
                 .unwrap();
         })

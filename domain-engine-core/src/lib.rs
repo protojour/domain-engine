@@ -18,7 +18,7 @@ mod entity_id_utils;
 mod in_memory;
 
 #[cfg(test)]
-mod tests;
+mod in_memory_tests;
 
 pub struct Config {
     pub default_limit: u32,

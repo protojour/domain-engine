@@ -166,10 +166,8 @@ fn artist_and_instrument_error_artist() {
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
     ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(&env, "artist");
+        let [artist, instrument_id] = TypeBinding::new_n(&env, ["artist", "instrument-id"]);
         let plays = artist.find_property("plays").unwrap();
-
-        let instrument_id = TypeBinding::new(&env, "instrument-id");
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
         assert_json_io_matches!(artist, Create, {
@@ -295,7 +293,6 @@ fn test_entity_self_relationship_mandatory_object() {
     "
     .compile_ok(|env| {
         let node = TypeBinding::new(&env, "node");
-
         assert_error_msg!(
             node.de_create().data(json!({})),
             r#"missing properties, expected "parent" at line 1 column 2"#
@@ -307,7 +304,6 @@ fn test_entity_self_relationship_mandatory_object() {
 fn entity_union_simple() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
         let instrument = TypeBinding::new(&env, "instrument");
-
         assert_json_io_matches!(
             instrument,
             Create,
@@ -337,14 +333,11 @@ fn entity_union_with_object_relation() {
 #[test]
 fn entity_union_in_relation_with_ids() {
     GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let artist = TypeBinding::new(&env, "artist");
+        let [artist, guitar_id, synth_id] =
+            TypeBinding::new_n(&env, ["artist", "guitar_id", "synth_id"]);
         let plays = artist.find_property("plays").unwrap();
 
         assert!(artist.type_info.entity_info.is_some());
-
-        let guitar_id = TypeBinding::new(&env, "guitar_id");
-        let synth_id = TypeBinding::new(&env, "synth_id");
-
         assert!(guitar_id.type_info.entity_info.is_none());
 
         let json = json!({

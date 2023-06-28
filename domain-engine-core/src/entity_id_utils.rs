@@ -1,5 +1,6 @@
 use ontol_runtime::{
     env::Env,
+    string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
     value::{Data, PropertyId, Value},
 };
 
@@ -22,4 +23,20 @@ pub fn find_inherent_entity_id(env: &Env, entity: &Value) -> Result<Option<Value
         Some(attribute) => Ok(Some(attribute.value.clone())),
         None => Ok(None),
     }
+}
+
+pub fn analyze_string_pattern(pattern: &StringPattern) -> Option<&StringPatternProperty> {
+    let mut out_property = None;
+
+    for part in &pattern.constant_parts {
+        if let StringPatternConstantPart::Property(property) = part {
+            if out_property.is_some() {
+                return None;
+            }
+
+            out_property = Some(property);
+        }
+    }
+
+    out_property
 }

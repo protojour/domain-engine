@@ -238,9 +238,7 @@ async fn test_docs_introspection() {
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
     let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
-    let artist = TypeBinding::new(&env, "artist");
-    let instrument = TypeBinding::new(&env, "instrument");
-    let plays = TypeBinding::new(&env, "plays");
+    let [artist, instrument, plays] = TypeBinding::new_n(&env, ["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
