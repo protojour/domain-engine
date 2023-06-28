@@ -430,7 +430,9 @@ fn serialize_schema_inline<S: Serializer>(
                     map_type: struct_op,
                 },
             )?;
-            if struct_op.n_mandatory_properties > 0 {
+
+            let required_count = struct_op.properties_meta.required_count(ctx.mode);
+            if required_count > 0 {
                 map.serialize_entry(
                     "required",
                     &RequiredMapProperties {

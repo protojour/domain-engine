@@ -243,7 +243,7 @@ impl<'v> AttributeType<'v> {
                 }
             }
             (FieldKind::Property(property_data), Data::Struct(attrs)) => {
-                debug!("lookup property {field_name}");
+                debug!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
                     attrs,
                     property_data.property_id,
@@ -284,7 +284,9 @@ impl<'v> AttributeType<'v> {
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let attribute = match map.get(&property_id) {
             Some(attribute) => attribute,
-            None => return Ok(graphql_value!(None)),
+            None => {
+                return Ok(graphql_value!(None));
+            }
         };
 
         match virtual_schema.lookup_type_index(type_ref.unit) {
@@ -300,7 +302,7 @@ impl<'v> AttributeType<'v> {
                         scalar_ref.operator_id,
                         None,
                         ProcessorMode::Read,
-                        ProcessorLevel::Root,
+                        ProcessorLevel::new_root(),
                     )
                     .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
 

@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use juniper::GraphQLValue;
-use ontol_runtime::serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
+use juniper::{GraphQLValue, ID};
+use ontol_runtime::serde::operator::{
+    FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
+};
 use smartstring::alias::String;
 use tracing::{debug, warn};
 
@@ -96,11 +98,14 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     _ => Optionality::Mandatory,
                 };
 
-                for (name, property) in &struct_op.properties {
+                let (mode, _) = typing_purpose.mode_and_level();
+
+                for (name, property) in struct_op.filter_properties(mode) {
                     output.push(self.get_operator_argument(
                         name,
                         property.value_operator_id,
                         property.rel_params_operator_id,
+                        property.flags,
                         opt,
                     ))
                 }
@@ -131,6 +136,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     property_name,
                     *id_operator_id,
                     None,
+                    SerdePropertyFlags::ENTITY_ID,
                     Optionality::Optional,
                 ))
             }
@@ -145,6 +151,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         name: &str,
         operator_id: SerdeOperatorId,
         rel_params: Option<SerdeOperatorId>,
+        property_flags: SerdePropertyFlags,
         opt: Optionality,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.virtual_schema.env().get_serde_operator(operator_id);
@@ -152,6 +159,10 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         debug!("register argument {name} {operator:?}");
 
         use std::string::String;
+
+        if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
+            return self.get_native_argument::<ID>(name, opt);
+        }
 
         match operator {
             SerdeOperator::Unit => {
@@ -187,9 +198,13 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 self.registry.arg::<bool>(name, &())
                 // registry.arg::<CustomScalar>(name, &()),
             }
-            SerdeOperator::ValueType(value_op) => {
-                self.get_operator_argument(name, value_op.inner_operator_id, rel_params, opt)
-            }
+            SerdeOperator::ValueType(value_op) => self.get_operator_argument(
+                name,
+                value_op.inner_operator_id,
+                rel_params,
+                property_flags,
+                opt,
+            ),
             SerdeOperator::Union(union_op) => {
                 let type_index = self
                     .virtual_schema
@@ -286,6 +301,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 argument.name(),
                 operator_id,
                 None,
+                SerdePropertyFlags::default(),
                 Optionality::Mandatory,
             ),
         }

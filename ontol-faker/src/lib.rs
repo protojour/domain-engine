@@ -13,12 +13,22 @@ use ontol_runtime::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::fmt::Write;
+use tracing::debug;
 
 const MAX_REPEAT: u32 = 128;
+
+const SENSIBLE_RECURSION_LEVEL: u16 = 5;
 
 #[derive(Debug)]
 pub enum Error {
     NoSerializationInfo,
+    RecursionLimitExceeded,
+}
+
+impl From<ontol_runtime::serde::processor::RecursionLimitError> for Error {
+    fn from(_: ontol_runtime::serde::processor::RecursionLimitError) -> Self {
+        Self::RecursionLimitExceeded
+    }
 }
 
 pub fn new_constant_fake(
@@ -55,12 +65,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 operator_id,
                 None,
                 self.processor_mode,
-                ProcessorLevel::Root,
-            ))
+                ProcessorLevel::new_root_with_recursion_limit(32),
+            ))?
             .value)
     }
 
-    fn fake_attribute(&mut self, processor: SerdeProcessor) -> Attribute {
+    fn fake_attribute(&mut self, processor: SerdeProcessor) -> Result<Attribute, Error> {
+        debug!("fake attribute {processor:?}");
         let value = match processor.value_operator {
             SerdeOperator::Unit => Value::unit(),
             SerdeOperator::False(def_id) => Value::new(Data::Int(0), *def_id),
@@ -139,13 +150,17 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 }
             }
             SerdeOperator::DynamicSequence => {
-                return Value::new(Data::Sequence([].into()), DefId::unit()).into();
+                return Ok(Value::new(Data::Sequence([].into()), DefId::unit()).into());
             }
             SerdeOperator::RelationSequence(seq_op) => {
-                let variant = &seq_op.ranges[0];
-                let attr = self.fake_attribute(processor.narrow(variant.operator_id));
+                return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {
+                    Ok(Value::new(Data::Sequence(vec![]), seq_op.def_variant.def_id).into())
+                } else {
+                    let variant = &seq_op.ranges[0];
+                    let attr = self.fake_attribute(processor.narrow(variant.operator_id))?;
 
-                return Value::new(Data::Sequence([attr].into()), seq_op.def_variant.def_id).into();
+                    Ok(Value::new(Data::Sequence([attr].into()), seq_op.def_variant.def_id).into())
+                }
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut seq = vec![];
@@ -153,10 +168,10 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 for range in &seq_op.ranges {
                     if let Some(rep) = range.finite_repetition {
                         for _ in 0..(rep as usize) {
-                            seq.push(self.fake_attribute(processor.new_child(range.operator_id)));
+                            seq.push(self.fake_attribute(processor.new_child(range.operator_id)?)?);
                         }
                     } else {
-                        seq.push(self.fake_attribute(processor.new_child(range.operator_id)));
+                        seq.push(self.fake_attribute(processor.new_child(range.operator_id)?)?);
                     }
                 }
 
@@ -182,7 +197,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = BTreeMap::default();
                 for (_, property) in &struct_op.properties {
-                    let attr = self.fake_attribute(processor.new_child(property.value_operator_id));
+                    let attr =
+                        self.fake_attribute(processor.new_child(property.value_operator_id)?)?;
                     attrs.insert(property.property_id, attr);
                 }
 
@@ -191,13 +207,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         };
 
         let rel_params = if let Some(rel_params_operator_id) = processor.rel_params_operator_id {
-            self.fake_attribute(processor.new_child(rel_params_operator_id))
+            self.fake_attribute(processor.new_child(rel_params_operator_id)?)?
                 .value
         } else {
             Value::unit()
         };
 
-        Attribute { value, rel_params }
+        Ok(Attribute { value, rel_params })
     }
 }
 

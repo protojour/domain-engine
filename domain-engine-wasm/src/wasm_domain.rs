@@ -21,8 +21,8 @@ use crate::{wasm_error::WasmError, wasm_util::js_serializer};
 #[derive(Clone, Copy)]
 pub enum JsonFormat {
     Create,
+    Read,
     Update,
-    Select,
 }
 
 impl JsonFormat {
@@ -30,7 +30,7 @@ impl JsonFormat {
         match self {
             Self::Create => ProcessorMode::Create,
             Self::Update => ProcessorMode::Update,
-            Self::Select => ProcessorMode::Read,
+            Self::Read => ProcessorMode::Read,
         }
     }
 }
@@ -105,7 +105,7 @@ impl WasmTypeInfo {
                 operator_id(&self.inner)?,
                 None,
                 format.to_processor_mode(),
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
             .map(|attr| attr.value)
@@ -144,7 +144,7 @@ impl WasmValue {
                 operator_id(type_info)?,
                 None,
                 format.to_processor_mode(),
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .serialize_value(&self.value, None, &js_serializer())
             .map_err(|err| WasmError::Generic(format!("Serialization failed: {err}")))

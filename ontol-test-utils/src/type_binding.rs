@@ -50,7 +50,7 @@ impl<'e> TypeBinding<'e> {
                 id,
                 None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root
+                ProcessorLevel::new_root()
             ))
         );
 
@@ -106,7 +106,7 @@ impl<'e> TypeBinding<'e> {
                 self.serde_operator_id(),
                 None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .find_property(prop)
     }
@@ -121,7 +121,7 @@ impl<'e> TypeBinding<'e> {
         Deserializer {
             binding: self,
             mode: ProcessorMode::Create,
-            level: ProcessorLevel::Root,
+            level: ProcessorLevel::new_root(),
         }
     }
 
@@ -130,7 +130,7 @@ impl<'e> TypeBinding<'e> {
         Serializer {
             binding: self,
             mode: ProcessorMode::Create,
-            level: ProcessorLevel::Root,
+            level: ProcessorLevel::new_root(),
         }
     }
 
@@ -138,7 +138,7 @@ impl<'e> TypeBinding<'e> {
         Serializer {
             binding: self,
             mode: ProcessorMode::Read,
-            level: ProcessorLevel::Root,
+            level: ProcessorLevel::new_root(),
         }
     }
 }
@@ -343,7 +343,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
                 entity_info.id_operator_id,
                 None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&json).unwrap(),

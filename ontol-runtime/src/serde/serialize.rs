@@ -8,6 +8,7 @@ use tracing::debug;
 
 use crate::{
     cast::Cast,
+    serde::processor::RecursionLimitError,
     string_pattern::FormatPattern,
     value::{Attribute, Data, FormatStringData, Value},
 };
@@ -105,7 +106,9 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value,
                         rel_params: None,
-                        processor: self.new_child(*inner_operator_id),
+                        processor: self
+                            .new_child(*inner_operator_id)
+                            .map_err(RecursionLimitError::serialize_error)?,
                     },
                 )?;
                 self.serialize_rel_params::<S>(rel_params, &mut map)?;
@@ -201,7 +204,7 @@ impl<'e> SerdeProcessor<'e> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
-        for (name, serde_prop) in &struct_op.properties {
+        for (name, serde_prop) in struct_op.filter_properties(self.mode) {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
@@ -221,10 +224,12 @@ impl<'e> SerdeProcessor<'e> {
                 &Proxy {
                     value: &attribute.value,
                     rel_params: attribute.rel_params.filter_non_unit(),
-                    processor: self.new_child_with_rel(
-                        serde_prop.value_operator_id,
-                        serde_prop.rel_params_operator_id,
-                    ),
+                    processor: self
+                        .new_child_with_rel(
+                            serde_prop.value_operator_id,
+                            serde_prop.rel_params_operator_id,
+                        )
+                        .map_err(RecursionLimitError::serialize_error)?,
                 },
             )?;
         }
@@ -247,7 +252,9 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value: rel_params,
                         rel_params: None,
-                        processor: self.new_child(operator_id),
+                        processor: self
+                            .new_child(operator_id)
+                            .map_err(RecursionLimitError::serialize_error)?,
                     },
                 )?;
             }

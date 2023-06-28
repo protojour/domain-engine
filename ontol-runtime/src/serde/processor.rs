@@ -16,9 +16,65 @@ pub enum ProcessorMode {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum ProcessorLevel {
-    Root,
-    Child,
+pub struct ProcessorLevel {
+    level: u16,
+    recursion_limit: u16,
+}
+
+/// Maximum number of nested/recursive operators.
+const DEFAULT_RECURSION_LIMIT: u16 = 128;
+
+impl ProcessorLevel {
+    pub const fn new_root() -> Self {
+        Self {
+            level: 0,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn new_root_with_recursion_limit(limit: u16) -> Self {
+        Self {
+            level: 0,
+            recursion_limit: limit,
+        }
+    }
+
+    pub const fn new_child() -> Self {
+        Self {
+            level: 1,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn child(self) -> Result<Self, RecursionLimitError> {
+        if self.level == self.recursion_limit {
+            return Err(RecursionLimitError);
+        }
+        Ok(Self {
+            level: self.level + 1,
+            recursion_limit: self.recursion_limit,
+        })
+    }
+
+    pub const fn is_root(&self) -> bool {
+        self.level == 0
+    }
+
+    pub const fn current_level(&self) -> u16 {
+        self.level
+    }
+}
+
+pub struct RecursionLimitError;
+
+impl RecursionLimitError {
+    pub fn serialize_error<E: serde::ser::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
+
+    pub fn deserialize_error<E: serde::de::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
 }
 
 /// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.
@@ -69,22 +125,23 @@ impl<'e> SerdeProcessor<'e> {
     }
 
     /// Return a processor that processes a new value that is a child value of this processor.
-    pub fn new_child(&self, operator_id: SerdeOperatorId) -> Self {
-        self.env
-            .new_serde_processor(operator_id, None, self.mode, ProcessorLevel::Child)
+    pub fn new_child(&self, operator_id: SerdeOperatorId) -> Result<Self, RecursionLimitError> {
+        Ok(self
+            .env
+            .new_serde_processor(operator_id, None, self.mode, self.level.child()?))
     }
 
     pub fn new_child_with_rel(
         &self,
         operator_id: SerdeOperatorId,
         rel_params_operator_id: Option<SerdeOperatorId>,
-    ) -> Self {
-        self.env.new_serde_processor(
+    ) -> Result<Self, RecursionLimitError> {
+        Ok(self.env.new_serde_processor(
             operator_id,
             rel_params_operator_id,
             self.mode,
-            ProcessorLevel::Child,
-        )
+            self.level.child()?,
+        ))
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {

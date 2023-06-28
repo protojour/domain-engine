@@ -339,7 +339,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                         discriminator.operator_id,
                         None,
                         self.mode,
-                        ProcessorLevel::Root
+                        ProcessorLevel::new_root()
                     ))
                     .collect(),
                 logic_op: LogicOp::Or,

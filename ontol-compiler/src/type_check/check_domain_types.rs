@@ -78,7 +78,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         if id_meta.relationship.object.0.def_id == def_id {
                             debug!(
-                                "redefine as primary id: {id_relationship_id:?} <-> {:?}",
+                                "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
                                 property_id.relationship_id
                             );
 

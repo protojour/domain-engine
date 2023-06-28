@@ -23,7 +23,7 @@ use super::{
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
-    processor::SerdeProcessor,
+    processor::{ProcessorMode, RecursionLimitError, SerdeProcessor},
     SerdeOperatorId, StructOperator,
 };
 
@@ -61,16 +61,19 @@ struct SpecialOperatorIds<'s> {
 struct PropertySet<'s> {
     properties: &'s IndexMap<String, SerdeProperty>,
     special_operator_ids: SpecialOperatorIds<'s>,
+    processor_mode: ProcessorMode,
 }
 
 impl<'s> PropertySet<'s> {
     fn new(
         properties: &'s IndexMap<String, SerdeProperty>,
         special_operator_ids: SpecialOperatorIds<'s>,
+        processor_mode: ProcessorMode,
     ) -> Self {
         Self {
             properties,
             special_operator_ids,
+            processor_mode,
         }
     }
 }
@@ -415,7 +418,9 @@ impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
             map,
             self.buffered_attrs,
             &self.struct_op.properties,
-            self.struct_op.n_mandatory_properties,
+            self.struct_op
+                .properties_meta
+                .required_count(self.processor.mode),
             SpecialOperatorIds {
                 rel_params: self.rel_params_operator_id,
                 id: None,
@@ -436,21 +441,24 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
-    expected_mandatory_properties: usize,
+    expected_required_count: usize,
     special_operator_ids: SpecialOperatorIds,
 ) -> Result<DeserializedMap, A::Error> {
     let mut attributes = BTreeMap::new();
     let mut rel_params = Value::unit();
     let mut id = None;
 
-    let mut n_mandatory_properties = 0;
+    let mut observed_required_count = 0;
 
     // first parse buffered attributes, if any
     for (serde_key, serde_value) in buffered_attrs {
-        match PropertySet::new(properties, special_operator_ids).visit_str(&serde_key)? {
+        match PropertySet::new(properties, special_operator_ids, processor.mode)
+            .visit_str(&serde_key)?
+        {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } = processor
                     .new_child(operator_id)
+                    .map_err(RecursionLimitError::deserialize_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
@@ -458,6 +466,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
             MapKey::Id(operator_id) => {
                 let Attribute { value, .. } = processor
                     .new_child(operator_id)
+                    .map_err(RecursionLimitError::deserialize_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
                 id = Some(value);
             }
@@ -467,10 +476,11 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
                         serde_property.value_operator_id,
                         serde_property.rel_params_operator_id,
                     )
+                    .map_err(RecursionLimitError::deserialize_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 if !serde_property.is_optional() {
-                    n_mandatory_properties += 1;
+                    observed_required_count += 1;
                 }
 
                 attributes.insert(serde_property.property_id, Attribute { rel_params, value });
@@ -479,30 +489,42 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     }
 
     // parse rest of map
-    while let Some(map_key) =
-        map.next_key_seed(PropertySet::new(properties, special_operator_ids))?
-    {
+    while let Some(map_key) = map.next_key_seed(PropertySet::new(
+        properties,
+        special_operator_ids,
+        processor.mode,
+    ))? {
         match map_key {
             MapKey::RelParams(operator_id) => {
-                let Attribute { value, .. } =
-                    map.next_value_seed(processor.new_child(operator_id))?;
+                let Attribute { value, .. } = map.next_value_seed(
+                    processor
+                        .new_child(operator_id)
+                        .map_err(RecursionLimitError::deserialize_error)?,
+                )?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
-                let Attribute { value, .. } =
-                    map.next_value_seed(processor.new_child(operator_id))?;
+                let Attribute { value, .. } = map.next_value_seed(
+                    processor
+                        .new_child(operator_id)
+                        .map_err(RecursionLimitError::deserialize_error)?,
+                )?;
 
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
-                let attribute = map.next_value_seed(processor.new_child_with_rel(
-                    serde_property.value_operator_id,
-                    serde_property.rel_params_operator_id,
-                ))?;
+                let attribute = map.next_value_seed(
+                    processor
+                        .new_child_with_rel(
+                            serde_property.value_operator_id,
+                            serde_property.rel_params_operator_id,
+                        )
+                        .map_err(RecursionLimitError::deserialize_error)?,
+                )?;
 
                 if !serde_property.is_optional() {
-                    n_mandatory_properties += 1;
+                    observed_required_count += 1;
                 }
 
                 attributes.insert(serde_property.property_id, attribute);
@@ -510,7 +532,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         }
     }
 
-    if n_mandatory_properties < expected_mandatory_properties {
+    if observed_required_count < expected_required_count {
         // Generate default values if missing
         for (_, property) in properties {
             if let Some(default_const_proc_address) = property.default_const_proc_address {
@@ -525,13 +547,13 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());
-                    n_mandatory_properties += 1;
+                    observed_required_count += 1;
                 }
             }
         }
     }
 
-    if n_mandatory_properties < expected_mandatory_properties
+    if observed_required_count < expected_required_count
         || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
     {
         debug!(
@@ -544,9 +566,10 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         }
         for prop in properties {
             debug!(
-                "    prop {:?} '{}' optional={}",
+                "    prop {:?} '{}' visible={} optional={}",
                 prop.1.property_id,
                 prop.0,
+                prop.1.filter(processor.mode).is_some(),
                 prop.1.is_optional()
             );
         }
@@ -554,7 +577,9 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         let mut items: Vec<DoubleQuote<String>> = properties
             .iter()
             .filter(|(_, property)| {
-                !property.is_optional() && !attributes.contains_key(&property.property_id)
+                property.filter(processor.mode).is_some()
+                    && !property.is_optional()
+                    && !attributes.contains_key(&property.property_id)
             })
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
@@ -570,7 +595,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
             logic_op: LogicOp::And,
         };
 
-        return Err(Error::custom(format!(
+        return Err(serde::de::Error::custom(format!(
             "missing properties, expected {missing_keys}"
         )));
     }
@@ -613,14 +638,22 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
                     }
                 }
 
-                match self.properties.get(v) {
-                    Some(serde_property) => Ok(MapKey::Property(*serde_property)),
-                    None => {
-                        // TODO: This error message could be improved to suggest valid fields.
-                        // see OneOf in serde (this is a private struct)
-                        Err(Error::custom(format!("unknown property `{v}`")))
+                let map_key = match self.properties.get(v) {
+                    Some(serde_property) => {
+                        if serde_property.filter(self.processor_mode).is_some() {
+                            Some(MapKey::Property(*serde_property))
+                        } else {
+                            None
+                        }
                     }
-                }
+                    None => None,
+                };
+
+                map_key.ok_or_else(|| {
+                    // TODO: This error message could be improved to suggest valid fields.
+                    // see OneOf in serde (this is a private struct)
+                    Error::custom(format!("unknown property `{v}`"))
+                })
             }
         }
     }

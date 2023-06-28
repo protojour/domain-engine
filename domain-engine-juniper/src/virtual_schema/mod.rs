@@ -39,10 +39,10 @@ impl TypingPurpose {
 
     pub const fn mode_and_level(self) -> (ProcessorMode, ProcessorLevel) {
         match self {
-            TypingPurpose::Selection => (ProcessorMode::Read, ProcessorLevel::Root),
-            TypingPurpose::Input => (ProcessorMode::Create, ProcessorLevel::Root),
-            TypingPurpose::PartialInput => (ProcessorMode::Update, ProcessorLevel::Root),
-            TypingPurpose::ReferenceInput => (ProcessorMode::Create, ProcessorLevel::Child),
+            TypingPurpose::Selection => (ProcessorMode::Read, ProcessorLevel::new_root()),
+            TypingPurpose::Input => (ProcessorMode::Create, ProcessorLevel::new_root()),
+            TypingPurpose::PartialInput => (ProcessorMode::Update, ProcessorLevel::new_root()),
+            TypingPurpose::ReferenceInput => (ProcessorMode::Create, ProcessorLevel::new_child()),
         }
     }
 }

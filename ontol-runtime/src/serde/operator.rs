@@ -151,19 +151,18 @@ impl UnionOperator {
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        match (mode, level) {
-            (ProcessorMode::Read, _) | (_, ProcessorLevel::Root) => {
-                let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
-                    variant.discriminator.purpose > VariantPurpose::Identification
-                });
+        if matches!(mode, ProcessorMode::Read) || level.is_root() {
+            let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
+                variant.discriminator.purpose > VariantPurpose::Identification
+            });
 
-                if let Some((skip_index, _)) = skip_id {
-                    Self::filtered_variants(&self.variants[skip_index..])
-                } else {
-                    Self::filtered_variants(&self.variants)
-                }
+            if let Some((skip_index, _)) = skip_id {
+                Self::filtered_variants(&self.variants[skip_index..])
+            } else {
+                Self::filtered_variants(&self.variants)
             }
-            _ => Self::filtered_variants(&self.variants),
+        } else {
+            Self::filtered_variants(&self.variants)
         }
     }
 
@@ -197,8 +196,39 @@ pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,
-    // This number _includes_ required properties with _default fallback values_.
-    pub n_mandatory_properties: usize,
+    pub properties_meta: PropertiesMeta,
+}
+
+impl StructOperator {
+    pub fn filter_properties(
+        &self,
+        mode: ProcessorMode,
+    ) -> impl Iterator<Item = (&String, &SerdeProperty)> {
+        self.properties
+            .iter()
+            .filter(move |(_, property)| property.filter(mode).is_some())
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct PropertiesMeta {
+    // These number _include_ required properties with _default fallback values_.
+    pub required_count_for_create_update: usize,
+    pub required_count_for_read: usize,
+}
+
+impl PropertiesMeta {
+    pub fn required_count(&self, mode: ProcessorMode) -> usize {
+        match mode {
+            ProcessorMode::Create | ProcessorMode::Update => self.required_count_for_create_update,
+            ProcessorMode::Read => self.required_count_for_read,
+        }
+    }
+
+    pub fn add(&mut self, other: &Self) {
+        self.required_count_for_create_update += other.required_count_for_create_update;
+        self.required_count_for_read += other.required_count_for_read;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -211,8 +241,23 @@ pub struct SerdeProperty {
 }
 
 impl SerdeProperty {
+    #[inline]
     pub fn is_optional(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::OPTIONAL)
+    }
+
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::READ_ONLY)
+    }
+
+    #[inline]
+    pub fn filter(&self, mode: ProcessorMode) -> Option<&Self> {
+        if !matches!(mode, ProcessorMode::Read) && self.is_read_only() {
+            None
+        } else {
+            Some(self)
+        }
     }
 }
 
@@ -222,5 +267,6 @@ bitflags::bitflags! {
     pub struct SerdePropertyFlags: u32 {
         const OPTIONAL       = 0b00000001;
         const READ_ONLY      = 0b00000010;
+        const ENTITY_ID      = 0b00000100;
     }
 }

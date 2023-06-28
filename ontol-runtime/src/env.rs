@@ -200,7 +200,6 @@ pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
-    pub id_inherent_property_name: Option<String>,
     pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
 }
 

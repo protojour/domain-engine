@@ -18,6 +18,20 @@ pub mod type_binding;
 
 pub const ROOT_SRC_NAME: &str = "test_root.on";
 
+/// Workaround for `pretty_assertions::assert_eq` arguments appearing
+/// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
+/// in order to show the most sensible colored diff.
+/// This macro makes expected and actual explicit, and supports any order by using keyword arguments.
+#[macro_export]
+macro_rules! expect_eq {
+    (expected = $expected:expr, actual = $actual:expr $(,)?) => {
+        pretty_assertions::assert_eq!($expected, $actual);
+    };
+    (actual = $actual:expr, expected = $expected:expr $(,)?) => {
+        pretty_assertions::assert_eq!($expected, $actual);
+    };
+}
+
 #[macro_export]
 macro_rules! assert_error_msg {
     ($e:expr, $msg:expr) => {

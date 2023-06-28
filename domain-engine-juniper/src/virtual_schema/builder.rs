@@ -3,8 +3,8 @@ use ontol_runtime::{
     env::{Env, TypeInfo},
     serde::{
         operator::{
-            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator,
-            ValueOperator,
+            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, SerdePropertyFlags,
+            StructOperator, ValueOperator,
         },
         processor::{ProcessorLevel, ProcessorMode},
     },
@@ -18,9 +18,9 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 use super::{
     argument,
     data::{
-        EdgeData, EntityData, FieldData, FieldKind, IdPropertyData, NativeScalarKind,
-        NativeScalarRef, NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData,
-        TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+        EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, NodeData,
+        ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData, TypeIndex,
+        TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -242,7 +242,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 },
             ),
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Read, ProcessorLevel::Root) {
+                match union_op.variants(ProcessorMode::Read, ProcessorLevel::new_root()) {
                     FilteredVariants::Single(operator_id) => {
                         self.make_node_type_inner(type_info, operator_id)
                     }
@@ -323,16 +323,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     },
                 )
             }
-            operator => NewType::NativeScalar(self.make_new_native_scalar(operator_id, operator)),
+            operator => NewType::NativeScalar(NativeScalarRef {
+                operator_id,
+                kind: self.get_native_scalar_kind(operator),
+            }),
         }
     }
 
-    fn make_new_native_scalar(
-        &mut self,
-        operator_id: SerdeOperatorId,
-        serde_operator: &SerdeOperator,
-    ) -> NativeScalarRef {
-        let kind = match serde_operator {
+    fn get_native_scalar_kind(&mut self, serde_operator: &SerdeOperator) -> NativeScalarKind {
+        match serde_operator {
             SerdeOperator::Unit => NativeScalarKind::Unit,
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
                 NativeScalarKind::Bool
@@ -344,15 +343,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
-            SerdeOperator::ValueType(_)
-            | SerdeOperator::Union(_)
+            SerdeOperator::ValueType(value_op) => {
+                self.get_native_scalar_kind(self.env.get_serde_operator(value_op.inner_operator_id))
+            }
+            op @ (SerdeOperator::Union(_)
             | SerdeOperator::Struct(_)
             | SerdeOperator::DynamicSequence
             | SerdeOperator::RelationSequence(_)
-            | SerdeOperator::ConstructorSequence(_) => panic!("not a native scalar"),
-        };
-
-        NativeScalarRef { operator_id, kind }
+            | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {op:?}"),
+        }
     }
 
     fn make_value_op_type_kind(
@@ -376,26 +375,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
     ) -> TypeKind {
         let operator_id = type_info.operator_id.unwrap();
         let mut fields = IndexMap::default();
-
-        if let Some(entity_info) = &type_info.entity_info {
-            if let Some(id_field_name) = &entity_info.id_inherent_property_name {
-                fields.insert(
-                    id_field_name.clone(),
-                    FieldData {
-                        kind: FieldKind::Id(IdPropertyData {
-                            relationship_id: entity_info.id_relationship_id,
-                            operator_id: entity_info.id_operator_id,
-                        }),
-                        field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
-                            NativeScalarRef {
-                                operator_id: entity_info.id_operator_id,
-                                kind: NativeScalarKind::ID,
-                            },
-                        )),
-                    },
-                );
-            }
-        }
 
         self.register_struct_op_fields(
             struct_op,
@@ -527,9 +506,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     );
                 }
                 operator => {
-                    let scalar_ref = UnitTypeRef::NativeScalar(
-                        self.make_new_native_scalar(property.value_operator_id, operator),
-                    );
+                    let scalar_ref = UnitTypeRef::NativeScalar(NativeScalarRef {
+                        operator_id: property.value_operator_id,
+                        kind: if property.flags.contains(SerdePropertyFlags::ENTITY_ID) {
+                            NativeScalarKind::ID
+                        } else {
+                            self.get_native_scalar_kind(operator)
+                        },
+                    });
                     fields.insert(
                         field_namespace.unique_literal(property_name),
                         FieldData {

@@ -5,9 +5,9 @@ use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     env::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
-        ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
-        SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
-        ValueUnionVariant,
+        ConstructorSequenceOperator, PropertiesMeta, RelationSequenceOperator, SequenceRange,
+        SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator,
+        ValueOperator, ValueUnionVariant,
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
     DataModifier, DefId, DefVariant, RelationshipId, Role,
@@ -142,8 +142,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
-                        intersected_map.n_mandatory_properties +=
-                            next_map_type.n_mandatory_properties;
+                        intersected_map
+                            .properties_meta
+                            .add(&next_map_type.properties_meta);
                     }
                 }
 
@@ -359,7 +360,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
-                        n_mandatory_properties: 0,
+                        properties_meta: Default::default(),
                     }),
                 ));
             }
@@ -705,21 +706,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        let mut n_mandatory_properties = 0;
+        let mut properties_meta = PropertiesMeta::default();
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
         if let Some(map) = &properties.map {
             for (property_id, property) in map {
-                if self
-                    .relations
-                    .value_generators
-                    .get(&property_id.relationship_id)
-                    .is_some()
-                {
-                    // BUG(?): Ignored only for Create/Update
-                    continue;
-                }
-
                 let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
                         if property_id.relationship_id.0 == self.primitives.relations.identifies {
@@ -795,14 +786,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     default_const_proc_address = Some(proc.address);
                 }
 
-                if property_cardinality.is_mandatory() {
-                    n_mandatory_properties += 1;
-                }
-
                 let mut flags = SerdePropertyFlags::default();
 
                 if property_cardinality.is_optional() {
                     flags |= SerdePropertyFlags::OPTIONAL;
+                }
+
+                if self
+                    .relations
+                    .value_generators
+                    .get(&property_id.relationship_id)
+                    .is_some()
+                {
+                    flags |= SerdePropertyFlags::READ_ONLY;
+                }
+
+                if property.is_entity_id {
+                    flags |= SerdePropertyFlags::ENTITY_ID;
+                }
+
+                if property_cardinality.is_mandatory() {
+                    properties_meta.required_count_for_read += 1;
+                    if !flags.contains(SerdePropertyFlags::READ_ONLY) {
+                        properties_meta.required_count_for_create_update += 1;
+                    }
                 }
 
                 serde_properties.insert(
@@ -822,7 +829,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             typename: typename.into(),
             def_variant,
             properties: serde_properties,
-            n_mandatory_properties,
+            properties_meta,
         })
     }
 }
