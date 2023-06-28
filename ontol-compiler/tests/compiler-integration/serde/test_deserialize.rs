@@ -99,6 +99,21 @@ fn deserialize_object_properties() {
 }
 
 #[test]
+fn deserialize_read_only_property_error() {
+    "
+    pub type obj
+    rel obj 'created'(rel .gen: create_time): datetime
+    "
+    .compile_ok(|env| {
+        let obj = TypeBinding::new(&env, "obj");
+        assert_error_msg!(
+            obj.de_create().data(json!({ "created": "something" })),
+            "property `created` is read-only at line 1 column 10"
+        );
+    });
+}
+
+#[test]
 fn deserialize_nested() {
     "
     pub type one

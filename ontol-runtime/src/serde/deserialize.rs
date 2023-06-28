@@ -640,22 +640,25 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
                     }
                 }
 
-                let map_key = match self.properties.get(v) {
-                    Some(serde_property) => {
-                        if serde_property.filter(self.processor_mode).is_some() {
-                            Some(MapKey::Property(*serde_property))
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                };
-
-                map_key.ok_or_else(|| {
+                let serde_property = self.properties.get(v).ok_or_else(|| {
                     // TODO: This error message could be improved to suggest valid fields.
                     // see OneOf in serde (this is a private struct)
                     Error::custom(format!("unknown property `{v}`"))
-                })
+                })?;
+
+                if serde_property.filter(self.processor_mode).is_some() {
+                    Ok(MapKey::Property(*serde_property))
+                } else {
+                    if serde_property.is_read_only()
+                        && !matches!(self.processor_mode, ProcessorMode::Read)
+                    {
+                        Err(Error::custom(format!("property `{v}` is read-only")))
+                    } else {
+                        Err(Error::custom(format!(
+                            "property `{v}` not available in this context"
+                        )))
+                    }
+                }
             }
         }
     }

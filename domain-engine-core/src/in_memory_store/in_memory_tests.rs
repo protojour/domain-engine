@@ -7,13 +7,25 @@ use test_log::test;
 
 use crate::{DomainEngine, EngineAPI};
 
-const CONDUIT_DB: &str = include_str!("../../../examples/conduit/conduit_db.on");
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
+fn conduit_db() -> TestPackages {
+    TestPackages::with_sources([(
+        SourceName::root(),
+        include_str!("../../../examples/conduit/conduit_db.on"),
+    )])
+    .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+}
+
+fn artist_and_instrument() -> TestPackages {
+    TestPackages::with_sources([(
+        SourceName::root(),
+        include_str!("../../../examples/artist_and_instrument.on"),
+    )])
+    .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+}
 
 #[test(tokio::test)]
 async fn test_conduit_db_in_memory_id_generation() {
-    TestPackages::with_sources([(SourceName::root(), CONDUIT_DB)])
-        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+    conduit_db()
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
             let [user, article, comment, tag_entity] =
@@ -79,8 +91,6 @@ async fn test_conduit_db_in_memory_id_generation() {
                             "author": {
                                 "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
                             },
-                            "createdAt": "2023-01-25T19:00:15.149284864+00:00",
-                            "updatedAt": "2033-01-25T19:00:15.149284864+00:00",
                         }))
                         .unwrap(),
                 )
@@ -97,8 +107,7 @@ async fn test_conduit_db_in_memory_id_generation() {
 
 #[test(tokio::test)]
 async fn test_conduit_db_unresolved_foreign_key() {
-    TestPackages::with_sources([(SourceName::root(), CONDUIT_DB)])
-        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+    conduit_db()
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
             let article = TypeBinding::new(&test_env, "Article");
@@ -128,8 +137,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
-    TestPackages::with_sources([(SourceName::root(), ARTIST_AND_INSTRUMENT)])
-        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+    artist_and_instrument()
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
             let artist = TypeBinding::new(&test_env, "artist");

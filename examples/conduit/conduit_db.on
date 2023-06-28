@@ -28,8 +28,8 @@ pub type Article {
 pub type Comment {
     rel .'id'(rel .gen: auto)|id: { rel .is: int }
     rel .'body': string
-    rel .'createdAt': datetime
-    rel .'updatedAt': datetime
+    rel .'createdAt'(rel .gen: create_time): datetime
+    rel .'updatedAt'(rel .gen: update_time): datetime
 }
 
 pub type TagEntity {
