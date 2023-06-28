@@ -14,7 +14,7 @@ use crate::{
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},
-    types::Type,
+    types::{FormatType, Type},
     SourceSpan,
 };
 
@@ -111,16 +111,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ));
                     }
 
-                    if let Some(generator_def_id) = self
+                    if let Some((generator_def_id, gen_span)) = self
                         .relations
                         .value_generators_unchecked
-                        .get(&property_id.relationship_id)
+                        .remove(&property_id.relationship_id)
                     {
                         actions.push(Action::CheckValueGenerator {
                             relationship_id: property_id.relationship_id,
-                            generator_def_id: *generator_def_id,
+                            generator_def_id,
                             object_def_id: meta.relationship.object.0.def_id,
-                            span: *meta.relationship.span,
+                            span: gen_span,
                         });
                     }
                 }
@@ -251,8 +251,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .insert(relationship_id, value_generator);
                     }
                     Err(_) => {
+                        let object_ty = self.def_types.map.get(&object_def_id).unwrap();
                         self.error(
-                            CompileError::TODO(smart_format!("Invalid gen for object type")),
+                            CompileError::CannotGenerateValue(smart_format!(
+                                "{}",
+                                FormatType(object_ty, self.defs, self.primitives)
+                            )),
                             &span,
                         );
                     }
@@ -327,22 +331,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             StringPatternSegment::Concat(segments) => {
                 let mut output_generator = None;
                 for concat_segment in segments {
-                    match self.auto_generator_for_string_pattern_segment(concat_segment) {
-                        Ok(generator) => {
-                            if output_generator.is_some() {
-                                return Err(());
-                            }
-                            output_generator = Some(generator);
+                    if let Ok(generator) =
+                        self.auto_generator_for_string_pattern_segment(concat_segment)
+                    {
+                        if output_generator.is_some() {
+                            return Err(());
                         }
-                        _ => {}
+                        output_generator = Some(generator);
                     }
                 }
 
                 output_generator.ok_or(())
             }
             StringPatternSegment::Property { type_def_id, .. } => {
-                return self
-                    .determine_value_generator(self.primitives.generators.auto, *type_def_id);
+                self.determine_value_generator(self.primitives.generators.auto, *type_def_id)
             }
             _ => Err(()),
         }

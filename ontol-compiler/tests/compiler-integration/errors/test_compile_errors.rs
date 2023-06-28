@@ -435,3 +435,16 @@ fn bad_domain_relation() {
 fn value_generator_as_field_type() {
     "type foo { rel .'prop': auto } // ERROR object must be a data type".compile_fail();
 }
+
+#[test]
+fn nonsense_value_generator() {
+    "
+    type bar { rel .'prop': string }
+    type foo {
+        rel .'bar'
+            (rel .gen: auto) // ERROR Cannot generate a value of type bar
+        : bar
+    }
+    "
+    .compile_fail();
+}

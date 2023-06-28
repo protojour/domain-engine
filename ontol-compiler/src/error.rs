@@ -134,6 +134,8 @@ pub enum CompileError {
     NoRelationParametersExpected,
     #[error("Incompatible literal")]
     IncompatibleLiteral,
+    #[error("Cannot generate a value of type {0}")]
+    CannotGenerateValue(String),
     #[error("TODO: {0}")]
     TODO(String),
 }

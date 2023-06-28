@@ -21,7 +21,7 @@ pub struct Relations {
     /// `default` relationships:
     pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
     /// `gen` relations, what the user wrote directly:
-    pub value_generators_unchecked: FnvHashMap<RelationshipId, DefId>,
+    pub value_generators_unchecked: FnvHashMap<RelationshipId, (DefId, SourceSpan)>,
     /// `gen` relations after proper type check:
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
 }

@@ -315,7 +315,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Some(_outer_object_ty) => {
                                 self.relations.value_generators_unchecked.insert(
                                     RelationshipId(*outer_relationship_id),
-                                    value_generator_def_id,
+                                    (value_generator_def_id, *span),
                                 );
                                 object_ty
                             }
