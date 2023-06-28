@@ -1,4 +1,4 @@
-use ontol_runtime::config::DataSourceConfig;
+use ontol_runtime::config::DataStoreConfig;
 use ontol_test_utils::{
     expect_eq, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
 };
@@ -7,19 +7,19 @@ use test_log::test;
 
 use crate::{DomainEngine, EngineAPI};
 
-const CONDUIT_DB: &str = include_str!("../../examples/conduit/conduit_db.on");
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../examples/artist_and_instrument.on");
+const CONDUIT_DB: &str = include_str!("../../../examples/conduit/conduit_db.on");
+const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
 
 #[test(tokio::test)]
-async fn test_conduit_db_in_memory_data_source() {
+async fn test_conduit_db_in_memory_id_generation() {
     TestPackages::with_sources([(SourceName::root(), CONDUIT_DB)])
-        .with_data_source(SourceName::root(), DataSourceConfig::InMemory)
+        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
             let [user, article, comment, tag_entity] =
                 TypeBinding::new_n(&test_env, ["User", "Article", "Comment", "TagEntity"]);
 
-            let _user_id1 = domain_engine
+            domain_engine
                 .store_entity(
                     user.de_create()
                         .value(json!({
@@ -32,7 +32,7 @@ async fn test_conduit_db_in_memory_data_source() {
                 .await
                 .unwrap();
 
-            let user_id2 = domain_engine
+            let explicit_user_id = domain_engine
                 .store_entity(
                     // Store with the Read processor which supports specifying ID upfront
                     user.de_read()
@@ -48,11 +48,11 @@ async fn test_conduit_db_in_memory_data_source() {
                 .unwrap();
 
             expect_eq!(
-                actual = format!("{:?}", user_id2.data),
+                actual = format!("{:?}", explicit_user_id.data),
                 expected = "Uuid(67e55044-10b1-426f-9247-bb680e5fe0c8)"
             );
 
-            let _article_id1 = domain_engine
+            domain_engine
                 .store_entity(
                     article
                         .de_create()
@@ -67,7 +67,7 @@ async fn test_conduit_db_in_memory_data_source() {
                 .await
                 .unwrap();
 
-            let _comment_id1 = domain_engine
+            domain_engine
                 .store_entity(
                     comment
                         .de_create()
@@ -81,7 +81,7 @@ async fn test_conduit_db_in_memory_data_source() {
                 .await
                 .unwrap();
 
-            let _tag_id1 = domain_engine
+            domain_engine
                 .store_entity(tag_entity.de_create().value(json!({})).unwrap())
                 .await
                 .unwrap();
@@ -92,7 +92,7 @@ async fn test_conduit_db_in_memory_data_source() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
     TestPackages::with_sources([(SourceName::root(), ARTIST_AND_INSTRUMENT)])
-        .with_data_source(SourceName::root(), DataSourceConfig::InMemory)
+        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
             let [artist, _instrument] = TypeBinding::new_n(&test_env, ["artist", "instrument"]);

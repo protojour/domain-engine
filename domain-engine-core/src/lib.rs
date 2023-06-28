@@ -1,24 +1,21 @@
 use std::sync::Arc;
 
-use data_source::DataSourceAPI;
-use in_memory::InMemory;
+use data_store::DataStoreAPI;
+use in_memory_store::api::InMemoryDb;
 use thiserror::Error;
 
 use ontol_runtime::{
-    config::DataSourceConfig,
+    config::DataStoreConfig,
     env::Env,
     query::{EntityQuery, StructOrUnionQuery},
     value::{Attribute, Value},
     DefId,
 };
 
-pub mod data_source;
+pub mod data_store;
 
 mod entity_id_utils;
-mod in_memory;
-
-#[cfg(test)]
-mod in_memory_tests;
+mod in_memory_store;
 
 pub struct Config {
     pub default_limit: u32,
@@ -32,8 +29,8 @@ impl Default for Config {
 
 #[derive(Error, Clone, Debug)]
 pub enum DomainError {
-    #[error("No data source")]
-    NoDataSource,
+    #[error("No data store")]
+    NoDataStore,
     #[error("Not an entity")]
     NotAnEntity(DefId),
     #[error("Entity must be a struct")]
@@ -66,17 +63,17 @@ pub struct DomainEngine {
     config: Arc<Config>,
 
     #[allow(unused)]
-    data_source: Option<Box<dyn DataSourceAPI + Send + Sync>>,
+    data_store: Option<Box<dyn DataStoreAPI + Send + Sync>>,
 }
 
 impl DomainEngine {
     pub fn new(env: Arc<Env>) -> Self {
-        let mut data_source: Option<Box<dyn DataSourceAPI + Send + Sync>> = None;
+        let mut data_store: Option<Box<dyn DataStoreAPI + Send + Sync>> = None;
 
         for (package_id, _) in env.domains() {
             if let Some(config) = env.get_package_config(*package_id) {
-                if let Some(DataSourceConfig::InMemory) = config.data_source {
-                    data_source = Some(Box::new(InMemory::new(&env, *package_id)))
+                if let Some(DataStoreConfig::InMemory) = config.data_store {
+                    data_store = Some(Box::new(InMemoryDb::new(&env, *package_id)))
                 }
             }
         }
@@ -84,15 +81,15 @@ impl DomainEngine {
         Self {
             env,
             config: Arc::new(Config::default()),
-            data_source,
+            data_store,
         }
     }
 
     async fn store_entity_inner(&self, entity: Value) -> Result<Value, DomainError> {
         // TODO: Domain translation by finding optimal mapping path
-        let data_source = self.data_source.as_ref().ok_or(DomainError::NoDataSource)?;
+        let data_store = self.data_store.as_ref().ok_or(DomainError::NoDataStore)?;
 
-        data_source.store_entity(&self.env, entity).await
+        data_store.store_entity(&self.env, entity).await
     }
 }
 

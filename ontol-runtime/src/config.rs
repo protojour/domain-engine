@@ -1,9 +1,9 @@
 #[derive(Default, Debug)]
 pub struct PackageConfig {
-    pub data_source: Option<DataSourceConfig>,
+    pub data_store: Option<DataStoreConfig>,
 }
 
 #[derive(Clone, Debug)]
-pub enum DataSourceConfig {
+pub enum DataStoreConfig {
     InMemory,
 }

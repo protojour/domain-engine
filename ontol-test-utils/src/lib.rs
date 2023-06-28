@@ -8,7 +8,7 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{
-    config::{DataSourceConfig, PackageConfig},
+    config::{DataStoreConfig, PackageConfig},
     env::Env,
     PackageId,
 };
@@ -124,7 +124,7 @@ pub struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
-    data_source: Option<(SourceName, DataSourceConfig)>,
+    data_store: Option<(SourceName, DataStoreConfig)>,
 }
 
 impl TestPackages {
@@ -142,12 +142,12 @@ impl TestPackages {
                 .collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
-            data_source: None,
+            data_store: None,
         }
     }
 
-    pub fn with_data_source(mut self, name: SourceName, config: DataSourceConfig) -> Self {
-        self.data_source = Some((name, config));
+    pub fn with_data_store(mut self, name: SourceName, config: DataStoreConfig) -> Self {
+        self.data_store = Some((name, config));
         self
     }
 
@@ -171,9 +171,9 @@ impl TestPackages {
 
                         let mut package_config = PackageConfig::default();
 
-                        if let Some((db_source_name, data_source_config)) = &self.data_source {
+                        if let Some((db_source_name, data_store_config)) = &self.data_store {
                             if source_name == db_source_name.0 {
-                                package_config.data_source = Some(data_source_config.clone());
+                                package_config.data_store = Some(data_store_config.clone());
                             }
                         }
 
