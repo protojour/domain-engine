@@ -48,7 +48,6 @@ impl<'e> TypeBinding<'e> {
             operator_id = type_info.operator_id,
             processor = type_info.operator_id.map(|id| env.new_serde_processor(
                 id,
-                None,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root()
             ))
@@ -112,7 +111,6 @@ impl<'e> TypeBinding<'e> {
         self.env
             .new_serde_processor(
                 self.serde_operator_id(),
-                None,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
             )
@@ -200,12 +198,7 @@ impl<'b, 'e> Deserializer<'b, 'e> {
         let attribute_result = self
             .binding
             .env
-            .new_serde_processor(
-                self.binding.serde_operator_id(),
-                None,
-                self.mode,
-                self.level,
-            )
+            .new_serde_processor(self.binding.serde_operator_id(), self.mode, self.level)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
         match self.binding.json_schema.as_ref() {
@@ -270,7 +263,6 @@ impl<'b, 'e> Serializer<'b, 'e> {
                 } else {
                     self.binding.serde_operator_id()
                 },
-                None,
                 self.mode,
                 self.level,
             )
@@ -358,7 +350,6 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
             .env
             .new_serde_processor(
                 entity_info.id_operator_id,
-                None,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
             )

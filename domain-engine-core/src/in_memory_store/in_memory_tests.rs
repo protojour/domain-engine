@@ -150,16 +150,14 @@ async fn test_conduit_db_store_entity_tree() {
                                     }
                                 ]
                             },
-                            // BUG: This still requires `comment_on` even if that's obvious given
-                            // that the comment is embedded inside the article which is the subject of this relationship.
-                            // "comments": [
-                            //     {
-                            //         "body": "First post!",
-                            //         "author": {
-                            //             "user_id": pre_existing_user_id.to_string()
-                            //         }
-                            //     },
-                            // ]
+                            "comments": [
+                                {
+                                    "body": "First post!",
+                                    "author": {
+                                        "user_id": pre_existing_user_id.to_string()
+                                    }
+                                },
+                            ]
                         }))
                         .unwrap(),
                 )

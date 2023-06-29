@@ -431,7 +431,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
 
-            let required_count = struct_op.properties_meta.required_count(ctx.mode);
+            let required_count = struct_op.required_count(ctx.mode, None);
             if required_count > 0 {
                 map.serialize_entry(
                     "required",

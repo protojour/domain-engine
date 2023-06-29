@@ -121,13 +121,12 @@ impl Env {
     pub fn new_serde_processor(
         &self,
         value_operator_id: SerdeOperatorId,
-        rel_params_operator_id: Option<SerdeOperatorId>,
         mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
-            rel_params_operator_id,
+            ctx: Default::default(),
             level,
             env: self,
             mode,

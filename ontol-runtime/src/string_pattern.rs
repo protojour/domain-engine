@@ -54,7 +54,6 @@ impl StringPattern {
                             type_info
                                 .operator_id
                                 .expect("No operator id for pattern constant part"),
-                            None,
                             ProcessorMode::Create,
                             ProcessorLevel::new_root(),
                         );

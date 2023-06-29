@@ -196,40 +196,27 @@ pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,
-    pub properties_meta: PropertiesMeta,
 }
 
 impl StructOperator {
     pub fn filter_properties(
         &self,
         mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
     ) -> impl Iterator<Item = (&String, &SerdeProperty)> {
         self.properties
             .iter()
-            .filter(move |(_, property)| property.filter(mode).is_some())
-    }
-}
-
-#[derive(Clone, Default, Debug)]
-pub struct PropertiesMeta {
-    // These number _include_ required properties with _default fallback values_.
-    pub required_count_for_create_update: u32,
-    pub required_count_for_read: u32,
-}
-
-impl PropertiesMeta {
-    pub fn required_count(&self, mode: ProcessorMode) -> usize {
-        match mode {
-            ProcessorMode::Create | ProcessorMode::Update => {
-                self.required_count_for_create_update as usize
-            }
-            ProcessorMode::Read => self.required_count_for_read as usize,
-        }
+            .filter(move |(_, property)| property.filter(mode, parent_property_id).is_some())
     }
 
-    pub fn add(&mut self, other: &Self) {
-        self.required_count_for_create_update += other.required_count_for_create_update;
-        self.required_count_for_read += other.required_count_for_read;
+    pub fn required_count(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
+    ) -> usize {
+        self.filter_properties(mode, parent_property_id)
+            .filter(|(_, property)| !property.is_optional())
+            .count()
     }
 }
 
@@ -262,12 +249,25 @@ impl SerdeProperty {
     }
 
     #[inline]
-    pub fn filter(&self, mode: ProcessorMode) -> Option<&Self> {
+    pub fn filter(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
+    ) -> Option<&Self> {
         if !matches!(mode, ProcessorMode::Read) && self.is_read_only() {
-            None
-        } else {
-            Some(self)
+            return None;
         }
+
+        if let Some(parent_property_id) = parent_property_id {
+            // Filter out if this property is the mirrored property of the parent property
+            if self.property_id.relationship_id == parent_property_id.relationship_id
+                && self.property_id.role != parent_property_id.role
+            {
+                return None;
+            }
+        }
+
+        Some(self)
     }
 }
 

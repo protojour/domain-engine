@@ -89,7 +89,7 @@ impl<'a> ArgsWrapper<'a> {
 
         let (mode, level) = typing_purpose.mode_and_level();
 
-        env.new_serde_processor(operator_id, None, mode, level)
+        env.new_serde_processor(operator_id, mode, level)
             .deserialize(LookAheadValueDeserializer {
                 value: argument.spanned_value(),
             })

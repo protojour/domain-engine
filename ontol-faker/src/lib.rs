@@ -63,7 +63,6 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         Ok(self
             .fake_attribute(self.env.new_serde_processor(
                 operator_id,
-                None,
                 self.processor_mode,
                 ProcessorLevel::new_root_with_recursion_limit(32),
             ))?
@@ -206,7 +205,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
         };
 
-        let rel_params = if let Some(rel_params_operator_id) = processor.rel_params_operator_id {
+        let rel_params = if let Some(rel_params_operator_id) = processor.ctx.rel_params_operator_id
+        {
             self.fake_attribute(processor.new_child(rel_params_operator_id)?)?
                 .value
         } else {

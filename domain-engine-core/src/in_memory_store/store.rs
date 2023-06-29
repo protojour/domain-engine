@@ -160,7 +160,6 @@ impl InMemoryStore {
 
                     let processor = env.new_serde_processor(
                         operator_id,
-                        None,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
                     );

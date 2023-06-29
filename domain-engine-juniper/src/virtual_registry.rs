@@ -100,7 +100,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
 
                 let (mode, _) = typing_purpose.mode_and_level();
 
-                for (name, property) in struct_op.filter_properties(mode) {
+                for (name, property) in struct_op.filter_properties(mode, None) {
                     output.push(self.get_operator_argument(
                         name,
                         property.value_operator_id,

@@ -88,34 +88,6 @@ fn test_fake_guitar_synth() {
                         "instrument-id": "guitar/9fe5a078-ccaa-f029-bccc-b1436ec3ffee",
                         "type": "guitar",
                         "string_count": -245468183,
-                        "played-by": [
-                            {
-                                "artist-id": "amet consectetur tempore",
-                                "name": "eaque omnis neque repellat nam",
-                                "plays": [
-                                    {
-                                        "instrument-id": "guitar/7165ee7a-5fde-9f8b-badd-ab0efe6cb2c5",
-                                        "type": "guitar",
-                                        "string_count": 270115708,
-                                        "played-by": [
-                                            {
-                                                "artist-id": "optio alias ipsa ut et",
-                                                "name": "nemo aut pariatur quia",
-                                                "plays": [
-                                                    {
-                                                        "instrument-id": "synth/3d58b86a-fcad-849f-ab0c-ebf52f2badd2",
-                                                        "type": "synth",
-                                                        "polyphony": 1898028637,
-                                                        // The faker recursion limit kicked in:
-                                                        "played-by": []
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
                     }
                 ]
             }),

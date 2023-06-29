@@ -103,7 +103,6 @@ impl WasmTypeInfo {
             .env
             .new_serde_processor(
                 operator_id(&self.inner)?,
-                None,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
             )
@@ -142,7 +141,6 @@ impl WasmValue {
         self.env
             .new_serde_processor(
                 operator_id(type_info)?,
-                None,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
             )

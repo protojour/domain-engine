@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator},
-    processor::SerdeProcessor,
+    processor::{SerdeProcessor, SubProcessorContext},
     StructOperator, EDGE_PROPERTY,
 };
 
@@ -108,7 +108,7 @@ impl<'e> SerdeProcessor<'e> {
                         rel_params: None,
                         processor: self
                             .new_child(*inner_operator_id)
-                            .map_err(RecursionLimitError::serialize_error)?,
+                            .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
                 self.serialize_rel_params::<S>(rel_params, &mut map)?;
@@ -204,7 +204,9 @@ impl<'e> SerdeProcessor<'e> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
-        for (name, serde_prop) in struct_op.filter_properties(self.mode) {
+        for (name, serde_prop) in
+            struct_op.filter_properties(self.mode, self.ctx.parent_property_id)
+        {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
@@ -225,11 +227,14 @@ impl<'e> SerdeProcessor<'e> {
                     value: &attribute.value,
                     rel_params: attribute.rel_params.filter_non_unit(),
                     processor: self
-                        .new_child_with_rel(
+                        .new_child_with_context(
                             serde_prop.value_operator_id,
-                            serde_prop.rel_params_operator_id,
+                            SubProcessorContext {
+                                parent_property_id: Some(serde_prop.property_id),
+                                rel_params_operator_id: serde_prop.rel_params_operator_id,
+                            },
                         )
-                        .map_err(RecursionLimitError::serialize_error)?,
+                        .map_err(RecursionLimitError::to_ser_error)?,
                 },
             )?;
         }
@@ -244,7 +249,7 @@ impl<'e> SerdeProcessor<'e> {
         rel_params: Option<&Value>,
         map: &mut <S as Serializer>::SerializeMap,
     ) -> Result<(), <S as Serializer>::Error> {
-        match (rel_params, self.rel_params_operator_id) {
+        match (rel_params, self.ctx.rel_params_operator_id) {
             (None, None) => {}
             (Some(rel_params), Some(operator_id)) => {
                 map.serialize_entry(
@@ -254,7 +259,7 @@ impl<'e> SerdeProcessor<'e> {
                         rel_params: None,
                         processor: self
                             .new_child(operator_id)
-                            .map_err(RecursionLimitError::serialize_error)?,
+                            .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
             }

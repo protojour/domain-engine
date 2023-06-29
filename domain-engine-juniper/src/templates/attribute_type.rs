@@ -300,7 +300,6 @@ impl<'v> AttributeType<'v> {
                     .env()
                     .new_serde_processor(
                         scalar_ref.operator_id,
-                        None,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
                     )

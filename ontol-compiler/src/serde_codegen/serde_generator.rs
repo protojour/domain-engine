@@ -5,9 +5,9 @@ use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     env::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
-        ConstructorSequenceOperator, PropertiesMeta, RelationSequenceOperator, SequenceRange,
-        SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator,
-        ValueOperator, ValueUnionVariant,
+        ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
+        SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
+        ValueUnionVariant,
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
     value_generator::ValueGenerator,
@@ -143,9 +143,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
-                        intersected_map
-                            .properties_meta
-                            .add(&next_map_type.properties_meta);
                     }
                 }
 
@@ -361,7 +358,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
-                        properties_meta: Default::default(),
                     }),
                 ));
             }
@@ -707,7 +703,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        let mut properties_meta = PropertiesMeta::default();
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
         if let Some(map) = &properties.map {
@@ -808,13 +803,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     flags |= SerdePropertyFlags::ENTITY_ID;
                 }
 
-                if property_cardinality.is_mandatory() {
-                    properties_meta.required_count_for_read += 1;
-                    if !flags.contains(SerdePropertyFlags::READ_ONLY) {
-                        properties_meta.required_count_for_create_update += 1;
-                    }
-                }
-
                 serde_properties.insert(
                     prop_key.into(),
                     SerdeProperty {
@@ -832,7 +820,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             typename: typename.into(),
             def_variant,
             properties: serde_properties,
-            properties_meta,
         })
     }
 }
