@@ -8,7 +8,11 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources, SpannedCompileError,
 };
-use ontol_runtime::{config::PackageConfig, env::Env, PackageId};
+use ontol_runtime::{
+    config::{DataStoreConfig, PackageConfig},
+    env::Env,
+    PackageId,
+};
 use wasm_bindgen::prelude::*;
 use wasm_domain::{WasmDomain, WasmMapper};
 use wasm_error::{JsCompileError, JsCompileErrors, WasmError};
@@ -87,7 +91,11 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv,
                         package_graph_builder.provide_package(ParsedPackage::parse(
                             request,
                             source_text,
-                            PackageConfig::default(),
+                            PackageConfig {
+                                // Note: Make sure only one of the domains have a data store.
+                                // (when WASM supports more than one domain)
+                                data_store: Some(DataStoreConfig::InMemory),
+                            },
                             &mut sources,
                             &mut source_code_registry,
                         ));
@@ -183,10 +191,9 @@ mod tests {
     #[wasm_bindgen_test]
     async fn compile_domain_and_introspec_graphql() {
         let ontol = "
-        pub type foo_id { fmt '' => string => _ }
+        pub type foo_id { fmt '' => string => . }
         pub type foo {
-            rel foo_id identifies: _
-            rel _ 'prop': int
+            rel .'prop'|id: foo_id
         }
         ";
 

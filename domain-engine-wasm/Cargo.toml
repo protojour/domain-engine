@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
+domain-engine-core.path = "../domain-engine-core"
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 ontol-faker = { path = "../ontol-faker", features = ["js"] }
@@ -21,7 +22,6 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 serde-wasm-bindgen = "0.5"
-unimock = "0.5"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

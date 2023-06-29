@@ -467,6 +467,7 @@ name = "domain-engine-wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "domain-engine-core",
  "domain-engine-juniper",
  "ontol-compiler",
  "ontol-faker",
@@ -475,7 +476,6 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
- "unimock",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
