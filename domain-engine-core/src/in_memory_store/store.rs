@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     entity_id_utils::{analyze_string_pattern, find_inherent_entity_id},
-    DomainError,
+    DomainEngine, DomainError,
 };
 
 #[derive(Debug)]
@@ -61,9 +61,14 @@ pub struct Edge {
 }
 
 impl InMemoryStore {
-    pub fn write_entity(&mut self, env: &Env, entity: Value) -> Result<Value, DomainError> {
+    pub fn write_entity(
+        &mut self,
+        engine: &DomainEngine,
+        entity: Value,
+    ) -> Result<Value, DomainError> {
         debug!("write entity {entity:#?}");
 
+        let env = engine.env();
         let type_info = env.get_type_info(entity.type_def_id);
         let entity_info = type_info
             .entity_info
@@ -97,7 +102,7 @@ impl InMemoryStore {
                 match entity_relationship.cardinality.1 {
                     ValueCardinality::One => {
                         self.insert_entity_relationship(
-                            env,
+                            engine,
                             &entity_key,
                             property_id,
                             attribute,
@@ -112,7 +117,7 @@ impl InMemoryStore {
 
                         for attribute in attributes {
                             self.insert_entity_relationship(
-                                env,
+                                engine,
                                 &entity_key,
                                 property_id,
                                 attribute,
@@ -134,7 +139,7 @@ impl InMemoryStore {
 
     fn insert_entity_relationship(
         &mut self,
-        env: &Env,
+        engine: &DomainEngine,
         entity_key: &DynamicKey,
         property_id: PropertyId,
         attribute: Attribute,
@@ -142,11 +147,12 @@ impl InMemoryStore {
     ) -> Result<(), DomainError> {
         debug!("entity rel attribute: {attribute:?}");
 
+        let env = engine.env();
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 
         let foreign_key = if value.type_def_id == entity_relationship.target {
-            let foreign_id = self.write_entity(env, value)?;
+            let foreign_id = self.write_entity(engine, value)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
             let foreign_key = Self::extract_dynamic_key(&value.data)?;

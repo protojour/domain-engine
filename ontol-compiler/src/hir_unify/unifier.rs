@@ -319,8 +319,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
                 let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
 
-                for (prop_scope, sub_scoped) in dep_tree.trees {
-                    nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_scoped)?.node);
+                for (prop_scope, sub_tree) in dep_tree.trees {
+                    nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_tree)?.node);
                 }
 
                 if !dep_tree.constants.is_empty() {

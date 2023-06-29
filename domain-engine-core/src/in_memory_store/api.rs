@@ -8,7 +8,9 @@ use ontol_runtime::{
 };
 use tokio::sync::RwLock;
 
-use crate::{data_store::DataStoreAPI, entity_id_utils::analyze_string_pattern, DomainError};
+use crate::{
+    data_store::DataStoreAPI, entity_id_utils::analyze_string_pattern, DomainEngine, DomainError,
+};
 
 use super::store::{EdgeCollection, EntityCollection, InMemoryStore};
 
@@ -21,11 +23,19 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn store_entity(&self, env: &Env, entity: Value) -> Result<Value, DomainError> {
-        self.store.write().await.write_entity(env, entity)
+    async fn store_entity(
+        &self,
+        engine: &DomainEngine,
+        entity: Value,
+    ) -> Result<Value, DomainError> {
+        self.store.write().await.write_entity(engine, entity)
     }
 
-    async fn query(&self, _env: &Env, def_id: DefId) -> Result<Vec<Value>, DomainError> {
+    async fn query(
+        &self,
+        _engine: &DomainEngine,
+        def_id: DefId,
+    ) -> Result<Vec<Value>, DomainError> {
         let storage = self.store.read().await;
 
         let _collection = match storage.collections.get(&def_id) {

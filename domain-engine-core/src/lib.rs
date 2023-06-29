@@ -88,11 +88,21 @@ impl DomainEngine {
         }
     }
 
+    pub fn env(&self) -> &Env {
+        &self.env
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn data_store(&self) -> Result<&(dyn DataStoreAPI + Send + Sync), DomainError> {
+        self.data_store.as_deref().ok_or(DomainError::NoDataStore)
+    }
+
     async fn store_entity_inner(&self, entity: Value) -> Result<Value, DomainError> {
         // TODO: Domain translation by finding optimal mapping path
-        let data_store = self.data_store.as_ref().ok_or(DomainError::NoDataStore)?;
-
-        data_store.store_entity(&self.env, entity).await
+        self.data_store()?.store_entity(self, entity).await
     }
 }
 
