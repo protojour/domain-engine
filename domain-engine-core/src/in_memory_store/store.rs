@@ -200,15 +200,22 @@ impl InMemoryStore {
 
         match query {
             Query::Leaf => {
-                // FIXME: A leaf query for an entity should probably only include its ID.
+                // Entity leaf only includes the ID of that entity, not its other fields
+                let id_attribute = properties
+                    .get(&PropertyId::subject(entity_info.id_relationship_id))
+                    .unwrap();
+                Ok(id_attribute.value.clone())
+            }
+            Query::Struct(struct_query) => {
+                let mut query_properties = struct_query.properties.clone();
 
-                let mut query_properties: FnvHashMap<PropertyId, Query> = Default::default();
                 // Need to "infer" mandatory entity properties, because JSON serializer expects that
                 for (property_id, entity_relationship) in &entity_info.entity_relationships {
                     if matches!(
                         entity_relationship.cardinality.0,
                         PropertyCardinality::Mandatory
-                    ) {
+                    ) && !query_properties.contains_key(property_id)
+                    {
                         query_properties.insert(*property_id, Query::Leaf);
                     }
                 }
@@ -223,9 +230,6 @@ impl InMemoryStore {
                         properties: query_properties,
                     },
                 )
-            }
-            Query::Struct(struct_query) => {
-                self.apply_struct_query(engine, entity_info, entity_key, properties, struct_query)
             }
             _ => todo!(),
         }

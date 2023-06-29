@@ -13,6 +13,9 @@ pub enum ProcessorMode {
     Create,
     Read,
     Update,
+    /// Used for inspecting the fields of types.
+    /// Should not be used for serialization or deserialization.
+    Inspect,
 }
 
 #[derive(Copy, Clone, Debug)]

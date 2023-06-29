@@ -115,7 +115,8 @@ async fn test_conduit_db_store_entity_tree() {
     conduit_db()
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
-            let [user_type, article_type] = TypeBinding::new_n(&test_env, ["User", "Article"]);
+            let [user_type, article_type, comment_type] =
+                TypeBinding::new_n(&test_env, ["User", "Article", "Comment"]);
 
             let pre_existing_user_id: Uuid = domain_engine
                 .store_entity(
@@ -196,13 +197,7 @@ async fn test_conduit_db_store_entity_tree() {
                     "password_hash": "s3cr3t",
                     "bio": "New bio",
                     "authored_articles": [
-                        {
-                            "article_id": article_id.to_string(),
-                            "slug": "foo",
-                            "title": "Foo",
-                            "description": "An article",
-                            "body": "The body",
-                        }
+                        { "article_id": article_id.to_string() }
                     ]
                 })
             );
@@ -215,7 +210,10 @@ async fn test_conduit_db_store_entity_tree() {
                                 .struct_query([(
                                     "authored_articles",
                                     article_type
-                                        .struct_query([("comments", Query::Leaf)])
+                                        .struct_query([(
+                                            "comments",
+                                            comment_type.struct_query([]).into()
+                                        )])
                                         .into()
                                 )])
                                 .into(),
@@ -243,10 +241,6 @@ async fn test_conduit_db_store_entity_tree() {
                                     "body": "First post!",
                                     "author": {
                                         "user_id": pre_existing_user_id.to_string(),
-                                        "username": "pre-existing",
-                                        "email": "pre@existing",
-                                        "password_hash": "s3cr3t",
-                                        "bio": "",
                                     }
                                 }
                             ]

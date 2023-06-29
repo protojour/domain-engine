@@ -23,6 +23,7 @@ pub enum JsonFormat {
     Create,
     Read,
     Update,
+    Inspect,
 }
 
 impl JsonFormat {
@@ -31,6 +32,7 @@ impl JsonFormat {
             Self::Create => ProcessorMode::Create,
             Self::Update => ProcessorMode::Update,
             Self::Read => ProcessorMode::Read,
+            Self::Inspect => ProcessorMode::Inspect,
         }
     }
 }

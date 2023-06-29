@@ -151,7 +151,7 @@ impl UnionOperator {
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        if matches!(mode, ProcessorMode::Read) || level.is_root() {
+        if matches!(mode, ProcessorMode::Inspect) || level.is_root() {
             let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
                 variant.discriminator.purpose > VariantPurpose::Identification
             });

@@ -3,7 +3,7 @@ use smartstring::alias::String;
 
 use crate::{value::PropertyId, DefId};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Query {
     Leaf,
     Struct(StructQuery),
@@ -11,14 +11,14 @@ pub enum Query {
     Entity(EntityQuery),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EntityQuery {
     pub source: StructOrUnionQuery,
     pub limit: u32,
     pub cursor: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum StructOrUnionQuery {
     Struct(StructQuery),
     Union(DefId, Vec<StructQuery>),
@@ -33,7 +33,7 @@ impl StructOrUnionQuery {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct StructQuery {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, Query>,

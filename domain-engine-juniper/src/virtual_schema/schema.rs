@@ -223,7 +223,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
             )
         }
         SerdeOperator::Union(union_op) => {
-            match union_op.variants(ProcessorMode::Read, ProcessorLevel::new_child()) {
+            match union_op.variants(ProcessorMode::Inspect, ProcessorLevel::new_child()) {
                 FilteredVariants::Single(operator_id) => classify_type(env, operator_id),
                 FilteredVariants::Union(variants) => {
                     // start with the "highest" classification and downgrade as "lower" variants are found.
@@ -235,7 +235,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
 
                     for variant in variants {
                         if variant.discriminator.discriminant == Discriminant::MapFallback {
-                            panic!("BUG: Don't want to see this variant in ProcessorMode::Select");
+                            panic!("BUG: Don't want to see this variant in ProcessorMode::Inspect");
                         }
 
                         let variant_classification = classify_type(env, variant.operator_id);

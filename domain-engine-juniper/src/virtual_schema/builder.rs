@@ -242,7 +242,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 },
             ),
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Read, ProcessorLevel::new_root()) {
+                match union_op.variants(ProcessorMode::Inspect, ProcessorLevel::new_root()) {
                     FilteredVariants::Single(operator_id) => {
                         self.make_node_type_inner(type_info, operator_id)
                     }
