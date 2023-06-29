@@ -1,4 +1,8 @@
-use ontol_runtime::{config::DataStoreConfig, query::StructQuery};
+use fnv::FnvHashMap;
+use ontol_runtime::{
+    config::DataStoreConfig,
+    query::{Query, StructQuery},
+};
 use ontol_test_utils::{
     assert_error_msg, expect_eq,
     type_binding::{create_de, read_de, read_ser, TypeBinding},
@@ -167,7 +171,10 @@ async fn test_conduit_db_store_entity_tree() {
                 .query_entities(
                     StructQuery {
                         def_id: user.def_id(),
-                        properties: Default::default(),
+                        properties: FnvHashMap::from_iter([(
+                            user.find_property("authored_articles").unwrap(),
+                            Query::Leaf,
+                        )]),
                     }
                     .into(),
                 )

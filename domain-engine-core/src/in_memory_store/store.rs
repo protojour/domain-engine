@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::{EntityRelationship, Env, ValueCardinality},
+    env::{EntityInfo, EntityRelationship, Env, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
@@ -26,24 +26,17 @@ use crate::{
 
 #[derive(Debug)]
 pub struct InMemoryStore {
-    pub collections: FnvHashMap<DefId, EntityCollection>,
+    pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
     #[allow(unused)]
     pub edge_collections: FnvHashMap<RelationshipId, EdgeCollection>,
     pub int_id_counter: i64,
 }
 
-#[derive(Debug, Clone)]
-enum DynamicKey {
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum DynamicKey {
     String(String),
     Uuid(Uuid),
     Int(i64),
-}
-
-#[derive(Debug)]
-pub enum EntityCollection {
-    String(EntityTable<String>),
-    Uuid(EntityTable<Uuid>),
-    Int(EntityTable<i64>),
 }
 
 pub type EntityTable<K> = IndexMap<K, BTreeMap<PropertyId, Attribute>>;
@@ -69,13 +62,13 @@ impl InMemoryStore {
     ) -> DomainResult<Vec<Value>> {
         match &query.source {
             StructOrUnionQuery::Struct(struct_query) => {
-                self.query_single_entity(engine, struct_query)
+                self.query_single_entity_collection(engine, struct_query)
             }
             StructOrUnionQuery::Union(..) => todo!(),
         }
     }
 
-    fn query_single_entity(
+    fn query_single_entity_collection(
         &self,
         engine: &DomainEngine,
         struct_query: &StructQuery,
@@ -91,57 +84,135 @@ impl InMemoryStore {
             .as_ref()
             .ok_or(DomainError::NotAnEntity(struct_query.def_id))?;
 
-        let raw_props_vec: Vec<_> = match collection {
-            EntityCollection::Uuid(table) => table.values().cloned().collect(),
-            EntityCollection::Int(table) => table.values().cloned().collect(),
-            EntityCollection::String(table) => table.values().cloned().collect(),
-        };
+        let raw_props_vec: Vec<_> = collection
+            .iter()
+            .map(|(key, props)| (key.clone(), props.clone()))
+            .collect();
 
         raw_props_vec
             .into_iter()
-            .map(|mut properties| -> DomainResult<Value> {
-                for (property_id, sub_query) in &struct_query.properties {
-                    if properties.contains_key(property_id) {
-                        continue;
-                    }
-
-                    if let Some(entity_relationship) =
-                        entity_info.entity_relationships.get(property_id)
-                    {
-                        let attributes = self.sub_query(engine, *property_id, sub_query)?;
-
-                        match entity_relationship.cardinality.1 {
-                            ValueCardinality::One => {
-                                if let Some(attribute) = attributes.into_iter().next() {
-                                    properties.insert(*property_id, attribute);
-                                }
-                            }
-                            ValueCardinality::Many => {
-                                properties.insert(
-                                    *property_id,
-                                    Value::new(
-                                        Data::Sequence(attributes),
-                                        entity_relationship.target,
-                                    )
-                                    .into(),
-                                );
-                            }
-                        }
-                    }
-                }
-
-                Ok(Value::new(Data::Struct(properties), struct_query.def_id))
+            .map(|(entity_key, properties)| {
+                self.apply_struct_query(engine, entity_info, &entity_key, properties, struct_query)
             })
             .collect()
     }
 
-    fn sub_query(
+    fn apply_struct_query(
         &self,
-        _engine: &DomainEngine,
-        _property_id: PropertyId,
-        _query: &Query,
+        engine: &DomainEngine,
+        entity_info: &EntityInfo,
+        entity_key: &DynamicKey,
+        mut properties: BTreeMap<PropertyId, Attribute>,
+        struct_query: &StructQuery,
+    ) -> DomainResult<Value> {
+        for (property_id, sub_query) in &struct_query.properties {
+            if properties.contains_key(property_id) {
+                continue;
+            }
+
+            if let Some(entity_relationship) = entity_info.entity_relationships.get(property_id) {
+                let attributes =
+                    self.sub_query_attributes(engine, entity_key, *property_id, sub_query)?;
+
+                match entity_relationship.cardinality.1 {
+                    ValueCardinality::One => {
+                        if let Some(attribute) = attributes.into_iter().next() {
+                            properties.insert(*property_id, attribute);
+                        }
+                    }
+                    ValueCardinality::Many => {
+                        properties.insert(
+                            *property_id,
+                            Value::new(Data::Sequence(attributes), entity_relationship.target)
+                                .into(),
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(Value::new(Data::Struct(properties), struct_query.def_id))
+    }
+
+    fn sub_query_attributes(
+        &self,
+        engine: &DomainEngine,
+        parent_key: &DynamicKey,
+        property_id: PropertyId,
+        query: &Query,
     ) -> DomainResult<Vec<Attribute>> {
-        todo!()
+        let relationship_id = property_id.relationship_id;
+        let edge_collection = self
+            .edge_collections
+            .get(&relationship_id)
+            .expect("No edge collection");
+
+        match property_id.role {
+            Role::Subject => edge_collection
+                .edges
+                .iter()
+                .filter(|edge| &edge.from == parent_key)
+                .map(|edge| -> DomainResult<Attribute> {
+                    let entity = self.sub_query_entity(engine, &edge.to, query)?;
+                    Ok(Attribute {
+                        value: entity,
+                        rel_params: edge.params.clone(),
+                    })
+                })
+                .collect(),
+            Role::Object => edge_collection
+                .edges
+                .iter()
+                .filter(|edge| &edge.to == parent_key)
+                .map(|edge| -> DomainResult<Attribute> {
+                    let entity = self.sub_query_entity(engine, &edge.from, query)?;
+                    Ok(Attribute {
+                        value: entity,
+                        rel_params: edge.params.clone(),
+                    })
+                })
+                .collect(),
+        }
+    }
+
+    fn sub_query_entity(
+        &self,
+        engine: &DomainEngine,
+        entity_key: &DynamicKey,
+        query: &Query,
+    ) -> DomainResult<Value> {
+        // Find the def_id of the dynamic key. This is a little inefficient.
+        let (def_id, properties) = self
+            .collections
+            .iter()
+            .find_map(|(def_id, collection)| {
+                if let Some(properties) = collection.get(entity_key) {
+                    Some((*def_id, properties.clone()))
+                } else {
+                    None
+                }
+            })
+            .ok_or(DomainError::InvalidId)?;
+
+        let type_info = engine.get_env().get_type_info(def_id);
+        let entity_info = type_info
+            .entity_info
+            .as_ref()
+            .ok_or(DomainError::NotAnEntity(def_id))?;
+
+        match query {
+            Query::Leaf => self.apply_struct_query(
+                engine,
+                entity_info,
+                entity_key,
+                properties,
+                &StructQuery {
+                    def_id,
+                    properties: Default::default(),
+                },
+            ),
+            _ => todo!(),
+        }
     }
 
     pub fn write_entity(&mut self, engine: &DomainEngine, entity: Value) -> DomainResult<Value> {
@@ -220,7 +291,7 @@ impl InMemoryStore {
         }
 
         let collection = self.collections.get_mut(&entity.type_def_id).unwrap();
-        Self::store_in_collection(collection, entity_key, raw_props)?;
+        collection.insert(entity_key, raw_props);
 
         Ok(id)
     }
@@ -321,34 +392,7 @@ impl InMemoryStore {
         dynamic_key: &DynamicKey,
     ) -> Option<&BTreeMap<PropertyId, Attribute>> {
         let collection = self.collections.get(&def_id)?;
-        match (collection, dynamic_key) {
-            (EntityCollection::String(table), DynamicKey::String(string)) => table.get(string),
-            (EntityCollection::Uuid(table), DynamicKey::Uuid(uuid)) => table.get(uuid),
-            (EntityCollection::Int(table), DynamicKey::Int(int)) => table.get(int),
-            _ => None,
-        }
-    }
-
-    fn store_in_collection(
-        collection: &mut EntityCollection,
-        dynamic_key: DynamicKey,
-        raw_props: BTreeMap<PropertyId, Attribute>,
-    ) -> DomainResult<()> {
-        match (collection, dynamic_key) {
-            (EntityCollection::String(table), DynamicKey::String(string)) => {
-                table.insert(string, raw_props);
-                Ok(())
-            }
-            (EntityCollection::Uuid(table), DynamicKey::Uuid(uuid)) => {
-                table.insert(uuid, raw_props);
-                Ok(())
-            }
-            (EntityCollection::Int(table), DynamicKey::Int(int)) => {
-                table.insert(int, raw_props);
-                Ok(())
-            }
-            _ => Err(DomainError::InvalidId),
-        }
+        collection.get(dynamic_key)
     }
 
     fn generate_entity_id(
