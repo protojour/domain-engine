@@ -88,12 +88,8 @@ impl DomainEngine {
         }
     }
 
-    pub fn env(&self) -> &Env {
+    fn get_env(&self) -> &Env {
         &self.env
-    }
-
-    pub fn config(&self) -> &Config {
-        &self.config
     }
 
     pub fn data_store(&self) -> Result<&(dyn DataStoreAPI + Send + Sync), DomainError> {

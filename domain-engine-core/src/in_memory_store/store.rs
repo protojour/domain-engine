@@ -68,7 +68,7 @@ impl InMemoryStore {
     ) -> Result<Value, DomainError> {
         debug!("write entity {entity:#?}");
 
-        let env = engine.env();
+        let env = engine.get_env();
         let type_info = env.get_type_info(entity.type_def_id);
         let entity_info = type_info
             .entity_info
@@ -147,7 +147,7 @@ impl InMemoryStore {
     ) -> Result<(), DomainError> {
         debug!("entity rel attribute: {attribute:?}");
 
-        let env = engine.env();
+        let env = engine.get_env();
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 
