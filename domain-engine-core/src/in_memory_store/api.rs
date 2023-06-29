@@ -1,15 +1,16 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     env::Env,
+    query::EntityQuery,
     serde::operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
     string_types::StringLikeType,
-    value::Value,
+    value::{Attribute, Value},
     DefId, PackageId, RelationshipId,
 };
 use tokio::sync::RwLock;
 
 use crate::{
-    data_store::DataStoreAPI, entity_id_utils::analyze_string_pattern, DomainEngine, DomainError,
+    data_store::DataStoreAPI, entity_id_utils::analyze_string_pattern, DomainEngine, DomainResult,
 };
 
 use super::store::{EdgeCollection, EntityCollection, InMemoryStore};
@@ -23,27 +24,23 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn store_entity(
-        &self,
-        engine: &DomainEngine,
-        entity: Value,
-    ) -> Result<Value, DomainError> {
-        self.store.write().await.write_entity(engine, entity)
-    }
-
     async fn query(
         &self,
-        _engine: &DomainEngine,
-        def_id: DefId,
-    ) -> Result<Vec<Value>, DomainError> {
-        let storage = self.store.read().await;
+        engine: &DomainEngine,
+        query: EntityQuery,
+    ) -> DomainResult<Vec<Attribute>> {
+        Ok(self
+            .store
+            .read()
+            .await
+            .query_entities(engine, &query)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
 
-        let _collection = match storage.collections.get(&def_id) {
-            Some(collection) => collection,
-            None => return Ok(vec![]),
-        };
-
-        Ok(vec![])
+    async fn store_entity(&self, engine: &DomainEngine, entity: Value) -> DomainResult<Value> {
+        self.store.write().await.write_entity(engine, entity)
     }
 }
 

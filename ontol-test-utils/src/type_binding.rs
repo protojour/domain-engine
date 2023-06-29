@@ -103,6 +103,10 @@ impl<'e> TypeBinding<'e> {
         .data(data)
     }
 
+    pub fn def_id(&self) -> DefId {
+        self.type_info.def_id
+    }
+
     fn serde_operator_id(&self) -> SerdeOperatorId {
         self.type_info.operator_id.expect("No serde operator id")
     }

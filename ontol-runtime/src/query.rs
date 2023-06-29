@@ -18,6 +18,16 @@ pub struct EntityQuery {
     pub cursor: Option<String>,
 }
 
+impl From<StructQuery> for EntityQuery {
+    fn from(value: StructQuery) -> Self {
+        EntityQuery {
+            source: StructOrUnionQuery::Struct(value),
+            limit: 20,
+            cursor: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum StructOrUnionQuery {
     Struct(StructQuery),

@@ -6,9 +6,9 @@ pub type User {
     rel .'user_id'(rel .gen: auto)|id: user_id
     rel .'username': string
     rel .'email': string
+    rel .'password_hash': string
     rel .'bio'(rel .default := ''): string
     rel .'image'?: string
-    rel .'password_hash': string
 
     // TODO(constraint): User cannot follow itself
     rel .'following'::'followed_by'? [User]

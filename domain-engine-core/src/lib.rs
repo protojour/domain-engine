@@ -44,21 +44,19 @@ pub enum DomainError {
     UnresolvedForeignKey(String),
 }
 
+pub type DomainResult<T> = Result<T, DomainError>;
+
 #[unimock::unimock(api = EngineAPIMock)]
 #[async_trait::async_trait]
 pub trait EngineAPI: Send + Sync + 'static {
     fn get_config(&self) -> &Config;
 
     /// Store an entity. Returns the entity id.
-    async fn store_entity(&self, entity: Value) -> Result<Value, DomainError>;
+    async fn store_entity(&self, entity: Value) -> DomainResult<Value>;
 
-    async fn query_entities(&self, query: EntityQuery) -> Result<Vec<Attribute>, DomainError>;
+    async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>>;
 
-    async fn create_entity(
-        &self,
-        value: Value,
-        query: StructOrUnionQuery,
-    ) -> Result<Value, DomainError>;
+    async fn create_entity(&self, value: Value, query: StructOrUnionQuery) -> DomainResult<Value>;
 }
 
 pub struct DomainEngine {
@@ -92,11 +90,16 @@ impl DomainEngine {
         &self.env
     }
 
-    pub fn data_store(&self) -> Result<&(dyn DataStoreAPI + Send + Sync), DomainError> {
+    pub fn data_store(&self) -> DomainResult<&(dyn DataStoreAPI + Send + Sync)> {
         self.data_store.as_deref().ok_or(DomainError::NoDataStore)
     }
 
-    async fn store_entity_inner(&self, entity: Value) -> Result<Value, DomainError> {
+    async fn query_entities_inner(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+        // TODO: Domain translation by rewriting whatever is used as query language
+        self.data_store()?.query(self, query).await
+    }
+
+    async fn store_entity_inner(&self, entity: Value) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
         self.data_store()?.store_entity(self, entity).await
     }
@@ -108,20 +111,19 @@ impl EngineAPI for DomainEngine {
         &self.config
     }
 
-    async fn store_entity(&self, entity: Value) -> Result<Value, DomainError> {
-        self.store_entity_inner(entity).await
+    async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+        self.query_entities_inner(query).await
     }
 
-    async fn query_entities(&self, _query: EntityQuery) -> Result<Vec<Attribute>, DomainError> {
-        let _ = self.env.domains().count();
-        Ok(vec![])
+    async fn store_entity(&self, entity: Value) -> DomainResult<Value> {
+        self.store_entity_inner(entity).await
     }
 
     async fn create_entity(
         &self,
         _value: Value,
         _query: StructOrUnionQuery,
-    ) -> Result<Value, DomainError> {
+    ) -> DomainResult<Value> {
         Ok(Value::unit())
     }
 }

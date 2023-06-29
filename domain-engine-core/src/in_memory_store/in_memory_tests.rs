@@ -1,4 +1,4 @@
-use ontol_runtime::config::DataStoreConfig;
+use ontol_runtime::{config::DataStoreConfig, query::StructQuery};
 use ontol_test_utils::{
     assert_error_msg, expect_eq,
     type_binding::{create_de, read_de, read_ser, TypeBinding},
@@ -162,6 +162,28 @@ async fn test_conduit_db_store_entity_tree() {
                 )
                 .await
                 .unwrap();
+
+            let queried_users = domain_engine
+                .query_entities(
+                    StructQuery {
+                        def_id: user.def_id(),
+                        properties: Default::default(),
+                    }
+                    .into(),
+                )
+                .await
+                .unwrap();
+
+            expect_eq!(
+                actual = read_ser(&user).json(&queried_users[0].value),
+                expected = json!({
+                    "user_id": pre_existing_user_id.to_string(),
+                    "username": "pre-existing",
+                    "email": "pre@existing",
+                    "password_hash": "s3cr3t",
+                    "bio": "",
+                })
+            );
         })
         .await;
 }

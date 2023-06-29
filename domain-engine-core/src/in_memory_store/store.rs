@@ -4,6 +4,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::{EntityRelationship, Env, ValueCardinality},
+    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
         processor::{ProcessorLevel, ProcessorMode},
@@ -20,7 +21,7 @@ use uuid::Uuid;
 
 use crate::{
     entity_id_utils::{analyze_string_pattern, find_inherent_entity_id},
-    DomainEngine, DomainError,
+    DomainEngine, DomainError, DomainResult,
 };
 
 #[derive(Debug)]
@@ -61,11 +62,89 @@ pub struct Edge {
 }
 
 impl InMemoryStore {
-    pub fn write_entity(
-        &mut self,
+    pub fn query_entities(
+        &self,
         engine: &DomainEngine,
-        entity: Value,
-    ) -> Result<Value, DomainError> {
+        query: &EntityQuery,
+    ) -> DomainResult<Vec<Value>> {
+        match &query.source {
+            StructOrUnionQuery::Struct(struct_query) => {
+                self.query_single_entity(engine, struct_query)
+            }
+            StructOrUnionQuery::Union(..) => todo!(),
+        }
+    }
+
+    fn query_single_entity(
+        &self,
+        engine: &DomainEngine,
+        struct_query: &StructQuery,
+    ) -> DomainResult<Vec<Value>> {
+        let collection = self
+            .collections
+            .get(&struct_query.def_id)
+            .ok_or(DomainError::InvalidId)?;
+
+        let type_info = engine.get_env().get_type_info(struct_query.def_id);
+        let entity_info = type_info
+            .entity_info
+            .as_ref()
+            .ok_or(DomainError::NotAnEntity(struct_query.def_id))?;
+
+        let raw_props_vec: Vec<_> = match collection {
+            EntityCollection::Uuid(table) => table.values().cloned().collect(),
+            EntityCollection::Int(table) => table.values().cloned().collect(),
+            EntityCollection::String(table) => table.values().cloned().collect(),
+        };
+
+        raw_props_vec
+            .into_iter()
+            .map(|mut properties| -> DomainResult<Value> {
+                for (property_id, sub_query) in &struct_query.properties {
+                    if properties.contains_key(property_id) {
+                        continue;
+                    }
+
+                    if let Some(entity_relationship) =
+                        entity_info.entity_relationships.get(property_id)
+                    {
+                        let attributes = self.sub_query(engine, *property_id, sub_query)?;
+
+                        match entity_relationship.cardinality.1 {
+                            ValueCardinality::One => {
+                                if let Some(attribute) = attributes.into_iter().next() {
+                                    properties.insert(*property_id, attribute);
+                                }
+                            }
+                            ValueCardinality::Many => {
+                                properties.insert(
+                                    *property_id,
+                                    Value::new(
+                                        Data::Sequence(attributes),
+                                        entity_relationship.target,
+                                    )
+                                    .into(),
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Ok(Value::new(Data::Struct(properties), struct_query.def_id))
+            })
+            .collect()
+    }
+
+    fn sub_query(
+        &self,
+        _engine: &DomainEngine,
+        _property_id: PropertyId,
+        _query: &Query,
+    ) -> DomainResult<Vec<Attribute>> {
+        todo!()
+    }
+
+    pub fn write_entity(&mut self, engine: &DomainEngine, entity: Value) -> DomainResult<Value> {
         debug!("write entity {entity:#?}");
 
         let env = engine.get_env();
@@ -75,11 +154,13 @@ impl InMemoryStore {
             .as_ref()
             .ok_or(DomainError::NotAnEntity(entity.type_def_id))?;
 
-        let id = match find_inherent_entity_id(env, &entity)? {
-            Some(id) => id,
+        let (id, id_generated) = match find_inherent_entity_id(env, &entity)? {
+            Some(id) => (id, false),
             None => {
                 if let Some(value_generator) = entity_info.id_value_generator {
-                    self.generate_entity_id(env, entity_info.id_operator_id, value_generator)?
+                    let id =
+                        self.generate_entity_id(env, entity_info.id_operator_id, value_generator)?;
+                    (id, true)
                 } else {
                     panic!("No id provided and no ID generator");
                 }
@@ -88,10 +169,17 @@ impl InMemoryStore {
 
         debug!("write entity id={id:?}");
 
-        let struct_map = match entity.data {
+        let mut struct_map = match entity.data {
             Data::Struct(struct_map) => struct_map,
             _ => return Err(DomainError::EntityMustBeStruct),
         };
+
+        if id_generated {
+            struct_map.insert(
+                PropertyId::subject(entity_info.id_relationship_id),
+                id.clone().into(),
+            );
+        }
 
         let mut raw_props: BTreeMap<PropertyId, Attribute> = Default::default();
 
@@ -144,7 +232,7 @@ impl InMemoryStore {
         property_id: PropertyId,
         attribute: Attribute,
         entity_relationship: &EntityRelationship,
-    ) -> Result<(), DomainError> {
+    ) -> DomainResult<()> {
         debug!("entity rel attribute: {attribute:?}");
 
         let env = engine.get_env();
@@ -210,7 +298,7 @@ impl InMemoryStore {
         Ok(())
     }
 
-    fn extract_dynamic_key(id_data: &Data) -> Result<DynamicKey, DomainError> {
+    fn extract_dynamic_key(id_data: &Data) -> DomainResult<DynamicKey> {
         match id_data {
             Data::Struct(struct_map) => {
                 if struct_map.len() != 1 {
@@ -245,7 +333,7 @@ impl InMemoryStore {
         collection: &mut EntityCollection,
         dynamic_key: DynamicKey,
         raw_props: BTreeMap<PropertyId, Attribute>,
-    ) -> Result<(), DomainError> {
+    ) -> DomainResult<()> {
         match (collection, dynamic_key) {
             (EntityCollection::String(table), DynamicKey::String(string)) => {
                 table.insert(string, raw_props);
@@ -268,7 +356,7 @@ impl InMemoryStore {
         env: &Env,
         id_operator_id: SerdeOperatorId,
         value_generator: ValueGenerator,
-    ) -> Result<Value, DomainError> {
+    ) -> DomainResult<Value> {
         match (env.get_serde_operator(id_operator_id), value_generator) {
             (SerdeOperator::String(def_id), ValueGenerator::UuidV4) => {
                 let string = smart_format!("{}", Uuid::new_v4());
