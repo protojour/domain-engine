@@ -44,7 +44,7 @@ pub enum DefKind<'m> {
     /// A type definition in some domain:
     Type(TypeDef<'m>),
     Relation(Relation<'m>),
-    Relationship(Relationship),
+    Relationship(Relationship<'m>),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
@@ -111,7 +111,6 @@ pub enum DefParamBinding {
 pub struct Relation<'m> {
     pub kind: RelationKind,
     pub subject_prop: Option<&'m str>,
-    pub object_prop: Option<&'m str>,
 }
 
 impl<'m> Relation<'m> {
@@ -127,10 +126,6 @@ impl<'m> Relation<'m> {
 
     pub fn subject_prop(&self, defs: &'m Defs) -> Option<&'m str> {
         self.subject_prop.or_else(|| self.named_ident(defs))
-    }
-
-    pub fn object_prop(&self, defs: &'m Defs) -> Option<&'m str> {
-        self.object_prop.or_else(|| self.named_ident(defs))
     }
 }
 
@@ -165,7 +160,7 @@ pub struct RelationId(pub DefId);
 
 /// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]
-pub struct Relationship {
+pub struct Relationship<'m> {
     pub relation_id: RelationId,
 
     pub subject: (DefReference, SourceSpan),
@@ -175,6 +170,8 @@ pub struct Relationship {
     pub object: (DefReference, SourceSpan),
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
+
+    pub object_prop: Option<&'m str>,
 
     pub rel_params: RelParams,
 }
@@ -188,7 +185,7 @@ pub enum RelParams {
 
 pub struct RelationshipMeta<'m> {
     pub relationship_id: RelationshipId,
-    pub relationship: SpannedBorrow<'m, Relationship>,
+    pub relationship: SpannedBorrow<'m, Relationship<'m>>,
     pub relation: SpannedBorrow<'m, Relation<'m>>,
 }
 
@@ -292,7 +289,6 @@ impl<'m> Defs<'m> {
             DefKind::Relation(Relation {
                 kind: RelationKind::Builtin(kind),
                 subject_prop: None,
-                object_prop: None,
             }),
             CORE_PKG,
             SourceSpan::none(),

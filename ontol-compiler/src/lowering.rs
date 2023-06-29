@@ -303,15 +303,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         // This syntax just defines the relation the first time it's used
         let relation_id = match self.define_relation_if_undefined(key) {
             ImplicitRelationId::New(kind, relation_id) => {
-                let object_prop =
-                    object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
-
                 self.set_def_kind(
                     relation_id.0,
                     DefKind::Relation(Relation {
                         kind,
                         subject_prop: None,
-                        object_prop,
                     }),
                     &ident_span,
                 );
@@ -367,6 +363,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             RelParams::Unit
         };
 
+        let object_prop = object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
+
         let mut relationship = Relationship {
             relation_id,
             subject: (subject.0, self.src.span(subject.1)),
@@ -387,6 +385,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         (PropertyCardinality::Optional, ValueCardinality::Many)
                     }
                 }),
+            object_prop,
             rel_params,
         };
 
@@ -398,6 +397,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 subject_cardinality: relationship.object_cardinality,
                 object: relationship.subject,
                 object_cardinality: relationship.subject_cardinality,
+                object_prop: None,
                 rel_params: relationship.rel_params,
             };
         }
@@ -504,7 +504,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     DefKind::Relation(Relation {
                         kind,
                         subject_prop: None,
-                        object_prop: None,
                     }),
                     &transition.1,
                 );
@@ -522,6 +521,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 object: (to.0, self.src.span(to.1)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                object_prop: None,
                 rel_params: RelParams::Unit,
             }),
             &span,

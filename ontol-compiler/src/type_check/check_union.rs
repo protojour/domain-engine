@@ -266,7 +266,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let (object_reference, _) = &meta.relationship.object;
             let object_ty = self.def_types.map.get(&object_reference.def_id).unwrap();
-            let Some(property_name) = meta.relation.object_prop(self.defs) else {
+            let Some(property_name) = meta.relationship.object_prop.or(meta.relation.named_ident(self.defs)) else {
                 continue;
             };
 

@@ -734,8 +734,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let subject = meta.relationship.subject.0.def_id;
 
                         let prop_key = meta
-                            .relation
-                            .object_prop(self.defs)
+                            .relationship
+                            .object_prop
                             .expect("Object property has no name");
 
                         (meta, prop_key, subject)

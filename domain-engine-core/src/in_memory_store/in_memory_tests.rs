@@ -191,32 +191,20 @@ async fn test_conduit_db_store_entity_tree() {
                 .cast_ref::<Uuid>();
 
             expect_eq!(
-                actual = read_ser(&user).json(&queried_users[0].value),
+                actual = read_ser(&user).json(&queried_users[1].value),
                 expected = json!({
-                    "user_id": pre_existing_user_id.to_string(),
-                    "username": "pre-existing",
-                    "email": "pre@existing",
+                    "user_id": new_user_id.to_string(),
+                    "username": "new_user",
+                    "email": "new@user",
                     "password_hash": "s3cr3t",
-                    "bio": "",
-                    // BUG! `authored_articles` is misintepreted as `authored_comments`.
+                    "bio": "New bio",
                     "authored_articles": [
                         {
-                            "id": 0,
-                            "body": "First post!",
-                            "comment_on": {
-                                "article_id": article_id.to_string(),
-                                "slug": "foo",
-                                "title": "Foo",
-                                "description": "An article",
-                                "body": "The body",
-                                "author": {
-                                    "user_id": new_user_id.to_string(),
-                                    "username": "new_user",
-                                    "email": "new@user",
-                                    "password_hash": "s3cr3t",
-                                    "bio": "New bio",
-                                }
-                            }
+                            "article_id": article_id.to_string(),
+                            "slug": "foo",
+                            "title": "Foo",
+                            "description": "An article",
+                            "body": "The body",
                         }
                     ]
                 })

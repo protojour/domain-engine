@@ -413,7 +413,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
 
             match (
-                &relation.1.object_prop,
+                &relationship.1.object_prop,
                 object_ty,
                 &mut object_properties.map,
             ) {
