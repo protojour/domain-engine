@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::{EntityInfo, EntityRelationship, Env, ValueCardinality},
+    env::{EntityInfo, EntityRelationship, Env, PropertyCardinality, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
@@ -186,11 +186,9 @@ impl InMemoryStore {
             .collections
             .iter()
             .find_map(|(def_id, collection)| {
-                if let Some(properties) = collection.get(entity_key) {
-                    Some((*def_id, properties.clone()))
-                } else {
-                    None
-                }
+                collection
+                    .get(entity_key)
+                    .map(|properties| (*def_id, properties.clone()))
             })
             .ok_or(DomainError::InvalidId)?;
 
@@ -201,16 +199,29 @@ impl InMemoryStore {
             .ok_or(DomainError::NotAnEntity(def_id))?;
 
         match query {
-            Query::Leaf => self.apply_struct_query(
-                engine,
-                entity_info,
-                entity_key,
-                properties,
-                &StructQuery {
-                    def_id,
-                    properties: Default::default(),
-                },
-            ),
+            Query::Leaf => {
+                let mut query_properties: FnvHashMap<PropertyId, Query> = Default::default();
+                // Need to "infer" mandatory entity properties, because JSON serializer expects that
+                for (property_id, entity_relationship) in &entity_info.entity_relationships {
+                    if matches!(
+                        entity_relationship.cardinality.0,
+                        PropertyCardinality::Mandatory
+                    ) {
+                        query_properties.insert(*property_id, Query::Leaf);
+                    }
+                }
+
+                self.apply_struct_query(
+                    engine,
+                    entity_info,
+                    entity_key,
+                    properties,
+                    &StructQuery {
+                        def_id,
+                        properties: query_properties,
+                    },
+                )
+            }
             _ => todo!(),
         }
     }
