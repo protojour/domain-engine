@@ -1122,6 +1122,7 @@ name = "ontol-test-utils"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "fnv",
  "jsonschema",
  "ontol-compiler",
  "ontol-faker",

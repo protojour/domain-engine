@@ -18,16 +18,6 @@ pub struct EntityQuery {
     pub cursor: Option<String>,
 }
 
-impl From<StructQuery> for EntityQuery {
-    fn from(value: StructQuery) -> Self {
-        EntityQuery {
-            source: StructOrUnionQuery::Struct(value),
-            limit: 20,
-            cursor: None,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum StructOrUnionQuery {
     Struct(StructQuery),
@@ -47,4 +37,20 @@ impl StructOrUnionQuery {
 pub struct StructQuery {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, Query>,
+}
+
+impl From<StructQuery> for Query {
+    fn from(value: StructQuery) -> Self {
+        Query::Struct(value)
+    }
+}
+
+impl From<StructQuery> for EntityQuery {
+    fn from(value: StructQuery) -> Self {
+        EntityQuery {
+            source: StructOrUnionQuery::Struct(value),
+            limit: 20,
+            cursor: None,
+        }
+    }
 }

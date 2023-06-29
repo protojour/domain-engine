@@ -1,8 +1,4 @@
-use fnv::FnvHashMap;
-use ontol_runtime::{
-    config::DataStoreConfig,
-    query::{Query, StructQuery},
-};
+use ontol_runtime::{config::DataStoreConfig, query::Query};
 use ontol_test_utils::{
     assert_error_msg, expect_eq,
     type_binding::{create_de, read_de, read_ser, TypeBinding},
@@ -119,11 +115,11 @@ async fn test_conduit_db_store_entity_tree() {
     conduit_db()
         .compile_ok_async(|test_env| async move {
             let domain_engine = DomainEngine::new(test_env.env.clone());
-            let [user, article] = TypeBinding::new_n(&test_env, ["User", "Article"]);
+            let [user_type, article_type] = TypeBinding::new_n(&test_env, ["User", "Article"]);
 
             let pre_existing_user_id: Uuid = domain_engine
                 .store_entity(
-                    create_de(&user)
+                    create_de(&user_type)
                         .value(json!({
                             "username": "pre-existing",
                             "email": "pre@existing",
@@ -137,7 +133,7 @@ async fn test_conduit_db_store_entity_tree() {
 
             let article_id: Uuid = domain_engine
                 .store_entity(
-                    create_de(&article)
+                    create_de(&article_type)
                         .value(json!({
                             "slug": "foo",
                             "title": "Foo",
@@ -169,29 +165,30 @@ async fn test_conduit_db_store_entity_tree() {
                 .unwrap()
                 .cast_into();
 
-            let queried_users = domain_engine
-                .query_entities(
-                    StructQuery {
-                        def_id: user.def_id(),
-                        properties: FnvHashMap::from_iter([(
-                            user.find_property("authored_articles").unwrap(),
-                            Query::Leaf,
-                        )]),
-                    }
-                    .into(),
-                )
+            let users = domain_engine
+                .query_entities(user_type.struct_query([]).into())
                 .await
                 .unwrap();
 
-            let new_user_id = queried_users[1]
+            let new_user_id = users[1]
                 .value
-                .get_attribute(user.find_property("user_id").unwrap())
+                .get_attribute(user_type.find_property("user_id").unwrap())
                 .unwrap()
                 .value
                 .cast_ref::<Uuid>();
 
             expect_eq!(
-                actual = read_ser(&user).json(&queried_users[1].value),
+                actual = read_ser(&user_type).json(
+                    &domain_engine
+                        .query_entities(
+                            user_type
+                                .struct_query([("authored_articles", Query::Leaf)])
+                                .into(),
+                        )
+                        .await
+                        .unwrap()[1]
+                        .value
+                ),
                 expected = json!({
                     "user_id": new_user_id.to_string(),
                     "username": "new_user",
@@ -205,6 +202,54 @@ async fn test_conduit_db_store_entity_tree() {
                             "title": "Foo",
                             "description": "An article",
                             "body": "The body",
+                        }
+                    ]
+                })
+            );
+
+            expect_eq!(
+                actual = read_ser(&user_type).json(
+                    &domain_engine
+                        .query_entities(
+                            user_type
+                                .struct_query([(
+                                    "authored_articles",
+                                    article_type
+                                        .struct_query([("comments", Query::Leaf)])
+                                        .into()
+                                )])
+                                .into(),
+                        )
+                        .await
+                        .unwrap()[1]
+                        .value
+                ),
+                expected = json!({
+                    "user_id": new_user_id.to_string(),
+                    "username": "new_user",
+                    "email": "new@user",
+                    "password_hash": "s3cr3t",
+                    "bio": "New bio",
+                    "authored_articles": [
+                        {
+                            "article_id": article_id.to_string(),
+                            "slug": "foo",
+                            "title": "Foo",
+                            "description": "An article",
+                            "body": "The body",
+                            "comments": [
+                                {
+                                    "id": 0,
+                                    "body": "First post!",
+                                    "author": {
+                                        "user_id": pre_existing_user_id.to_string(),
+                                        "username": "pre-existing",
+                                        "email": "pre@existing",
+                                        "password_hash": "s3cr3t",
+                                        "bio": "",
+                                    }
+                                }
+                            ]
                         }
                     ]
                 })

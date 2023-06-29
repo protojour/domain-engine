@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
+    query::{Query, StructQuery},
     serde::operator::SerdeOperatorId,
     serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
@@ -105,6 +107,20 @@ impl<'e> TypeBinding<'e> {
 
     pub fn def_id(&self) -> DefId {
         self.type_info.def_id
+    }
+
+    pub fn struct_query(
+        &self,
+        properties: impl IntoIterator<Item = (&'static str, Query)>,
+    ) -> StructQuery {
+        StructQuery {
+            def_id: self.type_info.def_id,
+            properties: FnvHashMap::from_iter(
+                properties
+                    .into_iter()
+                    .map(|(prop_name, query)| (self.find_property(prop_name).unwrap(), query)),
+            ),
+        }
     }
 
     fn serde_operator_id(&self) -> SerdeOperatorId {
