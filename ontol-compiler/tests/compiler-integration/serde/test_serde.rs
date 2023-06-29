@@ -1,8 +1,6 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
-use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
-};
+use ontol_test_utils::{assert_error_msg, assert_json_io_matches, type_binding::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -42,11 +40,11 @@ fn test_serde_booleans() {
         assert_json_io_matches!(b, Create, true);
 
         assert_error_msg!(
-            f.de_create().data(json!(true)),
+            create_de(&f).data(json!(true)),
             "invalid type: boolean `true`, expected false at line 1 column 4"
         );
         assert_error_msg!(
-            t.de_create().data(json!(false)),
+            create_de(&t).data(json!(false)),
             "invalid type: boolean `false`, expected true at line 1 column 5"
         );
     });
@@ -184,7 +182,7 @@ fn test_serde_infinite_sequence() {
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44, 45, 46]);
         assert_error_msg!(
-            foo.de_create().data(json!([77])),
+            create_de(&foo).data(json!([77])),
             "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
         );
     });
@@ -199,18 +197,16 @@ fn test_serde_uuid() {
     .compile_ok(|env| {
         let my_id = TypeBinding::new(&env, "my_id");
         assert_matches!(
-            my_id
-                .de_create()
-                .data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            create_de(&my_id).data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Uuid(_))
         );
         assert_json_io_matches!(my_id, Create, "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
-            my_id.de_create().data(json!(42)),
+            create_de(&my_id).data(json!(42)),
             "invalid type: integer `42`, expected `uuid` at line 1 column 2"
         );
         assert_error_msg!(
-            my_id.de_create().data(json!("foobar")),
+            create_de(&my_id).data(json!("foobar")),
             r#"invalid type: string "foobar", expected `uuid` at line 1 column 8"#
         );
     });
@@ -225,9 +221,7 @@ fn test_serde_datetime() {
     .compile_ok(|env| {
         let my_dt = TypeBinding::new(&env, "my_dt");
         assert_matches!(
-            my_dt
-                .de_create()
-                .data(json!("1983-10-01T01:31:32.59+01:00")),
+            create_de(&my_dt).data(json!("1983-10-01T01:31:32.59+01:00")),
             Ok(Data::ChronoDateTime(_))
         );
         assert_json_io_matches!(
@@ -236,11 +230,11 @@ fn test_serde_datetime() {
             "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590+00:00"
         );
         assert_error_msg!(
-            my_dt.de_create().data(json!(42)),
+            create_de(&my_dt).data(json!(42)),
             "invalid type: integer `42`, expected `datetime` at line 1 column 2"
         );
         assert_error_msg!(
-            my_dt.de_create().data(json!("foobar")),
+            create_de(&my_dt).data(json!("foobar")),
             r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
         );
     });

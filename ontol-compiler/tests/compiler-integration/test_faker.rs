@@ -1,5 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{expect_eq, type_binding::TypeBinding, TestCompile};
+use ontol_test_utils::{expect_eq, type_binding::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -18,7 +18,7 @@ fn test_fake_primitives() {
         let foo = TypeBinding::new(&test_env, "foo");
 
         expect_eq!(
-            actual = foo.ser_read().json(&foo.new_fake(ProcessorMode::Read)),
+            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Read)),
             expected = json!({
                 "s": "mollitia sit porro tenetur",
                 "i": 2117826670,
@@ -39,7 +39,7 @@ fn test_fake_string_like_types() {
         let foo = TypeBinding::new(&test_env, "foo");
 
         expect_eq!(
-            actual = foo.ser_read().json(&foo.new_fake(ProcessorMode::Read)),
+            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Read)),
             expected = json!({
                 "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
                 "created_at": "1943-07-25T19:00:15.149284864+00:00",
@@ -54,9 +54,7 @@ fn test_fake_geojson() {
         let geometry = TypeBinding::new(&test_env, "Geometry");
 
         expect_eq!(
-            actual = geometry
-                .ser_read()
-                .json(&geometry.new_fake(ProcessorMode::Read)),
+            actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Read)),
             expected = json!({
                 "type": "Polygon",
                 "coordinates": [
@@ -77,9 +75,7 @@ fn test_fake_guitar_synth() {
         let artist = TypeBinding::new(&test_env, "artist");
 
         expect_eq!(
-            actual = artist
-                .ser_read()
-                .json(&artist.new_fake(ProcessorMode::Read)),
+            actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Read)),
             expected = json!({
                 "artist-id": "mollitia sit porro tenetur",
                 "name": "delectus molestias aspernatur voluptatem reprehenderit",

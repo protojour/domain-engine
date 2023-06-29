@@ -1,5 +1,9 @@
 use ontol_runtime::MapKey;
-use ontol_test_utils::{expect_eq, type_binding::TypeBinding, TestEnv};
+use ontol_test_utils::{
+    expect_eq,
+    type_binding::{create_de, create_ser, TypeBinding},
+    TestEnv,
+};
 
 mod test_map_basic;
 mod test_unify_partial;
@@ -62,7 +66,7 @@ fn assert_domain_map(
     let input_binding = TypeBinding::new(test_env, from.typename());
     let output_binding = TypeBinding::new(test_env, to.typename());
 
-    let value = input_binding.de_create().value(input).unwrap();
+    let value = create_de(&input_binding).value(input).unwrap();
 
     fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
         let seq = matches!(key, Key::Seq(_));
@@ -87,8 +91,8 @@ fn assert_domain_map(
     let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {
-        Key::Unit(_) => output_binding.ser_create().json(&value),
-        Key::Seq(_) => output_binding.ser_create().dynamic_sequence_json(&value),
+        Key::Unit(_) => create_ser(&output_binding).json(&value),
+        Key::Seq(_) => create_ser(&output_binding).dynamic_sequence_json(&value),
     };
 
     expect_eq!(actual = output_json, expected = expected);

@@ -121,40 +121,41 @@ impl<'e> TypeBinding<'e> {
         let schema = build_standalone_schema(self.env, &self.type_info, processor_mode).unwrap();
         serde_json::to_value(schema).unwrap()
     }
+}
 
-    /// Make a deserializer for the data creation processor mode
-    pub fn de_create(&self) -> Deserializer<'_, 'e> {
-        Deserializer {
-            binding: self,
-            mode: ProcessorMode::Create,
-            level: ProcessorLevel::new_root(),
-        }
+/// Make a deserializer for the data creation processor mode
+pub fn create_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
+    Deserializer {
+        binding,
+        mode: ProcessorMode::Create,
+        level: ProcessorLevel::new_root(),
     }
+}
 
-    /// Make a serializer for the data creation processor mode
-    pub fn ser_create(&self) -> Serializer<'_, 'e> {
-        Serializer {
-            binding: self,
-            mode: ProcessorMode::Create,
-            level: ProcessorLevel::new_root(),
-        }
+/// Make a deserializer for the `Read` processor mode
+pub fn read_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
+    Deserializer {
+        binding,
+        mode: ProcessorMode::Read,
+        level: ProcessorLevel::new_root(),
     }
+}
 
-    /// Make a deserializer for the data creation processor mode
-    pub fn de_read(&self) -> Deserializer<'_, 'e> {
-        Deserializer {
-            binding: self,
-            mode: ProcessorMode::Read,
-            level: ProcessorLevel::new_root(),
-        }
+/// Make a serializer for the data creation processor mode
+pub fn create_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
+    Serializer {
+        binding,
+        mode: ProcessorMode::Create,
+        level: ProcessorLevel::new_root(),
     }
+}
 
-    pub fn ser_read(&self) -> Serializer<'_, 'e> {
-        Serializer {
-            binding: self,
-            mode: ProcessorMode::Read,
-            level: ProcessorLevel::new_root(),
-        }
+/// Make a serializer for the `Read` processor mode
+pub fn read_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
+    Serializer {
+        binding,
+        mode: ProcessorMode::Read,
+        level: ProcessorLevel::new_root(),
     }
 }
 
@@ -319,7 +320,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
-        let value = self.binding.de_create().value(json).unwrap();
+        let value = create_de(self.binding).value(json).unwrap();
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {
                 self.value = value;

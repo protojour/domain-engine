@@ -1,6 +1,4 @@
-use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, TestCompile,
-};
+use ontol_test_utils::{assert_error_msg, assert_json_io_matches, type_binding::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -11,7 +9,7 @@ fn test_stix_lite() {
     STIX_ON.compile_ok(|env| {
         let attack_pattern = TypeBinding::new(&env, "attack-pattern");
         assert_error_msg!(
-            attack_pattern.de_create().data(json!({
+            create_de(&attack_pattern).data(json!({
                 "type": "attack-pattern",
             })),
             r#"missing properties, expected all of "spec_version", "created", "modified", "name" at line 1 column 25"#

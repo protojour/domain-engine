@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile,
+    assert_error_msg, assert_json_io_matches, type_binding::*, SourceName, TestCompile,
     TestPackages,
 };
 use serde_json::json;
@@ -35,27 +35,27 @@ fn test_geojson() {
             ]
         });
         assert_error_msg!(
-            geometry.de_create().data_variant(json!({ "type": "Point", "coordinates": [[1, 2]] })),
+            create_de(&geometry).data_variant(json!({ "type": "Point", "coordinates": [[1, 2]] })),
             "invalid type: sequence, expected integer at line 1 column 38"
         );
         assert_error_msg!(
-            geometry.de_create().data_variant(json!({ "type": "Polygon", "coordinates": [1, 2] })),
+            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [1, 2] })),
             "invalid type: integer `1`, expected sequence with length 2 at line 1 column 38"
         );
         assert_error_msg!(
-            geometry.de_create().data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
+            create_de(&geometry).data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
             "invalid length 1, expected sequence with minimum length 2 at line 1 column 43"
         );
         assert_error_msg!(
-            geometry.de_create().data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
+            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
             "invalid length 1, expected sequence with minimum length 4 at line 1 column 40"
         );
         assert_error_msg!(
-            geometry.de_create().data_variant(json!([])),
+            create_de(&geometry).data_variant(json!([])),
             "invalid type: sequence, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 2"
         );
         assert_error_msg!(
-            geometry.de_create().data_variant(json!({ "type": "bogus" })),
+            create_de(&geometry).data_variant(json!({ "type": "bogus" })),
             "invalid map value, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 16"
         );
     });
