@@ -36,7 +36,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                 TypeBinding::new_n(&test_env, ["User", "Article", "Comment", "TagEntity"]);
 
             domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&user)
                         .value(json!({
                             "username": "u1",
@@ -44,12 +44,13 @@ async fn test_conduit_db_in_memory_id_generation() {
                             "password_hash": "s3cr3t",
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap();
 
             let explicit_user_id = domain_engine
-                .store_entity(
+                .store_new_entity(
                     // Store with the Read processor which supports specifying ID upfront
                     read_de(&user)
                         .value(json!({
@@ -59,6 +60,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                             "password_hash": "s3cr3t",
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap();
@@ -69,7 +71,7 @@ async fn test_conduit_db_in_memory_id_generation() {
             );
 
             let article_id: Uuid = domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&article)
                         .value(json!({
                             "slug": "foo",
@@ -81,13 +83,14 @@ async fn test_conduit_db_in_memory_id_generation() {
                             }
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap()
                 .cast_into();
 
             domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&comment)
                         .value(json!({
                             "body": "Comment body",
@@ -99,12 +102,16 @@ async fn test_conduit_db_in_memory_id_generation() {
                             }
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap();
 
             domain_engine
-                .store_entity(create_de(&tag_entity).value(json!({})).unwrap())
+                .store_new_entity(
+                    create_de(&tag_entity).value(json!({})).unwrap(),
+                    Query::EntityId,
+                )
                 .await
                 .unwrap();
         })
@@ -120,7 +127,7 @@ async fn test_conduit_db_store_entity_tree() {
                 TypeBinding::new_n(&test_env, ["User", "Article", "Comment"]);
 
             let pre_existing_user_id: Uuid = domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&user_type)
                         .value(json!({
                             "username": "pre-existing",
@@ -128,13 +135,14 @@ async fn test_conduit_db_store_entity_tree() {
                             "password_hash": "s3cr3t",
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap()
                 .cast_into();
 
             let article_id: Uuid = domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&article_type)
                         .value(json!({
                             "slug": "foo",
@@ -162,6 +170,7 @@ async fn test_conduit_db_store_entity_tree() {
                             ]
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap()
@@ -262,7 +271,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 
             assert_error_msg!(
                 domain_engine
-                    .store_entity(
+                    .store_new_entity(
                         create_de(&article)
                             .value(json!({
                                 "slug": "foo",
@@ -274,6 +283,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
                                 }
                             }))
                             .unwrap(),
+                        Query::EntityId
                     )
                     .await,
                 r#"Unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
@@ -299,10 +309,11 @@ async fn test_artist_and_instrument_fmt_id_generation() {
             );
 
             let generated_id = domain_engine
-                .store_entity(
+                .store_new_entity(
                     create_de(&artist)
                         .value(json!({"name": "Igor Stravinskij" }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap();
@@ -311,13 +322,14 @@ async fn test_artist_and_instrument_fmt_id_generation() {
             assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
             let explicit_id = domain_engine
-                .store_entity(
+                .store_new_entity(
                     read_de(&artist)
                         .value(json!({
                             "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
                             "name": "Karlheinz Stockhausen"
                         }))
                         .unwrap(),
+                    Query::EntityId,
                 )
                 .await
                 .unwrap();

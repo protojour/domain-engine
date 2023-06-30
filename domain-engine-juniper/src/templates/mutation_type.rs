@@ -1,4 +1,5 @@
 use juniper::LookAheadMethods;
+use ontol_runtime::query::{Query, StructOrUnionQuery};
 use tracing::debug;
 
 use crate::{
@@ -56,14 +57,20 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
                     let input_attribute = args_wrapper.deserialize_attribute(input, info.env())?;
-                    let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let struct_query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let query = match struct_query {
+                        StructOrUnionQuery::Struct(struct_query) => Query::Struct(struct_query),
+                        StructOrUnionQuery::Union(def_id, structs) => {
+                            Query::StructUnion(def_id, structs)
+                        }
+                    };
 
                     debug!("CREATE {input_attribute:#?} -> {query:#?}");
 
                     let value = executor
                         .context()
                         .engine_api
-                        .create_entity(input_attribute.value, query)
+                        .store_new_entity(input_attribute.value, query)
                         .await?;
 
                     resolve_virtual_schema_field(

@@ -70,7 +70,7 @@ async fn test_graphql_basic_schema() {
         .exec(
             &schema,
             &mock_gql_context(
-                EngineAPIMock::create_entity
+                EngineAPIMock::store_new_entity
                     .next_call(matching!(_, _))
                     .returns(Ok(entity.into())),
             )
@@ -175,7 +175,7 @@ async fn test_inner_struct() {
         .exec(
             &schema,
             &mock_gql_context(
-                EngineAPIMock::create_entity
+                EngineAPIMock::store_new_entity
                     .next_call(matching!(_, _))
                     .returns(Ok(entity.into())),
             )
@@ -371,7 +371,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         .exec(
             &schema,
             &mock_gql_context(
-                EngineAPIMock::create_entity
+                EngineAPIMock::store_new_entity
                     .next_call(matching!(_, _))
                     .returns(Ok(ziggy.value)),
             ),

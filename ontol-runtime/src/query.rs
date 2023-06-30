@@ -5,6 +5,7 @@ use crate::{value::PropertyId, DefId};
 
 #[derive(Clone, Debug)]
 pub enum Query {
+    EntityId,
     Leaf,
     Struct(StructQuery),
     StructUnion(DefId, Vec<StructQuery>),

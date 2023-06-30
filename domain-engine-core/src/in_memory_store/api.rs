@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     env::Env,
-    query::EntityQuery,
+    query::{EntityQuery, Query},
     value::{Attribute, Value},
     DefId, PackageId, RelationshipId,
 };
@@ -35,8 +35,16 @@ impl DataStoreAPI for InMemoryDb {
             .collect())
     }
 
-    async fn store_entity(&self, engine: &DomainEngine, entity: Value) -> DomainResult<Value> {
-        self.store.write().await.write_entity(engine, entity)
+    async fn store_new_entity(
+        &self,
+        engine: &DomainEngine,
+        entity: Value,
+        query: Query,
+    ) -> DomainResult<Value> {
+        self.store
+            .write()
+            .await
+            .write_new_entity(engine, entity, query)
     }
 }
 

@@ -2,15 +2,14 @@ use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use domain_engine_juniper::GqlContext;
+use juniper::graphql_value;
 use ontol_runtime::config::DataStoreConfig;
-use ontol_test_utils::{SourceName, TestPackages};
+use ontol_test_utils::{expect_eq, SourceName, TestPackages};
 use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
 
 #[test(tokio::test)]
-// FIXME:
-#[should_panic = "BUG: unhandled combination"]
 async fn test_graphql_conduit_db_in_memory() {
     let test_packages = TestPackages::with_sources([(
         SourceName::root(),
@@ -23,18 +22,55 @@ async fn test_graphql_conduit_db_in_memory() {
         engine_api: Arc::new(DomainEngine::new(test_env.env.clone())),
     };
 
-    r#"mutation {
-        createUser(
-            input: {
-                username: "u1",
-                email: "a@b",
-                password_hash: "s3cr3t",
+    expect_eq!(
+        actual = r#"mutation {
+            createUser(
+                input: {
+                    username: "u1",
+                    email: "a@b",
+                    password_hash: "s3cr3t",
+                }
+            ) {
+                username
             }
-        ) {
-            username
-        }
-    }"#
-    .exec(&schema, &gql_context)
-    .await
-    .unwrap();
+        }"#
+        .exec(&schema, &gql_context,)
+        .await,
+        expected = Ok(graphql_value!({
+            "createUser": {
+                "username": "u1"
+            }
+        })),
+    );
+
+    expect_eq!(
+        actual = "{
+            UserList {
+                edges {
+                    node {
+                        username
+                        email
+                        password_hash
+                        bio
+                    }
+                }
+            }
+        }"
+        .exec(&schema, &gql_context,)
+        .await,
+        expected = Ok(graphql_value!({
+            "UserList": {
+                "edges": [
+                    {
+                        "node": {
+                            "username": "u1",
+                            "email": "a@b",
+                            "password_hash": "s3cr3t",
+                            "bio": "",
+                        }
+                    }
+                ]
+            },
+        })),
+    );
 }

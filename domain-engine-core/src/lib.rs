@@ -8,7 +8,7 @@ use thiserror::Error;
 use ontol_runtime::{
     config::DataStoreConfig,
     env::Env,
-    query::{EntityQuery, StructOrUnionQuery},
+    query::{EntityQuery, Query},
     value::{Attribute, Value},
     DefId,
 };
@@ -51,12 +51,9 @@ pub type DomainResult<T> = Result<T, DomainError>;
 pub trait EngineAPI: Send + Sync + 'static {
     fn get_config(&self) -> &Config;
 
-    /// Store an entity. Returns the entity id.
-    async fn store_entity(&self, entity: Value) -> DomainResult<Value>;
-
     async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>>;
 
-    async fn create_entity(&self, value: Value, query: StructOrUnionQuery) -> DomainResult<Value>;
+    async fn store_new_entity(&self, value: Value, query: Query) -> DomainResult<Value>;
 }
 
 pub struct DomainEngine {
@@ -99,9 +96,11 @@ impl DomainEngine {
         self.data_store()?.query(self, query).await
     }
 
-    async fn store_entity_inner(&self, entity: Value) -> DomainResult<Value> {
+    async fn store_new_entity_inner(&self, entity: Value, query: Query) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
-        self.data_store()?.store_entity(self, entity).await
+        self.data_store()?
+            .store_new_entity(self, entity, query)
+            .await
     }
 }
 
@@ -115,11 +114,7 @@ impl EngineAPI for DomainEngine {
         self.query_entities_inner(query).await
     }
 
-    async fn store_entity(&self, entity: Value) -> DomainResult<Value> {
-        self.store_entity_inner(entity).await
-    }
-
-    async fn create_entity(&self, value: Value, _query: StructOrUnionQuery) -> DomainResult<Value> {
-        self.store_entity_inner(value).await
+    async fn store_new_entity(&self, value: Value, query: Query) -> DomainResult<Value> {
+        self.store_new_entity_inner(value, query).await
     }
 }

@@ -113,7 +113,7 @@ impl<'a> QueryAnalyzer<'a> {
                             limit,
                             cursor,
                         }),
-                        Some(Query::Entity(_)) => panic!("Query in query"),
+                        Some(Query::Entity(_) | Query::EntityId) => panic!("Query in query"),
                         Some(Query::Leaf) | None => Query::Leaf,
                     },
                 }

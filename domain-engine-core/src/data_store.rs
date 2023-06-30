@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    query::EntityQuery,
+    query::{EntityQuery, Query},
     value::{Attribute, Value},
 };
 
@@ -13,5 +13,10 @@ pub trait DataStoreAPI {
         query: EntityQuery,
     ) -> DomainResult<Vec<Attribute>>;
 
-    async fn store_entity(&self, engine: &DomainEngine, entity: Value) -> DomainResult<Value>;
+    async fn store_new_entity(
+        &self,
+        engine: &DomainEngine,
+        entity: Value,
+        query: Query,
+    ) -> DomainResult<Value>;
 }

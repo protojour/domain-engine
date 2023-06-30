@@ -235,7 +235,50 @@ impl InMemoryStore {
         }
     }
 
-    pub fn write_entity(&mut self, engine: &DomainEngine, entity: Value) -> DomainResult<Value> {
+    pub fn write_new_entity(
+        &mut self,
+        engine: &DomainEngine,
+        entity: Value,
+        query: Query,
+    ) -> DomainResult<Value> {
+        let entity_id = self.write_new_entity_inner(engine, entity)?;
+
+        match query {
+            Query::EntityId => Ok(entity_id),
+            Query::Struct(struct_query) => {
+                let target_dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
+                let entities = self.query_entities(
+                    engine,
+                    &EntityQuery {
+                        source: StructOrUnionQuery::Struct(struct_query),
+                        limit: u32::MAX,
+                        cursor: None,
+                    },
+                )?;
+
+                for entity in entities {
+                    let id = find_inherent_entity_id(engine.get_env(), &entity)?;
+                    if let Some(id) = id {
+                        let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+
+                        if dynamic_key == target_dynamic_key {
+                            return Ok(entity);
+                        }
+                    }
+                }
+
+                panic!("Not found")
+            }
+            _ => todo!(),
+        }
+    }
+
+    /// Returns the entity ID
+    fn write_new_entity_inner(
+        &mut self,
+        engine: &DomainEngine,
+        entity: Value,
+    ) -> DomainResult<Value> {
         debug!("write entity {entity:#?}");
 
         let env = engine.get_env();
@@ -331,7 +374,7 @@ impl InMemoryStore {
         let rel_params = attribute.rel_params;
 
         let foreign_key = if value.type_def_id == entity_relationship.target {
-            let foreign_id = self.write_entity(engine, value)?;
+            let foreign_id = self.write_new_entity_inner(engine, value)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
             let foreign_key = Self::extract_dynamic_key(&value.data)?;
