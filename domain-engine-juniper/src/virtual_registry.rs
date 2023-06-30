@@ -93,20 +93,33 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
-                let opt = match typing_purpose {
-                    TypingPurpose::PartialInput => Optionality::Optional,
-                    _ => Optionality::Mandatory,
-                };
-
                 let (mode, _) = typing_purpose.mode_and_level();
 
                 for (name, property) in struct_op.filter_properties(mode, None) {
+                    if property.is_read_only()
+                        && matches!(
+                            typing_purpose,
+                            TypingPurpose::Input | TypingPurpose::PartialInput
+                        )
+                    {
+                        continue;
+                    }
+
                     output.push(self.get_operator_argument(
                         name,
                         property.value_operator_id,
                         property.rel_params_operator_id,
                         property.flags,
-                        opt,
+                        match typing_purpose {
+                            TypingPurpose::PartialInput => Optionality::Optional,
+                            _ => {
+                                if property.is_optional() || property.value_generator.is_some() {
+                                    Optionality::Optional
+                                } else {
+                                    Optionality::Mandatory
+                                }
+                            }
+                        },
                     ))
                 }
             }
@@ -156,7 +169,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.virtual_schema.env().get_serde_operator(operator_id);
 
-        debug!("register argument {name} {operator:?}");
+        debug!("register argument '{name}': {operator:?}");
 
         use std::string::String;
 

@@ -119,11 +119,7 @@ impl EngineAPI for DomainEngine {
         self.store_entity_inner(entity).await
     }
 
-    async fn create_entity(
-        &self,
-        _value: Value,
-        _query: StructOrUnionQuery,
-    ) -> DomainResult<Value> {
-        Ok(Value::unit())
+    async fn create_entity(&self, value: Value, _query: StructOrUnionQuery) -> DomainResult<Value> {
+        self.store_entity_inner(value).await
     }
 }

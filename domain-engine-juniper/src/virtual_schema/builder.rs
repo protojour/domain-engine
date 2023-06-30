@@ -364,7 +364,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.make_value_op_type_kind(type_info, inner_value_op)
             }
             SerdeOperator::Struct(struct_op) => self.make_struct_op_type_kind(type_info, struct_op),
-            other => panic!("Unsupported: {other:?}"),
+            // other => panic!("Unsupported: {other:?}"),
+            _ => TypeKind::CustomScalar(ScalarData {
+                serde_operator_id: value_op.inner_operator_id,
+            }),
         }
     }
 
