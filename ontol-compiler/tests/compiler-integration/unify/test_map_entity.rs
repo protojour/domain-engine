@@ -7,6 +7,31 @@ const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../../examples/artist_an
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth_union.on");
 
 #[test]
+fn should_map_inherent_capturing_pattern_id() {
+    "
+    pub type foo {
+        rel .'id'|id: { fmt '' => 'foo/' => uuid => . }
+    }
+    pub type bar {
+        rel .'id'|id: { fmt '' => 'bar/' => uuid => . }
+    }
+
+    map {
+        foo { 'id': id }
+        bar { 'id': id }
+    }
+    "
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("foo", "bar"),
+            json!({ "id": "foo/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
+            json!({ "id": "bar/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
+        );
+    });
+}
+
+#[test]
 fn test_extract_rel_params() {
     "
     pub type a1_id { fmt '' => 'a1/' => uuid => . }
@@ -251,12 +276,12 @@ fn artist_etc_routing() {
             rel gsu route(
                 map {
                     gsu.artist {
-                        'artist-id': id // ERROR cannot convert this `artist_id` from `anonymous`: These types are not equated.
+                        'artist-id': id
                         'name': n
                         'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                     ai.artist {
-                        'ID': id // ERROR cannot convert this `anonymous` from `artist_id`: These types are not equated.
+                        'ID': id
                         'name': n
                         'plays': [p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
@@ -264,12 +289,12 @@ fn artist_etc_routing() {
 
                 map {
                     gsu.synth {
-                        'instrument-id': id // ERROR cannot convert this `synth_id` from `instrument-id`: These types are not equated.
+                        'instrument-id': id
                         'type': t // ERROR unbound variable
                         'polyphony': p // ERROR unbound variable
                     }
                     ai.instrument {
-                        'ID': id // ERROR cannot convert this `instrument-id` from `synth_id`: These types are not equated.
+                        'ID': id
                         'name': n // ERROR unbound variable
                     }
                 }

@@ -6,11 +6,12 @@ use ontol_runtime::smart_format;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, MapCodegenTask},
+    codegen::task::{AutoMapKey, CodegenTask, MapCodegenTask},
     def::{Def, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
+    relation::Constructor,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
@@ -121,8 +122,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
                         match (actual, expected) {
                             (
-                                Type::Domain(_) | Type::Anonymous(_),
-                                Type::Domain(_) | Type::Anonymous(_),
+                                Type::Domain(first_def_id) | Type::Anonymous(first_def_id),
+                                Type::Domain(second_def_id) | Type::Anonymous(second_def_id),
                             ) => {
                                 ctx.variable_mapping.insert(
                                     explicit_var.variable,
@@ -131,6 +132,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         second_arm_type: expected,
                                     },
                                 );
+
+                                // try to auto-generate map for `fmt` type mappings
+                                let first_constructor = self
+                                    .relations
+                                    .properties_by_def_id(*first_def_id)
+                                    .map(|properties| &properties.constructor);
+                                let second_constructor = self
+                                    .relations
+                                    .properties_by_def_id(*first_def_id)
+                                    .map(|properties| &properties.constructor);
+
+                                if let (
+                                    Some(Constructor::StringFmt(_)),
+                                    Some(Constructor::StringFmt(_)),
+                                ) = (first_constructor, second_constructor)
+                                {
+                                    self.codegen_tasks
+                                        .auto_maps
+                                        .insert(AutoMapKey::new(*first_def_id, *second_def_id));
+                                }
                             }
                             _ => {
                                 self.type_error(
