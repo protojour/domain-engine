@@ -1,5 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{expect_eq, type_binding::*, TestCompile};
+use ontol_test_utils::{expect_eq, serde_utils::*, type_binding::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
 

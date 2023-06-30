@@ -1,6 +1,7 @@
 use ontol_runtime::value::Value;
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, expect_eq, type_binding::*, TestCompile,
+    assert_error_msg, assert_json_io_matches, expect_eq, serde_utils::*, type_binding::TypeBinding,
+    TestCompile,
 };
 use serde_json::json;
 use test_log::test;

@@ -24,7 +24,7 @@ fn json_schema_from_simple_entity() {
     "
     .compile_ok(|env| {
         expect_eq!(
-            actual = TypeBinding::new(&env, "entity").json_schema(Create),
+            actual = TypeBinding::new(&env, "entity").new_json_schema(Create),
             expected = json!({
                 "$defs": {
                     "1_entity": {

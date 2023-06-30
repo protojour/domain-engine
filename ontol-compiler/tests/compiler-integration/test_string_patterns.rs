@@ -1,6 +1,9 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
-use ontol_test_utils::{assert_error_msg, assert_json_io_matches, type_binding::*, TestCompile};
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, serde_utils::*, type_binding::TypeBinding,
+    TestCompile,
+};
 use serde_json::json;
 use test_log::test;
 

@@ -1,7 +1,8 @@
 use ontol_runtime::{config::DataStoreConfig, query::Query};
 use ontol_test_utils::{
     assert_error_msg, expect_eq,
-    type_binding::{create_de, read_de, read_ser, TypeBinding},
+    serde_utils::{create_de, read_de, read_ser},
+    type_binding::TypeBinding,
     SourceName, TestCompile, TestPackages,
 };
 use serde_json::json;
