@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 
-use crate::{expr::ExprId, types::TypeRef, SourceSpan};
+use crate::{def::MapDirection, expr::ExprId, types::TypeRef, SourceSpan};
 
 use super::inference::Inference;
 
@@ -8,6 +8,7 @@ use super::inference::Inference;
 pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
+    pub direction: MapDirection,
     pub inference: Inference<'m>,
     pub expr_variables: FnvHashMap<ExprId, ExpressionVariable>,
     pub label_map: FnvHashMap<ExprId, ontol_hir::Label>,
@@ -29,8 +30,9 @@ pub struct HirBuildCtx<'m> {
 }
 
 impl<'m> HirBuildCtx<'m> {
-    pub fn new() -> Self {
+    pub fn new(direction: MapDirection) -> Self {
         Self {
+            direction,
             inference: Inference::new(),
             expr_variables: Default::default(),
             label_map: Default::default(),

@@ -50,7 +50,7 @@ pub enum DefKind<'m> {
     // if there are different variants per type.
     CoreFn(BuiltinProc),
     Constant(ExprId),
-    Mapping(Variables, ExprId, ExprId),
+    Mapping(MapDirection, Variables, ExprId, ExprId),
 }
 
 impl<'m> DefKind<'m> {
@@ -73,7 +73,7 @@ impl<'m> DefKind<'m> {
             Self::Relation(_) => None,
             Self::Relationship(_) => None,
             Self::Constant(_) => None,
-            Self::Mapping(_, _, _) => None,
+            Self::Mapping(..) => None,
         }
     }
 }
@@ -187,6 +187,12 @@ pub struct RelationshipMeta<'m> {
     pub relationship_id: RelationshipId,
     pub relationship: SpannedBorrow<'m, Relationship<'m>>,
     pub relation: SpannedBorrow<'m, Relation<'m>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum MapDirection {
+    Omni,
+    Forwards,
 }
 
 #[derive(Debug)]

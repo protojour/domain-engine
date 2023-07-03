@@ -14,6 +14,7 @@ use tracing::{debug, warn};
 
 use crate::{
     codegen::{code_generator::map_codegen, type_mapper::TypeMapper},
+    def::MapDirection,
     hir_unify::unify_to_function,
     mem::Intern,
     patterns::StringPatternSegment,
@@ -65,6 +66,7 @@ pub struct ConstCodegenTask<'m> {
 }
 
 pub struct MapCodegenTask<'m> {
+    pub direction: MapDirection,
     pub first: TypedHirNode<'m>,
     pub second: TypedHirNode<'m>,
     pub span: SourceSpan,
@@ -192,13 +194,15 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
                     Err(err) => warn!("unifier error: {err:?}"),
                 }
 
-                debug!("Backward start");
-                match unify_to_function(&map_task.second, &map_task.first, compiler) {
-                    Ok(func) => {
-                        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                        map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
+                if matches!(map_task.direction, MapDirection::Omni) {
+                    debug!("Backward start");
+                    match unify_to_function(&map_task.second, &map_task.first, compiler) {
+                        Ok(func) => {
+                            let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+                            map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
+                        }
+                        Err(err) => warn!("unifier error: {err:?}"),
                     }
-                    Err(err) => warn!("unifier error: {err:?}"),
                 }
             }
         }
@@ -260,6 +264,7 @@ fn autogenerate_mapping<'m>(
     )?;
 
     Some(CodegenTask::Map(MapCodegenTask {
+        direction: MapDirection::Omni,
         first: first_node,
         second: second_node,
         span: SourceSpan::none(),

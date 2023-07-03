@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     codegen::task::{AutoMapKey, CodegenTask, MapCodegenTask},
-    def::{Def, Variables},
+    def::{Def, MapDirection, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
@@ -28,11 +28,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_map(
         &mut self,
         def: &Def,
+        direction: MapDirection,
         variables: &Variables,
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = HirBuildCtx::new();
+        let mut ctx = HirBuildCtx::new(direction);
 
         {
             let mut map_check = MapCheck {
@@ -82,6 +83,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
         self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
+            direction: ctx.direction,
             first,
             second,
             span: def.span,

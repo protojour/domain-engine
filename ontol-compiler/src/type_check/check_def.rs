@@ -3,7 +3,7 @@ use tracing::debug;
 
 use crate::{
     codegen::task::{CodegenTask, ConstCodegenTask},
-    def::{DefKind, TypeDef},
+    def::{DefKind, MapDirection, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::hir_build_ctx::HirBuildCtx,
@@ -44,8 +44,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(PrimitiveKind::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(PrimitiveKind::Number) => self.types.intern(Type::Number(def_id)),
-            DefKind::Mapping(variables, first_id, second_id) => {
-                match self.check_map(def, variables, *first_id, *second_id) {
+            DefKind::Mapping(direction, variables, first_id, second_id) => {
+                match self.check_map(def, *direction, variables, *first_id, *second_id) {
                     Ok(ty) => ty,
                     Err(error) => {
                         debug!("Aggregation group error: {error:?}");
@@ -60,7 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => ty,
                 };
 
-                let mut ctx = HirBuildCtx::new();
+                let mut ctx = HirBuildCtx::new(MapDirection::Omni);
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks

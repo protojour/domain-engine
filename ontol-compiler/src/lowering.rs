@@ -15,8 +15,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, RelParams, Relation,
-        RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
+        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, MapDirection, RelParams,
+        Relation, RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -123,6 +123,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Map(ast::MapStatement {
                 kw: _,
+                direction,
                 first,
                 second,
             }) => {
@@ -130,11 +131,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
                 let variables = var_table.variables.into_values().collect();
+                let direction = match direction {
+                    ast::MapDirection::Omni => MapDirection::Omni,
+                    ast::MapDirection::Forward => MapDirection::Forwards,
+                };
 
-                Ok(
-                    [self.define(DefKind::Mapping(Variables(variables), first, second), &span)]
-                        .into(),
-                )
+                Ok([self.define(
+                    DefKind::Mapping(direction, Variables(variables), first, second),
+                    &span,
+                )]
+                .into())
             }
         }
     }

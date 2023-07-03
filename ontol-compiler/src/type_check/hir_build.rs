@@ -8,7 +8,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, RelParams},
+    def::{Def, DefKind, MapDirection, RelParams},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
@@ -522,9 +522,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ));
                         }
 
-                        for (prop_name, match_property) in match_properties.into_iter() {
-                            if !match_property.used {
-                                self.error(CompileError::MissingProperty(prop_name.into()), &span);
+                        match (ctx.arm, ctx.direction) {
+                            (Arm::First, MapDirection::Forwards) => {
+                                // It's OK to not specify all properties here
+                            }
+                            _ => {
+                                for (prop_name, match_property) in match_properties.into_iter() {
+                                    if !match_property.used {
+                                        self.error(
+                                            CompileError::MissingProperty(prop_name.into()),
+                                            &span,
+                                        );
+                                    }
+                                }
                             }
                         }
 
