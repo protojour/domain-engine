@@ -40,7 +40,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 
-        let union_def = self.defs.map.get(&value_union_def_id).unwrap();
+        let union_def = self.defs.table.get(&value_union_def_id).unwrap();
 
         let properties = self
             .relations
@@ -142,7 +142,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) where
         't: 'b,
     {
-        let variant_ty = self.def_types.map.get(&variant_def).unwrap_or_else(|| {
+        let variant_ty = self.def_types.table.get(&variant_def).unwrap_or_else(|| {
             let def = self.defs.get_def_kind(variant_def);
             panic!("No type found for {def:?}");
         });
@@ -201,7 +201,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         loop {
             match self.relations.properties_by_def_id(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Struct => match &properties.map {
+                    Constructor::Struct => match &properties.table {
                         Some(property_set) => {
                             return Ok(DomainTypeMatchData::Map(property_set));
                         }
@@ -265,7 +265,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .expect("BUG: problem getting relationship meta");
 
             let (object_reference, _) = &meta.relationship.object;
-            let object_ty = self.def_types.map.get(&object_reference.def_id).unwrap();
+            let object_ty = self.def_types.table.get(&object_reference.def_id).unwrap();
             let Some(property_name) = meta.relationship.object_prop.or(meta.relation.named_ident(self.defs)) else {
                 continue;
             };
@@ -512,7 +512,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
-                let ty = self.def_types.map.get(&def_id).unwrap();
+                let ty = self.def_types.table.get(&def_id).unwrap();
                 CompileError::UnitTypePartOfUnion(smart_format!(
                     "{}",
                     FormatType(ty, self.defs, self.primitives)

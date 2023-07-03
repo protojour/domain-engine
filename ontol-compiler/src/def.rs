@@ -194,7 +194,7 @@ pub struct Defs<'m> {
     pub(crate) mem: &'m Mem,
     def_id_allocators: FnvHashMap<PackageId, u16>,
     next_def_param: DefParamId,
-    pub(crate) map: FnvHashMap<DefId, &'m Def<'m>>,
+    pub(crate) table: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_hirs: FnvHashMap<DefId, regex_syntax::hir::Hir>,
@@ -207,7 +207,7 @@ impl<'m> Defs<'m> {
             mem,
             def_id_allocators: Default::default(),
             next_def_param: DefParamId(0),
-            map: Default::default(),
+            table: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
             literal_regex_hirs: Default::default(),
@@ -216,11 +216,11 @@ impl<'m> Defs<'m> {
     }
 
     pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
-        self.map.get(&def_id).map(|def| &def.kind)
+        self.table.get(&def_id).map(|def| &def.kind)
     }
 
     pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'m, DefKind<'m>>> {
-        self.map.get(&def_id).map(|def| SpannedBorrow {
+        self.table.get(&def_id).map(|def| SpannedBorrow {
             value: &def.kind,
             span: &def.span,
         })
@@ -271,7 +271,7 @@ impl<'m> Defs<'m> {
 
     pub fn add_def(&mut self, kind: DefKind<'m>, package: PackageId, span: SourceSpan) -> DefId {
         let def_id = self.alloc_def_id(package);
-        self.map.insert(
+        self.table.insert(
             def_id,
             self.mem.bump.alloc(Def {
                 id: def_id,
@@ -354,7 +354,7 @@ impl<'m> Compiler<'m> {
         self.namespaces
             .get_namespace_mut(package, space)
             .insert(name.into(), def_id);
-        self.defs.map.insert(
+        self.defs.table.insert(
             def_id,
             self.defs.mem.bump.alloc(Def {
                 id: def_id,
@@ -369,7 +369,7 @@ impl<'m> Compiler<'m> {
 
     pub fn define_package(&mut self, package_id: PackageId) -> DefId {
         let def_id = self.defs.alloc_def_id(package_id);
-        self.defs.map.insert(
+        self.defs.table.insert(
             def_id,
             self.defs.mem.bump.alloc(Def {
                 id: def_id,
@@ -379,7 +379,7 @@ impl<'m> Compiler<'m> {
             }),
         );
         let ty = self.types.intern(Type::Package);
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
 
         // make sure the namespace exists
         self.namespaces.get_namespace_mut(package_id, Space::Type);

@@ -43,7 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("FIRST ARM START");
             ctx.arm = Arm::First;
             let _ = map_check.analyze_arm(
-                map_check.expressions.map.get(&first_id).unwrap(),
+                map_check.expressions.table.get(&first_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,
@@ -51,7 +51,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("SECOND ARM START");
             ctx.arm = Arm::Second;
             let _ = map_check.analyze_arm(
-                map_check.expressions.map.get(&second_id).unwrap(),
+                map_check.expressions.table.get(&second_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,

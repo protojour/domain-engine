@@ -59,14 +59,14 @@ impl<'m> Compiler<'m> {
 #[derive(Debug)]
 pub struct Expressions {
     next_expr_id: ExprId,
-    pub map: FnvHashMap<ExprId, Expr>,
+    pub table: FnvHashMap<ExprId, Expr>,
 }
 
 impl Default for Expressions {
     fn default() -> Self {
         Self {
             next_expr_id: ExprId(0),
-            map: Default::default(),
+            table: Default::default(),
         }
     }
 }

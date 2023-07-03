@@ -135,7 +135,7 @@ impl<'m> Compiler<'m> {
 
     fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
@@ -149,7 +149,7 @@ impl<'m> Compiler<'m> {
         self.namespaces
             .get_namespace_mut(CORE_PKG, Space::Type)
             .insert(ident.into(), def_id);
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
@@ -159,7 +159,7 @@ impl<'m> Compiler<'m> {
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
 
         def_id
     }

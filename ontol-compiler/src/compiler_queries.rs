@@ -26,13 +26,13 @@ where
     T: AsRef<Defs<'m>> + AsRef<DefTypes<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
-        get::<_, DefTypes>(self).map.get(&def_id).copied()
+        get::<_, DefTypes>(self).table.get(&def_id).copied()
     }
 
     fn expect_def_type(&self, def_id: DefId) -> TypeRef<'m> {
-        match get::<_, DefTypes>(self).map.get(&def_id) {
+        match get::<_, DefTypes>(self).table.get(&def_id) {
             Some(type_ref) => type_ref,
-            None => match get::<_, Defs>(self).map.get(&def_id) {
+            None => match get::<_, Defs>(self).table.get(&def_id) {
                 Some(def) => {
                     panic!("BUG: Type not found for {def_id:?}: {def:?}");
                 }

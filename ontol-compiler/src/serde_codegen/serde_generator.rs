@@ -156,7 +156,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .relations
                     .properties_by_def_id
                     .get(&def_variant.def_id)?
-                    .map
+                    .table
                     .as_ref()?;
 
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
@@ -547,7 +547,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 def_variant.remove_modifier(DataModifier::INTERSECTION),
             ))
         } else if modifier.contains(DataModifier::INTERSECTION) {
-            if items.len() == 1 && properties.map.is_none() {
+            if items.len() == 1 && properties.table.is_none() {
                 Some(OperatorAllocation::Redirect(def_variant.remove_modifier(
                     DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
                 )))
@@ -576,7 +576,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     )));
                 }
 
-                if properties.map.is_some() {
+                if properties.table.is_some() {
                     intersection_keys.insert(SerdeKey::Def(
                         def_variant.remove_modifier(DataModifier::INTERSECTION),
                     ));
@@ -665,7 +665,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             root_types.insert(root_discriminator.def_variant.def_id);
         }
 
-        let variants: Vec<_> = if properties.map.is_some() {
+        let variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_key =
@@ -705,8 +705,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> SerdeOperator {
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
-        if let Some(map) = &properties.map {
-            for (property_id, property) in map {
+        if let Some(table) = &properties.table {
+            for (property_id, property) in table {
                 let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
                         if property_id.relationship_id.0 == self.primitives.relations.identifies {

@@ -30,7 +30,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr_id: ExprId,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let expr = self.expressions.map.remove(&expr_id).unwrap();
+        let expr = self.expressions.table.remove(&expr_id).unwrap();
 
         let node = self.build_node(
             &expr, // Don't pass inference types as the expected type:
@@ -61,7 +61,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypedHirNode<'m> {
         let node = match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
-                match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
+                match (
+                    self.defs.table.get(def_id),
+                    self.def_types.table.get(def_id),
+                ) {
                     (
                         Some(Def {
                             kind: DefKind::CoreFn(proc),
@@ -329,7 +332,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let node_kind = match properties.map(|props| &props.constructor) {
             Some(Constructor::Struct) | None => {
-                match properties.and_then(|props| props.map.as_ref()) {
+                match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
                         let struct_binder = ontol_hir::Binder(ctx.var_allocator.alloc());
 

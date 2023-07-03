@@ -148,7 +148,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
 
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
-    pub map: FnvHashMap<DefId, TypeRef<'m>>,
+    pub table: FnvHashMap<DefId, TypeRef<'m>>,
 }
 
 pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>, pub &'c Primitives);

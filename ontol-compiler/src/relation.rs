@@ -39,7 +39,7 @@ impl Relations {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub map: Option<IndexMap<PropertyId, Property>>,
+    pub table: Option<IndexMap<PropertyId, Property>>,
     pub identifies: Option<RelationshipId>,
     pub identified_by: Option<RelationshipId>,
 }
@@ -50,8 +50,8 @@ impl Properties {
     }
 
     pub fn insert_map_property(&mut self, property_id: PropertyId, property: Property) {
-        let map = self.map.get_or_insert_with(Default::default);
-        map.insert(property_id, property);
+        let table = self.table.get_or_insert_with(Default::default);
+        table.insert(property_id, property);
     }
 }
 

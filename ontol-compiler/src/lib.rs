@@ -255,8 +255,8 @@ impl<'m> Compiler<'m> {
         let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
             IndexMap::default();
 
-        if let Some(map) = &properties.map {
-            for (property_id, property) in map {
+        if let Some(table) = &properties.table {
+            for (property_id, property) in table {
                 let meta = self
                     .defs
                     .lookup_relationship_meta(property_id.relationship_id)
@@ -323,7 +323,7 @@ impl<'m> Compiler<'m> {
             .inherent_id_map
             .get(&id_relationship_id)
             .cloned()?;
-        let map = properties.map.as_ref()?;
+        let map = properties.table.as_ref()?;
         let _property = map.get(&PropertyId::subject(inherent_id))?;
 
         self.defs.lookup_relationship_meta(inherent_id).ok()

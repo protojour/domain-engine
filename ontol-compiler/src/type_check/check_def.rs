@@ -14,18 +14,18 @@ use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
-        if let Some(type_ref) = self.def_types.map.get(&def_id) {
+        if let Some(type_ref) = self.def_types.table.get(&def_id) {
             return type_ref;
         }
         let ty = self.check_def_inner(def_id);
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
     fn check_def_inner(&mut self, def_id: DefId) -> TypeRef<'m> {
         let def = self
             .defs
-            .map
+            .table
             .get(&def_id)
             .expect("BUG: definition not found");
 
@@ -54,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             DefKind::Constant(expr_id) => {
-                let expr = self.expressions.map.remove(expr_id).unwrap();
+                let expr = self.expressions.table.remove(expr_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
                     None => return self.types.intern(Type::Error),
                     Some(ty) => ty,

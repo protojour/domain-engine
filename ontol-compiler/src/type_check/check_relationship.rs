@@ -27,7 +27,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let relation = match self.defs.map.get(&relationship.relation_id.0) {
+        let relation = match self.defs.table.get(&relationship.relation_id.0) {
             Some(Def {
                 kind: DefKind::Relation(relation),
                 ..
@@ -169,7 +169,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
-                match (&properties.map, &mut properties.constructor) {
+                match (&properties.table, &mut properties.constructor) {
                     (None, Constructor::Struct) => {
                         let mut sequence = Sequence::default();
 
@@ -204,9 +204,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
 
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
-                match &mut properties.map {
+                match &mut properties.table {
                     None => {
-                        properties.map = Some(
+                        properties.table = Some(
                             [(
                                 PropertyId::subject(relationship.0),
                                 Property {
@@ -257,7 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Some(DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
+                        })) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
                             Some(object_ty) => {
                                 // just copy the type, type check done later
                                 self.expected_constant_types
@@ -311,7 +311,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         Some(DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        })) => match self.def_types.map.get(&outer_object.0.def_id).cloned() {
+                        })) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
                             Some(_outer_object_ty) => {
                                 self.relations.value_generators_unchecked.insert(
                                     RelationshipId(*outer_relationship_id),
@@ -415,10 +415,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match (
                 &relationship.1.object_prop,
                 object_ty,
-                &mut object_properties.map,
+                &mut object_properties.table,
             ) {
                 (Some(_), Type::Domain(_), None) => {
-                    object_properties.map = Some(
+                    object_properties.table = Some(
                         [(
                             PropertyId::object(relationship.0),
                             Property {

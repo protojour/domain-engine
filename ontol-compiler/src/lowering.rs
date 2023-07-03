@@ -229,7 +229,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut var_table = ExprVarTable::default();
                 let expr = self.lower_pattern((pattern, object_span.clone()), &mut var_table)?;
                 let expr_id = self.compiler.expressions.alloc_expr_id();
-                self.compiler.expressions.map.insert(expr_id, expr);
+                self.compiler.expressions.table.insert(expr_id, expr);
 
                 DefReference {
                     def_id: self.define(DefKind::Constant(expr_id), &object_span),
@@ -722,7 +722,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         let expr_id = self.compiler.expressions.alloc_expr_id();
-        self.compiler.expressions.map.insert(expr_id, expr);
+        self.compiler.expressions.table.insert(expr_id, expr);
 
         Ok(expr_id)
     }
@@ -1024,7 +1024,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
-        self.compiler.defs.map.insert(
+        self.compiler.defs.table.insert(
             def_id,
             self.compiler.defs.mem.bump.alloc(Def {
                 id: def_id,

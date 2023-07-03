@@ -292,7 +292,7 @@ fn autogenerate_fmt_hir_struct<'m>(
         }
     }
 
-    let ty = compiler.def_types.map.get(&def_id)?;
+    let ty = compiler.def_types.table.get(&def_id)?;
 
     Some(TypedHirNode(
         ontol_hir::Kind::Struct(ontol_hir::Binder(binder_var), nodes),
@@ -317,7 +317,7 @@ fn autogenerate_fmt_segment_property<'m>(
         segment: _,
     } = segment
     {
-        let object_ty = compiler.def_types.map.get(type_def_id)?;
+        let object_ty = compiler.def_types.table.get(type_def_id)?;
         let meta = Meta {
             ty: object_ty,
             span: SourceSpan::none(),

@@ -40,7 +40,7 @@ enum Action {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_domain_types(&mut self) {
-        for (def_id, def) in &self.defs.map {
+        for (def_id, def) in &self.defs.table {
             if let DefKind::Type(_) = &def.kind {
                 self.check_domain_type_properties(*def_id, def);
             }
@@ -49,12 +49,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_def_id.get(&def_id)?;
-        let map = properties.map.as_ref()?;
+        let table = properties.table.as_ref()?;
 
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
 
-        for (property_id, cardinality) in map {
+        for (property_id, cardinality) in table {
             trace!("check {def_id:?} {property_id:?} {cardinality:?}");
 
             match property_id.role {
@@ -128,8 +128,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if properties.identified_by.is_none() {
                         match &properties.constructor {
                             Constructor::Union(relationships) => {
-                                if let Some(map) = &properties.map {
-                                    assert!(map.get(property_id).is_some());
+                                if let Some(table) = &properties.table {
+                                    assert!(table.get(property_id).is_some());
 
                                     let all_entities =
                                         relationships.iter().all(|(relationship_id, _span)| {
@@ -159,7 +159,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         ));
                                     }
                                 } else {
-                                    panic!("No map in value union");
+                                    panic!("No table in value union");
                                 }
                             }
                             _ => {
@@ -210,8 +210,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
                     let properties = self.relations.properties_by_def_id_mut(def_id);
-                    if let Some(map) = &mut properties.map {
-                        let cardinality = map.get_mut(&property_id).unwrap();
+                    if let Some(table) = &mut properties.table {
+                        let cardinality = table.get_mut(&property_id).unwrap();
                         adjust_entity_prop_cardinality(cardinality);
                     }
                 }
@@ -226,8 +226,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                     let properties = self.relations.properties_by_def_id_mut(def_id);
 
-                    if let Some(map) = &mut properties.map {
-                        map.insert(
+                    if let Some(table) = &mut properties.table {
+                        table.insert(
                             inherent_property_id,
                             Property {
                                 cardinality: (
@@ -251,7 +251,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .insert(relationship_id, value_generator);
                     }
                     Err(_) => {
-                        let object_ty = self.def_types.map.get(&object_def_id).unwrap();
+                        let object_ty = self.def_types.table.get(&object_def_id).unwrap();
                         self.error(
                             CompileError::CannotGenerateValue(smart_format!(
                                 "{}",
@@ -290,7 +290,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Now looking at a primitive type
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
-                match self.def_types.map.get(&object_def_id) {
+                match self.def_types.table.get(&object_def_id) {
                     Some(Type::Int(_)) => Ok(ValueGenerator::Autoincrement),
                     Some(Type::String(_)) => Ok(ValueGenerator::UuidV4),
                     Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
@@ -303,7 +303,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.create_time => {
-                match self.def_types.map.get(&object_def_id) {
+                match self.def_types.table.get(&object_def_id) {
                     Some(Type::StringLike(_, StringLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
                     }
@@ -311,7 +311,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.update_time => {
-                match self.def_types.map.get(&object_def_id) {
+                match self.def_types.table.get(&object_def_id) {
                     Some(Type::StringLike(_, StringLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
                     }

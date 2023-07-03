@@ -78,7 +78,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 }
 
 fn format_map_key(compiler: &Compiler, map_key: MapKey) -> String {
-    let ty = compiler.def_types.map.get(&map_key.def_id).unwrap();
+    let ty = compiler.def_types.table.get(&map_key.def_id).unwrap();
 
     smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }
