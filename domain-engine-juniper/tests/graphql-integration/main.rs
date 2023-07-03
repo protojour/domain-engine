@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use domain_engine_core::{Config, EngineAPIMock};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
-use ontol_test_utils::{TestCompile, TestEnv};
+use ontol_test_utils::{SourceName, TestCompile, TestEnv};
 use unimock::*;
 
 mod test_graphql_basic;
@@ -11,18 +11,27 @@ mod test_graphql_in_memory;
 mod test_graphql_input;
 
 trait TestCompileSchema {
-    fn compile_schema(self) -> (TestEnv, Schema);
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [SourceName; N],
+    ) -> (TestEnv, [Schema; N]);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn compile_schema(self) -> (TestEnv, Schema) {
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [SourceName; N],
+    ) -> (TestEnv, [Schema; N]) {
         let mut test_env = self.compile_ok(|_| {});
         // Don't want JSON schema noise in GraphQL tests:
         test_env.compile_json_schema = false;
-        (
-            test_env.clone(),
-            create_graphql_schema(test_env.root_package, test_env.env).unwrap(),
-        )
+
+        let schemas: [Schema; N] = source_names.map(|source_name| {
+            create_graphql_schema(test_env.get_package_id(source_name.0), test_env.env.clone())
+                .unwrap()
+        });
+
+        (test_env, schemas)
     }
 }
 

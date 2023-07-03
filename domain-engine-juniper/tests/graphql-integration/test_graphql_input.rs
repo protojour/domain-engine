@@ -1,18 +1,18 @@
-use ontol_test_utils::assert_error_msg;
+use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
 use crate::{mock_gql_context, Exec, TestCompileSchema};
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
-    let (_, schema) = "
+    let (_, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
         rel .'prop': 'const'
     }
     "
-    .compile_schema();
+    .compile_schemas([SourceName::root()]);
 
     let ctx = mock_gql_context(());
     assert_error_msg!(

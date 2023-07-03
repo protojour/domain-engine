@@ -9,15 +9,18 @@ use test_log::test;
 
 use crate::{Exec, TestCompileSchema};
 
+const ROOT: SourceName = SourceName::root();
+const CONDUIT_DB: SourceName = SourceName("conduit_db");
+
 #[test(tokio::test)]
-async fn test_graphql_conduit_db_in_memory() {
+async fn test_graphql_in_memory_conduit_db() {
     let test_packages = TestPackages::with_sources([(
-        SourceName::root(),
+        ROOT,
         include_str!("../../../examples/conduit/conduit_db.on"),
     )])
-    .with_data_store(SourceName::root(), DataStoreConfig::InMemory);
+    .with_data_store(ROOT, DataStoreConfig::InMemory);
 
-    let (test_env, schema) = test_packages.compile_schema();
+    let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context = GqlContext {
         engine_api: Arc::new(DomainEngine::new(test_env.env.clone())),
     };
@@ -34,7 +37,7 @@ async fn test_graphql_conduit_db_in_memory() {
                 username
             }
         }"#
-        .exec(&schema, &gql_context,)
+        .exec(&schema, &gql_context)
         .await,
         expected = Ok(graphql_value!({
             "createUser": {
@@ -56,7 +59,7 @@ async fn test_graphql_conduit_db_in_memory() {
                 }
             }
         }"
-        .exec(&schema, &gql_context,)
+        .exec(&schema, &gql_context)
         .await,
         expected = Ok(graphql_value!({
             "UserList": {
@@ -72,5 +75,65 @@ async fn test_graphql_conduit_db_in_memory() {
                 ]
             },
         })),
+    );
+}
+
+#[test(tokio::test)]
+// FIXME: Currently fails! Implement query translation!
+#[should_panic = "left == right"]
+async fn test_graphql_in_memory_blog_post_on_conduit_db() {
+    let test_packages = TestPackages::with_sources([
+        (
+            ROOT,
+            include_str!("../../../examples/conduit/blog_post_public.on"),
+        ),
+        (
+            CONDUIT_DB,
+            include_str!("../../../examples/conduit/conduit_db.on"),
+        ),
+    ])
+    .with_data_store(CONDUIT_DB, DataStoreConfig::InMemory);
+
+    let (test_env, [_db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
+    let gql_context = GqlContext {
+        engine_api: Arc::new(DomainEngine::new(test_env.env.clone())),
+    };
+
+    // TODO: Insert using data store domain:
+    // expect_eq!(
+    //     actual = r#"mutation {
+    //         createUser(
+    //             input: {
+    //                 username: "u1",
+    //                 email: "a@b",
+    //                 password_hash: "s3cr3t",
+    //             }
+    //         ) {
+    //             username
+    //         }
+    //     }"#
+    //     .exec(&db_schema, &gql_context)
+    //     .await,
+    //     expected = Ok(graphql_value!({
+    //         "createUser": {
+    //             "username": "u1"
+    //         }
+    //     })),
+    // );
+
+    expect_eq!(
+        actual = "{
+            BlogPostList {
+                edges {
+                    node {
+                        post_id
+                        body
+                    }
+                }
+            }
+        }"
+        .exec(&blog_schema, &gql_context)
+        .await,
+        expected = Ok(graphql_value!({})),
     );
 }

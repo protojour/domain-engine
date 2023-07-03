@@ -38,23 +38,10 @@ impl<'e> TypeBinding<'e> {
             let source_name = vector.first().unwrap();
             let type_name = vector.get(1).unwrap();
 
-            Self::new_from_package_name(test_env, source_name, type_name)
+            Self::new_with_package(test_env, test_env.get_package_id(source_name), type_name)
         } else {
             Self::new_with_package(test_env, test_env.root_package, type_name)
         }
-    }
-
-    pub fn new_from_package_name(
-        test_env: &'e TestEnv,
-        package_source_name: &str,
-        type_name: &str,
-    ) -> Self {
-        let package_id = test_env
-            .packages_by_source_name
-            .get(package_source_name)
-            .unwrap_or_else(|| panic!("Source name {package_source_name} not found"));
-
-        Self::new_with_package(test_env, *package_id, type_name)
     }
 
     pub fn new_with_package(test_env: &'e TestEnv, package_id: PackageId, type_name: &str) -> Self {

@@ -19,20 +19,20 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 
 #[test]
 fn test_graphql_empty_schema() {
-    "".compile_schema();
+    "".compile_schemas([SourceName::root()]);
 }
 
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
-    let (env, schema) = "
+    let (test_env, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
         rel .'prop': int
     }
     "
-    .compile_schema();
-    let foo = TypeBinding::new(&env, "foo");
+    .compile_schemas([SourceName::root()]);
+    let foo = TypeBinding::new(&test_env, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
 
     expect_eq!(
@@ -87,12 +87,12 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
-    let (_, schema) = "
+    let (_, [schema]) = "
     pub type foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
     "
-    .compile_schema();
+    .compile_schemas([SourceName::root()]);
 
     expect_eq!(
         actual = "{
@@ -119,7 +119,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 
 #[test(tokio::test)]
 async fn test_inner_struct() {
-    let (env, schema) = "
+    let (test_env, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     type inner {
         rel .'prop': string
@@ -129,9 +129,9 @@ async fn test_inner_struct() {
         rel .'inner': inner
     }
     "
-    .compile_schema();
+    .compile_schemas([SourceName::root()]);
 
-    let foo = TypeBinding::new(&env, "foo");
+    let foo = TypeBinding::new(&test_env, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
 
     expect_eq!(
@@ -193,7 +193,7 @@ async fn test_inner_struct() {
 
 #[test(tokio::test)]
 async fn test_docs_introspection() {
-    let (_env, schema) = "
+    let (_, [schema]) = "
     type Key {
         rel .is: string
     }
@@ -205,7 +205,7 @@ async fn test_docs_introspection() {
         rel .'relation': string
     }
     "
-    .compile_schema();
+    .compile_schemas([SourceName::root()]);
 
     expect_eq!(
         actual = r#"{
@@ -237,8 +237,9 @@ async fn test_docs_introspection() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
-    let [artist, instrument, plays] = TypeBinding::new_n(&env, ["artist", "instrument", "plays"]);
+    let (test_env, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([SourceName::root()]);
+    let [artist, instrument, plays] =
+        TypeBinding::new_n(&test_env, ["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -388,8 +389,8 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let (env, schema) = GUITAR_SYNTH_UNION.compile_schema();
-    let artist = TypeBinding::new(&env, "artist");
+    let (test_env, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([SourceName::root()]);
+    let artist = TypeBinding::new(&test_env, "artist");
     let artist_entity: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -472,7 +473,7 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (_env, schema) = TestPackages::with_sources([
+    let (_, [schema]) = TestPackages::with_sources([
         (
             SourceName::root(),
             include_str!("../../../examples/municipalities.on"),
@@ -482,7 +483,7 @@ async fn test_graphql_municipalities() {
             include_str!("../../../examples/geojson.on"),
         ),
     ])
-    .compile_schema();
+    .compile_schemas([SourceName::root()]);
 
     {
         expect_eq!(

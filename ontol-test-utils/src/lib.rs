@@ -73,6 +73,15 @@ pub struct TestEnv {
     pub packages_by_source_name: HashMap<String, PackageId>,
 }
 
+impl TestEnv {
+    pub fn get_package_id(&self, source_name: &str) -> PackageId {
+        self.packages_by_source_name
+            .get(source_name)
+            .cloned()
+            .unwrap_or_else(|| panic!("PackageId for `{}` not found", source_name))
+    }
+}
+
 #[async_trait::async_trait]
 pub trait TestCompile: Sized {
     /// Compile
@@ -117,7 +126,7 @@ impl TestCompile for &'static str {
 pub struct SourceName(pub &'static str);
 
 impl SourceName {
-    pub fn root() -> Self {
+    pub const fn root() -> Self {
         Self(ROOT_SRC_NAME)
     }
 }
