@@ -1,6 +1,7 @@
-use std::{collections::HashSet, fmt::Debug};
+use std::fmt::Debug;
 
 use fnv::FnvHashMap;
+use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
     vm::proc::{Address, Lib, Procedure},
@@ -25,8 +26,8 @@ use super::{
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
-    tasks: Vec<CodegenTask<'m>>,
-    pub auto_maps: HashSet<AutoMapKey>,
+    const_tasks: Vec<ConstCodegenTask<'m>>,
+    pub map_tasks: IndexMap<MapKeyPair, MapCodegenTask<'m>>,
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
@@ -35,22 +36,30 @@ pub struct CodegenTasks<'m> {
 impl<'m> Debug for CodegenTasks<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CodegenTasks")
-            .field("tasks", &self.tasks)
+            .field("tasks", &self.const_tasks)
             .finish()
     }
 }
 
 impl<'m> CodegenTasks<'m> {
-    pub fn push(&mut self, task: CodegenTask<'m>) {
-        self.tasks.push(task);
+    pub fn add_map_task(&mut self, pair: MapKeyPair, task: MapCodegenTask<'m>) {
+        match self.map_tasks.entry(pair) {
+            Entry::Occupied(mut occupied) => {
+                if let (MapCodegenTask::Auto, MapCodegenTask::Explicit(_)) = (occupied.get(), &task)
+                {
+                    // Explicit maps may overwrite auto-generated maps
+                    occupied.insert(task);
+                }
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(task);
+            }
+        }
     }
-}
 
-#[derive(Debug)]
-pub enum CodegenTask<'m> {
-    // A procedure with 0 arguments, used to produce a constant value
-    Const(ConstCodegenTask<'m>),
-    Map(MapCodegenTask<'m>),
+    pub fn add_const_task(&mut self, const_task: ConstCodegenTask<'m>) {
+        self.const_tasks.push(const_task);
+    }
 }
 
 pub struct ConstCodegenTask<'m> {
@@ -58,7 +67,12 @@ pub struct ConstCodegenTask<'m> {
     pub node: TypedHirNode<'m>,
 }
 
-pub struct MapCodegenTask<'m> {
+pub enum MapCodegenTask<'m> {
+    Auto,
+    Explicit(ExplicitMapCodegenTask<'m>),
+}
+
+pub struct ExplicitMapCodegenTask<'m> {
     pub direction: MapDirection,
     pub first: TypedHirNode<'m>,
     pub second: TypedHirNode<'m>,
@@ -73,7 +87,7 @@ impl<'m> Debug for ConstCodegenTask<'m> {
     }
 }
 
-impl<'m> Debug for MapCodegenTask<'m> {
+impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MapCodegenTask")
             .field("first", &DebugViaDisplay(&self.first))
@@ -82,29 +96,15 @@ impl<'m> Debug for MapCodegenTask<'m> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct AutoMapKey {
-    first: DefId,
-    second: DefId,
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct MapKeyPair {
+    first: MapKey,
+    second: MapKey,
 }
 
-impl AutoMapKey {
-    // TODO: improve this function
-    #[allow(clippy::comparison_chain)]
-    pub fn new(a: DefId, b: DefId) -> Self {
-        if a.package_id() == b.package_id() {
-            if a.1 < b.1 {
-                Self {
-                    first: a,
-                    second: b,
-                }
-            } else {
-                Self {
-                    first: b,
-                    second: a,
-                }
-            }
-        } else if a.package_id() < b.package_id() {
+impl MapKeyPair {
+    pub fn new(a: MapKey, b: MapKey) -> Self {
+        if a < b {
             Self {
                 first: a,
                 second: b,
@@ -117,11 +117,11 @@ impl AutoMapKey {
         }
     }
 
-    pub fn first(&self) -> DefId {
+    pub fn first(&self) -> MapKey {
         self.first
     }
 
-    pub fn second(&self) -> DefId {
+    pub fn second(&self) -> MapKey {
         self.second
     }
 }
@@ -151,52 +151,56 @@ pub(super) struct MapCall {
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
-    let mut tasks = std::mem::take(&mut compiler.codegen_tasks.tasks);
-    let auto_maps = std::mem::take(&mut compiler.codegen_tasks.auto_maps);
+    let mut explicit_map_tasks = vec![];
 
-    for auto_map_key in auto_maps {
-        if let Some(task) = autogenerate_mapping(auto_map_key, compiler) {
-            tasks.push(task);
+    for (def_pair, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
+        match map_task {
+            MapCodegenTask::Auto => {
+                if let Some(task) = autogenerate_mapping(def_pair, compiler) {
+                    explicit_map_tasks.push(task);
+                }
+            }
+            MapCodegenTask::Explicit(explicit) => {
+                explicit_map_tasks.push(explicit);
+            }
         }
     }
 
     let mut proc_table = ProcTable::default();
 
-    for task in tasks {
-        match task {
-            CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
+    for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
+    {
+        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+        const_codegen(
+            &mut proc_table,
+            node,
+            def_id,
+            type_mapper,
+            &mut compiler.errors,
+        );
+    }
+
+    for map_task in explicit_map_tasks {
+        debug!("1st (ty={:?}):\n{}", map_task.first.ty(), map_task.first);
+        debug!("2nd (ty={:?}):\n{}", map_task.second.ty(), map_task.second);
+
+        debug!("Forward start");
+        match unify_to_function(&map_task.first, &map_task.second, compiler) {
+            Ok(func) => {
                 let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                const_codegen(
-                    &mut proc_table,
-                    node,
-                    def_id,
-                    type_mapper,
-                    &mut compiler.errors,
-                );
+                map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
             }
-            CodegenTask::Map(map_task) => {
-                debug!("1st (ty={:?}):\n{}", map_task.first.ty(), map_task.first);
-                debug!("2nd (ty={:?}):\n{}", map_task.second.ty(), map_task.second);
+            Err(err) => warn!("unifier error: {err:?}"),
+        }
 
-                debug!("Forward start");
-                match unify_to_function(&map_task.first, &map_task.second, compiler) {
-                    Ok(func) => {
-                        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                        map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
-                    }
-                    Err(err) => warn!("unifier error: {err:?}"),
+        if matches!(map_task.direction, MapDirection::Omni) {
+            debug!("Backward start");
+            match unify_to_function(&map_task.second, &map_task.first, compiler) {
+                Ok(func) => {
+                    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+                    map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
                 }
-
-                if matches!(map_task.direction, MapDirection::Omni) {
-                    debug!("Backward start");
-                    match unify_to_function(&map_task.second, &map_task.first, compiler) {
-                        Ok(func) => {
-                            let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                            map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
-                        }
-                        Err(err) => warn!("unifier error: {err:?}"),
-                    }
-                }
+                Err(err) => warn!("unifier error: {err:?}"),
             }
         }
     }

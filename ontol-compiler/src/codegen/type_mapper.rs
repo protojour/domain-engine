@@ -7,16 +7,31 @@ use crate::{
     types::{Type, TypeRef},
 };
 
+use super::task::MapKeyPair;
+
 #[derive(Debug)]
-pub(super) struct MapInfo {
+pub struct MapInfo {
     pub key: MapKey,
     /// When mapping a type using the `is` relation, the map key is the inner type
     /// and the alias is the outer type.
     pub alias: Option<DefId>,
 }
 
+impl MapInfo {
+    pub fn unique_key(&self) -> MapKey {
+        if let Some(alias) = self.alias {
+            MapKey {
+                def_id: alias,
+                seq: self.key.seq,
+            }
+        } else {
+            self.key
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
-pub(super) struct TypeMapper<'c, 'm> {
+pub struct TypeMapper<'c, 'm> {
     pub relations: &'c Relations,
     pub defs: &'c Defs<'m>,
 }
@@ -26,7 +41,14 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
         Self { relations, defs }
     }
 
-    pub(super) fn find_mapping_info(&self, ty: TypeRef) -> Option<MapInfo> {
+    pub fn find_map_key_pair(&self, first: TypeRef, second: TypeRef) -> Option<MapKeyPair> {
+        let first = self.find_mapping_info(first)?;
+        let second = self.find_mapping_info(second)?;
+
+        Some(MapKeyPair::new(first.unique_key(), second.unique_key()))
+    }
+
+    pub fn find_mapping_info(&self, ty: TypeRef) -> Option<MapInfo> {
         match ty {
             Type::Domain(def_id) => Some(MapInfo {
                 key: MapKey {

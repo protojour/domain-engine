@@ -2,7 +2,7 @@ use ontol_runtime::DefId;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, ConstCodegenTask},
+    codegen::task::ConstCodegenTask,
     def::{DefKind, MapDirection, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks
-                    .push(CodegenTask::Const(ConstCodegenTask { def_id, node }));
+                    .add_const_task(ConstCodegenTask { def_id, node });
 
                 ty
             }

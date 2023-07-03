@@ -49,7 +49,7 @@ impl DefId {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct MapKey {
     pub def_id: DefId,
     pub seq: bool,

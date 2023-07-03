@@ -6,12 +6,14 @@ use ontol_runtime::smart_format;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{AutoMapKey, CodegenTask, MapCodegenTask},
+    codegen::{
+        task::{ExplicitMapCodegenTask, MapCodegenTask, MapKeyPair},
+        type_mapper::TypeMapper,
+    },
     def::{Def, MapDirection, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
-    relation::Constructor,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
@@ -82,12 +84,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
-        self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            direction: ctx.direction,
-            first,
-            second,
-            span: def.span,
-        }));
+        if let Some(key_pair) =
+            TypeMapper::new(self.relations, self.defs).find_map_key_pair(first.1.ty, second.1.ty)
+        {
+            self.codegen_tasks.add_map_task(
+                key_pair,
+                crate::codegen::task::MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                    direction: ctx.direction,
+                    first,
+                    second,
+                    span: def.span,
+                }),
+            );
+        }
 
         Ok(())
     }
@@ -135,25 +144,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     },
                                 );
 
-                                // try to auto-generate map for `fmt` type mappings
-                                let first_constructor = self
-                                    .relations
-                                    .properties_by_def_id(*first_def_id)
-                                    .map(|properties| &properties.constructor);
-                                let second_constructor = self
-                                    .relations
-                                    .properties_by_def_id(*first_def_id)
-                                    .map(|properties| &properties.constructor);
-
-                                if let (
-                                    Some(Constructor::StringFmt(_)),
-                                    Some(Constructor::StringFmt(_)),
-                                ) = (first_constructor, second_constructor)
-                                {
-                                    self.codegen_tasks
-                                        .auto_maps
-                                        .insert(AutoMapKey::new(*first_def_id, *second_def_id));
-                                }
+                                self.codegen_tasks.add_map_task(
+                                    MapKeyPair::new(
+                                        (*first_def_id).into(),
+                                        (*second_def_id).into(),
+                                    ),
+                                    MapCodegenTask::Auto,
+                                );
                             }
                             _ => {
                                 self.type_error(

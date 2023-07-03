@@ -13,28 +13,42 @@ use crate::{
     Compiler, SourceSpan,
 };
 
-use super::task::{AutoMapKey, CodegenTask, MapCodegenTask};
+use super::task::{ExplicitMapCodegenTask, MapKeyPair};
 
 pub fn autogenerate_mapping<'m>(
-    key: AutoMapKey,
+    key_pair: MapKeyPair,
     compiler: &mut Compiler<'m>,
-) -> Option<CodegenTask<'m>> {
-    let first_def_id = key.first();
-    let second_def_id = key.second();
+) -> Option<ExplicitMapCodegenTask<'m>> {
+    let first_def_id = key_pair.first().def_id;
+    let second_def_id = key_pair.second().def_id;
+
     let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
 
     let first_properties = compiler.relations.properties_by_def_id(first_def_id)?;
     let second_properties = compiler.relations.properties_by_def_id(second_def_id)?;
 
-    let first_segment = match &first_properties.constructor {
-        Constructor::StringFmt(segment) => segment,
-        _ => return None,
-    };
-    let second_segment = match &second_properties.constructor {
-        Constructor::StringFmt(segment) => segment,
-        _ => return None,
-    };
+    match (
+        &first_properties.constructor,
+        &second_properties.constructor,
+    ) {
+        (Constructor::StringFmt(first_fmt), Constructor::StringFmt(second_fmt)) => {
+            autogenerate_fmt_to_fmt(
+                compiler,
+                unit_type,
+                (first_def_id, first_fmt),
+                (second_def_id, second_fmt),
+            )
+        }
+        _ => None,
+    }
+}
 
+fn autogenerate_fmt_to_fmt<'m>(
+    compiler: &Compiler<'m>,
+    unit_type: TypeRef<'m>,
+    first: (DefId, &StringPatternSegment),
+    second: (DefId, &StringPatternSegment),
+) -> Option<ExplicitMapCodegenTask<'m>> {
     let mut var_allocator = VarAllocator::default();
     let first_var = var_allocator.alloc();
     let second_var = var_allocator.alloc();
@@ -42,29 +56,29 @@ pub fn autogenerate_mapping<'m>(
 
     let first_node = autogenerate_fmt_hir_struct(
         Some(&mut var_allocator),
-        first_def_id,
+        first.0,
         first_var,
-        first_segment,
+        first.1,
         &mut var_map,
         unit_type,
         compiler,
     )?;
     let second_node = autogenerate_fmt_hir_struct(
         None,
-        second_def_id,
+        second.0,
         second_var,
-        second_segment,
+        second.1,
         &mut var_map,
         unit_type,
         compiler,
     )?;
 
-    Some(CodegenTask::Map(MapCodegenTask {
+    Some(ExplicitMapCodegenTask {
         direction: MapDirection::Omni,
         first: first_node,
         second: second_node,
         span: SourceSpan::none(),
-    }))
+    })
 }
 
 fn autogenerate_fmt_hir_struct<'m>(
