@@ -5,6 +5,7 @@ use ontol_runtime::{
     value::PropertyId,
     DefId, RelationshipId, Role,
 };
+use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
@@ -527,13 +528,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 // It's OK to not specify all properties here
                             }
                             _ => {
-                                for (prop_name, match_property) in match_properties.into_iter() {
-                                    if !match_property.used {
-                                        self.error(
-                                            CompileError::MissingProperty(prop_name.into()),
-                                            &span,
-                                        );
-                                    }
+                                let missing_properties: Vec<String> = match_properties
+                                    .into_iter()
+                                    .filter(|(_, property)| !property.used)
+                                    .map(|(prop_name, _)| prop_name.into())
+                                    .collect();
+
+                                if !missing_properties.is_empty() {
+                                    self.error(
+                                        CompileError::MissingProperties(missing_properties),
+                                        &span,
+                                    );
                                 }
                             }
                         }

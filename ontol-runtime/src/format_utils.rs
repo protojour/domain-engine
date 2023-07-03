@@ -75,6 +75,24 @@ where
     }
 }
 
+/// Maps a display operator for use with e.g. CommaSeparated.
+/// I is some IntoIterator, F is a function.
+#[derive(Clone, Copy)]
+pub struct FmtMap<I, F>(pub I, pub F);
+
+impl<I, F, Item, D> IntoIterator for FmtMap<I, F>
+where
+    I: IntoIterator<Item = Item>,
+    F: FnMut(Item) -> D,
+{
+    type Item = D;
+    type IntoIter = std::iter::Map<<I as IntoIterator>::IntoIter, F>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter().map(self.1)
+    }
+}
+
 /// Macro for formatting into a SmartString instead of a std::String
 #[macro_export]
 macro_rules! smart_format {

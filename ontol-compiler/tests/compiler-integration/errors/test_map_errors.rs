@@ -39,7 +39,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop2': bar
     rel bar is: int
     map {
-        foo: // ERROR expected named property// ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
+        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`
             x
         bar {} // ERROR expected expression attribute
     }
