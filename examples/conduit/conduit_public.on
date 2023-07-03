@@ -1,28 +1,23 @@
-type email { rel .is: string }
+
 type username { rel .is: string }
 type article_slug { rel .is: string }
-type CommentId { rel .is: int }
-type tag { rel .is: string }
 
 pub type User {
-    rel email identifies: .
-    rel .'email': email
+    rel .'email'|id: { rel .is: string }
     rel .'username': string
     rel .'bio': string
     rel .'image'?: string
 }
 
 pub type Profile {
-    rel username identifies: .
-    rel .'username': username
+    rel .'username'|id: username
     rel .'bio': string
     rel .'image'?: string
     rel .'following': bool
 }
 
 pub type Article {
-    rel article_slug identifies: .
-    rel .'slug': article_slug
+    rel .'slug'|id: article_slug
     rel .'title': string
     rel .'description': string
     rel .'body': string
@@ -34,8 +29,7 @@ pub type Article {
 }
 
 pub type Comment {
-    rel CommentId identifies: .
-    rel .'id': CommentId
+    rel .'id'|id: { rel .is: int }
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
     rel .'body': string
@@ -60,12 +54,12 @@ pub type MultipleComments {
 }
 
 pub type Tags {
-    rel .'tags': [tag]
+    rel .'tags': [string]
 }
 
 type ArticleFilter {
     rel .'slug'?: article_slug
-    rel .'tag'?: [tag]
+    rel .'tag'?: [string]
     rel .'author'?: [username]
     rel .'favorited'?: [username]
     rel .'limit'?: int

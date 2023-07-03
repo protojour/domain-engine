@@ -5,7 +5,12 @@ map {
     db::Article {
         'slug': slug
         'title': title
+        'description': desc
+        'body': body
+        'createdAt': ca
+        'updatedAt': ua
         'favorited_by': [fav_user]
+        'author': author
     }
     public::Article {
         'slug': slug
@@ -14,99 +19,44 @@ map {
         'body': body
         'createdAt': ca
         'updatedAt': ua
-        'favorited': [fav_user].filter {
-            . == $this_user
-        }.not_empty
-        'favoritesCount': [fav_user].length
+        'favorited': false
+        'favoritesCount': length([fav_user])
         'author': author
     }
 }
 
-map {
-    public.ArticleFilter {
-        'slug': ?slug
-        'tag': ?[tag]
-        'author': ?[author]
-        'favorited': ?[favorited]
-        'limit': ?limit
-        'offset': ?offset
+cond map {
+    db::Article { 'favorited_by': [db::User { 'user_id': id }] }
+    public::Article { 'favorited': true }
+    if [id] contains: memoriam::current_user
+}
+
+cond filter {
+    public::ArticleFilter { ..and 'slug': slug }
+    db::Article { 'slug': slug }
+}
+
+cond filter {
+    public::ArticleFilter { ..and 'tags': [filter_tag] }
+    db::Article { 'tagged': [db::TagEntity { 'tag': tag }] }
+    if [tag] intersects: [filter_tag]
+}
+
+cond filter {
+    public::ArticleFilter { ..and 'favorited': [favorited] }
+    db::Article {
+        ..and
+        'favorited_by': [db.User { 'username': username }]
     }
-    db.Article
-        .filter {
-            'slug': slug
-            'author': db.User {
-                // variant A
-                'username': ?{ username ->
-                    [author].match { a -> a == username }
-                }
-                // variant B uses Rust's @ binding
-                'username': username @ ?(username in [author])
-            }
-            'favorited_by': ?[
-                db.User {
-                    'username': { username ->
-                        [favorited].match { fav -> fav == username }
-                    }
-                }
-            ]
-        }
+    if [favorited] intersects: [username]
 }
 
-map {
-    (
-        db.Article { 'slug': slug ..rest }
-        public.ArticleFilter { 'slug': slug_filter.. }
-    )
-    if slug == slug_filter
-    db.Article { .. }
-}
-
-map {
-    (
-        db.Article {
-            'author': db.User {
-                'username': username..
-            }
-            ..
-        }
-        public.ArticleFilter { 'author': [author_filter].. }
-    )
-    if username in [author_filter]
-    db.Article { .. }
-}
-
-// Without any "tupling".
-// This might be weird because there isn't a complete data source on the left side of the map.
-// Data just flows from "nowhere" into `db.Article`.
-unify {
-    public.ArticleFilter {
-        'favorited': [favorited]
-        &&..
-    }
-    db.Article {
-        'favorited_by': [db.User {
-            'username': username..
-        }]
-        &&..
-    }
-    if [favorited] contains_any_of: [username]
-}
-
-unify {
-    public.ArticleFilter { 'offset': ?offset &&.. }
+cond filter {
+    public.ArticleFilter { ..and 'offset': offset }
     [db.Article][(offset ?: 0)..]
 }
 
-unify {
-    public.ArticleFilter { 'limit': ?limit &&.. }
+cond filter {
+    public.ArticleFilter { ..and 'limit': limit }
     [db.Article][..(limit ?: 20)]
-}
-
-// for reference: Multi-arm map, "anything-to-anything"
-unify {
-    meters: x
-    kilometers: x / 1000
-    millimeters: x * 1000
-    micrometers: x * 1_000_000
-    nanometers: x * 1_000_000_000
 }

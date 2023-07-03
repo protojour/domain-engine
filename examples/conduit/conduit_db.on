@@ -40,6 +40,6 @@ pub type TagEntity {
 
 rel [Article] 'author'::'authored_articles'? User
 rel Article 'favorited_by'::'favorited'? [User]
-rel TagEntity 'tags'::'tagged_with'? [Article]
+rel [TagEntity] 'tagged'::'tags'? [Article]
 rel [Comment] 'comment_on'::'comments'? Article
 rel [Comment] 'author'::'authored_comments'? User
