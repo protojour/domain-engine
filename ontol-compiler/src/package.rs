@@ -170,6 +170,7 @@ impl PackageGraphBuilder {
                     load_errors.push(SpannedCompileError {
                         error: CompileError::PackageNotFound,
                         span: requested_package.use_source_span,
+                        notes: vec![],
                     });
                 } else {
                     requests.push(PackageRequest {

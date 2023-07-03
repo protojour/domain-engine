@@ -10,7 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, Compiler, SourceSpan,
+    CompileErrors, Compiler, SourceSpan, SpannedCompileError, SpannedNote,
 };
 
 pub mod check_def;
@@ -60,7 +60,20 @@ pub struct TypeCheck<'c, 'm> {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
-        self.errors.push(error.spanned(span));
+        self.error_with_notes(error, span, vec![])
+    }
+
+    fn error_with_notes(
+        &mut self,
+        error: CompileError,
+        span: &SourceSpan,
+        notes: Vec<SpannedNote>,
+    ) -> TypeRef<'m> {
+        self.errors.push(SpannedCompileError {
+            error,
+            span: *span,
+            notes,
+        });
         self.types.intern(Type::Error)
     }
 

@@ -20,7 +20,7 @@ use crate::{
     },
     typed_hir::{Meta, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
-    SourceSpan,
+    Note, SourceSpan, SpannedNote,
 };
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
@@ -535,9 +535,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .collect();
 
                                 if !missing_properties.is_empty() {
-                                    self.error(
+                                    self.error_with_notes(
                                         CompileError::MissingProperties(missing_properties),
                                         &span,
+                                        vec![SpannedNote {
+                                            note: Note::ConsiderUsingOneWayMap,
+                                            span: ctx.map_kw_span,
+                                        }],
                                     );
                                 }
                             }

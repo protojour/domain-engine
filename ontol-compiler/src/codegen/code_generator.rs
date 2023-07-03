@@ -107,6 +107,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.errors.push(SpannedCompileError {
                         error: CompileError::UnboundVariable,
                         span,
+                        notes: vec![],
                     });
                 }
             },

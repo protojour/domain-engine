@@ -38,7 +38,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop1': bar
     rel foo 'prop2': bar
     rel bar is: int
-    map {
+    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
         foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`
             x
         bar {} // ERROR expected expression attribute
@@ -199,7 +199,7 @@ fn map_union() {
         rel .is?: bar
     }
 
-    map {
+    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
         foobar {} // ERROR cannot map a union, map each variant instead
         foo {} // ERROR missing property `type`
     }

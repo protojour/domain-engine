@@ -60,7 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => ty,
                 };
 
-                let mut ctx = HirBuildCtx::new(MapDirection::Omni);
+                let mut ctx = HirBuildCtx::new(expr.span, MapDirection::Omni);
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks

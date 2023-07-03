@@ -18,8 +18,8 @@ pub struct UnifiedCompileError {
 #[error("")]
 pub struct SpannedCompileError {
     pub error: CompileError,
-
     pub span: SourceSpan,
+    pub notes: Vec<SpannedNote>,
 }
 
 #[derive(Debug)]
@@ -209,6 +209,18 @@ impl std::fmt::Display for CompileError {
 }
 
 #[derive(Debug)]
+pub struct SpannedNote {
+    pub note: Note,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Error)]
+pub enum Note {
+    #[error("Consider using a one way mapping (`map => {{ .. }}`) here")]
+    ConsiderUsingOneWayMap,
+}
+
+#[derive(Debug)]
 pub struct LexError {
     inner: Box<Simple<char>>,
 }
@@ -310,6 +322,7 @@ impl CompileError {
         SpannedCompileError {
             error: self,
             span: *span,
+            notes: vec![],
         }
     }
 }

@@ -8,6 +8,7 @@ use super::inference::Inference;
 pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
+    pub map_kw_span: SourceSpan,
     pub direction: MapDirection,
     pub inference: Inference<'m>,
     pub expr_variables: FnvHashMap<ExprId, ExpressionVariable>,
@@ -30,8 +31,9 @@ pub struct HirBuildCtx<'m> {
 }
 
 impl<'m> HirBuildCtx<'m> {
-    pub fn new(direction: MapDirection) -> Self {
+    pub fn new(map_kw_span: SourceSpan, direction: MapDirection) -> Self {
         Self {
+            map_kw_span,
             direction,
             inference: Inference::new(),
             expr_variables: Default::default(),

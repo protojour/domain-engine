@@ -35,7 +35,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = HirBuildCtx::new(direction);
+        let mut ctx = HirBuildCtx::new(def.span, direction);
 
         {
             let mut map_check = MapCheck {

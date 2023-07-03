@@ -1,8 +1,8 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 use ontol_compiler::{
-    error::{CompileError, UnifiedCompileError},
-    SourceCodeRegistry, SourceId, Sources, SpannedCompileError,
+    error::{CompileError, Note, UnifiedCompileError},
+    SourceCodeRegistry, SourceId, SourceSpan, Sources,
 };
 
 #[derive(Default)]
@@ -15,7 +15,26 @@ struct DiagnosticBuilder {
 struct DiagnosticsLine {
     start: usize,
     orig_stripped: String,
-    errors: Vec<SpannedCompileError>,
+    messages: Vec<SpannedMessage>,
+}
+
+struct SpannedMessage {
+    message: Message,
+    span: SourceSpan,
+}
+
+enum Message {
+    Error(CompileError),
+    Note(Note),
+}
+
+impl Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error(error) => write!(f, "// ERROR {error}"),
+            Self::Note(note) => write!(f, "// NOTE {note}"),
+        }
+    }
 }
 
 pub struct AnnotatedCompileError {
@@ -28,9 +47,6 @@ pub fn diff_errors(
     sources: &Sources,
     source_code_registry: &SourceCodeRegistry,
 ) -> Vec<AnnotatedCompileError> {
-    let error_pattern = "// ERROR";
-    let space_error_pattern = " // ERROR";
-
     let mut builders: BTreeMap<SourceId, DiagnosticBuilder> = source_code_registry
         .registry
         .iter()
@@ -38,17 +54,22 @@ pub fn diff_errors(
             let mut builder =
                 text.lines()
                     .fold(DiagnosticBuilder::default(), |mut builder, line| {
-                        let orig_stripped = if let Some(byte_index) = line.find(space_error_pattern)
-                        {
+                        let orig_stripped = if let Some(byte_index) = line.find(" // ERROR") {
                             &line[..byte_index]
                         } else {
                             line
+                        };
+                        let orig_stripped = if let Some(byte_index) = orig_stripped.find(" // NOTE")
+                        {
+                            &orig_stripped[..byte_index]
+                        } else {
+                            orig_stripped
                         };
 
                         builder.lines.push(DiagnosticsLine {
                             start: builder.cursor,
                             orig_stripped: orig_stripped.to_string(),
-                            errors: vec![],
+                            messages: vec![],
                         });
                         builder.cursor += line.len() + 1;
                         builder
@@ -61,11 +82,14 @@ pub fn diff_errors(
         })
         .collect();
 
-    for spanned_error in errors.errors {
-        let source_id = spanned_error.span.source_id;
+    fn add_message_to_builder(
+        builders: &mut BTreeMap<SourceId, DiagnosticBuilder>,
+        spanned_message: SpannedMessage,
+    ) {
+        let source_id = spanned_message.span.source_id;
         let builder = builders.get_mut(&source_id).unwrap();
 
-        let byte_pos = spanned_error.span.start as usize;
+        let byte_pos = spanned_message.span.start as usize;
 
         let diagnostics_line = builder
             .lines
@@ -74,9 +98,28 @@ pub fn diff_errors(
             .find(|line| line.start <= byte_pos);
 
         if let Some(diagnostics_line) = diagnostics_line {
-            diagnostics_line.errors.push(spanned_error);
+            diagnostics_line.messages.push(spanned_message);
         } else {
             panic!("Did not find originating line in script");
+        }
+    }
+
+    for spanned_error in errors.errors {
+        add_message_to_builder(
+            &mut builders,
+            SpannedMessage {
+                message: Message::Error(spanned_error.error),
+                span: spanned_error.span,
+            },
+        );
+        for spanned_note in spanned_error.notes {
+            add_message_to_builder(
+                &mut builders,
+                SpannedMessage {
+                    message: Message::Note(spanned_note.note),
+                    span: spanned_note.span,
+                },
+            );
         }
     }
 
@@ -99,11 +142,11 @@ pub fn diff_errors(
             let orig_stripped = &line.orig_stripped;
             annotated.push_str(orig_stripped);
 
-            if !line.errors.is_empty() {
+            if !line.messages.is_empty() {
                 let joined_errors = line
-                    .errors
+                    .messages
                     .iter()
-                    .map(|spanned_error| format!("{} {}", error_pattern, spanned_error.error))
+                    .map(|spanned_msg| format!("{}", spanned_msg.message))
                     .collect::<Vec<_>>()
                     .join("");
 
@@ -127,19 +170,21 @@ pub fn diff_errors(
 
     for (source_id, builder) in builders {
         for line in builder.lines {
-            for spanned_error in line.errors {
+            for spanned_message in line.messages {
                 let text = source_code_registry
                     .registry
                     .get(&source_id)
                     .expect("no source text available");
 
                 let span_text =
-                    &text[spanned_error.span.start as usize..spanned_error.span.end as usize];
+                    &text[spanned_message.span.start as usize..spanned_message.span.end as usize];
 
-                annotated_errors.push(AnnotatedCompileError {
-                    compile_error: spanned_error.error,
-                    span_text: span_text.to_string(),
-                })
+                if let Message::Error(compile_error) = spanned_message.message {
+                    annotated_errors.push(AnnotatedCompileError {
+                        compile_error,
+                        span_text: span_text.to_string(),
+                    });
+                }
             }
         }
     }
