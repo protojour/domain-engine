@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ontol_hir::VarAllocator;
 use ontol_runtime::DefId;
+use tracing::warn;
 
 use crate::{
     def::MapDirection,
@@ -38,6 +39,27 @@ pub fn autogenerate_mapping<'m>(
                 (first_def_id, first_fmt),
                 (second_def_id, second_fmt),
             )
+        }
+        (Constructor::Value(first_rel_id, ..), Constructor::Value(second_rel_id, ..)) => {
+            let first_meta = compiler
+                .defs
+                .lookup_relationship_meta(*first_rel_id)
+                .unwrap();
+            let second_meta = compiler
+                .defs
+                .lookup_relationship_meta(*second_rel_id)
+                .unwrap();
+
+            let first_object = first_meta.relationship.object.0.def_id;
+            let second_object = second_meta.relationship.object.0.def_id;
+
+            if first_object == second_object {
+                // This is trivial and just uses type punning
+                None
+            } else {
+                warn!("TODO: Value to value - DIFFERENT OBJECTS");
+                None
+            }
         }
         _ => None,
     }

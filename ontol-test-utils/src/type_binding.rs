@@ -8,7 +8,7 @@ use ontol_runtime::{
     serde::operator::SerdeOperatorId,
     serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
-    DefId,
+    DefId, PackageId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
@@ -30,9 +30,36 @@ impl<'e> TypeBinding<'e> {
         type_names.map(|type_name| Self::new(test_env, type_name))
     }
 
+    /// Make a type binding with the given type name.
+    /// The type name may be written as "SourceName::Type" to specify a specific domain.
     pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
+        if type_name.contains("::") {
+            let vector: Vec<&str> = type_name.split("::").collect();
+            let source_name = vector.first().unwrap();
+            let type_name = vector.get(1).unwrap();
+
+            Self::new_from_package_name(test_env, source_name, type_name)
+        } else {
+            Self::new_with_package(test_env, test_env.root_package, type_name)
+        }
+    }
+
+    pub fn new_from_package_name(
+        test_env: &'e TestEnv,
+        package_source_name: &str,
+        type_name: &str,
+    ) -> Self {
+        let package_id = test_env
+            .packages_by_source_name
+            .get(package_source_name)
+            .unwrap_or_else(|| panic!("Source name {package_source_name} not found"));
+
+        Self::new_with_package(test_env, *package_id, type_name)
+    }
+
+    pub fn new_with_package(test_env: &'e TestEnv, package_id: PackageId, type_name: &str) -> Self {
         let env = &test_env.env;
-        let domain = env.find_domain(test_env.root_package).unwrap();
+        let domain = env.find_domain(package_id).unwrap();
         let def_id = domain
             .type_names
             .get(type_name)

@@ -1,7 +1,7 @@
 use 'conduit_db' as db
 
 pub type BlogPost {
-    rel .'id': { rel .is: uuid }
+    rel .'post_id': { rel .is: uuid }
     rel .'body': string
 }
 
@@ -11,8 +11,7 @@ map => {
         'body': body
     }
     BlogPost {
-        // TODO: fix this ID conversion
-        'id': id // ERROR cannot convert this `uuid` from `uuid`: These types are not equated.
+        'post_id': id
         'body': body
     }
 }

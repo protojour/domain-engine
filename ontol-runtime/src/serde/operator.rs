@@ -254,7 +254,7 @@ impl SerdeProperty {
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
     ) -> Option<&Self> {
-        if !matches!(mode, ProcessorMode::Read) && self.is_read_only() {
+        if !matches!(mode, ProcessorMode::Read | ProcessorMode::Inspect) && self.is_read_only() {
             return None;
         }
 

@@ -70,6 +70,7 @@ pub struct TestEnv {
     pub env: Arc<Env>,
     pub root_package: PackageId,
     pub compile_json_schema: bool,
+    pub packages_by_source_name: HashMap<String, PackageId>,
 }
 
 #[async_trait::async_trait]
@@ -126,6 +127,7 @@ pub struct TestPackages {
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
     data_store: Option<(SourceName, DataStoreConfig)>,
+    packages_by_source_name: HashMap<String, PackageId>,
 }
 
 impl TestPackages {
@@ -144,6 +146,7 @@ impl TestPackages {
             sources: Default::default(),
             source_code_registry: Default::default(),
             data_store: None,
+            packages_by_source_name: Default::default(),
         }
     }
 
@@ -165,6 +168,9 @@ impl TestPackages {
                         let source_name = match &request.reference {
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
+
+                        self.packages_by_source_name
+                            .insert(source_name.to_string(), request.package_id);
 
                         if source_name == ROOT_SRC_NAME {
                             root_package = Some(request.package_id);
@@ -207,6 +213,7 @@ impl TestPackages {
                     root_package,
                     // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
                     compile_json_schema: false,
+                    packages_by_source_name: self.packages_by_source_name.clone(),
                 })
             }
             Err(error) => Err(error),

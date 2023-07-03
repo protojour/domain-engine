@@ -161,16 +161,26 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.gen_node(*param, block);
 
-                let proc = Procedure {
-                    address: self.proc_table.gen_mapping_addr(from.key, to.key),
-                    n_params: NParams(1),
-                };
+                if from.key == to.key {
+                    if let Some(alias) = to.alias {
+                        let local = self.builder.top();
+                        self.builder
+                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    } else {
+                        // Nothing needs to be done
+                    }
+                } else {
+                    let proc = Procedure {
+                        address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                        n_params: NParams(1),
+                    };
 
-                self.builder.append(block, Ir::Call(proc), Delta(0), span);
-                if let Some(alias) = to.alias {
-                    let local = self.builder.top();
-                    self.builder
-                        .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    self.builder.append(block, Ir::Call(proc), Delta(0), span);
+                    if let Some(alias) = to.alias {
+                        let local = self.builder.top();
+                        self.builder
+                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    }
                 }
             }
             ontol_hir::Kind::Seq(_label, _attr) => {
