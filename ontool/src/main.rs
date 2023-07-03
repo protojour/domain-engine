@@ -179,6 +179,19 @@ fn generate(args: &Generate) -> Result<(), OntoolError> {
                         )
                         .finish()
                         .eprint((filename, Source::from(&source)))?;
+
+                    for note in &error.notes {
+                        let span = note.span.start as usize..note.span.end as usize;
+                        let message = note.note.to_string();
+                        Report::build(ReportKind::Advice, filename, span.start)
+                            .with_label(
+                                Label::new((filename, span))
+                                    .with_message(message)
+                                    .with_color(colors.next()),
+                            )
+                            .finish()
+                            .eprint((filename, Source::from(&source)))?;
+                    }
                 }
                 return Err(OntoolError::Compile);
             }
