@@ -1,5 +1,6 @@
 pub mod task;
 
+mod auto_map;
 mod code_generator;
 mod ir;
 mod link;
