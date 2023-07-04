@@ -75,8 +75,6 @@ async fn test_graphql_in_memory_conduit_db() {
 }
 
 #[test(tokio::test)]
-// FIXME: Currently fails! Implement query translation!
-#[should_panic = "Invalid entity DefId"]
 async fn test_graphql_in_memory_blog_post_on_conduit_db() {
     let test_packages = TestPackages::with_sources([
         (
@@ -129,7 +127,9 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
         .exec(&blog_schema, &gql_context)
         .await,
         expected = Ok(graphql_value!({
-            "edges": []
+            "BlogPostList": {
+                "edges": []
+            }
         })),
     );
 }

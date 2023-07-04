@@ -47,33 +47,46 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    pub async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+    pub async fn query_entities(&self, mut query: EntityQuery) -> DomainResult<Vec<Attribute>> {
         let data_store = self.get_data_store()?;
 
-        // TODO: Domain translation by rewriting whatever is used as query language
-        let resolve_path = match &query.source {
-            StructOrUnionQuery::Struct(struct_query) => self.resolver_graph.probe_path(
-                &self.env,
-                struct_query.def_id,
-                data_store.package_id(),
-                ProbeOptions {
-                    must_be_entity: true,
-                    inverted: true,
-                },
-            ),
+        let (resolve_path, mut def_id) = match &query.source {
+            StructOrUnionQuery::Struct(struct_query) => self
+                .resolver_graph
+                .probe_path(
+                    &self.env,
+                    struct_query.def_id,
+                    data_store.package_id(),
+                    ProbeOptions {
+                        must_be_entity: true,
+                        inverted: true,
+                    },
+                )
+                .map(|path| (path, struct_query.def_id)),
             StructOrUnionQuery::Union(..) => todo!("Resolve a union"),
         }
         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-        debug!("Resolve path: {resolve_path:?}");
-        if let Some(store_def_id) = resolve_path.path.last() {
-            debug!(
-                "Resolve to: {:?}",
-                self.env.get_type_info(*store_def_id).name
-            );
+        // transform query
+        for next_def_id in &resolve_path.path {
+            match &mut query.source {
+                StructOrUnionQuery::Struct(struct_query) => {
+                    struct_query.def_id = *next_def_id;
+                }
+                _ => todo!(),
+            }
+
+            def_id = *next_def_id;
         }
 
+        debug!(
+            "Resolve path: {resolve_path:?} to: {:?}",
+            self.env.get_type_info(def_id)
+        );
+
         data_store.api().query(self, query).await
+
+        // TODO: transform result
     }
 
     pub async fn store_new_entity(&self, entity: Value, query: Query) -> DomainResult<Value> {
