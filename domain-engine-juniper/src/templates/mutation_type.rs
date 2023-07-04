@@ -69,7 +69,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
 
                     let value = executor
                         .context()
-                        .engine_api
+                        .domain_engine
                         .store_new_entity(input_attribute.value, query)
                         .await?;
 

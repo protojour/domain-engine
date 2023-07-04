@@ -79,7 +79,7 @@ impl InMemoryStore {
             .get(&struct_query.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
-        let type_info = engine.get_env().get_type_info(struct_query.def_id);
+        let type_info = engine.env().get_type_info(struct_query.def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
@@ -193,7 +193,7 @@ impl InMemoryStore {
             })
             .ok_or(DomainError::IdNotFound)?;
 
-        let type_info = engine.get_env().get_type_info(def_id);
+        let type_info = engine.env().get_type_info(def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
@@ -258,7 +258,7 @@ impl InMemoryStore {
                 )?;
 
                 for entity in entities {
-                    let id = find_inherent_entity_id(engine.get_env(), &entity)?;
+                    let id = find_inherent_entity_id(engine.env(), &entity)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id.data)?;
 
@@ -282,7 +282,7 @@ impl InMemoryStore {
     ) -> DomainResult<Value> {
         debug!("write entity {entity:#?}");
 
-        let env = engine.get_env();
+        let env = engine.env();
         let type_info = env.get_type_info(entity.type_def_id);
         let entity_info = type_info
             .entity_info
@@ -370,7 +370,7 @@ impl InMemoryStore {
     ) -> DomainResult<()> {
         debug!("entity rel attribute: {attribute:?}");
 
-        let env = engine.get_env();
+        let env = engine.env();
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 

@@ -97,7 +97,7 @@ impl<'a> QueryAnalyzer<'a> {
                 let limit = args_wrapper
                     .deserialize::<u32>(first.name())
                     .unwrap()
-                    .unwrap_or(self.context.engine_api.get_config().default_limit);
+                    .unwrap_or(self.context.domain_engine.config().default_limit);
                 let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
                 KeyedPropertySelection {

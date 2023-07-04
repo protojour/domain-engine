@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::EngineAPI;
+use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{env::Env, PackageId};
 use tracing::debug;
@@ -15,7 +15,15 @@ mod templates;
 mod virtual_registry;
 
 pub struct GqlContext {
-    pub engine_api: Arc<dyn EngineAPI>,
+    pub domain_engine: Arc<DomainEngine>,
+}
+
+impl From<DomainEngine> for GqlContext {
+    fn from(value: DomainEngine) -> Self {
+        Self {
+            domain_engine: Arc::new(value),
+        }
+    }
 }
 
 pub mod juniper {

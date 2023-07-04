@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::{DomainEngine, EngineAPI};
+use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{create_graphql_schema, juniper, GqlContext, Schema};
 use ontol_runtime::{env::Env, PackageId};
 use serde::Serialize;
@@ -12,7 +12,7 @@ use crate::{wasm_error::WasmError, wasm_util::js_serializer};
 pub struct WasmGraphqlSchema {
     pub(crate) env: Arc<Env>,
     pub(crate) schema: Schema,
-    domain_engine: Arc<dyn EngineAPI>,
+    domain_engine: Arc<DomainEngine>,
 }
 
 #[wasm_bindgen]
@@ -38,7 +38,7 @@ impl WasmGraphqlSchema {
         variables: JsValue,
     ) -> Result<JsValue, WasmError> {
         let gql_context = GqlContext {
-            engine_api: self.domain_engine.clone(),
+            domain_engine: self.domain_engine.clone(),
         };
 
         let juniper_variables = serde_wasm_bindgen::from_value(variables)?;

@@ -11,7 +11,7 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, Query, StructOrUnionQuery},
     value::{Attribute, Value},
-    DefId,
+    DefId, PackageId,
 };
 use tracing::debug;
 
@@ -53,16 +53,6 @@ pub enum DomainError {
 
 pub type DomainResult<T> = Result<T, DomainError>;
 
-#[unimock::unimock(api = EngineAPIMock)]
-#[async_trait::async_trait]
-pub trait EngineAPI: Send + Sync + 'static {
-    fn get_config(&self) -> &Config;
-
-    async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>>;
-
-    async fn store_new_entity(&self, value: Value, query: Query) -> DomainResult<Value>;
-}
-
 pub struct DomainEngine {
     env: Arc<Env>,
     config: Arc<Config>,
@@ -81,7 +71,11 @@ impl DomainEngine {
         }
     }
 
-    fn get_env(&self) -> &Env {
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn env(&self) -> &Env {
         &self.env
     }
 
@@ -89,7 +83,7 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    async fn query_entities_inner(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+    pub async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
         let data_store = self.get_data_store()?;
 
         // TODO: Domain translation by rewriting whatever is used as query language
@@ -118,27 +112,12 @@ impl DomainEngine {
         data_store.api().query(self, query).await
     }
 
-    async fn store_new_entity_inner(&self, entity: Value, query: Query) -> DomainResult<Value> {
+    pub async fn store_new_entity(&self, entity: Value, query: Query) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
         self.get_data_store()?
             .api()
             .store_new_entity(self, entity, query)
             .await
-    }
-}
-
-#[async_trait::async_trait]
-impl EngineAPI for DomainEngine {
-    fn get_config(&self) -> &Config {
-        &self.config
-    }
-
-    async fn query_entities(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
-        self.query_entities_inner(query).await
-    }
-
-    async fn store_new_entity(&self, value: Value, query: Query) -> DomainResult<Value> {
-        self.store_new_entity_inner(value, query).await
     }
 }
 
@@ -156,6 +135,14 @@ impl Builder {
 
     pub fn data_store(mut self, data_store: DataStore) -> Self {
         self.data_store = Some(data_store);
+        self
+    }
+
+    pub fn mock_data_store(mut self, package_id: PackageId, setup: impl unimock::Clause) -> Self {
+        self.data_store = Some(DataStore::new(
+            package_id,
+            Box::new(unimock::Unimock::new(setup)),
+        ));
         self
     }
 

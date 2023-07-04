@@ -1,9 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
-use domain_engine_core::{
-    data_store::{DataStore, DataStoreAPIMock},
-    DomainEngine,
-};
+use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_test_utils::{SourceName, TestCompile, TestEnv};
 use unimock::*;
@@ -77,18 +74,15 @@ pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
         .returns(Ok(vec![]))
 }
 
-pub fn gql_mock_data_store(
+pub fn gql_ctx_mock_data_store(
     test_env: &TestEnv,
     data_store_package: SourceName,
     setup: impl unimock::Clause,
 ) -> GqlContext {
     GqlContext {
-        engine_api: Arc::new(
+        domain_engine: Arc::new(
             DomainEngine::builder(test_env.env.clone())
-                .data_store(DataStore::new(
-                    test_env.get_package_id(data_store_package.0),
-                    Box::new(Unimock::new(setup)),
-                ))
+                .mock_data_store(test_env.get_package_id(data_store_package.0), setup)
                 .build(),
         ),
     }

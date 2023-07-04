@@ -1,7 +1,7 @@
 use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
-use crate::{gql_mock_data_store, Exec, TestCompileSchema};
+use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
@@ -14,7 +14,7 @@ async fn test_graphql_input_deserialization_error() {
     "
     .compile_schemas([SourceName::root()]);
 
-    let ctx = gql_mock_data_store(&test_env, SourceName::root(), ());
+    let ctx = gql_ctx_mock_data_store(&test_env, SourceName::root(), ());
     assert_error_msg!(
         r#"
         mutation {

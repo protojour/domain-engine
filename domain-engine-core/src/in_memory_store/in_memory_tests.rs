@@ -9,7 +9,7 @@ use serde_json::json;
 use test_log::test;
 use uuid::Uuid;
 
-use crate::{DomainEngine, EngineAPI};
+use crate::DomainEngine;
 
 fn conduit_db() -> TestPackages {
     TestPackages::with_sources([(
