@@ -3,6 +3,7 @@ use ontol_runtime::{
     value::{Attribute, Value},
     PackageId,
 };
+use unimock::unimock;
 
 use crate::{DomainEngine, DomainResult};
 
@@ -25,6 +26,7 @@ impl DataStore {
     }
 }
 
+#[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
     async fn query(

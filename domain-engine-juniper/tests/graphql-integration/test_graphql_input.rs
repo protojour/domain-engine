@@ -1,11 +1,11 @@
 use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
-use crate::{mock_gql_context, Exec, TestCompileSchema};
+use crate::{gql_mock_data_store, Exec, TestCompileSchema};
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
-    let (_, [schema]) = "
+    let (test_env, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
@@ -14,7 +14,7 @@ async fn test_graphql_input_deserialization_error() {
     "
     .compile_schemas([SourceName::root()]);
 
-    let ctx = mock_gql_context(());
+    let ctx = gql_mock_data_store(&test_env, SourceName::root(), ());
     assert_error_msg!(
         r#"
         mutation {

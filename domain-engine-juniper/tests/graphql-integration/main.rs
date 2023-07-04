@@ -1,6 +1,9 @@
 use std::{fmt::Display, sync::Arc};
 
-use domain_engine_core::{Config, EngineAPIMock};
+use domain_engine_core::{
+    data_store::{DataStore, DataStoreAPIMock},
+    DomainEngine,
+};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
 use ontol_test_utils::{SourceName, TestCompile, TestEnv};
 use unimock::*;
@@ -68,21 +71,26 @@ impl Display for TestError {
     }
 }
 
-pub fn mock_default_config() -> impl unimock::Clause {
-    EngineAPIMock::get_config
-        .each_call(matching!())
-        .returns(Config::default())
-}
-
-pub fn mock_query_entities_empty() -> impl unimock::Clause {
-    EngineAPIMock::query_entities
-        .next_call(matching!(_))
+pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
+    DataStoreAPIMock::query
+        .next_call(matching!(_, _))
         .returns(Ok(vec![]))
 }
 
-pub fn mock_gql_context(setup: impl unimock::Clause) -> GqlContext {
+pub fn gql_mock_data_store(
+    test_env: &TestEnv,
+    data_store_package: SourceName,
+    setup: impl unimock::Clause,
+) -> GqlContext {
     GqlContext {
-        engine_api: Arc::new(Unimock::new(setup)),
+        engine_api: Arc::new(
+            DomainEngine::builder(test_env.env.clone())
+                .data_store(DataStore::new(
+                    test_env.get_package_id(data_store_package.0),
+                    Box::new(Unimock::new(setup)),
+                ))
+                .build(),
+        ),
     }
 }
 

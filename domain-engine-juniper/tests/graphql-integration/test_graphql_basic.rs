@@ -1,4 +1,4 @@
-use domain_engine_core::EngineAPIMock;
+use domain_engine_core::data_store::DataStoreAPIMock;
 use juniper::graphql_value;
 use ontol_runtime::value::Attribute;
 use ontol_test_utils::{
@@ -10,9 +10,7 @@ use serde_json::json;
 use test_log::test;
 use unimock::*;
 
-use crate::{
-    mock_default_config, mock_gql_context, mock_query_entities_empty, Exec, TestCompileSchema,
-};
+use crate::{gql_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema};
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
@@ -47,7 +45,11 @@ async fn test_graphql_basic_schema() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((mock_default_config(), mock_query_entities_empty()))
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                mock_data_store_query_entities_empty()
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -69,10 +71,12 @@ async fn test_graphql_basic_schema() {
         }"
         .exec(
             &schema,
-            &mock_gql_context(
-                EngineAPIMock::store_new_entity
-                    .next_call(matching!(_, _))
-                    .returns(Ok(entity.into())),
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(entity.into()))
             )
         )
         .await,
@@ -87,7 +91,7 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
-    let (_, [schema]) = "
+    let (test_env, [schema]) = "
     pub type foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
@@ -106,7 +110,11 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((mock_default_config(), mock_query_entities_empty()))
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                mock_data_store_query_entities_empty()
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -148,7 +156,11 @@ async fn test_inner_struct() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((mock_default_config(), mock_query_entities_empty()))
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                mock_data_store_query_entities_empty()
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -174,10 +186,12 @@ async fn test_inner_struct() {
         }"#
         .exec(
             &schema,
-            &mock_gql_context(
-                EngineAPIMock::store_new_entity
-                    .next_call(matching!(_, _))
-                    .returns(Ok(entity.into())),
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(entity.into()))
             )
         )
         .await,
@@ -193,7 +207,7 @@ async fn test_inner_struct() {
 
 #[test(tokio::test)]
 async fn test_docs_introspection() {
-    let (_, [schema]) = "
+    let (test_env, [schema]) = "
     type Key {
         rel .is: string
     }
@@ -218,7 +232,10 @@ async fn test_docs_introspection() {
                 }
             }
         }"#
-        .exec(&schema, &mock_gql_context(()))
+        .exec(
+            &schema,
+            &gql_mock_data_store(&test_env, SourceName::root(), ())
+        )
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -283,12 +300,13 @@ async fn test_graphql_artist_and_instrument_connections() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((
-                mock_default_config(),
-                EngineAPIMock::query_entities
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                DataStoreAPIMock::query
                     .next_call(matching!(_))
-                    .returns(Ok(vec![ziggy.clone()])),
-            )),
+                    .returns(Ok(vec![ziggy.clone()]))
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -334,7 +352,11 @@ async fn test_graphql_artist_and_instrument_connections() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((mock_default_config(), mock_query_entities_empty())),
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                mock_data_store_query_entities_empty()
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -371,11 +393,13 @@ async fn test_graphql_artist_and_instrument_connections() {
         "#
         .exec(
             &schema,
-            &mock_gql_context(
-                EngineAPIMock::store_new_entity
-                    .next_call(matching!(_, _))
-                    .returns(Ok(ziggy.value)),
-            ),
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(ziggy.value))
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -434,12 +458,13 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
         }"
         .exec(
             &schema,
-            &mock_gql_context((
-                mock_default_config(),
-                EngineAPIMock::query_entities
-                    .next_call(matching!(_))
-                    .returns(Ok(vec![artist_entity])),
-            ))
+            &gql_mock_data_store(
+                &test_env,
+                SourceName::root(),
+                DataStoreAPIMock::query
+                    .next_call(matching!(_, _))
+                    .returns(Ok(vec![artist_entity]))
+            )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -473,7 +498,7 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (_, [schema]) = TestPackages::with_sources([
+    let (test_env, [schema]) = TestPackages::with_sources([
         (
             SourceName::root(),
             include_str!("../../../examples/municipalities.on"),
@@ -511,7 +536,11 @@ async fn test_graphql_municipalities() {
             }"
             .exec(
                 &schema,
-                &mock_gql_context((mock_default_config(), mock_query_entities_empty()))
+                &gql_mock_data_store(
+                    &test_env,
+                    SourceName::root(),
+                    mock_data_store_query_entities_empty()
+                )
             )
             .await,
             expected = Ok(graphql_value!({
