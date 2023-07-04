@@ -5,7 +5,7 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, Query, StructOrUnionQuery},
     value::{Attribute, Value},
-    PackageId,
+    MapKey, PackageId,
 };
 use tracing::debug;
 
@@ -67,7 +67,9 @@ impl DomainEngine {
         }
         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-        // transform query
+        let outer_def_id = def_id;
+
+        // Transform query
         for next_def_id in &resolve_path.path {
             match &mut query.source {
                 StructOrUnionQuery::Struct(struct_query) => {
@@ -84,9 +86,38 @@ impl DomainEngine {
             self.env.get_type_info(def_id)
         );
 
-        data_store.api().query(self, query).await
+        let mut result = data_store.api().query(self, query).await?;
 
-        // TODO: transform result
+        if !resolve_path.path.is_empty() {
+            // Transform result
+
+            for next_def_id in
+                std::iter::once(&outer_def_id).chain(resolve_path.path.iter().rev().skip(1))
+            {
+                let proc = self
+                    .env()
+                    .get_mapper_proc(
+                        MapKey { def_id, seq: false },
+                        MapKey {
+                            def_id: *next_def_id,
+                            seq: false,
+                        },
+                    )
+                    .expect("No mapping procedure for query output");
+
+                result = result
+                    .into_iter()
+                    .map(|attribute| {
+                        let mapped_value = self.env().new_vm().eval(proc, [attribute.value]);
+                        mapped_value.into()
+                    })
+                    .collect();
+
+                def_id = *next_def_id;
+            }
+        }
+
+        Ok(result)
     }
 
     pub async fn store_new_entity(&self, entity: Value, query: Query) -> DomainResult<Value> {

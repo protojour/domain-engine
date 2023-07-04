@@ -43,7 +43,7 @@ fn test_compile_conduit_blog_post() {
             }),
             json!({
                 "post_id": "11111111-1111-1111-1111-111111111111",
-                "body": "THE BODY"
+                "contents": "THE BODY"
             }),
         )
     });

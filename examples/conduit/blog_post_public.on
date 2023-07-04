@@ -2,7 +2,7 @@ use 'conduit_db' as db
 
 pub type BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
-    rel .'body': string
+    rel .'contents': string
 }
 
 map => {
@@ -12,6 +12,6 @@ map => {
     }
     BlogPost {
         'post_id': id
-        'body': body
+        'contents': body
     }
 }
