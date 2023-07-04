@@ -48,11 +48,11 @@ impl WasmEnv {
 
     pub fn mappers(&self) -> Vec<JsValue> {
         self.env
-            .mapper_procs()
-            .map(|((from, to), procedure)| WasmMapper {
+            .iter_map_info()
+            .map(|((from, to), map_info)| WasmMapper {
                 from,
                 to,
-                procedure,
+                map_info: map_info.clone(),
                 env: self.env.clone(),
             })
             .map(JsValue::from)

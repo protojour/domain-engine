@@ -7,7 +7,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    codegen::{ir::Terminator, proc_builder::Delta},
+    codegen::{data_flow_analyzer::DataFlowAnalyzer, ir::Terminator, proc_builder::Delta},
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
@@ -51,6 +51,8 @@ pub(super) fn map_codegen<'m>(
     type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) -> bool {
+    let data_flow = DataFlowAnalyzer::new().analyze(&func);
+
     debug!("Generating code for\n{}", func);
 
     let return_ty = func.body.ty();
@@ -76,6 +78,13 @@ pub(super) fn map_codegen<'m>(
             proc_table
                 .map_procedures
                 .insert((from_info.key, to_info.key), builder);
+
+            if let Some(data_flow) = data_flow {
+                proc_table
+                    .dataflow_table
+                    .insert((from_info.key, to_info.key), data_flow);
+            }
+
             true
         }
         (from_info, to_info) => {

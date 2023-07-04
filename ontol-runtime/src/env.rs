@@ -26,7 +26,7 @@ use crate::{
 /// Runtime environment
 pub struct Env {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
-    pub(crate) mapper_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
 
@@ -44,7 +44,7 @@ impl Env {
         EnvBuilder {
             env: Self {
                 const_proc_table: Default::default(),
-                mapper_proc_table: Default::default(),
+                map_meta_table: Default::default(),
                 string_like_types: Default::default(),
                 string_patterns: Default::default(),
                 domain_table: Default::default(),
@@ -108,14 +108,14 @@ impl Env {
         self.const_proc_table.get(&const_id).cloned()
     }
 
-    pub fn mapper_procs(&self) -> impl Iterator<Item = ((MapKey, MapKey), Procedure)> + '_ {
-        self.mapper_proc_table
-            .iter()
-            .map(|(key, proc)| (*key, *proc))
+    pub fn iter_map_info(&self) -> impl Iterator<Item = ((MapKey, MapKey), &MapMeta)> + '_ {
+        self.map_meta_table.iter().map(|(key, proc)| (*key, proc))
     }
 
     pub fn get_mapper_proc(&self, from: MapKey, to: MapKey) -> Option<Procedure> {
-        self.mapper_proc_table.get(&(from, to)).cloned()
+        self.map_meta_table
+            .get(&(from, to))
+            .map(|map_info| map_info.procedure)
     }
 
     pub fn new_serde_processor(
@@ -210,6 +210,15 @@ pub struct EntityRelationship {
     pub target: DefId,
 }
 
+#[derive(Clone, Debug)]
+pub struct MapMeta {
+    pub procedure: Procedure,
+    pub data_flow: DataFlow,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct DataFlow {}
+
 pub struct EnvBuilder {
     env: Env,
 }
@@ -238,8 +247,8 @@ impl EnvBuilder {
         self
     }
 
-    pub fn mapper_procs(mut self, mapping_procs: FnvHashMap<(MapKey, MapKey), Procedure>) -> Self {
-        self.env.mapper_proc_table = mapping_procs;
+    pub fn map_meta_table(mut self, map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>) -> Self {
+        self.env.map_meta_table = map_meta_table;
         self
     }
 

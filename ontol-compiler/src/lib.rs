@@ -11,7 +11,7 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    env::{Domain, EntityInfo, EntityRelationship, Env, TypeInfo},
+    env::{Domain, EntityInfo, EntityRelationship, Env, MapMeta, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId, Role,
@@ -231,7 +231,25 @@ impl<'m> Compiler<'m> {
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
-            .mapper_procs(self.codegen_tasks.result_map_procs)
+            .map_meta_table(
+                self.codegen_tasks
+                    .result_map_proc_table
+                    .into_iter()
+                    .map(|(key, procedure)| {
+                        (
+                            key,
+                            MapMeta {
+                                procedure,
+                                data_flow: self
+                                    .codegen_tasks
+                                    .result_dataflow_table
+                                    .remove(&key)
+                                    .unwrap_or_default(),
+                            },
+                        )
+                    })
+                    .collect(),
+            )
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .string_like_types(self.defs.string_like_types)

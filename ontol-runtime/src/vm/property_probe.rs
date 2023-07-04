@@ -34,8 +34,8 @@ impl<'l> PropertyProbe<'l> {
         let dest_serde_operator_id = destination.operator_id?;
         let serde_operator = &env.get_serde_operator(dest_serde_operator_id);
 
-        let mapping_proc = env
-            .mapper_proc_table
+        let map_info = env
+            .map_meta_table
             .get(&(destination.def_id.into(), origin.def_id.into()))?;
 
         match serde_operator {
@@ -53,7 +53,7 @@ impl<'l> PropertyProbe<'l> {
 
                 self.prop_stack.stack.push(Props::Map(start_map));
                 self.abstract_vm
-                    .execute(*mapping_proc, &mut self.prop_stack, &mut Tracer);
+                    .execute(map_info.procedure, &mut self.prop_stack, &mut Tracer);
 
                 let prop_stack = std::mem::take(&mut self.prop_stack);
                 if prop_stack.stack.len() != 1 {

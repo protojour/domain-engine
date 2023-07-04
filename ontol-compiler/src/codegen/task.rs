@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
+    env::DataFlow,
     format_utils::DebugViaDisplay,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
@@ -30,7 +31,8 @@ pub struct CodegenTasks<'m> {
     pub map_tasks: IndexMap<MapKeyPair, MapCodegenTask<'m>>,
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
-    pub result_map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub result_map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub result_dataflow_table: FnvHashMap<(MapKey, MapKey), DataFlow>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -131,6 +133,7 @@ pub(super) struct ProcTable {
     pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub map_calls: Vec<MapCall>,
+    pub dataflow_table: FnvHashMap<(MapKey, MapKey), DataFlow>,
 }
 
 impl ProcTable {
@@ -151,7 +154,7 @@ pub(super) struct MapCall {
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
-    let mut explicit_map_tasks = vec![];
+    let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
 
     for (def_pair, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
         match map_task {
@@ -208,10 +211,11 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let LinkResult {
         lib,
         const_procs,
-        map_procs,
+        map_proc_table,
     } = link(compiler, &mut proc_table);
 
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
-    compiler.codegen_tasks.result_map_procs = map_procs;
+    compiler.codegen_tasks.result_map_proc_table = map_proc_table;
+    compiler.codegen_tasks.result_dataflow_table = proc_table.dataflow_table;
 }

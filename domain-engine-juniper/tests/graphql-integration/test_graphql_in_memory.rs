@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use domain_engine_core::DomainEngine;
 use domain_engine_juniper::GqlContext;
 use juniper::graphql_value;
@@ -21,9 +19,7 @@ async fn test_graphql_in_memory_conduit_db() {
     .with_data_store(ROOT, DataStoreConfig::InMemory);
 
     let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context = GqlContext {
-        domain_engine: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
-    };
+    let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -95,9 +91,7 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
     .with_data_store(CONDUIT_DB, DataStoreConfig::InMemory);
 
     let (test_env, [_db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
-    let gql_context = GqlContext {
-        domain_engine: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
-    };
+    let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
 
     // TODO: Insert using data store domain:
     // expect_eq!(

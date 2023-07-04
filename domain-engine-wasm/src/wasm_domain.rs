@@ -2,14 +2,13 @@ use std::sync::Arc;
 
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    env::{Env, TypeInfo},
+    env::{Env, MapMeta, TypeInfo},
     json_schema::build_openapi_schemas,
     serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
     value::Value,
-    vm::proc::Procedure,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -155,7 +154,7 @@ impl WasmValue {
 pub struct WasmMapper {
     pub(crate) from: MapKey,
     pub(crate) to: MapKey,
-    pub(crate) procedure: Procedure,
+    pub(crate) map_info: MapMeta,
     pub(crate) env: Arc<Env>,
 }
 
