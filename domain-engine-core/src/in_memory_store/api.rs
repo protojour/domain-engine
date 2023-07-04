@@ -7,7 +7,9 @@ use ontol_runtime::{
 };
 use tokio::sync::RwLock;
 
-use crate::{data_store::DataStoreAPI, DomainEngine, DomainResult};
+use crate::data_store::DataStoreAPI;
+use crate::domain_engine::DomainEngine;
+use crate::domain_error::DomainResult;
 
 use super::store::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
 

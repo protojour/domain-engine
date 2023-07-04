@@ -5,7 +5,8 @@ use ontol_runtime::{
 };
 use unimock::unimock;
 
-use crate::{DomainEngine, DomainResult};
+use crate::domain_engine::DomainEngine;
+use crate::domain_error::DomainResult;
 
 pub struct DataStore {
     package_id: PackageId,
