@@ -31,7 +31,7 @@ fn artist_and_instrument() -> TestPackages {
 async fn test_conduit_db_in_memory_id_generation() {
     conduit_db()
         .compile_ok_async(|test_env| async move {
-            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let domain_engine = DomainEngine::builder(test_env.env.clone()).build();
             let [user, article, comment, tag_entity] =
                 TypeBinding::new_n(&test_env, ["User", "Article", "Comment", "TagEntity"]);
 
@@ -122,7 +122,7 @@ async fn test_conduit_db_in_memory_id_generation() {
 async fn test_conduit_db_store_entity_tree() {
     conduit_db()
         .compile_ok_async(|test_env| async move {
-            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let domain_engine = DomainEngine::builder(test_env.env.clone()).build();
             let [user_type, article_type, comment_type] =
                 TypeBinding::new_n(&test_env, ["User", "Article", "Comment"]);
 
@@ -266,7 +266,7 @@ async fn test_conduit_db_store_entity_tree() {
 async fn test_conduit_db_unresolved_foreign_key() {
     conduit_db()
         .compile_ok_async(|test_env| async move {
-            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let domain_engine = DomainEngine::builder(test_env.env.clone()).build();
             let article = TypeBinding::new(&test_env, "Article");
 
             assert_error_msg!(
@@ -296,7 +296,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 async fn test_artist_and_instrument_fmt_id_generation() {
     artist_and_instrument()
         .compile_ok_async(|test_env| async move {
-            let domain_engine = DomainEngine::new(test_env.env.clone());
+            let domain_engine = DomainEngine::builder(test_env.env.clone()).build();
             let artist = TypeBinding::new(&test_env, "artist");
             let artist_id = TypeBinding::from_def_id(
                 artist

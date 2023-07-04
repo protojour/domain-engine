@@ -1,22 +1,25 @@
 use std::sync::Arc;
 
-use data_store::DataStoreAPI;
+use data_store::DataStore;
 use in_memory_store::api::InMemoryDb;
+use resolve_path::{ProbeOptions, ResolverGraph};
 use smartstring::alias::String;
 use thiserror::Error;
 
 use ontol_runtime::{
     config::DataStoreConfig,
     env::Env,
-    query::{EntityQuery, Query},
+    query::{EntityQuery, Query, StructOrUnionQuery},
     value::{Attribute, Value},
     DefId,
 };
+use tracing::debug;
 
 pub mod data_store;
 
 mod entity_id_utils;
 mod in_memory_store;
+mod resolve_path;
 
 pub struct Config {
     pub default_limit: u32,
@@ -32,12 +35,16 @@ impl Default for Config {
 pub enum DomainError {
     #[error("No data store")]
     NoDataStore,
+    #[error("No resolve path to data store")]
+    NoResolvePathToDataStore,
     #[error("Not an entity")]
     NotAnEntity(DefId),
     #[error("Entity must be a struct")]
     EntityMustBeStruct,
-    #[error("Invalid id")]
-    InvalidId,
+    #[error("Id not found in structure")]
+    IdNotFound,
+    #[error("BUG: Invalid entity DefId")]
+    InvalidEntityDefId,
     #[error("Type cannot be used for id generation")]
     TypeCannotBeUsedForIdGeneration,
     #[error("Unresolved foreign key: {0}")]
@@ -59,27 +66,18 @@ pub trait EngineAPI: Send + Sync + 'static {
 pub struct DomainEngine {
     env: Arc<Env>,
     config: Arc<Config>,
+    resolver_graph: ResolverGraph,
 
     #[allow(unused)]
-    data_store: Option<Box<dyn DataStoreAPI + Send + Sync>>,
+    data_store: Option<DataStore>,
 }
 
 impl DomainEngine {
-    pub fn new(env: Arc<Env>) -> Self {
-        let mut data_store: Option<Box<dyn DataStoreAPI + Send + Sync>> = None;
-
-        for (package_id, _) in env.domains() {
-            if let Some(config) = env.get_package_config(*package_id) {
-                if let Some(DataStoreConfig::InMemory) = config.data_store {
-                    data_store = Some(Box::new(InMemoryDb::new(&env, *package_id)))
-                }
-            }
-        }
-
-        Self {
+    pub fn builder(env: Arc<Env>) -> Builder {
+        Builder {
             env,
-            config: Arc::new(Config::default()),
-            data_store,
+            config: Config::default(),
+            data_store: None,
         }
     }
 
@@ -87,18 +85,43 @@ impl DomainEngine {
         &self.env
     }
 
-    pub fn data_store(&self) -> DomainResult<&(dyn DataStoreAPI + Send + Sync)> {
-        self.data_store.as_deref().ok_or(DomainError::NoDataStore)
+    fn get_data_store(&self) -> DomainResult<&DataStore> {
+        self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
     async fn query_entities_inner(&self, query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+        let data_store = self.get_data_store()?;
+
         // TODO: Domain translation by rewriting whatever is used as query language
-        self.data_store()?.query(self, query).await
+        let resolve_path = match &query.source {
+            StructOrUnionQuery::Struct(struct_query) => self.resolver_graph.probe_path(
+                &self.env,
+                struct_query.def_id,
+                data_store.package_id(),
+                ProbeOptions {
+                    must_be_entity: true,
+                    inverted: true,
+                },
+            ),
+            StructOrUnionQuery::Union(..) => todo!("Resolve a union"),
+        }
+        .ok_or(DomainError::NoResolvePathToDataStore)?;
+
+        debug!("Resolve path: {resolve_path:?}");
+        if let Some(store_def_id) = resolve_path.path.last() {
+            debug!(
+                "Resolve to: {:?}",
+                self.env.get_type_info(*store_def_id).name
+            );
+        }
+
+        data_store.api().query(self, query).await
     }
 
     async fn store_new_entity_inner(&self, entity: Value, query: Query) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
-        self.data_store()?
+        self.get_data_store()?
+            .api()
             .store_new_entity(self, entity, query)
             .await
     }
@@ -116,5 +139,51 @@ impl EngineAPI for DomainEngine {
 
     async fn store_new_entity(&self, value: Value, query: Query) -> DomainResult<Value> {
         self.store_new_entity_inner(value, query).await
+    }
+}
+
+pub struct Builder {
+    env: Arc<Env>,
+    config: Config,
+    data_store: Option<DataStore>,
+}
+
+impl Builder {
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn data_store(mut self, data_store: DataStore) -> Self {
+        self.data_store = Some(data_store);
+        self
+    }
+
+    pub fn build(self) -> DomainEngine {
+        let data_store = self.data_store.or_else(|| {
+            let mut data_store: Option<DataStore> = None;
+
+            for (package_id, _) in self.env.domains() {
+                if let Some(config) = self.env.get_package_config(*package_id) {
+                    if let Some(DataStoreConfig::InMemory) = config.data_store {
+                        data_store = Some(DataStore::new(
+                            *package_id,
+                            Box::new(InMemoryDb::new(&self.env, *package_id)),
+                        ));
+                    }
+                }
+            }
+
+            data_store
+        });
+
+        let resolver_graph = ResolverGraph::new(&self.env);
+
+        DomainEngine {
+            env: self.env,
+            config: Arc::new(self.config),
+            resolver_graph,
+            data_store,
+        }
     }
 }

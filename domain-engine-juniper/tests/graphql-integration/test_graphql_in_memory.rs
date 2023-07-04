@@ -22,7 +22,7 @@ async fn test_graphql_in_memory_conduit_db() {
 
     let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context = GqlContext {
-        engine_api: Arc::new(DomainEngine::new(test_env.env.clone())),
+        engine_api: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
     };
 
     expect_eq!(
@@ -80,7 +80,7 @@ async fn test_graphql_in_memory_conduit_db() {
 
 #[test(tokio::test)]
 // FIXME: Currently fails! Implement query translation!
-#[should_panic = "left == right"]
+#[should_panic = "Invalid entity DefId"]
 async fn test_graphql_in_memory_blog_post_on_conduit_db() {
     let test_packages = TestPackages::with_sources([
         (
@@ -96,7 +96,7 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
 
     let (test_env, [_db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
     let gql_context = GqlContext {
-        engine_api: Arc::new(DomainEngine::new(test_env.env.clone())),
+        engine_api: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
     };
 
     // TODO: Insert using data store domain:
@@ -134,6 +134,8 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
         }"
         .exec(&blog_schema, &gql_context)
         .await,
-        expected = Ok(graphql_value!({})),
+        expected = Ok(graphql_value!({
+            "edges": []
+        })),
     );
 }

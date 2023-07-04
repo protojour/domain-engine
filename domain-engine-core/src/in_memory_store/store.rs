@@ -73,10 +73,11 @@ impl InMemoryStore {
         engine: &DomainEngine,
         struct_query: &StructQuery,
     ) -> DomainResult<Vec<Value>> {
+        debug!("query single entity collection: {struct_query:?}");
         let collection = self
             .collections
             .get(&struct_query.def_id)
-            .ok_or(DomainError::InvalidId)?;
+            .ok_or(DomainError::InvalidEntityDefId)?;
 
         let type_info = engine.get_env().get_type_info(struct_query.def_id);
         let entity_info = type_info
@@ -190,7 +191,7 @@ impl InMemoryStore {
                     .get(entity_key)
                     .map(|properties| (*def_id, properties.clone()))
             })
-            .ok_or(DomainError::InvalidId)?;
+            .ok_or(DomainError::IdNotFound)?;
 
         let type_info = engine.get_env().get_type_info(def_id);
         let entity_info = type_info
@@ -436,7 +437,7 @@ impl InMemoryStore {
         match id_data {
             Data::Struct(struct_map) => {
                 if struct_map.len() != 1 {
-                    return Err(DomainError::InvalidId);
+                    return Err(DomainError::IdNotFound);
                 }
 
                 let attribute = struct_map.iter().next().unwrap();
@@ -445,7 +446,7 @@ impl InMemoryStore {
             Data::String(string) => Ok(DynamicKey::String(string.clone())),
             Data::Uuid(uuid) => Ok(DynamicKey::Uuid(*uuid)),
             Data::Int(int) => Ok(DynamicKey::Int(*int)),
-            _ => Err(DomainError::InvalidId),
+            _ => Err(DomainError::IdNotFound),
         }
     }
 

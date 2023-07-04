@@ -20,7 +20,7 @@ impl WasmGraphqlSchema {
     pub(crate) fn create(env: Arc<Env>, package_id: PackageId) -> Result<Self, WasmError> {
         // Since the domain engine current gets created here,
         // its data store (if any) won't be shared with other interfaces.
-        let domain_engine = DomainEngine::new(env.clone());
+        let domain_engine = DomainEngine::builder(env.clone()).build();
 
         let schema = create_graphql_schema(package_id, env.clone())?;
 
