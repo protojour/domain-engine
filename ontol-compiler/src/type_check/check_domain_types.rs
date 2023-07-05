@@ -10,7 +10,7 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, DefKind, RelationId, RelationKind},
+    def::{Def, DefKind, LookupRelationshipMeta, RelationId, RelationKind},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},

@@ -8,7 +8,7 @@ use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     typed_hir::{self, TypedBinder, TypedHirNode},
     types::TypeRef,
-    SourceSpan,
+    NO_SPAN,
 };
 
 use super::{
@@ -347,7 +347,7 @@ impl<'m> ScopeBuilder<'m> {
     fn unit_hir_meta(&self) -> typed_hir::Meta<'m> {
         typed_hir::Meta {
             ty: self.unit_type,
-            span: SourceSpan::none(),
+            span: NO_SPAN,
         }
     }
 

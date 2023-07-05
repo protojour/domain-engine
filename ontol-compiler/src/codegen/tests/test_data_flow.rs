@@ -1,37 +1,89 @@
-use ontol_runtime::env::{
-    DataFlow, PropertyFlow,
-    PropertyFlowRelationship::{self, *},
+use ontol_runtime::{
+    env::{
+        DataFlow, PropertyFlow,
+        PropertyFlowData::{self, *},
+    },
+    DefId,
 };
 use ontol_test_utils::expect_eq;
 use test_log::test;
 
-use crate::codegen::data_flow_analyzer::DataFlowAnalyzer;
+use crate::{
+    codegen::data_flow_analyzer::DataFlowAnalyzer,
+    def::{LookupRelationshipMeta, Relation, Relationship, RelationshipMeta},
+    typed_hir::TypedHir,
+    SpannedBorrow, NO_SPAN,
+};
 
-#[derive(Clone, Copy)]
-struct TestLang;
+struct MockDefs<'c> {
+    relationship: &'c Relationship<'static>,
+    relation: &'c Relation<'static>,
+}
 
-impl ontol_hir::Lang for TestLang {
-    type Node<'a> = ontol_hir::Kind<'a, Self>;
-
-    fn make_node<'a>(&self, kind: ontol_hir::Kind<'a, Self>) -> Self::Node<'a> {
-        kind
+impl<'c> LookupRelationshipMeta<'c> for MockDefs<'c> {
+    fn lookup_relationship_meta(
+        &self,
+        relationship_id: ontol_runtime::RelationshipId,
+    ) -> Result<RelationshipMeta<'c>, ()> {
+        Ok(RelationshipMeta {
+            relationship_id,
+            relationship: SpannedBorrow {
+                value: self.relationship,
+                span: &NO_SPAN,
+            },
+            relation: SpannedBorrow {
+                value: self.relation,
+                span: &NO_SPAN,
+            },
+        })
     }
 }
 
 fn analyze<'a>(arg: &str, hir: &str) -> DataFlow {
-    let node = ontol_hir::parse::Parser::new(TestLang)
+    let node = ontol_hir::parse::Parser::new(TypedHir)
         .parse(hir)
         .unwrap()
         .0;
-    DataFlowAnalyzer::new()
-        .analyze::<TestLang>(ontol_hir::Binder(arg.parse().unwrap()), &node)
-        .unwrap()
+    DataFlowAnalyzer::new(
+        /*&MockDefs {
+        relationship: &Relationship {
+            relation_id: RelationId(DefId::unit()),
+            subject: (
+                DefReference {
+                    def_id: DefId::unit(),
+                    pattern_bindings: Default::default(),
+                },
+                NO_SPAN,
+            ),
+            subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+            object: (
+                DefReference {
+                    def_id: DefId::unit(),
+                    pattern_bindings: Default::default(),
+                },
+                NO_SPAN,
+            ),
+            object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+            object_prop: None,
+            rel_params: RelParams::Unit,
+        },
+        relation: &Relation {
+            kind: RelationKind::Named(DefReference {
+                def_id: DefId::unit(),
+                pattern_bindings: Default::default(),
+            }),
+            subject_prop: None,
+        },
+    }
+*/)
+    .analyze(ontol_hir::Binder(arg.parse().unwrap()), &node)
+    .unwrap()
 }
 
-fn prop_flow(prop: &str, relationship: PropertyFlowRelationship) -> PropertyFlow {
+fn prop_flow(prop: &str, relationship: PropertyFlowData) -> PropertyFlow {
     PropertyFlow {
-        property: prop.parse().unwrap(),
-        relationship,
+        id: prop.parse().unwrap(),
+        data: relationship,
     }
 }
 
@@ -69,25 +121,11 @@ fn test_analyze1() {
             properties: vec![
                 prop_flow("S:0:0", DependentOn("O:0:0".parse().unwrap())),
                 prop_flow("S:1:1", DependentOn("O:2:2".parse().unwrap())),
-                prop_flow("O:0:0", None),
-                prop_flow("O:1:1", None),
+                prop_flow("O:0:0", Type(DefId::unit())),
+                prop_flow("O:1:1", Type(DefId::unit())),
+                prop_flow("O:2:2", Type(DefId::unit())),
                 prop_flow("O:2:2", ChildOf("O:1:1".parse().unwrap())),
             ]
         }
     );
-
-    /*
-    expect_eq!(
-        actual = data_flow,
-        expected = DataFlow {
-            properties: vec![
-                prop_flow("S:0:0", DependentOn(1)),
-                prop_flow("O:0:0", None),
-                prop_flow("S:1:1", DependentOn(4)),
-                prop_flow("O:1:1", None),
-                prop_flow("O:2:2", ChildOf(3)),
-            ]
-        }
-    );
-    */
 }

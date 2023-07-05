@@ -9,7 +9,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, MapDirection, RelParams},
+    def::{Def, DefKind, LookupRelationshipMeta, MapDirection, RelParams},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
@@ -20,7 +20,7 @@ use crate::{
     },
     typed_hir::{Meta, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
-    Note, SourceSpan, SpannedNote,
+    Note, SourceSpan, SpannedNote, NO_SPAN,
 };
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
@@ -679,7 +679,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ontol_hir::Kind::Unit,
             Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
-                span: SourceSpan::none(),
+                span: NO_SPAN,
             },
         )
     }

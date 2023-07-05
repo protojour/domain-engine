@@ -2,11 +2,11 @@ use std::cmp::Ordering;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    env::{DataFlow, PropertyFlow, PropertyFlowRelationship},
+    env::{DataFlow, PropertyFlow, PropertyFlowData},
     query::Query,
     value::PropertyId,
 };
-use tracing::{debug, info};
+use tracing::info;
 
 struct IsDep(bool);
 
@@ -31,73 +31,55 @@ fn traverse(
     is_dep: IsDep,
     target: &mut FnvHashMap<PropertyId, Query>,
 ) {
-    if let Some(flow_range) = flow_range(data_flow, property_id) {
-        for property_flow in flow_range {
-            match &property_flow.relationship {
-                PropertyFlowRelationship::DependentOn(dependent_property_id) => {
-                    if is_dep.0 {
-                        panic!("Transitive dependency");
-                    } else {
-                        // change to dep mode
-                        traverse(
-                            *dependent_property_id,
-                            query.clone(),
-                            data_flow,
-                            IsDep(true),
-                            target,
-                        );
-                    }
+    for property_flow in flow_iter(data_flow, property_id) {
+        match &property_flow.data {
+            PropertyFlowData::DependentOn(dependent_property_id) => {
+                if is_dep.0 {
+                    panic!("Transitive dependency");
+                } else {
+                    // change to dep mode
+                    traverse(
+                        *dependent_property_id,
+                        query.clone(),
+                        data_flow,
+                        IsDep(true),
+                        target,
+                    );
                 }
-                PropertyFlowRelationship::ChildOf(parent_property_id) => {
-                    if is_dep.0 {
-                        todo!("Need to make a sub query, but don't have the DefId");
-                    } else {
-                        traverse(
-                            *parent_property_id,
-                            query.clone(),
-                            data_flow,
-                            IsDep(false),
-                            target,
-                        );
-                    }
+            }
+            PropertyFlowData::ChildOf(parent_property_id) => {
+                if is_dep.0 {
+                    todo!("Need to make a sub query, but don't have the DefId");
+                } else {
+                    traverse(
+                        *parent_property_id,
+                        query.clone(),
+                        data_flow,
+                        IsDep(false),
+                        target,
+                    );
                 }
-                PropertyFlowRelationship::None => {
-                    if is_dep.0 {
-                        target.insert(property_flow.property, Query::Leaf);
-                    }
+            }
+            PropertyFlowData::Type(_def_id) => {
+                if is_dep.0 {
+                    target.insert(property_flow.id, Query::Leaf);
                 }
             }
         }
-    } else {
-        panic!(
-            "No flow range for {property_id} in {:#?}",
-            data_flow.properties
-        );
     }
 }
 
-// FIXME: Could use an iterator that stops when out of range instead of doing upper_bound
-fn flow_range(data_flow: &DataFlow, property_id: PropertyId) -> Option<&[PropertyFlow]> {
+fn flow_iter(data_flow: &DataFlow, property_id: PropertyId) -> impl Iterator<Item = &PropertyFlow> {
+    // "fast forward" to the first property flow for the given property_id:
     let lower_bound = data_flow
         .properties
-        .binary_search_by(|flow| match flow.property.cmp(&property_id) {
+        .binary_search_by(|flow| match flow.id.cmp(&property_id) {
             Ordering::Equal => Ordering::Greater,
             ord => ord,
         })
-        .or_else(|idx| match data_flow.properties.get(idx) {
-            Some(flow) if flow.property == property_id => Ok(idx),
-            _ => Err(idx),
-        });
+        .unwrap_or_else(|err| err);
 
-    let upper_bound = data_flow
-        .properties
-        .binary_search_by(|flow| match flow.property.cmp(&property_id) {
-            Ordering::Equal => Ordering::Less,
-            ord => ord,
-        })
-        .unwrap_err();
-
-    debug!("flow_range lower/upper: {lower_bound:?} / {upper_bound:?}");
-
-    Some(&data_flow.properties[lower_bound.ok()?..upper_bound])
+    data_flow.properties[lower_bound..]
+        .iter()
+        .take_while(move |flow| flow.id == property_id)
 }

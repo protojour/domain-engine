@@ -7,7 +7,7 @@ use ontol_hir::{
 
 use crate::{
     types::{Type, TypeRef},
-    SourceSpan,
+    SourceSpan, NO_SPAN,
 };
 
 /// An ontol_hir language "dialect" with type information and source spans.
@@ -22,7 +22,7 @@ impl ontol_hir::Lang for TypedHir {
             kind,
             Meta {
                 ty: &Type::Error,
-                span: SourceSpan::none(),
+                span: NO_SPAN,
             },
         )
     }

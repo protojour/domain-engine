@@ -11,7 +11,7 @@ use crate::{
     regex_util,
     relation::Constructor,
     types::{Type, TypeRef},
-    Compiler, SourceSpan,
+    Compiler, NO_SPAN,
 };
 
 impl<'m> Compiler<'m> {
@@ -127,7 +127,7 @@ impl<'m> Compiler<'m> {
                 rel_type_for: None,
             }),
             CORE_PKG,
-            SourceSpan::none(),
+            NO_SPAN,
         );
         let type_ref = self.register_named_type(def_id, ident, ty_fn);
         (def_id, type_ref)
@@ -158,7 +158,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
+        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, NO_SPAN);
         self.def_types.table.insert(def_id, ty);
 
         def_id

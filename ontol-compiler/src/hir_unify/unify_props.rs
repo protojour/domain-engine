@@ -1,6 +1,6 @@
 use crate::{
     typed_hir::{Meta, TypedHirNode},
-    SourceSpan,
+    NO_SPAN,
 };
 
 use super::{
@@ -101,10 +101,7 @@ pub(super) trait UnifyProps<'m>: Sized {
             typed_binder: None,
             node: TypedHirNode(
                 ontol_hir::Kind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
-                Meta {
-                    ty,
-                    span: SourceSpan::none(),
-                },
+                Meta { ty, span: NO_SPAN },
             ),
         })
     }
@@ -130,10 +127,7 @@ pub(super) trait UnifyProps<'m>: Sized {
 
                 let node = TypedHirNode(
                     ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
-                    Meta {
-                        ty,
-                        span: SourceSpan::none(),
-                    },
+                    Meta { ty, span: NO_SPAN },
                 );
 
                 Ok(vec![node])

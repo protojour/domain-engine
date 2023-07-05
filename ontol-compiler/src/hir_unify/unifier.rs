@@ -8,7 +8,7 @@ use crate::{
     mem::Intern,
     typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef, Types},
-    SourceSpan,
+    NO_SPAN,
 };
 
 use super::{
@@ -164,7 +164,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                     Meta {
                         ty: seq_ty,
-                        span: SourceSpan::none(),
+                        span: NO_SPAN,
                     },
                 );
 
@@ -231,7 +231,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                     Meta {
                         ty: seq_ty,
-                        span: SourceSpan::none(),
+                        span: NO_SPAN,
                     },
                 );
 
@@ -465,10 +465,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 let node = TypedHirNode(
                     ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
-                    Meta {
-                        ty,
-                        span: SourceSpan::none(),
-                    },
+                    Meta { ty, span: NO_SPAN },
                 );
 
                 Ok(UnifiedNode {
@@ -558,7 +555,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     pub(super) fn unit_meta(&mut self) -> Meta<'m> {
         Meta {
             ty: self.unit_type(),
-            span: SourceSpan::none(),
+            span: NO_SPAN,
         }
     }
 

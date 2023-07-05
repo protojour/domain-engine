@@ -18,7 +18,7 @@ use tracing::{debug, trace};
 use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
-    def::{DefKind, Defs, RelParams, TypeDef},
+    def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
     relation::{Constructor, Properties, Relations},

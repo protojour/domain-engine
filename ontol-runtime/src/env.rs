@@ -222,18 +222,19 @@ pub struct MapMeta {
 
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
 pub struct DataFlow {
+    // TODO: Consider moving these into an Env arena and just put the index range here
     pub properties: Vec<PropertyFlow>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct PropertyFlow {
-    pub property: PropertyId,
-    pub relationship: PropertyFlowRelationship,
+    pub id: PropertyId,
+    pub data: PropertyFlowData,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum PropertyFlowRelationship {
-    None,
+pub enum PropertyFlowData {
+    Type(DefId),
     ChildOf(PropertyId),
     DependentOn(PropertyId),
 }

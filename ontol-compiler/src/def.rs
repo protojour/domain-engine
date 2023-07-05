@@ -20,7 +20,7 @@ use crate::{
     source::SourceSpan,
     strings::Strings,
     types::Type,
-    Compiler, SpannedBorrow,
+    Compiler, SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::Span;
 
@@ -232,35 +232,6 @@ impl<'m> Defs<'m> {
         })
     }
 
-    pub fn lookup_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        let relationship = self
-            .get_spanned_def_kind(relationship_id.0)
-            .ok_or(())?
-            .filter(|kind| match kind {
-                DefKind::Relationship(relationship) => Some(relationship),
-                _ => None,
-            })
-            .ok_or(())?;
-
-        let relation = self
-            .get_spanned_def_kind(relationship.relation_id.0)
-            .ok_or(())?
-            .filter(|kind| match kind {
-                DefKind::Relation(relation) => Some(relation),
-                _ => None,
-            })
-            .ok_or(())?;
-
-        Ok(RelationshipMeta {
-            relationship_id,
-            relationship,
-            relation,
-        })
-    }
-
     pub fn alloc_def_id(&mut self, package_id: PackageId) -> DefId {
         let idx = self.def_id_allocators.entry(package_id).or_default();
         let def_id = DefId(package_id, *idx);
@@ -297,7 +268,7 @@ impl<'m> Defs<'m> {
                 subject_prop: None,
             }),
             CORE_PKG,
-            SourceSpan::none(),
+            NO_SPAN,
         )
     }
 
@@ -306,8 +277,7 @@ impl<'m> Defs<'m> {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
-                let def_id =
-                    self.add_def(DefKind::StringLiteral(lit), CORE_PKG, SourceSpan::none());
+                let def_id = self.add_def(DefKind::StringLiteral(lit), CORE_PKG, NO_SPAN);
                 self.string_literals.insert(lit, def_id);
                 def_id
             }
@@ -325,7 +295,7 @@ impl<'m> Defs<'m> {
             None => {
                 let hir = parse_literal_regex_to_hir(lit, span)?;
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::Regex(lit), CORE_PKG, SourceSpan::none());
+                let def_id = self.add_def(DefKind::Regex(lit), CORE_PKG, NO_SPAN);
                 self.regex_strings.insert(lit, def_id);
                 self.literal_regex_hirs.insert(def_id, hir);
 
@@ -343,7 +313,45 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_primitive(&mut self, kind: PrimitiveKind) -> DefId {
-        self.add_def(DefKind::Primitive(kind), CORE_PKG, SourceSpan::none())
+        self.add_def(DefKind::Primitive(kind), CORE_PKG, NO_SPAN)
+    }
+}
+
+pub trait LookupRelationshipMeta<'m> {
+    fn lookup_relationship_meta(
+        &self,
+        relationship_id: RelationshipId,
+    ) -> Result<RelationshipMeta<'m>, ()>;
+}
+
+impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
+    fn lookup_relationship_meta(
+        &self,
+        relationship_id: RelationshipId,
+    ) -> Result<RelationshipMeta<'m>, ()> {
+        let relationship = self
+            .get_spanned_def_kind(relationship_id.0)
+            .ok_or(())?
+            .filter(|kind| match kind {
+                DefKind::Relationship(relationship) => Some(relationship),
+                _ => None,
+            })
+            .ok_or(())?;
+
+        let relation = self
+            .get_spanned_def_kind(relationship.relation_id.0)
+            .ok_or(())?
+            .filter(|kind| match kind {
+                DefKind::Relation(relation) => Some(relation),
+                _ => None,
+            })
+            .ok_or(())?;
+
+        Ok(RelationshipMeta {
+            relationship_id,
+            relationship,
+            relation,
+        })
     }
 }
 
@@ -380,7 +388,7 @@ impl<'m> Compiler<'m> {
             self.defs.mem.bump.alloc(Def {
                 id: def_id,
                 package: package_id,
-                span: SourceSpan::none(),
+                span: NO_SPAN,
                 kind: DefKind::Package(package_id),
             }),
         );

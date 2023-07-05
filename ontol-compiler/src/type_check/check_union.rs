@@ -14,7 +14,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, RelationId, RelationKind},
+    def::{Def, LookupRelationshipMeta, RelationId, RelationKind},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},

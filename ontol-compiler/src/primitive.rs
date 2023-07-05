@@ -3,7 +3,7 @@ use ontol_runtime::DefId;
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs},
     package::CORE_PKG,
-    SourceSpan,
+    NO_SPAN,
 };
 
 #[derive(Debug)]
@@ -113,8 +113,8 @@ impl Primitives {
             true_value: defs.add_primitive(PrimitiveKind::True),
             bool: defs.add_primitive(PrimitiveKind::Bool),
 
-            empty_sequence: defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none()),
-            empty_string: defs.add_def(DefKind::StringLiteral(""), CORE_PKG, SourceSpan::none()),
+            empty_sequence: defs.add_def(DefKind::EmptySequence, CORE_PKG, NO_SPAN),
+            empty_string: defs.add_def(DefKind::StringLiteral(""), CORE_PKG, NO_SPAN),
             int: defs.add_primitive(PrimitiveKind::Int),
             number: defs.add_primitive(PrimitiveKind::Number),
             string: defs.add_primitive(PrimitiveKind::String),
@@ -132,9 +132,9 @@ impl Primitives {
             },
 
             generators: Generators {
-                auto: defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none()),
-                create_time: defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none()),
-                update_time: defs.add_def(DefKind::EmptySequence, CORE_PKG, SourceSpan::none()),
+                auto: defs.add_def(DefKind::EmptySequence, CORE_PKG, NO_SPAN),
+                create_time: defs.add_def(DefKind::EmptySequence, CORE_PKG, NO_SPAN),
+                update_time: defs.add_def(DefKind::EmptySequence, CORE_PKG, NO_SPAN),
             },
 
             doc: Doc {

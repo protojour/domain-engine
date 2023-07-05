@@ -1,5 +1,5 @@
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use def::{DefKind, Defs, RelationshipMeta, TypeDef};
+use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;

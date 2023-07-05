@@ -2,7 +2,7 @@ use ontol_runtime::{DefId, MapKey};
 use tracing::warn;
 
 use crate::{
-    def::Defs,
+    def::{Defs, LookupRelationshipMeta},
     relation::{Constructor, Properties, Relations},
     types::{Type, TypeRef},
 };

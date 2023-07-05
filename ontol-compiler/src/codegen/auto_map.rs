@@ -5,13 +5,13 @@ use ontol_runtime::DefId;
 use tracing::warn;
 
 use crate::{
-    def::MapDirection,
+    def::{LookupRelationshipMeta, MapDirection},
     mem::Intern,
     patterns::StringPatternSegment,
     relation::Constructor,
     typed_hir::{Meta, TypedHirNode},
     types::{Type, TypeRef},
-    Compiler, SourceSpan,
+    Compiler, NO_SPAN,
 };
 
 use super::task::{ExplicitMapCodegenTask, MapKeyPair};
@@ -99,7 +99,7 @@ fn autogenerate_fmt_to_fmt<'m>(
         direction: MapDirection::Omni,
         first: first_node,
         second: second_node,
-        span: SourceSpan::none(),
+        span: NO_SPAN,
     })
 }
 
@@ -133,10 +133,7 @@ fn autogenerate_fmt_hir_struct<'m>(
 
     Some(TypedHirNode(
         ontol_hir::Kind::Struct(ontol_hir::Binder(binder_var), nodes),
-        Meta {
-            ty,
-            span: SourceSpan::none(),
-        },
+        Meta { ty, span: NO_SPAN },
     ))
 }
 
@@ -157,7 +154,7 @@ fn autogenerate_fmt_segment_property<'m>(
         let object_ty = compiler.def_types.table.get(type_def_id)?;
         let meta = Meta {
             ty: object_ty,
-            span: SourceSpan::none(),
+            span: NO_SPAN,
         };
 
         let var_node = if let Some(var_allocator) = &mut var_allocator {
@@ -186,7 +183,7 @@ fn autogenerate_fmt_segment_property<'m>(
                             ontol_hir::Kind::Unit,
                             Meta {
                                 ty: unit_type,
-                                span: SourceSpan::none(),
+                                span: NO_SPAN,
                             },
                         )),
                         val: Box::new(var_node),
@@ -195,7 +192,7 @@ fn autogenerate_fmt_segment_property<'m>(
             ),
             Meta {
                 ty: object_ty,
-                span: SourceSpan::none(),
+                span: NO_SPAN,
             },
         ))
     } else {

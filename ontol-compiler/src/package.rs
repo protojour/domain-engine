@@ -17,6 +17,7 @@ use crate::SourceSpan;
 use crate::Sources;
 use crate::SpannedCompileError;
 use crate::Src;
+use crate::NO_SPAN;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
@@ -122,7 +123,7 @@ impl PackageGraphBuilder {
                 PackageReference::Named(root_package_name),
                 PackageNode {
                     package_id: ROOT_PKG,
-                    use_source_span: SourceSpan::none(),
+                    use_source_span: NO_SPAN,
                     requested_at_generation: generation,
                     dependencies: Default::default(),
                     found: false,
