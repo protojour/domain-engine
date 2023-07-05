@@ -216,8 +216,23 @@ pub struct MapMeta {
     pub data_flow: DataFlow,
 }
 
-#[derive(Clone, Default, Debug)]
-pub struct DataFlow {}
+#[derive(Clone, Default, Eq, PartialEq, Debug)]
+pub struct DataFlow {
+    pub properties: Vec<PropertyFlow>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct PropertyFlow {
+    pub property: PropertyId,
+    pub relationship: PropertyFlowRelationship,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum PropertyFlowRelationship {
+    None,
+    ChildOf(PropertyId),
+    DependentOn(PropertyId),
+}
 
 pub struct EnvBuilder {
     env: Env,

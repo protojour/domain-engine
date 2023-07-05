@@ -49,12 +49,13 @@ impl DomainEngine {
 
     pub async fn query_entities(&self, mut query: EntityQuery) -> DomainResult<Vec<Attribute>> {
         let data_store = self.get_data_store()?;
+        let env = self.env();
 
         let (resolve_path, mut def_id) = match &query.source {
             StructOrUnionQuery::Struct(struct_query) => self
                 .resolver_graph
                 .probe_path(
-                    &self.env,
+                    env,
                     struct_query.def_id,
                     data_store.package_id(),
                     ProbeOptions {
@@ -67,7 +68,7 @@ impl DomainEngine {
         }
         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-        let outer_def_id = def_id;
+        let original_def_id = def_id;
 
         // Transform query
         for next_def_id in &resolve_path.path {
@@ -83,41 +84,43 @@ impl DomainEngine {
 
         debug!(
             "Resolve path: {resolve_path:?} to: {:?}",
-            self.env.get_type_info(def_id)
+            env.get_type_info(def_id)
         );
 
-        let mut result = data_store.api().query(self, query).await?;
+        let mut edges = data_store.api().query(self, query).await?;
 
-        if !resolve_path.path.is_empty() {
-            // Transform result
-
-            for next_def_id in
-                std::iter::once(&outer_def_id).chain(resolve_path.path.iter().rev().skip(1))
-            {
-                let proc = self
-                    .env()
-                    .get_mapper_proc(
-                        MapKey { def_id, seq: false },
-                        MapKey {
-                            def_id: *next_def_id,
-                            seq: false,
-                        },
-                    )
-                    .expect("No mapping procedure for query output");
-
-                result = result
-                    .into_iter()
-                    .map(|attribute| {
-                        let mapped_value = self.env().new_vm().eval(proc, [attribute.value]);
-                        mapped_value.into()
-                    })
-                    .collect();
-
-                def_id = *next_def_id;
-            }
+        if resolve_path.path.is_empty() {
+            return Ok(edges);
         }
 
-        Ok(result)
+        // Transform result
+        for next_def_id in resolve_path
+            .path
+            .iter()
+            .rev()
+            .skip(1)
+            .chain(std::iter::once(&original_def_id))
+        {
+            let procedure = env
+                .get_mapper_proc(
+                    MapKey { def_id, seq: false },
+                    MapKey {
+                        def_id: *next_def_id,
+                        seq: false,
+                    },
+                )
+                .expect("No mapping procedure for query output");
+
+            for attr in edges.iter_mut() {
+                attr.value = env.new_vm().eval(procedure, [attr.value.take()]);
+            }
+
+            def_id = *next_def_id;
+        }
+
+        assert_eq!(def_id, original_def_id);
+
+        Ok(edges)
     }
 
     pub async fn store_new_entity(&self, entity: Value, query: Query) -> DomainResult<Value> {

@@ -3,15 +3,20 @@ use 'conduit_db' as db
 pub type BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
     rel .'contents': string
+    rel .'written_by': string
 }
 
 map => {
     db.Article {
         'article_id': id
         'body': body
+        'author': db.User {
+            'username': author
+        }
     }
     BlogPost {
         'post_id': id
         'contents': body
+        'written_by': author
     }
 }

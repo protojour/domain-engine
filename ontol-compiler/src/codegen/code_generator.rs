@@ -51,7 +51,8 @@ pub(super) fn map_codegen<'m>(
     type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) -> bool {
-    let data_flow = DataFlowAnalyzer::new().analyze(&func);
+    let data_flow =
+        DataFlowAnalyzer::new().analyze::<TypedHir>(ontol_hir::Binder(func.arg.var), &func.body);
 
     debug!("Generating code for\n{}", func);
 

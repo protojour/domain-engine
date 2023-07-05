@@ -19,7 +19,7 @@ fn test_compile_conduit_db() {
 }
 
 #[test]
-fn test_compile_conduit_blog_post() {
+fn test_map_conduit_blog_post() {
     TestPackages::with_sources([
         (SourceName("conduit_db"), CONDUIT_DB),
         (SourceName::root(), BLOG_POST_PUBLIC),
@@ -36,14 +36,15 @@ fn test_compile_conduit_blog_post() {
                 "body": "THE BODY",
                 "author": {
                     "user_id": "22222222-2222-2222-2222-222222222222",
-                    "username": "u",
-                    "email": "e",
+                    "username": "some_user",
+                    "email": "e@mail",
                     "password_hash": "h",
                 }
             }),
             json!({
                 "post_id": "11111111-1111-1111-1111-111111111111",
-                "contents": "THE BODY"
+                "contents": "THE BODY",
+                "written_by": "some_user",
             }),
         )
     });

@@ -32,6 +32,13 @@ impl Value {
         }
     }
 
+    /// Take the value, leave a Unit value behind.
+    pub fn take(&mut self) -> Value {
+        let mut value = Self::unit();
+        std::mem::swap(self, &mut value);
+        value
+    }
+
     pub fn is_unit(&self) -> bool {
         self.type_def_id == DefId::unit()
     }

@@ -8,3 +8,6 @@ mod ir;
 mod link;
 mod optimize;
 mod proc_builder;
+
+#[cfg(test)]
+mod tests;

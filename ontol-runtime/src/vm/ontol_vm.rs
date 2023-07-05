@@ -27,25 +27,23 @@ impl<'l> OntolVm<'l> {
         }
     }
 
-    pub fn eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
+    pub fn eval(&mut self, proc: Procedure, params: impl IntoIterator<Item = Value>) -> Value {
+        self.processor.stack.extend(params);
+
         if tracing::enabled!(Level::TRACE) {
-            self.internal_eval(proc, args, &mut Tracer)
+            self.internal_eval(proc, &mut Tracer)
         } else {
-            self.internal_eval(proc, args, &mut ())
+            self.internal_eval(proc, &mut ())
         }
     }
 
+    #[inline(never)]
     pub fn internal_eval(
         &mut self,
         procedure: Procedure,
-        args: impl IntoIterator<Item = Value>,
         debug: &mut dyn VmDebug<OntolProcessor>,
     ) -> Value {
         debug!("evaluating {procedure:?}");
-
-        for arg in args {
-            self.processor.stack.push(arg);
-        }
 
         self.abstract_vm
             .execute(procedure, &mut self.processor, debug);

@@ -126,6 +126,14 @@ impl VarSet {
     pub fn iter(&self) -> VarSetIter {
         VarSetIter(self.0.iter())
     }
+
+    pub fn insert(&mut self, var: ontol_hir::Var) {
+        self.0.insert(var.0 as usize);
+    }
+
+    pub fn union_with(&mut self, other: &Self) {
+        self.0.union_with(&other.0);
+    }
 }
 
 impl FromIterator<ontol_hir::Var> for VarSet {
