@@ -108,8 +108,12 @@ impl Env {
         self.const_proc_table.get(&const_id).cloned()
     }
 
-    pub fn iter_map_info(&self) -> impl Iterator<Item = ((MapKey, MapKey), &MapMeta)> + '_ {
+    pub fn iter_map_meta(&self) -> impl Iterator<Item = ((MapKey, MapKey), &MapMeta)> + '_ {
         self.map_meta_table.iter().map(|(key, proc)| (*key, proc))
+    }
+
+    pub fn get_map_meta(&self, from: MapKey, to: MapKey) -> Option<&MapMeta> {
+        self.map_meta_table.get(&(from, to))
     }
 
     pub fn get_mapper_proc(&self, from: MapKey, to: MapKey) -> Option<Procedure> {

@@ -5,11 +5,12 @@ use ontol_runtime::{
     env::Env,
     query::{EntityQuery, Query, StructOrUnionQuery},
     value::{Attribute, Value},
-    MapKey, PackageId,
+    PackageId,
 };
 use tracing::debug;
 
 use crate::{
+    data_flow::translate_query_property,
     data_store::DataStore,
     domain_error::DomainResult,
     in_memory_store::api::InMemoryDb,
@@ -72,9 +73,30 @@ impl DomainEngine {
 
         // Transform query
         for next_def_id in &resolve_path.path {
+            let map_meta = env
+                .get_map_meta((*next_def_id).into(), def_id.into())
+                .expect("No mapping procedure for query transformer");
+
             match &mut query.source {
                 StructOrUnionQuery::Struct(struct_query) => {
+                    // panic!(
+                    //     "query properties: {:#?} flow: {:#?}",
+                    //     struct_query.properties, map_meta.data_flow
+                    // );
+
                     struct_query.def_id = *next_def_id;
+
+                    let query_props = std::mem::take(&mut struct_query.properties);
+                    for (property_id, query) in query_props {
+                        translate_query_property(
+                            property_id,
+                            query,
+                            &map_meta.data_flow,
+                            &mut struct_query.properties,
+                        )
+                    }
+
+                    // panic!("Translated query: {struct_query:#?}");
                 }
                 _ => todo!(),
             }
@@ -102,13 +124,7 @@ impl DomainEngine {
             .chain(std::iter::once(&original_def_id))
         {
             let procedure = env
-                .get_mapper_proc(
-                    MapKey { def_id, seq: false },
-                    MapKey {
-                        def_id: *next_def_id,
-                        seq: false,
-                    },
-                )
+                .get_mapper_proc(def_id.into(), (*next_def_id).into())
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {

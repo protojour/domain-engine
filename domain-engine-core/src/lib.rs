@@ -2,6 +2,7 @@ pub mod data_store;
 mod domain_engine;
 pub mod domain_error;
 
+mod data_flow;
 mod entity_id_utils;
 mod in_memory_store;
 mod resolve_path;

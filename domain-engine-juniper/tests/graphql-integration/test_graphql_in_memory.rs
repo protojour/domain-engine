@@ -125,6 +125,7 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
                 edges {
                     node {
                         contents
+                        written_by
                     }
                 }
             }

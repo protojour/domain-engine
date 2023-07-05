@@ -48,7 +48,7 @@ impl WasmEnv {
 
     pub fn mappers(&self) -> Vec<JsValue> {
         self.env
-            .iter_map_info()
+            .iter_map_meta()
             .map(|((from, to), map_info)| WasmMapper {
                 from,
                 to,
