@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     smart_format,
     string_types::StringLikeType,
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
     DefId, RelationshipId, Role,
 };
@@ -280,7 +280,7 @@ impl InMemoryStore {
         engine: &DomainEngine,
         entity: Value,
     ) -> DomainResult<Value> {
-        debug!("write entity {entity:#?}");
+        debug!("write entity {}", ValueDebug(&entity));
 
         let env = engine.env();
         let type_info = env.get_type_info(entity.type_def_id);
@@ -302,7 +302,7 @@ impl InMemoryStore {
             }
         };
 
-        debug!("write entity id={id:?}");
+        debug!("write entity_id={}", ValueDebug(&id));
 
         let mut struct_map = match entity.data {
             Data::Struct(struct_map) => struct_map,
