@@ -21,7 +21,6 @@ impl DataFlowAnalyzer {
                 let mut struct_analyzer = StructAnalyzer {
                     var_to_property: FnvHashMap::default(),
                     var_dependencies: FnvHashMap::default(),
-                    var_types: FnvHashMap::default(),
                     property_flow: BTreeSet::default(),
                 };
                 struct_analyzer
@@ -44,28 +43,22 @@ impl DataFlowAnalyzer {
 }
 
 #[derive(Debug)]
-struct StructAnalyzer<'m> {
+struct StructAnalyzer {
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
-    var_types: FnvHashMap<ontol_hir::Var, TypeRef<'m>>,
     property_flow: BTreeSet<PropertyFlow>,
 }
 
-impl<'m> StructAnalyzer<'m> {
-    fn analyze_node(&mut self, node: &TypedHirNode<'m>) -> VarSet {
+impl StructAnalyzer {
+    fn analyze_node(&mut self, node: &TypedHirNode) -> VarSet {
         match node.kind() {
-            ontol_hir::Kind::Var(var) => {
-                self.var_types.insert(*var, node.meta().ty);
-                VarSet::from([*var])
-            }
+            ontol_hir::Kind::Var(var) => VarSet::from([*var]),
             ontol_hir::Kind::Unit => VarSet::default(),
             ontol_hir::Kind::Int(_) => VarSet::default(),
             ontol_hir::Kind::String(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
-                self.var_types.insert(binder.var, definition.meta().ty);
-
                 let var_deps = self.analyze_node(definition);
                 self.var_dependencies.insert(binder.var, var_deps);
 
@@ -188,12 +181,7 @@ impl<'m> StructAnalyzer<'m> {
         }
     }
 
-    fn reg_scope_prop(
-        &mut self,
-        struct_var: ontol_hir::Var,
-        property_id: PropertyId,
-        ty: TypeRef<'m>,
-    ) {
+    fn reg_scope_prop(&mut self, struct_var: ontol_hir::Var, property_id: PropertyId, ty: TypeRef) {
         let def_id = ty.get_single_def_id().unwrap_or(DefId::unit());
 
         self.property_flow.insert(PropertyFlow {
