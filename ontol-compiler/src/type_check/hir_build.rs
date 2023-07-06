@@ -18,7 +18,7 @@ use crate::{
         hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
     },
-    typed_hir::{Meta, TypedHir, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
     Note, SourceSpan, SpannedNote, NO_SPAN,
 };
@@ -335,7 +335,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::Struct) | None => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = ontol_hir::Binder(ctx.var_allocator.alloc());
+                        let struct_binder = TypedBinder {
+                            var: ctx.var_allocator.alloc(),
+                            ty: struct_ty,
+                        };
 
                         struct MatchProperty {
                             relationship_id: RelationshipId,
@@ -512,7 +515,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             hir_props.push(TypedHirNode(
                                 ontol_hir::Kind::Prop(
                                     optional,
-                                    struct_binder.0,
+                                    struct_binder.var,
                                     PropertyId::subject(match_property.relationship_id),
                                     prop_variants,
                                 ),

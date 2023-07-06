@@ -76,7 +76,7 @@ fn analyze<'a>(arg: &str, hir: &str) -> DataFlow {
         },
     }
 */)
-    .analyze(ontol_hir::Binder(arg.parse().unwrap()), &node)
+    .analyze(arg.parse().unwrap(), &node)
     .unwrap()
 }
 

@@ -101,7 +101,7 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
                     description: "An article",
                     body: "THE BODY",
                     author: {
-                        username: "u1",
+                        username: "teh_user",
                         email: "a@b",
                         password_hash: "s3cr3t"
                     }
@@ -137,7 +137,8 @@ async fn test_graphql_in_memory_blog_post_on_conduit_db() {
                 "edges": [
                     {
                         "node": {
-                            "contents": "THE BODY"
+                            "contents": "THE BODY",
+                            "written_by": "teh_user",
                         }
                     }
                 ]

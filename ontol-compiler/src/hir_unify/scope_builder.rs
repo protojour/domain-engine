@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_hir::{visitor::HirVisitor, Node};
+use ontol_hir::{visitor::HirVisitor, GetKind};
 use ontol_runtime::vm::proc::BuiltinProc;
 use smallvec::SmallVec;
 
@@ -29,7 +29,7 @@ impl<'m> ScopeBinder<'m> {
             scope::Kind::Const => scope::PatternBinding::Wildcard(self.scope.1.hir_meta),
             _ => scope::PatternBinding::Scope(
                 match self.binder {
-                    Some(binder) => binder.var,
+                    Some(binder) => binder,
                     None => panic!("missing scope binder: {:?}", self.scope),
                 },
                 self.scope,
@@ -137,7 +137,7 @@ impl<'m> ScopeBuilder<'m> {
             }
             ontol_hir::Kind::Map(arg) => self.build_scope_binder(arg),
             ontol_hir::Kind::Seq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
-            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
+            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
                     zelf.current_prop_analysis_map = Some({
                         let mut dep_analyzer = DepScopeAnalyzer::default();
@@ -163,7 +163,7 @@ impl<'m> ScopeBuilder<'m> {
 
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
-                        var: binder.0,
+                        var: binder.var,
                         ty: hir_meta.ty,
                     }),
                     scope: scope::Scope(
@@ -316,7 +316,10 @@ impl<'m> ScopeBuilder<'m> {
                     scope: scope::Scope(
                         scope::Kind::Let(scope::Let {
                             outer_binder: Some(outer_binder),
-                            inner_binder: ontol_hir::Binder(scoped_var),
+                            inner_binder: TypedBinder {
+                                var: scoped_var,
+                                ty: next_let_def.meta().ty,
+                            },
                             def: next_let_def,
                             sub_scope: Box::new(scope::Scope(
                                 scope::Kind::Const,
@@ -351,16 +354,12 @@ impl<'m> ScopeBuilder<'m> {
         }
     }
 
-    fn enter_binder<T>(
-        &mut self,
-        binder: ontol_hir::Binder,
-        func: impl FnOnce(&mut Self) -> T,
-    ) -> T {
-        if !self.in_scope.0.insert(binder.0 .0 as usize) {
+    fn enter_binder<T>(&mut self, binder: &TypedBinder, func: impl FnOnce(&mut Self) -> T) -> T {
+        if !self.in_scope.0.insert(binder.var.0 as usize) {
             panic!("Malformed HIR: {binder:?} variable was already in scope");
         }
         let value = func(self);
-        self.in_scope.0.remove(binder.0 .0 as usize);
+        self.in_scope.0.remove(binder.var.0 as usize);
         value
     }
 

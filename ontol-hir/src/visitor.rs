@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 use crate::*;
 
 macro_rules! visitor_trait_methods {
-    ($ref:tt, $kind:ident, $iter:ident) => {
+    ($ref:tt, $kind:ident, $var:ident, $iter:ident) => {
         fn visit_node(&mut self, index: usize, node: arg!($ref L::Node<'l>)) {
             self.visit_kind(index, node.$kind());
         }
@@ -35,7 +35,7 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn visit_pattern_binding(&mut self, index: usize, binding: arg!($ref Binding)) {
+        fn visit_pattern_binding(&mut self, index: usize, binding: arg!($ref Binding<'l, L>)) {
             self.traverse_pattern_binding(binding);
         }
 
@@ -46,7 +46,7 @@ macro_rules! visitor_trait_methods {
         fn visit_binder(&mut self, var: arg!($ref Var)) {}
 
         #[allow(unused_variables)]
-        fn visit_iter_binder(&mut self, binder: arg!($ref IterBinder)) {
+        fn visit_iter_binder(&mut self, binder: arg!($ref IterBinder<'l, L>)) {
             self.traverse_iter_binder(binder);
         }
 
@@ -71,7 +71,7 @@ macro_rules! visitor_trait_methods {
                     self.visit_node(0, arg);
                 }
                 Kind::Let(binder, def, body) => {
-                    self.visit_binder(borrow!($ref binder.0));
+                    self.visit_binder(binder.$var());
                     self.visit_node(0, def);
                     for (index, node) in body.$iter().enumerate() {
                         self.visit_node(index + 1, node);
@@ -83,7 +83,7 @@ macro_rules! visitor_trait_methods {
                     self.visit_node(1, borrow!($ref spec.val));
                 }
                 Kind::Struct(binder, children) => {
-                    self.visit_binder(borrow!($ref binder.0));
+                    self.visit_binder(binder.$var());
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }
@@ -155,14 +155,14 @@ macro_rules! visitor_trait_methods {
             }
         }
 
-        fn traverse_pattern_binding(&mut self, binding: arg!($ref Binding)) {
+        fn traverse_pattern_binding(&mut self, binding: arg!($ref Binding<'l, L>)) {
             match binding {
-                Binding::Binder(var) => self.visit_binder(var),
+                Binding::Binder(binder) => self.visit_binder(binder.$var()),
                 Binding::Wildcard => {}
             }
         }
 
-        fn traverse_iter_binder(&mut self, binder: arg!($ref IterBinder)) {
+        fn traverse_iter_binder(&mut self, binder: arg!($ref IterBinder<'l, L>)) {
             self.traverse_pattern_binding(borrow!($ref binder.seq));
             self.traverse_pattern_binding(borrow!($ref binder.rel));
             self.traverse_pattern_binding(borrow!($ref binder.val));
@@ -195,9 +195,9 @@ macro_rules! borrow {
 }
 
 pub trait HirVisitor<'p, 'l: 'p, L: Lang + 'l> {
-    visitor_trait_methods!((&'p), kind, iter);
+    visitor_trait_methods!((&'p), kind, var, iter);
 }
 
 pub trait HirMutVisitor<'l, L: Lang + 'l> {
-    visitor_trait_methods!((&mut), kind_mut, iter_mut);
+    visitor_trait_methods!((&mut), kind_mut, var_mut, iter_mut);
 }

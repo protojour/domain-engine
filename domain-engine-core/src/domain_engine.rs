@@ -10,10 +10,10 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    data_flow::translate_query_property,
     data_store::DataStore,
     domain_error::DomainResult,
     in_memory_store::api::InMemoryDb,
+    query_data_flow::QueryFlowProcessor,
     resolve_path::{ProbeOptions, ResolverGraph},
     Config, DomainError,
 };
@@ -88,15 +88,14 @@ impl DomainEngine {
 
                     let query_props = std::mem::take(&mut struct_query.properties);
                     for (property_id, query) in query_props {
-                        translate_query_property(
+                        QueryFlowProcessor::new(&map_meta.data_flow).translate_query_property(
                             property_id,
                             query,
-                            &map_meta.data_flow,
                             &mut struct_query.properties,
                         )
                     }
 
-                    // panic!("Translated query: {struct_query:#?}");
+                    debug!("Translated query: {struct_query:#?}");
                 }
                 _ => todo!(),
             }

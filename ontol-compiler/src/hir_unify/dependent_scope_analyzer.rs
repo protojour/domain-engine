@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_hir::Node;
+use ontol_hir::GetKind;
 use smallvec::SmallVec;
 use tracing::debug;
 

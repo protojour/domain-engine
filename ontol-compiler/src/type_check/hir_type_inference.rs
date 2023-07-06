@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::Node;
+use ontol_hir::GetKind;
 use ontol_runtime::smart_format;
 
 use crate::{

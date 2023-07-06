@@ -2,7 +2,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{self, TypedBinder, TypedHirNode},
+    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
 };
 
 #[derive(Clone, Debug)]
@@ -53,19 +53,19 @@ impl<'m> Kind<'m> {
             Self::Const => "Const".to_string(),
             Self::Var(var) => format!("Var({var})"),
             Self::PropSet(_) => "PropSet".to_string(),
-            Self::Let(let_) => format!("Let({})", let_.inner_binder.0),
+            Self::Let(let_) => format!("Let({})", let_.inner_binder.var),
             Self::Gen(gen) => format!("Gen({})", gen.input_seq),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct PropSet<'m>(pub Option<ontol_hir::Binder>, pub Vec<Prop<'m>>);
+pub struct PropSet<'m>(pub Option<TypedBinder<'m>>, pub Vec<Prop<'m>>);
 
 #[derive(Clone, Debug)]
 pub struct Let<'m> {
     pub outer_binder: Option<TypedBinder<'m>>,
-    pub inner_binder: ontol_hir::Binder,
+    pub inner_binder: TypedBinder<'m>,
     pub def: TypedHirNode<'m>,
     pub sub_scope: Box<Scope<'m>>,
 }
@@ -97,11 +97,11 @@ pub enum PropKind<'m> {
 #[derive(Clone, Debug)]
 pub enum PatternBinding<'m> {
     Wildcard(typed_hir::Meta<'m>),
-    Scope(ontol_hir::Var, Scope<'m>),
+    Scope(TypedBinder<'m>, Scope<'m>),
 }
 
 impl<'m> PatternBinding<'m> {
-    pub fn hir_binding(&self) -> ontol_hir::Binding {
+    pub fn hir_binding(&self) -> ontol_hir::Binding<'m, TypedHir> {
         match &self {
             Self::Wildcard(_) => ontol_hir::Binding::Wildcard,
             Self::Scope(binder, _) => ontol_hir::Binding::Binder(*binder),

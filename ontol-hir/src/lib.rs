@@ -19,15 +19,6 @@ impl From<u32> for Var {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Binder(pub Var);
-
-impl From<Var> for Binder {
-    fn from(value: Var) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
@@ -36,14 +27,21 @@ pub struct Label(pub u32);
 /// Implementing this trait makes an ontol_hir "dialect" - the implementor may freely choose
 /// what kind of metadata to attach to each node.
 pub trait Lang: Sized + Copy {
-    type Node<'a>: Sized + Node<'a, Self>;
+    type Node<'a>: Sized + GetKind<'a, Self>;
+    type Binder<'a>: Sized + GetVar<'a, Self>;
 
     fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a>;
+    fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a>;
 }
 
-pub trait Node<'a, L: Lang> {
+pub trait GetKind<'a, L: Lang> {
     fn kind(&self) -> &Kind<'a, L>;
     fn kind_mut(&mut self) -> &mut Kind<'a, L>;
+}
+
+pub trait GetVar<'a, L: Lang> {
+    fn var(&self) -> &Var;
+    fn var_mut(&mut self) -> &mut Var;
 }
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
@@ -55,24 +53,34 @@ pub enum Kind<'a, L: Lang> {
     Unit,
     Int(i64),
     String(String),
-    Let(Binder, Box<L::Node<'a>>, Nodes<'a, L>),
+    Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Map(Box<L::Node<'a>>),
     Seq(Label, Attribute<Box<L::Node<'a>>>),
-    Struct(Binder, Nodes<'a, L>),
+    Struct(L::Binder<'a>, Nodes<'a, L>),
     Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
     MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
-    Gen(Var, IterBinder, Nodes<'a, L>),
-    Iter(Var, IterBinder, Nodes<'a, L>),
+    Gen(Var, IterBinder<'a, L>, Nodes<'a, L>),
+    Iter(Var, IterBinder<'a, L>, Nodes<'a, L>),
     Push(Var, Attribute<Box<L::Node<'a>>>),
 }
 
-impl<'a, L: Lang> Node<'a, L> for Kind<'a, L> {
+impl<'a, L: Lang> GetKind<'a, L> for Kind<'a, L> {
     fn kind(&self) -> &Kind<'a, L> {
         self
     }
 
     fn kind_mut(&mut self) -> &mut Kind<'a, L> {
+        self
+    }
+}
+
+impl<'a, L: Lang> GetVar<'a, L> for Var {
+    fn var(&self) -> &Var {
+        self
+    }
+
+    fn var_mut(&mut self) -> &mut Var {
         self
     }
 }
@@ -124,13 +132,13 @@ impl<T> Index<usize> for Attribute<T> {
 }
 
 pub struct MatchArm<'a, L: Lang> {
-    pub pattern: PropPattern,
+    pub pattern: PropPattern<'a, L>,
     pub nodes: Vec<<L as Lang>::Node<'a>>,
 }
 
-// BUG: Why can't this be derived?
 impl<'a, L: Lang> Clone for MatchArm<'a, L>
 where
+    <L as Lang>::Binder<'a>: Clone,
     <L as Lang>::Node<'a>: Clone,
 {
     fn clone(&self) -> Self {
@@ -141,28 +149,52 @@ where
     }
 }
 
-#[derive(Clone)]
-pub enum PropPattern {
+pub enum PropPattern<'a, L: Lang> {
     /// ($rel $val)
-    Attr(Binding, Binding),
+    Attr(Binding<'a, L>, Binding<'a, L>),
     /// (seq $val)
     /// The sequence is captured in $val, relation is ignored
-    Seq(Binding),
+    Seq(Binding<'a, L>),
     /// The property is absent
     Absent,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Binding {
-    Wildcard,
-    Binder(Var),
+impl<'a, L: Lang> Clone for PropPattern<'a, L>
+where
+    <L as Lang>::Binder<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Attr(rel, val) => Self::Attr(rel.clone(), val.clone()),
+            Self::Seq(b) => Self::Seq(b.clone()),
+            Self::Absent => Self::Absent,
+        }
+    }
 }
 
-#[derive(Clone)]
-pub struct IterBinder {
-    pub seq: Binding,
-    pub rel: Binding,
-    pub val: Binding,
+#[derive(Clone, Copy, Debug)]
+pub enum Binding<'a, L: Lang> {
+    Wildcard,
+    Binder(L::Binder<'a>),
+}
+
+pub struct IterBinder<'a, L: Lang> {
+    pub seq: Binding<'a, L>,
+    pub rel: Binding<'a, L>,
+    pub val: Binding<'a, L>,
+}
+
+impl<'a, L: Lang> Clone for IterBinder<'a, L>
+where
+    <L as Lang>::Binder<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            seq: self.seq.clone(),
+            rel: self.rel.clone(),
+            val: self.val.clone(),
+        }
+    }
 }
 
 pub struct VarAllocator {

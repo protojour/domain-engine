@@ -3,13 +3,12 @@
 use std::collections::BTreeSet;
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::Node;
+use ontol_hir::GetKind;
 use ontol_runtime::{
     env::{DataFlow, PropertyFlow, PropertyFlowData},
     value::PropertyId,
     DefId,
 };
-use tracing::info;
 
 use crate::{hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef};
 
@@ -20,7 +19,7 @@ impl DataFlowAnalyzer {
         Self
     }
 
-    pub fn analyze(&mut self, arg: ontol_hir::Binder, body: &TypedHirNode) -> Option<DataFlow> {
+    pub fn analyze(&mut self, arg: ontol_hir::Var, body: &TypedHirNode) -> Option<DataFlow> {
         match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, nodes) => {
                 let mut struct_analyzer = StructAnalyzer {
@@ -31,10 +30,10 @@ impl DataFlowAnalyzer {
                 };
                 struct_analyzer
                     .var_dependencies
-                    .insert(arg.0, VarSet::default());
+                    .insert(arg, VarSet::default());
                 struct_analyzer
                     .var_dependencies
-                    .insert(struct_binder.0, VarSet::default());
+                    .insert(struct_binder.var, VarSet::default());
                 for node in nodes {
                     struct_analyzer.analyze_node(node);
                 }
@@ -69,10 +68,10 @@ impl<'m> StructAnalyzer<'m> {
             ontol_hir::Kind::Int(_) => VarSet::default(),
             ontol_hir::Kind::String(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
-                self.var_types.insert(binder.0, definition.meta().ty);
+                self.var_types.insert(binder.var, definition.meta().ty);
 
                 let var_deps = self.analyze_node(definition);
-                self.var_dependencies.insert(binder.0, var_deps);
+                self.var_dependencies.insert(binder.var, var_deps);
 
                 let mut var_set = VarSet::default();
                 for node in body {
@@ -120,22 +119,22 @@ impl<'m> StructAnalyzer<'m> {
 
                 let mut var_set = VarSet::default();
 
-                let mut type_var = None;
+                let mut property_type = None;
 
                 for arm in arms {
                     match &arm.pattern {
                         ontol_hir::PropPattern::Attr(rel, val) => {
-                            if let ontol_hir::Binding::Binder(var) = rel {
-                                self.add_dep(*var, *struct_var);
+                            if let ontol_hir::Binding::Binder(binder) = rel {
+                                self.add_dep(binder.var, *struct_var);
                             }
-                            if let ontol_hir::Binding::Binder(var) = val {
-                                self.add_dep(*var, *struct_var);
-                                type_var = Some(var);
+                            if let ontol_hir::Binding::Binder(binder) = val {
+                                self.add_dep(binder.var, *struct_var);
+                                property_type = Some(binder.ty);
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding) => {
-                            if let ontol_hir::Binding::Binder(var) = binding {
-                                self.add_dep(*var, *struct_var);
+                            if let ontol_hir::Binding::Binder(binder) = binding {
+                                self.add_dep(binder.var, *struct_var);
                             }
                         }
                         ontol_hir::PropPattern::Absent => {}
@@ -149,14 +148,7 @@ impl<'m> StructAnalyzer<'m> {
                 self.reg_scope_prop(
                     *struct_var,
                     *property_id,
-                    type_var
-                        .and_then(|var| {
-                            let ty = self.var_types.get(var).copied();
-                            info!("Type for {var}: {ty:?}");
-
-                            ty
-                        })
-                        .unwrap_or(node.meta().ty),
+                    property_type.unwrap_or(node.meta().ty),
                 );
 
                 var_set

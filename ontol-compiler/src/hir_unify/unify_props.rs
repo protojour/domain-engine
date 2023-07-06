@@ -1,5 +1,5 @@
 use crate::{
-    typed_hir::{Meta, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHirNode},
     NO_SPAN,
 };
 
@@ -79,7 +79,10 @@ pub(super) trait UnifyProps<'m>: Sized {
                 (
                     ontol_hir::MatchArm {
                         pattern: ontol_hir::PropPattern::Seq(ontol_hir::Binding::Binder(
-                            ontol_hir::Var(label.0),
+                            TypedBinder {
+                                var: ontol_hir::Var(label.0),
+                                ty,
+                            },
                         )),
                         nodes,
                     },

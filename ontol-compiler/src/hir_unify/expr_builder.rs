@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 use super::expr;
-use crate::{hir_unify::VarSet, typed_hir::TypedHirNode};
+use crate::{
+    hir_unify::VarSet,
+    typed_hir::{TypedBinder, TypedHirNode},
+};
 
 pub struct ExprBuilder<'m> {
     in_scope: VarSet,
@@ -98,7 +101,7 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }
-            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(*binder, |zelf| {
+            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
                 let props: Vec<_> = nodes
                     .iter()
                     .flat_map(|node| zelf.node_to_props(node))
@@ -173,16 +176,15 @@ impl<'m> ExprBuilder<'m> {
     }
 
     // do we even need this, expression are so simple
-    fn enter_binder<T>(
-        &mut self,
-        binder: ontol_hir::Binder,
-        func: impl FnOnce(&mut Self) -> T,
-    ) -> T {
-        if !self.in_scope.0.insert(binder.0 .0 as usize) {
-            panic!("Malformed HIR: {binder:?} variable was already in scope");
+    fn enter_binder<T>(&mut self, binder: &TypedBinder, func: impl FnOnce(&mut Self) -> T) -> T {
+        if !self.in_scope.0.insert(binder.var.0 as usize) {
+            panic!(
+                "Malformed HIR: {:?} variable was already in scope",
+                binder.var
+            );
         }
         let value = func(self);
-        self.in_scope.0.remove(binder.0 .0 as usize);
+        self.in_scope.0.remove(binder.var.0 as usize);
         value
     }
 }

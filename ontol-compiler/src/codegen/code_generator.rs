@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::Node;
+use ontol_hir::GetKind;
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
@@ -51,7 +51,7 @@ pub(super) fn map_codegen<'m>(
     type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) -> bool {
-    let data_flow = DataFlowAnalyzer::new().analyze(ontol_hir::Binder(func.arg.var), &func.body);
+    let data_flow = DataFlowAnalyzer::new().analyze(func.arg.var, &func.body);
 
     debug!("Generating code for\n{}", func);
 
@@ -146,11 +146,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(*definition, block);
-                self.scope.insert(binder.0, self.builder.top());
+                self.scope.insert(binder.var, self.builder.top());
                 for node in body {
                     self.gen_node(node, block);
                 }
-                self.scope.remove(&binder.0);
+                self.scope.remove(&binder.var);
             }
             ontol_hir::Kind::Call(proc, params) => {
                 let stack_delta = Delta(-(params.len() as i32) + 1);
@@ -204,12 +204,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     Delta(1),
                     span,
                 );
-                self.scope.insert(binder.0, local);
+                self.scope.insert(binder.var, local);
                 for node in nodes {
                     self.gen_node(node, block);
                     self.builder.append_pop_until(block, local, span);
                 }
-                self.scope.remove(&binder.0);
+                self.scope.remove(&binder.var);
             }
             ontol_hir::Kind::Prop(_, struct_var, id, variants) => {
                 if let Some(ontol_hir::PropVariant { dimension: _, attr }) =
@@ -414,14 +414,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn gen_in_scope(
         &mut self,
-        scopes: &[(Local, ontol_hir::Binding)],
+        scopes: &[(Local, ontol_hir::Binding<TypedHir>)],
         nodes: impl Iterator<Item = TypedHirNode<'m>>,
         block: &mut Block,
     ) {
         for (local, binding) in scopes {
-            if let ontol_hir::Binding::Binder(var) = binding {
-                if self.scope.insert(*var, *local).is_some() {
-                    panic!("Variable {var} already in scope");
+            if let ontol_hir::Binding::Binder(binder) = binding {
+                if self.scope.insert(binder.var, *local).is_some() {
+                    panic!("Variable {} already in scope", binder.var);
                 }
             }
         }
@@ -431,8 +431,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         }
 
         for (_, binding) in scopes {
-            if let ontol_hir::Binding::Binder(var) = binding {
-                self.scope.remove(var);
+            if let ontol_hir::Binding::Binder(binder) = binding {
+                self.scope.remove(&binder.var);
             }
         }
     }

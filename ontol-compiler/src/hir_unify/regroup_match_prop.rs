@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
-use ontol_hir::Node;
+use ontol_hir::GetKind;
 use ontol_runtime::value::PropertyId;
 
 use crate::typed_hir::{Meta, TypedHir, TypedHirNode};

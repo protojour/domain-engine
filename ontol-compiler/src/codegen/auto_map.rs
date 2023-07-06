@@ -9,7 +9,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     relation::Constructor,
-    typed_hir::{Meta, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -132,7 +132,13 @@ fn autogenerate_fmt_hir_struct<'m>(
     let ty = compiler.def_types.table.get(&def_id)?;
 
     Some(TypedHirNode(
-        ontol_hir::Kind::Struct(ontol_hir::Binder(binder_var), nodes),
+        ontol_hir::Kind::Struct(
+            TypedBinder {
+                var: binder_var,
+                ty: compiler.def_types.table.get(&def_id).unwrap(),
+            },
+            nodes,
+        ),
         Meta { ty, span: NO_SPAN },
     ))
 }

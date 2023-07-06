@@ -9,9 +9,14 @@ struct TestLang;
 
 impl Lang for TestLang {
     type Node<'a> = Kind<'a, Self>;
+    type Binder<'a> = Var;
 
     fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a> {
         kind
+    }
+
+    fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
+        var
     }
 }
 

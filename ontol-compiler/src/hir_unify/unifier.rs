@@ -156,7 +156,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ontol_hir::Kind::Gen(
                         gen_scope.input_seq,
                         ontol_hir::IterBinder {
-                            seq: ontol_hir::Binding::Binder(gen_scope.output_seq),
+                            seq: ontol_hir::Binding::Binder(TypedBinder {
+                                var: gen_scope.output_seq,
+                                ty: seq_ty,
+                            }),
                             rel: hir_rel_binding,
                             val: hir_val_binding,
                         },
@@ -223,7 +226,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ontol_hir::Kind::Gen(
                         gen_scope.input_seq,
                         ontol_hir::IterBinder {
-                            seq: ontol_hir::Binding::Binder(gen_scope.output_seq),
+                            seq: ontol_hir::Binding::Binder(TypedBinder {
+                                var: gen_scope.output_seq,
+                                ty: seq_ty,
+                            }),
                             rel: hir_rel_binding,
                             val: hir_val_binding,
                         },
@@ -340,7 +346,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| TypedBinder {
-                        var: binder.0,
+                        var: binder.var,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node: TypedHirNode(
@@ -409,7 +415,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| TypedBinder {
-                        var: binder.0,
+                        var: binder.var,
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node,

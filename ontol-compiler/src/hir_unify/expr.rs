@@ -1,7 +1,10 @@
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
 use smartstring::alias::String;
 
-use crate::{hir_unify::VarSet, typed_hir};
+use crate::{
+    hir_unify::VarSet,
+    typed_hir::{self, TypedBinder},
+};
 
 #[derive(Debug)]
 pub struct Expr<'m>(pub Kind<'m>, pub Meta<'m>);
@@ -57,7 +60,7 @@ impl<'m> Kind<'m> {
 }
 
 #[derive(Debug)]
-pub struct Struct<'m>(pub ontol_hir::Binder, pub Vec<Prop<'m>>);
+pub struct Struct<'m>(pub TypedBinder<'m>, pub Vec<Prop<'m>>);
 
 #[derive(Debug)]
 pub struct Prop<'m> {

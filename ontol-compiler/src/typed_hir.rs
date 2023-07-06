@@ -16,6 +16,7 @@ pub struct TypedHir;
 
 impl ontol_hir::Lang for TypedHir {
     type Node<'m> = TypedHirNode<'m>;
+    type Binder<'m> = TypedBinder<'m>;
 
     fn make_node<'m>(&self, kind: ontol_hir::Kind<'m, Self>) -> Self::Node<'m> {
         TypedHirNode(
@@ -25,6 +26,13 @@ impl ontol_hir::Lang for TypedHir {
                 span: NO_SPAN,
             },
         )
+    }
+
+    fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
+        TypedBinder {
+            var,
+            ty: &Type::Error,
+        }
     }
 }
 
@@ -68,7 +76,7 @@ impl<'m> TypedHirNode<'m> {
     }
 }
 
-impl<'m> ontol_hir::Node<'m, TypedHir> for TypedHirNode<'m> {
+impl<'m> ontol_hir::GetKind<'m, TypedHir> for TypedHirNode<'m> {
     fn kind(&self) -> &ontol_hir::Kind<'m, TypedHir> {
         &self.0
     }
@@ -106,4 +114,14 @@ impl<'m> Display for HirFunc<'m> {
 pub struct TypedBinder<'m> {
     pub var: Var,
     pub ty: TypeRef<'m>,
+}
+
+impl<'m> ontol_hir::GetVar<'m, TypedHir> for TypedBinder<'m> {
+    fn var(&self) -> &Var {
+        &self.var
+    }
+
+    fn var_mut(&mut self) -> &mut Var {
+        &mut self.var
+    }
 }

@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    Binding, Dimension, IterBinder, Kind, Label, Lang, MatchArm, Node, PropPattern, PropVariant,
-    Var,
+    Binding, Dimension, GetKind, GetVar, IterBinder, Kind, Label, Lang, MatchArm, PropPattern,
+    PropVariant, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -47,10 +47,11 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 Ok(sep.multiline())
             }
             Kind::Let(binder, definition, body) => {
-                write!(f, "{indent}(let ({}", binder.0)?;
+                write!(f, "{indent}(let ({}", binder.var())?;
                 let multi = self.print(Sep::Space, definition.kind(), f)?;
                 self.print_rparen(multi, f)?;
-                let multi = self.print_all(self.indent.indent(), body.iter().map(Node::kind), f)?;
+                let multi =
+                    self.print_all(self.indent.indent(), body.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -63,14 +64,14 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                     proc => panic!("unsupported proc {proc:?}"),
                 };
                 write!(f, "{sep}({proc}")?;
-                let multi = self.print_all(Sep::Space, args.iter().map(Node::kind), f)?;
+                let multi = self.print_all(Sep::Space, args.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
             Kind::Map(arg) => {
                 write!(f, "{sep}(map")?;
                 let multi =
-                    self.print_all(Sep::Space, [arg.as_ref()].into_iter().map(Node::kind), f)?;
+                    self.print_all(Sep::Space, [arg.as_ref()].into_iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
@@ -80,15 +81,15 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                     Sep::Space,
                     [attr.rel.as_ref(), attr.val.as_ref()]
                         .into_iter()
-                        .map(Node::kind),
+                        .map(GetKind::kind),
                     f,
                 )?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             Kind::Struct(binder, children) => {
-                write!(f, "{indent}(struct ({})", binder.0)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
+                write!(f, "{indent}(struct ({})", binder.var())?;
+                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -110,13 +111,13 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
             }
             Kind::Gen(var, iter_binder, children) => {
                 write!(f, "{indent}(gen {var} {iter_binder}",)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             Kind::Iter(var, iter_binder, children) => {
                 write!(f, "{indent}(iter {var} {iter_binder}",)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(Node::kind), f)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -126,7 +127,7 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                     Sep::Space,
                     [attr.rel.as_ref(), attr.val.as_ref()]
                         .into_iter()
-                        .map(Node::kind),
+                        .map(GetKind::kind),
                     f,
                 )?;
                 self.print_rparen(multi, f)?;
@@ -179,17 +180,17 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
                 write!(f, "()")?;
             }
         }
-        let multi = self.print_all(Sep::Space, node.nodes.iter().map(Node::kind), f)?;
+        let multi = self.print_all(Sep::Space, node.nodes.iter().map(GetKind::kind), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }
 }
 
-impl<L: Lang> Print<Binding> for Printer<L> {
-    fn print(self, sep: Sep, ast: &Binding, f: &mut std::fmt::Formatter) -> PrintResult {
+impl<'a, L: Lang> Print<Binding<'a, L>> for Printer<L> {
+    fn print(self, sep: Sep, ast: &Binding<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         match ast {
-            Binding::Binder(var) => {
-                write!(f, "{sep}{}", var)?;
+            Binding::Binder(binder) => {
+                write!(f, "{sep}{}", binder.var())?;
             }
             Binding::Wildcard => {
                 write!(f, "{sep}$_")?;
@@ -333,16 +334,16 @@ impl Display for AsAlpha {
     }
 }
 
-impl Display for Binding {
+impl<'a, L: Lang> Display for Binding<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wildcard => write!(f, "$_"),
-            Self::Binder(var) => write!(f, "{var}"),
+            Self::Binder(binder) => write!(f, "{}", binder.var()),
         }
     }
 }
 
-impl Display for IterBinder {
+impl<'a, L: Lang> Display for IterBinder<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.seq, self.rel, self.val)
     }
