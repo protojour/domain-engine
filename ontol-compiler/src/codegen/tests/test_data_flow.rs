@@ -44,40 +44,9 @@ fn analyze<'a>(arg: &str, hir: &str) -> DataFlow {
         .parse(hir)
         .unwrap()
         .0;
-    DataFlowAnalyzer::new(
-        /*&MockDefs {
-        relationship: &Relationship {
-            relation_id: RelationId(DefId::unit()),
-            subject: (
-                DefReference {
-                    def_id: DefId::unit(),
-                    pattern_bindings: Default::default(),
-                },
-                NO_SPAN,
-            ),
-            subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
-            object: (
-                DefReference {
-                    def_id: DefId::unit(),
-                    pattern_bindings: Default::default(),
-                },
-                NO_SPAN,
-            ),
-            object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
-            object_prop: None,
-            rel_params: RelParams::Unit,
-        },
-        relation: &Relation {
-            kind: RelationKind::Named(DefReference {
-                def_id: DefId::unit(),
-                pattern_bindings: Default::default(),
-            }),
-            subject_prop: None,
-        },
-    }
-*/)
-    .analyze(arg.parse().unwrap(), &node)
-    .unwrap()
+    DataFlowAnalyzer
+        .analyze(arg.parse().unwrap(), &node)
+        .unwrap()
 }
 
 fn prop_flow(prop: &str, relationship: PropertyFlowData) -> PropertyFlow {

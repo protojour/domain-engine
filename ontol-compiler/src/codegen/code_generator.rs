@@ -51,7 +51,7 @@ pub(super) fn map_codegen<'m>(
     type_mapper: TypeMapper<'_, 'm>,
     errors: &mut CompileErrors,
 ) -> bool {
-    let data_flow = DataFlowAnalyzer::new().analyze(func.arg.var, &func.body);
+    let data_flow = DataFlowAnalyzer.analyze(func.arg.var, &func.body);
 
     debug!("Generating code for\n{}", func);
 

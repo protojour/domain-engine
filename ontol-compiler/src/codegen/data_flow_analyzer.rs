@@ -15,10 +15,6 @@ use crate::{hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef};
 pub struct DataFlowAnalyzer;
 
 impl DataFlowAnalyzer {
-    pub fn new() -> Self {
-        Self
-    }
-
     pub fn analyze(&mut self, arg: ontol_hir::Var, body: &TypedHirNode) -> Option<DataFlow> {
         match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, nodes) => {
