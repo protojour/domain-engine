@@ -39,9 +39,9 @@ pub struct ProbeOptions {
 }
 
 pub struct ResolverGraph {
-    // Graph of what each DefId can map to
+    /// Graph of what each DefId can map to
     map_graph: FnvHashMap<MapKey, Vec<MapKey>>,
-    // Graph of what each DefId can map from
+    /// Graph of what each DefId can map from
     inverted_map_graph: FnvHashMap<MapKey, Vec<MapKey>>,
 }
 

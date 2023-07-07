@@ -7,7 +7,7 @@ use ontol_runtime::{
     value::PropertyId,
     DefId, MapKey,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 struct IsDep(bool);
 
@@ -16,15 +16,40 @@ pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey,
         .get_map_meta(to, from)
         .expect("No mapping procedure for query transformer");
 
+    trace!(
+        "translate_entity_query flow props: {:#?}",
+        map_meta.data_flow.properties
+    );
+
     match &mut query.source {
         StructOrUnionQuery::Struct(struct_query) => {
+            let output_package_id = struct_query.def_id.package_id();
+            let processor = QueryFlowProcessor::new(&map_meta.data_flow);
+
+            // Auto-select properties that are necessary for map to work.
+            // BUG: Currently harvests too much: i.e. everything
+            for property_flow in &map_meta.data_flow.properties {
+                if property_flow.id.relationship_id.0.package_id() == output_package_id
+                    && matches!(
+                        &property_flow.data,
+                        PropertyFlowData::Type(_) | PropertyFlowData::DependentOn(_)
+                    )
+                {
+                    processor
+                        .select_output_property(property_flow.id, &mut struct_query.properties);
+                }
+            }
+
+            debug!("Input query: {struct_query:#?}");
+
             struct_query.def_id = to.def_id;
 
             let query_props = std::mem::take(&mut struct_query.properties);
             for (property_id, query) in query_props {
-                QueryFlowProcessor::new(&map_meta.data_flow).translate_query_property(
+                processor.translate_property(
                     property_id,
                     query,
+                    IsDep(false),
                     &mut struct_query.properties,
                 )
             }
@@ -44,21 +69,26 @@ impl<'e> QueryFlowProcessor<'e> {
         Self { data_flow }
     }
 
-    fn translate_query_property(
+    fn select_output_property(
         &self,
         property_id: PropertyId,
-        query: Query,
         target: &mut FnvHashMap<PropertyId, Query>,
     ) {
-        debug!(
-            "translate property_id {property_id} flow: {:#?}",
-            self.data_flow.properties
-        );
-
-        self.traverse(property_id, query, IsDep(false), target);
+        for property_flow in self.flow_iter(property_id) {
+            match &property_flow.data {
+                PropertyFlowData::ChildOf(parent_property_id) => {
+                    self.with_parent_query(*parent_property_id, target, &|target| {
+                        target.insert(property_flow.id, Query::Leaf);
+                    })
+                }
+                PropertyFlowData::Type(_) | PropertyFlowData::DependentOn(_) => {
+                    target.insert(property_flow.id, Query::Leaf);
+                }
+            }
+        }
     }
 
-    fn traverse(
+    fn translate_property(
         &self,
         property_id: PropertyId,
         query: Query,
@@ -72,7 +102,12 @@ impl<'e> QueryFlowProcessor<'e> {
                         panic!("Transitive dependency");
                     } else {
                         // change to dep mode
-                        self.traverse(*dependent_property_id, query.clone(), IsDep(true), target);
+                        self.translate_property(
+                            *dependent_property_id,
+                            query.clone(),
+                            IsDep(true),
+                            target,
+                        );
                     }
                 }
                 PropertyFlowData::ChildOf(parent_property_id) => {
@@ -81,7 +116,12 @@ impl<'e> QueryFlowProcessor<'e> {
                             target.insert(property_flow.id, Query::Leaf);
                         })
                     } else {
-                        self.traverse(*parent_property_id, query.clone(), IsDep(false), target);
+                        self.translate_property(
+                            *parent_property_id,
+                            query.clone(),
+                            IsDep(false),
+                            target,
+                        );
                     }
                 }
                 PropertyFlowData::Type(_def_id) => {

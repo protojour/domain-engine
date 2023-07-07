@@ -176,12 +176,6 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
-// BUG:
-// The generated ontol_vm mapping code is intolerant
-// when it comes to missing attributes.
-// Here the attribute needs to be missing since GraphQL
-// does not request it, and the source attribute belongs to a foreign entity.
-#[should_panic = "Attribute S:2:74 not present"]
 async fn test_graphql_in_memory_blog_post_conduit_no_join() {
     let ctx = BlogPostConduit::new();
     ctx.create_db_article().await;
