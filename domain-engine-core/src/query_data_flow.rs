@@ -2,16 +2,40 @@ use std::cmp::Ordering;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    env::{DataFlow, PropertyFlow, PropertyFlowData},
-    query::{Query, StructQuery},
+    env::{DataFlow, Env, PropertyFlow, PropertyFlowData},
+    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
-    DefId,
+    DefId, MapKey,
 };
 use tracing::debug;
 
 struct IsDep(bool);
 
-pub struct QueryFlowProcessor<'e> {
+pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey, env: &Env) {
+    let map_meta = env
+        .get_map_meta(to, from)
+        .expect("No mapping procedure for query transformer");
+
+    match &mut query.source {
+        StructOrUnionQuery::Struct(struct_query) => {
+            struct_query.def_id = to.def_id;
+
+            let query_props = std::mem::take(&mut struct_query.properties);
+            for (property_id, query) in query_props {
+                QueryFlowProcessor::new(&map_meta.data_flow).translate_query_property(
+                    property_id,
+                    query,
+                    &mut struct_query.properties,
+                )
+            }
+
+            debug!("Translated query: {struct_query:#?}");
+        }
+        _ => todo!(),
+    }
+}
+
+struct QueryFlowProcessor<'e> {
     pub data_flow: &'e DataFlow,
 }
 
@@ -20,7 +44,7 @@ impl<'e> QueryFlowProcessor<'e> {
         Self { data_flow }
     }
 
-    pub fn translate_query_property(
+    fn translate_query_property(
         &self,
         property_id: PropertyId,
         query: Query,

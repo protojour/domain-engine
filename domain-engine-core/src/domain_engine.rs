@@ -3,19 +3,15 @@ use std::sync::Arc;
 use ontol_runtime::{
     config::DataStoreConfig,
     env::Env,
-    query::{EntityQuery, Query, StructOrUnionQuery},
+    query::{EntityQuery, Query},
     value::{Attribute, Value},
     PackageId,
 };
 use tracing::debug;
 
 use crate::{
-    data_store::DataStore,
-    domain_error::DomainResult,
-    in_memory_store::api::InMemoryDb,
-    query_data_flow::QueryFlowProcessor,
-    resolve_path::{ProbeOptions, ResolverGraph},
-    Config, DomainError,
+    data_store::DataStore, domain_error::DomainResult, in_memory_store::api::InMemoryDb,
+    query_data_flow::translate_entity_query, resolve_path::ResolverGraph, Config, DomainError,
 };
 
 pub struct DomainEngine {
@@ -52,88 +48,44 @@ impl DomainEngine {
         let data_store = self.get_data_store()?;
         let env = self.env();
 
-        let (resolve_path, mut def_id) = match &query.source {
-            StructOrUnionQuery::Struct(struct_query) => self
-                .resolver_graph
-                .probe_path(
-                    env,
-                    struct_query.def_id,
-                    data_store.package_id(),
-                    ProbeOptions {
-                        must_be_entity: true,
-                        inverted: true,
-                    },
-                )
-                .map(|path| (path, struct_query.def_id)),
-            StructOrUnionQuery::Union(..) => todo!("Resolve a union"),
-        }
-        .ok_or(DomainError::NoResolvePathToDataStore)?;
+        let (mut cur_def_id, resolve_path) = self
+            .resolver_graph
+            .probe_path_for_entity_query(env, &query, data_store)
+            .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-        let original_def_id = def_id;
+        let original_def_id = cur_def_id;
 
         // Transform query
-        for next_def_id in &resolve_path.path {
-            let map_meta = env
-                .get_map_meta((*next_def_id).into(), def_id.into())
-                .expect("No mapping procedure for query transformer");
-
-            match &mut query.source {
-                StructOrUnionQuery::Struct(struct_query) => {
-                    // panic!(
-                    //     "query properties: {:#?} flow: {:#?}",
-                    //     struct_query.properties, map_meta.data_flow
-                    // );
-
-                    struct_query.def_id = *next_def_id;
-
-                    let query_props = std::mem::take(&mut struct_query.properties);
-                    for (property_id, query) in query_props {
-                        QueryFlowProcessor::new(&map_meta.data_flow).translate_query_property(
-                            property_id,
-                            query,
-                            &mut struct_query.properties,
-                        )
-                    }
-
-                    debug!("Translated query: {struct_query:#?}");
-                }
-                _ => todo!(),
-            }
-
-            def_id = *next_def_id;
+        for next_def_id in resolve_path.iter() {
+            translate_entity_query(&mut query, cur_def_id.into(), next_def_id.into(), env);
+            cur_def_id = next_def_id;
         }
 
         debug!(
             "Resolve path: {resolve_path:?} to: {:?}",
-            env.get_type_info(def_id)
+            env.get_type_info(cur_def_id)
         );
 
         let mut edges = data_store.api().query(self, query).await?;
 
-        if resolve_path.path.is_empty() {
+        if resolve_path.is_empty() {
             return Ok(edges);
         }
 
         // Transform result
-        for next_def_id in resolve_path
-            .path
-            .iter()
-            .rev()
-            .skip(1)
-            .chain(std::iter::once(&original_def_id))
-        {
+        for next_def_id in resolve_path.reverse(original_def_id) {
             let procedure = env
-                .get_mapper_proc(def_id.into(), (*next_def_id).into())
+                .get_mapper_proc(cur_def_id.into(), (next_def_id).into())
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {
                 attr.value = env.new_vm().eval(procedure, [attr.value.take()]);
             }
 
-            def_id = *next_def_id;
+            cur_def_id = next_def_id;
         }
 
-        assert_eq!(def_id, original_def_id);
+        assert_eq!(cur_def_id, original_def_id);
 
         Ok(edges)
     }

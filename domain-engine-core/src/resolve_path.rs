@@ -1,10 +1,35 @@
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{env::Env, DefId, MapKey, PackageId};
+use ontol_runtime::{
+    env::Env,
+    query::{EntityQuery, StructOrUnionQuery},
+    DefId, MapKey, PackageId,
+};
 use tracing::trace;
+
+use crate::data_store::DataStore;
 
 #[derive(Debug)]
 pub struct ResolvePath {
-    pub(crate) path: Vec<DefId>,
+    path: Vec<DefId>,
+}
+
+impl ResolvePath {
+    pub fn is_empty(&self) -> bool {
+        self.path.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = DefId> + '_ {
+        self.path.iter().cloned()
+    }
+
+    pub fn reverse(&self, original_def_id: DefId) -> impl Iterator<Item = DefId> + '_ {
+        self.path
+            .iter()
+            .cloned()
+            .rev()
+            .skip(1)
+            .chain(std::iter::once(original_def_id))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -36,6 +61,28 @@ impl ResolverGraph {
         Self {
             map_graph,
             inverted_map_graph,
+        }
+    }
+
+    pub fn probe_path_for_entity_query(
+        &self,
+        env: &Env,
+        query: &EntityQuery,
+        data_store: &DataStore,
+    ) -> Option<(DefId, ResolvePath)> {
+        match &query.source {
+            StructOrUnionQuery::Struct(struct_query) => self
+                .probe_path(
+                    env,
+                    struct_query.def_id,
+                    data_store.package_id(),
+                    ProbeOptions {
+                        must_be_entity: true,
+                        inverted: true,
+                    },
+                )
+                .map(|path| (struct_query.def_id, path)),
+            StructOrUnionQuery::Union(..) => todo!("Resolve a union"),
         }
     }
 
