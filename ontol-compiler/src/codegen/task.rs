@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
-    env::DataFlow,
+    env::PropertyFlow,
     format_utils::DebugViaDisplay,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
@@ -29,7 +29,7 @@ pub struct CodegenTasks<'m> {
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
-    pub result_dataflow_table: FnvHashMap<(MapKey, MapKey), DataFlow>,
+    pub result_propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -130,7 +130,7 @@ pub(super) struct ProcTable {
     pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub map_calls: Vec<MapCall>,
-    pub dataflow_table: FnvHashMap<(MapKey, MapKey), DataFlow>,
+    pub propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
 }
 
 impl ProcTable {
@@ -208,5 +208,5 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
-    compiler.codegen_tasks.result_dataflow_table = proc_table.dataflow_table;
+    compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
 }

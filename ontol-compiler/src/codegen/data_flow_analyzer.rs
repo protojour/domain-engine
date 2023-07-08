@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::GetKind;
 use ontol_runtime::{
-    env::{DataFlow, PropertyFlow, PropertyFlowData},
+    env::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
     DefId,
 };
@@ -37,7 +37,11 @@ where
         }
     }
 
-    pub fn analyze(mut self, arg: ontol_hir::Var, body: &TypedHirNode) -> Option<DataFlow> {
+    pub fn analyze(
+        mut self,
+        arg: ontol_hir::Var,
+        body: &TypedHirNode,
+    ) -> Option<Vec<PropertyFlow>> {
         match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
@@ -47,9 +51,7 @@ where
                     self.analyze_node(node);
                 }
 
-                Some(DataFlow {
-                    properties: self.property_flow.into_iter().collect(),
-                })
+                Some(self.property_flow.into_iter().collect())
             }
             _ => None,
         }

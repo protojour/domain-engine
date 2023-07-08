@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    env::{DataFlow, Env, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
+    env::{Env, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
     DefId, MapKey, PackageId,
@@ -17,17 +17,15 @@ pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey,
     let map_meta = env
         .get_map_meta(to, from)
         .expect("No mapping procedure for query transformer");
+    let prop_flow_slice = env.get_prop_flow_slice(map_meta);
 
-    trace!(
-        "translate_entity_query flow props: {:#?}",
-        map_meta.data_flow.properties
-    );
+    trace!("translate_entity_query flow props: {:#?}", prop_flow_slice);
 
     match &mut query.source {
         StructOrUnionQuery::Struct(struct_query) => {
             let processor = QueryFlowProcessor {
                 env,
-                data_flow: &map_meta.data_flow,
+                prop_flow_slice,
             };
 
             debug!("Input query: {struct_query:#?}");
@@ -59,7 +57,7 @@ pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey,
 
 struct QueryFlowProcessor<'e> {
     env: &'e Env,
-    data_flow: &'e DataFlow,
+    prop_flow_slice: &'e [PropertyFlow],
 }
 
 impl<'e> QueryFlowProcessor<'e> {
@@ -68,7 +66,7 @@ impl<'e> QueryFlowProcessor<'e> {
         output_package_id: PackageId,
         target: &mut FnvHashMap<PropertyId, Query>,
     ) {
-        for (property_id, flows) in &self.data_flow.properties.iter().group_by(|flow| flow.id) {
+        for (property_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
             if property_id.relationship_id.0.package_id() != output_package_id {
                 continue;
@@ -250,15 +248,14 @@ impl<'e> QueryFlowProcessor<'e> {
     fn property_flows_for(&self, property_id: PropertyId) -> impl Iterator<Item = &PropertyFlow> {
         // "fast forward" to the first property flow for the given property_id:
         let lower_bound = self
-            .data_flow
-            .properties
+            .prop_flow_slice
             .binary_search_by(|flow| match flow.id.cmp(&property_id) {
                 Ordering::Equal => Ordering::Greater,
                 ord => ord,
             })
             .unwrap_or_else(|err| err);
 
-        self.data_flow.properties[lower_bound..]
+        self.prop_flow_slice[lower_bound..]
             .iter()
             .take_while(move |flow| flow.id == property_id)
     }

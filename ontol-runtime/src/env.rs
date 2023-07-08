@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
@@ -36,6 +36,7 @@ pub struct Env {
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_id: SerdeOperatorId,
+    property_flows: Vec<PropertyFlow>,
 }
 
 impl Env {
@@ -53,6 +54,7 @@ impl Env {
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_id: SerdeOperatorId(u32::MAX),
+                property_flows: Default::default(),
             },
         }
     }
@@ -109,6 +111,11 @@ impl Env {
 
     pub fn get_map_meta(&self, from: MapKey, to: MapKey) -> Option<&MapMeta> {
         self.map_meta_table.get(&(from, to))
+    }
+
+    pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> &[PropertyFlow] {
+        let range = &map_meta.propflow_range;
+        &self.property_flows[range.start as usize..range.end as usize]
     }
 
     pub fn get_mapper_proc(&self, from: MapKey, to: MapKey) -> Option<Procedure> {
@@ -212,13 +219,7 @@ pub struct EntityRelationship {
 #[derive(Clone, Debug)]
 pub struct MapMeta {
     pub procedure: Procedure,
-    pub data_flow: DataFlow,
-}
-
-#[derive(Clone, Default, Eq, PartialEq, Debug)]
-pub struct DataFlow {
-    // TODO: Consider moving these into an Env arena and just put the index range here
-    pub properties: Vec<PropertyFlow>,
+    pub propflow_range: Range<u32>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -283,6 +284,11 @@ impl EnvBuilder {
         dynamic_sequence_operator_id: SerdeOperatorId,
     ) -> Self {
         self.env.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
+        self
+    }
+
+    pub fn property_flows(mut self, flows: Vec<PropertyFlow>) -> Self {
+        self.env.property_flows = flows;
         self
     }
 

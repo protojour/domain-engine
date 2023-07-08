@@ -227,31 +227,42 @@ impl<'m> Compiler<'m> {
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();
 
+        let mut property_flows = vec![];
+
+        let map_meta_table = self
+            .codegen_tasks
+            .result_map_proc_table
+            .into_iter()
+            .map(|(key, procedure)| {
+                let propflow_range = if let Some(current_prop_flows) =
+                    self.codegen_tasks.result_propflow_table.remove(&key)
+                {
+                    let start: u32 = property_flows.len().try_into().unwrap();
+                    let len: u32 = current_prop_flows.len().try_into().unwrap();
+                    property_flows.extend(current_prop_flows);
+                    start..(start + len)
+                } else {
+                    0..0
+                };
+
+                (
+                    key,
+                    MapMeta {
+                        procedure,
+                        propflow_range,
+                    },
+                )
+            })
+            .collect();
+
         builder
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
-            .map_meta_table(
-                self.codegen_tasks
-                    .result_map_proc_table
-                    .into_iter()
-                    .map(|(key, procedure)| {
-                        (
-                            key,
-                            MapMeta {
-                                procedure,
-                                data_flow: self
-                                    .codegen_tasks
-                                    .result_dataflow_table
-                                    .remove(&key)
-                                    .unwrap_or_default(),
-                            },
-                        )
-                    })
-                    .collect(),
-            )
+            .map_meta_table(map_meta_table)
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
+            .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()

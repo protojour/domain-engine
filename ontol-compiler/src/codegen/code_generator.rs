@@ -88,7 +88,7 @@ pub(super) fn map_codegen<'m>(
 
             if let Some(data_flow) = data_flow {
                 proc_table
-                    .dataflow_table
+                    .propflow_table
                     .insert((from_info.key, to_info.key), data_flow);
             }
 

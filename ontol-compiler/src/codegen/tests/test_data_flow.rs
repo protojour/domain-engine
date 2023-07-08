@@ -1,6 +1,6 @@
 use ontol_runtime::{
     env::{
-        DataFlow, PropertyCardinality, PropertyFlow,
+        PropertyCardinality, PropertyFlow,
         PropertyFlowData::{self, *},
         ValueCardinality,
     },
@@ -49,7 +49,7 @@ const MOCK_RELATION: Relation = Relation {
     subject_prop: None,
 };
 
-fn analyze<'a>(arg: &str, hir: &str) -> DataFlow {
+fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
     let node = ontol_hir::parse::Parser::new(TypedHir)
         .parse(hir)
         .unwrap()
@@ -114,18 +114,16 @@ fn test_analyze1() {
 
     expect_eq!(
         actual = data_flow,
-        expected = DataFlow {
-            properties: vec![
-                prop_flow("S:0:0", DependentOn("O:0:0".parse().unwrap())),
-                prop_flow("S:1:1", DependentOn("O:2:2".parse().unwrap())),
-                prop_flow("O:0:0", Type(DefId::unit())),
-                prop_flow("O:0:0", expected_cardinality.clone()),
-                prop_flow("O:1:1", Type(DefId::unit())),
-                prop_flow("O:1:1", expected_cardinality.clone()),
-                prop_flow("O:2:2", Type(DefId::unit())),
-                prop_flow("O:2:2", expected_cardinality),
-                prop_flow("O:2:2", ChildOf("O:1:1".parse().unwrap())),
-            ]
-        }
+        expected = vec![
+            prop_flow("S:0:0", DependentOn("O:0:0".parse().unwrap())),
+            prop_flow("S:1:1", DependentOn("O:2:2".parse().unwrap())),
+            prop_flow("O:0:0", Type(DefId::unit())),
+            prop_flow("O:0:0", expected_cardinality.clone()),
+            prop_flow("O:1:1", Type(DefId::unit())),
+            prop_flow("O:1:1", expected_cardinality.clone()),
+            prop_flow("O:2:2", Type(DefId::unit())),
+            prop_flow("O:2:2", expected_cardinality),
+            prop_flow("O:2:2", ChildOf("O:1:1".parse().unwrap())),
+        ]
     );
 }
