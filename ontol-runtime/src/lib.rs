@@ -10,7 +10,6 @@ pub mod env;
 pub mod format_utils;
 pub mod json_schema;
 pub mod query;
-pub mod query_translate;
 pub mod serde;
 pub mod string_pattern;
 pub mod string_types;

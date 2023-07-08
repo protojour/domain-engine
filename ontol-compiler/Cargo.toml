@@ -36,3 +36,4 @@ test-log.workspace = true
 assert_matches = "1"
 pretty_assertions = "1"
 indoc = "2"
+unimock = "0.5"

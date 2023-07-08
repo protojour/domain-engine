@@ -14,7 +14,7 @@ use ontol_runtime::{
     env::{Domain, EntityInfo, EntityRelationship, Env, MapMeta, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, PackageId, Role,
+    DataModifier, DefId, DefVariant, PackageId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
@@ -280,21 +280,17 @@ impl<'m> Compiler<'m> {
                     .lookup_relationship_meta(property_id.relationship_id)
                     .unwrap();
 
-                let relationship_target = match property_id.role {
-                    Role::Subject => &meta.relationship.object,
-                    Role::Object => &meta.relationship.subject,
-                };
+                let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
 
-                if let Some(target_properties) = self
-                    .relations
-                    .properties_by_def_id(relationship_target.0.def_id)
+                if let Some(target_properties) =
+                    self.relations.properties_by_def_id(target_def_ref.def_id)
                 {
                     if target_properties.identified_by.is_some() {
                         entity_relationships.insert(
                             *property_id,
                             EntityRelationship {
                                 cardinality: property.cardinality,
-                                target: relationship_target.0.def_id,
+                                target: target_def_ref.def_id,
                             },
                         );
                     }

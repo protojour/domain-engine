@@ -11,7 +11,7 @@ use crate::{
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
-    CompileErrors, SpannedCompileError,
+    CompileErrors, Compiler, SpannedCompileError,
 };
 
 use super::{
@@ -25,9 +25,11 @@ pub(super) fn const_codegen<'m>(
     proc_table: &mut ProcTable,
     expr: TypedHirNode<'m>,
     def_id: DefId,
-    type_mapper: TypeMapper<'_, 'm>,
-    errors: &mut CompileErrors,
-) {
+    compiler: &Compiler<'m>,
+) -> CompileErrors {
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let mut errors = CompileErrors::default();
+
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
@@ -36,22 +38,27 @@ pub(super) fn const_codegen<'m>(
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors,
+        errors: &mut errors,
         type_mapper,
     };
     generator.gen_node(expr, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
     proc_table.const_procedures.insert(def_id, builder);
+    errors
 }
 
+/// The intention for this is to be parallelizable,
+/// but that won't work with `&mut ProcTable`.
+/// Maybe find a solution for that.
 pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
     func: HirFunc<'m>,
-    type_mapper: TypeMapper<'_, 'm>,
-    errors: &mut CompileErrors,
-) -> bool {
-    let data_flow = DataFlowAnalyzer.analyze(func.arg.var, &func.body);
+    compiler: &Compiler<'m>,
+) -> CompileErrors {
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
+    let mut errors = CompileErrors::default();
 
     debug!("Generating code for\n{}", func);
 
@@ -63,7 +70,7 @@ pub(super) fn map_codegen<'m>(
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors,
+        errors: &mut errors,
         type_mapper,
     };
     generator.scope.insert(func.arg.var, Local(0));
@@ -85,7 +92,7 @@ pub(super) fn map_codegen<'m>(
                     .insert((from_info.key, to_info.key), data_flow);
             }
 
-            true
+            errors
         }
         (from_info, to_info) => {
             panic!("Problem finding def ids: ({from_info:?}, {to_info:?})");

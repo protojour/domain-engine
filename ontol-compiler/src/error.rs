@@ -333,6 +333,10 @@ pub struct CompileErrors {
 }
 
 impl CompileErrors {
+    pub fn extend(&mut self, errors: CompileErrors) {
+        self.errors.extend(errors.errors);
+    }
+
     pub fn push(&mut self, error: SpannedCompileError) {
         self.errors.push(error);
     }

@@ -235,6 +235,7 @@ pub struct PropertyFlow {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum PropertyFlowData {
     Type(DefId),
+    Cardinality(Cardinality),
     ChildOf(PropertyId),
     DependentOn(PropertyId),
 }
@@ -307,7 +308,7 @@ impl EnvBuilder {
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum PropertyCardinality {
     Optional,
     Mandatory,
@@ -323,7 +324,7 @@ impl PropertyCardinality {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum ValueCardinality {
     One,
     Many,

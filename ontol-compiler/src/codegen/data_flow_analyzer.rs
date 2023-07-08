@@ -10,40 +10,13 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::{hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef};
+use crate::{
+    def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef,
+};
 
-pub struct DataFlowAnalyzer;
-
-impl DataFlowAnalyzer {
-    pub fn analyze(&mut self, arg: ontol_hir::Var, body: &TypedHirNode) -> Option<DataFlow> {
-        match body.kind() {
-            ontol_hir::Kind::Struct(struct_binder, nodes) => {
-                let mut struct_analyzer = StructAnalyzer {
-                    var_to_property: FnvHashMap::default(),
-                    var_dependencies: FnvHashMap::default(),
-                    property_flow: BTreeSet::default(),
-                };
-                struct_analyzer
-                    .var_dependencies
-                    .insert(arg, VarSet::default());
-                struct_analyzer
-                    .var_dependencies
-                    .insert(struct_binder.var, VarSet::default());
-                for node in nodes {
-                    struct_analyzer.analyze_node(node);
-                }
-
-                Some(DataFlow {
-                    properties: struct_analyzer.property_flow.into_iter().collect(),
-                })
-            }
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct StructAnalyzer {
+pub struct DataFlowAnalyzer<'c, R> {
+    defs: &'c R,
+    // relations: &'c Relations,
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
@@ -51,7 +24,37 @@ struct StructAnalyzer {
     property_flow: BTreeSet<PropertyFlow>,
 }
 
-impl StructAnalyzer {
+impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
+where
+    R: LookupRelationshipMeta<'m>,
+{
+    pub fn new(defs: &'c R) -> Self {
+        Self {
+            defs,
+            var_to_property: FnvHashMap::default(),
+            var_dependencies: FnvHashMap::default(),
+            property_flow: BTreeSet::default(),
+        }
+    }
+
+    pub fn analyze(mut self, arg: ontol_hir::Var, body: &TypedHirNode) -> Option<DataFlow> {
+        match body.kind() {
+            ontol_hir::Kind::Struct(struct_binder, nodes) => {
+                self.var_dependencies.insert(arg, VarSet::default());
+                self.var_dependencies
+                    .insert(struct_binder.var, VarSet::default());
+                for node in nodes {
+                    self.analyze_node(node);
+                }
+
+                Some(DataFlow {
+                    properties: self.property_flow.into_iter().collect(),
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn analyze_node(&mut self, node: &TypedHirNode) -> VarSet {
         match node.kind() {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
@@ -184,9 +187,19 @@ impl StructAnalyzer {
     fn reg_scope_prop(&mut self, struct_var: ontol_hir::Var, property_id: PropertyId, ty: TypeRef) {
         let def_id = ty.get_single_def_id().unwrap_or(DefId::unit());
 
+        let meta = self
+            .defs
+            .lookup_relationship_meta(property_id.relationship_id)
+            .unwrap();
+        let (_, _, cardinality) = meta.relationship.left_side(property_id.role);
+
         self.property_flow.insert(PropertyFlow {
             id: property_id,
             data: PropertyFlowData::Type(def_id),
+        });
+        self.property_flow.insert(PropertyFlow {
+            id: property_id,
+            data: PropertyFlowData::Cardinality(cardinality),
         });
 
         if let Some(dependencies) = self.var_dependencies.get(&struct_var) {

@@ -562,9 +562,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Type::Path(path, param_patterns) => {
                 let def_id = self.lookup_path(&path, span)?;
                 let args = if let Some((patterns, patterns_span)) = param_patterns {
-                    self.resolve_type_pattern_bindings(patterns, patterns_span, def_id)
+                    Some(self.resolve_type_pattern_bindings(patterns, patterns_span, def_id))
                 } else {
-                    Default::default()
+                    None
                 };
 
                 Ok(DefReference {

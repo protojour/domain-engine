@@ -11,11 +11,8 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::{code_generator::map_codegen, type_mapper::TypeMapper},
-    def::MapDirection,
-    hir_unify::unify_to_function,
-    typed_hir::TypedHirNode,
-    Compiler, SourceSpan,
+    codegen::code_generator::map_codegen, def::MapDirection, hir_unify::unify_to_function,
+    typed_hir::TypedHirNode, Compiler, SourceSpan,
 };
 
 use super::{
@@ -173,14 +170,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
     {
-        let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-        const_codegen(
-            &mut proc_table,
-            node,
-            def_id,
-            type_mapper,
-            &mut compiler.errors,
-        );
+        let errors = const_codegen(&mut proc_table, node, def_id, compiler);
+        compiler.errors.extend(errors);
     }
 
     for map_task in explicit_map_tasks {
@@ -190,8 +181,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         debug!("Forward start");
         match unify_to_function(&map_task.first, &map_task.second, compiler) {
             Ok(func) => {
-                let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
+                let errors = map_codegen(&mut proc_table, func, compiler);
+                compiler.errors.extend(errors);
             }
             Err(err) => warn!("unifier error: {err:?}"),
         }
@@ -200,8 +191,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
             debug!("Backward start");
             match unify_to_function(&map_task.second, &map_task.first, compiler) {
                 Ok(func) => {
-                    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-                    map_codegen(&mut proc_table, func, type_mapper, &mut compiler.errors);
+                    let errors = map_codegen(&mut proc_table, func, compiler);
+                    compiler.errors.extend(errors);
                 }
                 Err(err) => warn!("unifier error: {err:?}"),
             }

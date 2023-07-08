@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     env::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
-    PackageId, RelationshipId,
+    PackageId, RelationshipId, Role,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -97,7 +97,16 @@ pub struct Variables(pub SmallVec<[ExprId; 2]>);
 #[derive(Debug, Clone)]
 pub struct DefReference {
     pub def_id: DefId,
-    pub pattern_bindings: FnvHashMap<DefParamId, DefParamBinding>,
+    pub pattern_bindings: Option<FnvHashMap<DefParamId, DefParamBinding>>,
+}
+
+impl From<DefId> for DefReference {
+    fn from(value: DefId) -> Self {
+        Self {
+            def_id: value,
+            pattern_bindings: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -174,6 +183,22 @@ pub struct Relationship<'m> {
     pub object_prop: Option<&'m str>,
 
     pub rel_params: RelParams,
+}
+
+impl<'m> Relationship<'m> {
+    pub fn left_side(&self, role: Role) -> (&DefReference, SourceSpan, Cardinality) {
+        match role {
+            Role::Subject => (&self.subject.0, self.subject.1, self.subject_cardinality),
+            Role::Object => (&self.object.0, self.object.1, self.object_cardinality),
+        }
+    }
+
+    pub fn right_side(&self, role: Role) -> (&DefReference, SourceSpan, Cardinality) {
+        match role {
+            Role::Subject => (&self.object.0, self.object.1, self.object_cardinality),
+            Role::Object => (&self.subject.0, self.subject.1, self.subject_cardinality),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -317,6 +342,7 @@ impl<'m> Defs<'m> {
     }
 }
 
+#[cfg_attr(test, unimock::unimock(api = LookupRelationshipMetaMock))]
 pub trait LookupRelationshipMeta<'m> {
     fn lookup_relationship_meta(
         &self,

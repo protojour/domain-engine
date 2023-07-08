@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
 use domain_engine_juniper::{GqlContext, Schema};
+use fnv::FnvHashMap;
 use juniper::graphql_value;
-use ontol_runtime::config::DataStoreConfig;
-use ontol_test_utils::{expect_eq, SourceName, TestPackages};
+use ontol_runtime::{
+    config::DataStoreConfig,
+    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
+    DefId, PackageId,
+};
+use ontol_test_utils::{expect_eq, SourceName, TestEnv, TestPackages};
 use test_log::test;
+use unimock::{matching, MockFn};
 
-use crate::{Exec, TestCompileSchema};
+use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 
 const ROOT: SourceName = SourceName::root();
 const CONDUIT_DB: SourceName = SourceName("conduit_db");
@@ -77,6 +83,7 @@ async fn test_graphql_in_memory_conduit_db() {
 }
 
 struct BlogPostConduit {
+    test_env: TestEnv,
     domain_engine: Arc<DomainEngine>,
     db_schema: Schema,
     blog_schema: Schema,
@@ -99,7 +106,8 @@ impl BlogPostConduit {
         let (test_env, [db_schema, blog_schema]) =
             test_packages.compile_schemas([CONDUIT_DB, ROOT]);
         Self {
-            domain_engine: Arc::new(DomainEngine::builder(test_env.env).build()),
+            domain_engine: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
+            test_env,
             db_schema,
             blog_schema,
         }
@@ -176,7 +184,65 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_no_join() {
+async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
+    let ctx = BlogPostConduit::new();
+    expect_eq!(
+        actual = "{
+            BlogPostList {
+                edges {
+                    node {
+                        contents
+                    }
+                }
+            }
+        }"
+        .exec(
+            &ctx.blog_schema,
+            &gql_ctx_mock_data_store(
+                &ctx.test_env,
+                CONDUIT_DB,
+                DataStoreAPIMock::query
+                    .next_call(matching!(
+                        _,
+                        // The purpose of this is to check that the data store
+                        // receives a correctly structured query.
+                        // Note: The hard coded PropertyIds used below are unstable
+                        // and will likely change if the ONTOL files change.
+                        // Just update as necessary, the point is the structure, not the property IDs.
+                        eq!(&EntityQuery {
+                            source: StructOrUnionQuery::Struct(StructQuery {
+                                def_id: DefId(PackageId(2), 28),
+                                properties: FnvHashMap::from_iter([
+                                    // This is the "body" property:
+                                    ("S:2:43".parse().unwrap(), Query::Leaf),
+                                    (
+                                        // This is the `author` property:
+                                        "S:2:74".parse().unwrap(),
+                                        Query::Struct(StructQuery {
+                                            def_id: DefId(PackageId(2), 7),
+                                            properties: FnvHashMap::from_iter([(
+                                                // This is the `username` property:
+                                                "S:2:14".parse().unwrap(),
+                                                Query::Leaf
+                                            )])
+                                        })
+                                    )
+                                ]),
+                            }),
+                            cursor: None,
+                            limit: 20,
+                        })
+                    ))
+                    .returns(Ok(vec![]))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({ "BlogPostList": { "edges": [] } }))
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_in_memory_blog_post_conduit_no_join_real() {
     let ctx = BlogPostConduit::new();
     ctx.create_db_article().await;
 

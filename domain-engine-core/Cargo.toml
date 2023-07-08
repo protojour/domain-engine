@@ -16,6 +16,7 @@ thiserror.workspace = true
 tracing.workspace = true
 indexmap.workspace = true
 fnv.workspace = true
+itertools.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 tokio = { workspace = true, features = ["sync"] }
 async-trait.workspace = true
