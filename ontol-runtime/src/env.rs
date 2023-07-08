@@ -18,7 +18,6 @@ use crate::{
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
-        property_probe::PropertyProbe,
     },
     DefId, MapKey, PackageId, RelationshipId,
 };
@@ -60,10 +59,6 @@ impl Env {
 
     pub fn new_vm(&self) -> OntolVm<'_> {
         OntolVm::new(&self.lib)
-    }
-
-    pub fn new_property_probe(&self) -> PropertyProbe<'_> {
-        PropertyProbe::new(&self.lib)
     }
 
     pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {

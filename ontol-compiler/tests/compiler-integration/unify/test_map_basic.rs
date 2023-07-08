@@ -528,18 +528,6 @@ fn test_map_complex_flow() {
             json!({ "a": "A", "b": "B" }),
             json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
         );
-
-        // FIXME: Property probe does not make completely sense for this mapping:
-        let domain = test_env.env.find_domain(test_env.root_package).unwrap();
-        let mut property_probe = test_env.env.new_property_probe();
-        let property_map = property_probe.probe_from_serde_operator(
-            &test_env.env,
-            domain.type_info(*domain.type_names.get("one").unwrap()),
-            domain.type_info(*domain.type_names.get("two").unwrap()),
-        );
-        // Since there is no backwards mapping (two -> one), how should we be able to do 'property probe'?
-        // at least the logic in probe_from_serde_operator says to do a reverse lookup..
-        assert!(property_map.is_none());
     });
 }
 
