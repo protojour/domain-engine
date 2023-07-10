@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use juniper::graphql_value;
 use ontol_runtime::{
-    serde::processor::{ProcessorLevel, ProcessorMode},
+    serde::{
+        operator::SerdeOperator,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -14,7 +17,8 @@ use crate::{
     virtual_registry::VirtualRegistry,
     virtual_schema::{
         data::{
-            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeRef, UnionData,
+            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
+            TypeRef, UnionData,
         },
         TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
     },
@@ -295,18 +299,47 @@ impl<'v> AttributeType<'v> {
                 virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
                 executor,
             ),
-            Err(scalar_ref) => {
-                let scalar = virtual_schema
+            Err(scalar_ref) => match (
+                type_ref.modifier,
+                virtual_schema
                     .env()
-                    .new_serde_processor(
-                        scalar_ref.operator_id,
+                    .get_serde_operator(scalar_ref.operator_id),
+            ) {
+                (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
+                    let attributes = attribute.value.cast_ref::<Vec<_>>();
+                    let processor = virtual_schema.env().new_serde_processor(
+                        operator.ranges[0].operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
-                    )
-                    .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+                    );
 
-                Ok(juniper::Value::Scalar(scalar))
-            }
+                    let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
+                        .iter()
+                        .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
+                            let scalar = processor.serialize_value(
+                                &attr.value,
+                                None,
+                                GqlScalarSerializer,
+                            )?;
+                            Ok(juniper::Value::Scalar(scalar))
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    Ok(juniper::Value::List(graphql_values))
+                }
+                _ => {
+                    let scalar = virtual_schema
+                        .env()
+                        .new_serde_processor(
+                            scalar_ref.operator_id,
+                            ProcessorMode::Read,
+                            ProcessorLevel::new_root(),
+                        )
+                        .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+
+                    Ok(juniper::Value::Scalar(scalar))
+                }
+            },
         }
     }
 }

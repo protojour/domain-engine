@@ -184,6 +184,41 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_in_memory_blog_post_conduit_empty_tags() {
+    let ctx = BlogPostConduit::new();
+    ctx.create_db_article().await;
+
+    expect_eq!(
+        actual = "{
+            BlogPostList {
+                edges {
+                    node {
+                        contents
+                        written_by
+                        tags
+                    }
+                }
+            }
+        }"
+        .exec(&ctx.blog_schema, &ctx.gql_context())
+        .await,
+        expected = Ok(graphql_value!({
+            "BlogPostList": {
+                "edges": [
+                    {
+                        "node": {
+                            "contents": "THE BODY",
+                            "written_by": "teh_user",
+                            "tags": []
+                        }
+                    }
+                ]
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
     let ctx = BlogPostConduit::new();
     expect_eq!(
