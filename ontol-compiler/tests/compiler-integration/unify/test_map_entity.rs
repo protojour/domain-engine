@@ -183,6 +183,49 @@ fn test_rel_params_implicit_map() {
     });
 }
 
+#[test]
+fn test_map_relation_sequence_default_fallback() {
+    "
+    pub type foo_inner { rel .'foo_id'|id: { rel .is: string } }
+    pub type bar_inner { rel .'bar_id'|id: { rel .is: string } }
+    rel [foo_inner] 'bars'::'foos' [bar_inner]
+
+    pub type bar {
+        rel .'id'|id: { rel .is: string }
+        // BUG: want to use string here:
+        rel .'foos': [{rel .is: string }]
+    }
+
+    map => {
+        bar_inner {
+            'bar_id': id
+            'foos': [foo_inner { 'foo_id': foo }]
+        }
+        bar {
+            'id': id
+            'foos': [foo]
+        }
+    }
+    "
+    .compile_ok(|test_env| {
+        // The point of this test is to show that a
+        // "foos" in input is not needed to produce a "foo" in output,
+        // since the input "foo" is an inverted/object relation sequence property:
+        assert_domain_map(
+            &test_env,
+            ("bar_inner", "bar"),
+            json!({ "bar_id": "B" }),
+            json!({ "id": "B", "foos": [] }),
+        );
+        assert_domain_map(
+            &test_env,
+            ("bar_inner", "bar"),
+            json!({ "bar_id": "B", "foos": [{ "foo_id": "F" }]}),
+            json!({ "id": "B", "foos": ["F"] }),
+        );
+    });
+}
+
 const WORK: &str = "
 pub type worker_id { fmt '' => 'worker/' => uuid => . }
 pub type tech_id { fmt '' => 'tech/' => uuid => . }

@@ -193,6 +193,7 @@ impl Processor for OntolProcessor {
                 value.type_def_id == *def_id
             }
             Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::Int(0)),
+            Predicate::YankFalse(local) => matches!(self.yank(*local).data, Data::Int(0)),
         }
     }
 

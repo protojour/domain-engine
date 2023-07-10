@@ -183,7 +183,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut did_report_one_way_note = false;
         let mut errors_in_second = false;
 
-        for (arm, _) in &ctx.missing_properties {
+        for arm in ctx.missing_properties.keys() {
             if matches!(arm, Arm::Second) {
                 errors_in_second = true;
             }

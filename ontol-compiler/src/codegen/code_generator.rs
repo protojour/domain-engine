@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::GetKind;
+use ontol_hir::{GetKind, HasDefault, PropPattern};
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
@@ -11,7 +11,7 @@ use crate::{
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
-    CompileErrors, Compiler, SpannedCompileError,
+    CompileErrors, Compiler, SpannedCompileError, NO_SPAN,
 };
 
 use super::{
@@ -272,7 +272,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         let status_local = self.builder.top_minus(1);
                         let post_cond_offset = block.current_offset().plus(1);
 
-                        // These overlaps with the status_local, but that will be removed in the Cond opcode,
+                        // These overlap with the status_local, but that will be yanked(!) in the Cond opcode,
                         // leading into the present block.
                         let val_local = self.builder.top();
                         let rel_local = self.builder.top_minus(1);
@@ -306,14 +306,79 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         todo!();
                     }
                 } else {
-                    self.builder
-                        .append(block, Ir::TakeAttr2(struct_local, id), Delta(2), span);
+                    let arm = arms.into_iter().next().unwrap();
 
-                    let val_local = self.builder.top();
-                    let rel_local = self.builder.top_minus(1);
+                    match &arm.pattern {
+                        PropPattern::Seq(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
+                            self.builder.append(
+                                block,
+                                Ir::TryTakeAttr2(struct_local, id),
+                                Delta(2),
+                                span,
+                            );
 
-                    for arm in arms {
-                        self.gen_match_arm(arm, (rel_local, val_local), block);
+                            let status_local = self.builder.top_minus(1);
+                            let post_cond_offset = block.current_offset().plus(1);
+
+                            // These overlap with the status_local, but that will be yanked(!) in the Cond opcode,
+                            // leading into the present block.
+                            let val_local = self.builder.top();
+                            let rel_local = self.builder.top_minus(1);
+
+                            // Code for generating the default values:
+                            let default_fallback_body_index = {
+                                let mut default_block = self.builder.new_block(Delta(0), span);
+
+                                // rel_params (unit)
+                                self.builder.append(
+                                    &mut default_block,
+                                    Ir::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
+                                    Delta(0),
+                                    NO_SPAN,
+                                );
+                                // empty sequence
+                                self.builder.append(
+                                    &mut default_block,
+                                    Ir::CallBuiltin(
+                                        BuiltinProc::NewSeq,
+                                        binder.ty.get_single_def_id().unwrap(),
+                                    ),
+                                    Delta(0),
+                                    NO_SPAN,
+                                );
+
+                                self.builder.commit(
+                                    default_block,
+                                    Terminator::PopGoto(block.index(), post_cond_offset),
+                                )
+                            };
+
+                            // If the TryTakeAttr2 was false, run the default body
+                            self.builder.append(
+                                block,
+                                Ir::Cond(
+                                    Predicate::YankFalse(status_local),
+                                    default_fallback_body_index,
+                                ),
+                                Delta(0),
+                                span,
+                            );
+
+                            self.gen_match_arm(arm, (rel_local, val_local), block);
+                        }
+                        _ => {
+                            self.builder.append(
+                                block,
+                                Ir::TakeAttr2(struct_local, id),
+                                Delta(2),
+                                span,
+                            );
+
+                            let val_local = self.builder.top();
+                            let rel_local = self.builder.top_minus(1);
+
+                            self.gen_match_arm(arm, (rel_local, val_local), block);
+                        }
                     }
                 }
             }

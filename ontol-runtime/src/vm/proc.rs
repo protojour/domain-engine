@@ -115,4 +115,6 @@ pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
     /// Test if true. NB: Yanks from stack.
     YankTrue(Local),
+    /// Test if not true. NB: Yanks from stack.
+    YankFalse(Local),
 }

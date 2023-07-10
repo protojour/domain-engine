@@ -477,7 +477,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         ontol_hir::PropVariant {
                                             dimension: ontol_hir::AttrDimension::Seq(
                                                 label,
-                                                ontol_hir::HasDefault(false),
+                                                ontol_hir::HasDefault(matches!(
+                                                    match_property.property_id.role,
+                                                    Role::Object
+                                                )),
                                             ),
                                             attr: ontol_hir::Attribute {
                                                 rel: Box::new(rel_node),
