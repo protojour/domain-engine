@@ -152,10 +152,10 @@ impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for DepScopeAn
         self.enter_child(index, |zelf| {
             let ontol_hir::PropVariant { dimension, .. } = variant;
             match dimension {
-                ontol_hir::Dimension::Singular => {
+                ontol_hir::AttrDimension::Singular => {
                     zelf.traverse_prop_variant(variant);
                 }
-                ontol_hir::Dimension::Seq(_) => {}
+                ontol_hir::AttrDimension::Seq(_, _) => {}
             }
         });
 

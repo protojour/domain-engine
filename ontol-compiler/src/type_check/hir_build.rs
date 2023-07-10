@@ -462,7 +462,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ValueCardinality::One => {
                                     let val_node = self.build_node(value, Some(value_ty), ctx);
                                     ontol_hir::PropVariant {
-                                        dimension: ontol_hir::Dimension::Singular,
+                                        dimension: ontol_hir::AttrDimension::Singular,
                                         attr: ontol_hir::Attribute {
                                             rel: Box::new(rel_node),
                                             val: Box::new(val_node),
@@ -475,7 +475,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
                                         ontol_hir::PropVariant {
-                                            dimension: ontol_hir::Dimension::Seq(label),
+                                            dimension: ontol_hir::AttrDimension::Seq(
+                                                label,
+                                                ontol_hir::HasDefault(false),
+                                            ),
                                             attr: ontol_hir::Attribute {
                                                 rel: Box::new(rel_node),
                                                 val: Box::new(val_node),

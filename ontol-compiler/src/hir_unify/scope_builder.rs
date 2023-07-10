@@ -203,7 +203,7 @@ impl<'m> ScopeBuilder<'m> {
             for (variant_idx, variant) in variants.iter().enumerate() {
                 self.enter_child(variant_idx, |zelf| -> UnifierResult<()> {
                     let (kind, vars, dependencies) = match variant.dimension {
-                        ontol_hir::Dimension::Singular => {
+                        ontol_hir::AttrDimension::Singular => {
                             let mut var_union = UnionBuilder::default();
                             let mut dep_union = UnionBuilder::default();
 
@@ -224,7 +224,7 @@ impl<'m> ScopeBuilder<'m> {
                                 dep_union.vars,
                             )
                         }
-                        ontol_hir::Dimension::Seq(label) => {
+                        ontol_hir::AttrDimension::Seq(label, has_default) => {
                             let rel = zelf
                                 .enter_child(0, |zelf| zelf.build_scope_binder(&variant.attr.rel))?
                                 .into_scope_pattern_binding();
@@ -233,7 +233,7 @@ impl<'m> ScopeBuilder<'m> {
                                 .into_scope_pattern_binding();
 
                             (
-                                scope::PropKind::Seq(label, rel, val),
+                                scope::PropKind::Seq(label, has_default, rel, val),
                                 VarSet::from([ontol_hir::Var(label.0)]),
                                 VarSet::default(),
                             )

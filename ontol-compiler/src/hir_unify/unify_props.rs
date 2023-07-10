@@ -56,7 +56,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     ty,
                 )
             }
-            scope::PropKind::Seq(label, rel_binding, val_binding) => {
+            scope::PropKind::Seq(label, has_default, rel_binding, val_binding) => {
                 let gen_scope = scope::Scope(
                     scope::Kind::Gen(scope::Gen {
                         input_seq: ontol_hir::Var(label.0),
@@ -78,12 +78,13 @@ pub(super) trait UnifyProps<'m>: Sized {
 
                 (
                     ontol_hir::MatchArm {
-                        pattern: ontol_hir::PropPattern::Seq(ontol_hir::Binding::Binder(
-                            TypedBinder {
+                        pattern: ontol_hir::PropPattern::Seq(
+                            ontol_hir::Binding::Binder(TypedBinder {
                                 var: ontol_hir::Var(label.0),
                                 ty,
-                            },
-                        )),
+                            }),
+                            has_default,
+                        ),
                         nodes,
                     },
                     ty,
@@ -199,7 +200,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                     prop.struct_var,
                     prop.prop_id,
                     vec![ontol_hir::PropVariant {
-                        dimension: ontol_hir::Dimension::Singular,
+                        dimension: ontol_hir::AttrDimension::Singular,
                         attr: ontol_hir::Attribute {
                             rel: Box::new(rel.node),
                             val: Box::new(val.node),

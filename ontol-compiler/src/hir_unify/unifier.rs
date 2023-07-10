@@ -106,7 +106,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             prop.struct_var,
                             prop.prop_id,
                             vec![ontol_hir::PropVariant {
-                                dimension: ontol_hir::Dimension::Singular,
+                                dimension: ontol_hir::AttrDimension::Singular,
                                 attr: ontol_hir::Attribute {
                                     rel: Box::new(rel.node),
                                     val: Box::new(val.node),
@@ -179,7 +179,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             prop.struct_var,
                             prop.prop_id,
                             vec![ontol_hir::PropVariant {
-                                dimension: ontol_hir::Dimension::Singular,
+                                dimension: ontol_hir::AttrDimension::Singular,
                                 attr: ontol_hir::Attribute {
                                     rel: Box::new(TypedHirNode(
                                         ontol_hir::Kind::Unit,

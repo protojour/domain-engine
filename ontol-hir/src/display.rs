@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    Binding, Dimension, GetKind, GetVar, IterBinder, Kind, Label, Lang, MatchArm, PropPattern,
-    PropVariant, Var,
+    AttrDimension, Binding, GetKind, GetVar, HasDefault, IterBinder, Kind, Label, Lang, MatchArm,
+    PropPattern, PropVariant, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -147,11 +147,16 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
-        let sep = if let Dimension::Seq(label) = dimension {
-            write!(f, "seq ({})", label)?;
-            self.indent.indent()
-        } else {
-            Sep::None
+        let sep = match dimension {
+            AttrDimension::Singular => Sep::None,
+            AttrDimension::Seq(label, HasDefault(false)) => {
+                write!(f, "seq ({})", label)?;
+                self.indent.indent()
+            }
+            AttrDimension::Seq(label, HasDefault(true)) => {
+                write!(f, "seq-default ({})", label)?;
+                self.indent.indent()
+            }
         };
 
         let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
@@ -171,8 +176,13 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            PropPattern::Seq(val) => {
+            PropPattern::Seq(val, HasDefault(false)) => {
                 write!(f, "(seq")?;
+                self.print(Sep::Space, val, f)?;
+                write!(f, ")")?;
+            }
+            PropPattern::Seq(val, HasDefault(true)) => {
+                write!(f, "(seq-default")?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }

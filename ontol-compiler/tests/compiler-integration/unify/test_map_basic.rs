@@ -525,8 +525,8 @@ fn test_map_complex_flow() {
         assert_domain_map(
             &test_env,
             ("one", "two"),
-            json!({ "a": "A", "b": "B" }),
-            json!({ "a": "A", "b": "B", "c": "A", "d": "B" }),
+            json!({ "a": "X", "b": "Y" }),
+            json!({ "a": "X", "b": "Y", "c": "X", "d": "Y" }),
         );
     });
 }

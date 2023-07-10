@@ -405,10 +405,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 arm.nodes.into_iter(),
                 block,
             ),
-            ontol_hir::PropPattern::Seq(seq_binding) => self.gen_in_scope(
+            ontol_hir::PropPattern::Seq(binding, _has_default) => self.gen_in_scope(
                 &[
                     (rel_local, ontol_hir::Binding::Wildcard),
-                    (val_local, seq_binding),
+                    (val_local, binding),
                 ],
                 arm.nodes.into_iter(),
                 block,

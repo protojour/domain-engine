@@ -88,16 +88,24 @@ impl<'a, L: Lang> GetVar<'a, L> for Var {
 #[derive(Clone, Copy, Debug)]
 pub struct Optional(pub bool);
 
+#[derive(Clone, Copy, Debug)]
+pub struct HasDefault(pub bool);
+
+/// One of the variants of a property
 #[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
-    pub dimension: Dimension,
+    pub dimension: AttrDimension,
     pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
+/// The dimension of a property
 #[derive(Copy, Clone, Debug)]
-pub enum Dimension {
+pub enum AttrDimension {
+    /// A single attribute
     Singular,
-    Seq(Label),
+    /// A sequence of attributes, identified by a label
+    /// If `HasDefault`, an undefined property "coerces" into an empty sequence
+    Seq(Label, HasDefault),
 }
 
 /// An attribute existing of (relation parameter, value)
@@ -154,7 +162,7 @@ pub enum PropPattern<'a, L: Lang> {
     Attr(Binding<'a, L>, Binding<'a, L>),
     /// (seq $val)
     /// The sequence is captured in $val, relation is ignored
-    Seq(Binding<'a, L>),
+    Seq(Binding<'a, L>, HasDefault),
     /// The property is absent
     Absent,
 }
@@ -166,7 +174,7 @@ where
     fn clone(&self) -> Self {
         match self {
             Self::Attr(rel, val) => Self::Attr(rel.clone(), val.clone()),
-            Self::Seq(b) => Self::Seq(b.clone()),
+            Self::Seq(b, has_default) => Self::Seq(b.clone(), *has_default),
             Self::Absent => Self::Absent,
         }
     }

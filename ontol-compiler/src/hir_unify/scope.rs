@@ -91,7 +91,12 @@ pub struct Prop<'m> {
 #[derive(Clone, Debug)]
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
-    Seq(ontol_hir::Label, PatternBinding<'m>, PatternBinding<'m>),
+    Seq(
+        ontol_hir::Label,
+        ontol_hir::HasDefault,
+        PatternBinding<'m>,
+        PatternBinding<'m>,
+    ),
 }
 
 #[derive(Clone, Debug)]

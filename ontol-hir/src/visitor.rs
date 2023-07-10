@@ -135,7 +135,7 @@ macro_rules! visitor_trait_methods {
         }
 
         fn traverse_prop_variant(&mut self, variant: arg!($ref PropVariant<'l, L>)) {
-            if let Dimension::Seq(label) = borrow!($ref variant.dimension) {
+            if let AttrDimension::Seq(label, _) = borrow!($ref variant.dimension) {
                 self.visit_label(label);
             }
             self.visit_node(0, borrow!($ref variant.attr.rel));
@@ -148,7 +148,7 @@ macro_rules! visitor_trait_methods {
                     self.visit_pattern_binding(0, rel);
                     self.visit_pattern_binding(1, val);
                 }
-                PropPattern::Seq(val) => {
+                PropPattern::Seq(val, _) => {
                     self.visit_pattern_binding(0, val);
                 }
                 PropPattern::Absent => {}

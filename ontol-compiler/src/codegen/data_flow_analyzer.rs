@@ -126,7 +126,7 @@ where
                                 property_type = Some(binder.ty);
                             }
                         }
-                        ontol_hir::PropPattern::Seq(binding) => {
+                        ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.var, *struct_var);
                             }

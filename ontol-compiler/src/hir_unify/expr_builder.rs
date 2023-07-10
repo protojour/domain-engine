@@ -140,7 +140,7 @@ impl<'m> ExprBuilder<'m> {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| match variant.dimension {
-                    ontol_hir::Dimension::Singular => {
+                    ontol_hir::AttrDimension::Singular => {
                         let mut union = UnionBuilder::default();
                         let rel = union.plus(self.hir_to_expr(&variant.attr.rel));
                         let val = union.plus(self.hir_to_expr(&variant.attr.val));
@@ -154,7 +154,7 @@ impl<'m> ExprBuilder<'m> {
                             attr: ontol_hir::Attribute { rel, val },
                         }
                     }
-                    ontol_hir::Dimension::Seq(label) => {
+                    ontol_hir::AttrDimension::Seq(label, _has_default) => {
                         let rel = self.hir_to_expr(&variant.attr.rel);
                         let val = self.hir_to_expr(&variant.attr.val);
                         let mut free_vars = VarSet::default();
