@@ -3,10 +3,16 @@ pub type slug { rel.is: string }
 pub type tag { rel.is: string }
 
 pub type User {
+    // TODO: This must be an Authly user id
     rel .'user_id'(rel .gen: auto)|id: user_id
+    // TODO: This is.. an authly user name? Maybe?
     rel .'username': string
+
+    // TODO: Should not store auth-related fields in memoriam,
+    // this is the responsibility of Authly.
     rel .'email': string
     rel .'password_hash': string
+
     rel .'bio'(rel .default := ''): string
     rel .'image'?: string
 
