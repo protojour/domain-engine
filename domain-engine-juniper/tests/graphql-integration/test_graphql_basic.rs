@@ -122,6 +122,30 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_value_type_as_field() {
+    "
+    type foo { rel .is: string }
+    pub type bar {
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'foo': foo
+    }
+    "
+    .compile_schemas([ROOT]);
+}
+
+#[test(tokio::test)]
+async fn test_graphql_value_type_in_array() {
+    "
+    type foo { rel .is: string }
+    pub type bar {
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'foo': [foo]
+    }
+    "
+    .compile_schemas([ROOT]);
+}
+
+#[test(tokio::test)]
 async fn test_inner_struct() {
     let (test_env, [schema]) = "
     pub type foo_id { fmt '' => string => . }

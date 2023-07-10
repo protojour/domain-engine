@@ -217,7 +217,7 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
                                     ("S:2:43".parse().unwrap(), Query::Leaf),
                                     (
                                         // This is the `author` property:
-                                        "S:2:74".parse().unwrap(),
+                                        "S:2:72".parse().unwrap(),
                                         Query::Struct(StructQuery {
                                             def_id: DefId(PackageId(2), 7),
                                             properties: FnvHashMap::from_iter([(

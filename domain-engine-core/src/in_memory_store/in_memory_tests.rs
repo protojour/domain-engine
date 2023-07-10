@@ -109,7 +109,9 @@ async fn test_conduit_db_in_memory_id_generation() {
 
             domain_engine
                 .store_new_entity(
-                    create_de(&tag_entity).value(json!({})).unwrap(),
+                    create_de(&tag_entity)
+                        .value(json!({ "tag": "foo" }))
+                        .unwrap(),
                     Query::EntityId,
                 )
                 .await

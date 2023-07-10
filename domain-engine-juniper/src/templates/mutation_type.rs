@@ -1,6 +1,6 @@
 use juniper::LookAheadMethods;
 use ontol_runtime::query::{Query, StructOrUnionQuery};
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     gql_scalar::GqlScalar,
@@ -65,7 +65,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                         }
                     };
 
-                    debug!("CREATE {input_attribute:#?} -> {query:#?}");
+                    trace!("CREATE {input_attribute:#?} -> {query:#?}");
 
                     let value = executor
                         .context()
@@ -92,13 +92,13 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
 
                     let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
 
-                    debug!("UPDATE {id_attribute:?} -> {input_attribute:#?} -> {query:#?}");
+                    trace!("UPDATE {id_attribute:?} -> {input_attribute:#?} -> {query:#?}");
                     Ok(juniper::Value::Null)
                 }
                 FieldKind::DeleteMutation { id } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
 
-                    debug!("DELETE {id_value:?}");
+                    trace!("DELETE {id_value:?}");
 
                     Ok(juniper::Value::Null)
                 }

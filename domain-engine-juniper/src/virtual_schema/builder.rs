@@ -495,10 +495,25 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             debug!("Id not handled here");
                         }
                         TypeClassification::NativeScalar => {
-                            panic!(
-                                "Unhandled scalar: {:?}",
-                                self.env.get_serde_operator(seq_op.ranges[0].operator_id)
-                            )
+                            let scalar_ref = UnitTypeRef::NativeScalar(NativeScalarRef {
+                                operator_id: property.value_operator_id,
+                                kind: self.get_native_scalar_kind(
+                                    self.env.get_serde_operator(seq_op.ranges[0].operator_id),
+                                ),
+                            });
+
+                            fields.insert(
+                                field_namespace.unique_literal(property_name),
+                                FieldData {
+                                    kind: make_property_field_kind(PropertyData {
+                                        property_id: property.property_id,
+                                        value_operator_id: property.value_operator_id,
+                                    }),
+                                    field_type: TypeRef::mandatory(scalar_ref).to_array(
+                                        Optionality::from_optional(property.is_optional()),
+                                    ),
+                                },
+                            );
                         }
                     }
                 }
