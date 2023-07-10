@@ -35,11 +35,11 @@ pub type Comment {
 }
 
 pub type TagEntity {
-    rel .'tag'(rel .gen: auto)|id: tag
+    rel .'tag'|id: tag
 }
 
 rel [Article] 'author'::'authored_articles'? User
 rel Article 'favorited_by'::'favorited'? [User]
-rel [TagEntity] 'tagged'::'tags'? [Article]
+rel [TagEntity] 'tagged'::'tags' [Article]
 rel [Comment] 'comment_on'::'comments'? Article
 rel [Comment] 'author'::'authored_comments'? User

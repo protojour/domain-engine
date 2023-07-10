@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use smartstring::alias::String;
 
 use crate::{def::MapDirection, expr::ExprId, types::TypeRef, SourceSpan};
 
@@ -28,6 +29,8 @@ pub struct HirBuildCtx<'m> {
     pub arm: Arm,
 
     ctrl_flow_depth: CtrlFlowDepth,
+
+    pub missing_properties: FnvHashMap<Arm, FnvHashMap<SourceSpan, Vec<String>>>,
 }
 
 impl<'m> HirBuildCtx<'m> {
@@ -45,6 +48,7 @@ impl<'m> HirBuildCtx<'m> {
             arm: Arm::First,
             ctrl_flow_depth: CtrlFlowDepth(0),
             var_allocator: Default::default(),
+            missing_properties: FnvHashMap::default(),
         }
     }
 

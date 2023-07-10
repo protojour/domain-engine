@@ -4,6 +4,8 @@ pub type BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
     rel .'contents': string
     rel .'written_by': string
+    // BUG: Could use [string], but currently does not auto-map:
+    rel .'tags': [db.tag]
 }
 
 map => {
@@ -13,10 +15,14 @@ map => {
         'author': db.User {
             'username': author
         }
+        'tags': [db.TagEntity {
+            'tag': tag
+        }]
     }
     BlogPost {
         'post_id': id
         'contents': body
         'written_by': author
+        'tags': [tag]
     }
 }

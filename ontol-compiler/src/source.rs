@@ -27,7 +27,7 @@ impl Src {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct SourceSpan {
     pub source_id: SourceId,
     pub start: u32,

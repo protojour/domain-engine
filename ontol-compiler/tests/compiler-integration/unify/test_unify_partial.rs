@@ -14,7 +14,7 @@ fn test_unify_partial() {
         rel .'bar': string
     }
 
-    unify { // NOTE Consider using a one way mapping (`map => { .. }`) here// NOTE Consider using a one way mapping (`map => { .. }`) here
+    unify {
         Filter { 'foo': foo } // ERROR TODO: required to be optional?// ERROR missing property `bar`
         Foo { 'foo': foo } // ERROR missing property `bar`
     }

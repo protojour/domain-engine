@@ -3,9 +3,8 @@ use ontol_runtime::{
     env::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
-    DefId, RelationshipId, Role,
+    DefId, Role,
 };
-use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
@@ -20,7 +19,7 @@ use crate::{
     },
     typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
-    Note, SourceSpan, SpannedNote, NO_SPAN,
+    SourceSpan, NO_SPAN,
 };
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
@@ -329,6 +328,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
+        struct MatchProperty {
+            property_id: PropertyId,
+            cardinality: Cardinality,
+            rel_params_def: Option<DefId>,
+            value_def: DefId,
+            used: bool,
+        }
+
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let node_kind = match properties.map(|props| &props.constructor) {
@@ -340,44 +347,43 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ty: struct_ty,
                         };
 
-                        struct MatchProperty {
-                            relationship_id: RelationshipId,
-                            cardinality: Cardinality,
-                            rel_params_def: Option<DefId>,
-                            object_def: DefId,
-                            used: bool,
-                        }
                         let mut match_properties = property_set
                             .iter()
-                            .filter_map(|(property_id, _cardinality)| match property_id.role {
-                                Role::Subject => {
-                                    let meta = self
-                                        .defs
-                                        .lookup_relationship_meta(property_id.relationship_id)
-                                        .expect("BUG: problem getting relationship meta");
-                                    let property_name = meta
-                                        .relation
-                                        .subject_prop(self.defs)
-                                        .expect("BUG: Expected named subject property");
+                            .filter_map(|(property_id, _cardinality)| {
+                                let meta = self
+                                    .defs
+                                    .lookup_relationship_meta(property_id.relationship_id)
+                                    .expect("BUG: problem getting relationship meta");
+                                let property_name = match property_id.role {
+                                    Role::Subject => Some(
+                                        meta.relation
+                                            .subject_prop(self.defs)
+                                            .expect("BUG: Expected named subject property"),
+                                    ),
+                                    Role::Object => meta.relationship.object_prop,
+                                };
+                                let (_, _, owner_cardinality) =
+                                    meta.relationship.left_side(property_id.role);
+                                let (value_def_ref, _, _) =
+                                    meta.relationship.right_side(property_id.role);
 
-                                    Some((
+                                property_name.map(|property_name| {
+                                    (
                                         property_name,
                                         MatchProperty {
-                                            // relation_id: property_id.relationship_id,
-                                            relationship_id: property_id.relationship_id,
-                                            cardinality: meta.relationship.subject_cardinality,
+                                            property_id: *property_id,
+                                            cardinality: owner_cardinality,
                                             rel_params_def: match &meta.relationship.rel_params {
                                                 RelParams::Type(def_reference) => {
                                                     Some(def_reference.def_id)
                                                 }
                                                 _ => None,
                                             },
-                                            object_def: meta.relationship.object.0.def_id,
+                                            value_def: value_def_ref.def_id,
                                             used: false,
                                         },
-                                    ))
-                                }
-                                Role::Object => None,
+                                    )
+                                })
                             })
                             .collect::<IndexMap<_, _>>();
 
@@ -387,7 +393,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             key: (def, prop_span),
                             rel,
                             bind_option,
-                            object,
+                            value,
                         } in attributes
                         {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
@@ -431,8 +437,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
                                 (ty @ Type::Anonymous(def_id), None) => {
                                     match self.relations.properties_by_def_id(*def_id) {
-                                        Some(_) => self
-                                            .build_implicit_rel_node(ty, object, *prop_span, ctx),
+                                        Some(_) => {
+                                            self.build_implicit_rel_node(ty, value, *prop_span, ctx)
+                                        }
                                         // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
                                         None => TypedHirNode(
                                             ontol_hir::Kind::Unit,
@@ -444,16 +451,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                 }
                                 (ty, None) => {
-                                    self.build_implicit_rel_node(ty, object, *prop_span, ctx)
+                                    self.build_implicit_rel_node(ty, value, *prop_span, ctx)
                                 }
                             };
 
-                            let object_ty = self.check_def(match_property.object_def);
-                            debug!("object_ty: {object_ty:?}");
+                            let value_ty = self.check_def(match_property.value_def);
+                            debug!("value_ty: {value_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let val_node = self.build_node(object, Some(object_ty), ctx);
+                                    let val_node = self.build_node(value, Some(value_ty), ctx);
                                     ontol_hir::PropVariant {
                                         dimension: ontol_hir::Dimension::Singular,
                                         attr: ontol_hir::Attribute {
@@ -462,10 +469,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         },
                                     }
                                 }
-                                ValueCardinality::Many => match &object.kind {
-                                    ExprKind::Seq(aggr_expr_id, object) => {
-                                        let val_node =
-                                            self.build_node(object, Some(object_ty), ctx);
+                                ValueCardinality::Many => match &value.kind {
+                                    ExprKind::Seq(aggr_expr_id, value) => {
+                                        let val_node = self.build_node(value, Some(value_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
                                         ontol_hir::PropVariant {
@@ -478,8 +484,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     }
                                     _ => {
                                         self.type_error(
-                                            TypeError::VariableMustBeSequenceEnclosed(object_ty),
-                                            &object.span,
+                                            TypeError::VariableMustBeSequenceEnclosed(value_ty),
+                                            &value.span,
                                         );
                                         continue;
                                     }
@@ -505,7 +511,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 CompileError::TODO(
                                                     "required to be optional?".into(),
                                                 ),
-                                                &object.span,
+                                                &value.span,
                                             );
                                             vec![]
                                         }
@@ -516,7 +522,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ontol_hir::Kind::Prop(
                                     optional,
                                     struct_binder.var,
-                                    PropertyId::subject(match_property.relationship_id),
+                                    match_property.property_id,
                                     prop_variants,
                                 ),
                                 Meta {
@@ -531,21 +537,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 // It's OK to not specify all properties here
                             }
                             _ => {
-                                let missing_properties: Vec<String> = match_properties
-                                    .into_iter()
-                                    .filter(|(_, property)| !property.used)
-                                    .map(|(prop_name, _)| prop_name.into())
-                                    .collect();
-
-                                if !missing_properties.is_empty() {
-                                    self.error_with_notes(
-                                        CompileError::MissingProperties(missing_properties),
-                                        &span,
-                                        vec![SpannedNote {
-                                            note: Note::ConsiderUsingOneWayMap,
-                                            span: ctx.map_kw_span,
-                                        }],
-                                    );
+                                for (name, match_property) in match_properties {
+                                    if !match_property.used
+                                        && !matches!(match_property.property_id.role, Role::Object)
+                                    {
+                                        ctx.missing_properties
+                                            .entry(ctx.arm)
+                                            .or_default()
+                                            .entry(span)
+                                            .or_default()
+                                            .push(name.into());
+                                    }
                                 }
                             }
                         }
@@ -580,7 +582,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 key: (def, _),
                                 rel: _,
                                 bind_option: _,
-                                object: value,
+                                value,
                             }) if def.def_id == DefId::unit() => {
                                 let object_ty = self.check_def(meta.relationship.object.0.def_id);
                                 let inner_node = self.build_node(value, Some(object_ty), ctx);

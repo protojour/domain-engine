@@ -17,7 +17,7 @@ use crate::{
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
-    CompileErrors, SourceSpan,
+    CompileErrors, Note, SourceSpan, SpannedNote,
 };
 
 use super::{
@@ -62,6 +62,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.build_arms(def, first_id, second_id, &mut ctx)?;
+
+        self.report_missing_prop_errors(&mut ctx);
 
         Ok(self.types.intern(Type::Tautology))
     }
@@ -176,6 +178,41 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
         .visit_node(0, second);
     }
+
+    fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {
+        let mut did_report_one_way_note = false;
+        let mut errors_in_second = false;
+
+        for (arm, _) in &ctx.missing_properties {
+            if matches!(arm, Arm::Second) {
+                errors_in_second = true;
+            }
+        }
+
+        for (arm, missing) in std::mem::take(&mut ctx.missing_properties) {
+            for (span, properties) in missing {
+                let error = CompileError::MissingProperties(properties);
+
+                if matches!(arm, Arm::First)
+                    && matches!(ctx.direction, MapDirection::Omni)
+                    && !errors_in_second
+                    && !did_report_one_way_note
+                {
+                    self.error_with_notes(
+                        error,
+                        &span,
+                        vec![SpannedNote {
+                            note: Note::ConsiderUsingOneWayMap,
+                            span: ctx.map_kw_span,
+                        }],
+                    );
+                    did_report_one_way_note = true;
+                } else {
+                    self.error(error, &span);
+                }
+            }
+        }
+    }
 }
 
 pub struct MapCheck<'c, 'm> {
@@ -205,7 +242,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
             } => {
                 for attr in attrs.iter() {
                     group_set.join(self.analyze_arm(
-                        &attr.object,
+                        &attr.value,
                         variables,
                         parent_aggr_group,
                         ctx,

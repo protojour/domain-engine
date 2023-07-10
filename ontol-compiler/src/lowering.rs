@@ -761,7 +761,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     key,
                     rel: None,
                     bind_option: false,
-                    object: expr,
+                    value: expr,
                 }]
                 .into(),
             },
@@ -825,7 +825,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     key: (def, self.src.span(&relation.1)),
                     rel,
                     bind_option: option.is_some(),
-                    object: object_expr,
+                    value: object_expr,
                 })
             })
             .collect()

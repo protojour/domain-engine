@@ -48,6 +48,33 @@ fn map_attribute_mismatch() {
 }
 
 #[test]
+fn map_missing_property_suggest_one_way() {
+    "
+    type foo { rel .'a'|'b'|'c': string }
+    type bar { rel .'d': string }
+    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
+        foo { 'a': x } // ERROR missing properties `b`, `c`
+        bar { 'd': x }
+    }
+    "
+    .compile_fail()
+}
+
+/// Tests that the "consider using one way mapping" does not appear if it's already a one-way mapping
+#[test]
+fn map_missing_attributes_one_way() {
+    "
+    type foo { rel .'a'|'b': string }
+    type bar { rel .'c'|'d': string }
+    map => {
+        foo { 'a': x }
+        bar { 'c': x } // ERROR missing property `d`
+    }
+    "
+    .compile_fail()
+}
+
+#[test]
 fn map_duplicate_unknown_property() {
     "
     type foo
@@ -199,7 +226,7 @@ fn map_union() {
         rel .is?: bar
     }
 
-    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
+    map {
         foobar {} // ERROR cannot map a union, map each variant instead
         foo {} // ERROR missing property `type`
     }

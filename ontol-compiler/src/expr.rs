@@ -37,7 +37,7 @@ pub struct ExprStructAttr {
     pub key: PropertyKey,
     pub rel: Option<Expr>,
     pub bind_option: bool,
-    pub object: Expr,
+    pub value: Expr,
 }
 
 #[derive(Debug)]

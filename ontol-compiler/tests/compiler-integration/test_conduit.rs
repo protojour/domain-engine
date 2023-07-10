@@ -39,13 +39,46 @@ fn test_map_conduit_blog_post() {
                     "username": "some_user",
                     "email": "e@mail",
                     "password_hash": "h",
-                }
+                },
+                "tags": [{ "tag": "foobar" }]
             }),
             json!({
                 "post_id": "11111111-1111-1111-1111-111111111111",
                 "contents": "THE BODY",
                 "written_by": "some_user",
+                "tags": ["foobar"]
             }),
+        )
+    });
+}
+
+/// The "tags" property is not required in deserialization (why?)
+/// So the map from db.Article to BlogPost crashes because it's not found.
+#[test]
+#[should_panic = "Attribute O:2:76 not present"]
+fn test_map_conduit_blog_post_crashes_on_missing_tags() {
+    TestPackages::with_sources([
+        (SourceName("conduit_db"), CONDUIT_DB),
+        (SourceName::root(), BLOG_POST_PUBLIC),
+    ])
+    .compile_ok(|test_env| {
+        assert_domain_map(
+            &test_env,
+            ("conduit_db::Article", "BlogPost"),
+            json!({
+                "article_id": "11111111-1111-1111-1111-111111111111",
+                "slug": "s",
+                "title": "t",
+                "description": "d",
+                "body": "THE BODY",
+                "author": {
+                    "user_id": "22222222-2222-2222-2222-222222222222",
+                    "username": "some_user",
+                    "email": "e@mail",
+                    "password_hash": "h",
+                },
+            }),
+            json!({}),
         )
     });
 }
