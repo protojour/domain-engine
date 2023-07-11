@@ -1,5 +1,4 @@
-use ontol_test_utils::TestCompile;
-use pretty_assertions::assert_eq;
+use ontol_test_utils::{expect_eq, TestCompile};
 use test_log::test;
 
 #[test]
@@ -39,10 +38,37 @@ fn map_attribute_mismatch() {
     rel foo 'prop1': bar
     rel foo 'prop2': bar
     rel bar is: int
-    map {
-        foo: // ERROR expected named property// ERROR missing property `prop0`// ERROR missing property `prop1`// ERROR missing property `prop2`
+    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
+        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`
             x
-        bar {} // ERROR expected expression
+        bar {} // ERROR expected expression attribute
+    }
+    "
+    .compile_fail()
+}
+
+#[test]
+fn map_missing_property_suggest_one_way() {
+    "
+    type foo { rel .'a'|'b'|'c': string }
+    type bar { rel .'d': string }
+    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
+        foo { 'a': x } // ERROR missing properties `b`, `c`
+        bar { 'd': x }
+    }
+    "
+    .compile_fail()
+}
+
+/// Tests that the "consider using one way mapping" does not appear if it's already a one-way mapping
+#[test]
+fn map_missing_attributes_one_way() {
+    "
+    type foo { rel .'a'|'b': string }
+    type bar { rel .'c'|'d': string }
+    map => {
+        foo { 'a': x }
+        bar { 'c': x } // ERROR missing property `d`
     }
     "
     .compile_fail()
@@ -84,7 +110,7 @@ fn map_type_mismatch_simple() {
     }
     "
     .compile_fail_then(|errors| {
-        assert_eq!("x", errors[0].span_text);
+        expect_eq!(actual = errors[0].span_text, expected = "x");
     })
 }
 
@@ -137,8 +163,8 @@ fn map_array_mismatch() {
 #[test]
 fn array_map_without_brackets() {
     "
-    type foo { rel _ 'a': [string] }
-    type bar { rel _ 'b': [string] }
+    type foo { rel .'a': [string] }
+    type bar { rel .'b': [string] }
 
     map {
         foo {
@@ -153,21 +179,11 @@ fn array_map_without_brackets() {
 }
 
 #[test]
-fn union_in_named_relationship() {
-    "
-    type foo
-    rel foo 'a': string
-    rel foo 'a': int // ERROR union in named relationship is not supported yet. Make a union type instead.
-    "
-    .compile_fail();
-}
-
-#[test]
 fn only_entities_may_have_reverse_relationship() {
     "
     type foo
     type bar
-    rel [foo] 'a'::'aa' bar {} // ERROR only entities may have named reverse relationship
+    rel [foo] 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
     rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
@@ -176,11 +192,11 @@ fn only_entities_may_have_reverse_relationship() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a { rel _ is?: int }
-    type b { rel _ is?: int }
+    type a { rel .is?: int }
+    type b { rel .is?: int }
 
-    type c { rel _ 'p0': a }
-    type d { rel _ 'p1': b }
+    type c { rel .'p0': a }
+    type d { rel .'p1': b }
 
     map {
         c {
@@ -200,19 +216,37 @@ fn unresolved_transitive_map() {
 fn map_union() {
     "
     type foo {
-        rel _ 'type': 'foo'
+        rel .'type': 'foo'
     }
     type bar {
-        rel _ 'type': 'bar'
+        rel .'type': 'bar'
     }
     type foobar {
-        rel _ is?: foo
-        rel _ is?: bar
+        rel .is?: foo
+        rel .is?: bar
     }
 
     map {
         foobar {} // ERROR cannot map a union, map each variant instead
         foo {} // ERROR missing property `type`
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
+fn map_invalid_unit_rel_params() {
+    "
+    type foo { rel .'foo': string }
+    type bar { rel .'bar': string }
+
+    map {
+        foo {
+            'foo'
+                ('bug': b) // ERROR no relation parameters expected
+                : s
+        }
+        bar { 'bar': s }
     }
     "
     .compile_fail();

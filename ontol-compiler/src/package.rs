@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use fnv::FnvHashMap;
 use ontol_parser::ast;
 use ontol_parser::Spanned;
+use ontol_runtime::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
 use smartstring::alias::String;
@@ -16,6 +17,7 @@ use crate::SourceSpan;
 use crate::Sources;
 use crate::SpannedCompileError;
 use crate::Src;
+use crate::NO_SPAN;
 
 pub const CORE_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
@@ -57,6 +59,7 @@ pub enum PackageReference {
 pub struct ParsedPackage {
     pub package_id: PackageId,
     pub reference: PackageReference,
+    pub config: PackageConfig,
     pub src: Src,
     pub statements: Vec<Spanned<ast::Statement>>,
     pub parser_errors: Vec<ontol_parser::Error>,
@@ -66,6 +69,7 @@ impl ParsedPackage {
     pub fn parse(
         request: PackageRequest,
         text: &str,
+        config: PackageConfig,
         sources: &mut Sources,
         source_code_registry: &mut SourceCodeRegistry,
     ) -> Self {
@@ -82,6 +86,7 @@ impl ParsedPackage {
         Self {
             package_id: src.package_id,
             reference: request.reference,
+            config,
             src,
             statements,
             parser_errors,
@@ -118,7 +123,7 @@ impl PackageGraphBuilder {
                 PackageReference::Named(root_package_name),
                 PackageNode {
                     package_id: ROOT_PKG,
-                    use_source_span: SourceSpan::none(),
+                    use_source_span: NO_SPAN,
                     requested_at_generation: generation,
                     dependencies: Default::default(),
                     found: false,
@@ -166,6 +171,7 @@ impl PackageGraphBuilder {
                     load_errors.push(SpannedCompileError {
                         error: CompileError::PackageNotFound,
                         span: requested_package.use_source_span,
+                        notes: vec![],
                     });
                 } else {
                     requests.push(PackageRequest {

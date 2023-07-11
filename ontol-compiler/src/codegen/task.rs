@@ -1,7 +1,9 @@
 use std::fmt::Debug;
 
 use fnv::FnvHashMap;
+use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
+    env::PropertyFlow,
     format_utils::DebugViaDisplay,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
@@ -9,14 +11,12 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen,
-    hir_unify::unifier::unify_to_function,
-    typed_hir::TypedHirNode,
-    types::{Type, TypeRef},
-    Compiler, SourceSpan,
+    codegen::code_generator::map_codegen, def::MapDirection, hir_unify::unify_to_function,
+    typed_hir::TypedHirNode, Compiler, SourceSpan,
 };
 
 use super::{
+    auto_map::autogenerate_mapping,
     code_generator::const_codegen,
     link::{link, LinkResult},
     proc_builder::ProcBuilder,
@@ -24,31 +24,41 @@ use super::{
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
-    tasks: Vec<CodegenTask<'m>>,
+    const_tasks: Vec<ConstCodegenTask<'m>>,
+    pub map_tasks: IndexMap<MapKeyPair, MapCodegenTask<'m>>,
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
-    pub result_map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub result_map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub result_propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CodegenTasks")
-            .field("tasks", &self.tasks)
+            .field("tasks", &self.const_tasks)
             .finish()
     }
 }
 
 impl<'m> CodegenTasks<'m> {
-    pub fn push(&mut self, task: CodegenTask<'m>) {
-        self.tasks.push(task);
+    pub fn add_map_task(&mut self, pair: MapKeyPair, task: MapCodegenTask<'m>) {
+        match self.map_tasks.entry(pair) {
+            Entry::Occupied(mut occupied) => {
+                if let (MapCodegenTask::Auto, MapCodegenTask::Explicit(_)) = (occupied.get(), &task)
+                {
+                    // Explicit maps may overwrite auto-generated maps
+                    occupied.insert(task);
+                }
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(task);
+            }
+        }
     }
-}
 
-#[derive(Debug)]
-pub enum CodegenTask<'m> {
-    // A procedure with 0 arguments, used to produce a constant value
-    Const(ConstCodegenTask<'m>),
-    Map(MapCodegenTask<'m>),
+    pub fn add_const_task(&mut self, const_task: ConstCodegenTask<'m>) {
+        self.const_tasks.push(const_task);
+    }
 }
 
 pub struct ConstCodegenTask<'m> {
@@ -56,7 +66,13 @@ pub struct ConstCodegenTask<'m> {
     pub node: TypedHirNode<'m>,
 }
 
-pub struct MapCodegenTask<'m> {
+pub enum MapCodegenTask<'m> {
+    Auto,
+    Explicit(ExplicitMapCodegenTask<'m>),
+}
+
+pub struct ExplicitMapCodegenTask<'m> {
+    pub direction: MapDirection,
     pub first: TypedHirNode<'m>,
     pub second: TypedHirNode<'m>,
     pub span: SourceSpan,
@@ -70,7 +86,7 @@ impl<'m> Debug for ConstCodegenTask<'m> {
     }
 }
 
-impl<'m> Debug for MapCodegenTask<'m> {
+impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MapCodegenTask")
             .field("first", &DebugViaDisplay(&self.first))
@@ -79,11 +95,42 @@ impl<'m> Debug for MapCodegenTask<'m> {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct MapKeyPair {
+    first: MapKey,
+    second: MapKey,
+}
+
+impl MapKeyPair {
+    pub fn new(a: MapKey, b: MapKey) -> Self {
+        if a < b {
+            Self {
+                first: a,
+                second: b,
+            }
+        } else {
+            Self {
+                first: b,
+                second: a,
+            }
+        }
+    }
+
+    pub fn first(&self) -> MapKey {
+        self.first
+    }
+
+    pub fn second(&self) -> MapKey {
+        self.second
+    }
+}
+
 #[derive(Default)]
 pub(super) struct ProcTable {
     pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub map_calls: Vec<MapCall>,
+    pub propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
 }
 
 impl ProcTable {
@@ -102,52 +149,52 @@ pub(super) struct MapCall {
     pub mapping: (MapKey, MapKey),
 }
 
-pub(super) fn find_mapping_key(ty: TypeRef) -> Option<MapKey> {
-    match ty {
-        Type::Domain(def_id) => Some(MapKey {
-            def_id: *def_id,
-            seq: false,
-        }),
-        Type::Array(element) => {
-            let def_id = element.get_single_def_id()?;
-            Some(MapKey { def_id, seq: true })
-        }
-        other => {
-            warn!("unable to get mapping key: {other:?}");
-            None
-        }
-    }
-}
-
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
-    let tasks = std::mem::take(&mut compiler.codegen_tasks.tasks);
+    let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
+
+    for (def_pair, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
+        match map_task {
+            MapCodegenTask::Auto => {
+                if let Some(task) = autogenerate_mapping(def_pair, compiler) {
+                    explicit_map_tasks.push(task);
+                }
+            }
+            MapCodegenTask::Explicit(explicit) => {
+                explicit_map_tasks.push(explicit);
+            }
+        }
+    }
 
     let mut proc_table = ProcTable::default();
 
-    for task in tasks {
-        match task {
-            CodegenTask::Const(ConstCodegenTask { def_id, node }) => {
-                const_codegen(&mut proc_table, node, def_id, &mut compiler.errors);
+    for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
+    {
+        let errors = const_codegen(&mut proc_table, node, def_id, compiler);
+        compiler.errors.extend(errors);
+    }
+
+    for map_task in explicit_map_tasks {
+        debug!("1st (ty={:?}):\n{}", map_task.first.ty(), map_task.first);
+        debug!("2nd (ty={:?}):\n{}", map_task.second.ty(), map_task.second);
+
+        debug!("Forward start");
+        match unify_to_function(&map_task.first, &map_task.second, compiler) {
+            Ok(func) => {
+                let errors = map_codegen(&mut proc_table, func, compiler);
+                compiler.errors.extend(errors);
             }
-            CodegenTask::Map(map_task) => {
-                debug!("1st (ty={:?}):\n{}", map_task.first.meta.ty, map_task.first);
-                debug!(
-                    "2nd (ty={:?}):\n{}",
-                    map_task.second.meta.ty, map_task.second
-                );
+            Err(err) => warn!("unifier error: {err:?}"),
+        }
 
-                debug!("Forward start");
-                if let Ok(func) =
-                    unify_to_function(map_task.first.clone(), map_task.second.clone(), compiler)
-                {
-                    map_codegen(&mut proc_table, func, &mut compiler.errors);
+        if matches!(map_task.direction, MapDirection::Omni) {
+            debug!("Backward start");
+            match unify_to_function(&map_task.second, &map_task.first, compiler) {
+                Ok(func) => {
+                    let errors = map_codegen(&mut proc_table, func, compiler);
+                    compiler.errors.extend(errors);
                 }
-
-                debug!("Backward start");
-                if let Ok(func) = unify_to_function(map_task.second, map_task.first, compiler) {
-                    map_codegen(&mut proc_table, func, &mut compiler.errors);
-                }
+                Err(err) => warn!("unifier error: {err:?}"),
             }
         }
     }
@@ -155,10 +202,11 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let LinkResult {
         lib,
         const_procs,
-        map_procs,
+        map_proc_table,
     } = link(compiler, &mut proc_table);
 
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
-    compiler.codegen_tasks.result_map_procs = map_procs;
+    compiler.codegen_tasks.result_map_proc_table = map_proc_table;
+    compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
 }

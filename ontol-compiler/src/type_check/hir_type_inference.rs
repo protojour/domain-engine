@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::{kind::NodeKind, visitor::HirMutVisitor};
+use ontol_hir::GetKind;
 use ontol_runtime::smart_format;
 
 use crate::{
@@ -15,44 +15,47 @@ use super::{
     TypeError,
 };
 
+/// Perform type inference limited to within one "map arm"
 pub(super) struct HirArmTypeInference<'c, 'm> {
     pub(super) types: &'c mut Types<'m>,
     pub(super) eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
     pub(super) errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirArmTypeInference<'c, 'm> {
+impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirArmTypeInference<'c, 'm> {
     fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
         let mut infer = Infer {
             types: self.types,
             eq_relations: self.eq_relations,
         };
-        match infer.infer_recursive(node.meta.ty) {
-            Ok(ty) => node.meta.ty = ty,
+        match infer.infer_recursive(node.ty()) {
+            Ok(ty) => node.meta_mut().ty = ty,
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
                 self.errors.push(
                     CompileError::TODO(smart_format!("Not enough type information"))
-                        .spanned(&node.meta.span),
+                        .spanned(&node.span()),
                 );
             }
             _ => panic!("Unexpected inference error"),
         }
 
-        self.visit_kind(index, &mut node.kind);
+        self.visit_kind(index, node.kind_mut());
     }
 }
 
+/// Unify the types of variables in both map arms.
+/// If the types do not match, the variable expression gets changed to a map expression.
 pub(super) struct HirVariableMapper<'c, 'm> {
-    pub variable_mapping: &'c FnvHashMap<ontol_hir::Variable, VariableMapping<'m>>,
+    pub variable_mapping: &'c FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
     pub arm: Arm,
 }
 
-impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
+impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
     fn visit_node(&mut self, index: usize, node: &mut <TypedHir as ontol_hir::Lang>::Node<'m>) {
-        self.visit_kind(index, &mut node.kind);
+        self.visit_kind(index, node.kind_mut());
 
-        if let NodeKind::VariableRef(var) = &node.kind {
+        if let ontol_hir::Kind::Var(var) = node.kind() {
             if let Some(var_mapping) = self.variable_mapping.get(var) {
                 let arm = self.arm;
                 let mapped_type = match arm {
@@ -60,17 +63,14 @@ impl<'c, 'm> HirMutVisitor<'m, TypedHir> for HirVariableMapper<'c, 'm> {
                     Arm::Second => var_mapping.first_arm_type,
                 };
 
-                let variable_ref = TypedHirNode {
-                    kind: NodeKind::VariableRef(*var),
-                    meta: Meta {
+                let variable_ref = TypedHirNode(
+                    ontol_hir::Kind::Var(*var),
+                    Meta {
                         ty: mapped_type,
-                        span: node.meta.span,
+                        span: node.span(),
                     },
-                };
-                let map = TypedHirNode {
-                    kind: NodeKind::Map(Box::new(variable_ref)),
-                    meta: node.meta,
-                };
+                );
+                let map = TypedHirNode(ontol_hir::Kind::Map(Box::new(variable_ref)), *node.meta());
 
                 *node = map;
             }

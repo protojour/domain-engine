@@ -3,6 +3,7 @@ use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, Predicate, Procedure},
     DefId,
 };
+use smartstring::alias::String;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct BlockIndex(pub u32);
@@ -30,10 +31,13 @@ pub enum Ir {
     /// Take attribute and push two values on the stack: value(top), rel_params
     TakeAttr2(Local, PropertyId),
     TryTakeAttr2(Local, PropertyId),
-    PutAttrValue(Local, PropertyId),
+    PutAttr1(Local, PropertyId),
+    PutAttr2(Local, PropertyId),
     AppendAttr2(Local),
-    Constant(i64, DefId),
+    I64(i64, DefId),
+    String(String, DefId),
     Cond(Predicate, BlockIndex),
+    TypePun(Local, DefId),
 }
 
 #[derive(Clone, Debug)]

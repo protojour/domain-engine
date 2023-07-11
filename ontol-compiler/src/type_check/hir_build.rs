@@ -1,25 +1,25 @@
 use indexmap::IndexMap;
-use ontol_hir::{
-    kind::{Attribute, Dimension, NodeKind, PropVariant},
-    Binder,
+use ontol_runtime::{
+    env::{Cardinality, PropertyCardinality, ValueCardinality},
+    smart_format,
+    value::PropertyId,
+    DefId, Role,
 };
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationId, Role};
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
-    def::{Cardinality, Def, DefKind, PropertyCardinality, ValueCardinality},
+    def::{Def, DefKind, LookupRelationshipMeta, MapDirection, RelParams},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
     relation::Constructor,
     type_check::{
-        hir_build_ctx::{Arm, ExplicitVariableArm},
+        hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
     },
-    typed_hir::{Meta, TypedHir, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode},
     types::{Type, TypeRef},
-    SourceSpan,
+    SourceSpan, NO_SPAN,
 };
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
@@ -30,7 +30,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         expr_id: ExprId,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let expr = self.expressions.map.remove(&expr_id).unwrap();
+        let expr = self.expressions.table.remove(&expr_id).unwrap();
 
         let node = self.build_node(
             &expr, // Don't pass inference types as the expected type:
@@ -38,14 +38,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         );
 
         // Save typing result for the final type unification:
-        match node.meta.ty {
+        match node.ty() {
             Type::Error | Type::Infer(_) => {}
             _ => {
                 let type_var = ctx.inference.new_type_variable(expr_id);
-                debug!("Check expr(2) root type result: {:?}", node.meta.ty);
+                debug!("Check expr(2) root type result: {:?}", node.ty());
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(type_var, UnifyValue::Known(node.meta.ty))
+                    .unify_var_value(type_var, UnifyValue::Known(node.ty()))
                     .unwrap();
             }
         }
@@ -61,7 +61,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypedHirNode<'m> {
         let node = match (&expr.kind, expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
-                match (self.defs.map.get(def_id), self.def_types.map.get(def_id)) {
+                match (
+                    self.defs.table.get(def_id),
+                    self.def_types.table.get(def_id),
+                ) {
                     (
                         Some(Def {
                             kind: DefKind::CoreFn(proc),
@@ -85,32 +88,48 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             parameters.push(node);
                         }
 
-                        TypedHirNode {
-                            kind: NodeKind::Call(*proc, parameters),
-                            meta: Meta {
+                        TypedHirNode(
+                            ontol_hir::Kind::Call(*proc, parameters),
+                            Meta {
                                 ty: output,
                                 span: expr.span,
                             },
-                        }
+                        )
                     }
                     _ => self.error_node(CompileError::NotCallable, &expr.span),
                 }
             }
-            (ExprKind::Struct(type_path, attributes), expected_ty) => {
-                let struct_node = self.build_struct(type_path, attributes, expr.span, ctx);
+            (
+                ExprKind::Struct {
+                    type_path: Some(type_path),
+                    attributes,
+                },
+                expected_ty,
+            ) => {
+                let struct_ty = self.check_def(type_path.def_id);
+                match struct_ty {
+                    Type::Domain(def_id) => {
+                        assert_eq!(*def_id, type_path.def_id);
+                    }
+                    _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
+                };
+                let struct_node =
+                    self.build_struct(type_path.def_id, struct_ty, attributes, expr.span, ctx);
+
+                let meta = *struct_node.meta();
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
-                    Some(Type::Option(Type::Domain(_))) => TypedHirNode {
-                        kind: struct_node.kind,
-                        meta: Meta {
-                            ty: self.types.intern(Type::Option(struct_node.meta.ty)),
-                            span: struct_node.meta.span,
+                    Some(Type::Option(Type::Domain(_))) => TypedHirNode(
+                        struct_node.into_kind(),
+                        Meta {
+                            ty: self.types.intern(Type::Option(meta.ty)),
+                            span: meta.span,
                         },
-                    },
+                    ),
                     Some(expected_ty) => self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
-                            actual: struct_node.meta.ty,
+                            actual: struct_node.meta().ty,
                             expected: expected_ty,
                         }),
                         &expr.span,
@@ -118,63 +137,105 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => struct_node,
                 }
             }
+            (
+                ExprKind::Struct {
+                    type_path: None,
+                    attributes,
+                },
+                Some(expected_struct_ty @ Type::Anonymous(def_id)),
+            ) => {
+                let actual_ty = self.check_def(*def_id);
+                if actual_ty != expected_struct_ty {
+                    return self.type_error_node(
+                        TypeError::Mismatch(TypeEquation {
+                            actual: actual_ty,
+                            expected: expected_struct_ty,
+                        }),
+                        &expr.span,
+                    );
+                }
+
+                self.build_struct(*def_id, actual_ty, attributes, expr.span, ctx)
+            }
+            (
+                ExprKind::Struct {
+                    type_path: None, ..
+                },
+                _,
+            ) => self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span),
             (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
-                let elem_ty = match expected_ty {
-                    Some(Type::Array(elem_ty)) => elem_ty,
+                let (rel_ty, val_ty) = match expected_ty {
+                    Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
                     Some(other_ty) => {
                         self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
-                        self.types.intern(Type::Error)
+                        (self.unit_type(), self.types.intern(Type::Error))
                     }
                     None => {
                         let expr_id = self.expressions.alloc_expr_id();
-
-                        let ty = self
+                        let val_ty = self
                             .types
                             .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
 
-                        debug!("Infer seq type: {ty:?}");
-                        ty
+                        debug!("Infer seq val type: {val_ty:?}");
+                        (self.unit_type(), val_ty)
                     }
                 };
 
-                let inner_node = self.build_node(inner, Some(elem_ty), ctx);
+                let inner_node = self.build_node(inner, Some(val_ty), ctx);
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
-                let array_ty = self.types.intern(Type::Array(elem_ty));
+                let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
-                TypedHirNode {
-                    kind: NodeKind::Seq(
+                TypedHirNode(
+                    ontol_hir::Kind::Seq(
                         label,
-                        Attribute {
+                        ontol_hir::Attribute {
                             rel: Box::new(self.unit_node_no_span()),
                             val: Box::new(inner_node),
                         },
                     ),
-                    meta: Meta {
-                        ty: array_ty,
+                    Meta {
+                        ty: seq_ty,
                         span: expr.span,
                     },
-                }
+                )
             }
-            (ExprKind::Constant(k), Some(expected_ty)) => {
+            (ExprKind::ConstI64(int), Some(expected_ty)) => {
                 if matches!(expected_ty, Type::Int(_)) {
-                    TypedHirNode {
-                        kind: NodeKind::Int(*k),
-                        meta: Meta {
+                    TypedHirNode(
+                        ontol_hir::Kind::Int(*int),
+                        Meta {
                             ty: expected_ty,
                             span: expr.span,
                         },
-                    }
-                } else {
-                    self.error_node(
-                        CompileError::TODO(smart_format!("Expected integer type")),
-                        &expr.span,
                     )
+                } else {
+                    self.error_node(CompileError::IncompatibleLiteral, &expr.span)
                 }
             }
+            (ExprKind::ConstString(string), Some(expected_ty)) => match expected_ty {
+                Type::String(_) => TypedHirNode(
+                    ontol_hir::Kind::String(string.clone()),
+                    Meta {
+                        ty: expected_ty,
+                        span: expr.span,
+                    },
+                ),
+                Type::StringConstant(def_id) => match self.defs.get_def_kind(*def_id) {
+                    Some(DefKind::StringLiteral(lit)) if string == lit => TypedHirNode(
+                        ontol_hir::Kind::String(string.clone()),
+                        Meta {
+                            ty: expected_ty,
+                            span: expr.span,
+                        },
+                    ),
+                    _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                },
+                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+            },
             (ExprKind::Variable(expr_id), expected_ty) => {
                 let arm = ctx.arm;
                 let explicit_variable = ctx
-                    .explicit_variables
+                    .expr_variables
                     .get_mut(expr_id)
                     .expect("variable not found");
 
@@ -196,19 +257,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let type_var = ctx.inference.new_type_variable(arm_expr_id);
 
                 match expected_ty {
-                    Some(Type::Array(elem_ty)) => self.type_error_node(
-                        TypeError::VariableMustBeSequenceEnclosed(elem_ty),
+                    Some(Type::Seq(_rel_ty, val_ty)) => self.type_error_node(
+                        TypeError::VariableMustBeSequenceEnclosed(val_ty),
                         &expr.span,
                     ),
                     Some(expected_ty) => {
                         let variable = explicit_variable.variable;
-                        let variable_ref = TypedHirNode {
-                            kind: NodeKind::VariableRef(variable),
-                            meta: Meta {
+                        let variable_ref = TypedHirNode(
+                            ontol_hir::Kind::Var(variable),
+                            Meta {
                                 ty: expected_ty,
                                 span: expr.span,
                             },
-                        };
+                        );
 
                         match ctx
                             .inference
@@ -243,14 +304,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
         };
 
-        debug!("expected/meta: {:?} {:?}", expected_ty, node.meta.ty);
+        debug!("expected/meta: {:?} {:?}", expected_ty, node.ty());
 
-        match (expected_ty, node.meta.ty) {
+        match (expected_ty, node.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some(Type::Infer(type_var)), _) => {
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(*type_var, UnifyValue::Known(node.meta.ty))
+                    .unify_var_value(*type_var, UnifyValue::Known(node.ty()))
                     .unwrap();
             }
             _ => {}
@@ -261,57 +322,68 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct(
         &mut self,
-        type_path: &TypePath,
+        struct_def_id: DefId,
+        struct_ty: TypeRef<'m>,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let domain_type = self.check_def(type_path.def_id);
-        let subject_id = match domain_type {
-            Type::Domain(subject_id) => subject_id,
-            _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
-        };
+        struct MatchProperty {
+            property_id: PropertyId,
+            cardinality: Cardinality,
+            rel_params_def: Option<DefId>,
+            value_def: DefId,
+            used: bool,
+        }
 
-        let properties = self.relations.properties_by_type(type_path.def_id);
+        let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let node_kind = match properties.map(|props| &props.constructor) {
             Some(Constructor::Struct) | None => {
-                match properties.and_then(|props| props.map.as_ref()) {
+                match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = Binder(ctx.alloc_variable());
+                        let struct_binder = TypedBinder {
+                            var: ctx.var_allocator.alloc(),
+                            ty: struct_ty,
+                        };
 
-                        struct MatchProperty {
-                            relation_id: RelationId,
-                            cardinality: Cardinality,
-                            object_def: DefId,
-                            used: bool,
-                        }
                         let mut match_properties = property_set
                             .iter()
-                            .filter_map(|(property_id, _cardinality)| match property_id.role {
-                                Role::Subject => {
-                                    let meta = self
-                                        .property_meta_by_subject(
-                                            *subject_id,
-                                            property_id.relation_id,
-                                        )
-                                        .expect("BUG: problem getting property meta");
-                                    let property_name = meta
-                                        .relation
-                                        .subject_prop(self.defs)
-                                        .expect("BUG: Expected named subject property");
+                            .filter_map(|(property_id, _cardinality)| {
+                                let meta = self
+                                    .defs
+                                    .lookup_relationship_meta(property_id.relationship_id)
+                                    .expect("BUG: problem getting relationship meta");
+                                let property_name = match property_id.role {
+                                    Role::Subject => Some(
+                                        meta.relation
+                                            .subject_prop(self.defs)
+                                            .expect("BUG: Expected named subject property"),
+                                    ),
+                                    Role::Object => meta.relationship.object_prop,
+                                };
+                                let (_, _, owner_cardinality) =
+                                    meta.relationship.left_side(property_id.role);
+                                let (value_def_ref, _, _) =
+                                    meta.relationship.right_side(property_id.role);
 
-                                    Some((
+                                property_name.map(|property_name| {
+                                    (
                                         property_name,
                                         MatchProperty {
-                                            relation_id: property_id.relation_id,
-                                            cardinality: meta.relationship.subject_cardinality,
-                                            object_def: meta.relationship.object.0.def_id,
+                                            property_id: *property_id,
+                                            cardinality: owner_cardinality,
+                                            rel_params_def: match &meta.relationship.rel_params {
+                                                RelParams::Type(def_reference) => {
+                                                    Some(def_reference.def_id)
+                                                }
+                                                _ => None,
+                                            },
+                                            value_def: value_def_ref.def_id,
                                             used: false,
                                         },
-                                    ))
-                                }
-                                Role::Object => None,
+                                    )
+                                })
                             })
                             .collect::<IndexMap<_, _>>();
 
@@ -319,8 +391,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         for ExprStructAttr {
                             key: (def, prop_span),
+                            rel,
                             bind_option,
-                            expr,
+                            value,
                         } in attributes
                         {
                             let attr_prop = match self.defs.get_def_kind(def.def_id) {
@@ -343,105 +416,191 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                             match_property.used = true;
 
-                            let object_ty = self.check_def(match_property.object_def);
-                            debug!("object_ty: {object_ty:?}");
+                            let rel_params_ty = match match_property.rel_params_def {
+                                Some(rel_def_id) => self.check_def(rel_def_id),
+                                None => self.unit_type(),
+                            };
+                            debug!("rel_params_ty: {rel_params_ty:?}");
+
+                            let rel_node = match (rel_params_ty, rel) {
+                                (Type::Unit(_), Some(rel)) => self.error_node(
+                                    CompileError::NoRelationParametersExpected,
+                                    &rel.span,
+                                ),
+                                (ty @ Type::Unit(_), None) => TypedHirNode(
+                                    ontol_hir::Kind::Unit,
+                                    Meta {
+                                        ty,
+                                        span: *prop_span,
+                                    },
+                                ),
+                                (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
+                                (ty @ Type::Anonymous(def_id), None) => {
+                                    match self.relations.properties_by_def_id(*def_id) {
+                                        Some(_) => {
+                                            self.build_implicit_rel_node(ty, value, *prop_span, ctx)
+                                        }
+                                        // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
+                                        None => TypedHirNode(
+                                            ontol_hir::Kind::Unit,
+                                            Meta {
+                                                ty,
+                                                span: *prop_span,
+                                            },
+                                        ),
+                                    }
+                                }
+                                (ty, None) => {
+                                    self.build_implicit_rel_node(ty, value, *prop_span, ctx)
+                                }
+                            };
+
+                            let value_ty = self.check_def(match_property.value_def);
+                            debug!("value_ty: {value_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let node = self.build_node(expr, Some(object_ty), ctx);
-                                    PropVariant::Present {
-                                        dimension: Dimension::Singular,
-                                        attr: Attribute {
-                                            rel: Box::new(self.unit_node_no_span()),
-                                            val: Box::new(node),
+                                    let val_node = self.build_node(value, Some(value_ty), ctx);
+                                    ontol_hir::PropVariant {
+                                        dimension: ontol_hir::AttrDimension::Singular,
+                                        attr: ontol_hir::Attribute {
+                                            rel: Box::new(rel_node),
+                                            val: Box::new(val_node),
                                         },
                                     }
                                 }
-                                ValueCardinality::Many => match &expr.kind {
-                                    ExprKind::Seq(aggr_expr_id, inner) => {
-                                        let node = self.build_node(inner, Some(object_ty), ctx);
+                                ValueCardinality::Many => match &value.kind {
+                                    ExprKind::Seq(aggr_expr_id, value) => {
+                                        let val_node = self.build_node(value, Some(value_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
-                                        PropVariant::Present {
-                                            dimension: Dimension::Seq(label),
-                                            attr: Attribute {
-                                                rel: Box::new(self.unit_node_no_span()),
-                                                val: Box::new(node),
+                                        ontol_hir::PropVariant {
+                                            dimension: ontol_hir::AttrDimension::Seq(
+                                                label,
+                                                ontol_hir::HasDefault(matches!(
+                                                    match_property.property_id.role,
+                                                    Role::Object
+                                                )),
+                                            ),
+                                            attr: ontol_hir::Attribute {
+                                                rel: Box::new(rel_node),
+                                                val: Box::new(val_node),
                                             },
                                         }
                                     }
                                     _ => {
                                         self.type_error(
-                                            TypeError::VariableMustBeSequenceEnclosed(object_ty),
-                                            &expr.span,
+                                            TypeError::VariableMustBeSequenceEnclosed(value_ty),
+                                            &value.span,
                                         );
                                         continue;
                                     }
                                 },
                             };
 
-                            let prop_variants: Vec<PropVariant<'_, TypedHir>> =
+                            let optional = ontol_hir::Optional(matches!(
+                                match_property.cardinality.0,
+                                PropertyCardinality::Optional
+                            ));
+
+                            let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
                                 match match_property.cardinality.0 {
                                     PropertyCardinality::Mandatory => {
                                         vec![prop_variant]
                                     }
                                     PropertyCardinality::Optional => {
                                         if *bind_option {
-                                            vec![prop_variant, PropVariant::Absent]
+                                            vec![prop_variant]
                                         } else {
                                             ctx.partial = true;
-                                            panic!("partial unification");
+                                            self.error(
+                                                CompileError::TODO(
+                                                    "required to be optional?".into(),
+                                                ),
+                                                &value.span,
+                                            );
+                                            vec![]
                                         }
                                     }
                                 };
 
-                            hir_props.push(TypedHirNode {
-                                kind: NodeKind::Prop(
-                                    struct_binder.0,
-                                    PropertyId::subject(match_property.relation_id),
+                            hir_props.push(TypedHirNode(
+                                ontol_hir::Kind::Prop(
+                                    optional,
+                                    struct_binder.var,
+                                    match_property.property_id,
                                     prop_variants,
                                 ),
-                                meta: Meta {
+                                Meta {
                                     ty: self.types.intern(Type::Unit(DefId::unit())),
                                     span: *prop_span,
                                 },
-                            });
+                            ));
                         }
 
-                        for (prop_name, match_property) in match_properties.into_iter() {
-                            if !match_property.used {
-                                self.error(CompileError::MissingProperty(prop_name.into()), &span);
+                        match (ctx.arm, ctx.direction) {
+                            (Arm::First, MapDirection::Forwards) => {
+                                // It's OK to not specify all properties here
+                            }
+                            _ => {
+                                for (name, match_property) in match_properties {
+                                    if !match_property.used
+                                        && !matches!(match_property.property_id.role, Role::Object)
+                                    {
+                                        ctx.missing_properties
+                                            .entry(ctx.arm)
+                                            .or_default()
+                                            .entry(span)
+                                            .or_default()
+                                            .push(name.into());
+                                    }
+                                }
                             }
                         }
 
-                        NodeKind::Struct(struct_binder, hir_props)
+                        ontol_hir::Kind::Struct(struct_binder, hir_props)
                     }
                     None => {
                         if !attributes.is_empty() {
                             return self.error_node(CompileError::NoPropertiesExpected, &span);
                         }
-                        NodeKind::Unit
+                        ontol_hir::Kind::Unit
                     }
                 }
             }
             Some(Constructor::Value(relationship_id, _, _)) => {
-                let mut attributes = attributes.iter();
-                match attributes.next() {
-                    Some(ExprStructAttr {
-                        key: (def, _),
-                        bind_option: _,
-                        expr: value,
-                    }) if def.def_id == DefId::unit() => {
-                        let meta = self
-                            .get_relationship_meta(*relationship_id)
-                            .expect("BUG: problem getting anonymous property meta");
+                let meta = self
+                    .defs
+                    .lookup_relationship_meta(*relationship_id)
+                    .expect("BUG: problem getting anonymous relationship meta");
 
-                        let object_ty = self.check_def(meta.relationship.object.0.def_id);
-                        let inner_node = self.build_node(value, Some(object_ty), ctx);
+                let value_object_ty = self.check_def(meta.relationship.object.0.def_id);
+                debug!("value_object_ty: {value_object_ty:?}");
 
-                        inner_node.kind
+                match value_object_ty {
+                    Type::Domain(def_id) => {
+                        return self.build_struct(*def_id, value_object_ty, attributes, span, ctx);
                     }
-                    _ => return self.error_node(CompileError::AnonymousPropertyExpected, &span),
+                    _ => {
+                        let mut attributes = attributes.iter();
+                        match attributes.next() {
+                            Some(ExprStructAttr {
+                                key: (def, _),
+                                rel: _,
+                                bind_option: _,
+                                value,
+                            }) if def.def_id == DefId::unit() => {
+                                let object_ty = self.check_def(meta.relationship.object.0.def_id);
+                                let inner_node = self.build_node(value, Some(object_ty), ctx);
+
+                                inner_node.into_kind()
+                            }
+                            _ => {
+                                return self
+                                    .error_node(CompileError::ExpectedExpressionAttribute, &span);
+                            }
+                        }
+                    }
                 }
             }
             Some(Constructor::Intersection(_)) => {
@@ -454,14 +613,55 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Some(Constructor::StringFmt(_)) => todo!(),
         };
 
-        debug!("Struct type: {domain_type:?}");
+        debug!("Struct type: {struct_ty:?}");
 
-        TypedHirNode {
-            kind: node_kind,
-            meta: Meta {
-                ty: domain_type,
+        TypedHirNode(
+            node_kind,
+            Meta {
+                ty: struct_ty,
                 span,
             },
+        )
+    }
+
+    fn build_implicit_rel_node(
+        &mut self,
+        ty: TypeRef<'m>,
+        object: &Expr,
+        prop_span: SourceSpan,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> TypedHirNode<'m> {
+        match &object.kind {
+            ExprKind::Variable(object_expr_id) => {
+                // implicit mapping; for now the object needs to be a variable
+                let edge_expr_id = ctx
+                    .object_to_edge_expr_id
+                    .entry(*object_expr_id)
+                    .or_insert_with(|| {
+                        let edge_expr_id = self.expressions.alloc_expr_id();
+                        ctx.expr_variables.insert(
+                            edge_expr_id,
+                            ExpressionVariable {
+                                variable: ctx.var_allocator.alloc(),
+                                ctrl_group: None,
+                                hir_arms: Default::default(),
+                            },
+                        );
+                        edge_expr_id
+                    });
+
+                self.build_node(
+                    &Expr {
+                        id: *edge_expr_id,
+                        kind: ExprKind::Variable(*edge_expr_id),
+                        span: prop_span,
+                    },
+                    Some(ty),
+                    ctx,
+                )
+            }
+            ExprKind::Seq(_, expr) => self.build_implicit_rel_node(ty, expr, prop_span, ctx),
+            _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
         }
     }
 
@@ -476,22 +676,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn make_error_node(&mut self, span: &SourceSpan) -> TypedHirNode<'m> {
-        TypedHirNode {
-            kind: NodeKind::Unit,
-            meta: Meta {
+        TypedHirNode(
+            ontol_hir::Kind::Unit,
+            Meta {
                 ty: self.types.intern(Type::Error),
                 span: *span,
             },
-        }
+        )
     }
 
     fn unit_node_no_span(&mut self) -> TypedHirNode<'m> {
-        TypedHirNode {
-            kind: NodeKind::Unit,
-            meta: Meta {
+        TypedHirNode(
+            ontol_hir::Kind::Unit,
+            Meta {
                 ty: self.types.intern(Type::Unit(DefId::unit())),
-                span: SourceSpan::none(),
+                span: NO_SPAN,
             },
-        }
+        )
+    }
+
+    fn unit_type(&mut self) -> TypeRef<'m> {
+        self.types.intern(Type::Unit(DefId::unit()))
     }
 }

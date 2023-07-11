@@ -10,7 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, Compiler, SourceSpan,
+    CompileErrors, Compiler, SourceSpan, SpannedCompileError, SpannedNote,
 };
 
 pub mod check_def;
@@ -26,13 +26,14 @@ mod hir_type_inference;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {
+    // Another error is the cause of this error
+    Propagated,
     Mismatch(TypeEquation<'m>),
     MustBeSequence(TypeRef<'m>),
     VariableMustBeSequenceEnclosed(TypeRef<'m>),
     NotEnoughInformation,
-    // Another error is the cause of this error
-    Propagated,
     NotConvertibleFromNumber(TypeRef<'m>),
+    NoRelationParametersExpected,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,12 +60,26 @@ pub struct TypeCheck<'c, 'm> {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
-        self.errors.push(error.spanned(span));
+        self.error_with_notes(error, span, vec![])
+    }
+
+    fn error_with_notes(
+        &mut self,
+        error: CompileError,
+        span: &SourceSpan,
+        notes: Vec<SpannedNote>,
+    ) -> TypeRef<'m> {
+        self.errors.push(SpannedCompileError {
+            error,
+            span: *span,
+            notes,
+        });
         self.types.intern(Type::Error)
     }
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
         match error {
+            TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::Mismatch(equation) => self.error(
                 CompileError::TypeMismatch {
                     actual: smart_format!(
@@ -96,7 +111,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::TODO(smart_format!("Not enough information to infer type")),
                 span,
             ),
-            TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::NotConvertibleFromNumber(ty) => self.error(
                 CompileError::TODO(smart_format!(
                     "Type {} cannot be represented as a number",
@@ -104,6 +118,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )),
                 span,
             ),
+            TypeError::NoRelationParametersExpected => {
+                self.error(CompileError::NoRelationParametersExpected, span)
+            }
         }
     }
 }

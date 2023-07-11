@@ -57,9 +57,8 @@ pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub subject: Spanned<Option<Type>>,
-    pub relation: Relation,
+    pub relations: Vec<Relation>,
     pub object: Spanned<Option<TypeOrPattern>>,
-    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -75,6 +74,7 @@ pub struct Relation {
     pub ty: RelType,
     pub subject_cardinality: Option<Cardinality>,
     pub object_prop_ident: Option<Spanned<String>>,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
     pub object_cardinality: Option<Cardinality>,
 }
 
@@ -93,14 +93,15 @@ pub enum Cardinality {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct RelChain {
-    pub subject: Option<Spanned<Type>>,
-    pub connection: Relation,
+pub enum MapDirection {
+    Omni,
+    Forward,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
     pub kw: Span,
+    pub direction: MapDirection,
     pub first: Spanned<(UnitOrSeq, MapArm)>,
     pub second: Spanned<(UnitOrSeq, MapArm)>,
 }
@@ -122,7 +123,7 @@ pub enum Pattern {
     Struct(Spanned<(UnitOrSeq, StructPattern)>),
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum UnitOrSeq {
     Unit,
     Seq,
@@ -137,8 +138,8 @@ pub struct StructPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
+    pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
     pub option: Option<Spanned<()>>,
-    pub relation_struct: Option<Spanned<StructPattern>>,
     pub object: Spanned<Pattern>,
 }
 
@@ -164,6 +165,7 @@ pub enum TypeOrPattern {
 pub enum Type {
     Unit,
     Path(Path, Option<Spanned<Vec<Spanned<TypeParamPattern>>>>),
+    AnonymousStruct(Spanned<Vec<Spanned<Statement>>>),
     NumberLiteral(String),
     StringLiteral(String),
     Regex(String),

@@ -1,26 +1,23 @@
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
+    query::{Query, StructQuery},
     serde::operator::SerdeOperatorId,
     serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
-    DefId,
+    DefId, PackageId,
 };
 use serde::de::DeserializeSeed;
-use tracing::{debug, error};
+use tracing::{debug, trace, warn};
 
-use crate::TestEnv;
+use crate::{serde_utils::create_de, TestEnv};
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
-///
-/// Currently we can't run these in the test suite because of missing implementation in the validator:
-/// https://github.com/Stranger6667/jsonschema-rs/issues/288
-const TEST_JSON_SCHEMA_VALIDATION: bool = false;
+pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
@@ -29,9 +26,27 @@ pub struct TypeBinding<'e> {
 }
 
 impl<'e> TypeBinding<'e> {
+    pub fn new_n<const N: usize>(test_env: &'e TestEnv, type_names: [&str; N]) -> [Self; N] {
+        type_names.map(|type_name| Self::new(test_env, type_name))
+    }
+
+    /// Make a type binding with the given type name.
+    /// The type name may be written as "SourceName::Type" to specify a specific domain.
     pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
+        if type_name.contains("::") {
+            let vector: Vec<&str> = type_name.split("::").collect();
+            let source_name = vector.first().unwrap();
+            let type_name = vector.get(1).unwrap();
+
+            Self::new_with_package(test_env, test_env.get_package_id(source_name), type_name)
+        } else {
+            Self::new_with_package(test_env, test_env.root_package, type_name)
+        }
+    }
+
+    pub fn new_with_package(test_env: &'e TestEnv, package_id: PackageId, type_name: &str) -> Self {
         let env = &test_env.env;
-        let domain = env.find_domain(test_env.root_package).unwrap();
+        let domain = env.find_domain(package_id).unwrap();
         let def_id = domain
             .type_names
             .get(type_name)
@@ -39,21 +54,20 @@ impl<'e> TypeBinding<'e> {
         let type_info = domain.type_info(*def_id).clone();
 
         if !type_info.public {
-            panic!("`{:?}` is not public!", type_info.name);
+            warn!("`{:?}` is not public!", type_info.name);
         }
 
-        debug!(
+        trace!(
             "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
             operator_id = type_info.operator_id,
             processor = type_info.operator_id.map(|id| env.new_serde_processor(
                 id,
-                None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root
+                ProcessorLevel::new_root()
             ))
         );
 
-        let json_schema = if test_env.test_json_schema {
+        let json_schema = if test_env.compile_json_schema {
             Some(compile_json_schema(env, &type_info))
         } else {
             None
@@ -62,6 +76,14 @@ impl<'e> TypeBinding<'e> {
         Self {
             type_info,
             json_schema,
+            env,
+        }
+    }
+
+    pub fn from_def_id(def_id: DefId, env: &'e Env) -> Self {
+        Self {
+            type_info: env.get_type_info(def_id).clone(),
+            json_schema: None,
             env,
         }
     }
@@ -95,7 +117,25 @@ impl<'e> TypeBinding<'e> {
         .data(data)
     }
 
-    fn serde_operator_id(&self) -> SerdeOperatorId {
+    pub fn def_id(&self) -> DefId {
+        self.type_info.def_id
+    }
+
+    pub fn struct_query(
+        &self,
+        properties: impl IntoIterator<Item = (&'static str, Query)>,
+    ) -> StructQuery {
+        StructQuery {
+            def_id: self.type_info.def_id,
+            properties: FnvHashMap::from_iter(
+                properties
+                    .into_iter()
+                    .map(|(prop_name, query)| (self.find_property(prop_name).unwrap(), query)),
+            ),
+        }
+    }
+
+    pub fn serde_operator_id(&self) -> SerdeOperatorId {
         self.type_info.operator_id.expect("No serde operator id")
     }
 
@@ -103,116 +143,19 @@ impl<'e> TypeBinding<'e> {
         self.env
             .new_serde_processor(
                 self.serde_operator_id(),
-                None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .find_property(prop)
     }
 
-    pub fn deserialize_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.type_info.def_id);
-        Ok(value.data)
+    pub fn json_schema(&self) -> Option<&JSONSchema> {
+        self.json_schema.as_ref()
     }
 
-    pub fn deserialize_data_map(
-        &self,
-        json: serde_json::Value,
-    ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_eq!(value.type_def_id, self.type_info.def_id);
-        match value.data {
-            Data::Struct(attrs) => Ok(attrs),
-            other => panic!("not a map: {other:?}"),
-        }
-    }
-
-    /// Deserialize data, but expect that the resulting type DefId
-    /// is not the same as the nominal one for the TypeBinding.
-    /// (i.e. it should deserialize to a _variant_ of the type)
-    pub fn deserialize_data_variant(
-        &self,
-        json: serde_json::Value,
-    ) -> Result<Data, serde_json::Error> {
-        let value = self.deserialize_value(json)?;
-        assert_ne!(value.type_def_id, self.type_info.def_id);
-        Ok(value.data)
-    }
-
-    pub fn deserialize_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let json_string = serde_json::to_string(&json).unwrap();
-
-        let attribute_result = self
-            .env
-            .new_serde_processor(
-                self.serde_operator_id(),
-                None,
-                ProcessorMode::Create,
-                ProcessorLevel::Root,
-            )
-            .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
-
-        match self.json_schema.as_ref() {
-            Some(json_schema) if TEST_JSON_SCHEMA_VALIDATION => {
-                let json_schema_result = json_schema.validate(&json);
-
-                match (attribute_result, json_schema_result) {
-                    (Ok(Attribute { value, rel_params }), Ok(())) => {
-                        assert_eq!(rel_params.type_def_id, DefId::unit());
-
-                        Ok(value)
-                    }
-                    (Err(json_error), Err(_)) => Err(json_error),
-                    (Ok(_), Err(validation_errors)) => {
-                        for error in validation_errors {
-                            error!("JSON schema error: {error}");
-                        }
-                        panic!("BUG: JSON schema did not accept input {json_string}");
-                    }
-                    (Err(json_error), Ok(())) => {
-                        panic!(
-                            "BUG: Deserializer did not accept input, but JSONSchema did: {json_error:?}. input={json_string}"
-                        );
-                    }
-                }
-            }
-            _ => attribute_result.map(|Attribute { value, rel_params }| {
-                assert_eq!(rel_params.type_def_id, DefId::unit());
-
-                value
-            }),
-        }
-    }
-
-    pub fn serialize_data_json(&self, data: &Data) -> serde_json::Value {
-        self.serialize_identity_json(&Value::new(data.clone(), self.type_info.def_id))
-    }
-
-    pub fn serialize_identity_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, false)
-    }
-
-    pub fn serialize_dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, true)
-    }
-
-    fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
-        let mut buf: Vec<u8> = vec![];
-        self.env
-            .new_serde_processor(
-                if dynamic_seq {
-                    self.env.dynamic_sequence_operator_id()
-                } else {
-                    self.serde_operator_id()
-                },
-                None,
-                ProcessorMode::Create,
-                ProcessorLevel::Root,
-            )
-            .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
-            .expect("serialization failed");
-        serde_json::from_slice(&buf).unwrap()
+    pub fn new_json_schema(&self, processor_mode: ProcessorMode) -> serde_json::Value {
+        let schema = build_standalone_schema(self.env, &self.type_info, processor_mode).unwrap();
+        serde_json::to_value(schema).unwrap()
     }
 }
 
@@ -263,7 +206,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
-        let value = self.binding.deserialize_value(json).unwrap();
+        let value = create_de(self.binding).value(json).unwrap();
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {
                 self.value = value;
@@ -294,16 +237,15 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
             .env
             .new_serde_processor(
                 entity_info.id_operator_id,
-                None,
                 ProcessorMode::Create,
-                ProcessorLevel::Root,
+                ProcessorLevel::new_root(),
             )
             .deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&json).unwrap(),
             ))
             .unwrap();
 
-        self.merge_attribute(PropertyId::subject(entity_info.id_relation_id), id)
+        self.merge_attribute(PropertyId::subject(entity_info.id_relationship_id), id)
     }
 
     fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {

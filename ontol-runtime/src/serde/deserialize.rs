@@ -12,6 +12,7 @@ use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
+    value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
     DefId,
 };
@@ -23,7 +24,7 @@ use super::{
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
-    processor::SerdeProcessor,
+    processor::{ProcessorMode, RecursionLimitError, SerdeProcessor, SubProcessorContext},
     SerdeOperatorId, StructOperator,
 };
 
@@ -48,7 +49,7 @@ struct StructVisitor<'e> {
     processor: SerdeProcessor<'e>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     struct_op: &'e StructOperator,
-    rel_params_operator_id: Option<SerdeOperatorId>,
+    ctx: SubProcessorContext,
 }
 
 #[derive(Clone, Copy)]
@@ -61,16 +62,22 @@ struct SpecialOperatorIds<'s> {
 struct PropertySet<'s> {
     properties: &'s IndexMap<String, SerdeProperty>,
     special_operator_ids: SpecialOperatorIds<'s>,
+    processor_mode: ProcessorMode,
+    parent_property_id: Option<PropertyId>,
 }
 
 impl<'s> PropertySet<'s> {
     fn new(
         properties: &'s IndexMap<String, SerdeProperty>,
         special_operator_ids: SpecialOperatorIds<'s>,
+        processor_mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
     ) -> Self {
         Self {
             properties,
             special_operator_ids,
+            processor_mode,
+            parent_property_id,
         }
     }
 }
@@ -78,7 +85,7 @@ impl<'s> PropertySet<'s> {
 impl<'e> SerdeProcessor<'e> {
     fn assert_no_rel_params(&self) {
         assert!(
-            self.rel_params_operator_id.is_none(),
+            self.ctx.rel_params_operator_id.is_none(),
             "rel_params_operator_id should be None for {:?}",
             self.value_operator
         );
@@ -164,20 +171,12 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 Err(Error::custom("Cannot deserialize dynamic sequence"))
             }
             SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
-                SequenceMatcher::new(
-                    &seq_op.ranges,
-                    seq_op.def_variant.def_id,
-                    self.rel_params_operator_id,
-                )
-                .into_visitor(self),
+                SequenceMatcher::new(&seq_op.ranges, seq_op.def_variant.def_id, self.ctx)
+                    .into_visitor(self),
             ),
             SerdeOperator::ConstructorSequence(seq_op) => deserializer.deserialize_seq(
-                SequenceMatcher::new(
-                    &seq_op.ranges,
-                    seq_op.def_variant.def_id,
-                    self.rel_params_operator_id,
-                )
-                .into_visitor(self),
+                SequenceMatcher::new(&seq_op.ranges, seq_op.def_variant.def_id, self.ctx)
+                    .into_visitor(self),
             ),
             SerdeOperator::ValueType(value_op) => {
                 let mut typed_attribute = self
@@ -192,12 +191,12 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 FilteredVariants::Single(operator_id) => {
                     self.narrow(operator_id).deserialize(deserializer)
                 }
-                FilteredVariants::Multi(variants) => deserializer.deserialize_any(
+                FilteredVariants::Union(variants) => deserializer.deserialize_any(
                     UnionMatcher {
                         typename: union_op.typename(),
                         variants,
-                        rel_params_operator_id: self.rel_params_operator_id,
                         env: self.env,
+                        ctx: self.ctx,
                         mode: self.mode,
                         level: self.level,
                     }
@@ -213,7 +212,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 processor: self,
                 buffered_attrs: Default::default(),
                 struct_op,
-                rel_params_operator_id: self.rel_params_operator_id,
+                ctx: self.ctx,
             }),
         }
     }
@@ -289,10 +288,9 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
-                Some(element_match) => self.processor.narrow_with_rel(
-                    element_match.element_operator_id,
-                    element_match.rel_params_operator_id,
-                ),
+                Some(element_match) => self
+                    .processor
+                    .narrow_with_context(element_match.element_operator_id, element_match.ctx),
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
@@ -373,7 +371,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,
-                rel_params_operator_id: map_match.rel_params_operator_id,
+                ctx: map_match.ctx,
             }
             .visit_map(map),
             MapMatchKind::IdType(name, serde_operator_id) => {
@@ -384,7 +382,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
                     &IndexMap::default(),
                     0,
                     SpecialOperatorIds {
-                        rel_params: map_match.rel_params_operator_id,
+                        rel_params: map_match.ctx.rel_params_operator_id,
                         id: Some((name, serde_operator_id)),
                     },
                 )?;
@@ -415,9 +413,10 @@ impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
             map,
             self.buffered_attrs,
             &self.struct_op.properties,
-            self.struct_op.n_mandatory_properties,
+            self.struct_op
+                .required_count(self.processor.mode, self.processor.ctx.parent_property_id),
             SpecialOperatorIds {
-                rel_params: self.rel_params_operator_id,
+                rel_params: self.ctx.rel_params_operator_id,
                 id: None,
             },
         )?;
@@ -436,21 +435,29 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
-    expected_mandatory_properties: usize,
+    expected_required_count: usize,
     special_operator_ids: SpecialOperatorIds,
 ) -> Result<DeserializedMap, A::Error> {
     let mut attributes = BTreeMap::new();
     let mut rel_params = Value::unit();
     let mut id = None;
 
-    let mut n_mandatory_properties = 0;
+    let mut observed_required_count = 0;
 
     // first parse buffered attributes, if any
     for (serde_key, serde_value) in buffered_attrs {
-        match PropertySet::new(properties, special_operator_ids).visit_str(&serde_key)? {
+        match PropertySet::new(
+            properties,
+            special_operator_ids,
+            processor.mode,
+            processor.ctx.parent_property_id,
+        )
+        .visit_str(&serde_key)?
+        {
             MapKey::RelParams(operator_id) => {
                 let Attribute { value, .. } = processor
                     .new_child(operator_id)
+                    .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
@@ -458,19 +465,24 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
             MapKey::Id(operator_id) => {
                 let Attribute { value, .. } = processor
                     .new_child(operator_id)
+                    .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
                 let Attribute { rel_params, value } = processor
-                    .new_child_with_rel(
+                    .new_child_with_context(
                         serde_property.value_operator_id,
-                        serde_property.rel_params_operator_id,
+                        SubProcessorContext {
+                            parent_property_id: Some(serde_property.property_id),
+                            rel_params_operator_id: serde_property.rel_params_operator_id,
+                        },
                     )
+                    .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                if !serde_property.optional {
-                    n_mandatory_properties += 1;
+                if !serde_property.is_optional() {
+                    observed_required_count += 1;
                 }
 
                 attributes.insert(serde_property.property_id, Attribute { rel_params, value });
@@ -479,30 +491,46 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
     }
 
     // parse rest of map
-    while let Some(map_key) =
-        map.next_key_seed(PropertySet::new(properties, special_operator_ids))?
-    {
+    while let Some(map_key) = map.next_key_seed(PropertySet::new(
+        properties,
+        special_operator_ids,
+        processor.mode,
+        processor.ctx.parent_property_id,
+    ))? {
         match map_key {
             MapKey::RelParams(operator_id) => {
-                let Attribute { value, .. } =
-                    map.next_value_seed(processor.new_child(operator_id))?;
+                let Attribute { value, .. } = map.next_value_seed(
+                    processor
+                        .new_child(operator_id)
+                        .map_err(RecursionLimitError::to_de_error)?,
+                )?;
 
                 rel_params = value;
             }
             MapKey::Id(operator_id) => {
-                let Attribute { value, .. } =
-                    map.next_value_seed(processor.new_child(operator_id))?;
+                let Attribute { value, .. } = map.next_value_seed(
+                    processor
+                        .new_child(operator_id)
+                        .map_err(RecursionLimitError::to_de_error)?,
+                )?;
 
                 id = Some(value);
             }
             MapKey::Property(serde_property) => {
-                let attribute = map.next_value_seed(processor.new_child_with_rel(
-                    serde_property.value_operator_id,
-                    serde_property.rel_params_operator_id,
-                ))?;
+                let attribute = map.next_value_seed(
+                    processor
+                        .new_child_with_context(
+                            serde_property.value_operator_id,
+                            SubProcessorContext {
+                                parent_property_id: Some(serde_property.property_id),
+                                rel_params_operator_id: serde_property.rel_params_operator_id,
+                            },
+                        )
+                        .map_err(RecursionLimitError::to_de_error)?,
+                )?;
 
-                if !serde_property.optional {
-                    n_mandatory_properties += 1;
+                if !serde_property.is_optional() {
+                    observed_required_count += 1;
                 }
 
                 attributes.insert(serde_property.property_id, attribute);
@@ -510,14 +538,15 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         }
     }
 
-    if n_mandatory_properties < expected_mandatory_properties {
+    if observed_required_count < expected_required_count {
         // Generate default values if missing
         for (_, property) in properties {
-            if let Some(default_const_proc_address) = property.default_const_proc_address {
-                if !property.optional && !attributes.contains_key(&property.property_id) {
+            // Only _default values_ are handled in the deserializer:
+            if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
+                if !property.is_optional() && !attributes.contains_key(&property.property_id) {
                     let value = processor.env.new_vm().eval(
                         Procedure {
-                            address: default_const_proc_address,
+                            address,
                             n_params: NParams(0),
                         },
                         [],
@@ -525,34 +554,44 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());
-                    n_mandatory_properties += 1;
+                    observed_required_count += 1;
                 }
             }
         }
     }
 
-    if n_mandatory_properties < expected_mandatory_properties
+    if observed_required_count < expected_required_count
         || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
     {
         debug!(
-            "Missing attributes. Rel params match: {}, {}",
+            "Missing attributes. Rel params match: {}, special_rel: {} parent_relationship: {:?}",
             rel_params.is_unit(),
-            special_operator_ids.rel_params.is_none()
+            special_operator_ids.rel_params.is_none(),
+            processor.ctx.parent_property_id,
         );
         for attr in &attributes {
             debug!("    attr {:?}", attr.0);
         }
         for prop in properties {
             debug!(
-                "    prop {:?} '{}' optional={}",
-                prop.1.property_id, prop.0, prop.1.optional
+                "    prop {:?} '{}' visible={} optional={}",
+                prop.1.property_id,
+                prop.0,
+                prop.1
+                    .filter(processor.mode, processor.ctx.parent_property_id)
+                    .is_some(),
+                prop.1.is_optional()
             );
         }
 
         let mut items: Vec<DoubleQuote<String>> = properties
             .iter()
             .filter(|(_, property)| {
-                !property.optional && !attributes.contains_key(&property.property_id)
+                property
+                    .filter(processor.mode, processor.ctx.parent_property_id)
+                    .is_some()
+                    && !property.is_optional()
+                    && !attributes.contains_key(&property.property_id)
             })
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
@@ -568,7 +607,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
             logic_op: LogicOp::And,
         };
 
-        return Err(Error::custom(format!(
+        return Err(serde::de::Error::custom(format!(
             "missing properties, expected {missing_keys}"
         )));
     }
@@ -611,13 +650,25 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
                     }
                 }
 
-                match self.properties.get(v) {
-                    Some(serde_property) => Ok(MapKey::Property(*serde_property)),
-                    None => {
-                        // TODO: This error message could be improved to suggest valid fields.
-                        // see OneOf in serde (this is a private struct)
-                        Err(Error::custom(format!("unknown property `{v}`")))
-                    }
+                let serde_property = self.properties.get(v).ok_or_else(|| {
+                    // TODO: This error message could be improved to suggest valid fields.
+                    // see OneOf in serde (this is a private struct)
+                    Error::custom(format!("unknown property `{v}`"))
+                })?;
+
+                if serde_property
+                    .filter(self.processor_mode, self.parent_property_id)
+                    .is_some()
+                {
+                    Ok(MapKey::Property(*serde_property))
+                } else if serde_property.is_read_only()
+                    && !matches!(self.processor_mode, ProcessorMode::Read)
+                {
+                    Err(Error::custom(format!("property `{v}` is read-only")))
+                } else {
+                    Err(Error::custom(format!(
+                        "property `{v}` not available in this context"
+                    )))
                 }
             }
         }

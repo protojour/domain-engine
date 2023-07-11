@@ -1,42 +1,47 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
-use ontol_runtime::{discriminator::UnionDiscriminator, value::PropertyId, DefId, RelationId};
+use ontol_runtime::{
+    discriminator::UnionDiscriminator, env::Cardinality, value::PropertyId,
+    value_generator::ValueGenerator, DefId, RelationshipId,
+};
 
-use crate::{def::Cardinality, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
-
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct RelationshipId(pub DefId);
+use crate::{def::RelationId, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
 
 #[derive(Default, Debug)]
 pub struct Relations {
     pub relations: FnvHashMap<DefId, RelationId>,
-    pub properties_by_type: FnvHashMap<DefId, Properties>,
-    pub relationships_by_subject: FnvHashMap<(DefId, RelationId), RelationshipId>,
-    pub relationships_by_object: FnvHashMap<(DefId, RelationId), RelationshipId>,
-
-    pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
+    pub properties_by_def_id: FnvHashMap<DefId, Properties>,
+    /// A map from "idenfities" relationship to named relationship:
+    pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
 
     pub value_unions: FnvHashSet<DefId>,
     pub string_pattern_constructors: FnvHashSet<DefId>,
     pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,
+
+    /// `default` relationships:
+    pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
+    /// `gen` relations, what the user wrote directly:
+    pub value_generators_unchecked: FnvHashMap<RelationshipId, (DefId, SourceSpan)>,
+    /// `gen` relations after proper type check:
+    pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
 }
 
 impl Relations {
-    pub fn properties_by_type(&self, domain_type_id: DefId) -> Option<&Properties> {
-        self.properties_by_type.get(&domain_type_id)
+    pub fn properties_by_def_id(&self, domain_type_id: DefId) -> Option<&Properties> {
+        self.properties_by_def_id.get(&domain_type_id)
     }
 
-    pub fn properties_by_type_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
-        self.properties_by_type.entry(domain_type_id).or_default()
+    pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
+        self.properties_by_def_id.entry(domain_type_id).or_default()
     }
 }
 
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub map: Option<IndexMap<PropertyId, Property>>,
-    pub identifies: Option<RelationId>,
-    pub identified_by: Option<RelationId>,
+    pub table: Option<IndexMap<PropertyId, Property>>,
+    pub identifies: Option<RelationshipId>,
+    pub identified_by: Option<RelationshipId>,
 }
 
 impl Properties {
@@ -45,8 +50,8 @@ impl Properties {
     }
 
     pub fn insert_map_property(&mut self, property_id: PropertyId, property: Property) {
-        let map = self.map.get_or_insert_with(Default::default);
-        map.insert(property_id, property);
+        let table = self.table.get_or_insert_with(Default::default);
+        table.insert(property_id, property);
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
     regex_util,
     relation::Constructor,
     types::{Type, TypeRef},
-    Compiler, SourceSpan,
+    Compiler, NO_SPAN,
 };
 
 impl<'m> Compiler<'m> {
@@ -22,12 +22,14 @@ impl<'m> Compiler<'m> {
         self.register_type(self.primitives.unit, Type::Unit);
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
-        self.register_named_builtin_relation(self.primitives.is_relation, "is");
-        self.register_named_builtin_relation(self.primitives.identifies_relation, "identifies");
-        self.register_named_builtin_relation(self.primitives.min_relation, "min");
-        self.register_named_builtin_relation(self.primitives.max_relation, "max");
-        self.register_named_builtin_relation(self.primitives.default_relation, "default");
-        self.register_named_builtin_relation(self.primitives.route_relation, "route");
+        self.register_named_builtin_relation(self.primitives.relations.is, "is");
+        self.register_named_builtin_relation(self.primitives.relations.identifies, "identifies");
+        self.register_named_builtin_relation(self.primitives.relations.id, "id");
+        self.register_named_builtin_relation(self.primitives.relations.min, "min");
+        self.register_named_builtin_relation(self.primitives.relations.max, "max");
+        self.register_named_builtin_relation(self.primitives.relations.default, "default");
+        self.register_named_builtin_relation(self.primitives.relations.gen, "gen");
+        self.register_named_builtin_relation(self.primitives.relations.route, "route");
 
         self.register_named_type(self.primitives.false_value, "false", Type::Bool);
         self.register_named_type(self.primitives.true_value, "true", Type::Bool);
@@ -66,6 +68,22 @@ impl<'m> Compiler<'m> {
         self.def_uuid();
         self.def_datetime();
 
+        self.register_named_type(
+            self.primitives.generators.auto,
+            "auto",
+            Type::ValueGenerator,
+        );
+        self.register_named_type(
+            self.primitives.generators.create_time,
+            "create_time",
+            Type::ValueGenerator,
+        );
+        self.register_named_type(
+            self.primitives.generators.update_time,
+            "update_time",
+            Type::ValueGenerator,
+        );
+
         self
     }
 
@@ -75,7 +93,7 @@ impl<'m> Compiler<'m> {
         });
         let segment = StringPatternSegment::Regex(regex_util::uuid());
         store_string_pattern_segment(&mut self.patterns, uuid, &segment);
-        self.relations.properties_by_type_mut(uuid).constructor = Constructor::StringFmt(segment);
+        self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::StringFmt(segment);
         self.defs
             .string_like_types
             .insert(uuid, StringLikeType::Uuid);
@@ -87,8 +105,9 @@ impl<'m> Compiler<'m> {
         });
         let segment = StringPatternSegment::Regex(regex_util::datetime_rfc3339());
         store_string_pattern_segment(&mut self.patterns, datetime, &segment);
-        self.relations.properties_by_type_mut(datetime).constructor =
-            Constructor::StringFmt(segment.clone());
+        self.relations
+            .properties_by_def_id_mut(datetime)
+            .constructor = Constructor::StringFmt(segment.clone());
         self.defs
             .string_like_types
             .insert(datetime, StringLikeType::DateTime);
@@ -108,7 +127,7 @@ impl<'m> Compiler<'m> {
                 rel_type_for: None,
             }),
             CORE_PKG,
-            SourceSpan::none(),
+            NO_SPAN,
         );
         let type_ref = self.register_named_type(def_id, ident, ty_fn);
         (def_id, type_ref)
@@ -116,7 +135,7 @@ impl<'m> Compiler<'m> {
 
     fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
@@ -130,7 +149,7 @@ impl<'m> Compiler<'m> {
         self.namespaces
             .get_namespace_mut(CORE_PKG, Space::Type)
             .insert(ident.into(), def_id);
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
@@ -139,8 +158,8 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, SourceSpan::none());
-        self.def_types.map.insert(def_id, ty);
+        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, NO_SPAN);
+        self.def_types.table.insert(def_id, ty);
 
         def_id
     }

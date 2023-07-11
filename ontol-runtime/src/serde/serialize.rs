@@ -8,13 +8,14 @@ use tracing::debug;
 
 use crate::{
     cast::Cast,
+    serde::processor::RecursionLimitError,
     string_pattern::FormatPattern,
     value::{Attribute, Data, FormatStringData, Value},
 };
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator},
-    processor::SerdeProcessor,
+    processor::{SerdeProcessor, SubProcessorContext},
     StructOperator, EDGE_PROPERTY,
 };
 
@@ -80,7 +81,7 @@ impl<'e> SerdeProcessor<'e> {
                 FilteredVariants::Single(id) => self
                     .narrow(id)
                     .serialize_value(value, rel_params, serializer),
-                FilteredVariants::Multi(variants) => {
+                FilteredVariants::Union(variants) => {
                     let variant = variants.iter().find(|discriminator| {
                         value.type_def_id == discriminator.discriminator.def_variant.def_id
                     });
@@ -105,7 +106,9 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value,
                         rel_params: None,
-                        processor: self.new_child(*inner_operator_id),
+                        processor: self
+                            .new_child(*inner_operator_id)
+                            .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
                 self.serialize_rel_params::<S>(rel_params, &mut map)?;
@@ -201,11 +204,13 @@ impl<'e> SerdeProcessor<'e> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
-        for (name, serde_prop) in &struct_op.properties {
+        for (name, serde_prop) in
+            struct_op.filter_properties(self.mode, self.ctx.parent_property_id)
+        {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
-                    if serde_prop.optional {
+                    if serde_prop.is_optional() {
                         continue;
                     } else {
                         panic!(
@@ -221,10 +226,15 @@ impl<'e> SerdeProcessor<'e> {
                 &Proxy {
                     value: &attribute.value,
                     rel_params: attribute.rel_params.filter_non_unit(),
-                    processor: self.new_child_with_rel(
-                        serde_prop.value_operator_id,
-                        serde_prop.rel_params_operator_id,
-                    ),
+                    processor: self
+                        .new_child_with_context(
+                            serde_prop.value_operator_id,
+                            SubProcessorContext {
+                                parent_property_id: Some(serde_prop.property_id),
+                                rel_params_operator_id: serde_prop.rel_params_operator_id,
+                            },
+                        )
+                        .map_err(RecursionLimitError::to_ser_error)?,
                 },
             )?;
         }
@@ -239,7 +249,7 @@ impl<'e> SerdeProcessor<'e> {
         rel_params: Option<&Value>,
         map: &mut <S as Serializer>::SerializeMap,
     ) -> Result<(), <S as Serializer>::Error> {
-        match (rel_params, self.rel_params_operator_id) {
+        match (rel_params, self.ctx.rel_params_operator_id) {
             (None, None) => {}
             (Some(rel_params), Some(operator_id)) => {
                 map.serialize_entry(
@@ -247,12 +257,14 @@ impl<'e> SerdeProcessor<'e> {
                     &Proxy {
                         value: rel_params,
                         rel_params: None,
-                        processor: self.new_child(operator_id),
+                        processor: self
+                            .new_child(operator_id)
+                            .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
             }
             (None, Some(_)) => {
-                panic!("Must serialize edge params, but attribute did not contain anything")
+                panic!("Must serialize edge params, but was not present in attribute")
             }
             (Some(rel_params), None) => {
                 panic!("Attribute had rel params {rel_params:#?}, but no serializer operator available: {self:#?}")

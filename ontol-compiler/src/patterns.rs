@@ -198,7 +198,7 @@ fn compile_string_pattern_constructors(compiler: &mut Compiler) {
     for def_id in string_patterns {
         let segment = match compiler
             .relations
-            .properties_by_type(def_id)
+            .properties_by_def_id(def_id)
             .map(|p| &p.constructor)
         {
             Some(Constructor::StringFmt(segment)) => segment,

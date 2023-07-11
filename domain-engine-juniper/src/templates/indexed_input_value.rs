@@ -80,7 +80,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     .build_input_object_type::<Self>(info, &[])
                     .into_meta()
             }
-            TypeKind::CustomScalar(_) => todo!(),
+            TypeKind::CustomScalar(_) => registry.build_scalar_type::<Self>(info).into_meta(),
             TypeKind::Object(_) => panic!("Invalid Object input data"),
         }
     }

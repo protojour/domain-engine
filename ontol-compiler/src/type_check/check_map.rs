@@ -6,19 +6,22 @@ use ontol_runtime::smart_format;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, MapCodegenTask},
-    def::{Def, Variables},
+    codegen::{
+        task::{ExplicitMapCodegenTask, MapCodegenTask, MapKeyPair},
+        type_mapper::TypeMapper,
+    },
+    def::{Def, MapDirection, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
-    CompileErrors, SourceSpan,
+    CompileErrors, Note, SourceSpan, SpannedNote,
 };
 
 use super::{
-    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExplicitVariable, HirBuildCtx},
+    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExpressionVariable, HirBuildCtx},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -27,11 +30,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_map(
         &mut self,
         def: &Def,
+        direction: MapDirection,
         variables: &Variables,
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = HirBuildCtx::new();
+        let mut ctx = HirBuildCtx::new(def.span, direction);
 
         {
             let mut map_check = MapCheck {
@@ -42,7 +46,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("FIRST ARM START");
             ctx.arm = Arm::First;
             let _ = map_check.analyze_arm(
-                map_check.expressions.map.get(&first_id).unwrap(),
+                map_check.expressions.table.get(&first_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,
@@ -50,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             debug!("SECOND ARM START");
             ctx.arm = Arm::Second;
             let _ = map_check.analyze_arm(
-                map_check.expressions.map.get(&second_id).unwrap(),
+                map_check.expressions.table.get(&second_id).unwrap(),
                 variables,
                 None,
                 &mut ctx,
@@ -58,6 +62,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.build_arms(def, first_id, second_id, &mut ctx)?;
+
+        self.report_missing_prop_errors(&mut ctx);
 
         Ok(self.types.intern(Type::Tautology))
     }
@@ -80,11 +86,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
-        self.codegen_tasks.push(CodegenTask::Map(MapCodegenTask {
-            first,
-            second,
-            span: def.span,
-        }));
+        if let Some(key_pair) =
+            TypeMapper::new(self.relations, self.defs).find_map_key_pair(first.1.ty, second.1.ty)
+        {
+            self.codegen_tasks.add_map_task(
+                key_pair,
+                crate::codegen::task::MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                    direction: ctx.direction,
+                    first,
+                    second,
+                    span: def.span,
+                }),
+            );
+        }
 
         Ok(())
     }
@@ -104,7 +118,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second: &mut TypedHirNode<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        for explicit_var in &mut ctx.explicit_variables.values_mut() {
+        for explicit_var in &mut ctx.expr_variables.values_mut() {
             let first_arm = explicit_var.hir_arms.get(&Arm::First);
             let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
@@ -120,13 +134,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Ok(_) => {}
                     Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
                         match (actual, expected) {
-                            (Type::Domain(_), Type::Domain(_)) => {
+                            (
+                                Type::Domain(first_def_id) | Type::Anonymous(first_def_id),
+                                Type::Domain(second_def_id) | Type::Anonymous(second_def_id),
+                            ) => {
                                 ctx.variable_mapping.insert(
                                     explicit_var.variable,
                                     VariableMapping {
                                         first_arm_type: actual,
                                         second_arm_type: expected,
                                     },
+                                );
+
+                                self.codegen_tasks.add_map_task(
+                                    MapKeyPair::new(
+                                        (*first_def_id).into(),
+                                        (*second_def_id).into(),
+                                    ),
+                                    MapCodegenTask::Auto,
                                 );
                             }
                             _ => {
@@ -153,6 +178,41 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
         .visit_node(0, second);
     }
+
+    fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {
+        let mut did_report_one_way_note = false;
+        let mut errors_in_second = false;
+
+        for arm in ctx.missing_properties.keys() {
+            if matches!(arm, Arm::Second) {
+                errors_in_second = true;
+            }
+        }
+
+        for (arm, missing) in std::mem::take(&mut ctx.missing_properties) {
+            for (span, properties) in missing {
+                let error = CompileError::MissingProperties(properties);
+
+                if matches!(arm, Arm::First)
+                    && matches!(ctx.direction, MapDirection::Omni)
+                    && !errors_in_second
+                    && !did_report_one_way_note
+                {
+                    self.error_with_notes(
+                        error,
+                        &span,
+                        vec![SpannedNote {
+                            note: Note::ConsiderUsingOneWayMap,
+                            span: ctx.map_kw_span,
+                        }],
+                    );
+                    did_report_one_way_note = true;
+                } else {
+                    self.error(error, &span);
+                }
+            }
+        }
+    }
 }
 
 pub struct MapCheck<'c, 'm> {
@@ -177,22 +237,24 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     group_set.join(self.analyze_arm(arg, variables, parent_aggr_group, ctx)?);
                 }
             }
-            ExprKind::Struct(_, attributes) => {
-                for attr in attributes.iter() {
+            ExprKind::Struct {
+                attributes: attrs, ..
+            } => {
+                for attr in attrs.iter() {
                     group_set.join(self.analyze_arm(
-                        &attr.expr,
+                        &attr.value,
                         variables,
                         parent_aggr_group,
                         ctx,
                     )?);
                 }
             }
-            ExprKind::Seq(expr_id, inner) => {
+            ExprKind::Seq(expr_id, object) => {
                 if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
-                    let label = Label(ctx.alloc_variable().0);
+                    let label = Label(ctx.var_allocator.alloc().0);
                     debug!("first arm seq: expr_id={expr_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
@@ -200,7 +262,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     let result = ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx| {
                         self.analyze_arm(
-                            inner,
+                            object,
                             variables,
                             Some(CtrlFlowGroup {
                                 label,
@@ -216,7 +278,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         let inner_aggr_group =
-                            self.analyze_arm(inner, variables, None, ctx).unwrap();
+                            self.analyze_arm(object, variables, None, ctx).unwrap();
 
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
@@ -246,7 +308,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 }
             }
             ExprKind::Variable(expr_id) => {
-                if let Some(explicit_variable) = ctx.explicit_variables.get(expr_id) {
+                if let Some(explicit_variable) = ctx.expr_variables.get(expr_id) {
                     // Variable is used more than once
                     if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                         self.error(
@@ -266,13 +328,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .unwrap();
 
                     // Register variable
-                    let syntax_var = ctx.alloc_variable();
+                    let variable = ctx.var_allocator.alloc();
 
                     if ctx.arm.is_first() {
-                        ctx.explicit_variables.insert(
+                        ctx.expr_variables.insert(
                             *variable_expr_id,
-                            ExplicitVariable {
-                                variable: syntax_var,
+                            ExpressionVariable {
+                                variable,
                                 ctrl_group: parent_aggr_group,
                                 hir_arms: Default::default(),
                             },
@@ -280,13 +342,13 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                         group_set.add(parent_aggr_group);
                     } else {
-                        match ctx.explicit_variables.entry(*variable_expr_id) {
+                        match ctx.expr_variables.entry(*variable_expr_id) {
                             Entry::Occupied(_occ) => {
                                 todo!();
                             }
                             Entry::Vacant(vac) => {
-                                vac.insert(ExplicitVariable {
-                                    variable: syntax_var,
+                                vac.insert(ExpressionVariable {
+                                    variable,
                                     ctrl_group: parent_aggr_group,
                                     hir_arms: Default::default(),
                                 });
@@ -296,7 +358,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     }
                 }
             }
-            ExprKind::Constant(_) => {}
+            ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
         };
 
         Ok(group_set)
@@ -308,20 +370,17 @@ impl<'c, 'm> MapCheck<'c, 'm> {
     }
 }
 
-#[derive(Clone, Copy)]
-struct FirstArm(bool);
-
-struct AggrGroupSet {
-    set: FnvHashSet<Option<Label>>,
-    tallest_depth: u16,
-}
-
 #[derive(Debug)]
 pub enum AggrGroupError {
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
     TooManyLeaves(Vec<Label>),
+}
+
+struct AggrGroupSet {
+    set: FnvHashSet<Option<Label>>,
+    tallest_depth: u16,
 }
 
 impl AggrGroupSet {

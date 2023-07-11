@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::DefId;
+use smartstring::alias::String;
 
 use crate::{def::DefReference, source::SourceSpan, Compiler};
 
@@ -19,19 +20,24 @@ type PropertyKey = (DefReference, SourceSpan);
 pub enum ExprKind {
     /// Function call
     Call(DefId, Box<[Expr]>),
-    /// Object constructor
-    Struct(TypePath, Box<[ExprStructAttr]>),
+    Struct {
+        /// The user-supplied type of the struct, None means anonymous
+        type_path: Option<TypePath>,
+        attributes: Box<[ExprStructAttr]>,
+    },
     /// Expression enclosed in sequence brackets: `[expr]`
     Seq(ExprId, Box<Expr>),
     Variable(ExprId),
-    Constant(i64),
+    ConstI64(i64),
+    ConstString(String),
 }
 
 #[derive(Debug)]
 pub struct ExprStructAttr {
     pub key: PropertyKey,
+    pub rel: Option<Expr>,
     pub bind_option: bool,
-    pub expr: Expr,
+    pub value: Expr,
 }
 
 #[derive(Debug)]
@@ -53,14 +59,14 @@ impl<'m> Compiler<'m> {
 #[derive(Debug)]
 pub struct Expressions {
     next_expr_id: ExprId,
-    pub map: FnvHashMap<ExprId, Expr>,
+    pub table: FnvHashMap<ExprId, Expr>,
 }
 
 impl Default for Expressions {
     fn default() -> Self {
         Self {
             next_expr_id: ExprId(0),
-            map: Default::default(),
+            table: Default::default(),
         }
     }
 }

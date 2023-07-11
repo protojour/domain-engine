@@ -2,8 +2,8 @@ use ontol_runtime::DefId;
 use tracing::debug;
 
 use crate::{
-    codegen::task::{CodegenTask, ConstCodegenTask},
-    def::{DefKind, TypeDef},
+    codegen::task::ConstCodegenTask,
+    def::{DefKind, MapDirection, TypeDef},
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::hir_build_ctx::HirBuildCtx,
@@ -14,18 +14,18 @@ use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
-        if let Some(type_ref) = self.def_types.map.get(&def_id) {
+        if let Some(type_ref) = self.def_types.table.get(&def_id) {
             return type_ref;
         }
         let ty = self.check_def_inner(def_id);
-        self.def_types.map.insert(def_id, ty);
+        self.def_types.table.insert(def_id, ty);
         ty
     }
 
     fn check_def_inner(&mut self, def_id: DefId) -> TypeRef<'m> {
         let def = self
             .defs
-            .map
+            .table
             .get(&def_id)
             .expect("BUG: definition not found");
 
@@ -44,8 +44,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(PrimitiveKind::Int) => self.types.intern(Type::Int(def_id)),
             DefKind::Primitive(PrimitiveKind::Number) => self.types.intern(Type::Number(def_id)),
-            DefKind::Mapping(variables, first_id, second_id) => {
-                match self.check_map(def, variables, *first_id, *second_id) {
+            DefKind::Mapping(direction, variables, first_id, second_id) => {
+                match self.check_map(def, *direction, variables, *first_id, *second_id) {
                     Ok(ty) => ty,
                     Err(error) => {
                         debug!("Aggregation group error: {error:?}");
@@ -54,17 +54,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             DefKind::Constant(expr_id) => {
-                let expr = self.expressions.map.remove(expr_id).unwrap();
+                let expr = self.expressions.table.remove(expr_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
                     None => return self.types.intern(Type::Error),
                     Some(ty) => ty,
                 };
 
-                let mut ctx = HirBuildCtx::new();
+                let mut ctx = HirBuildCtx::new(expr.span, MapDirection::Omni);
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks
-                    .push(CodegenTask::Const(ConstCodegenTask { def_id, node }));
+                    .add_const_task(ConstCodegenTask { def_id, node });
 
                 ty
             }

@@ -3,23 +3,25 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    env::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
         ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
         SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
         ValueUnionVariant,
     },
-    serde::SerdeKey,
-    DataModifier, DefId, DefVariant, Role,
+    serde::{operator::SerdePropertyFlags, SerdeKey},
+    value_generator::ValueGenerator,
+    DataModifier, DefId, DefVariant, RelationshipId, Role,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     codegen::task::CodegenTasks,
-    compiler_queries::{GetDefType, GetPropertyMeta},
-    def::{Cardinality, DefKind, Defs, PropertyCardinality, RelParams, TypeDef, ValueCardinality},
+    compiler_queries::GetDefType,
+    def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
-    relation::{Constructor, Properties, Relations, RelationshipId},
+    relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
@@ -61,7 +63,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         match self.alloc_serde_operator_from_key(key.clone()) {
             Some(OperatorAllocation::Allocated(operator_id, operator)) => {
-                debug!("CREATED {operator_id:?} {key:?} {operator:?}");
+                trace!("CREATED {operator_id:?} {key:?} {operator:?}");
                 self.operators_by_id[operator_id.0 as usize] = operator;
                 Some(operator_id)
             }
@@ -141,8 +143,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         for (key, value) in &next_map_type.properties {
                             intersected_map.properties.insert(key.clone(), *value);
                         }
-                        intersected_map.n_mandatory_properties +=
-                            next_map_type.n_mandatory_properties;
                     }
                 }
 
@@ -154,16 +154,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
                 let map = self
                     .relations
-                    .properties_by_type
+                    .properties_by_def_id
                     .get(&def_variant.def_id)?
-                    .map
+                    .table
                     .as_ref()?;
 
                 let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
 
                 let meta = self
-                    .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
-                    .expect("Problem getting property meta");
+                    .defs
+                    .lookup_relationship_meta(property_id.relationship_id)
+                    .expect("Problem getting relationship meta");
 
                 let property_name = meta.relation.subject_prop(self.defs)?;
 
@@ -235,7 +236,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_def_type_operator(&mut self, def_variant: DefVariant) -> Option<OperatorAllocation> {
         match self.get_def_type(def_variant.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
-                let properties = self.relations.properties_by_type.get(def_id);
+                let properties = self.relations.properties_by_def_id.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(TypeDef {
                         ident: Some(ident), ..
@@ -325,7 +326,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
             }
-            Type::Array(_) => {
+            Type::Seq(..) => {
                 panic!("Array not handled here")
             }
             Type::Option(_) => {
@@ -336,7 +337,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             Type::Function { .. } => None,
             Type::Anonymous(_) => None,
-            Type::Package | Type::BuiltinRelation => None,
+            Type::Package | Type::BuiltinRelation | Type::ValueGenerator(_) => None,
             Type::Tautology | Type::Infer(_) | Type::Error => {
                 panic!("crap: {:?}", self.get_def_type(def_variant.def_id));
             }
@@ -357,7 +358,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
-                        n_mandatory_properties: 0,
                     }),
                 ));
             }
@@ -412,7 +412,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .unwrap(),
                         Some(relationship_id) => {
                             let meta = self
-                                .get_relationship_meta(relationship_id)
+                                .defs
+                                .lookup_relationship_meta(relationship_id)
                                 .expect("Problem getting relationship meta");
 
                             self.gen_operator_id(SerdeKey::Def(
@@ -455,7 +456,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let union_id = DataModifier::UNION | DataModifier::PRIMARY_ID;
 
         if def_variant.modifier.contains(union_id) {
-            let identifies_relation_id = match properties.identified_by {
+            let identifies_relationship_id = match properties.identified_by {
                 Some(id) => id,
                 None => {
                     return Some(OperatorAllocation::Redirect(
@@ -479,8 +480,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let map_def_variant = def_variant.remove_modifier(union_id);
 
             let identifies_meta = self
-                .property_meta_by_object(def_variant.def_id, identifies_relation_id)
-                .expect("Problem getting subject property meta");
+                .defs
+                .lookup_relationship_meta(identifies_relationship_id)
+                .expect("Problem getting relationship meta");
 
             // Create a union between { '_id' } and the map properties itself
             let map_properties_operator_id = self
@@ -502,7 +504,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
                                 discriminant: Discriminant::IsSingletonProperty(
-                                    identifies_relation_id,
+                                    identifies_relationship_id,
                                     id_property_name,
                                 ),
                                 purpose: VariantPurpose::Identification,
@@ -545,7 +547,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 def_variant.remove_modifier(DataModifier::INTERSECTION),
             ))
         } else if modifier.contains(DataModifier::INTERSECTION) {
-            if items.len() == 1 && properties.map.is_none() {
+            if items.len() == 1 && properties.table.is_none() {
                 Some(OperatorAllocation::Redirect(def_variant.remove_modifier(
                     DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
                 )))
@@ -564,8 +566,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             } else {
                 let mut intersection_keys = BTreeSet::new();
                 for (relationship_id, _, _cardinality) in items {
-                    let Ok(meta) = self.get_relationship_meta(*relationship_id) else {
-                        panic!("Problem getting property meta");
+                    let Ok(meta) = self.defs.lookup_relationship_meta(*relationship_id) else {
+                        panic!("Problem getting relationship meta");
                     };
 
                     intersection_keys.insert(SerdeKey::Def(DefVariant::new(
@@ -574,7 +576,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     )));
                 }
 
-                if properties.map.is_some() {
+                if properties.table.is_some() {
                     intersection_keys.insert(SerdeKey::Def(
                         def_variant.remove_modifier(DataModifier::INTERSECTION),
                     ));
@@ -593,8 +595,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             let (relationship_id, _, cardinality) = items[0];
 
-            let Ok(meta) = self.get_relationship_meta(relationship_id) else {
-                panic!("Problem getting property meta");
+            let Ok(meta) = self.defs.lookup_relationship_meta(relationship_id) else {
+                panic!("Problem getting relationship meta");
             };
 
             let value_def = meta.relationship.object.0.def_id;
@@ -663,7 +665,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             root_types.insert(root_discriminator.def_variant.def_id);
         }
 
-        let variants: Vec<_> = if properties.map.is_some() {
+        let variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_key =
@@ -701,24 +703,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        let mut n_mandatory_properties = 0;
         let mut serde_properties: IndexMap<_, _> = Default::default();
 
-        if let Some(map) = &properties.map {
-            for (property_id, property) in map {
-                if property.is_entity_id {
-                    continue;
-                }
-
+        if let Some(table) = &properties.table {
+            for (property_id, property) in table {
                 let (meta, prop_key, type_def_id) = match property_id.role {
                     Role::Subject => {
-                        if property_id.relation_id.0 == self.primitives.identifies_relation {
+                        if property_id.relationship_id.0 == self.primitives.relations.identifies {
                             // panic!();
                         }
 
                         let meta = self
-                            .property_meta_by_subject(def_variant.def_id, property_id.relation_id)
-                            .expect("Problem getting subject property meta");
+                            .defs
+                            .lookup_relationship_meta(property_id.relationship_id)
+                            .expect("Problem getting subject relationship meta");
                         let object = meta.relationship.object.0.def_id;
 
                         let prop_key = meta
@@ -730,13 +728,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let meta = self
-                            .property_meta_by_object(def_variant.def_id, property_id.relation_id)
-                            .expect("Problem getting object property meta");
+                            .defs
+                            .lookup_relationship_meta(property_id.relationship_id)
+                            .expect("Problem getting object relationship meta");
                         let subject = meta.relationship.subject.0.def_id;
 
                         let prop_key = meta
-                            .relation
-                            .object_prop(self.defs)
+                            .relationship
+                            .object_prop
                             .expect("Object property has no name");
 
                         (meta, prop_key, subject)
@@ -758,6 +757,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                     None
                                 }
                             }
+                            Some(SerdeOperator::Unit) => None,
                             Some(_) => self.gen_operator_id(key),
                             _ => None,
                         }
@@ -766,7 +766,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     _ => todo!(),
                 };
 
-                let mut default_const_proc_address = None;
+                let mut value_generator: Option<ValueGenerator> = None;
+                let mut flags = SerdePropertyFlags::default();
 
                 if let Some(default_const_def) = self
                     .relations
@@ -779,11 +780,27 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         .get(default_const_def)
                         .unwrap_or_else(|| panic!());
 
-                    default_const_proc_address = Some(proc.address);
+                    value_generator = Some(ValueGenerator::DefaultProc(proc.address));
                 }
 
-                if property_cardinality.is_mandatory() {
-                    n_mandatory_properties += 1;
+                if let Some(explicit_value_generator) = self
+                    .relations
+                    .value_generators
+                    .get(&property_id.relationship_id)
+                {
+                    flags |= SerdePropertyFlags::READ_ONLY;
+                    if value_generator.is_some() {
+                        panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
+                    }
+                    value_generator = Some(*explicit_value_generator);
+                }
+
+                if property_cardinality.is_optional() {
+                    flags |= SerdePropertyFlags::OPTIONAL;
+                }
+
+                if property.is_entity_id {
+                    flags |= SerdePropertyFlags::ENTITY_ID;
                 }
 
                 serde_properties.insert(
@@ -791,8 +808,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeProperty {
                         property_id: *property_id,
                         value_operator_id,
-                        optional: property_cardinality.is_optional(),
-                        default_const_proc_address,
+                        flags,
+                        value_generator,
                         rel_params_operator_id,
                     },
                 );
@@ -803,7 +820,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             typename: typename.into(),
             def_variant,
             properties: serde_properties,
-            n_mandatory_properties,
         })
     }
 }

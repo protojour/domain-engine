@@ -1,7 +1,7 @@
 use ontol_test_utils::{
-    assert_json_io_matches, type_binding::TypeBinding, SourceName, TestCompile, TestPackages,
+    assert_json_io_matches, expect_eq, type_binding::TypeBinding, SourceName, TestCompile,
+    TestPackages,
 };
-use serde_json::json;
 use test_log::test;
 
 #[test]
@@ -21,7 +21,7 @@ fn load_package() {
             SourceName("pkg"),
             "
             pub type foo {
-                rel _ 'prop': int
+                rel .'prop': int
             }
             ",
         ),
@@ -31,21 +31,18 @@ fn load_package() {
             use 'pkg' as other
 
             pub type bar {
-                rel _ 'foo': other.foo
+                rel .'foo': other.foo
             }
             ",
         ),
     ])
     .compile_ok(|env| {
         let bar = TypeBinding::new(&env, "bar");
-        assert_json_io_matches!(
-            bar,
-            json!({
-                "foo": {
-                    "prop": 42
-                }
-            })
-        );
+        assert_json_io_matches!(bar, Create, {
+            "foo": {
+                "prop": 42
+            }
+        });
     });
 }
 
@@ -59,8 +56,8 @@ fn dependency_dag() {
             use 'b' as b
 
             pub type foobar {
-                rel _ 'a': a.a
-                rel _ 'b': b.b
+                rel .'a': a.a
+                rel .'b': b.b
             }
             ",
         ),
@@ -69,7 +66,7 @@ fn dependency_dag() {
             "
             use 'c' as domain_c
             pub type a {
-                rel _ 'c': domain_c.c
+                rel .'c': domain_c.c
             }
             ",
         ),
@@ -78,23 +75,20 @@ fn dependency_dag() {
             "
             use 'c' as c
             pub type b {
-                rel _ 'c': c.c
+                rel .'c': c.c
             }
             ",
         ),
-        (SourceName("c"), "pub type c { rel _ is: int }"),
+        (SourceName("c"), "pub type c { rel .is: int }"),
     ])
     .compile_ok(|env| {
         // four user domains, plus core:
-        assert_eq!(5, env.env.domains().count());
+        expect_eq!(actual = env.env.domains().count(), expected = 5);
 
         let bar = TypeBinding::new(&env, "foobar");
-        assert_json_io_matches!(
-            bar,
-            json!({
-                "a": { "c": 42 },
-                "b": { "c": 43 }
-            })
-        );
+        assert_json_io_matches!(bar, Create, {
+            "a": { "c": 42 },
+            "b": { "c": 43 }
+        });
     });
 }

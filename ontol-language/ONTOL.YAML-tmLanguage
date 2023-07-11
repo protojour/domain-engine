@@ -9,67 +9,69 @@ patterns:
   # "use .. as .." is one statement
   - comment: use declaration
     name: keyword.import.ontol
-    match: ^(use)
+    match: \b(use)\b
 
   - comment: use as declaration
     name: keyword.import.as.ontol
-    match: \s(as)\s
+    match: \b(as)\b
 
   - comment: pub export modifier
     name: storage.modifier.pub.ontol
-    match: ^(pub)
+    match: \b(pub)\b
 
   # "pub type .. { }" is one statement
   - comment: type declaration
     name: keyword.declaration.type.ontol
-    match: \b(type)
+    match: \b(type)\b
 
   # "with .. { }" should include block
   - comment: with context block
     name: keyword.context.block.with.ontol
-    match: ^(with)
+    match: \b(with)\b
 
   # "rel .. .. .. { }" should include block
   - comment: rel declaration
     name: keyword.declaration.rel.ontol
-    match: \b(rel)
+    match: \b(rel)\b
 
   # "fmt .. .. .." should include arrows etc.
   - comment: fmt expression
     name: keyword.declaration.fmt.ontol
-    match: \b(fmt)
+    match: \b(fmt)\b
 
   - comment: fat arrow (fmt expression)
     name: keyword.operator.fatarrow.ontol
     match: (=>)
 
-  # "map .. { }" should include
+  # "map { }" should include
   # block, path, expressions etc.
   - comment: map declaration
-    match: \b(map)\s*([\w\s]*)
+    match: \b(map)\b({)\b(.*)\b(})
     captures:
       '1': { name: keyword.declaration.map.ontol }
-      '2': { name: variable.parameter.ontol }
+      '2': { name: keyword.context.block.ontol }
+      '3': { name: variable.parameter.ontol }
+      '4': { name: keyword.context.block.ontol }
 
   - comment: built-in types
     name: storage.type.ontol
-    match: \b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)
+    match: \b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)\b
 
   - comment: number literal
     name: constant.numeric.ontol
-    match: (\d+(\.?\d+)*)
+    match: \b\-?(\d+(\.?\d+)?)\b
 
   - comment: built-in constant value
     name: constant.language.ontol
-    match: \b(true|false|null|inf|nan)\b
+    match: \b(true|false|null|inf|nan|\(\)|\[\]PI|GET|POST|PUT|PATCH|DELETE)\b
 
   - comment: built-in assigment keywords
     name: variable.function.ontol
-    match: \b(is|identifies)\b
+    match: \b(is|identifies|query)\b
 
   - comment: unit/self underscore
     name: variable.language.ontol
-    match: \s(_)\s
+    match: \b(_)\b
 
   - comment: single quoted string literal
     name: string.quoted.single.ontol
@@ -91,7 +93,7 @@ patterns:
     end: '[^\\]/'
     # TODO: include regex
     # patterns:
-    #   - include: source.regexp.embedde
+    #   - include: source.regexp.embedded
 
   - comment: comment
     name: comment.line.double-slash.ontol
@@ -100,7 +102,7 @@ patterns:
 
   - comment: doc comment
     name: comment.block.documentation.ontol
-    begin: ^///
+    begin: ^\s*+///
     end: $
     # TODO: include markdown in comments
     # patterns:

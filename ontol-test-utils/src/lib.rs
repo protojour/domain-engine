@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, future::Future, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -7,12 +7,31 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
-use ontol_runtime::{env::Env, PackageId};
+use ontol_runtime::{
+    config::{DataStoreConfig, PackageConfig},
+    env::Env,
+    PackageId,
+};
 
 pub mod diagnostics;
+pub mod serde_utils;
 pub mod type_binding;
 
 pub const ROOT_SRC_NAME: &str = "test_root.on";
+
+/// Workaround for `pretty_assertions::assert_eq` arguments appearing
+/// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
+/// in order to show the most sensible colored diff.
+/// This macro makes expected and actual explicit, and supports any order by using keyword arguments.
+#[macro_export]
+macro_rules! expect_eq {
+    (expected = $expected:expr, actual = $actual:expr $(,)?) => {
+        pretty_assertions::assert_eq!($expected, $actual);
+    };
+    (actual = $actual:expr, expected = $expected:expr $(,)?) => {
+        pretty_assertions::assert_eq!($expected, $actual);
+    };
+}
 
 #[macro_export]
 macro_rules! assert_error_msg {
@@ -30,19 +49,19 @@ macro_rules! assert_error_msg {
 /// With passing two JSON parameters, the left one is the input and the right one is the expected output.
 #[macro_export]
 macro_rules! assert_json_io_matches {
-    ($binding:expr, $json:expr) => {
-        assert_json_io_matches!($binding, $json, $json);
+    ($binding:expr, $mode:ident, $json:tt) => {
+        assert_json_io_matches!($binding, $mode, $json == $json);
     };
-    ($binding:expr, $input:expr, $expected_output:expr) => {
-        let input = $input;
-        let value = match $binding.deserialize_value(input.clone()) {
+    ($binding:expr, Create, $input:tt == $expected_output:tt) => {
+        let input = serde_json::json!($input);
+        let value = match ontol_test_utils::serde_utils::create_de(&$binding).value(input.clone()) {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = $binding.serialize_identity_json(&value);
+        let output = ontol_test_utils::serde_utils::create_ser(&$binding).json(&value);
 
-        pretty_assertions::assert_eq!($expected_output, output);
+        pretty_assertions::assert_eq!(serde_json::json!($expected_output), output);
     };
 }
 
@@ -50,12 +69,29 @@ macro_rules! assert_json_io_matches {
 pub struct TestEnv {
     pub env: Arc<Env>,
     pub root_package: PackageId,
-    pub test_json_schema: bool,
+    pub compile_json_schema: bool,
+    pub packages_by_source_name: HashMap<String, PackageId>,
 }
 
+impl TestEnv {
+    pub fn get_package_id(&self, source_name: &str) -> PackageId {
+        self.packages_by_source_name
+            .get(source_name)
+            .cloned()
+            .unwrap_or_else(|| panic!("PackageId for `{}` not found", source_name))
+    }
+}
+
+#[async_trait::async_trait]
 pub trait TestCompile: Sized {
     /// Compile
     fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv;
+
+    /// Compile (async validator)
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv;
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -66,9 +102,19 @@ pub trait TestCompile: Sized {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
+#[async_trait::async_trait]
 impl TestCompile for &'static str {
     fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv {
         TestPackages::with_root(self).compile_ok(validator)
+    }
+
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv {
+        TestPackages::with_root(self)
+            .compile_ok_async(validator)
+            .await
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
@@ -80,7 +126,7 @@ impl TestCompile for &'static str {
 pub struct SourceName(pub &'static str);
 
 impl SourceName {
-    pub fn root() -> Self {
+    pub const fn root() -> Self {
         Self(ROOT_SRC_NAME)
     }
 }
@@ -89,6 +135,8 @@ pub struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
+    data_store: Option<(SourceName, DataStoreConfig)>,
+    packages_by_source_name: HashMap<String, PackageId>,
 }
 
 impl TestPackages {
@@ -106,7 +154,14 @@ impl TestPackages {
                 .collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
+            data_store: None,
+            packages_by_source_name: Default::default(),
         }
+    }
+
+    pub fn with_data_store(mut self, name: SourceName, config: DataStoreConfig) -> Self {
+        self.data_store = Some((name, config));
+        self
     }
 
     fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
@@ -123,14 +178,26 @@ impl TestPackages {
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
+                        self.packages_by_source_name
+                            .insert(source_name.to_string(), request.package_id);
+
                         if source_name == ROOT_SRC_NAME {
                             root_package = Some(request.package_id);
+                        }
+
+                        let mut package_config = PackageConfig::default();
+
+                        if let Some((db_source_name, data_store_config)) = &self.data_store {
+                            if source_name == db_source_name.0 {
+                                package_config.data_store = Some(data_store_config.clone());
+                            }
                         }
 
                         if let Some(source_text) = self.sources_by_name.get(source_name) {
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
                                 source_text,
+                                package_config,
                                 &mut self.sources,
                                 &mut self.source_code_registry,
                             ));
@@ -154,21 +221,17 @@ impl TestPackages {
                     env: Arc::new(env),
                     root_package,
                     // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
-                    test_json_schema: false,
+                    compile_json_schema: false,
+                    packages_by_source_name: self.packages_by_source_name.clone(),
                 })
             }
             Err(error) => Err(error),
         }
     }
-}
 
-impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
+    fn compile_topology_ok(&mut self) -> TestEnv {
         match self.compile_topology() {
-            Ok(test_env) => {
-                validator(test_env.clone());
-                test_env
-            }
+            Ok(test_env) => test_env,
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
@@ -178,6 +241,25 @@ impl TestCompile for TestPackages {
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl TestCompile for TestPackages {
+    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
+        let test_env = self.compile_topology_ok();
+        validator(test_env.clone());
+        test_env
+    }
+
+    async fn compile_ok_async<F: Future<Output = ()> + Send>(
+        mut self,
+        validator: impl Fn(TestEnv) -> F + Send,
+    ) -> TestEnv {
+        let test_env = self.compile_topology_ok();
+        let fut = validator(test_env.clone());
+        fut.await;
+        test_env
     }
 
     fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {

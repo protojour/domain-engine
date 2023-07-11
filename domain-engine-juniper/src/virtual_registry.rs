@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use juniper::GraphQLValue;
-use ontol_runtime::serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
+use juniper::{GraphQLValue, ID};
+use ontol_runtime::serde::operator::{
+    FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
+};
 use smartstring::alias::String;
-use tracing::{debug, warn};
+use tracing::{trace, warn};
 
 use crate::{
     gql_scalar::GqlScalar,
@@ -48,7 +50,13 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 .iter()
                 .map(|(name, field_data)| juniper::meta::Field {
                     name: name.clone(),
-                    description: None,
+                    description: match &field_data.kind {
+                        FieldKind::Property(property) => self
+                            .virtual_schema
+                            .env()
+                            .get_docs(property.property_id.relationship_id.0),
+                        _ => None,
+                    },
                     arguments: self.get_arguments_for_field(&field_data.kind),
                     field_type: self
                         .get_type::<AttributeType>(field_data.field_type, TypingPurpose::Selection),
@@ -85,17 +93,33 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
-                let opt = match typing_purpose {
-                    TypingPurpose::PartialInput => Optionality::Optional,
-                    _ => Optionality::Mandatory,
-                };
+                let (mode, _) = typing_purpose.mode_and_level();
 
-                for (name, property) in &struct_op.properties {
+                for (name, property) in struct_op.filter_properties(mode, None) {
+                    if property.is_read_only()
+                        && matches!(
+                            typing_purpose,
+                            TypingPurpose::Input | TypingPurpose::PartialInput
+                        )
+                    {
+                        continue;
+                    }
+
                     output.push(self.get_operator_argument(
                         name,
                         property.value_operator_id,
                         property.rel_params_operator_id,
-                        opt,
+                        property.flags,
+                        TypeModifier::Unit(match typing_purpose {
+                            TypingPurpose::PartialInput => Optionality::Optional,
+                            _ => {
+                                if property.is_optional() || property.value_generator.is_some() {
+                                    Optionality::Optional
+                                } else {
+                                    Optionality::Mandatory
+                                }
+                            }
+                        }),
                     ))
                 }
             }
@@ -105,7 +129,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     FilteredVariants::Single(operator_id) => {
                         self.collect_operator_arguments(operator_id, output, typing_purpose);
                     }
-                    FilteredVariants::Multi(variants) => {
+                    FilteredVariants::Union(variants) => {
                         warn!("Multiple variants in union: {variants:#?}");
                         for variant in variants {
                             self.collect_operator_arguments(
@@ -125,7 +149,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     property_name,
                     *id_operator_id,
                     None,
-                    Optionality::Optional,
+                    SerdePropertyFlags::ENTITY_ID,
+                    TypeModifier::Unit(Optionality::Optional),
                 ))
             }
             other => {
@@ -139,51 +164,69 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         name: &str,
         operator_id: SerdeOperatorId,
         rel_params: Option<SerdeOperatorId>,
-        opt: Optionality,
+        property_flags: SerdePropertyFlags,
+        modifier: TypeModifier,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.virtual_schema.env().get_serde_operator(operator_id);
 
-        debug!("register argument {name} {operator:?}");
+        trace!("register argument '{name}': {operator:?}");
 
         use std::string::String;
+
+        if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
+            return self.get_native_argument::<ID>(name, modifier);
+        }
 
         match operator {
             SerdeOperator::Unit => {
                 todo!("unit argument")
             }
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
-                self.get_native_argument::<bool>(name, opt)
+                self.get_native_argument::<bool>(name, modifier)
             }
-            SerdeOperator::Int(_) => self.get_native_argument::<i32>(name, opt),
-            SerdeOperator::Number(_) => self.get_native_argument::<f64>(name, opt),
-            SerdeOperator::String(_) => self.get_native_argument::<String>(name, opt),
-            SerdeOperator::StringConstant(_, _) => self.get_native_argument::<String>(name, opt),
-            SerdeOperator::StringPattern(_) => self.get_native_argument::<String>(name, opt),
+            SerdeOperator::Int(_) => return self.get_native_argument::<i32>(name, modifier),
+            SerdeOperator::Number(_) => return self.get_native_argument::<f64>(name, modifier),
+            SerdeOperator::String(_) => return self.get_native_argument::<String>(name, modifier),
+            SerdeOperator::StringConstant(_, _) => {
+                self.get_native_argument::<String>(name, modifier)
+            }
+            SerdeOperator::StringPattern(_) => self.get_native_argument::<String>(name, modifier),
             SerdeOperator::CapturingStringPattern(_) => {
-                self.get_native_argument::<String>(name, opt)
+                self.get_native_argument::<String>(name, modifier)
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
-                let type_index = self
+                match self
                     .virtual_schema
                     .type_index_by_def(seq_op.def_variant.def_id, QueryLevel::Edge { rel_params })
-                    .expect("Should have an edge type for relation sequence");
-
-                self.registry.arg::<Option<Vec<IndexedInputValue>>>(
-                    name,
-                    &self
-                        .virtual_schema
-                        .indexed_type_info(type_index, TypingPurpose::ReferenceInput),
-                )
+                {
+                    Some(type_index) => self.registry.arg::<Option<Vec<IndexedInputValue>>>(
+                        name,
+                        &self
+                            .virtual_schema
+                            .indexed_type_info(type_index, TypingPurpose::ReferenceInput),
+                    ),
+                    None => self.get_operator_argument(
+                        name,
+                        seq_op.ranges[0].operator_id,
+                        rel_params,
+                        property_flags,
+                        TypeModifier::Array(modifier.unit_optionality(), Optionality::Mandatory),
+                    ),
+                }
             }
             SerdeOperator::ConstructorSequence(_) => {
                 warn!("Skipping constructor sequence for now");
-                self.registry.arg::<bool>(name, &())
+                return self.registry.arg::<bool>(name, &());
                 // registry.arg::<CustomScalar>(name, &()),
             }
-            SerdeOperator::ValueType(value_op) => {
-                self.get_operator_argument(name, value_op.inner_operator_id, rel_params, opt)
-            }
+            SerdeOperator::ValueType(value_op) => self.get_operator_argument(
+                name,
+                value_op.inner_operator_id,
+                rel_params,
+                property_flags,
+                modifier,
+            ),
             SerdeOperator::Union(union_op) => {
                 let type_index = self
                     .virtual_schema
@@ -193,7 +236,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     .virtual_schema
                     .indexed_type_info(type_index, TypingPurpose::Input);
 
-                match opt {
+                match modifier.unit_optionality() {
                     Optionality::Mandatory => {
                         self.registry.arg::<IndexedInputValue>(name, &type_info)
                     }
@@ -211,34 +254,20 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     .virtual_schema
                     .indexed_type_info(type_index, TypingPurpose::Input);
 
-                match opt {
+                match modifier.unit_optionality() {
                     Optionality::Mandatory => {
-                        self.registry.arg::<IndexedInputValue>(name, &type_info)
+                        return self.registry.arg::<IndexedInputValue>(name, &type_info);
                     }
-                    Optionality::Optional => self
-                        .registry
-                        .arg::<Option<IndexedInputValue>>(name, &type_info),
+                    Optionality::Optional => {
+                        return self
+                            .registry
+                            .arg::<Option<IndexedInputValue>>(name, &type_info)
+                    }
                 }
             }
             SerdeOperator::PrimaryId(..) => {
                 panic!()
             }
-        }
-    }
-
-    fn get_native_argument<T>(
-        &mut self,
-        name: &str,
-        optionality: Optionality,
-    ) -> juniper::meta::Argument<'r, GqlScalar>
-    where
-        T: juniper::GraphQLType<GqlScalar>
-            + juniper::FromInputValue<GqlScalar>
-            + juniper::GraphQLValue<GqlScalar, TypeInfo = ()>,
-    {
-        match optionality {
-            Optionality::Mandatory => self.registry.arg::<T>(name, &()),
-            Optionality::Optional => self.registry.arg::<Option<T>>(name, &()),
         }
     }
 
@@ -280,7 +309,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 argument.name(),
                 operator_id,
                 None,
-                Optionality::Mandatory,
+                SerdePropertyFlags::default(),
+                TypeModifier::Unit(Optionality::Mandatory),
             ),
         }
     }
@@ -348,6 +378,34 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             }
             TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
                 self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
+            }
+        }
+    }
+
+    fn get_native_argument<T>(
+        &mut self,
+        name: &str,
+        modifier: TypeModifier,
+    ) -> juniper::meta::Argument<'r, GqlScalar>
+    where
+        T: juniper::GraphQLType<GqlScalar>
+            + juniper::FromInputValue<GqlScalar>
+            + juniper::GraphQLValue<GqlScalar, TypeInfo = ()>,
+    {
+        match modifier {
+            TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, &()),
+            TypeModifier::Unit(Optionality::Optional) => self.registry.arg::<Option<T>>(name, &()),
+            TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory) => {
+                self.registry.arg::<Vec<T>>(name, &())
+            }
+            TypeModifier::Array(Optionality::Mandatory, Optionality::Optional) => {
+                self.registry.arg::<Vec<Option<T>>>(name, &())
+            }
+            TypeModifier::Array(Optionality::Optional, Optionality::Mandatory) => {
+                self.registry.arg::<Option<Vec<T>>>(name, &())
+            }
+            TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
+                self.registry.arg::<Option<Vec<Option<T>>>>(name, &())
             }
         }
     }

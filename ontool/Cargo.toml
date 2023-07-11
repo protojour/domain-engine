@@ -1,0 +1,22 @@
+[package]
+name = "ontool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+domain-engine-juniper.path = "../domain-engine-juniper"
+ontol-compiler.path = "../ontol-compiler"
+ontol-parser.path = "../ontol-parser"
+ontol-runtime.path = "../ontol-runtime"
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+ariadne = { version = "0.3.0", features = ["auto-color"] }
+clap = { version = "4.3.4", features = ["derive"] }
+
+[[bin]]
+name = "ontool"
+path = "src/main.rs"

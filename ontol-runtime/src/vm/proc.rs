@@ -1,4 +1,5 @@
 use derive_debug_extras::DebugExtras;
+use smartstring::alias::String;
 
 use crate::{value::PropertyId, DefId};
 
@@ -76,14 +77,20 @@ pub enum OpCode {
     /// If present, pushes three values on the stack: [value, rel_params, Int(1)].
     /// If absent, pushes one value on the stack: [Int(0)].
     TryTakeAttr2(Local, PropertyId),
-    /// Pop value from stack, and move it into the specified local map.
-    PutUnitAttr(Local, PropertyId),
+    /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
+    PutAttr1(Local, PropertyId),
+    /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
+    PutAttr2(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
-    /// Push a constant to the stack.
-    PushConstant(i64, DefId),
+    /// Push a constant i64 to the stack.
+    I64(i64, DefId),
+    /// Push a constant string to the stack.
+    String(String, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
+    /// Overwrite runtime type info with a new type
+    TypePun(Local, DefId),
 }
 
 /// A reference to a local on the value stack during procedure execution.
@@ -108,4 +115,6 @@ pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
     /// Test if true. NB: Yanks from stack.
     YankTrue(Local),
+    /// Test if not true. NB: Yanks from stack.
+    YankFalse(Local),
 }

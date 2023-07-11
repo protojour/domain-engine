@@ -4,16 +4,17 @@ use derive_debug_extras::DebugExtras;
 use value::Value;
 
 pub mod cast;
+pub mod config;
 pub mod discriminator;
 pub mod env;
 pub mod format_utils;
 pub mod json_schema;
 pub mod query;
-pub mod query_translate;
 pub mod serde;
 pub mod string_pattern;
 pub mod string_types;
 pub mod value;
+pub mod value_generator;
 pub mod vm;
 
 /// Identifies one "package" of ONTOL code.
@@ -47,7 +48,7 @@ impl DefId {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct MapKey {
     pub def_id: DefId,
     pub seq: bool,
@@ -138,12 +139,12 @@ pub enum DefParam {
     Const(Value),
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
-#[debug_single_tuple_inline]
-pub struct RelationId(pub DefId);
-
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Role {
     Subject,
     Object,
 }
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[debug_single_tuple_inline]
+pub struct RelationshipId(pub DefId);

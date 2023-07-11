@@ -1,18 +1,18 @@
 use fnv::FnvHashMap;
 use ontol_runtime::vm::proc::{AddressOffset, Local, NParams, OpCode};
 use smallvec::{smallvec, SmallVec};
-use tracing::{debug, Level};
+use tracing::{debug, trace, Level};
 
 use crate::{codegen::optimize::optimize, SourceSpan};
 
 use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
 
 /// How an instruction influences the size of the stack
-pub struct Stack(pub i32);
+pub struct Delta(pub i32);
 
 #[derive(Default)]
 pub struct Scope {
-    pub in_scope: FnvHashMap<ontol_hir::Variable, Local>,
+    pub in_scope: FnvHashMap<ontol_hir::Var, Local>,
 }
 
 pub struct ProcBuilder {
@@ -34,7 +34,7 @@ impl ProcBuilder {
     /// implicitly pushed as the block is transitioned to.
     /// For the first block, this is the number of parameters.
     /// This block "owns" these locals, and they are allowed to be cleared before the block ends.
-    pub fn new_block(&mut self, stack_delta: Stack, span: SourceSpan) -> Block {
+    pub fn new_block(&mut self, stack_delta: Delta, span: SourceSpan) -> Block {
         let stack_start = self.stack_size as u32;
         self.stack_size += stack_delta.0;
 
@@ -80,7 +80,7 @@ impl ProcBuilder {
         &mut self,
         block: &mut Block,
         ir: Ir,
-        stack_delta: Stack,
+        stack_delta: Delta,
         span: SourceSpan,
     ) -> Local {
         let local = Local(self.stack_size as u16);
@@ -90,7 +90,7 @@ impl ProcBuilder {
     }
 
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
-        let stack_delta = Stack(local.0 as i32 - self.top().0 as i32);
+        let stack_delta = Delta(local.0 as i32 - self.top().0 as i32);
         if stack_delta.0 != 0 {
             if let Some((Ir::PopUntil(last_local), _)) = block.ir.last_mut() {
                 // peephole optimization: No need for consecutive PopUntil
@@ -146,13 +146,16 @@ impl ProcBuilder {
                     Ir::TryTakeAttr2(local, property_id) => {
                         OpCode::TryTakeAttr2(local, property_id)
                     }
-                    Ir::PutAttrValue(local, property_id) => OpCode::PutUnitAttr(local, property_id),
+                    Ir::PutAttr1(local, property_id) => OpCode::PutAttr1(local, property_id),
+                    Ir::PutAttr2(local, property_id) => OpCode::PutAttr2(local, property_id),
                     Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
-                    Ir::Constant(value, def_id) => OpCode::PushConstant(value, def_id),
+                    Ir::I64(value, def_id) => OpCode::I64(value, def_id),
+                    Ir::String(value, def_id) => OpCode::String(value, def_id),
                     Ir::Cond(predicate, block_index) => OpCode::Cond(
                         predicate,
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
+                    Ir::TypePun(local, def_id) => OpCode::TypePun(local, def_id),
                 };
                 output.push((opcode, span));
             }
@@ -171,7 +174,7 @@ impl ProcBuilder {
             }
         }
 
-        if tracing::enabled!(Level::DEBUG) {
+        if tracing::enabled!(Level::TRACE) {
             debug_output(self.n_params, &output);
         }
 
@@ -193,7 +196,7 @@ impl ProcBuilder {
 }
 
 fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
-    debug!(
+    trace!(
         "Built proc: {:?} {:#?}",
         n_params,
         output

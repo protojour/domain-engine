@@ -1,6 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{type_binding::TypeBinding, TestCompile};
-use pretty_assertions::assert_eq;
+use ontol_test_utils::{expect_eq, serde_utils::*, type_binding::TypeBinding, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -11,19 +10,19 @@ const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_un
 fn test_fake_primitives() {
     "
     pub type foo {
-        rel _ 's': string
-        rel _ 'i': int
+        rel .'s': string
+        rel .'i': int
     }
     "
     .compile_ok(|test_env| {
         let foo = TypeBinding::new(&test_env, "foo");
 
-        assert_eq!(
-            foo.serialize_identity_json(&foo.new_fake(ProcessorMode::Create)),
-            json!({
-                "s": "Patricia McClure",
-                "i": -1732221745,
-            })
+        expect_eq!(
+            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
+            expected = json!({
+                "s": "mollitia sit porro tenetur",
+                "i": 2117826670,
+            }),
         );
     });
 }
@@ -32,19 +31,19 @@ fn test_fake_primitives() {
 fn test_fake_string_like_types() {
     "
     pub type foo {
-        rel _ 'id': uuid
-        rel _ 'created_at': datetime
+        rel .'id': uuid
+        rel .'created_at': datetime
     }
     "
     .compile_ok(|test_env| {
         let foo = TypeBinding::new(&test_env, "foo");
 
-        assert_eq!(
-            foo.serialize_identity_json(&foo.new_fake(ProcessorMode::Create)),
-            json!({
+        expect_eq!(
+            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
+            expected = json!({
                 "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
                 "created_at": "1943-07-25T19:00:15.149284864+00:00",
-            })
+            }),
         );
     });
 }
@@ -54,9 +53,9 @@ fn test_fake_geojson() {
     GEOJSON.compile_ok(|test_env| {
         let geometry = TypeBinding::new(&test_env, "Geometry");
 
-        assert_eq!(
-            geometry.serialize_identity_json(&geometry.new_fake(ProcessorMode::Create)),
-            json!({
+        expect_eq!(
+            actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
+            expected = json!({
                 "type": "Polygon",
                 "coordinates": [
                     [-1732221745, 70099678],
@@ -65,7 +64,7 @@ fn test_fake_geojson() {
                     [-140280828, -2108307479],
                     [428606290, 1128193060]
                 ]
-            })
+            }),
         );
     });
 }
@@ -75,27 +74,19 @@ fn test_fake_guitar_synth() {
     GUITAR_SYNTH_UNION.compile_ok(|test_env| {
         let artist = TypeBinding::new(&test_env, "artist");
 
-        assert_eq!(
-            artist.serialize_identity_json(&artist.new_fake(ProcessorMode::Create)),
-            json!({
-                "name": "Demarco Price",
+        expect_eq!(
+            actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),
+            expected = json!({
+                "artist-id": "mollitia sit porro tenetur",
+                "name": "delectus molestias aspernatur voluptatem reprehenderit",
                 "plays": [
                     {
+                        "instrument-id": "guitar/9fe5a078-ccaa-f029-bccc-b1436ec3ffee",
                         "type": "guitar",
-                        "string_count": -1732221745,
-                        "played-by": [
-                            {
-                                "name": "Chyna Wuckert",
-                                "plays": [
-                                    {
-                                        "instrument-id": "guitar/552e9fe5-a078-ccaa-f029-bcccb1436ec3"
-                                    }
-                                ]
-                            }
-                        ]
+                        "string_count": -245468183,
                     }
                 ]
-            })
+            }),
         );
     });
 }

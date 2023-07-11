@@ -1,15 +1,51 @@
+pub type user_id { rel .is: uuid }
+pub type slug { rel.is: string }
+pub type tag { rel.is: string }
+
 pub type User {
-    rel uuid identifies: _
+    // TODO: This must be an Authly user id
+    rel .'user_id'(rel .gen: auto)|id: user_id
+    // TODO: This is.. an authly user name? Maybe?
+    rel .'username': string
+
+    // TODO: Should not store auth-related fields in memoriam,
+    // this is the responsibility of Authly.
+    rel .'email': string
+    rel .'password_hash': string
+
+    rel .'bio'(rel .default := ''): string
+    rel .'image'?: string
+
+    // TODO(constraint): User cannot follow itself
+    rel .'following'::'followed_by'? [User]
 }
 
 pub type Article {
-    rel string identifies: _
-    rel _ 'slug': string
-    rel _ 'title': string
-    rel _ 'description': string
-    rel _ 'body': string
-    rel _ 'createdAt': datetime
-    rel _ 'updatedAt': datetime
-    rel _ 'favorited_by'::'favorited' [User]
-    rel _ 'author': User
+    rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
+    // TODO(constraint): slug is unique
+    rel .'slug': slug
+    rel .'title': string
+    rel .'description': string
+    rel .'body': string
+    // TODO: Make these required generated properties:
+    rel .'createdAt'(rel .gen: create_time)?: datetime
+    rel .'updatedAt'(rel .gen: update_time)?: datetime
 }
+
+pub type Comment {
+    rel .'id'(rel .gen: auto)|id: { rel .is: int }
+    rel .'body': string
+    // TODO: Make these required generated properties:
+    rel .'createdAt'(rel .gen: create_time)?: datetime
+    rel .'updatedAt'(rel .gen: update_time)?: datetime
+}
+
+pub type TagEntity {
+    rel .'tag'|id: tag
+}
+
+rel [Article] 'author'::'authored_articles'? User
+rel Article 'favorited_by'::'favorited'? [User]
+rel [TagEntity] 'tagged'::'tags' [Article]
+rel [Comment] 'comment_on'::'comments'? Article
+rel [Comment] 'author'::'authored_comments'? User

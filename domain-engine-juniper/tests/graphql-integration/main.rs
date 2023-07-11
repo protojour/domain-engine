@@ -1,26 +1,37 @@
 use std::{fmt::Display, sync::Arc};
 
-use domain_engine_core::{Config, EngineAPIMock};
+use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
 use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
-use ontol_test_utils::{TestCompile, TestEnv};
+use ontol_test_utils::{SourceName, TestCompile, TestEnv};
 use unimock::*;
 
 mod test_graphql_basic;
+mod test_graphql_conduit;
+mod test_graphql_demo;
 mod test_graphql_input;
 
 trait TestCompileSchema {
-    fn compile_schema(self) -> (TestEnv, Schema);
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [SourceName; N],
+    ) -> (TestEnv, [Schema; N]);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
-    fn compile_schema(self) -> (TestEnv, Schema) {
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [SourceName; N],
+    ) -> (TestEnv, [Schema; N]) {
         let mut test_env = self.compile_ok(|_| {});
         // Don't want JSON schema noise in GraphQL tests:
-        test_env.test_json_schema = false;
-        (
-            test_env.clone(),
-            create_graphql_schema(test_env.root_package, test_env.env).unwrap(),
-        )
+        test_env.compile_json_schema = false;
+
+        let schemas: [Schema; N] = source_names.map(|source_name| {
+            create_graphql_schema(test_env.get_package_id(source_name.0), test_env.env.clone())
+                .unwrap()
+        });
+
+        (test_env, schemas)
     }
 }
 
@@ -57,21 +68,23 @@ impl Display for TestError {
     }
 }
 
-pub fn mock_default_config() -> impl unimock::Clause {
-    EngineAPIMock::get_config
-        .each_call(matching!())
-        .returns(Config::default())
-}
-
-pub fn mock_query_entities_empty() -> impl unimock::Clause {
-    EngineAPIMock::query_entities
-        .next_call(matching!(_))
+pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
+    DataStoreAPIMock::query
+        .next_call(matching!(_, _))
         .returns(Ok(vec![]))
 }
 
-pub fn mock_gql_context(setup: impl unimock::Clause) -> GqlContext {
+pub fn gql_ctx_mock_data_store(
+    test_env: &TestEnv,
+    data_store_package: SourceName,
+    setup: impl unimock::Clause,
+) -> GqlContext {
     GqlContext {
-        engine_api: Arc::new(Unimock::new(setup)),
+        domain_engine: Arc::new(
+            DomainEngine::builder(test_env.env.clone())
+                .mock_data_store(test_env.get_package_id(data_store_package.0), setup)
+                .build(),
+        ),
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
-    processor::{ProcessorLevel, ProcessorMode},
+    processor::{ProcessorLevel, ProcessorMode, SubProcessorContext},
     SerdeOperatorId, StructOperator,
 };
 
@@ -26,7 +26,7 @@ impl<'v> Display for ExpectingMatching<'v> {
 
 pub struct SeqElementMatch {
     pub element_operator_id: SerdeOperatorId,
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub ctx: SubProcessorContext,
 }
 
 /// Trait for matching incoming types for deserialization
@@ -221,7 +221,7 @@ pub struct SequenceMatcher<'e> {
     repetition_cursor: u16,
 
     pub type_def_id: DefId,
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub ctx: SubProcessorContext,
 }
 
 impl<'e> ValueMatcher for SequenceMatcher<'e> {
@@ -250,17 +250,13 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
 }
 
 impl<'e> SequenceMatcher<'e> {
-    pub fn new(
-        ranges: &'e [SequenceRange],
-        type_def_id: DefId,
-        rel_params_operator_id: Option<SerdeOperatorId>,
-    ) -> Self {
+    pub fn new(ranges: &'e [SequenceRange], type_def_id: DefId, ctx: SubProcessorContext) -> Self {
         Self {
             ranges,
             range_cursor: 0,
             repetition_cursor: 0,
             type_def_id,
-            rel_params_operator_id,
+            ctx,
         }
     }
 
@@ -274,7 +270,7 @@ impl<'e> SequenceMatcher<'e> {
 
                     return Some(SeqElementMatch {
                         element_operator_id: range.operator_id,
-                        rel_params_operator_id: self.rel_params_operator_id,
+                        ctx: self.ctx,
                     });
                 } else {
                     self.range_cursor += 1;
@@ -289,7 +285,7 @@ impl<'e> SequenceMatcher<'e> {
             } else {
                 return Some(SeqElementMatch {
                     element_operator_id: range.operator_id,
-                    rel_params_operator_id: self.rel_params_operator_id,
+                    ctx: self.ctx,
                 });
             }
         }
@@ -319,7 +315,7 @@ impl<'e> SequenceMatcher<'e> {
 pub struct UnionMatcher<'e> {
     pub typename: &'e str,
     pub variants: &'e [ValueUnionVariant],
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub ctx: SubProcessorContext,
     pub env: &'e Env,
     pub mode: ProcessorMode,
     pub level: ProcessorLevel,
@@ -337,9 +333,8 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     .iter()
                     .map(|discriminator| self.env.new_serde_processor(
                         discriminator.operator_id,
-                        None,
                         self.mode,
-                        ProcessorLevel::Root
+                        ProcessorLevel::new_root()
                     ))
                     .collect(),
                 logic_op: LogicOp::Or,
@@ -402,14 +397,14 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
                             seq_op.def_variant.def_id,
-                            self.rel_params_operator_id,
+                            self.ctx,
                         ))
                     }
                     SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
                             seq_op.def_variant.def_id,
-                            self.rel_params_operator_id,
+                            self.ctx,
                         ))
                     }
                     _ => panic!("not a sequence"),
@@ -436,7 +431,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
 
         Ok(MapMatcher {
             variants: self.variants,
-            rel_params_operator_id: self.rel_params_operator_id,
+            ctx: self.ctx,
             env: self.env,
             mode: self.mode,
             level: self.level,
@@ -459,8 +454,8 @@ impl<'e> UnionMatcher<'e> {
 #[derive(Clone)]
 pub struct MapMatcher<'e> {
     variants: &'e [ValueUnionVariant],
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
     env: &'e Env,
+    pub ctx: SubProcessorContext,
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
@@ -473,7 +468,7 @@ pub enum MapMatchResult<'e> {
 #[derive(Debug)]
 pub struct MapMatch<'e> {
     pub kind: MapMatchKind<'e>,
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub ctx: SubProcessorContext,
 }
 
 #[derive(Debug)]
@@ -523,9 +518,9 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Union(union_op) => {
                         match union_op.variants(self.mode, self.level) {
                             FilteredVariants::Single(_) => todo!(),
-                            FilteredVariants::Multi(variants) => MapMatcher {
+                            FilteredVariants::Union(variants) => MapMatcher {
                                 variants,
-                                rel_params_operator_id: self.rel_params_operator_id,
+                                ctx: self.ctx,
                                 env: self.env,
                                 mode: self.mode,
                                 level: self.level,
@@ -573,7 +568,7 @@ impl<'e> MapMatcher<'e> {
     fn new_match(&self, kind: MapMatchKind<'e>) -> MapMatch<'e> {
         MapMatch {
             kind,
-            rel_params_operator_id: self.rel_params_operator_id,
+            ctx: self.ctx,
         }
     }
 }

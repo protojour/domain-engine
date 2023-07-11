@@ -58,7 +58,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             let entity_attributes = executor
                 .context()
-                .engine_api
+                .domain_engine
                 .query_entities(entity_query)
                 .await?;
 

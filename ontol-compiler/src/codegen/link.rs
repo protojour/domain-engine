@@ -14,11 +14,11 @@ use super::task::ProcTable;
 pub struct LinkResult {
     pub lib: Lib,
     pub const_procs: FnvHashMap<DefId, Procedure>,
-    pub map_procs: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut map_procs: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
+    let mut map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
     let mut const_procs: FnvHashMap<DefId, Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
@@ -44,7 +44,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
         debug!("got procedure {procedure:?}");
-        map_procs.insert((from, to), procedure);
+        map_proc_table.insert((from, to), procedure);
     }
 
     // correct "call" opcodes to point to correct address
@@ -52,9 +52,9 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         if let OpCode::Call(call_procedure) = opcode {
             let map_call = &proc_table.map_calls[call_procedure.address.0 as usize];
 
-            match map_procs.get(&map_call.mapping) {
-                Some(mapping_proc) => {
-                    call_procedure.address = mapping_proc.address;
+            match map_proc_table.get(&map_call.mapping) {
+                Some(procedure) => {
+                    call_procedure.address = procedure.address;
                 }
                 None => {
                     call_procedure.address = Address(0);
@@ -73,12 +73,12 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     LinkResult {
         lib,
         const_procs,
-        map_procs,
+        map_proc_table,
     }
 }
 
 fn format_map_key(compiler: &Compiler, map_key: MapKey) -> String {
-    let ty = compiler.def_types.map.get(&map_key.def_id).unwrap();
+    let ty = compiler.def_types.table.get(&map_key.def_id).unwrap();
 
     smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }

@@ -6,7 +6,7 @@ use tracing::{debug, trace, Level};
 use crate::{
     cast::Cast,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
-    vm::abstract_vm::{AbstractVm, Stack, VmDebug},
+    vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Lib, Local, Procedure},
     DefId,
 };
@@ -15,74 +15,60 @@ use super::proc::Predicate;
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
-    abstract_vm: AbstractVm<'l>,
-    value_stack: ValueStack,
+    abstract_vm: AbstractVm<'l, OntolProcessor>,
+    processor: OntolProcessor,
 }
 
 impl<'l> OntolVm<'l> {
     pub fn new(lib: &'l Lib) -> Self {
         Self {
             abstract_vm: AbstractVm::new(lib),
-            value_stack: ValueStack::default(),
+            processor: OntolProcessor::default(),
         }
     }
 
-    pub fn eval(&mut self, proc: Procedure, args: impl IntoIterator<Item = Value>) -> Value {
+    pub fn eval(&mut self, proc: Procedure, params: impl IntoIterator<Item = Value>) -> Value {
+        self.processor.stack.extend(params);
+
         if tracing::enabled!(Level::TRACE) {
-            self.internal_eval(proc, args, &mut Tracer)
+            self.internal_eval(proc, &mut Tracer)
         } else {
-            self.internal_eval(proc, args, &mut ())
+            self.internal_eval(proc, &mut ())
         }
     }
 
+    #[inline(never)]
     pub fn internal_eval(
         &mut self,
         procedure: Procedure,
-        args: impl IntoIterator<Item = Value>,
-        debug: &mut dyn VmDebug<ValueStack>,
+        debug: &mut dyn VmDebug<OntolProcessor>,
     ) -> Value {
         debug!("evaluating {procedure:?}");
 
-        for arg in args {
-            self.value_stack.stack.push(arg);
-        }
-
         self.abstract_vm
-            .execute(procedure, &mut self.value_stack, debug);
+            .execute(procedure, &mut self.processor, debug);
 
-        let value_stack = std::mem::take(&mut self.value_stack);
-        if value_stack.stack.len() != 1 {
-            panic!("Stack did not contain one value");
-        }
+        let value_stack = std::mem::take(&mut self.processor);
         value_stack.stack.into_iter().next().unwrap()
     }
 }
 
 #[derive(Default)]
-pub struct ValueStack {
-    local0_pos: usize,
+pub struct OntolProcessor {
     stack: Vec<Value>,
 }
 
-impl Stack for ValueStack {
+impl Processor for OntolProcessor {
+    type Value = Value;
+
     #[inline(always)]
     fn size(&self) -> usize {
         self.stack.len()
     }
 
     #[inline(always)]
-    fn local0_pos(&self) -> usize {
-        self.local0_pos
-    }
-
-    #[inline(always)]
-    fn local0_pos_mut(&mut self) -> &mut usize {
-        &mut self.local0_pos
-    }
-
-    #[inline(always)]
-    fn truncate(&mut self, n_locals: usize) {
-        self.stack.truncate(self.local0_pos + n_locals);
+    fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
+        &mut self.stack
     }
 
     #[inline(always)]
@@ -99,22 +85,19 @@ impl Stack for ValueStack {
 
     #[inline(always)]
     fn bump(&mut self, source: Local) {
+        let last = self.stack.len();
         self.stack.push(Value::unit());
-        let stack_len = self.stack.len();
-        self.stack
-            .swap(self.local0_pos + source.0 as usize, stack_len - 1);
+        self.stack.swap(source.0 as usize, last);
     }
 
     #[inline(always)]
     fn pop_until(&mut self, local: Local) {
-        self.stack.truncate(self.local0_pos + local.0 as usize + 1);
+        self.stack.truncate(local.0 as usize + 1);
     }
 
     #[inline(always)]
     fn swap(&mut self, a: Local, b: Local) {
-        let stack_pos = self.local0_pos;
-        self.stack
-            .swap(stack_pos + a.0 as usize, stack_pos + b.0 as usize);
+        self.stack.swap(a.0 as usize, b.0 as usize);
     }
 
     #[inline(always)]
@@ -167,7 +150,7 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn put_unit_attr(&mut self, target: Local, key: PropertyId) {
+    fn put_attr1(&mut self, target: Local, key: PropertyId) {
         let value = self.stack.pop().unwrap();
         if !matches!(value.data, Data::Unit) {
             let map = self.struct_local_mut(target);
@@ -176,8 +159,23 @@ impl Stack for ValueStack {
     }
 
     #[inline(always)]
-    fn push_constant(&mut self, k: i64, result_type: DefId) {
+    fn put_attr2(&mut self, target: Local, key: PropertyId) {
+        let [rel_params, value]: [Value; 2] = self.pop_n();
+        if !matches!(value.data, Data::Unit) {
+            let map = self.struct_local_mut(target);
+            map.insert(key, Attribute { value, rel_params });
+        }
+    }
+
+    #[inline(always)]
+    fn push_i64(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::Int(k), result_type));
+    }
+
+    #[inline(always)]
+    fn push_string(&mut self, k: &str, result_type: DefId) {
+        self.stack
+            .push(Value::new(Data::String(k.into()), result_type));
     }
 
     #[inline(always)]
@@ -195,11 +193,17 @@ impl Stack for ValueStack {
                 value.type_def_id == *def_id
             }
             Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::Int(0)),
+            Predicate::YankFalse(local) => matches!(self.yank(*local).data, Data::Int(0)),
         }
+    }
+
+    #[inline(always)]
+    fn type_pun(&mut self, local: Local, def_id: DefId) {
+        self.local_mut(local).type_def_id = def_id;
     }
 }
 
-impl ValueStack {
+impl OntolProcessor {
     fn eval_builtin(&mut self, proc: BuiltinProc) -> Data {
         match proc {
             BuiltinProc::Add => {
@@ -230,12 +234,12 @@ impl ValueStack {
 
     #[inline(always)]
     fn local(&self, local: Local) -> &Value {
-        &self.stack[self.local0_pos + local.0 as usize]
+        &self.stack[local.0 as usize]
     }
 
     #[inline(always)]
     fn local_mut(&mut self, local: Local) -> &mut Value {
-        &mut self.stack[self.local0_pos + local.0 as usize]
+        &mut self.stack[local.0 as usize]
     }
 
     #[inline(always)]
@@ -281,16 +285,16 @@ impl ValueStack {
 
     #[inline(always)]
     fn yank(&mut self, local: Local) -> Value {
-        self.stack.remove(self.local0_pos + local.0 as usize)
+        self.stack.remove(local.0 as usize)
     }
 }
 
 struct Tracer;
 
-impl VmDebug<ValueStack> for Tracer {
-    fn tick(&mut self, vm: &AbstractVm, stack: &ValueStack) {
+impl VmDebug<OntolProcessor> for Tracer {
+    fn tick(&mut self, vm: &AbstractVm<OntolProcessor>, stack: &OntolProcessor) {
         if tracing::enabled!(Level::TRACE) {
-            for (index, value) in stack.stack.iter().skip(stack.local0_pos).enumerate() {
+            for (index, value) in stack.stack.iter().enumerate() {
                 trace!("    Local({index}): {}", ValueDebug(value));
             }
         }
@@ -306,7 +310,7 @@ mod tests {
     use crate::{
         value::Value,
         vm::proc::{AddressOffset, NParams, OpCode},
-        DefId, PackageId, RelationId,
+        DefId, PackageId,
     };
 
     use super::*;
@@ -322,10 +326,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(3)))),
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "S:0:3".parse().unwrap()),
+                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -337,11 +341,11 @@ mod tests {
                 Data::Struct(
                     [
                         (
-                            PropertyId::subject(RelationId(def_id(1))),
+                            "S:0:1".parse().unwrap(),
                             Value::new(Data::String("foo".into()), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(2))),
+                            "S:0:2".parse().unwrap(),
                             Value::new(Data::String("bar".into()), def_id(0)).into(),
                         ),
                     ]
@@ -356,10 +360,7 @@ mod tests {
         };
         let properties = attrs.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
-            FnvHashSet::from_iter([
-                PropertyId::subject(RelationId(def_id(3))),
-                PropertyId::subject(RelationId(def_id(4)))
-            ]),
+            FnvHashSet::from_iter(["S:0:3".parse().unwrap(), "S:0:4".parse().unwrap(),]),
             properties
         );
     }
@@ -388,17 +389,17 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(1)))),
+                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
                 OpCode::Call(double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(4)))),
+                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(2)))),
+                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
                 // 5, 6:
-                OpCode::TakeAttr2(Local(0), PropertyId::subject(RelationId(def_id(3)))),
+                OpCode::TakeAttr2(Local(0), "S:0:3".parse().unwrap()),
                 OpCode::Clone(Local(4)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutUnitAttr(Local(1), PropertyId::subject(RelationId(def_id(5)))),
+                OpCode::PutAttr1(Local(1), "S:0:5".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
         );
@@ -410,15 +411,15 @@ mod tests {
                 Data::Struct(
                     [
                         (
-                            PropertyId::subject(RelationId(def_id(1))),
+                            "S:0:1".parse().unwrap(),
                             Value::new(Data::Int(333), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(2))),
+                            "S:0:2".parse().unwrap(),
                             Value::new(Data::Int(10), def_id(0)).into(),
                         ),
                         (
-                            PropertyId::subject(RelationId(def_id(3))),
+                            "S:0:3".parse().unwrap(),
                             Value::new(Data::Int(11), def_id(0)).into(),
                         ),
                     ]
@@ -431,10 +432,10 @@ mod tests {
         let Data::Struct(mut attrs) = output.data else {
             panic!();
         };
-        let Data::Int(a) = attrs.remove(&PropertyId::subject(RelationId(def_id(4)))).unwrap().value.data else {
+        let Data::Int(a) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = attrs.remove(&PropertyId::subject(RelationId(def_id(5)))).unwrap().value.data else {
+        let Data::Int(b) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);
@@ -451,12 +452,12 @@ mod tests {
                 // result sequence
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
                 // index counter
-                OpCode::PushConstant(0, def_id(0)),
+                OpCode::I64(0, def_id(0)),
                 // Offset(2): for each in Local(0)
                 OpCode::Iter(Local(0), Local(2), AddressOffset(4)),
                 OpCode::Return(Local(1)),
                 // Offset(4): map item
-                OpCode::PushConstant(2, def_id(0)),
+                OpCode::I64(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
                 // add rel params
                 OpCode::CallBuiltin(BuiltinProc::NewUnit, def_id(0)),
@@ -493,8 +494,8 @@ mod tests {
     fn flat_map_object() {
         let mut lib = Lib::default();
 
-        let prop_a = PropertyId::subject(RelationId(def_id(0)));
-        let prop_b = PropertyId::subject(RelationId(def_id(1)));
+        let prop_a: PropertyId = "S:0:0".parse().unwrap();
+        let prop_b: PropertyId = "S:0:1".parse().unwrap();
 
         let proc = lib.append_procedure(
             NParams(1),
@@ -504,7 +505,7 @@ mod tests {
                 // [b] -> Local(4):
                 OpCode::TakeAttr2(Local(0), prop_b),
                 // counter -> Local(5):
-                OpCode::PushConstant(0, def_id(0)),
+                OpCode::I64(0, def_id(0)),
                 // output -> Local(6):
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
                 OpCode::Iter(Local(4), Local(5), AddressOffset(6)),
@@ -513,9 +514,9 @@ mod tests {
                 // New object -> Local(9)
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 OpCode::Clone(Local(2)),
-                OpCode::PutUnitAttr(Local(9), prop_a),
+                OpCode::PutAttr1(Local(9), prop_a),
                 OpCode::Bump(Local(8)),
-                OpCode::PutUnitAttr(Local(9), prop_b),
+                OpCode::PutAttr1(Local(9), prop_b),
                 OpCode::Bump(Local(7)),
                 OpCode::AppendAttr2(Local(6)),
                 OpCode::PopUntil(Local(6)),
@@ -552,7 +553,7 @@ mod tests {
         );
 
         assert_eq!(
-            "[{subj(0, 0): 'a', subj(0, 1): 'b0'}, {subj(0, 0): 'a', subj(0, 1): 'b1'}]",
+            "[{S:0:0 -> 'a', S:0:1 -> 'b0'}, {S:0:0 -> 'a', S:0:1 -> 'b1'}]",
             format!("{}", ValueDebug(&output))
         );
     }
@@ -561,7 +562,7 @@ mod tests {
     fn discriminant_cond() {
         let mut lib = Lib::default();
 
-        let prop = PropertyId::subject(RelationId(def_id(42)));
+        let prop: PropertyId = "S:0:42".parse().unwrap();
         let inner_def_id = def_id(100);
 
         let proc = lib.append_procedure(
@@ -579,8 +580,8 @@ mod tests {
                 ),
                 OpCode::Goto(AddressOffset(3)),
                 // AddressOffset(6):
-                OpCode::PushConstant(666, def_id(200)),
-                OpCode::PutUnitAttr(Local(1), prop),
+                OpCode::I64(666, def_id(200)),
+                OpCode::PutAttr1(Local(1), prop),
                 OpCode::Goto(AddressOffset(3)),
             ],
         );
@@ -610,7 +611,7 @@ mod tests {
         );
 
         assert_eq!(
-            "{subj(0, 42): int(666)}",
+            "{S:0:42 -> int(666)}",
             format!(
                 "{}",
                 ValueDebug(

@@ -1,0 +1,142 @@
+// -----------------------------------
+// database
+
+/// Item type enum
+type ItemType {
+    /// worthless junk
+    rel .is?: 'worthless junk'
+    /// ancient treasure
+    rel .is?: 'ancient treasure'
+    /// alien artifact
+    rel .is?: 'alien artifact'
+}
+type archive_item {
+    rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
+    rel .'created': datetime
+    rel .'updated': datetime
+    rel .'archived': datetime
+    rel .'name': string
+    rel .'description': string
+    rel .'asset_score': int
+    rel .'type': ItemType
+}
+type archive_group {
+    rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
+    rel .'created': datetime
+    rel .'updated': datetime
+    rel .'archived': datetime
+    rel .'name': string
+    rel .'description': string
+    rel .'start_date': datetime
+    rel .'end_date': datetime
+}
+rel [archive_group] 'archive_items'::'archive_groups' [archive_item]
+
+// -----------------------------------
+// public API
+
+/// Common dates for Archive entities
+type ArchiveDates {
+    /// The (estimated) date the archived object was created
+    rel .'createdAt': datetime
+    /// The date the archived object was last updated
+    rel .'updatedAt': datetime
+    /// The date the archived object was entered into the collection
+    rel .'archivedAt': datetime
+}
+/// ## An Archived Object
+/// Comments support [Markdown](https://www.markdownguide.org/)
+pub type ArchiveObject {
+    /// ID of the object
+    rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
+    /// Relevant dates for the object
+    rel .'dates': ArchiveDates
+    /// Name of the object
+    rel .'name': string
+    /// Description of the object
+    rel .'description': string
+    /// Relative value of the object
+    rel .'assetScoreTimesTen': int
+    /// Classification of the object
+    rel .'kind': ItemType
+}
+/// ## An Archived Object Collection
+/// A collection of archived objects
+pub type ArchiveCollection {
+    /// ID of the collection
+    rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
+    /// Relevant dates for the collection
+    rel .'dates': ArchiveDates
+    /// Name of the collection
+    rel .'name': string
+    /// Description of the collection
+    rel .'description': string
+    /// Start date; earliest (estimated)
+    /// creation date of object in collection
+    rel .'startDate': datetime
+    /// Start date; latest (estimated)
+    /// creation date of object in collection
+    rel .'endDate': datetime
+}
+/// Relation between ArchiveCollections and ArchiveObjects
+rel [ArchiveCollection] 'archiveObjects'::'archiveCollections' [ArchiveObject]
+
+map {
+    // variables for mapping values between
+    // map arms are created as needed
+    archive_item {
+        'id': id
+        'created': cr
+        'updated':  up
+        'archived': ar
+        'name': n
+        'description': d
+        'asset_score': s
+        'type': t
+    }
+    // variables must all be used
+    // and correspond between map arms
+    ArchiveObject {
+        // values can be remapped structurally
+        'id': id
+        'dates': ArchiveDates {
+            'createdAt': cr
+            'updatedAt': up
+            'archivedAt': ar
+        }
+        'name': n
+        'description': d
+        // ONTOL supports many transformations
+        // the inverse transformation is applied automatically
+        'assetScoreTimesTen': s * 10
+        'kind': t
+    }
+}
+
+map {
+    archive_group {
+        'id': id
+        'created': cr
+        'updated': up
+        'archived': ar
+        'name': n
+        'description': d
+        'start_date': sd
+        'end_date': ed
+        // the previous map is reused here
+        'archive_items': [ai]
+    }
+    ArchiveCollection {
+        'id': id
+        'dates': ArchiveDates {
+            'createdAt': cr
+            'updatedAt': up
+            'archivedAt': ar
+        }
+        'name': n
+        'description': d
+        'startDate': sd
+        'endDate': ed
+        'archiveObjects': [ai]
+    }
+}

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use ontol_parser::Token;
-use ontol_runtime::format_utils::{LogicOp, Missing};
+use ontol_runtime::format_utils::{Backticks, CommaSeparated, FmtMap, LogicOp, Missing};
 use smartstring::alias::String;
 use thiserror::Error;
 
@@ -18,120 +18,206 @@ pub struct UnifiedCompileError {
 #[error("")]
 pub struct SpannedCompileError {
     pub error: CompileError,
+    pub span: SourceSpan,
+    pub notes: Vec<SpannedNote>,
+}
 
+#[derive(Debug)]
+pub enum CompileError {
+    Lex(LexError),
+    Parse(ParseError),
+    PackageNotFound,
+    WildcardNeedsContextualBlock,
+    InvalidExpression,
+    IncorrectNumberOfArguments { expected: u8, actual: u8 },
+    NotCallable,
+    TypeNotFound,
+    PrivateType,
+    DuplicateTypeDefinition,
+    NamespaceNotFound,
+    InvalidType,
+    InvalidInteger,
+    DomainTypeExpected,
+    InvalidRelationType,
+    DuplicateAnonymousRelationship,
+    SubjectMustBeDomainType,
+    ObjectMustBeDataType,
+    FmtTooFewTransitions,
+    FmtMisplacedWildcard,
+    InvalidMixOfRelationshipTypeForSubject,
+    CannotMixIndexedRelationIdentsAndEdgeTypes,
+    NoPropertiesExpected,
+    ExpectedExpressionAttribute,
+    NamedPropertyExpected,
+    UnknownProperty,
+    DuplicateProperty,
+    TypeMismatch { actual: String, expected: String },
+    MissingProperties(Vec<String>),
+    UnboundVariable,
+    VariableMustBeSequenceEnclosed(String),
+    CannotDiscriminateType,
+    UnionTreeNotSupported,
+    UnitTypePartOfUnion(String),
+    NoUniformDiscriminatorFound,
+    SharedPrefixInPatternUnion,
+    AlreadyIdentifiesAType,
+    AlreadyIdentified,
+    MustIdentifyWithinDomain,
+    NonDisjointIdsInEntityUnion,
+    UnionInNamedRelationshipNotSupported,
+    UnsupportedCardinality,
+    InvalidCardinaltyCombinationInUnion,
+    CannotConvertMissingMapping { input: String, output: String },
+    NonEntityInReverseRelationship,
+    OverlappingSequenceIndexes,
+    UnsupportedSequenceIndexType,
+    ConstructorMismatch,
+    CannotConcatenateStringPattern,
+    InvalidRegex(String),
+    InvalidTypeParameters,
+    UnknownTypeParameter,
+    CannotMapUnion,
+    NoRelationParametersExpected,
+    IncompatibleLiteral,
+    CannotGenerateValue(String),
+    TODO(String),
+}
+
+impl std::error::Error for CompileError {}
+
+impl std::fmt::Display for CompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Lex(err) => write!(f, "lex error: {err}"),
+            Self::Parse(err) => {
+                write!(f, "parse error: {err}")
+            }
+            Self::PackageNotFound => write!(f, "package not found"),
+            Self::WildcardNeedsContextualBlock => {
+                write!(f, "using `.` requires a contextual block")
+            }
+            Self::InvalidExpression => write!(f, "invalid expression"),
+            Self::IncorrectNumberOfArguments { expected, actual } => write!(
+                f,
+                "function takes {expected} parameters, but {actual} was supplied",
+            ),
+            Self::NotCallable => write!(f, "not callable"),
+            Self::TypeNotFound => write!(f, "type not found"),
+            Self::PrivateType => write!(f, "private type"),
+            Self::DuplicateTypeDefinition => {
+                write!(f, "duplicate type definition")
+            }
+            Self::NamespaceNotFound => write!(f, "namespace not found"),
+            Self::InvalidType => write!(f, "invalid type"),
+            Self::InvalidInteger => write!(f, "invalid integer"),
+            Self::DomainTypeExpected => write!(f, "expected domain type"),
+            Self::InvalidRelationType => write!(f, "invalid relation type"),
+            Self::DuplicateAnonymousRelationship => {
+                write!(f, "duplicate anonymous relationship")
+            }
+            Self::SubjectMustBeDomainType => write!(f, "subject must be a domain type"),
+            Self::ObjectMustBeDataType => write!(f, "object must be a data type"),
+            Self::FmtTooFewTransitions => {
+                write!(f, "fmt needs at least two transitions: `fmt a => b => c`")
+            }
+            Self::FmtMisplacedWildcard => {
+                write!(f, "fmt only supports `.` at the final target position")
+            }
+            Self::InvalidMixOfRelationshipTypeForSubject => {
+                write!(f, "invalid mix of relationship type for subject")
+            }
+            Self::CannotMixIndexedRelationIdentsAndEdgeTypes => {
+                write!(f, "cannot mix index relation identifiers and edge types")
+            }
+            Self::NoPropertiesExpected => write!(f, "no properties expected"),
+            Self::ExpectedExpressionAttribute => write!(f, "expected expression attribute"),
+            Self::NamedPropertyExpected => write!(f, "expected named property"),
+            Self::UnknownProperty => write!(f, "unknown property"),
+            Self::DuplicateProperty => write!(f, "duplicate property"),
+            Self::TypeMismatch { actual, expected } => {
+                write!(f, "type mismatch: expected `{expected}`, found `{actual}`")
+            }
+            Self::MissingProperties(props) => {
+                write!(
+                    f,
+                    "{msg} {props}",
+                    msg = if props.len() == 1 {
+                        "missing property"
+                    } else {
+                        "missing properties"
+                    },
+                    props = CommaSeparated(FmtMap(props, Backticks))
+                )
+            }
+            Self::UnboundVariable => write!(f, "unbound variable"),
+            Self::VariableMustBeSequenceEnclosed(var) => {
+                write!(f, "[{var}] variable must be enclosed in []")
+            }
+            Self::CannotDiscriminateType => write!(f, "cannot discriminate type"),
+            Self::UnionTreeNotSupported => write!(f, "union tree not supported"),
+            Self::UnitTypePartOfUnion(name) => {
+                write!(f, "unit type `{name}` cannot be part of a union",)
+            }
+            Self::NoUniformDiscriminatorFound => {
+                write!(f, "no uniform discriminator found for union variants")
+            }
+            Self::SharedPrefixInPatternUnion => write!(
+                f,
+                "variants of the union have prefixes that are prefixes of other variants"
+            ),
+            Self::AlreadyIdentifiesAType => write!(f, "already identifies a type"),
+            Self::AlreadyIdentified => write!(
+                f,
+                "already identified by another type; secondary ids not supported (yet)"
+            ),
+            Self::MustIdentifyWithinDomain => {
+                write!(f, "must identify a type within the domain")
+            }
+            Self::NonDisjointIdsInEntityUnion => write!(
+                f,
+                "entity variants of the union are not uniquely identifiable"
+            ),
+            Self::UnionInNamedRelationshipNotSupported => write!(
+                f,
+                "union in named relationship is not supported yet. Make a union type instead."
+            ),
+            Self::UnsupportedCardinality => write!(f, "unsupported cardinality"),
+            Self::InvalidCardinaltyCombinationInUnion => {
+                write!(f, "invalid cardinality combination in union")
+            }
+            Self::CannotConvertMissingMapping { input, output } => write!(
+                f,
+                "cannot convert this `{output}` from `{input}`: These types are not equated.",
+            ),
+            Self::NonEntityInReverseRelationship => {
+                write!(f, "only entities may have named reverse relationship")
+            }
+            Self::OverlappingSequenceIndexes => write!(f, "overlapping indexes"),
+            Self::UnsupportedSequenceIndexType => write!(f, "unsupported sequence index type"),
+            Self::ConstructorMismatch => write!(f, "constructor mismatch"),
+            Self::CannotConcatenateStringPattern => write!(f, "cannot concatenate string pattern"),
+            Self::InvalidRegex(regex) => write!(f, "invalid regex: {regex}"),
+            Self::InvalidTypeParameters => write!(f, "invalid type parameters"),
+            Self::UnknownTypeParameter => write!(f, "unknown type parameter"),
+            Self::CannotMapUnion => write!(f, "cannot map a union, map each variant instead"),
+            Self::NoRelationParametersExpected => write!(f, "no relation parameters expected"),
+            Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
+            Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
+            Self::TODO(msg) => write!(f, "TODO: {msg}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SpannedNote {
+    pub note: Note,
     pub span: SourceSpan,
 }
 
 #[derive(Debug, Error)]
-pub enum CompileError {
-    #[error("lex error: {0}")]
-    Lex(LexError),
-    #[error("parse error: {0}")]
-    Parse(ParseError),
-    #[error("package not found")]
-    PackageNotFound,
-    #[error("using `_` requires a contextual block")]
-    WildcardNeedsContextualBlock,
-    #[error("invalid expression")]
-    InvalidExpression,
-    #[error("function takes {expected} parameters, but {actual} was supplied")]
-    IncorrectNumberOfArguments { expected: u8, actual: u8 },
-    #[error("not callable")]
-    NotCallable,
-    #[error("type not found")]
-    TypeNotFound,
-    #[error("private type")]
-    PrivateType,
-    #[error("duplicate type definition")]
-    DuplicateTypeDefinition,
-    #[error("namespace not found")]
-    NamespaceNotFound,
-    #[error("invalid type")]
-    InvalidType,
-    #[error("invalid integer")]
-    InvalidInteger,
-    #[error("expected domain type")]
-    DomainTypeExpected,
-    #[error("invalid relation type")]
-    InvalidRelationType,
-    #[error("duplicate anonymous relationship")]
-    DuplicateAnonymousRelationship,
-    #[error("subject must be a domain type")]
-    SubjectMustBeDomainType,
-    #[error("object must be a data type")]
-    ObjectMustBeDataType,
-    #[error("fmt needs at least two transitions: `fmt a => b => c`")]
-    FmtTooFewTransitions,
-    #[error("fmt only supports `_` at the final target position")]
-    FmtMisplacedWildcard,
-    #[error("invalid mix of relationship type for subject")]
-    InvalidMixOfRelationshipTypeForSubject,
-    #[error("cannot mix index relation identifiers and edge types")]
-    CannotMixIndexedRelationIdentsAndEdgeTypes,
-    #[error("no properties expected")]
-    NoPropertiesExpected,
-    #[error("expected expression")]
-    AnonymousPropertyExpected,
-    #[error("expected named property")]
-    NamedPropertyExpected,
-    #[error("unknown property")]
-    UnknownProperty,
-    #[error("duplicate property")]
-    DuplicateProperty,
-    #[error("type mismatch: expected `{expected}`, found `{actual}`")]
-    TypeMismatch { actual: String, expected: String },
-    #[error("missing property `{0}`")]
-    MissingProperty(String),
-    #[error("unbound variable")]
-    UnboundVariable,
-    #[error("[{0}] variable must be enclosed in []")]
-    VariableMustBeSequenceEnclosed(String),
-    #[error("cannot discriminate type")]
-    CannotDiscriminateType,
-    #[error("union tree not supported")]
-    UnionTreeNotSupported,
-    #[error("unit type `{0}` cannot be part of a union")]
-    UnitTypePartOfUnion(String),
-    #[error("no uniform discriminator found for union variants")]
-    NoUniformDiscriminatorFound,
-    #[error("variants of the union have prefixes that are prefixes of other variants")]
-    SharedPrefixInPatternUnion,
-    #[error("already identifies another type")]
-    AlreadyIdentifiesAType,
-    #[error("already identified by another type; secondary ids not supported (yet)")]
-    AlreadyIdentified,
-    #[error("must identify a type within the domain")]
-    MustIdentifyWithinDomain,
-    #[error("entity variants of the union are not uniquely identifiable")]
-    NonDisjointIdsInEntityUnion,
-    #[error("union in named relationship is not supported yet. Make a union type instead.")]
-    UnionInNamedRelationshipNotSupported,
-    #[error("unsupported cardinality")]
-    UnsupportedCardinality,
-    #[error("invalid cardinality combination in union")]
-    InvalidCardinaltyCombinationInUnion,
-    #[error("cannot convert this `{output}` from `{input}`: These types are not equated.")]
-    CannotConvertMissingMapping { input: String, output: String },
-    #[error("only entities may have named reverse relationship")]
-    NonEntityInReverseRelationship,
-    #[error("overlapping indexes")]
-    OverlappingSequenceIndexes,
-    #[error("unsupported sequence index type")]
-    UnsupportedSequenceIndexType,
-    #[error("constructor mismatch")]
-    ConstructorMismatch,
-    #[error("cannot concatenate string pattern")]
-    CannotConcatenateStringPattern,
-    #[error("invalid regex: {0}")]
-    InvalidRegex(String),
-    #[error("invalid type parameters")]
-    InvalidTypeParameters,
-    #[error("unknown type parameter")]
-    UnknownTypeParameter,
-    #[error("cannot map a union, map each variant instead")]
-    CannotMapUnion,
-    #[error("TODO: {0}")]
-    TODO(String),
+pub enum Note {
+    #[error("Consider using a one way mapping (`map => {{ .. }}`) here")]
+    ConsiderUsingOneWayMap,
 }
 
 #[derive(Debug)]
@@ -236,6 +322,7 @@ impl CompileError {
         SpannedCompileError {
             error: self,
             span: *span,
+            notes: vec![],
         }
     }
 }
@@ -246,6 +333,10 @@ pub struct CompileErrors {
 }
 
 impl CompileErrors {
+    pub fn extend(&mut self, errors: CompileErrors) {
+        self.errors.extend(errors.errors);
+    }
+
     pub fn push(&mut self, error: SpannedCompileError) {
         self.errors.push(error);
     }

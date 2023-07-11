@@ -1,12 +1,17 @@
 use ontol_runtime::MapKey;
-use ontol_test_utils::{type_binding::TypeBinding, TestEnv};
+use ontol_test_utils::{
+    expect_eq,
+    serde_utils::{inspect_de, inspect_ser},
+    type_binding::TypeBinding,
+    TestEnv,
+};
 
 mod test_map_basic;
 mod test_unify_partial;
 
 mod test_map_entity;
 
-trait IntoKey: Sized {
+pub trait IntoKey: Sized {
     fn into_key(self) -> Key;
     fn unit(self) -> Key {
         self.into_key()
@@ -30,15 +35,15 @@ impl IntoKey for &'static str {
     }
 }
 
+pub enum Key {
+    Unit(&'static str),
+    Seq(&'static str),
+}
+
 impl IntoKey for Key {
     fn into_key(self) -> Key {
         self
     }
-}
-
-enum Key {
-    Unit(&'static str),
-    Seq(&'static str),
 }
 
 impl Key {
@@ -50,7 +55,7 @@ impl Key {
     }
 }
 
-fn assert_domain_map(
+pub fn assert_domain_map(
     test_env: &TestEnv,
     (from, to): (impl IntoKey, impl IntoKey),
     input: serde_json::Value,
@@ -62,7 +67,7 @@ fn assert_domain_map(
     let input_binding = TypeBinding::new(test_env, from.typename());
     let output_binding = TypeBinding::new(test_env, to.typename());
 
-    let value = input_binding.deserialize_value(input).unwrap();
+    let value = inspect_de(&input_binding).value(input).unwrap();
 
     fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
         let seq = matches!(key, Key::Seq(_));
@@ -87,9 +92,9 @@ fn assert_domain_map(
     let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {
-        Key::Unit(_) => output_binding.serialize_identity_json(&value),
-        Key::Seq(_) => output_binding.serialize_dynamic_sequence_json(&value),
+        Key::Unit(_) => inspect_ser(&output_binding).json(&value),
+        Key::Seq(_) => inspect_ser(&output_binding).dynamic_sequence_json(&value),
     };
 
-    assert_eq!(expected, output_json);
+    expect_eq!(actual = output_json, expected = expected);
 }

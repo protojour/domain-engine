@@ -8,7 +8,7 @@ use smartstring::alias::String;
 use crate::{
     discriminator::{VariantDiscriminator, VariantPurpose},
     value::PropertyId,
-    vm::proc::Address,
+    value_generator::ValueGenerator,
     DefId, DefVariant,
 };
 
@@ -33,7 +33,7 @@ pub enum SerdeOperator {
     /// Always deserializes into a string, ignores capture groups:
     StringPattern(DefId),
 
-    /// Deserializes into a Map if there are capture groups:
+    /// Deserializes into a Struct if there are capture groups:
     CapturingStringPattern(DefId),
 
     /// Special operator for serialization, can serialize a sequence of anything,
@@ -151,19 +151,18 @@ impl UnionOperator {
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        match (mode, level) {
-            (ProcessorMode::Select, _) | (_, ProcessorLevel::Root) => {
-                let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
-                    variant.discriminator.purpose > VariantPurpose::Identification
-                });
+        if matches!(mode, ProcessorMode::Inspect) || level.is_root() {
+            let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
+                variant.discriminator.purpose > VariantPurpose::Identification
+            });
 
-                if let Some((skip_index, _)) = skip_id {
-                    Self::filtered_variants(&self.variants[skip_index..])
-                } else {
-                    Self::filtered_variants(&self.variants)
-                }
+            if let Some((skip_index, _)) = skip_id {
+                Self::filtered_variants(&self.variants[skip_index..])
+            } else {
+                Self::filtered_variants(&self.variants)
             }
-            _ => Self::filtered_variants(&self.variants),
+        } else {
+            Self::filtered_variants(&self.variants)
         }
     }
 
@@ -171,7 +170,7 @@ impl UnionOperator {
         if variants.len() == 1 {
             FilteredVariants::Single(variants[0].operator_id)
         } else {
-            FilteredVariants::Multi(variants)
+            FilteredVariants::Union(variants)
         }
     }
 
@@ -182,7 +181,8 @@ impl UnionOperator {
 
 pub enum FilteredVariants<'e> {
     Single(SerdeOperatorId),
-    Multi(&'e [ValueUnionVariant]),
+    /// Should serialize one of the union members
+    Union(&'e [ValueUnionVariant]),
 }
 
 #[derive(Clone, Debug)]
@@ -196,15 +196,86 @@ pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub properties: IndexMap<String, SerdeProperty>,
-    // This number _includes_ required properties with _default fallback values_.
-    pub n_mandatory_properties: usize,
+}
+
+impl StructOperator {
+    pub fn filter_properties(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
+    ) -> impl Iterator<Item = (&String, &SerdeProperty)> {
+        self.properties
+            .iter()
+            .filter(move |(_, property)| property.filter(mode, parent_property_id).is_some())
+    }
+
+    pub fn required_count(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
+    ) -> usize {
+        self.filter_properties(mode, parent_property_id)
+            .filter(|(_, property)| !property.is_optional())
+            .count()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct SerdeProperty {
+    /// The ID of this property
     pub property_id: PropertyId,
+
+    /// The operator id for the value of this property
     pub value_operator_id: SerdeOperatorId,
-    pub optional: bool,
-    pub default_const_proc_address: Option<Address>,
+
+    /// Various flags
+    pub flags: SerdePropertyFlags,
+
+    /// Value generator
+    pub value_generator: Option<ValueGenerator>,
+
     pub rel_params_operator_id: Option<SerdeOperatorId>,
+}
+
+impl SerdeProperty {
+    #[inline]
+    pub fn is_optional(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::OPTIONAL)
+    }
+
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::READ_ONLY)
+    }
+
+    #[inline]
+    pub fn filter(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<PropertyId>,
+    ) -> Option<&Self> {
+        if !matches!(mode, ProcessorMode::Read | ProcessorMode::Inspect) && self.is_read_only() {
+            return None;
+        }
+
+        if let Some(parent_property_id) = parent_property_id {
+            // Filter out if this property is the mirrored property of the parent property
+            if self.property_id.relationship_id == parent_property_id.relationship_id
+                && self.property_id.role != parent_property_id.role
+            {
+                return None;
+            }
+        }
+
+        Some(self)
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct SerdePropertyFlags: u32 {
+        const OPTIONAL       = 0b00000001;
+        const READ_ONLY      = 0b00000010;
+        const ENTITY_ID      = 0b00000100;
+    }
 }

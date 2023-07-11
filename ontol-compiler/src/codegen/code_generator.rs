@@ -1,8 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_hir::{
-    kind::{MatchArm, NodeKind, PatternBinding, PropPattern, PropVariant},
-    Variable,
-};
+use ontol_hir::{GetKind, HasDefault, PropPattern};
 use ontol_runtime::{
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
@@ -10,126 +7,160 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    codegen::{ir::Terminator, proc_builder::Stack},
+    codegen::{data_flow_analyzer::DataFlowAnalyzer, ir::Terminator, proc_builder::Delta},
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
-    CompileErrors, SpannedCompileError,
+    CompileErrors, Compiler, SpannedCompileError, NO_SPAN,
 };
 
 use super::{
     ir::Ir,
     proc_builder::{Block, ProcBuilder},
-    task::{find_mapping_key, ProcTable},
+    task::ProcTable,
+    type_mapper::TypeMapper,
 };
 
-pub(super) fn const_codegen(
+pub(super) fn const_codegen<'m>(
     proc_table: &mut ProcTable,
-    expr: TypedHirNode,
+    expr: TypedHirNode<'m>,
     def_id: DefId,
-    errors: &mut CompileErrors,
-) {
+    compiler: &Compiler<'m>,
+) -> CompileErrors {
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let mut errors = CompileErrors::default();
+
     debug!("Generating code for\n{}", expr);
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(0), expr.meta.span);
+    let mut block = builder.new_block(Delta(0), expr.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors,
+        errors: &mut errors,
+        type_mapper,
     };
     generator.gen_node(expr, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
     proc_table.const_procedures.insert(def_id, builder);
+    errors
 }
 
-pub(super) fn map_codegen(
+/// The intention for this is to be parallelizable,
+/// but that won't work with `&mut ProcTable`.
+/// Maybe find a solution for that.
+pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
-    func: HirFunc,
-    errors: &mut CompileErrors,
-) -> bool {
+    func: HirFunc<'m>,
+    compiler: &Compiler<'m>,
+) -> CompileErrors {
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
+    let mut errors = CompileErrors::default();
+
     debug!("Generating code for\n{}", func);
 
-    let return_ty = func.body.meta.ty;
+    let return_ty = func.body.ty();
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Stack(1), func.body.meta.span);
+    let mut block = builder.new_block(Delta(1), func.body.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors,
+        errors: &mut errors,
+        type_mapper,
     };
-    generator.scope.insert(func.arg.variable, Local(0));
+    generator.scope.insert(func.arg.var, Local(0));
     generator.gen_node(func.body, &mut block);
     builder.commit(block, Terminator::Return(builder.top()));
 
-    match (find_mapping_key(func.arg.ty), find_mapping_key(return_ty)) {
-        (Some(from_def), Some(to_def)) => {
+    match (
+        type_mapper.find_mapping_info(func.arg.ty),
+        type_mapper.find_mapping_info(return_ty),
+    ) {
+        (Some(from_info), Some(to_info)) => {
             proc_table
                 .map_procedures
-                .insert((from_def, to_def), builder);
-            true
+                .insert((from_info.key, to_info.key), builder);
+
+            if let Some(data_flow) = data_flow {
+                proc_table
+                    .propflow_table
+                    .insert((from_info.key, to_info.key), data_flow);
+            }
+
+            errors
         }
-        (from_def, to_def) => {
-            panic!("Problem finding def ids: ({from_def:?}, {to_def:?})");
+        (from_info, to_info) => {
+            panic!("Problem finding def ids: ({from_info:?}, {to_info:?})");
         }
     }
 }
 
-pub(super) struct CodeGenerator<'a> {
+pub(super) struct CodeGenerator<'a, 'm> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
+    pub type_mapper: TypeMapper<'a, 'm>,
 
-    scope: FnvHashMap<Variable, Local>,
+    scope: FnvHashMap<ontol_hir::Var, Local>,
 }
 
-impl<'a> CodeGenerator<'a> {
-    fn gen_node(&mut self, node: TypedHirNode, block: &mut Block) {
-        let ty = node.meta.ty;
-        let span = node.meta.span;
-        match node.kind {
-            NodeKind::VariableRef(var) => match self.scope.get(&var) {
+impl<'a, 'm> CodeGenerator<'a, 'm> {
+    fn gen_node(&mut self, TypedHirNode(kind, meta): TypedHirNode<'m>, block: &mut Block) {
+        let ty = meta.ty;
+        let span = meta.span;
+        match kind {
+            ontol_hir::Kind::Var(var) => match self.scope.get(&var) {
                 Some(local) => {
                     self.builder
-                        .append(block, Ir::Clone(*local), Stack(1), span);
+                        .append(block, Ir::Clone(*local), Delta(1), span);
                 }
                 None => {
                     self.errors.push(SpannedCompileError {
                         error: CompileError::UnboundVariable,
-                        span: node.meta.span,
+                        span,
+                        notes: vec![],
                     });
                 }
             },
-            NodeKind::Unit => {
+            ontol_hir::Kind::Unit => {
                 self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
             }
-            NodeKind::Int(int) => {
+            ontol_hir::Kind::Int(int) => {
                 self.builder.append(
                     block,
-                    Ir::Constant(int, ty.get_single_def_id().unwrap()),
-                    Stack(1),
+                    Ir::I64(int, ty.get_single_def_id().unwrap()),
+                    Delta(1),
                     span,
                 );
             }
-            NodeKind::Let(binder, definition, body) => {
+            ontol_hir::Kind::String(string) => {
+                self.builder.append(
+                    block,
+                    Ir::String(string, ty.get_single_def_id().unwrap()),
+                    Delta(1),
+                    span,
+                );
+            }
+            ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(*definition, block);
-                self.scope.insert(binder.0, self.builder.top());
+                self.scope.insert(binder.var, self.builder.top());
                 for node in body {
                     self.gen_node(node, block);
                 }
-                self.scope.remove(&binder.0);
+                self.scope.remove(&binder.var);
             }
-            NodeKind::Call(proc, params) => {
-                let stack_delta = Stack(-(params.len() as i32) + 1);
+            ontol_hir::Kind::Call(proc, params) => {
+                let stack_delta = Delta(-(params.len() as i32) + 1);
                 for param in params {
                     self.gen_node(param, block);
                 }
@@ -141,88 +172,116 @@ impl<'a> CodeGenerator<'a> {
                     span,
                 );
             }
-            NodeKind::Map(param) => {
-                let from = find_mapping_key(param.meta.ty).unwrap();
-                let to = find_mapping_key(ty).unwrap();
+            ontol_hir::Kind::Map(param) => {
+                let from = self.type_mapper.find_mapping_info(param.ty()).unwrap();
+                let to = self.type_mapper.find_mapping_info(ty).unwrap();
 
                 self.gen_node(*param, block);
 
-                let proc = Procedure {
-                    address: self.proc_table.gen_mapping_addr(from, to),
-                    n_params: NParams(1),
-                };
+                if from.key == to.key {
+                    if let Some(alias) = to.alias {
+                        let local = self.builder.top();
+                        self.builder
+                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    } else {
+                        // Nothing needs to be done
+                    }
+                } else {
+                    let proc = Procedure {
+                        address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                        n_params: NParams(1),
+                    };
 
-                self.builder.append(block, Ir::Call(proc), Stack(0), span);
+                    self.builder.append(block, Ir::Call(proc), Delta(0), span);
+                    if let Some(alias) = to.alias {
+                        let local = self.builder.top();
+                        self.builder
+                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    }
+                }
             }
-            NodeKind::Seq(_label, _attr) => {
+            ontol_hir::Kind::Seq(_label, _attr) => {
                 todo!("seq");
             }
-            NodeKind::Struct(binder, nodes) => {
+            ontol_hir::Kind::Struct(binder, nodes) => {
                 let def_id = ty.get_single_def_id().unwrap();
                 let local = self.builder.append(
                     block,
                     Ir::CallBuiltin(BuiltinProc::NewStruct, def_id),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
-                self.scope.insert(binder.0, local);
+                self.scope.insert(binder.var, local);
                 for node in nodes {
                     self.gen_node(node, block);
                     self.builder.append_pop_until(block, local, span);
                 }
-                self.scope.remove(&binder.0);
+                self.scope.remove(&binder.var);
             }
-            NodeKind::Prop(struct_var, id, variants) => {
-                for variant in variants {
-                    if let PropVariant::Present { dimension: _, attr } = variant {
-                        // FIXME: Don't ignore relation parameters!
-                        // self.generate(*variant.attr.rel, block);
-                        // let rel = self.builder.top();
-                        self.gen_node(*attr.val, block);
+            ontol_hir::Kind::Prop(_, struct_var, id, variants) => {
+                if let Some(ontol_hir::PropVariant { dimension: _, attr }) =
+                    variants.into_iter().next()
+                {
+                    let struct_local = self.var_local(struct_var);
 
-                        let struct_local = self.var_local(struct_var);
+                    match attr.rel.kind() {
+                        ontol_hir::Kind::Unit => {
+                            self.gen_node(*attr.val, block);
+                            self.builder.append(
+                                block,
+                                Ir::PutAttr1(struct_local, id),
+                                Delta(-1),
+                                span,
+                            );
+                        }
+                        _ => {
+                            self.gen_node(*attr.rel, block);
+                            let rel_local = self.builder.top();
+                            self.gen_node(*attr.val, block);
 
-                        self.builder.append(
-                            block,
-                            Ir::PutAttrValue(struct_local, id),
-                            Stack(-1),
-                            span,
-                        );
+                            self.builder
+                                .append(block, Ir::Clone(rel_local), Delta(1), span);
 
-                        return;
+                            self.builder.append(
+                                block,
+                                Ir::PutAttr2(struct_local, id),
+                                Delta(-2),
+                                span,
+                            );
+                        }
                     }
                 }
             }
-            NodeKind::MatchProp(struct_var, id, arms) => {
+            ontol_hir::Kind::MatchProp(struct_var, id, arms) => {
                 let struct_local = self.var_local(struct_var);
 
                 if arms.len() > 1 {
                     if arms
                         .iter()
-                        .any(|arm| matches!(arm.pattern, PropPattern::Absent))
+                        .any(|arm| matches!(arm.pattern, ontol_hir::PropPattern::Absent))
                     {
                         self.builder.append(
                             block,
                             Ir::TryTakeAttr2(struct_local, id),
                             // even if three locals are pushed, the `status` one
                             // is not kept track of here.
-                            Stack(2),
+                            Delta(2),
                             span,
                         );
 
                         let status_local = self.builder.top_minus(1);
                         let post_cond_offset = block.current_offset().plus(1);
 
-                        // These overlaps with the status_local, but that will be removed in the Cond opcode,
+                        // These overlap with the status_local, but that will be yanked(!) in the Cond opcode,
                         // leading into the present block.
                         let val_local = self.builder.top();
                         let rel_local = self.builder.top_minus(1);
 
                         let present_body_index = {
-                            let mut present_block = self.builder.new_block(Stack(0), span);
+                            let mut present_block = self.builder.new_block(Delta(0), span);
 
                             for arm in arms {
-                                if !matches!(arm.pattern, PropPattern::Absent) {
+                                if !matches!(arm.pattern, ontol_hir::PropPattern::Absent) {
                                     self.gen_match_arm(
                                         arm,
                                         (rel_local, val_local),
@@ -240,51 +299,116 @@ impl<'a> CodeGenerator<'a> {
                         self.builder.append(
                             block,
                             Ir::Cond(Predicate::YankTrue(status_local), present_body_index),
-                            Stack(0),
+                            Delta(0),
                             span,
                         );
                     } else {
                         todo!();
                     }
                 } else {
-                    self.builder
-                        .append(block, Ir::TakeAttr2(struct_local, id), Stack(2), span);
+                    let arm = arms.into_iter().next().unwrap();
 
-                    let val_local = self.builder.top();
-                    let rel_local = self.builder.top_minus(1);
+                    match &arm.pattern {
+                        PropPattern::Seq(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
+                            self.builder.append(
+                                block,
+                                Ir::TryTakeAttr2(struct_local, id),
+                                Delta(2),
+                                span,
+                            );
 
-                    for arm in arms {
-                        self.gen_match_arm(arm, (rel_local, val_local), block);
+                            let status_local = self.builder.top_minus(1);
+                            let post_cond_offset = block.current_offset().plus(1);
+
+                            // These overlap with the status_local, but that will be yanked(!) in the Cond opcode,
+                            // leading into the present block.
+                            let val_local = self.builder.top();
+                            let rel_local = self.builder.top_minus(1);
+
+                            // Code for generating the default values:
+                            let default_fallback_body_index = {
+                                let mut default_block = self.builder.new_block(Delta(0), span);
+
+                                // rel_params (unit)
+                                self.builder.append(
+                                    &mut default_block,
+                                    Ir::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
+                                    Delta(0),
+                                    NO_SPAN,
+                                );
+                                // empty sequence
+                                self.builder.append(
+                                    &mut default_block,
+                                    Ir::CallBuiltin(
+                                        BuiltinProc::NewSeq,
+                                        binder.ty.get_single_def_id().unwrap(),
+                                    ),
+                                    Delta(0),
+                                    NO_SPAN,
+                                );
+
+                                self.builder.commit(
+                                    default_block,
+                                    Terminator::PopGoto(block.index(), post_cond_offset),
+                                )
+                            };
+
+                            // If the TryTakeAttr2 was false, run the default body
+                            self.builder.append(
+                                block,
+                                Ir::Cond(
+                                    Predicate::YankFalse(status_local),
+                                    default_fallback_body_index,
+                                ),
+                                Delta(0),
+                                span,
+                            );
+
+                            self.gen_match_arm(arm, (rel_local, val_local), block);
+                        }
+                        _ => {
+                            self.builder.append(
+                                block,
+                                Ir::TakeAttr2(struct_local, id),
+                                Delta(2),
+                                span,
+                            );
+
+                            let val_local = self.builder.top();
+                            let rel_local = self.builder.top_minus(1);
+
+                            self.gen_match_arm(arm, (rel_local, val_local), block);
+                        }
                     }
                 }
             }
-            NodeKind::Gen(seq_var, iter_binder, nodes) => {
+            ontol_hir::Kind::Gen(seq_var, iter_binder, nodes) => {
                 let seq_local = self.var_local(seq_var);
-                let elem_ty = match ty {
-                    Type::Array(elem_ty) => elem_ty,
+                let val_ty = match ty {
+                    Type::Seq(_, val_ty) => val_ty,
                     _ => panic!("Not an array"),
                 };
                 let out_seq = self.builder.append(
                     block,
                     Ir::CallBuiltin(
                         BuiltinProc::NewSeq,
-                        elem_ty
+                        val_ty
                             .get_single_def_id()
-                            .unwrap_or_else(|| panic!("elem_ty: {elem_ty:?}")),
+                            .unwrap_or_else(|| panic!("val_ty: {val_ty:?}")),
                     ),
-                    Stack(1),
+                    Delta(1),
                     span,
                 );
-                let counter =
-                    self.builder
-                        .append(block, Ir::Constant(0, DefId::unit()), Stack(1), span);
+                let counter = self
+                    .builder
+                    .append(block, Ir::I64(0, DefId::unit()), Delta(1), span);
 
                 let iter_offset = block.current_offset();
                 let elem_rel_local = self.builder.top_plus(1);
                 let elem_val_local = self.builder.top_plus(2);
 
                 let iter_body_index = {
-                    let mut iter_block = self.builder.new_block(Stack(2), span);
+                    let mut iter_block = self.builder.new_block(Delta(2), span);
 
                     self.gen_in_scope(
                         &[
@@ -306,16 +430,16 @@ impl<'a> CodeGenerator<'a> {
                 self.builder.append(
                     block,
                     Ir::Iter(seq_local, counter, iter_body_index),
-                    Stack(0),
+                    Delta(0),
                     span,
                 );
 
                 self.builder.append_pop_until(block, out_seq, span);
             }
-            NodeKind::Iter(..) => {
+            ontol_hir::Kind::Iter(..) => {
                 todo!("iter");
             }
-            NodeKind::Push(seq_var, attr) => {
+            ontol_hir::Kind::Push(seq_var, attr) => {
                 let top = self.builder.top();
                 let seq_local = self.var_local(seq_var);
                 self.gen_node(*attr.rel, block);
@@ -324,10 +448,10 @@ impl<'a> CodeGenerator<'a> {
                 self.gen_node(*attr.val, block);
 
                 self.builder
-                    .append(block, Ir::Clone(rel_local), Stack(1), span);
+                    .append(block, Ir::Clone(rel_local), Delta(1), span);
 
                 self.builder
-                    .append(block, Ir::AppendAttr2(seq_local), Stack(-2), span);
+                    .append(block, Ir::AppendAttr2(seq_local), Delta(-2), span);
 
                 self.builder.append_pop_until(block, top, span);
             }
@@ -336,40 +460,40 @@ impl<'a> CodeGenerator<'a> {
 
     fn gen_match_arm(
         &mut self,
-        arm: MatchArm<TypedHir>,
+        arm: ontol_hir::MatchArm<'m, TypedHir>,
         (rel_local, val_local): (Local, Local),
         block: &mut Block,
     ) {
         match arm.pattern {
-            PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
+            ontol_hir::PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
                 &[(rel_local, rel_binding), (val_local, val_binding)],
                 arm.nodes.into_iter(),
                 block,
             ),
-            PropPattern::Seq(seq_binding) => self.gen_in_scope(
+            ontol_hir::PropPattern::Seq(binding, _has_default) => self.gen_in_scope(
                 &[
-                    (rel_local, PatternBinding::Wildcard),
-                    (val_local, seq_binding),
+                    (rel_local, ontol_hir::Binding::Wildcard),
+                    (val_local, binding),
                 ],
                 arm.nodes.into_iter(),
                 block,
             ),
-            PropPattern::Absent => {
+            ontol_hir::PropPattern::Absent => {
                 todo!("Arm pattern not present")
             }
         }
     }
 
-    fn gen_in_scope<'m>(
+    fn gen_in_scope(
         &mut self,
-        scopes: &[(Local, PatternBinding)],
+        scopes: &[(Local, ontol_hir::Binding<TypedHir>)],
         nodes: impl Iterator<Item = TypedHirNode<'m>>,
         block: &mut Block,
     ) {
         for (local, binding) in scopes {
-            if let PatternBinding::Binder(var) = binding {
-                if self.scope.insert(*var, *local).is_some() {
-                    panic!("Variable {var} already in scope");
+            if let ontol_hir::Binding::Binder(binder) = binding {
+                if self.scope.insert(binder.var, *local).is_some() {
+                    panic!("Variable {} already in scope", binder.var);
                 }
             }
         }
@@ -379,13 +503,13 @@ impl<'a> CodeGenerator<'a> {
         }
 
         for (_, binding) in scopes {
-            if let PatternBinding::Binder(var) = binding {
-                self.scope.remove(var);
+            if let ontol_hir::Binding::Binder(binder) = binding {
+                self.scope.remove(&binder.var);
             }
         }
     }
 
-    fn var_local(&self, var: Variable) -> Local {
+    fn var_local(&self, var: ontol_hir::Var) -> Local {
         *self
             .scope
             .get(&var)

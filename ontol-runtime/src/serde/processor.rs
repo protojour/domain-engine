@@ -11,23 +11,78 @@ use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
 #[derive(Copy, Clone, Debug)]
 pub enum ProcessorMode {
     Create,
+    Read,
     Update,
-    Select,
+    /// Used for inspecting the fields of types.
+    /// Should not be used for serialization or deserialization.
+    Inspect,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum ProcessorLevel {
-    Root,
-    Child,
+pub struct ProcessorLevel {
+    level: u16,
+    recursion_limit: u16,
 }
 
-/// SerdeProcessor is handle serializing and deserializing domain types in an optimized way.
-/// Each serde-enabled type has its own operator, which is cached
-/// in the compilerironment.
-#[derive(Clone, Copy)]
-pub struct SerdeProcessor<'e> {
-    /// The operator used for (de)serializing this value
-    pub value_operator: &'e SerdeOperator,
+/// Maximum number of nested/recursive operators.
+const DEFAULT_RECURSION_LIMIT: u16 = 128;
+
+impl ProcessorLevel {
+    pub const fn new_root() -> Self {
+        Self {
+            level: 0,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn new_root_with_recursion_limit(limit: u16) -> Self {
+        Self {
+            level: 0,
+            recursion_limit: limit,
+        }
+    }
+
+    pub const fn new_child() -> Self {
+        Self {
+            level: 1,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn child(self) -> Result<Self, RecursionLimitError> {
+        if self.level == self.recursion_limit {
+            return Err(RecursionLimitError);
+        }
+        Ok(Self {
+            level: self.level + 1,
+            recursion_limit: self.recursion_limit,
+        })
+    }
+
+    pub const fn is_root(&self) -> bool {
+        self.level == 0
+    }
+
+    pub const fn current_level(&self) -> u16 {
+        self.level
+    }
+}
+
+pub struct RecursionLimitError;
+
+impl RecursionLimitError {
+    pub fn to_ser_error<E: serde::ser::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
+
+    pub fn to_de_error<E: serde::de::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct SubProcessorContext {
+    pub parent_property_id: Option<PropertyId>,
 
     /// The edge properties used for (de)serializing the _edge data_
     /// related to this value when it's associated with a "parent value" through a relation.
@@ -36,6 +91,17 @@ pub struct SerdeProcessor<'e> {
     /// The parent (often the subject) map has an attribute that is another child map.
     /// The edge data would be injected in the child map as the `_edge` property.
     pub rel_params_operator_id: Option<SerdeOperatorId>,
+}
+
+/// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
+/// Each serde-enabled type has its own operator, which is cached
+/// in the runtime environment.
+#[derive(Clone, Copy)]
+pub struct SerdeProcessor<'e> {
+    /// The operator used for (de)serializing this value
+    pub value_operator: &'e SerdeOperator,
+
+    pub ctx: SubProcessorContext,
 
     /// The environment, via which new SerdeOperators can be created.
     pub(crate) env: &'e Env,
@@ -51,40 +117,52 @@ impl<'e> SerdeProcessor<'e> {
 
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
-        self.env.new_serde_processor(
-            operator_id,
-            self.rel_params_operator_id,
-            self.mode,
-            self.level,
-        )
+        Self {
+            env: self.env,
+            value_operator: self.env.get_serde_operator(operator_id),
+            ctx: self.ctx,
+            mode: self.mode,
+            level: self.level,
+        }
     }
 
-    pub fn narrow_with_rel(
+    pub fn narrow_with_context(
         &self,
         operator_id: SerdeOperatorId,
-        rel_params_operator_id: Option<SerdeOperatorId>,
+        ctx: SubProcessorContext,
     ) -> Self {
-        self.env
-            .new_serde_processor(operator_id, rel_params_operator_id, self.mode, self.level)
+        Self {
+            env: self.env,
+            value_operator: self.env.get_serde_operator(operator_id),
+            ctx,
+            mode: self.mode,
+            level: self.level,
+        }
     }
 
     /// Return a processor that processes a new value that is a child value of this processor.
-    pub fn new_child(&self, operator_id: SerdeOperatorId) -> Self {
-        self.env
-            .new_serde_processor(operator_id, None, self.mode, ProcessorLevel::Child)
+    pub fn new_child(&self, operator_id: SerdeOperatorId) -> Result<Self, RecursionLimitError> {
+        Ok(Self {
+            env: self.env,
+            value_operator: self.env.get_serde_operator(operator_id),
+            ctx: Default::default(),
+            mode: self.mode,
+            level: self.level.child()?,
+        })
     }
 
-    pub fn new_child_with_rel(
+    pub fn new_child_with_context(
         &self,
         operator_id: SerdeOperatorId,
-        rel_params_operator_id: Option<SerdeOperatorId>,
-    ) -> Self {
-        self.env.new_serde_processor(
-            operator_id,
-            rel_params_operator_id,
-            self.mode,
-            ProcessorLevel::Child,
-        )
+        ctx: SubProcessorContext,
+    ) -> Result<Self, RecursionLimitError> {
+        Ok(Self {
+            env: self.env,
+            value_operator: self.env.get_serde_operator(operator_id),
+            ctx,
+            mode: self.mode,
+            level: self.level.child()?,
+        })
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
@@ -97,7 +175,7 @@ impl<'e> SerdeProcessor<'e> {
                 FilteredVariants::Single(operator_id) => {
                     self.narrow(operator_id).find_property(prop)
                 }
-                FilteredVariants::Multi(variants) => {
+                FilteredVariants::Union(variants) => {
                     for variant in variants {
                         if let Some(property_id) =
                             self.narrow(variant.operator_id).find_property(prop)
@@ -124,7 +202,7 @@ impl<'e> Debug for SerdeProcessor<'e> {
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
             .field("operator", self.value_operator)
-            .field("rel_params_operator_id", &self.rel_params_operator_id)
+            .field("rel_params_operator_id", &self.ctx.rel_params_operator_id)
             .finish()
     }
 }

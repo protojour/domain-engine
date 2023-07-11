@@ -1,5 +1,6 @@
 use juniper::LookAheadMethods;
-use tracing::debug;
+use ontol_runtime::query::{Query, StructOrUnionQuery};
+use tracing::trace;
 
 use crate::{
     gql_scalar::GqlScalar,
@@ -56,14 +57,20 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
                     let input_attribute = args_wrapper.deserialize_attribute(input, info.env())?;
-                    let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let struct_query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let query = match struct_query {
+                        StructOrUnionQuery::Struct(struct_query) => Query::Struct(struct_query),
+                        StructOrUnionQuery::Union(def_id, structs) => {
+                            Query::StructUnion(def_id, structs)
+                        }
+                    };
 
-                    debug!("CREATE {input_attribute:#?} -> {query:#?}");
+                    trace!("CREATE {input_attribute:#?} -> {query:#?}");
 
                     let value = executor
                         .context()
-                        .engine_api
-                        .create_entity(input_attribute.value, query)
+                        .domain_engine
+                        .store_new_entity(input_attribute.value, query)
                         .await?;
 
                     resolve_virtual_schema_field(
@@ -85,13 +92,13 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
 
                     let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
 
-                    debug!("UPDATE {id_attribute:?} -> {input_attribute:#?} -> {query:#?}");
+                    trace!("UPDATE {id_attribute:?} -> {input_attribute:#?} -> {query:#?}");
                     Ok(juniper::Value::Null)
                 }
                 FieldKind::DeleteMutation { id } => {
                     let id_value = args_wrapper.deserialize_attribute(id, info.env())?;
 
-                    debug!("DELETE {id_value:?}");
+                    trace!("DELETE {id_value:?}");
 
                     Ok(juniper::Value::Null)
                 }

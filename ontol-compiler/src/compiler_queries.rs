@@ -1,12 +1,10 @@
 //! Traits that can be implemented for "variants" of the compiler
 
-use ontol_runtime::{DefId, RelationId};
+use ontol_runtime::DefId;
 
 use crate::{
-    def::{Defs, Relation, Relationship},
-    relation::{Relations, RelationshipId},
+    def::Defs,
     types::{DefTypes, TypeRef},
-    SpannedBorrow,
 };
 
 fn get<T: AsRef<U>, U>(owner: &T) -> &U {
@@ -28,13 +26,13 @@ where
     T: AsRef<Defs<'m>> + AsRef<DefTypes<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
-        get::<_, DefTypes>(self).map.get(&def_id).copied()
+        get::<_, DefTypes>(self).table.get(&def_id).copied()
     }
 
     fn expect_def_type(&self, def_id: DefId) -> TypeRef<'m> {
-        match get::<_, DefTypes>(self).map.get(&def_id) {
+        match get::<_, DefTypes>(self).table.get(&def_id) {
             Some(type_ref) => type_ref,
-            None => match get::<_, Defs>(self).map.get(&def_id) {
+            None => match get::<_, Defs>(self).table.get(&def_id) {
                 Some(def) => {
                     panic!("BUG: Type not found for {def_id:?}: {def:?}");
                 }
@@ -43,70 +41,5 @@ where
                 }
             },
         }
-    }
-}
-
-pub struct RelationshipMeta<'m> {
-    pub relationship_id: RelationshipId,
-    pub relationship: SpannedBorrow<'m, Relationship>,
-    pub relation: SpannedBorrow<'m, Relation<'m>>,
-}
-
-pub trait GetPropertyMeta<'m> {
-    fn get_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
-
-    fn property_meta_by_subject(
-        &self,
-        subject_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
-
-    fn property_meta_by_object(
-        &self,
-        object_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
-}
-
-impl<'m, T> GetPropertyMeta<'m> for T
-where
-    T: AsRef<Relations> + AsRef<Defs<'m>>,
-{
-    fn get_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
-    }
-
-    fn property_meta_by_subject(
-        &self,
-        subject_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        let relationship_id = get::<_, Relations>(self)
-            .relationships_by_subject
-            .get(&(subject_id, relation_id))
-            .cloned()
-            .ok_or(())?;
-
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
-    }
-
-    fn property_meta_by_object(
-        &self,
-        object_id: DefId,
-        relation_id: RelationId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
-        let relationship_id = get::<_, Relations>(self)
-            .relationships_by_object
-            .get(&(object_id, relation_id))
-            .cloned()
-            .ok_or(())?;
-
-        get::<_, Defs<'m>>(self).lookup_relationship_meta(relationship_id)
     }
 }

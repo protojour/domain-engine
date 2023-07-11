@@ -1,12 +1,14 @@
-use std::sync::Arc;
+pub mod data_store;
+mod domain_engine;
+pub mod domain_error;
 
-use thiserror::Error;
+mod entity_id_utils;
+mod in_memory_store;
+mod query_data_flow;
+mod resolve_path;
 
-use ontol_runtime::{
-    env::Env,
-    query::{EntityQuery, StructOrUnionQuery},
-    value::{Attribute, Value},
-};
+pub use domain_engine::DomainEngine;
+pub use domain_error::{DomainError, DomainResult};
 
 pub struct Config {
     pub default_limit: u32,
@@ -15,47 +17,5 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self { default_limit: 20 }
-    }
-}
-
-#[derive(Error, Clone, Debug)]
-pub enum DomainError {}
-
-#[unimock::unimock(api = EngineAPIMock)]
-#[async_trait::async_trait]
-pub trait EngineAPI: Send + Sync + 'static {
-    fn get_config(&self) -> &Config;
-
-    async fn query_entities(&self, query: EntityQuery) -> Result<Vec<Attribute>, DomainError>;
-
-    async fn create_entity(
-        &self,
-        value: Value,
-        query: StructOrUnionQuery,
-    ) -> Result<Value, DomainError>;
-}
-
-pub struct Engine {
-    env: Arc<Env>,
-    config: Arc<Config>,
-}
-
-#[async_trait::async_trait]
-impl EngineAPI for Engine {
-    fn get_config(&self) -> &Config {
-        &self.config
-    }
-
-    async fn query_entities(&self, _query: EntityQuery) -> Result<Vec<Attribute>, DomainError> {
-        let _ = self.env.domains().count();
-        Ok(vec![])
-    }
-
-    async fn create_entity(
-        &self,
-        _value: Value,
-        _query: StructOrUnionQuery,
-    ) -> Result<Value, DomainError> {
-        Ok(Value::unit())
     }
 }

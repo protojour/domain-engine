@@ -54,9 +54,8 @@ impl StringPattern {
                             type_info
                                 .operator_id
                                 .expect("No operator id for pattern constant part"),
-                            None,
                             ProcessorMode::Create,
-                            ProcessorLevel::Root,
+                            ProcessorLevel::new_root(),
                         );
 
                         let attribute = processor

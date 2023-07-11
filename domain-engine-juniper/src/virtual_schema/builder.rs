@@ -3,8 +3,8 @@ use ontol_runtime::{
     env::{Env, TypeInfo},
     serde::{
         operator::{
-            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator,
-            ValueOperator,
+            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, SerdePropertyFlags,
+            StructOperator, ValueOperator,
         },
         processor::{ProcessorLevel, ProcessorMode},
     },
@@ -18,9 +18,9 @@ use crate::virtual_schema::schema::{classify_type, TypeClassification};
 use super::{
     argument,
     data::{
-        EdgeData, EntityData, FieldData, FieldKind, IdPropertyData, NativeScalarKind,
-        NativeScalarRef, NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData,
-        TypeData, TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+        EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, NodeData,
+        ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData, TypeIndex,
+        TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
     },
     namespace::Namespace,
     schema::NodeClassification,
@@ -242,14 +242,16 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 },
             ),
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Select, ProcessorLevel::Root) {
+                match union_op.variants(ProcessorMode::Inspect, ProcessorLevel::new_root()) {
                     FilteredVariants::Single(operator_id) => {
                         self.make_node_type_inner(type_info, operator_id)
                     }
-                    FilteredVariants::Multi(variants) => {
+                    FilteredVariants::Union(variants) => {
                         let node_index =
                             self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
                         let mut type_variants = vec![];
+
+                        let mut needs_scalar = false;
 
                         for variant in variants {
                             match classify_type(self.env, variant.operator_id) {
@@ -265,7 +267,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 }
                                 TypeClassification::Id => {}
                                 TypeClassification::NativeScalar => {
-                                    panic!("BUG: Scalar in union");
+                                    needs_scalar = true;
                                 }
                             }
                         }
@@ -282,10 +284,16 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                 partial_input_typename: Some(
                                     self.namespace.union_partial_input(type_info),
                                 ),
-                                kind: TypeKind::Union(UnionData {
-                                    union_def_id: type_info.def_id,
-                                    variants: type_variants,
-                                }),
+                                kind: if needs_scalar {
+                                    TypeKind::CustomScalar(ScalarData {
+                                        serde_operator_id: operator_id,
+                                    })
+                                } else {
+                                    TypeKind::Union(UnionData {
+                                        union_def_id: type_info.def_id,
+                                        variants: type_variants,
+                                    })
+                                },
                             },
                         )
                     }
@@ -315,16 +323,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     },
                 )
             }
-            operator => NewType::NativeScalar(self.make_new_native_scalar(operator_id, operator)),
+            operator => NewType::NativeScalar(NativeScalarRef {
+                operator_id,
+                kind: self.get_native_scalar_kind(operator),
+            }),
         }
     }
 
-    fn make_new_native_scalar(
-        &mut self,
-        operator_id: SerdeOperatorId,
-        serde_operator: &SerdeOperator,
-    ) -> NativeScalarRef {
-        let kind = match serde_operator {
+    fn get_native_scalar_kind(&mut self, serde_operator: &SerdeOperator) -> NativeScalarKind {
+        match serde_operator {
             SerdeOperator::Unit => NativeScalarKind::Unit,
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
                 NativeScalarKind::Bool
@@ -336,15 +343,15 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
-            SerdeOperator::ValueType(_)
-            | SerdeOperator::Union(_)
+            SerdeOperator::ValueType(value_op) => {
+                self.get_native_scalar_kind(self.env.get_serde_operator(value_op.inner_operator_id))
+            }
+            op @ (SerdeOperator::Union(_)
             | SerdeOperator::Struct(_)
             | SerdeOperator::DynamicSequence
             | SerdeOperator::RelationSequence(_)
-            | SerdeOperator::ConstructorSequence(_) => panic!("not a native scalar"),
-        };
-
-        NativeScalarRef { operator_id, kind }
+            | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {op:?}"),
+        }
     }
 
     fn make_value_op_type_kind(
@@ -357,7 +364,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 self.make_value_op_type_kind(type_info, inner_value_op)
             }
             SerdeOperator::Struct(struct_op) => self.make_struct_op_type_kind(type_info, struct_op),
-            other => panic!("Unsupported: {other:?}"),
+            // other => panic!("Unsupported: {other:?}"),
+            _ => TypeKind::CustomScalar(ScalarData {
+                serde_operator_id: value_op.inner_operator_id,
+            }),
         }
     }
 
@@ -368,26 +378,6 @@ impl<'a> VirtualSchemaBuilder<'a> {
     ) -> TypeKind {
         let operator_id = type_info.operator_id.unwrap();
         let mut fields = IndexMap::default();
-
-        if let Some(entity_info) = &type_info.entity_info {
-            if let Some(id_field_name) = &entity_info.id_inherent_property_name {
-                fields.insert(
-                    id_field_name.clone(),
-                    FieldData {
-                        kind: FieldKind::Id(IdPropertyData {
-                            relation_id: entity_info.id_relation_id,
-                            operator_id: entity_info.id_operator_id,
-                        }),
-                        field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(
-                            NativeScalarRef {
-                                operator_id: entity_info.id_operator_id,
-                                kind: NativeScalarKind::ID,
-                            },
-                        )),
-                    },
-                );
-            }
-        }
 
         self.register_struct_op_fields(
             struct_op,
@@ -495,8 +485,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
                                         property_id: property.property_id,
                                         value_operator_id: property.value_operator_id,
                                     }),
-                                    field_type: TypeRef::mandatory(edge_ref)
-                                        .to_array(Optionality::from_optional(property.optional)),
+                                    field_type: TypeRef::mandatory(edge_ref).to_array(
+                                        Optionality::from_optional(property.is_optional()),
+                                    ),
                                 },
                             );
                         }
@@ -504,10 +495,25 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             debug!("Id not handled here");
                         }
                         TypeClassification::NativeScalar => {
-                            panic!(
-                                "Unhandled scalar: {:?}",
-                                self.env.get_serde_operator(seq_op.ranges[0].operator_id)
-                            )
+                            let scalar_ref = UnitTypeRef::NativeScalar(NativeScalarRef {
+                                operator_id: property.value_operator_id,
+                                kind: self.get_native_scalar_kind(
+                                    self.env.get_serde_operator(seq_op.ranges[0].operator_id),
+                                ),
+                            });
+
+                            fields.insert(
+                                field_namespace.unique_literal(property_name),
+                                FieldData {
+                                    kind: make_property_field_kind(PropertyData {
+                                        property_id: property.property_id,
+                                        value_operator_id: property.value_operator_id,
+                                    }),
+                                    field_type: TypeRef::mandatory(scalar_ref).to_array(
+                                        Optionality::from_optional(property.is_optional()),
+                                    ),
+                                },
+                            );
                         }
                     }
                 }
@@ -518,9 +524,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     );
                 }
                 operator => {
-                    let scalar_ref = UnitTypeRef::NativeScalar(
-                        self.make_new_native_scalar(property.value_operator_id, operator),
-                    );
+                    let scalar_ref = UnitTypeRef::NativeScalar(NativeScalarRef {
+                        operator_id: property.value_operator_id,
+                        kind: if property.flags.contains(SerdePropertyFlags::ENTITY_ID) {
+                            NativeScalarKind::ID
+                        } else {
+                            self.get_native_scalar_kind(operator)
+                        },
+                    });
                     fields.insert(
                         field_namespace.unique_literal(property_name),
                         FieldData {
@@ -530,7 +541,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             }),
                             field_type: TypeRef {
                                 modifier: TypeModifier::new_unit(Optionality::from_optional(
-                                    property.optional,
+                                    property.is_optional(),
                                 )),
                                 unit: scalar_ref,
                             },
@@ -558,7 +569,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 value_operator_id: property.value_operator_id,
             }),
             field_type: TypeRef {
-                modifier: TypeModifier::new_unit(Optionality::from_optional(property.optional)),
+                modifier: TypeModifier::new_unit(Optionality::from_optional(
+                    property.is_optional(),
+                )),
                 unit: unit_ref,
             },
         }

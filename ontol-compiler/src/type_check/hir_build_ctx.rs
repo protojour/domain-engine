@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
-use ontol_hir::{Label, Variable};
+use smartstring::alias::String;
 
-use crate::{expr::ExprId, types::TypeRef, SourceSpan};
+use crate::{def::MapDirection, expr::ExprId, types::TypeRef, SourceSpan};
 
 use super::inference::Inference;
 
@@ -9,34 +9,46 @@ use super::inference::Inference;
 pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
+    pub map_kw_span: SourceSpan,
+    pub direction: MapDirection,
     pub inference: Inference<'m>,
-    pub explicit_variables: FnvHashMap<ExprId, ExplicitVariable>,
-    pub label_map: FnvHashMap<ExprId, Label>,
+    pub expr_variables: FnvHashMap<ExprId, ExpressionVariable>,
+    pub label_map: FnvHashMap<ExprId, ontol_hir::Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
-    pub variable_mapping: FnvHashMap<Variable, VariableMapping<'m>>,
+    pub variable_mapping: FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
+
+    pub object_to_edge_expr_id: FnvHashMap<ExprId, ExprId>,
 
     pub partial: bool,
 
+    pub var_allocator: ontol_hir::VarAllocator,
+
     /// Which Arm is currently processed in a map statement:
     pub arm: Arm,
+
     ctrl_flow_depth: CtrlFlowDepth,
-    next_variable: Variable,
+
+    pub missing_properties: FnvHashMap<Arm, FnvHashMap<SourceSpan, Vec<String>>>,
 }
 
 impl<'m> HirBuildCtx<'m> {
-    pub fn new() -> Self {
+    pub fn new(map_kw_span: SourceSpan, direction: MapDirection) -> Self {
         Self {
+            map_kw_span,
+            direction,
             inference: Inference::new(),
-            explicit_variables: Default::default(),
+            expr_variables: Default::default(),
             label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
             variable_mapping: Default::default(),
+            object_to_edge_expr_id: Default::default(),
             partial: false,
             arm: Arm::First,
             ctrl_flow_depth: CtrlFlowDepth(0),
-            next_variable: Variable(0),
+            var_allocator: Default::default(),
+            missing_properties: FnvHashMap::default(),
         }
     }
 
@@ -51,16 +63,10 @@ impl<'m> HirBuildCtx<'m> {
 
         ret
     }
-
-    pub fn alloc_variable(&mut self) -> Variable {
-        let next = self.next_variable;
-        self.next_variable.0 += 1;
-        next
-    }
 }
 
-pub struct ExplicitVariable {
-    pub variable: Variable,
+pub struct ExpressionVariable {
+    pub variable: ontol_hir::Var,
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
@@ -78,7 +84,7 @@ pub struct ExplicitVariableArm {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CtrlFlowGroup {
-    pub label: Label,
+    pub label: ontol_hir::Label,
     pub bind_depth: CtrlFlowDepth,
 }
 
@@ -86,15 +92,15 @@ pub struct CtrlFlowGroup {
 #[derive(Default)]
 pub struct CtrlFlowForest {
     /// if the map is self-referential, that means a root
-    map: FnvHashMap<Label, Label>,
+    map: FnvHashMap<ontol_hir::Label, ontol_hir::Label>,
 }
 
 impl CtrlFlowForest {
-    pub fn insert(&mut self, label: Label, parent_label: Option<Label>) {
+    pub fn insert(&mut self, label: ontol_hir::Label, parent_label: Option<ontol_hir::Label>) {
         self.map.insert(label, parent_label.unwrap_or(label));
     }
 
-    pub fn find_parent(&self, label: Label) -> Option<Label> {
+    pub fn find_parent(&self, label: ontol_hir::Label) -> Option<ontol_hir::Label> {
         let parent = self.map.get(&label).unwrap();
         if parent == &label {
             None
@@ -103,7 +109,7 @@ impl CtrlFlowForest {
         }
     }
 
-    pub fn find_root(&self, mut label: Label) -> Label {
+    pub fn find_root(&self, mut label: ontol_hir::Label) -> ontol_hir::Label {
         loop {
             let parent = self.map.get(&label).unwrap();
             if parent == &label {

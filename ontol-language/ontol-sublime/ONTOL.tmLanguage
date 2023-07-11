@@ -14,7 +14,7 @@
 			<key>comment</key>
 			<string>use declaration</string>
 			<key>match</key>
-			<string>^(use)</string>
+			<string>\b(use)\b</string>
 			<key>name</key>
 			<string>keyword.import.ontol</string>
 		</dict>
@@ -22,7 +22,7 @@
 			<key>comment</key>
 			<string>use as declaration</string>
 			<key>match</key>
-			<string>\s(as)\s</string>
+			<string>\b(as)\b</string>
 			<key>name</key>
 			<string>keyword.import.as.ontol</string>
 		</dict>
@@ -30,7 +30,7 @@
 			<key>comment</key>
 			<string>pub export modifier</string>
 			<key>match</key>
-			<string>^(pub)</string>
+			<string>\b(pub)\b</string>
 			<key>name</key>
 			<string>storage.modifier.pub.ontol</string>
 		</dict>
@@ -38,7 +38,7 @@
 			<key>comment</key>
 			<string>type declaration</string>
 			<key>match</key>
-			<string>\b(type)</string>
+			<string>\b(type)\b</string>
 			<key>name</key>
 			<string>keyword.declaration.type.ontol</string>
 		</dict>
@@ -46,7 +46,7 @@
 			<key>comment</key>
 			<string>with context block</string>
 			<key>match</key>
-			<string>^(with)</string>
+			<string>\b(with)\b</string>
 			<key>name</key>
 			<string>keyword.context.block.with.ontol</string>
 		</dict>
@@ -54,7 +54,7 @@
 			<key>comment</key>
 			<string>rel declaration</string>
 			<key>match</key>
-			<string>\b(rel)</string>
+			<string>\b(rel)\b</string>
 			<key>name</key>
 			<string>keyword.declaration.rel.ontol</string>
 		</dict>
@@ -62,7 +62,7 @@
 			<key>comment</key>
 			<string>fmt expression</string>
 			<key>match</key>
-			<string>\b(fmt)</string>
+			<string>\b(fmt)\b</string>
 			<key>name</key>
 			<string>keyword.declaration.fmt.ontol</string>
 		</dict>
@@ -85,19 +85,29 @@
 				<key>2</key>
 				<dict>
 					<key>name</key>
+					<string>keyword.context.block.ontol</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
 					<string>variable.parameter.ontol</string>
+				</dict>
+				<key>4</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.context.block.ontol</string>
 				</dict>
 			</dict>
 			<key>comment</key>
 			<string>map declaration</string>
 			<key>match</key>
-			<string>\b(map)\s*([\w\s]*)</string>
+			<string>\b(map)\b({)\b(.*)\b(})</string>
 		</dict>
 		<dict>
 			<key>comment</key>
 			<string>built-in types</string>
 			<key>match</key>
-			<string>\b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)</string>
+			<string>\b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)\b</string>
 			<key>name</key>
 			<string>storage.type.ontol</string>
 		</dict>
@@ -105,7 +115,7 @@
 			<key>comment</key>
 			<string>number literal</string>
 			<key>match</key>
-			<string>(\d+(\.?\d+)*)</string>
+			<string>\b\-?(\d+(\.?\d+)?)\b</string>
 			<key>name</key>
 			<string>constant.numeric.ontol</string>
 		</dict>
@@ -113,7 +123,7 @@
 			<key>comment</key>
 			<string>built-in constant value</string>
 			<key>match</key>
-			<string>\b(true|false|null|inf|nan)\b</string>
+			<string>\b(true|false|null|inf|nan|\(\)|\[\]PI|GET|POST|PUT|PATCH|DELETE)\b</string>
 			<key>name</key>
 			<string>constant.language.ontol</string>
 		</dict>
@@ -121,7 +131,7 @@
 			<key>comment</key>
 			<string>built-in assigment keywords</string>
 			<key>match</key>
-			<string>\b(is|identifies)\b</string>
+			<string>\b(is|identifies|query)\b</string>
 			<key>name</key>
 			<string>variable.function.ontol</string>
 		</dict>
@@ -129,7 +139,7 @@
 			<key>comment</key>
 			<string>unit/self underscore</string>
 			<key>match</key>
-			<string>\s(_)\s</string>
+			<string>\b(_)\b</string>
 			<key>name</key>
 			<string>variable.language.ontol</string>
 		</dict>
@@ -189,7 +199,7 @@
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>^///</string>
+			<string>^\s*+///</string>
 			<key>comment</key>
 			<string>doc comment</string>
 			<key>end</key>

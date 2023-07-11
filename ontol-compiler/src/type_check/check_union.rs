@@ -4,17 +4,17 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
+    env::{PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, RelationId,
+    DataModifier, DefId, DefVariant,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    compiler_queries::GetPropertyMeta,
-    def::{Def, PropertyCardinality, RelationKind, ValueCardinality},
+    def::{Def, LookupRelationshipMeta, RelationId, RelationKind},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},
@@ -40,11 +40,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 
-        let union_def = self.defs.map.get(&value_union_def_id).unwrap();
+        let union_def = self.defs.table.get(&value_union_def_id).unwrap();
 
         let properties = self
             .relations
-            .properties_by_type(value_union_def_id)
+            .properties_by_def_id(value_union_def_id)
             .unwrap();
         let Constructor::Union(relationship_ids) = &properties.constructor else {
             panic!("not a union");
@@ -58,13 +58,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (relationship_id, span) in relationship_ids {
             let meta = self
-                .get_relationship_meta(*relationship_id)
-                .expect("BUG: problem getting property meta");
+                .defs
+                .lookup_relationship_meta(*relationship_id)
+                .expect("BUG: problem getting relationship meta");
 
             debug!("check union {:?}", meta.relationship);
 
             let variant_def = match &meta.relation.kind {
-                RelationKind::Named(def) | RelationKind::FmtTransition(def) => def.def_id,
+                RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => def.def_id,
                 _ => meta.relationship.object.0.def_id,
             };
 
@@ -79,11 +80,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
 
-            if let Some(properties) = self.relations.properties_by_type(variant_def) {
-                if let Some(id_relation_id) = &properties.identified_by {
+            if let Some(properties) = self.relations.properties_by_def_id(variant_def) {
+                if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self
-                        .property_meta_by_object(variant_def, *id_relation_id)
-                        .expect("BUG: problem getting property meta");
+                        .defs
+                        .lookup_relationship_meta(*id_relationship_id)
+                        .expect("BUG: problem getting relationship meta");
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
@@ -140,7 +142,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) where
         't: 'b,
     {
-        let variant_ty = self.def_types.map.get(&variant_def).unwrap_or_else(|| {
+        let variant_ty = self.def_types.table.get(&variant_def).unwrap_or_else(|| {
             let def = self.defs.get_def_kind(variant_def);
             panic!("No type found for {def:?}");
         });
@@ -197,9 +199,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         mut def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
         loop {
-            match self.relations.properties_by_type(def_id) {
+            match self.relations.properties_by_def_id(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Struct => match &properties.map {
+                    Constructor::Struct => match &properties.table {
                         Some(property_set) => {
                             return Ok(DomainTypeMatchData::Map(property_set));
                         }
@@ -213,8 +215,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                     ) => {
                         let meta = self
-                            .get_relationship_meta(*relationship_id)
-                            .expect("BUG: problem getting property meta");
+                            .defs
+                            .lookup_relationship_meta(*relationship_id)
+                            .expect("BUG: problem getting realtionship meta");
 
                         def_id = meta.relationship.object.0.def_id;
                         continue;
@@ -257,12 +260,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for (property_id, _cardinality) in property_set {
             let meta = self
-                .property_meta_by_subject(variant_def, property_id.relation_id)
-                .expect("BUG: problem getting property meta");
+                .defs
+                .lookup_relationship_meta(property_id.relationship_id)
+                .expect("BUG: problem getting relationship meta");
 
             let (object_reference, _) = &meta.relationship.object;
-            let object_ty = self.def_types.map.get(&object_reference.def_id).unwrap();
-            let Some(property_name) = meta.relation.object_prop(self.defs) else {
+            let object_ty = self.def_types.table.get(&object_reference.def_id).unwrap();
+            let Some(property_name) = meta.relationship.object_prop.or(meta.relation.named_ident(self.defs)) else {
                 continue;
             };
 
@@ -281,7 +285,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         PropertyDiscriminatorCandidate {
                             relation_id: meta.relationship.relation_id,
                             discriminant: Discriminant::HasStringAttribute(
-                                property_id.relation_id,
+                                property_id.relationship_id,
                                 property_name.into(),
                                 string_literal.into(),
                             ),
@@ -508,7 +512,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
-                let ty = self.def_types.map.get(&def_id).unwrap();
+                let ty = self.def_types.table.get(&def_id).unwrap();
                 CompileError::UnitTypePartOfUnion(smart_format!(
                     "{}",
                     FormatType(ty, self.defs, self.primitives)

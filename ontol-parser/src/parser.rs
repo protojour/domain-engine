@@ -4,9 +4,9 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, Path, Pattern, StructPattern, StructPatternAttr,
-    TypeOrPattern, TypeParam, TypeParamPattern, TypeParamPatternBinding, UnitOrSeq, UseStatement,
-    Visibility, WithStatement,
+    ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, StructPattern,
+    StructPatternAttr, TypeOrPattern, TypeParam, TypeParamPattern, TypeParamPatternBinding,
+    UnitOrSeq, UseStatement, Visibility, WithStatement,
 };
 
 use super::{
@@ -78,7 +78,11 @@ fn type_statement(
 
     fn generic_param() -> impl AstParser<TypeParam> {
         spanned(ident())
-            .then(just(Token::Sigil('=')).ignore_then(spanned(ty())).or_not())
+            .then(
+                just(Token::Sigil('='))
+                    .ignore_then(spanned(named_type()))
+                    .or_not(),
+            )
             .map(|(ident, default)| TypeParam { ident, default })
     }
 
@@ -107,53 +111,83 @@ fn with_statement(
     stmt_parser: impl AstParser<Spanned<Statement>>,
 ) -> impl AstParser<WithStatement> {
     keyword(Token::With)
-        .then(spanned(ty()))
+        .then(spanned(named_type()))
         .then(spanned(
             stmt_parser.repeated().delimited_by(open('{'), close('}')),
         ))
         .map(|((kw, ty), statements)| WithStatement { kw, ty, statements })
 }
 
-fn rel_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<RelStatement> {
-    let ctx_block = stmt_parser.repeated().delimited_by(open('{'), close('}'));
-
-    let object_type_or_pattern = with_unit_or_seq(spanned_ty_or_underscore())
-        .map(|(unit_or_seq, (opt_ty, span))| (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span)))
-        .or(sigil('=').ignore_then(
-            spanned(pattern())
-                .map(|(pat, span)| (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))),
-        ));
+fn rel_statement(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<RelStatement> {
+    let object_type_or_pattern =
+        with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
+            .map(|(unit_or_seq, (opt_ty, span))| {
+                (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span))
+            })
+            .or(sigil('=').ignore_then(
+                spanned(pattern()).map(|(pat, span)| {
+                    (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))
+                }),
+            ));
 
     doc_comments()
         .then(keyword(Token::Rel))
-        // subject
-        .then(with_unit_or_seq(spanned_ty_or_underscore()))
-        // relation
-        .then(relation())
-        // object
+        // subject:
+        .then(with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(
+            stmt_parser.clone(),
+        )))
+        // forward relations:
+        .then(forward_relation(stmt_parser).separated_by(sigil('|')))
+        // colon separator:
+        .then_ignore(colon())
+        // backward relations:
+        .then(
+            colon()
+                .ignore_then(backward_relation().separated_by(sigil('|')))
+                .or_not(),
+        )
+        // object:
         .then(object_type_or_pattern)
-        .then(spanned(ctx_block).or_not())
         .map(
             |(
-                ((((docs, kw), (obj_unit_or_seq, subject)), relation), (subj_unit_or_seq, object)),
-                ctx_block,
-            )| RelStatement {
-                docs,
-                kw,
-                subject,
-                relation: Relation {
-                    subject_cardinality: compose_cardinality(
-                        relation.subject_cardinality,
-                        subj_unit_or_seq,
-                    ),
-                    object_cardinality: compose_cardinality(
-                        relation.object_cardinality,
-                        obj_unit_or_seq,
-                    ),
-                    ..relation
-                },
-                object,
-                ctx_block,
+                ((((docs, kw), (obj_unit_or_seq, subject)), forward_relations), backward_relations),
+                (subj_unit_or_seq, object),
+            )| {
+                let relations = forward_relations
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, forward): (usize, ForwardRelation)| {
+                        let backward_relation = backward_relations
+                            .as_ref()
+                            .and_then(|backward_vec| backward_vec.get(idx));
+
+                        Relation {
+                            ty: forward.ty,
+                            subject_cardinality: compose_cardinality(
+                                forward.subject_cardinality,
+                                subj_unit_or_seq,
+                            ),
+                            ctx_block: forward.ctx_block,
+                            object_prop_ident: backward_relation
+                                .map(|backward| backward.object_prop_ident.clone()),
+                            object_cardinality: compose_cardinality(
+                                backward_relation
+                                    .and_then(|backward| backward.object_cardinality.clone()),
+                                obj_unit_or_seq,
+                            ),
+                        }
+                    })
+                    .collect();
+
+                RelStatement {
+                    docs,
+                    kw,
+                    subject,
+                    relations,
+                    object,
+                }
             },
         )
 }
@@ -170,48 +204,60 @@ fn compose_cardinality(
     }
 }
 
-fn relation() -> impl AstParser<Relation> {
+struct ForwardRelation {
+    pub ty: RelType,
+    pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
+    pub subject_cardinality: Option<Cardinality>,
+}
+
+struct BackwardRelation {
+    pub object_prop_ident: Spanned<String>,
+    pub object_cardinality: Option<Cardinality>,
+}
+
+fn forward_relation(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<ForwardRelation> {
     let rel_ty_int_range = spanned(u16_range()).map(RelType::IntRange);
-    let rel_ty_type = spanned(ty()).map(RelType::Type);
+    let rel_ty_type =
+        spanned(named_type().or(anonymous_type(stmt_parser.clone()))).map(RelType::Type);
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
-    // type
-    rel_ty
-        .then(sigil('?').or_not())
-        .then_ignore(colon())
-        // object prop and cardinality
-        .then(
-            colon()
-                .ignore_then(spanned(string_literal()).then(sigil('?').or_not()))
-                .or_not(),
-        )
-        .map(|((ty, subject_optional), object)| {
-            let (object_prop_ident, object_cardinality) = match object {
-                Some((prop, object_optional)) => {
-                    (Some(prop), object_optional.map(|_| Cardinality::Optional))
-                }
-                None => (None, None),
-            };
+    let rel_params_block = stmt_parser.repeated().delimited_by(open('('), close(')'));
 
-            Relation {
-                ty,
-                subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
+    rel_ty
+        .then(spanned(rel_params_block).or_not())
+        .then(sigil('?').or_not())
+        .map(|((ty, ctx_block), subject_optional)| ForwardRelation {
+            ty,
+            ctx_block,
+            subject_cardinality: subject_optional.map(|_| Cardinality::Optional),
+        })
+}
+
+fn backward_relation() -> impl AstParser<BackwardRelation> {
+    spanned(string_literal()).then(sigil('?').or_not()).map(
+        |(object_prop_ident, object_optional)| {
+            let object_cardinality = object_optional.map(|_| Cardinality::Optional);
+
+            BackwardRelation {
                 object_prop_ident,
                 object_cardinality,
             }
-        })
+        },
+    )
 }
 
 fn fmt_statement() -> impl AstParser<FmtStatement> {
     doc_comments()
         .then(keyword(Token::Fmt))
         // origin
-        .then(spanned(ty()))
+        .then(spanned(named_type()))
         // transitions
         .then(
             just(Token::FatArrow)
-                .ignore_then(spanned_ty_or_underscore())
+                .ignore_then(spanned_named_type_or_dot())
                 .repeated(),
         )
         .map(|(((docs, kw), origin), transitions)| FmtStatement {
@@ -230,16 +276,25 @@ fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(Unit
 
 fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
+        .then(just(Token::FatArrow).or_not())
         .then(
             spanned(with_unit_or_seq(map_arm()))
                 .then(spanned(with_unit_or_seq(map_arm())))
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(kw, (first, second))| MapStatement { kw, first, second })
+        .map(|((kw, fat_arrow), (first, second))| MapStatement {
+            kw,
+            direction: match fat_arrow {
+                Some(_) => MapDirection::Forward,
+                None => MapDirection::Omni,
+            },
+            first,
+            second,
+        })
 }
 
 fn map_arm() -> impl AstParser<MapArm> {
-    let struct_arm = struct_pattern(pattern()).map(MapArm::Struct);
+    let struct_arm = braced_struct_pattern(pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
         .then(expr_pattern())
@@ -250,14 +305,16 @@ fn map_arm() -> impl AstParser<MapArm> {
 
 fn pattern() -> impl AstParser<Pattern> {
     recursive(|pattern| {
-        spanned(with_unit_or_seq(struct_pattern(pattern)))
+        spanned(with_unit_or_seq(braced_struct_pattern(pattern)))
             .map(Pattern::Struct)
             .or(with_unit_or_seq(expr_pattern())
                 .map(|(unit_or_seq, (expr, span))| Pattern::Expr(((unit_or_seq, expr), span))))
     })
 }
 
-fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<StructPattern> {
+fn braced_struct_pattern(
+    pattern: impl AstParser<Pattern> + Clone + 'static,
+) -> impl AstParser<StructPattern> {
     spanned(path())
         .then(
             spanned(struct_pattern_attr(pattern))
@@ -269,18 +326,30 @@ fn struct_pattern(pattern: impl AstParser<Pattern> + Clone) -> impl AstParser<St
 }
 
 fn struct_pattern_attr(
-    pattern: impl AstParser<Pattern> + Clone,
+    pattern: impl AstParser<Pattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternAttr> {
-    spanned(ty())
-        .then(spanned(sigil('?')).or_not())
-        .then_ignore(colon())
-        .then(spanned(pattern))
-        .map_with_span(|((relation, option), object), _span| StructPatternAttr {
-            relation,
-            option: option.map(|(_, span)| ((), span)),
-            relation_struct: None,
-            object,
-        })
+    recursive(|struct_pattern_attr| {
+        spanned(named_type())
+            .then(
+                spanned(
+                    spanned(struct_pattern_attr)
+                        .repeated()
+                        .delimited_by(open('('), close(')')),
+                )
+                .or_not(),
+            )
+            .then(spanned(sigil('?')).or_not())
+            .then_ignore(colon())
+            .then(spanned(pattern))
+            .map_with_span(|(((relation, relation_attrs), option), object), _span| {
+                StructPatternAttr {
+                    relation,
+                    relation_attrs,
+                    option: option.map(|(_, span)| ((), span)),
+                    object,
+                }
+            })
+    })
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
@@ -331,12 +400,22 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     .labelled("expression pattern")
 }
 
-fn spanned_ty_or_underscore() -> impl AstParser<Spanned<Option<Type>>> {
-    spanned(ty().map(Some).or(sigil('_').map(|_| None)))
+fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(named_type().map(Some).or(sigil('.').map(|_| None)))
+}
+
+fn spanned_named_or_anonymous_type_or_dot(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<Spanned<Option<Type>>> {
+    spanned(
+        (named_type().or(anonymous_type(stmt_parser)))
+            .map(Some)
+            .or(sigil('.').map(|_| None)),
+    )
 }
 
 /// Type parser
-fn ty() -> impl AstParser<Type> {
+fn named_type() -> impl AstParser<Type> {
     recursive(|ty| {
         let binding = just(Token::Sigil('='))
             .ignore_then(spanned(ty))
@@ -374,6 +453,14 @@ fn ty() -> impl AstParser<Type> {
             .or(regex)
             .labelled("type")
     })
+}
+
+fn anonymous_type(
+    stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
+) -> impl AstParser<Type> {
+    spanned(stmt_parser.repeated().delimited_by(open('{'), close('}')))
+        .boxed()
+        .map(Type::AnonymousStruct)
 }
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
@@ -539,8 +626,8 @@ mod tests {
         /// doc comment
         type bar {
             rel a '': b
-            rel _ lol: c
-            fmt a => _ => _
+            rel .lol: c
+            fmt a => . => .
         }
         ";
 

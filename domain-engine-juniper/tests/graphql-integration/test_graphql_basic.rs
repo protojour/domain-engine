@@ -1,111 +1,169 @@
-use domain_engine_core::EngineAPIMock;
+use domain_engine_core::data_store::DataStoreAPIMock;
 use juniper::graphql_value;
 use ontol_runtime::value::Attribute;
 use ontol_test_utils::{
+    expect_eq,
     type_binding::{ToSequence, TypeBinding},
     SourceName, TestPackages,
 };
-use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_log::test;
 use unimock::*;
 
 use crate::{
-    mock_default_config, mock_gql_context, mock_query_entities_empty, Exec, TestCompileSchema,
+    gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema,
 };
 
 const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
+const ROOT: SourceName = SourceName::root();
+
 #[test]
 fn test_graphql_empty_schema() {
-    "".compile_schema();
+    "".compile_schemas([ROOT]);
 }
 
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
-    let (env, schema) = "
-    pub type foo_id { fmt '' => string => _ }
+    let (test_env, [schema]) = "
+    pub type foo_id { fmt '' => string => . }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'prop': int
+        rel foo_id identifies: .
+        rel .'prop': int
     }
     "
-    .compile_schema();
-    let foo = TypeBinding::new(&env, "foo");
+    .compile_schemas([ROOT]);
+    let foo = TypeBinding::new(&test_env, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
 
-    {
-        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
-        assert_eq!(
-            "{
-                fooList {
-                    edges {
-                        node {
-                            prop
-                        }
+    expect_eq!(
+        actual = "{
+            fooList {
+                edges {
+                    node {
+                        prop
                     }
-                }    
-            }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "fooList": {
-                    "edges": [],
-                },
-            })),
-        );
-    }
+                }
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty())
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "fooList": {
+                "edges": [],
+            },
+        })),
+    );
 
-    {
-        let ctx = mock_gql_context(
-            EngineAPIMock::create_entity
-                .next_call(matching!(_, _))
-                .returns(Ok(entity.into())),
-        );
-        assert_eq!(
-            "mutation {
-                createfoo(
-                    input: {
-                        prop: 42
-                    }
-                ) {
-                    prop
+    expect_eq!(
+        actual = "mutation {
+            createfoo(
+                input: {
+                    prop: 42
                 }
-            }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "createfoo": {
-                    // BUG: floating point
-                    "prop": 42.0
-                }
-            })),
-        );
+            ) {
+                prop
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test_env,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(entity.into()))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createfoo": {
+                // BUG: floating point
+                "prop": 42.0
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
+    let (test_env, [schema]) = "
+    pub type foo {
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
+    "
+    .compile_schemas([ROOT]);
+
+    expect_eq!(
+        actual = "{
+            fooList {
+                edges {
+                    node {
+                        id
+                    }
+                }
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty())
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "fooList": {
+                "edges": [],
+            },
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_value_type_as_field() {
+    "
+    type foo { rel .is: string }
+    pub type bar {
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'foo': foo
+    }
+    "
+    .compile_schemas([ROOT]);
+}
+
+#[test(tokio::test)]
+async fn test_graphql_value_type_in_array() {
+    "
+    type foo { rel .is: string }
+    pub type bar {
+        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'foo': [foo]
+    }
+    "
+    .compile_schemas([ROOT]);
 }
 
 #[test(tokio::test)]
 async fn test_inner_struct() {
-    let (env, schema) = "
-    pub type foo_id { fmt '' => string => _ }
+    let (test_env, [schema]) = "
+    pub type foo_id { fmt '' => string => . }
     type inner {
-        rel _ 'prop': string
+        rel .'prop': string
     }
     pub type foo {
-        rel foo_id identifies: _
-        rel _ 'inner': inner
+        rel foo_id identifies: .
+        rel .'inner': inner
     }
     "
-    .compile_schema();
+    .compile_schemas([ROOT]);
 
-    let foo = TypeBinding::new(&env, "foo");
+    let foo = TypeBinding::new(&test_env, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
 
-    {
-        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
-        assert_eq!(
-            "{
+    expect_eq!(
+        actual = "{
             fooList {
                 edges {
                     node {
@@ -116,55 +174,102 @@ async fn test_inner_struct() {
                 }
             }
         }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "fooList": {
-                    "edges": [],
-                },
-            })),
-        );
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty())
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "fooList": {
+                "edges": [],
+            },
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"mutation {
+            createfoo(
+                input: {
+                    inner: {
+                        prop: "yo"
+                    }
+                }
+            ) {
+                inner {
+                    prop
+                }
+            }
+        }"#
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test_env,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(entity.into()))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createfoo": {
+                "inner": {
+                    "prop": "yo"
+                }
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_docs_introspection() {
+    let (test_env, [schema]) = "
+    type Key {
+        rel .is: string
     }
 
-    {
-        let ctx = mock_gql_context(
-            EngineAPIMock::create_entity
-                .next_call(matching!(_, _))
-                .returns(Ok(entity.into())),
-        );
-        assert_eq!(
-            r#"mutation {
-                createfoo(
-                    input: {
-                        inner: {
-                            prop: "yo"
-                        }
-                    }
-                ) {
-                    inner {
-                        prop
-                    }
-                }
-            }"#
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "createfoo": {
-                    "inner": {
-                        "prop": "yo"
-                    }
-                }
-            })),
-        );
+    /// this is a type
+    pub type PublicType {
+        rel Key identifies: .
+        /// this is a field
+        rel .'relation': string
     }
+    "
+    .compile_schemas([ROOT]);
+
+    expect_eq!(
+        actual = r#"{
+            __type(name: "PublicType") {
+                name
+                description
+                fields {
+                    name
+                    description
+                }
+            }
+        }"#
+        .exec(&schema, &gql_ctx_mock_data_store(&test_env, ROOT, ()))
+        .await,
+        expected = Ok(graphql_value!({
+            "__type": {
+                "name": "PublicType",
+                "description": "this is a type",
+                "fields": [
+                    {
+                        "name": "relation",
+                        "description": "this is a field"
+                    }
+                ]
+            }
+        })),
+    );
 }
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let (env, schema) = ARTIST_AND_INSTRUMENT.compile_schema();
-    let artist = TypeBinding::new(&env, "artist");
-    let instrument = TypeBinding::new(&env, "instrument");
-    let plays = TypeBinding::new(&env, "plays");
+    let (test_env, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([ROOT]);
+    let [artist, instrument, plays] =
+        TypeBinding::new_n(&test_env, ["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -186,97 +291,92 @@ async fn test_graphql_artist_and_instrument_connections() {
         )
         .into();
 
-    {
-        let ctx = mock_gql_context((
-            mock_default_config(),
-            EngineAPIMock::query_entities
-                .next_call(matching!(_))
-                .returns(Ok(vec![ziggy.clone()])),
-        ));
-        assert_eq!(
-            "{
-                artistList {
-                    edges {
-                        node {
-                            ID
-                            name
-                            plays {
-                                edges {
-                                    node {
-                                        ID
-                                        name
-                                    }
-                                    how_much
+    expect_eq!(
+        actual = "{
+            artistList {
+                edges {
+                    node {
+                        ID
+                        name
+                        plays {
+                            edges {
+                                node {
+                                    ID
+                                    name
+                                }
+                                how_much
+                            }
+                        }
+                    }
+                }
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test_env,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_))
+                    .returns(Ok(vec![ziggy.clone()]))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "artistList": {
+                "edges": [{
+                    "node": {
+                        "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "name": "Ziggy",
+                        "plays": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "ID": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
+                                        "name": "Guitar",
+                                    },
+                                    "how_much": "A lot"
+                                }
+                            ]
+                        }
+                    }
+                }],
+            },
+        })),
+    );
+
+    expect_eq!(
+        actual = "{
+            instrumentList {
+                edges {
+                    node {
+                        ID
+                        name
+                        played_by {
+                            edges {
+                                node {
+                                    name
                                 }
                             }
                         }
                     }
                 }
-            }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "artistList": {
-                    "edges": [{
-                        "node": {
-                            "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
-                            "name": "Ziggy",
-                            "plays": {
-                                "edges": [
-                                    {
-                                        "node": {
-                                            "ID": "instrument/88832e20-8c6e-46b4-af79-27b19b889a58",
-                                            "name": "Guitar",
-                                        },
-                                        "how_much": "A lot"
-                                    }
-                                ]
-                            }
-                        }
-                    }],
-                },
-            })),
-        );
-    }
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty())
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "instrumentList": {
+                "edges": []
+            },
+        })),
+    );
 
-    {
-        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
-        assert_eq!(
-            "{
-                instrumentList {
-                    edges {
-                        node {
-                            ID
-                            name
-                            played_by {
-                                edges {
-                                    node {
-                                        name
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "instrumentList": {
-                    "edges": []
-                },
-            })),
-        );
-    }
-
-    {
-        let ctx = mock_gql_context(
-            EngineAPIMock::create_entity
-                .next_call(matching!(_, _))
-                .returns(Ok(ziggy.value)),
-        );
-        assert_eq!(
-            r#"
+    expect_eq!(
+        actual = r#"
             mutation {
                 createartist(input: {
                     name: "Ziggy",
@@ -299,23 +399,31 @@ async fn test_graphql_artist_and_instrument_connections() {
                     name
                 }
             }
-            "#
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "createartist": {
-                    "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
-                    "name": "Ziggy"
-                }
-            }))
-        );
-    }
+        "#
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test_env,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(ziggy.value))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createartist": {
+                "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                "name": "Ziggy"
+            }
+        })),
+    );
 }
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let (env, schema) = GUITAR_SYNTH_UNION.compile_schema();
-    let artist = TypeBinding::new(&env, "artist");
+    let (test_env, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([ROOT]);
+    let artist = TypeBinding::new(&test_env, "artist");
     let artist_entity: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -335,86 +443,82 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
         )
         .into();
 
-    {
-        let ctx = mock_gql_context((
-            mock_default_config(),
-            EngineAPIMock::query_entities
-                .next_call(matching!(_))
-                .returns(Ok(vec![artist_entity])),
-        ));
-
-        assert_eq!(
-            "{
-                artistList {
-                    edges {
-                        node {
-                            plays {
-                                edges {
-                                    node {
-                                        __typename
-                                        ... on guitar {
-                                            string_count
-                                        }
-                                        ... on synth {
-                                            polyphony
-                                        }
+    expect_eq!(
+        actual = "{
+            artistList {
+                edges {
+                    node {
+                        plays {
+                            edges {
+                                node {
+                                    __typename
+                                    ... on guitar {
+                                        string_count
+                                    }
+                                    ... on synth {
+                                        polyphony
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }"
-            .exec(&schema, &ctx)
-            .await,
-            Ok(graphql_value!({
-                "artistList": {
-                    "edges": [{
-                        "node": {
-                            "plays": {
-                                "edges": [
-                                    {
-                                        "node": {
-                                            "__typename": "synth",
-                                            // BUG: Floating point
-                                            "polyphony": 42.0
-                                        },
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test_env,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_, _))
+                    .returns(Ok(vec![artist_entity]))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "artistList": {
+                "edges": [{
+                    "node": {
+                        "plays": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "__typename": "synth",
+                                        // BUG: Floating point
+                                        "polyphony": 42.0
                                     },
-                                    {
-                                        "node": {
-                                            "__typename": "guitar",
-                                            // BUG: Floating point
-                                            "string_count": 91.0
-                                        }
+                                },
+                                {
+                                    "node": {
+                                        "__typename": "guitar",
+                                        // BUG: Floating point
+                                        "string_count": 91.0
                                     }
-                                ]
-                            }
+                                }
+                            ]
                         }
-                    }]
-                },
-            })),
-        );
-    }
+                    }
+                }]
+            },
+        })),
+    );
 }
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (_env, schema) = TestPackages::with_sources([
-        (
-            SourceName::root(),
-            include_str!("../../../examples/municipalities.on"),
-        ),
+    let (test_env, [schema]) = TestPackages::with_sources([
+        (ROOT, include_str!("../../../examples/municipalities.on")),
         (
             SourceName("geojson"),
             include_str!("../../../examples/geojson.on"),
         ),
     ])
-    .compile_schema();
+    .compile_schemas([ROOT]);
 
     {
-        let ctx = mock_gql_context((mock_default_config(), mock_query_entities_empty()));
-        assert_eq!(
-            "{
+        expect_eq!(
+            actual = "{
                 municipalityList {
                     edges {
                         node {
@@ -436,9 +540,12 @@ async fn test_graphql_municipalities() {
                     }
                 }
             }"
-            .exec(&schema, &ctx)
+            .exec(
+                &schema,
+                &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty())
+            )
             .await,
-            Ok(graphql_value!({
+            expected = Ok(graphql_value!({
                 "municipalityList": {
                     "edges": []
                 }

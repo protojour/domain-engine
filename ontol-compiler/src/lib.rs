@@ -1,23 +1,26 @@
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use compiler_queries::{GetPropertyMeta, RelationshipMeta};
-use def::{DefKind, Defs, TypeDef};
+use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 use error::{CompileError, ParseError, UnifiedCompileError};
 
 pub use error::*;
 use expr::Expressions;
+use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
-    env::{Domain, EntityInfo, Env, TypeInfo},
+    config::PackageConfig,
+    env::{Domain, EntityInfo, EntityRelationship, Env, MapMeta, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, PackageId, RelationId,
+    DataModifier, DefId, DefVariant, PackageId,
 };
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Relations};
+use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
@@ -55,6 +58,7 @@ pub struct Compiler<'m> {
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
+    pub(crate) package_config_table: FnvHashMap<PackageId, PackageConfig>,
     pub(crate) primitives: Primitives,
     pub(crate) expressions: Expressions,
 
@@ -79,6 +83,7 @@ impl<'m> Compiler<'m> {
             packages: Default::default(),
             namespaces: Default::default(),
             defs,
+            package_config_table: Default::default(),
             primitives,
             expressions: Default::default(),
             strings: Strings::new(mem),
@@ -130,6 +135,9 @@ impl<'m> Compiler<'m> {
                 .loaded_packages
                 .insert(parsed_package.reference, package_def_id);
 
+            self.package_config_table
+                .insert(parsed_package.package_id, parsed_package.config);
+
             let mut lowering = Lowering::new(self, &src);
 
             for stmt in parsed_package.statements {
@@ -166,6 +174,8 @@ impl<'m> Compiler<'m> {
         let package_ids = self.package_ids();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
+        let mut package_config_map = std::mem::take(&mut self.package_config_table);
+        let docs = std::mem::take(&mut self.namespaces.docs);
         let mut serde_generator = self.serde_generator();
 
         let mut builder = Env::builder();
@@ -179,50 +189,19 @@ impl<'m> Compiler<'m> {
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
 
+            if let Some(package_config) = package_config_map.remove(&package_id) {
+                builder.add_package_config(package_id, package_config);
+            }
+
             for (type_name, type_def_id) in type_namespace {
-                let entity_info =
-                    if let Some(properties) = self.relations.properties_by_type(type_def_id) {
-                        if let Some(id_relation_id) = &properties.identified_by {
-                            let identifies_meta = self
-                                .property_meta_by_object(type_def_id, *id_relation_id)
-                                .expect("BUG: problem getting property meta");
-
-                            Some(EntityInfo {
-                                id_relation_id: *id_relation_id,
-                                id_value_def_id: identifies_meta.relationship.subject.0.def_id,
-                                id_operator_id: serde_generator
-                                    .gen_operator_id(SerdeKey::Def(DefVariant::new(
-                                        identifies_meta.relationship.subject.0.def_id,
-                                        DataModifier::NONE,
-                                    )))
-                                    .unwrap(),
-                                id_inherent_property_name: match self
-                                    .find_inherent_primary_id(type_def_id, properties)
-                                {
-                                    Some(meta) => meta
-                                        .relation
-                                        .subject_prop(&self.defs)
-                                        .map(|name| name.into()),
-                                    None => None,
-                                },
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                let public = match self.defs.get_def_kind(type_def_id) {
-                    Some(DefKind::Type(TypeDef { public, .. })) => *public,
-                    _ => true,
-                };
-
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    public,
+                    public: match self.defs.get_def_kind(type_def_id) {
+                        Some(DefKind::Type(TypeDef { public, .. })) => *public,
+                        _ => true,
+                    },
                     name: Some(type_name),
-                    entity_info,
+                    entity_info: self.entity_info(type_def_id, &mut serde_generator),
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
                         DataModifier::default(),
@@ -248,27 +227,131 @@ impl<'m> Compiler<'m> {
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();
 
+        let mut property_flows = vec![];
+
+        let map_meta_table = self
+            .codegen_tasks
+            .result_map_proc_table
+            .into_iter()
+            .map(|(key, procedure)| {
+                let propflow_range = if let Some(current_prop_flows) =
+                    self.codegen_tasks.result_propflow_table.remove(&key)
+                {
+                    let start: u32 = property_flows.len().try_into().unwrap();
+                    let len: u32 = current_prop_flows.len().try_into().unwrap();
+                    property_flows.extend(current_prop_flows);
+                    start..(start + len)
+                } else {
+                    0..0
+                };
+
+                (
+                    key,
+                    MapMeta {
+                        procedure,
+                        propflow_range,
+                    },
+                )
+            })
+            .collect();
+
         builder
             .lib(self.codegen_tasks.result_lib)
+            .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
-            .mapper_procs(self.codegen_tasks.result_map_procs)
+            .map_meta_table(map_meta_table)
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
+            .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
             .build()
     }
 
+    fn entity_info(
+        &self,
+        type_def_id: DefId,
+        serde_generator: &mut SerdeGenerator,
+    ) -> Option<EntityInfo> {
+        let properties = self.relations.properties_by_def_id(type_def_id)?;
+        let id_relationship_id = properties.identified_by?;
+
+        let identifies_meta = self
+            .defs
+            .lookup_relationship_meta(id_relationship_id)
+            .expect("BUG: problem getting property meta");
+
+        let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
+            IndexMap::default();
+
+        if let Some(table) = &properties.table {
+            for (property_id, property) in table {
+                let meta = self
+                    .defs
+                    .lookup_relationship_meta(property_id.relationship_id)
+                    .unwrap();
+
+                let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
+
+                if let Some(target_properties) =
+                    self.relations.properties_by_def_id(target_def_ref.def_id)
+                {
+                    if target_properties.identified_by.is_some() {
+                        entity_relationships.insert(
+                            *property_id,
+                            EntityRelationship {
+                                cardinality: property.cardinality,
+                                target: target_def_ref.def_id,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
+
+        let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
+            self.relations
+                .value_generators
+                .get(&inherent_primary_id_meta.relationship_id)
+                .cloned()
+        } else {
+            None
+        };
+
+        Some(EntityInfo {
+            id_relationship_id: match inherent_primary_id_meta {
+                Some(inherent_meta) => inherent_meta.relationship_id,
+                None => id_relationship_id,
+            },
+            id_value_def_id: identifies_meta.relationship.subject.0.def_id,
+            id_value_generator,
+            id_operator_id: serde_generator
+                .gen_operator_id(SerdeKey::Def(DefVariant::new(
+                    identifies_meta.relationship.subject.0.def_id,
+                    DataModifier::NONE,
+                )))
+                .unwrap(),
+            entity_relationships,
+        })
+    }
+
     fn find_inherent_primary_id(
         &self,
-        entity_id: DefId,
+        _entity_id: DefId,
         properties: &Properties,
     ) -> Option<RelationshipMeta<'m>> {
-        let map = properties.map.as_ref()?;
-        let relation_id = RelationId(self.primitives.identifies_relation);
-        let _property = map.get(&(PropertyId::subject(relation_id)))?;
+        let id_relationship_id = properties.identified_by?;
+        let inherent_id = self
+            .relations
+            .inherent_id_map
+            .get(&id_relationship_id)
+            .cloned()?;
+        let map = properties.table.as_ref()?;
+        let _property = map.get(&PropertyId::subject(inherent_id))?;
 
-        self.property_meta_by_subject(entity_id, relation_id).ok()
+        self.defs.lookup_relationship_meta(inherent_id).ok()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

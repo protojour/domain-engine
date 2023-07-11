@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use juniper::graphql_value;
 use ontol_runtime::{
-    serde::processor::{ProcessorLevel, ProcessorMode},
+    serde::{
+        operator::SerdeOperator,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -14,7 +17,8 @@ use crate::{
     virtual_registry::VirtualRegistry,
     virtual_schema::{
         data::{
-            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeRef, UnionData,
+            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
+            TypeRef, UnionData,
         },
         TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
     },
@@ -106,10 +110,11 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
         match &info.type_data().kind {
             TypeKind::Object(_) => {
                 let fields = reg.get_fields(info.type_index);
-
-                registry
-                    .build_object_type::<Self>(info, &fields)
-                    .into_meta()
+                let mut builder = registry.build_object_type::<Self>(info, &fields);
+                if let Some(description) = info.description() {
+                    builder = builder.description(&description);
+                }
+                builder.into_meta()
             }
             TypeKind::Union(union_data) => {
                 let types: Vec<_> = union_data
@@ -127,9 +132,13 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
 
                 registry.build_union_type::<Self>(info, &types).into_meta()
             }
-            TypeKind::CustomScalar(_) => registry
-                .build_scalar_type::<IndexedInputValue>(info)
-                .into_meta(),
+            TypeKind::CustomScalar(_) => {
+                let mut builder = registry.build_scalar_type::<IndexedInputValue>(info);
+                if let Some(description) = info.description() {
+                    builder = builder.description(&description);
+                }
+                builder.into_meta()
+            }
         }
     }
 }
@@ -238,7 +247,7 @@ impl<'v> AttributeType<'v> {
                 }
             }
             (FieldKind::Property(property_data), Data::Struct(attrs)) => {
-                debug!("lookup property {field_name}");
+                debug!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
                     attrs,
                     property_data.property_id,
@@ -249,7 +258,7 @@ impl<'v> AttributeType<'v> {
             }
             (FieldKind::Id(id_property_data), Data::Struct(attrs)) => Self::resolve_property(
                 attrs,
-                PropertyId::subject(id_property_data.relation_id),
+                PropertyId::subject(id_property_data.relationship_id),
                 field_type,
                 virtual_schema,
                 executor,
@@ -279,7 +288,9 @@ impl<'v> AttributeType<'v> {
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let attribute = match map.get(&property_id) {
             Some(attribute) => attribute,
-            None => return Ok(graphql_value!(None)),
+            None => {
+                return Ok(graphql_value!(None));
+            }
         };
 
         match virtual_schema.lookup_type_index(type_ref.unit) {
@@ -288,19 +299,47 @@ impl<'v> AttributeType<'v> {
                 virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
                 executor,
             ),
-            Err(scalar_ref) => {
-                let scalar = virtual_schema
+            Err(scalar_ref) => match (
+                type_ref.modifier,
+                virtual_schema
                     .env()
-                    .new_serde_processor(
-                        scalar_ref.operator_id,
-                        None,
-                        ProcessorMode::Select,
-                        ProcessorLevel::Root,
-                    )
-                    .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+                    .get_serde_operator(scalar_ref.operator_id),
+            ) {
+                (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
+                    let attributes = attribute.value.cast_ref::<Vec<_>>();
+                    let processor = virtual_schema.env().new_serde_processor(
+                        operator.ranges[0].operator_id,
+                        ProcessorMode::Read,
+                        ProcessorLevel::new_root(),
+                    );
 
-                Ok(juniper::Value::Scalar(scalar))
-            }
+                    let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
+                        .iter()
+                        .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
+                            let scalar = processor.serialize_value(
+                                &attr.value,
+                                None,
+                                GqlScalarSerializer,
+                            )?;
+                            Ok(juniper::Value::Scalar(scalar))
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    Ok(juniper::Value::List(graphql_values))
+                }
+                _ => {
+                    let scalar = virtual_schema
+                        .env()
+                        .new_serde_processor(
+                            scalar_ref.operator_id,
+                            ProcessorMode::Read,
+                            ProcessorLevel::new_root(),
+                        )
+                        .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+
+                    Ok(juniper::Value::Scalar(scalar))
+                }
+            },
         }
     }
 }

@@ -12,8 +12,8 @@ pub enum Space {
     Rel,
 }
 
-/// The reason that BTreeMap is used here is determinism.
-/// The keys will then be sorted alphabetically, so that
+/// The reason that IndexMap is used here is determinism.
+/// The keys will then be sorted in the order written in ONTOL, so that
 /// each compile behaves similar to the previous compile, easing debugging.
 #[derive(Default, Debug)]
 pub struct Namespace {
@@ -41,6 +41,7 @@ impl Namespace {
 #[derive(Default, Debug)]
 pub struct Namespaces {
     pub(crate) namespaces: FnvHashMap<PackageId, Namespace>,
+    pub(crate) docs: FnvHashMap<DefId, Vec<String>>,
 }
 
 impl Namespaces {

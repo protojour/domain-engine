@@ -1,5 +1,7 @@
 use indexmap::IndexMap;
-use ontol_runtime::{serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationId};
+use ontol_runtime::{
+    env::Env, serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationshipId,
+};
 use smartstring::alias::String;
 
 use super::argument::{self};
@@ -102,6 +104,33 @@ pub struct TypeData {
 }
 
 impl TypeData {
+    pub fn description(&self, env: &Env) -> Option<std::string::String> {
+        match &self.kind {
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Node(nodedata),
+                ..
+            }) => env.get_docs(nodedata.def_id),
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Edge(_),
+                ..
+            }) => None,
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Connection,
+                ..
+            }) => None,
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Query,
+                ..
+            }) => None,
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Mutation,
+                ..
+            }) => None,
+            TypeKind::Union(uniondata) => env.get_docs(uniondata.union_def_id),
+            TypeKind::CustomScalar(_) => None,
+        }
+    }
+
     pub fn fields(&self) -> Option<&IndexMap<String, FieldData>> {
         match &self.kind {
             TypeKind::Object(obj) => Some(&obj.fields),
@@ -196,7 +225,7 @@ pub struct PropertyData {
 
 #[derive(Debug)]
 pub struct IdPropertyData {
-    pub relation_id: RelationId,
+    pub relationship_id: RelationshipId,
     pub operator_id: SerdeOperatorId,
 }
 

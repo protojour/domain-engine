@@ -33,7 +33,7 @@ pub enum Type<'m> {
     StringConstant(DefId),
     Regex(DefId),
     StringLike(DefId, StringLikeType),
-    Array(TypeRef<'m>),
+    Seq(TypeRef<'m>, TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:
@@ -44,6 +44,8 @@ pub enum Type<'m> {
     // User-defined data type from a domain:
     Domain(DefId),
     Anonymous(DefId),
+    // A builtin function for generating values
+    ValueGenerator(DefId),
     Package,
     BuiltinRelation,
     Infer(TypeVar<'m>),
@@ -64,11 +66,12 @@ impl<'m> Type<'m> {
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::StringLike(def_id, _) => Some(*def_id),
-            Self::Array(ty) => ty.get_single_def_id(),
+            Self::Seq(_, _) => None,
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function { .. } => None,
             Self::Domain(def_id) => Some(*def_id),
             Self::Anonymous(def_id) => Some(*def_id),
+            Self::ValueGenerator(def_id) => Some(*def_id),
             Self::Package => None,
             Self::BuiltinRelation => None,
             Self::Infer(_) => None,
@@ -145,7 +148,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
 
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
-    pub map: FnvHashMap<DefId, TypeRef<'m>>,
+    pub table: FnvHashMap<DefId, TypeRef<'m>>,
 }
 
 pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>, pub &'c Primitives);
@@ -187,8 +190,13 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             }
             Type::StringLike(_, StringLikeType::Uuid) => write!(f, "uuid"),
             Type::StringLike(_, StringLikeType::DateTime) => write!(f, "datetime"),
-            Type::Array(ty) => {
-                write!(f, "[{}]", FormatType(ty, defs, primitives))
+            Type::Seq(rel, val) => {
+                write!(
+                    f,
+                    "[{}: {}]",
+                    FormatType(rel, defs, primitives),
+                    FormatType(val, defs, primitives)
+                )
             }
             Type::Option(ty) => {
                 write!(f, "{}?", FormatType(ty, defs, primitives))
@@ -205,6 +213,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Anonymous(_) => {
                 write!(f, "anonymous")
             }
+            Type::ValueGenerator(_) => write!(f, "value_generator"),
             Type::Package => write!(f, "package"),
             Type::BuiltinRelation => write!(f, "relation"),
             Type::Infer(_) => write!(f, "?infer"),

@@ -27,26 +27,22 @@ impl Src {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct SourceSpan {
     pub source_id: SourceId,
     pub start: u32,
     pub end: u32,
 }
 
+pub const NO_SPAN: SourceSpan = SourceSpan {
+    source_id: SourceId(0),
+    start: 0,
+    end: 0,
+};
+
 impl Debug for SourceSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "#({:?}):{}..{}", self.source_id, self.start, self.end)
-    }
-}
-
-impl SourceSpan {
-    pub fn none() -> SourceSpan {
-        Self {
-            source_id: SourceId(0),
-            start: 0,
-            end: 0,
-        }
     }
 }
 

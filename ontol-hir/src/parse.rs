@@ -1,12 +1,16 @@
+use std::str::FromStr;
+
 use ontol_runtime::vm::proc::BuiltinProc;
 
-use crate::{
-    kind::{
-        Attribute, Dimension, IterBinder, MatchArm, NodeKind, PatternBinding, PropPattern,
-        PropVariant,
-    },
-    Binder, Label, Lang, Variable,
-};
+use crate::*;
+
+impl FromStr for Var {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        try_alpha_to_u32(s).map(Var).map_err(|_| ())
+    }
+}
 
 #[derive(Debug)]
 pub enum Error<'s> {
@@ -45,6 +49,7 @@ pub enum Token<'s> {
     Hash,
     At,
     Underscore,
+    Questionmark,
 }
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
@@ -66,20 +71,19 @@ impl<L: Lang> Parser<L> {
                 Ok((node, next))
             }
             (Token::Dollar, next) => match parse_token(next)? {
-                (Token::Symbol(sym), next) => Ok((
-                    self.make_node(NodeKind::VariableRef(Variable(try_alpha_to_u32(sym)?))),
-                    next,
-                )),
+                (Token::Symbol(sym), next) => {
+                    Ok((self.make_node(Kind::Var(Var(try_alpha_to_u32(sym)?))), next))
+                }
                 (token, _) => Err(Error::InvalidToken(token)),
             },
             (Token::Hash, next) => match parse_token(next)? {
                 (Token::Symbol(sym), next) => match sym {
-                    "u" => Ok((self.make_node(NodeKind::Unit), next)),
+                    "u" => Ok((self.make_node(Kind::Unit), next)),
                     sym => Err(Error::InvalidSymbol(sym)),
                 },
                 (token, _) => Err(Error::InvalidToken(token)),
             },
-            (Token::Int(num), next) => Ok((self.make_node(NodeKind::Int(num)), next)),
+            (Token::Int(num), next) => Ok((self.make_node(Kind::Int(num)), next)),
             (token, _) => Err(Error::InvalidToken(token)),
         }
     }
@@ -97,34 +101,21 @@ impl<L: Lang> Parser<L> {
                 let (_, next) = parse_rparen(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(NodeKind::Let(Binder(bind_var), Box::new(def), body)),
+                    self.make_node(Kind::Let(self.make_binder(bind_var), Box::new(def), body)),
                     next,
                 ))
             }
             ("map", next) => {
                 let (arg, next) = self.parse(next)?;
-                Ok((self.make_node(NodeKind::Map(Box::new(arg))), next))
+                Ok((self.make_node(Kind::Map(Box::new(arg))), next))
             }
             ("struct", next) => {
-                let (binder, next) = parse_binder(next)?;
+                let (binder, next) = self.parse_binder(next)?;
                 let (children, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Struct(binder, children)), next))
+                Ok((self.make_node(Kind::Struct(binder, children)), next))
             }
-            ("prop", next) => {
-                let (var, next) = parse_dollar_var(next)?;
-                let (prop, next) = parse_symbol(next)?;
-                let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
-                Ok((
-                    self.make_node(NodeKind::Prop(
-                        var,
-                        prop.parse().map_err(|_| {
-                            Error::Expected(Class::Property, Found(Token::Symbol(prop)))
-                        })?,
-                        variants,
-                    )),
-                    next,
-                ))
-            }
+            ("prop", next) => self.parse_prop(Optional(false), next),
+            ("prop?", next) => self.parse_prop(Optional(true), next),
             ("seq", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
@@ -132,7 +123,7 @@ impl<L: Lang> Parser<L> {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(NodeKind::Seq(
+                    self.make_node(Kind::Seq(
                         label,
                         Attribute {
                             rel: Box::new(rel),
@@ -147,7 +138,7 @@ impl<L: Lang> Parser<L> {
                 let (prop, next) = parse_symbol(next)?;
                 let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
                 Ok((
-                    self.make_node(NodeKind::MatchProp(
+                    self.make_node(Kind::MatchProp(
                         struct_var,
                         prop.parse().map_err(|_| {
                             Error::Expected(Class::Property, Found(Token::Symbol(prop)))
@@ -159,22 +150,22 @@ impl<L: Lang> Parser<L> {
             }
             ("gen", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
-                let (binder, next) = parse_iter_binder(next)?;
+                let (binder, next) = self.parse_iter_binder(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Gen(seq_var, binder, body)), next))
+                Ok((self.make_node(Kind::Gen(seq_var, binder, body)), next))
             }
             ("iter", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
-                let (binder, next) = parse_iter_binder(next)?;
+                let (binder, next) = self.parse_iter_binder(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(NodeKind::Iter(seq_var, binder, body)), next))
+                Ok((self.make_node(Kind::Iter(seq_var, binder, body)), next))
             }
             ("push", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(NodeKind::Push(
+                    self.make_node(Kind::Push(
                         seq_var,
                         Attribute {
                             rel: Box::new(rel),
@@ -186,6 +177,26 @@ impl<L: Lang> Parser<L> {
             }
             (sym, _) => Err(Error::InvalidSymbol(sym)),
         }
+    }
+
+    pub fn parse_prop<'a, 's>(
+        &self,
+        optional: Optional,
+        next: &'s str,
+    ) -> ParseResult<'s, L::Node<'a>> {
+        let (var, next) = parse_dollar_var(next)?;
+        let (prop, next) = parse_symbol(next)?;
+        let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
+        Ok((
+            self.make_node(Kind::Prop(
+                optional,
+                var,
+                prop.parse()
+                    .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(prop))))?,
+                variants,
+            )),
+            next,
+        ))
     }
 
     fn parse_many<'p, 's, T>(
@@ -209,74 +220,75 @@ impl<L: Lang> Parser<L> {
     }
 
     fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
-        let (_, next) = parse_lparen(next)?;
-        let (dimension, next) = match parse_symbol(next) {
-            Err(Error::Unexpected(Class::RParen)) => {
-                let (_, next) = parse_rparen(next)?;
-                return Ok((PropVariant::Absent, next));
-            }
-            Ok(("seq", next)) => {
-                let (_, next) = parse_lparen(next)?;
-                let (label, next) = parse_at_label(next)?;
-                let (_, next) = parse_rparen(next)?;
-                (Dimension::Seq(label), next)
-            }
-            Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
-            Err(_) => (Dimension::Singular, next),
-        };
-        let (rel, next) = self.parse(next)?;
-        let (value, next) = self.parse(next)?;
-        let (_, next) = parse_rparen(next)?;
+        parse_paren_delimited(next, |next| {
+            let (dimension, next) = match parse_symbol(next) {
+                Ok(("seq", next)) => {
+                    let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                    (AttrDimension::Seq(label, HasDefault(false)), next)
+                }
+                Ok(("seq-default", next)) => {
+                    let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                    (AttrDimension::Seq(label, HasDefault(true)), next)
+                }
+                Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+                Err(_) => (AttrDimension::Singular, next),
+            };
+            let (rel, next) = self.parse(next)?;
+            let (value, next) = self.parse(next)?;
 
-        Ok((
-            PropVariant::Present {
-                dimension,
-                attr: Attribute {
-                    rel: Box::new(rel),
-                    val: Box::new(value),
+            Ok((
+                PropVariant {
+                    dimension,
+                    attr: Attribute {
+                        rel: Box::new(rel),
+                        val: Box::new(value),
+                    },
                 },
-            },
-            next,
-        ))
+                next,
+            ))
+        })
     }
 
     fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
-        let (_, next) = parse_lparen(next)?;
-        let (_, next) = parse_lparen(next)?;
-        let (is_seq, next) = match parse_symbol(next) {
-            Ok(("seq", next)) => (true, next),
-            Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
-            _ => (false, next),
-        };
-        let (pattern, next) = match parse_pattern_binding(next) {
-            Ok((first_binding, next)) => match parse_pattern_binding(next) {
-                Ok((val_binding, next)) => {
-                    let (_, next) = parse_rparen(next)?;
-                    (
-                        if is_seq {
-                            return Err(Error::Unexpected(Class::Seq));
-                        } else {
-                            PropPattern::Attr(first_binding, val_binding)
-                        },
-                        next,
-                    )
+        parse_paren_delimited(next, |next| {
+            let (_, next) = parse_lparen(next)?;
+            let (seq_default, next) = match parse_symbol(next) {
+                Ok(("seq", next)) => (Some(HasDefault(false)), next),
+                Ok(("seq-default", next)) => (Some(HasDefault(true)), next),
+                Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+                _ => (None, next),
+            };
+            let (pattern, next) = match self.parse_pattern_binding(next) {
+                Ok((first_binding, next)) => {
+                    match (self.parse_pattern_binding(next), seq_default) {
+                        (Ok((val_binding, next)), seq_default) => {
+                            let (_, next) = parse_rparen(next)?;
+                            (
+                                if seq_default.is_some() {
+                                    return Err(Error::Unexpected(Class::Seq));
+                                } else {
+                                    PropPattern::Attr(first_binding, val_binding)
+                                },
+                                next,
+                            )
+                        }
+                        (Err(Error::Unexpected(Class::RParen)), Some(has_default)) => {
+                            let (_, next) = parse_rparen(next)?;
+                            (PropPattern::Seq(first_binding, has_default), next)
+                        }
+                        (Err(err), _) => return Err(err),
+                    }
                 }
-                Err(Error::Unexpected(Class::RParen)) if is_seq => {
+                Err(Error::Unexpected(Class::RParen)) => {
                     let (_, next) = parse_rparen(next)?;
-                    (PropPattern::Seq(first_binding), next)
+                    (PropPattern::Absent, next)
                 }
-                Err(err) => return Err(err),
-            },
-            Err(Error::Unexpected(Class::RParen)) => {
-                let (_, next) = parse_rparen(next)?;
-                (PropPattern::Absent, next)
-            }
-            Err(other) => return Err(other),
-        };
-        let (nodes, next) = self.parse_many(next, Self::parse)?;
-        let (_, next) = parse_rparen(next)?;
+                Err(other) => return Err(other),
+            };
+            let (nodes, next) = self.parse_many(next, Self::parse)?;
 
-        Ok((MatchArm { pattern, nodes }, next))
+            Ok((MatchArm { pattern, nodes }, next))
+        })
     }
 
     fn parse_binary_call<'a, 's>(
@@ -287,11 +299,43 @@ impl<L: Lang> Parser<L> {
         let (a, next) = self.parse(next)?;
         let (b, next) = self.parse(next)?;
 
-        Ok((self.make_node(NodeKind::Call(proc, [a, b].into())), next))
+        Ok((self.make_node(Kind::Call(proc, [a, b].into())), next))
     }
 
-    fn make_node<'a>(&self, kind: NodeKind<'a, L>) -> L::Node<'a> {
+    fn parse_binder<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Binder<'a>> {
+        parse_paren_delimited(next, |next| {
+            let (var, next) = parse_dollar_var(next)?;
+            Ok((self.make_binder(var), next))
+        })
+    }
+
+    fn parse_iter_binder<'a, 's>(&self, next: &'s str) -> ParseResult<'s, IterBinder<'a, L>> {
+        parse_paren_delimited(next, |next| {
+            let (seq, next) = self.parse_pattern_binding(next)?;
+            let (rel, next) = self.parse_pattern_binding(next)?;
+            let (val, next) = self.parse_pattern_binding(next)?;
+            Ok((IterBinder { seq, rel, val }, next))
+        })
+    }
+
+    fn parse_pattern_binding<'a, 's>(&self, next: &'s str) -> ParseResult<'s, Binding<'a, L>> {
+        let (_, next) = parse_dollar(next)?;
+        match parse_token(next)? {
+            (Token::Symbol(sym), next) => Ok((
+                Binding::Binder(self.make_binder(Var(try_alpha_to_u32(sym)?))),
+                next,
+            )),
+            (Token::Underscore, next) => Ok((Binding::Wildcard, next)),
+            (token, _) => Err(Error::InvalidToken(token)),
+        }
+    }
+
+    fn make_node<'a>(&self, kind: Kind<'a, L>) -> L::Node<'a> {
         self.lang.make_node(kind)
+    }
+
+    fn make_binder<'a>(&self, var: Var) -> L::Binder<'a> {
+        self.lang.make_binder(var)
     }
 }
 
@@ -309,40 +353,23 @@ fn parse_dollar(next: &str) -> ParseResult<()> {
     }
 }
 
-fn parse_dollar_var(next: &str) -> ParseResult<Variable> {
+fn parse_dollar_var(next: &str) -> ParseResult<Var> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((Variable(try_alpha_to_u32(sym)?), next)),
+        (Token::Symbol(sym), next) => Ok((Var(try_alpha_to_u32(sym)?), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
 
-fn parse_binder(next: &str) -> ParseResult<Binder> {
+/// Parse `(`, then closure, then `)`
+fn parse_paren_delimited<'s, T>(
+    next: &'s str,
+    item_fn: impl Fn(&'s str) -> ParseResult<'s, T>,
+) -> ParseResult<'s, T> {
     let (_, next) = parse_lparen(next)?;
-    let (var, next) = parse_dollar_var(next)?;
+    let (value, next) = item_fn(next)?;
     let (_, next) = parse_rparen(next)?;
-    Ok((Binder(var), next))
-}
-
-fn parse_iter_binder(next: &str) -> ParseResult<IterBinder> {
-    let (_, next) = parse_lparen(next)?;
-    let (seq, next) = parse_pattern_binding(next)?;
-    let (rel, next) = parse_pattern_binding(next)?;
-    let (val, next) = parse_pattern_binding(next)?;
-    let (_, next) = parse_rparen(next)?;
-    Ok((IterBinder { seq, rel, val }, next))
-}
-
-fn parse_pattern_binding(next: &str) -> ParseResult<PatternBinding> {
-    let (_, next) = parse_dollar(next)?;
-    match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((
-            PatternBinding::Binder(Variable(try_alpha_to_u32(sym)?)),
-            next,
-        )),
-        (Token::Underscore, next) => Ok((PatternBinding::Wildcard, next)),
-        (token, _) => Err(Error::InvalidToken(token)),
-    }
+    Ok((value, next))
 }
 
 fn parse_at_label(next: &str) -> ParseResult<Label> {
@@ -419,7 +446,7 @@ fn parse_int(num: &str) -> Result<Token, Error> {
     }
 }
 
-fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
+pub(super) fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
     if sym.is_empty() {
         return Err(Error::InvalidSymbol(sym));
     }

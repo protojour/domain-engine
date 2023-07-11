@@ -5,6 +5,7 @@ use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
+use urlencoding::encode;
 
 use crate::env::TypeInfo;
 use crate::serde::operator::{
@@ -52,6 +53,7 @@ pub fn build_standalone_schema<'e>(
 
     Ok(StandaloneJsonSchema {
         operator_id,
+        def_id: type_info.def_id,
         defs: graph_builder.graph,
         env,
         mode,
@@ -76,6 +78,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::ComponentsSchemas,
             env: self.env,
+            docs: None,
             rel_params_operator_id: None,
             mode: ProcessorMode::Create,
         };
@@ -101,6 +104,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 /// Schema for a single type, for use in JSON schema
 pub struct StandaloneJsonSchema<'e> {
     operator_id: SerdeOperatorId,
+    def_id: DefId,
     defs: BTreeMap<DefVariant, SerdeOperatorId>,
     env: &'e Env,
     mode: ProcessorMode,
@@ -108,9 +112,11 @@ pub struct StandaloneJsonSchema<'e> {
 
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let docs = self.env.get_docs(self.def_id);
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::Defs,
             env: self.env,
+            docs: docs.as_deref(),
             rel_params_operator_id: None,
             mode: self.mode,
         };
@@ -132,6 +138,7 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
 struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
     env: &'e Env,
+    docs: Option<&'e str>,
     rel_params_operator_id: Option<SerdeOperatorId>,
     mode: ProcessorMode,
 }
@@ -181,16 +188,42 @@ impl<'e> SchemaCtx<'e> {
             link_anchor: self.link_anchor,
             env: self.env,
             rel_params_operator_id,
+            docs: self.docs,
             mode: self.mode,
         }
     }
 
+    fn with_docs(&self, docs: Option<&'e str>) -> Self {
+        Self {
+            link_anchor: self.link_anchor,
+            env: self.env,
+            rel_params_operator_id: self.rel_params_operator_id,
+            docs,
+            mode: self.mode,
+        }
+    }
+
+    fn type_name(&self, def_variant: DefVariant) -> Option<String> {
+        match self.env.find_domain(def_variant.def_id.0) {
+            Some(domain) => domain.type_info(def_variant.def_id).name.to_owned(),
+            None => None,
+        }
+    }
+
     fn format_key(&self, def_variant: DefVariant) -> String {
-        smart_format!("{}", Key(def_variant))
+        let package_id = def_variant.def_id.0;
+        match self.type_name(def_variant) {
+            Some(name) => smart_format!("{}_{}", package_id.0, encode(&name)),
+            None => smart_format!("{}", Key(def_variant)),
+        }
     }
 
     fn format_ref_link(&self, def_variant: DefVariant) -> String {
-        smart_format!("{}{}", self.link_anchor, Key(def_variant))
+        let package_id = def_variant.def_id.0;
+        match self.type_name(def_variant) {
+            Some(name) => smart_format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
+            None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
+        }
     }
 }
 
@@ -247,7 +280,7 @@ struct SchemaDefinition<'e> {
 impl<'e> Serialize for SchemaDefinition<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-        serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, None, &mut map)?;
+        serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, &mut map)?;
         map.end()
     }
 }
@@ -255,47 +288,76 @@ impl<'e> Serialize for SchemaDefinition<'e> {
 fn serialize_schema_inline<S: Serializer>(
     ctx: &SchemaCtx,
     value_operator: &SerdeOperator,
-    _description: Option<&str>,
     def_map: Option<&DefMap>,
     map: &mut <S as Serializer>::SerializeMap,
 ) -> Result<(), S::Error> {
     match value_operator {
         SerdeOperator::Unit => {
             map.serialize_entry("type", "object")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::True(_) => {
             map.serialize_entry("type", "boolean")?;
             map.serialize_entry("enum", &[true])?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::False(_) => {
             map.serialize_entry("type", "boolean")?;
             map.serialize_entry("enum", &[false])?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::Bool(_) => {
             map.serialize_entry("type", "boolean")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         // FIXME: Distinguish different number types
         SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
             map.serialize_entry("type", "integer")?;
             map.serialize_entry("format", "int64")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::String(_) => {
             map.serialize_entry("type", "string")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::StringConstant(literal, _) => {
             map.serialize_entry("type", "string")?;
             map.serialize_entry("enum", &[literal])?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::StringPattern(def_id) | SerdeOperator::CapturingStringPattern(def_id) => {
             let pattern = ctx.env.string_patterns.get(def_id).unwrap();
             map.serialize_entry("type", "string")?;
             map.serialize_entry("pattern", pattern.regex.as_str())?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::DynamicSequence => {
             map.serialize_entry("type", "array")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
         }
         SerdeOperator::RelationSequence(seq_op) => {
             map.serialize_entry("type", "array")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
 
             let range = &seq_op.ranges[0];
             // normal array: all items are uniform
@@ -303,6 +365,9 @@ fn serialize_schema_inline<S: Serializer>(
         }
         SerdeOperator::ConstructorSequence(seq_op) => {
             map.serialize_entry("type", "array")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
 
             let ranges = &seq_op.ranges;
 
@@ -337,7 +402,6 @@ fn serialize_schema_inline<S: Serializer>(
             serialize_schema_inline::<S>(
                 ctx,
                 ctx.env.get_serde_operator(value_op.inner_operator_id),
-                Some("TODO: overridden description"),
                 None,
                 map,
             )?;
@@ -356,6 +420,9 @@ fn serialize_schema_inline<S: Serializer>(
         }
         SerdeOperator::Struct(struct_op) => {
             map.serialize_entry("type", "object")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
             map.serialize_entry(
                 "properties",
                 &MapProperties {
@@ -363,7 +430,9 @@ fn serialize_schema_inline<S: Serializer>(
                     map_type: struct_op,
                 },
             )?;
-            if struct_op.n_mandatory_properties > 0 {
+
+            let required_count = struct_op.required_count(ctx.mode, None);
+            if required_count > 0 {
                 map.serialize_entry(
                     "required",
                     &RequiredMapProperties {
@@ -406,24 +475,12 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             | SerdeOperator::DynamicSequence => {
                 // These are inline schemas
                 let mut map = serializer.serialize_map(None)?;
-                serialize_schema_inline::<S>(
-                    &self.ctx,
-                    value_operator,
-                    None,
-                    self.def_map,
-                    &mut map,
-                )?;
+                serialize_schema_inline::<S>(&self.ctx, value_operator, self.def_map, &mut map)?;
                 map.end()
             }
             SerdeOperator::RelationSequence(_seq_op) => {
                 let mut map = serializer.serialize_map(None)?;
-                serialize_schema_inline::<S>(
-                    &self.ctx,
-                    value_operator,
-                    None,
-                    self.def_map,
-                    &mut map,
-                )?;
+                serialize_schema_inline::<S>(&self.ctx, value_operator, self.def_map, &mut map)?;
                 map.end()
             }
             SerdeOperator::ConstructorSequence(seq_op) => self
@@ -567,14 +624,16 @@ impl<'e> Serialize for MapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         for (key, property) in &self.map_type.properties {
-            // FIXME: Need to merge the documentation of the _property_
-            // and the documentation of the type
-
+            let docs = self
+                .ctx
+                .env
+                .get_docs(property.property_id.relationship_id.0);
             map.serialize_entry(
                 key,
                 &self
                     .ctx
                     .with_rel_params(property.rel_params_operator_id)
+                    .with_docs(docs.as_deref())
                     .reference(property.value_operator_id),
             )?;
         }
@@ -591,7 +650,7 @@ impl<'e> Serialize for RequiredMapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
         for (key, property) in &self.map_type.properties {
-            if !property.optional {
+            if !property.is_optional() {
                 seq.serialize_element(key)?;
             }
         }
