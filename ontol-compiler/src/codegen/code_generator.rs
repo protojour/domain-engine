@@ -57,10 +57,11 @@ pub(super) fn map_codegen<'m>(
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
-    let mut errors = CompileErrors::default();
 
     debug!("Generating code for\n{}", func);
+
+    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
+    let mut errors = CompileErrors::default();
 
     let return_ty = func.body.ty();
 

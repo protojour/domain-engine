@@ -16,7 +16,7 @@ use ontol_runtime::{
     DefId, RelationshipId, Role,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::{
@@ -182,6 +182,17 @@ impl InMemoryStore {
         entity_key: &DynamicKey,
         query: &Query,
     ) -> DomainResult<Value> {
+        if let Query::Struct(struct_query) = query {
+            // sanity check
+            if !self.collections.contains_key(&struct_query.def_id) {
+                error!(
+                    "Store does not contain a collection for {:?}",
+                    struct_query.def_id
+                );
+                return Err(DomainError::InvalidEntityDefId);
+            }
+        }
+
         // Find the def_id of the dynamic key. This is a little inefficient.
         let (def_id, properties) = self
             .collections

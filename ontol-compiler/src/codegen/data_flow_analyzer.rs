@@ -11,7 +11,10 @@ use ontol_runtime::{
 };
 
 use crate::{
-    def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef,
+    def::LookupRelationshipMeta,
+    hir_unify::VarSet,
+    typed_hir::TypedHirNode,
+    types::{Type, TypeRef},
 };
 
 pub struct DataFlowAnalyzer<'c, R> {
@@ -141,6 +144,10 @@ where
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.var, *struct_var);
+                                if !matches!(binder.ty, Type::Seq(..)) {
+                                    panic!("Sequence binder was not seq but {:?}", binder.ty);
+                                }
+                                property_type = Some(binder.ty);
                             }
                         }
                         ontol_hir::PropPattern::Absent => {}
@@ -154,7 +161,10 @@ where
                 self.reg_scope_prop(
                     *struct_var,
                     *property_id,
-                    property_type.unwrap_or(node.meta().ty),
+                    property_type.unwrap_or_else(|| {
+                        panic!("No type found for {property_id}");
+                        node.meta().ty
+                    }),
                 );
 
                 var_set

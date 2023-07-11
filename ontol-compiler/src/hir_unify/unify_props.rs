@@ -70,7 +70,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     },
                 );
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, gen_scope, sub_scoped)?;
-                let ty = nodes
+                let arm_ty = nodes
                     .iter()
                     .map(TypedHirNode::ty)
                     .last()
@@ -81,13 +81,14 @@ pub(super) trait UnifyProps<'m>: Sized {
                         pattern: ontol_hir::PropPattern::Seq(
                             ontol_hir::Binding::Binder(TypedBinder {
                                 var: ontol_hir::Var(label.0),
-                                ty,
+                                // BUG: the type should be the Seq type
+                                ty: arm_ty,
                             }),
                             has_default,
                         ),
                         nodes,
                     },
-                    ty,
+                    arm_ty,
                 )
             }
         };
