@@ -56,10 +56,10 @@ pub(super) trait UnifyProps<'m>: Sized {
                     ty,
                 )
             }
-            scope::PropKind::Seq(label, has_default, rel_binding, val_binding) => {
+            scope::PropKind::Seq(typed_label, has_default, rel_binding, val_binding) => {
                 let gen_scope = scope::Scope(
                     scope::Kind::Gen(scope::Gen {
-                        input_seq: ontol_hir::Var(label.0),
+                        input_seq: ontol_hir::Var(typed_label.label.0),
                         output_seq: unifier.var_allocator.alloc(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
@@ -80,9 +80,8 @@ pub(super) trait UnifyProps<'m>: Sized {
                     ontol_hir::MatchArm {
                         pattern: ontol_hir::PropPattern::Seq(
                             ontol_hir::Binding::Binder(TypedBinder {
-                                var: ontol_hir::Var(label.0),
-                                // BUG: the type should be the Seq type
-                                ty: arm_ty,
+                                var: ontol_hir::Var(typed_label.label.0),
+                                ty: typed_label.ty,
                             }),
                             has_default,
                         ),

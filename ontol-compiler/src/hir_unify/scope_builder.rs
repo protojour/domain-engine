@@ -224,7 +224,7 @@ impl<'m> ScopeBuilder<'m> {
                                 dep_union.vars,
                             )
                         }
-                        ontol_hir::AttrDimension::Seq(label, has_default) => {
+                        ontol_hir::AttrDimension::Seq(typed_label, has_default) => {
                             let rel = zelf
                                 .enter_child(0, |zelf| zelf.build_scope_binder(&variant.attr.rel))?
                                 .into_scope_pattern_binding();
@@ -233,8 +233,8 @@ impl<'m> ScopeBuilder<'m> {
                                 .into_scope_pattern_binding();
 
                             (
-                                scope::PropKind::Seq(label, has_default, rel, val),
-                                VarSet::from([ontol_hir::Var(label.0)]),
+                                scope::PropKind::Seq(typed_label, has_default, rel, val),
+                                VarSet::from([typed_label.label.into()]),
                                 VarSet::default(),
                             )
                         }
@@ -355,11 +355,11 @@ impl<'m> ScopeBuilder<'m> {
     }
 
     fn enter_binder<T>(&mut self, binder: &TypedBinder, func: impl FnOnce(&mut Self) -> T) -> T {
-        if !self.in_scope.0.insert(binder.var.0 as usize) {
+        if !self.in_scope.insert(binder.var) {
             panic!("Malformed HIR: {binder:?} variable was already in scope");
         }
         let value = func(self);
-        self.in_scope.0.remove(binder.var.0 as usize);
+        self.in_scope.remove(binder.var);
         value
     }
 
@@ -378,18 +378,18 @@ pub struct UnionBuilder {
 
 impl UnionBuilder {
     fn plus<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.0.union_with(&binder.scope.vars().0);
+        self.vars.union_with(&binder.scope.vars());
         binder
     }
 
     fn plus_deps<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.0.union_with(&binder.scope.dependencies().0);
+        self.vars.union_with(&binder.scope.dependencies());
         binder
     }
 
     fn plus_iter<'a>(&mut self, iter: impl Iterator<Item = &'a VarSet>) {
         for var_set in iter {
-            self.vars.0.union_with(&var_set.0);
+            self.vars.union_with(&var_set);
         }
     }
 }

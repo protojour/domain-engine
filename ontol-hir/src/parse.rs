@@ -124,7 +124,7 @@ impl<L: Lang> Parser<L> {
                 let (val, next) = self.parse(next)?;
                 Ok((
                     self.make_node(Kind::Seq(
-                        label,
+                        self.make_label(label),
                         Attribute {
                             rel: Box::new(rel),
                             val: Box::new(val),
@@ -224,11 +224,17 @@ impl<L: Lang> Parser<L> {
             let (dimension, next) = match parse_symbol(next) {
                 Ok(("seq", next)) => {
                     let (label, next) = parse_paren_delimited(next, parse_at_label)?;
-                    (AttrDimension::Seq(label, HasDefault(false)), next)
+                    (
+                        AttrDimension::Seq(self.make_label(label), HasDefault(false)),
+                        next,
+                    )
                 }
                 Ok(("seq-default", next)) => {
                     let (label, next) = parse_paren_delimited(next, parse_at_label)?;
-                    (AttrDimension::Seq(label, HasDefault(true)), next)
+                    (
+                        AttrDimension::Seq(self.make_label(label), HasDefault(true)),
+                        next,
+                    )
                 }
                 Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
                 Err(_) => (AttrDimension::Singular, next),
@@ -336,6 +342,10 @@ impl<L: Lang> Parser<L> {
 
     fn make_binder<'a>(&self, var: Var) -> L::Binder<'a> {
         self.lang.make_binder(var)
+    }
+
+    fn make_label<'a>(&self, label: Label) -> L::Label<'a> {
+        self.lang.make_label(label)
     }
 }
 

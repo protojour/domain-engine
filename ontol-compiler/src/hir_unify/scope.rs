@@ -2,7 +2,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode, TypedLabel},
 };
 
 #[derive(Clone, Debug)]
@@ -92,7 +92,7 @@ pub struct Prop<'m> {
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
     Seq(
-        ontol_hir::Label,
+        TypedLabel<'m>,
         ontol_hir::HasDefault,
         PatternBinding<'m>,
         PatternBinding<'m>,

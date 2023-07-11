@@ -17,6 +17,7 @@ pub struct TypedHir;
 impl ontol_hir::Lang for TypedHir {
     type Node<'m> = TypedHirNode<'m>;
     type Binder<'m> = TypedBinder<'m>;
+    type Label<'m> = TypedLabel<'m>;
 
     fn make_node<'m>(&self, kind: ontol_hir::Kind<'m, Self>) -> Self::Node<'m> {
         TypedHirNode(
@@ -31,6 +32,13 @@ impl ontol_hir::Lang for TypedHir {
     fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
         TypedBinder {
             var,
+            ty: &Type::Error,
+        }
+    }
+
+    fn make_label<'a>(&self, label: ontol_hir::Label) -> Self::Label<'a> {
+        TypedLabel {
+            label,
             ty: &Type::Error,
         }
     }
@@ -123,5 +131,21 @@ impl<'m> ontol_hir::GetVar<'m, TypedHir> for TypedBinder<'m> {
 
     fn var_mut(&mut self) -> &mut Var {
         &mut self.var
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TypedLabel<'m> {
+    pub label: ontol_hir::Label,
+    pub ty: TypeRef<'m>,
+}
+
+impl<'m> ontol_hir::GetLabel<'m, TypedHir> for TypedLabel<'m> {
+    fn label(&self) -> &ontol_hir::Label {
+        &self.label
+    }
+
+    fn label_mut(&mut self) -> &mut ontol_hir::Label {
+        &mut self.label
     }
 }

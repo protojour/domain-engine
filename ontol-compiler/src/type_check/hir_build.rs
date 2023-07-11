@@ -17,7 +17,7 @@ use crate::{
         hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
     },
-    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode, TypedLabel},
     types::{Type, TypeRef},
     SourceSpan, NO_SPAN,
 };
@@ -187,7 +187,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 TypedHirNode(
                     ontol_hir::Kind::Seq(
-                        label,
+                        TypedLabel { label, ty: seq_ty },
                         ontol_hir::Attribute {
                             rel: Box::new(self.unit_node_no_span()),
                             val: Box::new(inner_node),
@@ -474,9 +474,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let val_node = self.build_node(value, Some(value_ty), ctx);
                                         let label = *ctx.label_map.get(aggr_expr_id).unwrap();
 
+                                        let seq_ty =
+                                            self.types.intern(Type::Seq(rel_params_ty, value_ty));
+
                                         ontol_hir::PropVariant {
                                             dimension: ontol_hir::AttrDimension::Seq(
-                                                label,
+                                                TypedLabel { label, ty: seq_ty },
                                                 ontol_hir::HasDefault(matches!(
                                                     match_property.property_id.role,
                                                     Role::Object

@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 use crate::*;
 
 macro_rules! visitor_trait_methods {
-    ($ref:tt, $kind:ident, $var:ident, $iter:ident) => {
+    ($ref:tt, $kind:ident, $var:ident, $label:ident, $iter:ident) => {
         fn visit_node(&mut self, index: usize, node: arg!($ref L::Node<'l>)) {
             self.visit_kind(index, node.$kind());
         }
@@ -78,7 +78,7 @@ macro_rules! visitor_trait_methods {
                     }
                 }
                 Kind::Seq(label, spec) => {
-                    self.visit_label(label);
+                    self.visit_label(label.$label());
                     self.visit_node(0, borrow!($ref spec.rel));
                     self.visit_node(1, borrow!($ref spec.val));
                 }
@@ -136,7 +136,7 @@ macro_rules! visitor_trait_methods {
 
         fn traverse_prop_variant(&mut self, variant: arg!($ref PropVariant<'l, L>)) {
             if let AttrDimension::Seq(label, _) = borrow!($ref variant.dimension) {
-                self.visit_label(label);
+                self.visit_label(label.$label());
             }
             self.visit_node(0, borrow!($ref variant.attr.rel));
             self.visit_node(1, borrow!($ref variant.attr.val));
@@ -195,9 +195,9 @@ macro_rules! borrow {
 }
 
 pub trait HirVisitor<'p, 'l: 'p, L: Lang + 'l> {
-    visitor_trait_methods!((&'p), kind, var, iter);
+    visitor_trait_methods!((&'p), kind, var, label, iter);
 }
 
 pub trait HirMutVisitor<'l, L: Lang + 'l> {
-    visitor_trait_methods!((&mut), kind_mut, var_mut, iter_mut);
+    visitor_trait_methods!((&mut), kind_mut, var_mut, label_mut, iter_mut);
 }

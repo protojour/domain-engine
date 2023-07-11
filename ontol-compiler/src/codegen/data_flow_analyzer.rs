@@ -10,12 +10,7 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::{
-    def::LookupRelationshipMeta,
-    hir_unify::VarSet,
-    typed_hir::TypedHirNode,
-    types::{Type, TypeRef},
-};
+use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::Type};
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
@@ -128,7 +123,7 @@ where
 
                 let mut var_set = VarSet::default();
 
-                let mut property_type = None;
+                let mut value_def_id = None;
 
                 for arm in arms {
                     match &arm.pattern {
@@ -138,16 +133,16 @@ where
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
                                 self.add_dep(binder.var, *struct_var);
-                                property_type = Some(binder.ty);
+                                value_def_id = binder.ty.get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.var, *struct_var);
-                                if !matches!(binder.ty, Type::Seq(..)) {
-                                    panic!("Sequence binder was not seq but {:?}", binder.ty);
-                                }
-                                property_type = Some(binder.ty);
+                                value_def_id = match binder.ty {
+                                    Type::Seq(_, val) => val.get_single_def_id(),
+                                    _ => None,
+                                };
                             }
                         }
                         ontol_hir::PropPattern::Absent => {}
@@ -161,10 +156,7 @@ where
                 self.reg_scope_prop(
                     *struct_var,
                     *property_id,
-                    property_type.unwrap_or_else(|| {
-                        panic!("No type found for {property_id}");
-                        node.meta().ty
-                    }),
+                    value_def_id.unwrap_or(DefId::unit()),
                 );
 
                 var_set
@@ -230,9 +222,15 @@ where
         }
     }
 
-    fn reg_scope_prop(&mut self, struct_var: ontol_hir::Var, property_id: PropertyId, ty: TypeRef) {
-        let def_id = ty.get_single_def_id().unwrap_or(DefId::unit());
-
+    /// The purpose of the value_def_id is for the query engine
+    /// to understand which entity must be looked up.
+    /// rel_params is ignored here.
+    fn reg_scope_prop(
+        &mut self,
+        struct_var: ontol_hir::Var,
+        property_id: PropertyId,
+        value_def_id: DefId,
+    ) {
         let meta = self
             .defs
             .lookup_relationship_meta(property_id.relationship_id)
@@ -241,7 +239,7 @@ where
 
         self.property_flow.insert(PropertyFlow {
             id: property_id,
-            data: PropertyFlowData::Type(def_id),
+            data: PropertyFlowData::Type(value_def_id),
         });
         self.property_flow.insert(PropertyFlow {
             id: property_id,
