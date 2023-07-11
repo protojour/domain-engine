@@ -142,9 +142,35 @@ impl BlogPostConduit {
             .exec(&self.db_schema, &self.gql_context())
             .await,
             expected = Ok(graphql_value!({
-                "createArticle": {
-                    "slug": "the-slug"
+                "createArticle": { "slug": "the-slug" }
+            })),
+        );
+    }
+
+    async fn create_db_article_with_tag(&self) {
+        expect_eq!(
+            actual = r#"mutation {
+                createArticle(
+                    input: {
+                        slug: "the-slug",
+                        title: "The title",
+                        description: "An article",
+                        body: "THE BODY",
+                        author: {
+                            username: "teh_user",
+                            email: "a@b",
+                            password_hash: "s3cr3t"
+                        }
+                        tags: [{ tag: "foobar" }]
+                    }
+                ) {
+                    slug
                 }
+            }"#
+            .exec(&self.db_schema, &self.gql_context())
+            .await,
+            expected = Ok(graphql_value!({
+                "createArticle": { "slug": "the-slug" }
             })),
         );
     }
@@ -184,9 +210,9 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_empty_tags() {
+async fn test_graphql_in_memory_blog_post_conduit_tags() {
     let ctx = BlogPostConduit::new();
-    ctx.create_db_article().await;
+    ctx.create_db_article_with_tag().await;
 
     expect_eq!(
         actual = "{
@@ -209,7 +235,7 @@ async fn test_graphql_in_memory_blog_post_conduit_empty_tags() {
                         "node": {
                             "contents": "THE BODY",
                             "written_by": "teh_user",
-                            "tags": []
+                            "tags": ["foobar"]
                         }
                     }
                 ]

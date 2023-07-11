@@ -28,8 +28,6 @@ pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey,
                 prop_flow_slice,
             };
 
-            debug!("Input query: {struct_query:#?}");
-
             processor.autoselect_output_properties(
                 struct_query.def_id.package_id(),
                 &mut struct_query.properties,

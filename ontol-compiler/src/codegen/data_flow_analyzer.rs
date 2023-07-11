@@ -1,6 +1,6 @@
 //! High-level data flow of struct properties
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::GetKind;
@@ -16,7 +16,6 @@ use crate::{
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
-    // relations: &'c Relations,
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies

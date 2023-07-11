@@ -206,6 +206,9 @@ pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_id: SerdeOperatorId,
+    /// Whether all inherent fields are part of the primary id of this entity.
+    /// In other words: The entity has only one field, its ID.
+    pub is_self_identifying: bool,
     pub id_value_generator: Option<ValueGenerator>,
     pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
 }
