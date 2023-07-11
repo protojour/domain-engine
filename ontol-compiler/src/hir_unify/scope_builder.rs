@@ -378,18 +378,18 @@ pub struct UnionBuilder {
 
 impl UnionBuilder {
     fn plus<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.union_with(&binder.scope.vars());
+        self.vars.union_with(binder.scope.vars());
         binder
     }
 
     fn plus_deps<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.union_with(&binder.scope.dependencies());
+        self.vars.union_with(binder.scope.dependencies());
         binder
     }
 
     fn plus_iter<'a>(&mut self, iter: impl Iterator<Item = &'a VarSet>) {
         for var_set in iter {
-            self.vars.union_with(&var_set);
+            self.vars.union_with(var_set);
         }
     }
 }
