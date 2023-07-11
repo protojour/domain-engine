@@ -208,6 +208,7 @@ pub enum RelParams {
     IndexRange(Range<Option<u16>>),
 }
 
+#[derive(Clone)]
 pub struct RelationshipMeta<'m> {
     pub relationship_id: RelationshipId,
     pub relationship: SpannedBorrow<'m, Relationship<'m>>,

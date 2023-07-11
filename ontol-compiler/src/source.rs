@@ -51,6 +51,15 @@ pub struct SpannedBorrow<'m, T> {
     pub span: &'m SourceSpan,
 }
 
+impl<'m, T> Clone for SpannedBorrow<'m, T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value,
+            span: self.span,
+        }
+    }
+}
+
 impl<'m, T> Deref for SpannedBorrow<'m, T> {
     type Target = T;
 

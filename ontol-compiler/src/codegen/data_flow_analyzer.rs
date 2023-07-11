@@ -23,6 +23,15 @@ pub struct DataFlowAnalyzer<'c, R> {
     property_flow: BTreeSet<PropertyFlow>,
 }
 
+impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataFlowAnalyzer")
+            .field("var_to_property", &self.var_to_property)
+            .field("var_dependencies", &self.var_dependencies)
+            .finish()
+    }
+}
+
 impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
 where
     R: LookupRelationshipMeta<'m>,
@@ -37,7 +46,7 @@ where
     }
 
     pub fn analyze(
-        mut self,
+        &mut self,
         arg: ontol_hir::Var,
         body: &TypedHirNode,
     ) -> Option<Vec<PropertyFlow>> {
@@ -50,7 +59,11 @@ where
                     self.analyze_node(node);
                 }
 
-                Some(self.property_flow.into_iter().collect())
+                Some(
+                    std::mem::take(&mut self.property_flow)
+                        .into_iter()
+                        .collect(),
+                )
             }
             _ => None,
         }
@@ -146,9 +159,31 @@ where
 
                 var_set
             }
-            ontol_hir::Kind::Gen(..) => Default::default(),
-            ontol_hir::Kind::Iter(..) => Default::default(),
-            ontol_hir::Kind::Push(..) => Default::default(),
+            ontol_hir::Kind::Gen(var, iter_binder, body) => {
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.seq {
+                    self.add_dep(binder.var, *var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.rel {
+                    self.add_dep(binder.var, *var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.val {
+                    self.add_dep(binder.var, *var);
+                }
+                let mut var_set = VarSet::default();
+                for node in body {
+                    var_set.union_with(&self.analyze_node(node));
+                }
+                var_set
+            }
+            ontol_hir::Kind::Iter(..) => todo!(),
+            ontol_hir::Kind::Push(var, attr) => {
+                let mut var_set = self.analyze_node(&attr.rel);
+                var_set.union_with(&self.analyze_node(&attr.val));
+
+                self.var_dependencies.insert(*var, var_set.clone());
+
+                var_set
+            }
         }
     }
 
@@ -203,16 +238,41 @@ where
             data: PropertyFlowData::Cardinality(cardinality),
         });
 
-        if let Some(dependencies) = self.var_dependencies.get(&struct_var) {
-            for var_dependency in dependencies {
-                if let Some(props) = self.var_to_property.get(&var_dependency) {
-                    for prop in props {
-                        self.property_flow.insert(PropertyFlow {
-                            id: property_id,
-                            data: PropertyFlowData::ChildOf(*prop),
-                        });
-                    }
+        register_children_recursive(
+            struct_var,
+            property_id,
+            &self.var_dependencies,
+            &self.var_to_property,
+            &mut self.property_flow,
+        );
+    }
+}
+
+fn register_children_recursive(
+    var: ontol_hir::Var,
+    property_id: PropertyId,
+    var_dependencies: &FnvHashMap<ontol_hir::Var, VarSet>,
+    var_to_property: &FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
+    output: &mut BTreeSet<PropertyFlow>,
+) {
+    if let Some(dependencies) = var_dependencies.get(&var) {
+        for var_dependency in dependencies {
+            if let Some(props) = var_to_property.get(&var_dependency) {
+                // recursion stops here, as there is a property associated with the variable:
+                for prop in props {
+                    output.insert(PropertyFlow {
+                        id: property_id,
+                        data: PropertyFlowData::ChildOf(*prop),
+                    });
                 }
+            } else {
+                register_children_recursive(
+                    var_dependency,
+                    property_id,
+                    var_dependencies,
+                    var_to_property,
+                    output,
+                );
             }
         }
     }
