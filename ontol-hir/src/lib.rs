@@ -19,6 +19,12 @@ impl From<u32> for Var {
     }
 }
 
+impl From<Label> for Var {
+    fn from(value: Label) -> Self {
+        Var(value.0)
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
@@ -29,9 +35,11 @@ pub struct Label(pub u32);
 pub trait Lang: Sized + Copy {
     type Node<'a>: Sized + GetKind<'a, Self>;
     type Binder<'a>: Sized + GetVar<'a, Self>;
+    type Label<'a>: Sized + Clone + GetLabel<'a, Self>;
 
     fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a>;
     fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a>;
+    fn make_label<'a>(&self, label: Label) -> Self::Label<'a>;
 }
 
 pub trait GetKind<'a, L: Lang> {
@@ -42,6 +50,11 @@ pub trait GetKind<'a, L: Lang> {
 pub trait GetVar<'a, L: Lang> {
     fn var(&self) -> &Var;
     fn var_mut(&mut self) -> &mut Var;
+}
+
+pub trait GetLabel<'a, L: Lang> {
+    fn label(&self) -> &Label;
+    fn label_mut(&mut self) -> &mut Label;
 }
 
 type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
@@ -56,33 +69,13 @@ pub enum Kind<'a, L: Lang> {
     Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),
     Map(Box<L::Node<'a>>),
-    Seq(Label, Attribute<Box<L::Node<'a>>>),
+    Seq(L::Label<'a>, Attribute<Box<L::Node<'a>>>),
     Struct(L::Binder<'a>, Nodes<'a, L>),
     Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
     MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
     Gen(Var, IterBinder<'a, L>, Nodes<'a, L>),
     Iter(Var, IterBinder<'a, L>, Nodes<'a, L>),
     Push(Var, Attribute<Box<L::Node<'a>>>),
-}
-
-impl<'a, L: Lang> GetKind<'a, L> for Kind<'a, L> {
-    fn kind(&self) -> &Kind<'a, L> {
-        self
-    }
-
-    fn kind_mut(&mut self) -> &mut Kind<'a, L> {
-        self
-    }
-}
-
-impl<'a, L: Lang> GetVar<'a, L> for Var {
-    fn var(&self) -> &Var {
-        self
-    }
-
-    fn var_mut(&mut self) -> &mut Var {
-        self
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -92,20 +85,40 @@ pub struct Optional(pub bool);
 pub struct HasDefault(pub bool);
 
 /// One of the variants of a property
-#[derive(Clone)]
 pub struct PropVariant<'a, L: Lang> {
-    pub dimension: AttrDimension,
+    pub dimension: AttrDimension<'a, L>,
     pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
+impl<'a, L: Lang> Clone for PropVariant<'a, L>
+where
+    L::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            dimension: self.dimension.clone(),
+            attr: self.attr.clone(),
+        }
+    }
+}
+
 /// The dimension of a property
-#[derive(Copy, Clone, Debug)]
-pub enum AttrDimension {
+#[derive(Debug)]
+pub enum AttrDimension<'a, L: Lang> {
     /// A single attribute
     Singular,
     /// A sequence of attributes, identified by a label
     /// If `HasDefault`, an undefined property "coerces" into an empty sequence
-    Seq(Label, HasDefault),
+    Seq(L::Label<'a>, HasDefault),
+}
+
+impl<'a, L: Lang> Clone for AttrDimension<'a, L> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Singular => Self::Singular,
+            Self::Seq(label, has_default) => Self::Seq(label.clone(), *has_default),
+        }
+    }
 }
 
 /// An attribute existing of (relation parameter, value)
@@ -226,5 +239,35 @@ impl VarAllocator {
         let next = self.next;
         self.next.0 += 1;
         next
+    }
+}
+
+impl<'a, L: Lang> GetKind<'a, L> for Kind<'a, L> {
+    fn kind(&self) -> &Kind<'a, L> {
+        self
+    }
+
+    fn kind_mut(&mut self) -> &mut Kind<'a, L> {
+        self
+    }
+}
+
+impl<'a, L: Lang> GetVar<'a, L> for Var {
+    fn var(&self) -> &Var {
+        self
+    }
+
+    fn var_mut(&mut self) -> &mut Var {
+        self
+    }
+}
+
+impl<'a, L: Lang> GetLabel<'a, L> for Label {
+    fn label(&self) -> &Label {
+        self
+    }
+
+    fn label_mut(&mut self) -> &mut Label {
+        self
     }
 }

@@ -57,10 +57,11 @@ pub(super) fn map_codegen<'m>(
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
-    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
-    let mut errors = CompileErrors::default();
 
     debug!("Generating code for\n{}", func);
+
+    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.var, &func.body);
+    let mut errors = CompileErrors::default();
 
     let return_ty = func.body.ty();
 
@@ -325,6 +326,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             let val_local = self.builder.top();
                             let rel_local = self.builder.top_minus(1);
 
+                            let seq_item_ty = match binder.ty {
+                                Type::Seq(_rel, val) => val,
+                                _ => panic!("Not a sequence"),
+                            };
+
                             // Code for generating the default values:
                             let default_fallback_body_index = {
                                 let mut default_block = self.builder.new_block(Delta(0), span);
@@ -341,7 +347,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                     &mut default_block,
                                     Ir::CallBuiltin(
                                         BuiltinProc::NewSeq,
-                                        binder.ty.get_single_def_id().unwrap(),
+                                        seq_item_ty.get_single_def_id().unwrap(),
                                     ),
                                     Delta(0),
                                     NO_SPAN,

@@ -10,6 +10,7 @@ struct TestLang;
 impl Lang for TestLang {
     type Node<'a> = Kind<'a, Self>;
     type Binder<'a> = Var;
+    type Label<'a> = Label;
 
     fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a> {
         kind
@@ -17,6 +18,10 @@ impl Lang for TestLang {
 
     fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
         var
+    }
+
+    fn make_label<'a>(&self, label: Label) -> Self::Label<'a> {
+        label
     }
 }
 

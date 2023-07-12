@@ -1,6 +1,6 @@
 //! High-level data flow of struct properties
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::GetKind;
@@ -10,18 +10,24 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::{
-    def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::TypeRef,
-};
+use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::Type};
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
-    // relations: &'c Relations,
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
+}
+
+impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataFlowAnalyzer")
+            .field("var_to_property", &self.var_to_property)
+            .field("var_dependencies", &self.var_dependencies)
+            .finish()
+    }
 }
 
 impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
@@ -38,7 +44,7 @@ where
     }
 
     pub fn analyze(
-        mut self,
+        &mut self,
         arg: ontol_hir::Var,
         body: &TypedHirNode,
     ) -> Option<Vec<PropertyFlow>> {
@@ -51,7 +57,11 @@ where
                     self.analyze_node(node);
                 }
 
-                Some(self.property_flow.into_iter().collect())
+                Some(
+                    std::mem::take(&mut self.property_flow)
+                        .into_iter()
+                        .collect(),
+                )
             }
             _ => None,
         }
@@ -113,7 +123,7 @@ where
 
                 let mut var_set = VarSet::default();
 
-                let mut property_type = None;
+                let mut value_def_id = None;
 
                 for arm in arms {
                     match &arm.pattern {
@@ -123,12 +133,16 @@ where
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
                                 self.add_dep(binder.var, *struct_var);
-                                property_type = Some(binder.ty);
+                                value_def_id = binder.ty.get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.var, *struct_var);
+                                value_def_id = match binder.ty {
+                                    Type::Seq(_, val) => val.get_single_def_id(),
+                                    _ => None,
+                                };
                             }
                         }
                         ontol_hir::PropPattern::Absent => {}
@@ -142,14 +156,36 @@ where
                 self.reg_scope_prop(
                     *struct_var,
                     *property_id,
-                    property_type.unwrap_or(node.meta().ty),
+                    value_def_id.unwrap_or(DefId::unit()),
                 );
 
                 var_set
             }
-            ontol_hir::Kind::Gen(..) => Default::default(),
-            ontol_hir::Kind::Iter(..) => Default::default(),
-            ontol_hir::Kind::Push(..) => Default::default(),
+            ontol_hir::Kind::Gen(var, iter_binder, body) => {
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.seq {
+                    self.add_dep(binder.var, *var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.rel {
+                    self.add_dep(binder.var, *var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = iter_binder.val {
+                    self.add_dep(binder.var, *var);
+                }
+                let mut var_set = VarSet::default();
+                for node in body {
+                    var_set.union_with(&self.analyze_node(node));
+                }
+                var_set
+            }
+            ontol_hir::Kind::Iter(..) => todo!(),
+            ontol_hir::Kind::Push(var, attr) => {
+                let mut var_set = self.analyze_node(&attr.rel);
+                var_set.union_with(&self.analyze_node(&attr.val));
+
+                self.var_dependencies.insert(*var, var_set.clone());
+
+                var_set
+            }
         }
     }
 
@@ -186,9 +222,15 @@ where
         }
     }
 
-    fn reg_scope_prop(&mut self, struct_var: ontol_hir::Var, property_id: PropertyId, ty: TypeRef) {
-        let def_id = ty.get_single_def_id().unwrap_or(DefId::unit());
-
+    /// The purpose of the value_def_id is for the query engine
+    /// to understand which entity must be looked up.
+    /// rel_params is ignored here.
+    fn reg_scope_prop(
+        &mut self,
+        struct_var: ontol_hir::Var,
+        property_id: PropertyId,
+        value_def_id: DefId,
+    ) {
         let meta = self
             .defs
             .lookup_relationship_meta(property_id.relationship_id)
@@ -197,23 +239,48 @@ where
 
         self.property_flow.insert(PropertyFlow {
             id: property_id,
-            data: PropertyFlowData::Type(def_id),
+            data: PropertyFlowData::Type(value_def_id),
         });
         self.property_flow.insert(PropertyFlow {
             id: property_id,
             data: PropertyFlowData::Cardinality(cardinality),
         });
 
-        if let Some(dependencies) = self.var_dependencies.get(&struct_var) {
-            for var_dependency in dependencies {
-                if let Some(props) = self.var_to_property.get(&var_dependency) {
-                    for prop in props {
-                        self.property_flow.insert(PropertyFlow {
-                            id: property_id,
-                            data: PropertyFlowData::ChildOf(*prop),
-                        });
-                    }
+        register_children_recursive(
+            struct_var,
+            property_id,
+            &self.var_dependencies,
+            &self.var_to_property,
+            &mut self.property_flow,
+        );
+    }
+}
+
+fn register_children_recursive(
+    var: ontol_hir::Var,
+    property_id: PropertyId,
+    var_dependencies: &FnvHashMap<ontol_hir::Var, VarSet>,
+    var_to_property: &FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
+    output: &mut BTreeSet<PropertyFlow>,
+) {
+    if let Some(dependencies) = var_dependencies.get(&var) {
+        for var_dependency in dependencies {
+            if let Some(props) = var_to_property.get(&var_dependency) {
+                // recursion stops here, as there is a property associated with the variable:
+                for prop in props {
+                    output.insert(PropertyFlow {
+                        id: property_id,
+                        data: PropertyFlowData::ChildOf(*prop),
+                    });
                 }
+            } else {
+                register_children_recursive(
+                    var_dependency,
+                    property_id,
+                    var_dependencies,
+                    var_to_property,
+                    output,
+                );
             }
         }
     }

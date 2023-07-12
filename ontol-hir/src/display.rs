@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    AttrDimension, Binding, GetKind, GetVar, HasDefault, IterBinder, Kind, Label, Lang, MatchArm,
-    PropPattern, PropVariant, Var,
+    AttrDimension, Binding, GetKind, GetLabel, GetVar, HasDefault, IterBinder, Kind, Label, Lang,
+    MatchArm, PropPattern, PropVariant, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -76,7 +76,7 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 Ok(multi.or(sep))
             }
             Kind::Seq(label, attr) => {
-                write!(f, "{indent}(seq ({})", label)?;
+                write!(f, "{indent}(seq ({})", label.label())?;
                 let multi = self.print_all(
                     Sep::Space,
                     [attr.rel.as_ref(), attr.val.as_ref()]
@@ -150,11 +150,11 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
         let sep = match dimension {
             AttrDimension::Singular => Sep::None,
             AttrDimension::Seq(label, HasDefault(false)) => {
-                write!(f, "seq ({})", label)?;
+                write!(f, "seq ({})", label.label())?;
                 self.indent.indent()
             }
             AttrDimension::Seq(label, HasDefault(true)) => {
-                write!(f, "seq-default ({})", label)?;
+                write!(f, "seq-default ({})", label.label())?;
                 self.indent.indent()
             }
         };

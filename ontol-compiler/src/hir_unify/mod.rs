@@ -127,10 +127,17 @@ impl VarSet {
         VarSetIter(self.0.iter())
     }
 
-    pub fn insert(&mut self, var: ontol_hir::Var) {
-        self.0.insert(var.0 as usize);
+    #[inline]
+    pub fn insert(&mut self, var: ontol_hir::Var) -> bool {
+        self.0.insert(var.0 as usize)
     }
 
+    #[inline]
+    pub fn remove(&mut self, var: ontol_hir::Var) -> bool {
+        self.0.remove(var.0 as usize)
+    }
+
+    #[inline]
     pub fn union_with(&mut self, other: &Self) {
         self.0.union_with(&other.0);
     }

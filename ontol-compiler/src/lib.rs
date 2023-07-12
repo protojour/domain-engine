@@ -19,7 +19,7 @@ use ontol_runtime::{
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
-use relation::{Properties, Relations};
+use relation::{Properties, Property, Relations};
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
@@ -284,27 +284,17 @@ impl<'m> Compiler<'m> {
         let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
             IndexMap::default();
 
+        // inherent properties are the properties that are _not_ entity relationships:
+        let mut inherent_property_count = 0;
+
         if let Some(table) = &properties.table {
             for (property_id, property) in table {
-                let meta = self
-                    .defs
-                    .lookup_relationship_meta(property_id.relationship_id)
-                    .unwrap();
-
-                let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
-
-                if let Some(target_properties) =
-                    self.relations.properties_by_def_id(target_def_ref.def_id)
+                if let Some(entity_relationship) =
+                    self.get_entity_relationship(*property_id, property)
                 {
-                    if target_properties.identified_by.is_some() {
-                        entity_relationships.insert(
-                            *property_id,
-                            EntityRelationship {
-                                cardinality: property.cardinality,
-                                target: target_def_ref.def_id,
-                            },
-                        );
-                    }
+                    entity_relationships.insert(*property_id, entity_relationship);
+                } else {
+                    inherent_property_count += 1;
                 }
             }
         }
@@ -321,6 +311,9 @@ impl<'m> Compiler<'m> {
         };
 
         Some(EntityInfo {
+            // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
+            // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
+            is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
             id_relationship_id: match inherent_primary_id_meta {
                 Some(inherent_meta) => inherent_meta.relationship_id,
                 None => id_relationship_id,
@@ -335,6 +328,33 @@ impl<'m> Compiler<'m> {
                 .unwrap(),
             entity_relationships,
         })
+    }
+
+    fn get_entity_relationship(
+        &self,
+        property_id: PropertyId,
+        property: &Property,
+    ) -> Option<EntityRelationship> {
+        let meta = self
+            .defs
+            .lookup_relationship_meta(property_id.relationship_id)
+            .unwrap();
+
+        let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
+
+        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_ref.def_id)
+        {
+            if target_properties.identified_by.is_some() {
+                Some(EntityRelationship {
+                    cardinality: property.cardinality,
+                    target: target_def_ref.def_id,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     fn find_inherent_primary_id(

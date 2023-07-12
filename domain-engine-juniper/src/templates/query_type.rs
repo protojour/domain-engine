@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, Value, ValueDebug},
     DefId,
 };
 use tracing::debug;
@@ -67,7 +67,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                 rel_params: Value::unit(),
             };
 
-            debug!("query result: {attribute:#?}");
+            debug!("query result: {}", ValueDebug(&attribute.value));
 
             resolve_virtual_schema_field(
                 AttributeType { attr: &attribute },

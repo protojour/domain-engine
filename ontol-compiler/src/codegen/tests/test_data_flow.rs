@@ -1,13 +1,10 @@
 use ontol_runtime::{
-    env::{
-        PropertyCardinality, PropertyFlow,
-        PropertyFlowData::{self, *},
-        ValueCardinality,
-    },
+    env::{PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
     DefId, RelationshipId,
 };
 use ontol_test_utils::expect_eq;
 use test_log::test;
+use tracing::debug;
 use unimock::{matching, MockFn, Unimock};
 
 use crate::{
@@ -54,10 +51,10 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
         .parse(hir)
         .unwrap()
         .0;
-    DataFlowAnalyzer::new(&Unimock::new(
+    let deps = Unimock::new(
         LookupRelationshipMetaMock::lookup_relationship_meta
             .each_call(matching!(_))
-            .answers(|_| {
+            .returns({
                 Ok(RelationshipMeta {
                     relationship_id: RelationshipId(DefId::unit()),
                     relationship: SpannedBorrow {
@@ -70,9 +67,13 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
                     },
                 })
             }),
-    ))
-    .analyze(arg.parse().unwrap(), &node)
-    .unwrap()
+    );
+    let mut analyzer = DataFlowAnalyzer::new(&deps);
+    let flow = analyzer.analyze(arg.parse().unwrap(), &node).unwrap();
+
+    debug!("post analysis: {analyzer:#?}");
+
+    flow
 }
 
 fn prop_flow(prop: &str, relationship: PropertyFlowData) -> PropertyFlow {
@@ -80,6 +81,22 @@ fn prop_flow(prop: &str, relationship: PropertyFlowData) -> PropertyFlow {
         id: prop.parse().unwrap(),
         data: relationship,
     }
+}
+
+fn dependent_on(prop: &str) -> PropertyFlowData {
+    PropertyFlowData::DependentOn(prop.parse().unwrap())
+}
+
+fn child_of(prop: &str) -> PropertyFlowData {
+    PropertyFlowData::ChildOf(prop.parse().unwrap())
+}
+
+const fn default_cardinality() -> PropertyFlowData {
+    PropertyFlowData::Cardinality((PropertyCardinality::Mandatory, ValueCardinality::One))
+}
+
+const fn default_type() -> PropertyFlowData {
+    PropertyFlowData::Type(DefId::unit())
 }
 
 #[test]
@@ -110,20 +127,56 @@ fn test_analyze1() {
             ",
     );
 
-    let expected_cardinality = Cardinality((PropertyCardinality::Mandatory, ValueCardinality::One));
+    expect_eq!(
+        actual = data_flow,
+        expected = vec![
+            prop_flow("S:0:0", dependent_on("O:0:0")),
+            prop_flow("S:1:1", dependent_on("O:2:2")),
+            prop_flow("O:0:0", default_type()),
+            prop_flow("O:0:0", default_cardinality()),
+            prop_flow("O:1:1", default_type()),
+            prop_flow("O:1:1", default_cardinality()),
+            prop_flow("O:2:2", default_type()),
+            prop_flow("O:2:2", default_cardinality()),
+            prop_flow("O:2:2", child_of("O:1:1")),
+        ]
+    );
+}
+
+#[test]
+fn test_analyze_seq1() {
+    let data_flow = analyze(
+        "b",
+        "
+        (struct ($a)
+            (match-prop $b O:0:0
+                ((seq-default $c)
+                    (prop $a S:0:0
+                        (#u
+                            (gen $c ($d $_ $e)
+                                (push $d #u
+                                    (match-prop $e O:1:1
+                                        (($_ $f) $f)
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
 
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("S:0:0", DependentOn("O:0:0".parse().unwrap())),
-            prop_flow("S:1:1", DependentOn("O:2:2".parse().unwrap())),
-            prop_flow("O:0:0", Type(DefId::unit())),
-            prop_flow("O:0:0", expected_cardinality.clone()),
-            prop_flow("O:1:1", Type(DefId::unit())),
-            prop_flow("O:1:1", expected_cardinality.clone()),
-            prop_flow("O:2:2", Type(DefId::unit())),
-            prop_flow("O:2:2", expected_cardinality),
-            prop_flow("O:2:2", ChildOf("O:1:1".parse().unwrap())),
+            prop_flow("S:0:0", dependent_on("O:1:1")),
+            prop_flow("O:0:0", default_type()),
+            prop_flow("O:0:0", default_cardinality()),
+            prop_flow("O:1:1", default_type()),
+            prop_flow("O:1:1", default_cardinality()),
+            prop_flow("O:1:1", child_of("O:0:0")),
         ]
     );
 }

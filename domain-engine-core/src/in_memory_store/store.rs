@@ -16,7 +16,7 @@ use ontol_runtime::{
     DefId, RelationshipId, Role,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::{
@@ -182,6 +182,17 @@ impl InMemoryStore {
         entity_key: &DynamicKey,
         query: &Query,
     ) -> DomainResult<Value> {
+        if let Query::Struct(struct_query) = query {
+            // sanity check
+            if !self.collections.contains_key(&struct_query.def_id) {
+                error!(
+                    "Store does not contain a collection for {:?}",
+                    struct_query.def_id
+                );
+                return Err(DomainError::InvalidEntityDefId);
+            }
+        }
+
         // Find the def_id of the dynamic key. This is a little inefficient.
         let (def_id, properties) = self
             .collections
@@ -378,11 +389,25 @@ impl InMemoryStore {
             let foreign_id = self.write_new_entity_inner(engine, value)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
+            let type_info = env.get_type_info(entity_relationship.target);
+            let entity_info = type_info.entity_info.as_ref().unwrap();
+
             let foreign_key = Self::extract_dynamic_key(&value.data)?;
-            if self
-                .look_up_entity(entity_relationship.target, &foreign_key)
-                .is_none()
-            {
+            let entity_data = self.look_up_entity(entity_relationship.target, &foreign_key);
+
+            if entity_data.is_none() && entity_info.is_self_identifying {
+                // This type has UPSERT semantics.
+                // Synthesize the entity, write it and move on..
+
+                let entity_data = BTreeMap::from([(
+                    PropertyId::subject(entity_info.id_relationship_id),
+                    Attribute::from(value),
+                )]);
+                self.write_new_entity_inner(
+                    engine,
+                    Value::new(Data::Struct(entity_data), entity_relationship.target),
+                )?;
+            } else if entity_data.is_none() {
                 let type_info = env.get_type_info(value.type_def_id);
                 let repr = if let Some(operator_id) = type_info.operator_id {
                     // TODO: Easier way to report values in "human readable"/JSON format
