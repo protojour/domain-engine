@@ -14,6 +14,7 @@ ontol-runtime.path = "../ontol-runtime"
 ontol-parser.path = "../ontol-parser"
 fnv.workspace = true
 indexmap.workspace = true
+serde.workspace = true
 smartstring.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true

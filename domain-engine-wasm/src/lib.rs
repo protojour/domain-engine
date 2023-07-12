@@ -13,10 +13,12 @@ use ontol_runtime::{
     env::Env,
     PackageId,
 };
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_domain::{WasmDomain, WasmMapper};
 use wasm_error::{JsCompileError, JsCompileErrors, WasmError};
 use wasm_graphql::WasmGraphqlSchema;
+use wasm_util::js_serializer;
 
 pub mod wasm_domain;
 pub mod wasm_error;
@@ -27,6 +29,7 @@ mod wasm_util;
 pub struct WasmEnv {
     env: Arc<Env>,
     package_id: PackageId,
+    ontology_graph_js: JsValue,
 }
 
 #[wasm_bindgen]
@@ -57,6 +60,10 @@ impl WasmEnv {
             })
             .map(JsValue::from)
             .collect()
+    }
+
+    pub fn ontology_graph_js(&self) -> JsValue {
+        self.ontology_graph_js.clone()
     }
 }
 
@@ -115,10 +122,17 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv,
     compiler
         .compile_package_topology(topology)
         .map_err(|err| convert_compile_error_to_wasm(err, &sources, &source_code_registry))?;
+
+    let ontology_graph_js = compiler.ontology_graph().serialize(&js_serializer())?;
+
     let env = Arc::new(compiler.into_env());
 
     match root_package {
-        Some(package_id) => Ok(WasmEnv { env, package_id }),
+        Some(package_id) => Ok(WasmEnv {
+            env,
+            package_id,
+            ontology_graph_js,
+        }),
         None => Err(WasmError::Generic("Did not find package".to_string())),
     }
 }

@@ -16,6 +16,7 @@ use ontol_runtime::{
     value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId,
 };
+use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
@@ -29,6 +30,7 @@ use types::{DefTypes, Types};
 pub mod error;
 pub mod hir_unify;
 pub mod mem;
+pub mod ontology_graph;
 pub mod package;
 pub mod serde_codegen;
 pub mod source;
@@ -167,6 +169,11 @@ impl<'m> Compiler<'m> {
         self.check_error()?;
 
         Ok(())
+    }
+
+    /// Get the current ontology graph (which is serde-serializable)
+    pub fn ontology_graph(&self) -> OntologyGraph<'_, 'm> {
+        OntologyGraph::from(self)
     }
 
     /// Finish compilation, turn into environment.
