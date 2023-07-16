@@ -4,8 +4,7 @@ use chumsky::{prelude::*, Stream};
 use std::ops::Range;
 
 pub mod ast;
-
-mod lexer;
+pub mod lexer;
 mod parser;
 
 pub type Span = Range<usize>;

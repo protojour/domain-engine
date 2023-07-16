@@ -5,10 +5,12 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
+use ontol_lsp::Backend;
 use ontol_parser::parse_statements;
 use ontol_runtime::{config::PackageConfig, json_schema::build_openapi_schemas};
 use std::{collections::HashMap, fs};
 use thiserror::Error;
+use tower_lsp::{LspService, Server};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -26,6 +28,8 @@ enum Commands {
     Check(Check),
     /// Generate schemas from ONTOL (.on) files
     Generate(Generate),
+    /// Run ontool in language server mode
+    Lsp,
 }
 
 #[derive(Args)]
@@ -62,7 +66,8 @@ enum OntoolError {
     IO(#[from] std::io::Error),
 }
 
-fn main() -> Result<(), OntoolError> {
+#[tokio::main]
+async fn main() -> Result<(), OntoolError> {
     tracing_subscriber::fmt().with_target(false).init();
 
     let cli = Cli::parse();
@@ -70,6 +75,7 @@ fn main() -> Result<(), OntoolError> {
     match &cli.command {
         Some(Commands::Check(args)) => check(args),
         Some(Commands::Generate(args)) => generate(args),
+        Some(Commands::Lsp) => lsp().await,
         None => Ok(()),
     }
 }
@@ -197,5 +203,14 @@ fn generate(args: &Generate) -> Result<(), OntoolError> {
             }
         }
     }
+    Ok(())
+}
+
+async fn lsp() -> Result<(), OntoolError> {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::new(Backend::new);
+    Server::new(stdin, stdout, socket).serve(service).await;
     Ok(())
 }

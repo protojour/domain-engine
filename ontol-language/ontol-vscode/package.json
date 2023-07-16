@@ -1,26 +1,66 @@
 {
   "name": "ontol",
   "displayName": "ONTOL",
-  "description": "ONTOL language support for VSCode",
-  "version": "0.0.1",
+  "description": "ONTOL language support for VS Code",
+  "version": "0.2.1",
   "publisher": "Protojour",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/protojour/memoriam/domain-engine.git"
+  } ,
   "engines": {
-    "vscode": "^1.77.0"
+    "vscode": "^1.79.0"
   },
+  "main": "./dist/extension.js",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "tidy": "prettier --write src/**/*.ts",
+    "build": "esbuild src/extension.ts --bundle --minify --outdir=dist --external:vscode --format=cjs --platform=node",
+    "package": "vsce package --out ontol.vsix"
+  },
+  "keywords": [
+    "language-server",
+    "domain",
+    "ontology",
+    "knowledge-graph"
+  ],
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Language Packs"
   ],
   "contributes": {
-    "languages": [{
-      "id": "ontol",
-      "aliases": ["ONTOL", "ontol"],
-      "extensions": [".on"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "ontol",
-      "scopeName": "source.ontol",
-      "path": "./syntaxes/ONTOL.tmLanguage"
-    }]
+    "languages": [
+      {
+        "id": "ontol",
+        "aliases": [
+          "ONTOL",
+          "ontol"
+        ],
+        "extensions": [
+          ".on"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ontol",
+        "scopeName": "source.ontol",
+        "path": "./syntaxes/ONTOL.tmLanguage.json"
+      }
+    ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.2",
+    "@types/vscode": "^1.79.0",
+    "@vscode/vsce": "^2.19.0",
+    "esbuild": "^0.18.13",
+    "typescript": "^5.1.6",
+    "vsce": "^2.15.0"
   }
 }

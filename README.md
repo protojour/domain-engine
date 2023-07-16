@@ -50,3 +50,19 @@ Tests must use the `test_log::test` attribute for proper tracing.
 * Run a specific test with `cargo test {test_name}`.
 * To enable traces, use `RUST_LOG=debug cargo test {test_name}`.
 * Rust captures all console output for successful tests. To show traces for successful tests, use `-- --nocapture` after the test command.
+
+## justfile
+
+```bash
+cargo install just
+
+# compile and install ontool
+just ontool
+
+# compile and install ontol-lsp
+just lsp
+code --install-extension ontol-language/ontol-vscode/ontol.vsix
+
+# compile domain-engine-wasm
+just wasm
+```

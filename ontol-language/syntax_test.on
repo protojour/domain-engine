@@ -1,4 +1,4 @@
-// SYNTAX TEST "Packages/ontol-sublime/ONTOL.tmLanguage"
+// SYNTAX TEST "Packages/ONTOL/ONTOL.sublime-syntax"
 
 use some_domain.some_type
 // <- keyword.import.ontol
@@ -18,37 +18,36 @@ use some_domain as another_domain
 pub type test {
 // <- storage.modifier.pub.ontol
 //  ^^^^ keyword.declaration.type.ontol
-    rel _ 'some_int' int
+    rel .'some_int' int
 //  ^^^ keyword.declaration.rel.ontol
-//     ^^^ variable.language.ontol
-//                   ^^^ storage.type.ontol
-    rel _ 'some_string' string
-    rel _ 'some_regex' regex
+//      ^ variable.language.ontol
+//                  ^^^ storage.type.ontol
+    rel .'some_string' string
+    rel .'some_regex' regex
 }
 
 with test {
 // <- keyword.context.block.with.ontol
-    rel _ 'three_oh_three' 303
+    rel .'three_oh_three' 303
 //                        *^^^ constant.numeric.ontol
-    rel _ 'p_value' 0.05
+    rel .'p_value' 0.05
 //                 *^^^^ constant.numeric.ontol
-    rel _ 'infinity!' inf
+    rel .'infinity!' inf
 //                   *^^^ constant.language.ontol
-    rel _ 'ready?' true
+    rel .'ready?' true
 //                *^^^^ constant.language.ontol
-    rel _ 'regex' /test\s.*test/
-//                ^^^^^^^^^^^^^^ string.regexp.ontol
+    rel .'regex' /test\s.*test/
+//               ^^^^^^^^^^^^^^ string.regexp.ontol
 }
 
 type testtest {
-    fmt '' => 'test' => 'test' => _
+    fmt '' => 'test' => 'test' => .
 //  ^^^ keyword.declaration.fmt.ontol
 //         ^^ keyword.operator.fatarrow.ontol
 }
 
-map (front back) {
+map {
 // <- keyword.declaration.map.ontol
-//   ^^^^^^^^^^ variable.parameter.ontol
 }
 
 rel plays 'how_much': string
@@ -56,11 +55,11 @@ rel plays 'how_much': string
 
 rel artist ['plays']::['played_by'] instrument {
 //                  ^^ keyword.operator.ontol
-    rel _ is: plays
+    rel .is: plays
 }
 
 type position-ring {
-    rel _ ..4: position
-    rel _ 4..: position
+    rel ...4: position
+    rel .4..: position
 }
 
