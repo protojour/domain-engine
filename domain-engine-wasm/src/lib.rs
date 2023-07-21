@@ -99,8 +99,6 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv,
                             request,
                             source_text,
                             PackageConfig {
-                                // Note: Make sure only one of the domains have a data store.
-                                // (when WASM supports more than one domain)
                                 data_store: Some(DataStoreConfig::InMemory),
                             },
                             &mut sources,
@@ -134,6 +132,116 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv,
             ontology_graph_js,
         }),
         None => Err(WasmError::Generic("Did not find package".to_string())),
+    }
+}
+
+#[wasm_bindgen]
+pub struct WasmSources {
+    sources: HashMap<String, String>,
+    root: String,
+}
+
+#[wasm_bindgen]
+impl WasmSources {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            sources: HashMap::new(),
+            root: String::new(),
+        }
+    }
+
+    pub fn insert(&mut self, filename: String, source: String) {
+        self.sources.insert(filename, source);
+    }
+
+    pub fn set_root(&mut self, filename: String) {
+        self.root = filename;
+    }
+
+    pub fn keys(&self) -> Vec<JsValue> {
+        self.sources
+            .iter()
+            .map(|(key, _)| JsValue::from(key))
+            .collect()
+    }
+
+    pub fn values(&self) -> Vec<JsValue> {
+        self.sources
+            .iter()
+            .map(|(_, val)| JsValue::from(val))
+            .collect()
+    }
+
+    pub fn root(&self) -> JsValue {
+        self.root.clone().into()
+    }
+
+    pub fn compile(&self) -> Result<WasmEnv, WasmError> {
+        console_error_panic_hook::set_once();
+
+        let sources_by_name = &self.sources;
+        let mut sources = Sources::default();
+        let mut source_code_registry = SourceCodeRegistry::default();
+        let mut package_graph_builder = PackageGraphBuilder::new(self.root.clone().into());
+        let mut root_package = None;
+
+        let topology = loop {
+            match package_graph_builder.transition().map_err(|err| {
+                convert_compile_error_to_wasm(err, &sources, &source_code_registry)
+            })? {
+                GraphState::RequestPackages { builder, requests } => {
+                    package_graph_builder = builder;
+
+                    for request in requests {
+                        let source_name = match &request.reference {
+                            PackageReference::Named(source_name) => source_name.as_str(),
+                        };
+
+                        if source_name == self.root {
+                            root_package = Some(request.package_id);
+
+                            // apparently there should only be one data store
+                            if let Some(source_text) = sources_by_name.get(source_name) {
+                                package_graph_builder.provide_package(ParsedPackage::parse(
+                                    request,
+                                    source_text,
+                                    PackageConfig {
+                                        data_store: Some(DataStoreConfig::InMemory),
+                                    },
+                                    &mut sources,
+                                    &mut source_code_registry,
+                                ));
+                            } else {
+                                return Err(WasmError::Generic(format!(
+                                    "Could not load `{source_name}`"
+                                )));
+                            }
+                        }
+                    }
+                }
+                GraphState::Built(topology) => break topology,
+            }
+        };
+
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
+        compiler
+            .compile_package_topology(topology)
+            .map_err(|err| convert_compile_error_to_wasm(err, &sources, &source_code_registry))?;
+
+        let ontology_graph_js = compiler.ontology_graph().serialize(&js_serializer())?;
+
+        let env = Arc::new(compiler.into_env());
+
+        match root_package {
+            Some(package_id) => Ok(WasmEnv {
+                env,
+                package_id,
+                ontology_graph_js,
+            }),
+            None => Err(WasmError::Generic("Did not find package".to_string())),
+        }
     }
 }
 
