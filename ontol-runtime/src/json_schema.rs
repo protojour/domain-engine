@@ -204,8 +204,20 @@ impl<'e> SchemaCtx<'e> {
     }
 
     fn type_name(&self, def_variant: DefVariant) -> Option<String> {
+        let mut modifier = String::from("");
+        if def_variant.modifier.contains(DataModifier::PRIMARY_ID) {
+            modifier.push_str("_id");
+        }
+        if def_variant.modifier.contains(DataModifier::UNION) {
+            modifier.push_str("_union");
+        }
+        if def_variant.modifier.contains(DataModifier::ARRAY) {
+            modifier.push_str("_array");
+        }
         match self.env.find_domain(def_variant.def_id.0) {
-            Some(domain) => domain.type_info(def_variant.def_id).name.to_owned(),
+            Some(domain) => {
+                Some(smart_format!("{}{}", domain.type_info(def_variant.def_id).name.as_ref().unwrap(), modifier))
+            }
             None => None,
         }
     }
