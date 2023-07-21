@@ -141,6 +141,12 @@ pub struct WasmSources {
     root: String,
 }
 
+impl Default for WasmSources {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl WasmSources {
     #[wasm_bindgen(constructor)]
@@ -160,17 +166,11 @@ impl WasmSources {
     }
 
     pub fn keys(&self) -> Vec<JsValue> {
-        self.sources
-            .iter()
-            .map(|(key, _)| JsValue::from(key))
-            .collect()
+        self.sources.keys().map(JsValue::from).collect()
     }
 
     pub fn values(&self) -> Vec<JsValue> {
-        self.sources
-            .iter()
-            .map(|(_, val)| JsValue::from(val))
-            .collect()
+        self.sources.values().map(JsValue::from).collect()
     }
 
     pub fn root(&self) -> JsValue {

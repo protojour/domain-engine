@@ -214,12 +214,13 @@ impl<'e> SchemaCtx<'e> {
         if def_variant.modifier.contains(DataModifier::ARRAY) {
             modifier.push_str("_array");
         }
-        match self.env.find_domain(def_variant.def_id.0) {
-            Some(domain) => {
-                Some(smart_format!("{}{}", domain.type_info(def_variant.def_id).name.as_ref().unwrap(), modifier))
-            }
-            None => None,
-        }
+        self.env.find_domain(def_variant.def_id.0).map(|domain| {
+            smart_format!(
+                "{}{}",
+                domain.type_info(def_variant.def_id).name.as_ref().unwrap(),
+                modifier
+            )
+        })
     }
 
     fn format_key(&self, def_variant: DefVariant) -> String {
