@@ -198,25 +198,30 @@ impl WasmSources {
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
+                        let mut is_root = false;
                         if source_name == self.root {
                             root_package = Some(request.package_id);
+                            is_root = true;
+                        }
 
-                            // apparently there should only be one data store
-                            if let Some(source_text) = sources_by_name.get(source_name) {
-                                package_graph_builder.provide_package(ParsedPackage::parse(
-                                    request,
-                                    source_text,
-                                    PackageConfig {
-                                        data_store: Some(DataStoreConfig::InMemory),
+                        if let Some(source_text) = sources_by_name.get(source_name) {
+                            package_graph_builder.provide_package(ParsedPackage::parse(
+                                request,
+                                source_text,
+                                PackageConfig {
+                                    // apparently there should only be one data store
+                                    data_store: match is_root {
+                                        false => None,
+                                        true => Some(DataStoreConfig::InMemory),
                                     },
-                                    &mut sources,
-                                    &mut source_code_registry,
-                                ));
-                            } else {
-                                return Err(WasmError::Generic(format!(
-                                    "Could not load `{source_name}`"
-                                )));
-                            }
+                                },
+                                &mut sources,
+                                &mut source_code_registry,
+                            ));
+                        } else {
+                            return Err(WasmError::Generic(format!(
+                                "Could not load `{source_name}`"
+                            )));
                         }
                     }
                 }
