@@ -11,6 +11,7 @@ lsp: ontool
         mkdir -p "$dest"  && cp ~/.cargo/bin/ontool "$dest"; done
     npx js-yaml ONTOL.tmLanguage.yaml > ONTOL.tmLanguage.json
     cp ONTOL.tmLanguage.yaml ontol-sublime/
+    mkdir -p ontol-vscode/syntaxes
     cp ONTOL.tmLanguage.json ontol-vscode/syntaxes/
     cd ontol-vscode
     npm run build && \
