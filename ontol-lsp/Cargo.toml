@@ -12,7 +12,6 @@ ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
 chumsky = "0.9"
 console_error_panic_hook = "0.1.7"
-futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
 js-sys = "0.3.64"
 lsp-types = "0.94.0"
 regex = "1.9.1"
@@ -23,4 +22,5 @@ wasm-bindgen-futures = { version = "0.4.37", features = ["futures-core-03-stream
 wasm-streams = "0.3.0"
 web-sys = { version = "0.3.64", features = ["console", "ReadableStream", "WritableStream"] }
 tokio = { workspace = true, default-features = false }
-tower-lsp = { version = "0.19.0", default-features = false, features = ["runtime-agnostic"] }
+tower-lsp = { version = "0.19.0", default-features = false }
+futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
