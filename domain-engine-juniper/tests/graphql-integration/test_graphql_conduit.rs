@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
-use domain_engine_juniper::{GqlContext, Schema};
+use domain_engine_juniper::{gql_scalar::GqlScalar, GqlContext, Schema};
 use fnv::FnvHashMap;
-use juniper::graphql_value;
+use juniper::{graphql_value, InputValue, Value};
 use ontol_runtime::{
     config::DataStoreConfig,
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
@@ -18,14 +18,17 @@ use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 const ROOT: SourceName = SourceName::root();
 const CONDUIT_DB: SourceName = SourceName("conduit_db");
 
-#[test(tokio::test)]
-async fn test_graphql_in_memory_conduit_db() {
-    let test_packages = TestPackages::with_sources([(
+fn conduit_db_only() -> TestPackages {
+    TestPackages::with_sources([(
         ROOT,
         include_str!("../../../examples/conduit/conduit_db.on"),
     )])
-    .with_data_store(ROOT, DataStoreConfig::InMemory);
+    .with_data_store(ROOT, DataStoreConfig::InMemory)
+}
 
+#[test(tokio::test)]
+async fn test_graphql_in_memory_conduit_db() {
+    let test_packages = conduit_db_only();
     let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
 
@@ -41,7 +44,7 @@ async fn test_graphql_in_memory_conduit_db() {
                 username
             }
         }"#
-        .exec(&schema, &gql_context)
+        .exec(&schema, &gql_context, [])
         .await,
         expected = Ok(graphql_value!({
             "createUser": {
@@ -63,7 +66,7 @@ async fn test_graphql_in_memory_conduit_db() {
                 }
             }
         }"
-        .exec(&schema, &gql_context)
+        .exec(&schema, &gql_context, [])
         .await,
         expected = Ok(graphql_value!({
             "UserList": {
@@ -78,6 +81,67 @@ async fn test_graphql_in_memory_conduit_db() {
                     }
                 ]
             },
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
+    let test_packages = conduit_db_only();
+    let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
+
+    let create_user_value = r#"mutation {
+        createUser(
+            input: {
+                username: "u1",
+                email: "a@b",
+                password_hash: "s3cr3t",
+            }
+        ) {
+            user_id
+        }
+    }"#
+    .exec(&schema, &gql_context, [])
+    .await
+    .unwrap();
+
+    let user_id = match &create_user_value {
+        Value::Object(object) => match object.get_field_value("createUser") {
+            Some(Value::Object(object)) => match object.get_field_value("user_id") {
+                Some(Value::Scalar(GqlScalar::String(user_id))) => user_id.clone(),
+                _ => panic!(),
+            },
+            _ => panic!(),
+        },
+        _ => panic!(),
+    };
+
+    expect_eq!(
+        actual = r#"mutation new_article($authorId: ID!) {
+            createArticle(
+                input: {
+                    slug: "the-slug",
+                    title: "The title",
+                    description: "An article",
+                    body: "THE BODY",
+                    author: {
+                        user_id: $authorId
+                    }
+                    tags: [{ tag: "foobar" }]
+                }
+            ) {
+                slug
+            }
+        }"#
+        .exec(
+            &schema,
+            &gql_context,
+            [("authorId".to_owned(), InputValue::Scalar(user_id.into()))]
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createArticle": { "slug": "the-slug" }
         })),
     );
 }
@@ -139,7 +203,7 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(&self.db_schema, &self.gql_context())
+            .exec(&self.db_schema, &self.gql_context(), [])
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -167,7 +231,7 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(&self.db_schema, &self.gql_context())
+            .exec(&self.db_schema, &self.gql_context(), [])
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -192,7 +256,7 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context())
+        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -226,7 +290,7 @@ async fn test_graphql_in_memory_blog_post_conduit_tags() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context())
+        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -295,7 +359,8 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
                         })
                     ))
                     .returns(Ok(vec![]))
-            )
+            ),
+            []
         )
         .await,
         expected = Ok(graphql_value!({ "BlogPostList": { "edges": [] } }))
@@ -317,7 +382,7 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_real() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context())
+        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {

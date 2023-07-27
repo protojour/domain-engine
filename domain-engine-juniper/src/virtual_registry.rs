@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use indexmap::IndexMap;
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::serde::operator::{
     FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
 };
-use smartstring::alias::String;
 use tracing::{trace, warn};
 
 use crate::{
@@ -14,8 +12,8 @@ use crate::{
     virtual_schema::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
-            FieldData, FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier,
-            TypeRef, UnitTypeRef,
+            FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef,
+            UnitTypeRef,
         },
         QueryLevel, TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
     },
@@ -67,22 +65,6 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         }
     }
 
-    /// Convert fields to input arguments
-    pub fn _convert_fields_to_arguments(
-        &mut self,
-        fields: &IndexMap<String, FieldData>,
-        typing_purpose: TypingPurpose,
-    ) -> Vec<juniper::meta::Argument<'r, GqlScalar>> {
-        fields
-            .iter()
-            .map(|(name, field_data)| {
-                let arg_type =
-                    self.get_type::<IndexedInputValue>(field_data.field_type, typing_purpose);
-                juniper::meta::Argument::new(name, arg_type)
-            })
-            .collect()
-    }
-
     pub fn collect_operator_arguments(
         &mut self,
         operator_id: SerdeOperatorId,
@@ -130,7 +112,6 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                         self.collect_operator_arguments(operator_id, output, typing_purpose);
                     }
                     FilteredVariants::Union(variants) => {
-                        warn!("Multiple variants in union: {variants:#?}");
                         for variant in variants {
                             self.collect_operator_arguments(
                                 variant.operator_id,
@@ -170,8 +151,6 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         let operator = self.virtual_schema.env().get_serde_operator(operator_id);
 
         trace!("register argument '{name}': {operator:?}");
-
-        use std::string::String;
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
             return self.get_native_argument::<ID>(name, modifier);
@@ -228,40 +207,54 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 modifier,
             ),
             SerdeOperator::Union(union_op) => {
+                let def_id = union_op.union_def_variant().def_id;
+                let type_info = self.virtual_schema.env().get_type_info(def_id);
+
+                // If this is an entity, use Edge + ReferenceInput
+                // to get the option of just specifying an ID.
+                // TODO: Ensure this for create mutations only
+                let (query_level, typing_purpose) = if type_info.entity_info.is_some() {
+                    (
+                        QueryLevel::Edge { rel_params: None },
+                        TypingPurpose::ReferenceInput,
+                    )
+                } else {
+                    (QueryLevel::Node, TypingPurpose::Input)
+                };
+
                 let type_index = self
                     .virtual_schema
-                    .type_index_by_def(union_op.union_def_variant().def_id, QueryLevel::Node)
+                    .type_index_by_def(def_id, query_level)
                     .expect("No union found");
-                let type_info = self
+
+                let info = self
                     .virtual_schema
-                    .indexed_type_info(type_index, TypingPurpose::Input);
+                    .indexed_type_info(type_index, typing_purpose);
 
                 match modifier.unit_optionality() {
-                    Optionality::Mandatory => {
-                        self.registry.arg::<IndexedInputValue>(name, &type_info)
+                    Optionality::Mandatory => self.registry.arg::<IndexedInputValue>(name, &info),
+                    Optionality::Optional => {
+                        self.registry.arg::<Option<IndexedInputValue>>(name, &info)
                     }
-                    Optionality::Optional => self
-                        .registry
-                        .arg::<Option<IndexedInputValue>>(name, &type_info),
                 }
             }
             SerdeOperator::Struct(struct_op) => {
+                let def_id = struct_op.def_variant.def_id;
                 let type_index = self
                     .virtual_schema
-                    .type_index_by_def(struct_op.def_variant.def_id, QueryLevel::Node)
+                    .type_index_by_def(def_id, QueryLevel::Node)
                     .expect("No struct found");
-                let type_info = self
+
+                let info = self
                     .virtual_schema
                     .indexed_type_info(type_index, TypingPurpose::Input);
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => {
-                        return self.registry.arg::<IndexedInputValue>(name, &type_info);
+                        return self.registry.arg::<IndexedInputValue>(name, &info);
                     }
                     Optionality::Optional => {
-                        return self
-                            .registry
-                            .arg::<Option<IndexedInputValue>>(name, &type_info)
+                        return self.registry.arg::<Option<IndexedInputValue>>(name, &info)
                     }
                 }
             }

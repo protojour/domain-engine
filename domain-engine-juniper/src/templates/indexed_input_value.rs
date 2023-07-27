@@ -50,8 +50,6 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     }),
                 ..
             }) => {
-                debug!("collect edge arguments");
-
                 let mut arguments = vec![];
                 reg.collect_operator_arguments(
                     *node_operator_id,
@@ -69,7 +67,6 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     ));
                 }
 
-                // let arguments = reg.convert_fields_to_arguments(fields, info.typing_purpose);
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()

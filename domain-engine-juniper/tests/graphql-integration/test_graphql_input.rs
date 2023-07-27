@@ -26,7 +26,7 @@ async fn test_graphql_input_deserialization_error() {
                 prop
             }
         }"#
-        .exec(&schema, &ctx)
+        .exec(&schema, &ctx, [])
         .await,
         r#"Execution: invalid type: string "invalid", expected "const" in input at line 4 column 26 (field at line 2 column 12)"#
     );

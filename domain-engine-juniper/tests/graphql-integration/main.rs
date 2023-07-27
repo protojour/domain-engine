@@ -94,6 +94,7 @@ trait Exec {
         self,
         schema: &Schema,
         context: &GqlContext,
+        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
     ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
@@ -103,8 +104,10 @@ impl Exec for &'static str {
         self,
         schema: &Schema,
         context: &GqlContext,
+        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
-        match juniper::execute(self, None, schema, &juniper::Variables::new(), context).await {
+        let variables = variables.into();
+        match juniper::execute(self, None, schema, &variables, context).await {
             Ok((value, execution_errors)) => {
                 if !execution_errors.is_empty() {
                     Err(TestError::Execution(execution_errors))

@@ -38,6 +38,12 @@ impl From<std::string::String> for GqlScalar {
     }
 }
 
+impl From<smartstring::alias::String> for GqlScalar {
+    fn from(value: smartstring::alias::String) -> Self {
+        Self::String(value)
+    }
+}
+
 impl Display for GqlScalar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
