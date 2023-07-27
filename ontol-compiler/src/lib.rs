@@ -11,7 +11,7 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    env::{Domain, EntityInfo, EntityRelationship, Env, MapMeta, TypeInfo},
+    ontology::{Domain, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo},
     serde::SerdeKey,
     value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId,
@@ -176,8 +176,8 @@ impl<'m> Compiler<'m> {
         OntologyGraph::from(self)
     }
 
-    /// Finish compilation, turn into environment.
-    pub fn into_env(mut self) -> Env {
+    /// Finish compilation, turn into runtime ontology.
+    pub fn into_ontology(mut self) -> Ontology {
         let package_ids = self.package_ids();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
@@ -185,7 +185,7 @@ impl<'m> Compiler<'m> {
         let docs = std::mem::take(&mut self.namespaces.docs);
         let mut serde_generator = self.serde_generator();
 
-        let mut builder = Env::builder();
+        let mut builder = Ontology::builder();
 
         let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
 

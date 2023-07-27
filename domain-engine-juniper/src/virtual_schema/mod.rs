@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ontol_runtime::{
-    env::Env,
+    ontology::Ontology,
     serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
@@ -55,8 +55,8 @@ pub struct VirtualIndexedTypeInfo {
 }
 
 impl VirtualIndexedTypeInfo {
-    pub fn env(&self) -> &Env {
-        &self.virtual_schema.env
+    pub fn ontology(&self) -> &Ontology {
+        &self.virtual_schema.ontology
     }
 
     pub fn type_data(&self) -> &TypeData {
@@ -79,7 +79,7 @@ impl VirtualIndexedTypeInfo {
     }
 
     pub fn description(&self) -> Option<String> {
-        self.type_data().description(self.env())
+        self.type_data().description(self.ontology())
     }
 }
 

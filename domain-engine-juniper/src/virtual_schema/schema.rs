@@ -3,7 +3,7 @@ use std::sync::Arc;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     discriminator::Discriminant,
-    env::Env,
+    ontology::Ontology,
     serde::{
         operator::{FilteredVariants, SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode},
@@ -30,7 +30,7 @@ use super::{
 /// This comes in handy when performing lookahead on selection sets,
 /// parsing field arguments, etc.
 pub struct VirtualSchema {
-    pub(super) env: Arc<Env>,
+    pub(super) ontology: Arc<Ontology>,
     pub(super) package_id: PackageId,
     pub(super) query: TypeIndex,
     pub(super) mutation: TypeIndex,
@@ -40,13 +40,13 @@ pub struct VirtualSchema {
 
 impl VirtualSchema {
     /// Builds a "shadow schema" before handing that over to juniper
-    pub fn build(package_id: PackageId, env: Arc<Env>) -> Result<Self, SchemaBuildError> {
-        let domain = env
+    pub fn build(package_id: PackageId, ontology: Arc<Ontology>) -> Result<Self, SchemaBuildError> {
+        let domain = ontology
             .find_domain(package_id)
             .ok_or(SchemaBuildError::UnknownPackage)?;
 
         let mut schema = Self {
-            env: env.clone(),
+            ontology: ontology.clone(),
             package_id,
             query: TypeIndex(0),
             mutation: TypeIndex(0),
@@ -58,10 +58,10 @@ impl VirtualSchema {
         };
         let mut namespace = Namespace::with_domain_disambiguation(DomainDisambiguation {
             root_domain: package_id,
-            env: env.clone(),
+            ontology: ontology.clone(),
         });
         let mut builder = VirtualSchemaBuilder {
-            env: env.as_ref(),
+            ontology: ontology.as_ref(),
             schema: &mut schema,
             namespace: &mut namespace,
         };
@@ -92,8 +92,8 @@ impl VirtualSchema {
         Ok(schema)
     }
 
-    pub fn env(&self) -> &Env {
-        &self.env
+    pub fn ontology(&self) -> &Ontology {
+        &self.ontology
     }
 
     pub fn package_id(&self) -> PackageId {
@@ -204,13 +204,13 @@ pub enum NodeClassification {
     Entity,
 }
 
-pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassification {
-    let operator = env.get_serde_operator(operator_id);
+pub fn classify_type(ontology: &Ontology, operator_id: SerdeOperatorId) -> TypeClassification {
+    let operator = ontology.get_serde_operator(operator_id);
     // debug!("    classify operator: {operator:?}");
 
     match operator {
         SerdeOperator::Struct(struct_op) => {
-            let type_info = env.get_type_info(struct_op.def_variant.def_id);
+            let type_info = ontology.get_type_info(struct_op.def_variant.def_id);
             let node_classification = if type_info.entity_info.is_some() {
                 NodeClassification::Entity
             } else {
@@ -224,7 +224,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
         }
         SerdeOperator::Union(union_op) => {
             match union_op.variants(ProcessorMode::Inspect, ProcessorLevel::new_child()) {
-                FilteredVariants::Single(operator_id) => classify_type(env, operator_id),
+                FilteredVariants::Single(operator_id) => classify_type(ontology, operator_id),
                 FilteredVariants::Union(variants) => {
                     // start with the "highest" classification and downgrade as "lower" variants are found.
                     let mut classification = TypeClassification::Type(
@@ -238,7 +238,7 @@ pub fn classify_type(env: &Env, operator_id: SerdeOperatorId) -> TypeClassificat
                             panic!("BUG: Don't want to see this variant in ProcessorMode::Inspect");
                         }
 
-                        let variant_classification = classify_type(env, variant.operator_id);
+                        let variant_classification = classify_type(ontology, variant.operator_id);
                         match (&classification, variant_classification) {
                             (
                                 TypeClassification::Type(..),

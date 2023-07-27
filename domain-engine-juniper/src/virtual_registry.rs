@@ -51,7 +51,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     description: match &field_data.kind {
                         FieldKind::Property(property) => self
                             .virtual_schema
-                            .env()
+                            .ontology()
                             .get_docs(property.property_id.relationship_id.0),
                         _ => None,
                     },
@@ -71,7 +71,10 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
     ) {
-        let serde_operator = self.virtual_schema.env().get_serde_operator(operator_id);
+        let serde_operator = self
+            .virtual_schema
+            .ontology()
+            .get_serde_operator(operator_id);
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
@@ -148,7 +151,10 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         property_flags: SerdePropertyFlags,
         modifier: TypeModifier,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let operator = self.virtual_schema.env().get_serde_operator(operator_id);
+        let operator = self
+            .virtual_schema
+            .ontology()
+            .get_serde_operator(operator_id);
 
         trace!("register argument '{name}': {operator:?}");
 
@@ -208,7 +214,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             ),
             SerdeOperator::Union(union_op) => {
                 let def_id = union_op.union_def_variant().def_id;
-                let type_info = self.virtual_schema.env().get_type_info(def_id);
+                let type_info = self.virtual_schema.ontology().get_type_info(def_id);
 
                 // If this is an entity, use Edge + ReferenceInput
                 // to get the option of just specifying an ID.

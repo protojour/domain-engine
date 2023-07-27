@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
-    env::PropertyFlow,
     format_utils::DebugViaDisplay,
+    ontology::PropertyFlow,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
 };

@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    env::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
+    ontology::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
 };
 use tracing::debug;
 

@@ -52,7 +52,7 @@ impl<'e> SerdeProcessor<'e> {
                 }
             },
             SerdeOperator::CapturingStringPattern(def_id) => {
-                let pattern = &self.env.string_patterns.get(def_id).unwrap();
+                let pattern = &self.ontology.string_patterns.get(def_id).unwrap();
                 let mut buf = String::new();
                 write!(
                     &mut buf,
@@ -175,7 +175,7 @@ impl<'e> SerdeProcessor<'e> {
 
         for attr in elements {
             let def_id = attr.value.type_def_id;
-            match self.env.get_type_info(def_id).operator_id {
+            match self.ontology.get_type_info(def_id).operator_id {
                 Some(operator_id) => seq.serialize_element(&Proxy {
                     value: &attr.value,
                     rel_params: None,

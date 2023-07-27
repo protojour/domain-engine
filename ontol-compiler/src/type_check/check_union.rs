@@ -4,7 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
-    env::{PropertyCardinality, ValueCardinality},
+    ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
     DataModifier, DefId, DefVariant,

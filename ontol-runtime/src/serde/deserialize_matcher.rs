@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use crate::{
     discriminator::Discriminant,
-    env::Env,
     format_utils::{Backticks, LogicOp, Missing},
+    ontology::Ontology,
     string_pattern::StringPattern,
     string_types::ParseError,
     value::{Data, Value},
@@ -137,7 +137,7 @@ impl ValueMatcher for NumberMatcher {
 /// match any string
 pub struct StringMatcher<'e> {
     pub def_id: DefId,
-    pub env: &'e Env,
+    pub ontology: &'e Ontology,
 }
 
 impl<'e> ValueMatcher for StringMatcher<'e> {
@@ -173,18 +173,18 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
 pub struct StringPatternMatcher<'e> {
     pub pattern: &'e StringPattern,
     pub def_id: DefId,
-    pub env: &'e Env,
+    pub ontology: &'e Ontology,
 }
 
 impl<'e> ValueMatcher for StringPatternMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        expecting_custom_string(self.env, self.def_id, f)
+        expecting_custom_string(self.ontology, self.def_id, f)
             .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if self.pattern.regex.is_match(str) {
-            try_deserialize_custom_string(self.env, self.def_id, str).map_err(|_| ())
+            try_deserialize_custom_string(self.ontology, self.def_id, str).map_err(|_| ())
         } else {
             Err(())
         }
@@ -197,7 +197,7 @@ impl<'e> ValueMatcher for StringPatternMatcher<'e> {
 pub struct CapturingStringPatternMatcher<'e> {
     pub pattern: &'e StringPattern,
     pub def_id: DefId,
-    pub env: &'e Env,
+    pub ontology: &'e Ontology,
 }
 
 impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
@@ -208,7 +208,7 @@ impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         let data = self
             .pattern
-            .try_capturing_match(str, self.env)
+            .try_capturing_match(str, self.ontology)
             .map_err(|_| ())?;
         Ok(Value::new(data, self.def_id))
     }
@@ -316,7 +316,7 @@ pub struct UnionMatcher<'e> {
     pub typename: &'e str,
     pub variants: &'e [ValueUnionVariant],
     pub ctx: SubProcessorContext,
-    pub env: &'e Env,
+    pub ontology: &'e Ontology,
     pub mode: ProcessorMode,
     pub level: ProcessorLevel,
 }
@@ -331,7 +331,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 items: self
                     .variants
                     .iter()
-                    .map(|discriminator| self.env.new_serde_processor(
+                    .map(|discriminator| self.ontology.new_serde_processor(
                         discriminator.operator_id,
                         self.mode,
                         ProcessorLevel::new_root()
@@ -360,7 +360,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
             match &variant.discriminator.discriminant {
                 Discriminant::IsString => {
                     return try_deserialize_custom_string(
-                        self.env,
+                        self.ontology,
                         variant.discriminator.def_variant.def_id,
                         str,
                     )
@@ -368,7 +368,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 }
                 Discriminant::IsStringLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
-                        self.env,
+                        self.ontology,
                         variant.discriminator.def_variant.def_id,
                         str,
                     )
@@ -376,9 +376,9 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
                     let result_type = variant.discriminator.def_variant.def_id;
-                    let pattern = self.env.string_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.string_patterns.get(def_id).unwrap();
 
-                    if let Ok(data) = pattern.try_capturing_match(str, self.env) {
+                    if let Ok(data) = pattern.try_capturing_match(str, self.ontology) {
                         return Ok(Value::new(data, result_type));
                     }
                 }
@@ -392,7 +392,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
         for variant in self.variants {
             if variant.discriminator.discriminant == Discriminant::IsSequence {
-                match self.env.get_serde_operator(variant.operator_id) {
+                match self.ontology.get_serde_operator(variant.operator_id) {
                     SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
@@ -432,7 +432,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         Ok(MapMatcher {
             variants: self.variants,
             ctx: self.ctx,
-            env: self.env,
+            ontology: self.ontology,
             mode: self.mode,
             level: self.level,
         })
@@ -454,7 +454,7 @@ impl<'e> UnionMatcher<'e> {
 #[derive(Clone)]
 pub struct MapMatcher<'e> {
     variants: &'e [ValueUnionVariant],
-    env: &'e Env,
+    ontology: &'e Ontology,
     pub ctx: SubProcessorContext,
     mode: ProcessorMode,
     level: ProcessorLevel,
@@ -493,7 +493,7 @@ impl<'e> MapMatcher<'e> {
                     serde_value::Value::String(value),
                 ) => {
                     if property == match_name {
-                        let pattern = self.env.string_patterns.get(def_id).unwrap();
+                        let pattern = self.ontology.string_patterns.get(def_id).unwrap();
                         pattern.regex.is_match(value)
                     } else {
                         false
@@ -508,7 +508,7 @@ impl<'e> MapMatcher<'e> {
             .iter()
             .find(|variant| match_fn(&variant.discriminator.discriminant))
             .map(
-                |variant| match self.env.get_serde_operator(variant.operator_id) {
+                |variant| match self.ontology.get_serde_operator(variant.operator_id) {
                     SerdeOperator::Struct(struct_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::StructType(struct_op)))
                     }
@@ -521,7 +521,7 @@ impl<'e> MapMatcher<'e> {
                             FilteredVariants::Union(variants) => MapMatcher {
                                 variants,
                                 ctx: self.ctx,
-                                env: self.env,
+                                ontology: self.ontology,
                                 mode: self.mode,
                                 level: self.level,
                             }
@@ -546,7 +546,7 @@ impl<'e> MapMatcher<'e> {
                 variant.discriminator.discriminant,
                 Discriminant::MapFallback
             ) {
-                match self.env.get_serde_operator(variant.operator_id) {
+                match self.ontology.get_serde_operator(variant.operator_id) {
                     SerdeOperator::Struct(struct_op) => {
                         return MapMatchResult::Match(
                             self.new_match(MapMatchKind::StructType(struct_op)),
@@ -573,19 +573,24 @@ impl<'e> MapMatcher<'e> {
     }
 }
 
-fn try_deserialize_custom_string(env: &Env, def_id: DefId, str: &str) -> Result<Value, ParseError> {
-    match env.string_like_types.get(&def_id) {
+fn try_deserialize_custom_string(
+    ontology: &Ontology,
+    def_id: DefId,
+    str: &str,
+) -> Result<Value, ParseError> {
+    match ontology.string_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
         None => Ok(Value::new(Data::String(str.into()), def_id)),
     }
 }
 
 fn expecting_custom_string(
-    env: &Env,
+    ontology: &Ontology,
     def_id: DefId,
     f: &mut std::fmt::Formatter,
 ) -> Option<std::fmt::Result> {
-    env.string_like_types
+    ontology
+        .string_like_types
         .get(&def_id)
         .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))
 }

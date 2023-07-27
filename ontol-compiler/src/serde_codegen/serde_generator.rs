@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    env::{Cardinality, PropertyCardinality, ValueCardinality},
+    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
         ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
         SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,

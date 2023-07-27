@@ -1,6 +1,6 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
-    env::{PropertyCardinality, ValueCardinality},
+    ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
     string_types::StringLikeType,
     value::PropertyId,

@@ -1,6 +1,6 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    env::Env,
+    ontology::Ontology,
     query::{EntityQuery, StructOrUnionQuery},
     DefId, MapKey, PackageId,
 };
@@ -46,11 +46,11 @@ pub struct ResolverGraph {
 }
 
 impl ResolverGraph {
-    pub fn new(env: &Env) -> Self {
+    pub fn new(ontology: &Ontology) -> Self {
         let mut map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
         let mut inverted_map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
 
-        for ((source_key, target_key), _) in env.iter_map_meta() {
+        for ((source_key, target_key), _) in ontology.iter_map_meta() {
             map_graph.entry(source_key).or_default().push(target_key);
             inverted_map_graph
                 .entry(target_key)
@@ -66,14 +66,14 @@ impl ResolverGraph {
 
     pub fn probe_path_for_entity_query(
         &self,
-        env: &Env,
+        ontology: &Ontology,
         query: &EntityQuery,
         data_store: &DataStore,
     ) -> Option<(DefId, ResolvePath)> {
         match &query.source {
             StructOrUnionQuery::Struct(struct_query) => self
                 .probe_path(
-                    env,
+                    ontology,
                     struct_query.def_id,
                     data_store.package_id(),
                     ProbeOptions {
@@ -88,7 +88,7 @@ impl ResolverGraph {
 
     pub fn probe_path(
         &self,
-        env: &Env,
+        ontology: &Ontology,
         public_def_id: DefId,
         target_package: PackageId,
         options: ProbeOptions,
@@ -96,7 +96,7 @@ impl ResolverGraph {
         let mut path = vec![];
         let mut visited = Default::default();
         let mut probe = Probe {
-            env,
+            ontology,
             graph: if options.inverted {
                 &self.inverted_map_graph
             } else {
@@ -117,7 +117,7 @@ impl ResolverGraph {
 }
 
 struct Probe<'e, 'a> {
-    env: &'e Env,
+    ontology: &'e Ontology,
     graph: &'e FnvHashMap<MapKey, Vec<MapKey>>,
     options: &'e ProbeOptions,
     path: &'a mut Vec<DefId>,
@@ -134,7 +134,7 @@ impl<'e, 'a> Probe<'e, 'a> {
         }
 
         if self.options.must_be_entity {
-            let type_info = self.env.get_type_info(def_id);
+            let type_info = self.ontology.get_type_info(def_id);
             if type_info.entity_info.is_none() {
                 return false;
             }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
-use ontol_runtime::{env::Env, PackageId};
+use ontol_runtime::{ontology::Ontology, PackageId};
 use tracing::debug;
 
 pub mod gql_scalar;
@@ -47,9 +47,9 @@ pub enum SchemaBuildError {
 
 pub fn create_graphql_schema(
     package_id: PackageId,
-    env: Arc<Env>,
+    ontology: Arc<Ontology>,
 ) -> Result<Schema, SchemaBuildError> {
-    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(package_id, env)?);
+    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(package_id, ontology)?);
 
     let schema = Schema::new_with_info(
         templates::query_type::QueryType,

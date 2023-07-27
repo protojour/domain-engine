@@ -9,8 +9,8 @@ pub const STIX_ON: &str = include_str!("../../../examples/stix_lite/stix.on");
 
 #[test]
 fn test_stix_lite() {
-    STIX_ON.compile_ok(|env| {
-        let attack_pattern = TypeBinding::new(&env, "attack-pattern");
+    STIX_ON.compile_ok(|test| {
+        let attack_pattern = TypeBinding::new(&test, "attack-pattern");
         assert_error_msg!(
             create_de(&attack_pattern).data(json!({
                 "type": "attack-pattern",

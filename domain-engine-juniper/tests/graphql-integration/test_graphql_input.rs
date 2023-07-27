@@ -5,7 +5,7 @@ use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
-    let (test_env, [schema]) = "
+    let (test, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
@@ -14,7 +14,7 @@ async fn test_graphql_input_deserialization_error() {
     "
     .compile_schemas([SourceName::root()]);
 
-    let ctx = gql_ctx_mock_data_store(&test_env, SourceName::root(), ());
+    let ctx = gql_ctx_mock_data_store(&test, SourceName::root(), ());
     assert_error_msg!(
         r#"
         mutation {

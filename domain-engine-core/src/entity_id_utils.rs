@@ -1,14 +1,17 @@
 use ontol_runtime::{
-    env::Env,
+    ontology::Ontology,
     string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
     value::{Data, PropertyId, Value},
 };
 
 use crate::DomainError;
 
-pub fn find_inherent_entity_id(env: &Env, entity: &Value) -> Result<Option<Value>, DomainError> {
+pub fn find_inherent_entity_id(
+    ontology: &Ontology,
+    entity: &Value,
+) -> Result<Option<Value>, DomainError> {
     let def_id = entity.type_def_id;
-    let type_info = env.get_type_info(def_id);
+    let type_info = ontology.get_type_info(def_id);
     let entity_info = type_info
         .entity_info
         .as_ref()

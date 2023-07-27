@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    env::{Env, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
+    ontology::{Ontology, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
     DefId, MapKey, PackageId,
@@ -13,18 +13,23 @@ use tracing::{debug, trace};
 #[derive(Clone, Copy)]
 struct IsDep(bool);
 
-pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey, env: &Env) {
-    let map_meta = env
+pub fn translate_entity_query(
+    query: &mut EntityQuery,
+    from: MapKey,
+    to: MapKey,
+    ontology: &Ontology,
+) {
+    let map_meta = ontology
         .get_map_meta(to, from)
         .expect("No mapping procedure for query transformer");
-    let prop_flow_slice = env.get_prop_flow_slice(map_meta);
+    let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 
     trace!("translate_entity_query flow props: {:#?}", prop_flow_slice);
 
     match &mut query.source {
         StructOrUnionQuery::Struct(struct_query) => {
             let processor = QueryFlowProcessor {
-                env,
+                ontology,
                 prop_flow_slice,
             };
 
@@ -54,7 +59,7 @@ pub fn translate_entity_query(query: &mut EntityQuery, from: MapKey, to: MapKey,
 }
 
 struct QueryFlowProcessor<'e> {
-    env: &'e Env,
+    ontology: &'e Ontology,
     prop_flow_slice: &'e [PropertyFlow],
 }
 
@@ -212,7 +217,7 @@ impl<'e> QueryFlowProcessor<'e> {
                     }
                 }
                 PropertyFlowData::Type(def_id) if is_dep.0 => {
-                    let type_info = self.env.get_type_info(*def_id);
+                    let type_info = self.ontology.get_type_info(*def_id);
                     is_entity = type_info.entity_info.is_some();
                 }
                 PropertyFlowData::Cardinality((

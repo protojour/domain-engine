@@ -36,8 +36,8 @@ fn load_package() {
             ",
         ),
     ])
-    .compile_ok(|env| {
-        let bar = TypeBinding::new(&env, "bar");
+    .compile_ok(|test| {
+        let bar = TypeBinding::new(&test, "bar");
         assert_json_io_matches!(bar, Create, {
             "foo": {
                 "prop": 42
@@ -81,11 +81,11 @@ fn dependency_dag() {
         ),
         (SourceName("c"), "pub type c { rel .is: int }"),
     ])
-    .compile_ok(|env| {
+    .compile_ok(|test| {
         // four user domains, plus core:
-        expect_eq!(actual = env.env.domains().count(), expected = 5);
+        expect_eq!(actual = test.ontology.domains().count(), expected = 5);
 
-        let bar = TypeBinding::new(&env, "foobar");
+        let bar = TypeBinding::new(&test, "foobar");
         assert_json_io_matches!(bar, Create, {
             "a": { "c": 42 },
             "b": { "c": 43 }

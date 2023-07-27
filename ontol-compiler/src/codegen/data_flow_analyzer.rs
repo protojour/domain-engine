@@ -5,7 +5,7 @@ use std::{collections::BTreeSet, fmt::Debug};
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::GetKind;
 use ontol_runtime::{
-    env::{PropertyFlow, PropertyFlowData},
+    ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
     DefId,
 };

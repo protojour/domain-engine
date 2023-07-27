@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use convert_case::{Case, Casing};
 use ontol_runtime::{
-    env::{Env, TypeInfo},
+    ontology::{Ontology, TypeInfo},
     smart_format, DefId, PackageId,
 };
 use smartstring::alias::String;
@@ -14,7 +14,7 @@ pub struct Namespace {
 
 pub struct DomainDisambiguation {
     pub root_domain: PackageId,
-    pub env: Arc<Env>,
+    pub ontology: Arc<Ontology>,
 }
 
 impl Namespace {

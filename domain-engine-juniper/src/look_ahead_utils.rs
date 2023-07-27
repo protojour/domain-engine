@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
-use ontol_runtime::{env::Env, serde::operator::SerdeOperatorId, smart_format, DefId};
+use ontol_runtime::{ontology::Ontology, serde::operator::SerdeOperatorId, smart_format, DefId};
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
 use crate::{
@@ -41,17 +41,17 @@ impl<'a> ArgsWrapper<'a> {
     pub fn deserialize_attribute(
         &self,
         field_arg: &dyn DomainFieldArg,
-        env: &Env,
+        ontology: &Ontology,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let name = field_arg.name();
         match field_arg.kind() {
             ArgKind::Def(_, def_id) => {
-                self.deserialize_def_attribute(name, def_id, env, field_arg.typing_purpose())
+                self.deserialize_def_attribute(name, def_id, ontology, field_arg.typing_purpose())
             }
             ArgKind::Operator(operator_id) => self.deserialize_operator_attribute(
                 name,
                 operator_id,
-                env,
+                ontology,
                 field_arg.typing_purpose(),
             ),
         }
@@ -62,16 +62,16 @@ impl<'a> ArgsWrapper<'a> {
         &self,
         name: &str,
         def_id: DefId,
-        env: &Env,
+        ontology: &Ontology,
         typing_purpose: TypingPurpose,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-        let type_info = env.get_type_info(def_id);
+        let type_info = ontology.get_type_info(def_id);
         self.deserialize_operator_attribute(
             name,
             type_info
                 .operator_id
                 .expect("This type cannot be deserialized"),
-            env,
+            ontology,
             typing_purpose,
         )
     }
@@ -80,7 +80,7 @@ impl<'a> ArgsWrapper<'a> {
         &self,
         name: &str,
         operator_id: SerdeOperatorId,
-        env: &Env,
+        ontology: &Ontology,
         typing_purpose: TypingPurpose,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let argument = self.find_argument(name).unwrap();
@@ -89,7 +89,8 @@ impl<'a> ArgsWrapper<'a> {
 
         let (mode, level) = typing_purpose.mode_and_level();
 
-        env.new_serde_processor(operator_id, mode, level)
+        ontology
+            .new_serde_processor(operator_id, mode, level)
             .deserialize(LookAheadValueDeserializer {
                 value: argument.spanned_value(),
             })

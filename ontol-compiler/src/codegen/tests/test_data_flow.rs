@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    env::{PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
+    ontology::{PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
     DefId, RelationshipId,
 };
 use ontol_test_utils::expect_eq;

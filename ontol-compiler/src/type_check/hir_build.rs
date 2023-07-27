@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::{Cardinality, PropertyCardinality, ValueCardinality},
+    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
     DefId, Role,

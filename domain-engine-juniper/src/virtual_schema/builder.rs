@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::{Env, TypeInfo},
+    ontology::{Ontology, TypeInfo},
     serde::{
         operator::{
             FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, SerdePropertyFlags,
@@ -33,7 +33,7 @@ enum NewType {
 }
 
 pub(super) struct VirtualSchemaBuilder<'a> {
-    pub env: &'a Env,
+    pub ontology: &'a Ontology,
     pub schema: &'a mut VirtualSchema,
     pub namespace: &'a mut Namespace,
 }
@@ -101,7 +101,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     fn make_def_type(&mut self, def_id: DefId, level: QueryLevel) -> NewType {
-        let type_info = self.env.get_type_info(def_id);
+        let type_info = self.ontology.get_type_info(def_id);
 
         match level {
             QueryLevel::Node => self.make_node_type(type_info),
@@ -122,7 +122,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 .into();
 
                 if let Some(rel_params) = rel_params {
-                    let rel_def_id = match self.env.get_serde_operator(rel_params) {
+                    let rel_def_id = match self.ontology.get_serde_operator(rel_params) {
                         SerdeOperator::Struct(struct_op) => {
                             self.register_struct_op_fields(
                                 struct_op,
@@ -148,7 +148,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     };
 
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QueryLevel::Node);
-                    let rel_type_info = self.env.get_type_info(rel_def_id);
+                    let rel_type_info = self.ontology.get_type_info(rel_def_id);
 
                     NewType::Indexed(
                         edge_index,
@@ -228,7 +228,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     ) -> NewType {
         let typename = type_info.name.as_ref();
 
-        match self.env.get_serde_operator(operator_id) {
+        match self.ontology.get_serde_operator(operator_id) {
             SerdeOperator::RelationSequence(_) => panic!("not handled here"),
             SerdeOperator::ConstructorSequence(_) => NewType::Indexed(
                 self.alloc_def_type_index(type_info.def_id, QueryLevel::Node),
@@ -254,7 +254,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         let mut needs_scalar = false;
 
                         for variant in variants {
-                            match classify_type(self.env, variant.operator_id) {
+                            match classify_type(self.ontology, variant.operator_id) {
                                 TypeClassification::Type(_, def_id, _operator_id) => {
                                     match self.get_def_type_ref(def_id, QueryLevel::Node) {
                                         UnitTypeRef::Indexed(type_index) => {
@@ -343,9 +343,9 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
-            SerdeOperator::ValueType(value_op) => {
-                self.get_native_scalar_kind(self.env.get_serde_operator(value_op.inner_operator_id))
-            }
+            SerdeOperator::ValueType(value_op) => self.get_native_scalar_kind(
+                self.ontology.get_serde_operator(value_op.inner_operator_id),
+            ),
             op @ (SerdeOperator::Union(_)
             | SerdeOperator::Struct(_)
             | SerdeOperator::DynamicSequence
@@ -359,7 +359,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         type_info: &TypeInfo,
         value_op: &ValueOperator,
     ) -> TypeKind {
-        match self.env.get_serde_operator(value_op.inner_operator_id) {
+        match self.ontology.get_serde_operator(value_op.inner_operator_id) {
             SerdeOperator::ValueType(inner_value_op) => {
                 self.make_value_op_type_kind(type_info, inner_value_op)
             }
@@ -406,7 +406,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
         field_namespace: &mut Namespace,
     ) {
-        match self.env.get_serde_operator(value_op.inner_operator_id) {
+        match self.ontology.get_serde_operator(value_op.inner_operator_id) {
             SerdeOperator::Struct(struct_op) => {
                 self.register_struct_op_fields(
                     struct_op,
@@ -433,7 +433,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
         field_namespace: &mut Namespace,
     ) {
         for (property_name, property) in &struct_op.properties {
-            match self.env.get_serde_operator(property.value_operator_id) {
+            match self.ontology.get_serde_operator(property.value_operator_id) {
                 SerdeOperator::Struct(property_struct_op) => {
                     fields.insert(
                         field_namespace.unique_literal(property_name),
@@ -447,7 +447,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     );
                 }
                 SerdeOperator::RelationSequence(seq_op) => {
-                    match classify_type(self.env, seq_op.ranges[0].operator_id) {
+                    match classify_type(self.ontology, seq_op.ranges[0].operator_id) {
                         TypeClassification::Type(NodeClassification::Entity, node_id, _) => {
                             let connection_ref = self.get_def_type_ref(
                                 node_id,
@@ -498,7 +498,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
                             let scalar_ref = UnitTypeRef::NativeScalar(NativeScalarRef {
                                 operator_id: property.value_operator_id,
                                 kind: self.get_native_scalar_kind(
-                                    self.env.get_serde_operator(seq_op.ranges[0].operator_id),
+                                    self.ontology
+                                        .get_serde_operator(seq_op.ranges[0].operator_id),
                                 ),
                             });
 
@@ -578,7 +579,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
     }
 
     pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
-        let type_info = self.env.get_type_info(entity_data.node_def_id);
+        let type_info = self.ontology.get_type_info(entity_data.node_def_id);
 
         let node_ref = UnitTypeRef::Indexed(entity_data.type_index);
         let connection_ref = self.get_def_type_ref(
@@ -586,7 +587,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
             QueryLevel::Connection { rel_params: None },
         );
 
-        let id_type_info = self.env.get_type_info(entity_data.id_def_id);
+        let id_type_info = self.ontology.get_type_info(entity_data.id_def_id);
         let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
         {

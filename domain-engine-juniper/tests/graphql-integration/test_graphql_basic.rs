@@ -26,7 +26,7 @@ fn test_graphql_empty_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
-    let (test_env, [schema]) = "
+    let (test, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
@@ -34,7 +34,7 @@ async fn test_graphql_basic_schema() {
     }
     "
     .compile_schemas([ROOT]);
-    let foo = TypeBinding::new(&test_env, "foo");
+    let foo = TypeBinding::new(&test, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
 
     expect_eq!(
@@ -49,7 +49,7 @@ async fn test_graphql_basic_schema() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
             []
         )
         .await,
@@ -73,7 +73,7 @@ async fn test_graphql_basic_schema() {
         .exec(
             &schema,
             &gql_ctx_mock_data_store(
-                &test_env,
+                &test,
                 ROOT,
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
@@ -93,7 +93,7 @@ async fn test_graphql_basic_schema() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
-    let (test_env, [schema]) = "
+    let (test, [schema]) = "
     pub type foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
@@ -112,7 +112,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
             []
         )
         .await,
@@ -150,7 +150,7 @@ async fn test_graphql_value_type_in_array() {
 
 #[test(tokio::test)]
 async fn test_inner_struct() {
-    let (test_env, [schema]) = "
+    let (test, [schema]) = "
     pub type foo_id { fmt '' => string => . }
     type inner {
         rel .'prop': string
@@ -162,7 +162,7 @@ async fn test_inner_struct() {
     "
     .compile_schemas([ROOT]);
 
-    let foo = TypeBinding::new(&test_env, "foo");
+    let foo = TypeBinding::new(&test, "foo");
     let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
 
     expect_eq!(
@@ -179,7 +179,7 @@ async fn test_inner_struct() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
             []
         )
         .await,
@@ -207,7 +207,7 @@ async fn test_inner_struct() {
         .exec(
             &schema,
             &gql_ctx_mock_data_store(
-                &test_env,
+                &test,
                 ROOT,
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
@@ -228,7 +228,7 @@ async fn test_inner_struct() {
 
 #[test(tokio::test)]
 async fn test_docs_introspection() {
-    let (test_env, [schema]) = "
+    let (test, [schema]) = "
     type Key {
         rel .is: string
     }
@@ -253,7 +253,7 @@ async fn test_docs_introspection() {
                 }
             }
         }"#
-        .exec(&schema, &gql_ctx_mock_data_store(&test_env, ROOT, ()), [])
+        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()), [])
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -272,9 +272,8 @@ async fn test_docs_introspection() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let (test_env, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([ROOT]);
-    let [artist, instrument, plays] =
-        TypeBinding::new_n(&test_env, ["artist", "instrument", "plays"]);
+    let (test, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([ROOT]);
+    let [artist, instrument, plays] = TypeBinding::new_n(&test, ["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -319,7 +318,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         .exec(
             &schema,
             &gql_ctx_mock_data_store(
-                &test_env,
+                &test,
                 ROOT,
                 DataStoreAPIMock::query
                     .next_call(matching!(_))
@@ -371,7 +370,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
             []
         )
         .await,
@@ -410,7 +409,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         .exec(
             &schema,
             &gql_ctx_mock_data_store(
-                &test_env,
+                &test,
                 ROOT,
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
@@ -430,8 +429,8 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let (test_env, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([ROOT]);
-    let artist = TypeBinding::new(&test_env, "artist");
+    let (test, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([ROOT]);
+    let artist = TypeBinding::new(&test, "artist");
     let artist_entity: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -476,7 +475,7 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
         .exec(
             &schema,
             &gql_ctx_mock_data_store(
-                &test_env,
+                &test,
                 ROOT,
                 DataStoreAPIMock::query
                     .next_call(matching!(_, _))
@@ -516,7 +515,7 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (test_env, [schema]) = TestPackages::with_sources([
+    let (test, [schema]) = TestPackages::with_sources([
         (ROOT, include_str!("../../../examples/municipalities.on")),
         (
             SourceName("geojson"),
@@ -551,7 +550,7 @@ async fn test_graphql_municipalities() {
             }"
             .exec(
                 &schema,
-                &gql_ctx_mock_data_store(&test_env, ROOT, mock_data_store_query_entities_empty()),
+                &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
                 []
             )
             .await,

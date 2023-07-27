@@ -6,7 +6,7 @@ use std::{
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
 use ontol_runtime::{
-    env::{PropertyCardinality, ValueCardinality},
+    ontology::{PropertyCardinality, ValueCardinality},
     smart_format, DefId, DefParamId, RelationshipId,
 };
 use smallvec::SmallVec;

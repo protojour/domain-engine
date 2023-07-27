@@ -10,7 +10,7 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    env::Env,
+    ontology::Ontology,
     PackageId,
 };
 use serde::Serialize;
@@ -26,37 +26,37 @@ pub mod wasm_graphql;
 mod wasm_util;
 
 #[wasm_bindgen]
-pub struct WasmEnv {
-    env: Arc<Env>,
+pub struct WasmOntology {
+    ontology: Arc<Ontology>,
     package_id: PackageId,
     ontology_graph_js: JsValue,
 }
 
 #[wasm_bindgen]
-impl WasmEnv {
+impl WasmOntology {
     pub fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
-        WasmGraphqlSchema::create(self.env.clone(), self.package_id)
+        WasmGraphqlSchema::create(self.ontology.clone(), self.package_id)
     }
 
     pub fn domains(&self) -> Vec<JsValue> {
-        self.env
+        self.ontology
             .domains()
             .map(|(package_id, _domain)| WasmDomain {
                 package_id: *package_id,
-                env: self.env.clone(),
+                ontology: self.ontology.clone(),
             })
             .map(JsValue::from)
             .collect()
     }
 
     pub fn mappers(&self) -> Vec<JsValue> {
-        self.env
+        self.ontology
             .iter_map_meta()
             .map(|((from, to), map_info)| WasmMapper {
                 from,
                 to,
                 map_info: map_info.clone(),
-                env: self.env.clone(),
+                ontology: self.ontology.clone(),
             })
             .map(JsValue::from)
             .collect()
@@ -68,7 +68,7 @@ impl WasmEnv {
 }
 
 #[wasm_bindgen]
-pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv, WasmError> {
+pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmOntology, WasmError> {
     console_error_panic_hook::set_once();
 
     let sources_by_name: HashMap<String, String> = [(filename.clone(), source)].into();
@@ -123,11 +123,11 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmEnv,
 
     let ontology_graph_js = compiler.ontology_graph().serialize(&js_serializer())?;
 
-    let env = Arc::new(compiler.into_env());
+    let ontology = Arc::new(compiler.into_ontology());
 
     match root_package {
-        Some(package_id) => Ok(WasmEnv {
-            env,
+        Some(package_id) => Ok(WasmOntology {
+            ontology,
             package_id,
             ontology_graph_js,
         }),
@@ -177,7 +177,7 @@ impl WasmSources {
         self.root.clone().into()
     }
 
-    pub fn compile(&self) -> Result<WasmEnv, WasmError> {
+    pub fn compile(&self) -> Result<WasmOntology, WasmError> {
         console_error_panic_hook::set_once();
 
         let sources_by_name = &self.sources;
@@ -237,11 +237,11 @@ impl WasmSources {
 
         let ontology_graph_js = compiler.ontology_graph().serialize(&js_serializer())?;
 
-        let env = Arc::new(compiler.into_env());
+        let ontology = Arc::new(compiler.into_ontology());
 
         match root_package {
-            Some(package_id) => Ok(WasmEnv {
-                env,
+            Some(package_id) => Ok(WasmOntology {
+                ontology,
                 package_id,
                 ontology_graph_js,
             }),
@@ -324,8 +324,8 @@ mod tests {
         }
         ";
 
-        let wasm_env = compile_ontol_domain("test.on".to_string(), ontol.to_string()).unwrap();
-        let graphql_schema = wasm_env.create_graphql_schema().unwrap();
+        let wasm_ontology = compile_ontol_domain("test.on".to_string(), ontol.to_string()).unwrap();
+        let graphql_schema = wasm_ontology.create_graphql_schema().unwrap();
 
         let document = "{
             __schema {

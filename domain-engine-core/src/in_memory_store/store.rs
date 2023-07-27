@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::{EntityInfo, EntityRelationship, Env, PropertyCardinality, ValueCardinality},
+    ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
@@ -79,7 +79,7 @@ impl InMemoryStore {
             .get(&struct_query.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
-        let type_info = engine.env().get_type_info(struct_query.def_id);
+        let type_info = engine.ontology().get_type_info(struct_query.def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
@@ -204,7 +204,7 @@ impl InMemoryStore {
             })
             .ok_or(DomainError::IdNotFound)?;
 
-        let type_info = engine.env().get_type_info(def_id);
+        let type_info = engine.ontology().get_type_info(def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
@@ -269,7 +269,7 @@ impl InMemoryStore {
                 )?;
 
                 for entity in entities {
-                    let id = find_inherent_entity_id(engine.env(), &entity)?;
+                    let id = find_inherent_entity_id(engine.ontology(), &entity)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id.data)?;
 
@@ -293,19 +293,22 @@ impl InMemoryStore {
     ) -> DomainResult<Value> {
         debug!("write entity {}", ValueDebug(&entity));
 
-        let env = engine.env();
-        let type_info = env.get_type_info(entity.type_def_id);
+        let ontology = engine.ontology();
+        let type_info = ontology.get_type_info(entity.type_def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
             .ok_or(DomainError::NotAnEntity(entity.type_def_id))?;
 
-        let (id, id_generated) = match find_inherent_entity_id(env, &entity)? {
+        let (id, id_generated) = match find_inherent_entity_id(ontology, &entity)? {
             Some(id) => (id, false),
             None => {
                 if let Some(value_generator) = entity_info.id_value_generator {
-                    let id =
-                        self.generate_entity_id(env, entity_info.id_operator_id, value_generator)?;
+                    let id = self.generate_entity_id(
+                        ontology,
+                        entity_info.id_operator_id,
+                        value_generator,
+                    )?;
                     (id, true)
                 } else {
                     panic!("No id provided and no ID generator");
@@ -381,7 +384,7 @@ impl InMemoryStore {
     ) -> DomainResult<()> {
         debug!("entity rel attribute: {attribute:?}");
 
-        let env = engine.env();
+        let ontology = engine.ontology();
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 
@@ -389,7 +392,7 @@ impl InMemoryStore {
             let foreign_id = self.write_new_entity_inner(engine, value)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
-            let type_info = env.get_type_info(entity_relationship.target);
+            let type_info = ontology.get_type_info(entity_relationship.target);
             let entity_info = type_info.entity_info.as_ref().unwrap();
 
             let foreign_key = Self::extract_dynamic_key(&value.data)?;
@@ -408,11 +411,11 @@ impl InMemoryStore {
                     Value::new(Data::Struct(entity_data), entity_relationship.target),
                 )?;
             } else if entity_data.is_none() {
-                let type_info = env.get_type_info(value.type_def_id);
+                let type_info = ontology.get_type_info(value.type_def_id);
                 let repr = if let Some(operator_id) = type_info.operator_id {
                     // TODO: Easier way to report values in "human readable"/JSON format
 
-                    let processor = env.new_serde_processor(
+                    let processor = ontology.new_serde_processor(
                         operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
@@ -486,17 +489,17 @@ impl InMemoryStore {
 
     fn generate_entity_id(
         &mut self,
-        env: &Env,
+        ontology: &Ontology,
         id_operator_id: SerdeOperatorId,
         value_generator: ValueGenerator,
     ) -> DomainResult<Value> {
-        match (env.get_serde_operator(id_operator_id), value_generator) {
+        match (ontology.get_serde_operator(id_operator_id), value_generator) {
             (SerdeOperator::String(def_id), ValueGenerator::UuidV4) => {
                 let string = smart_format!("{}", Uuid::new_v4());
                 Ok(Value::new(Data::String(string), *def_id))
             }
             (SerdeOperator::StringPattern(def_id), _) => {
-                match (env.get_string_like_type(*def_id), value_generator) {
+                match (ontology.get_string_like_type(*def_id), value_generator) {
                     (Some(StringLikeType::Uuid), ValueGenerator::UuidV4) => {
                         Ok(Value::new(Data::Uuid(Uuid::new_v4()), *def_id))
                     }
@@ -505,11 +508,11 @@ impl InMemoryStore {
             }
             (SerdeOperator::CapturingStringPattern(def_id), _) => {
                 if let Some(property) =
-                    analyze_string_pattern(env.get_string_pattern(*def_id).unwrap())
+                    analyze_string_pattern(ontology.get_string_pattern(*def_id).unwrap())
                 {
-                    let type_info = env.get_type_info(property.type_def_id);
+                    let type_info = ontology.get_type_info(property.type_def_id);
                     let id = self.generate_entity_id(
-                        env,
+                        ontology,
                         type_info.operator_id.unwrap(),
                         value_generator,
                     )?;
@@ -536,7 +539,7 @@ impl InMemoryStore {
                 _,
             ) => {
                 let mut value =
-                    self.generate_entity_id(env, *inner_operator_id, value_generator)?;
+                    self.generate_entity_id(ontology, *inner_operator_id, value_generator)?;
                 value.type_def_id = def_variant.def_id;
                 Ok(value)
             }

@@ -9,7 +9,7 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    env::Env,
+    ontology::Ontology,
     PackageId,
 };
 
@@ -66,14 +66,14 @@ macro_rules! assert_json_io_matches {
 }
 
 #[derive(Clone)]
-pub struct TestEnv {
-    pub env: Arc<Env>,
+pub struct OntolTest {
+    pub ontology: Arc<Ontology>,
     pub root_package: PackageId,
     pub compile_json_schema: bool,
     pub packages_by_source_name: HashMap<String, PackageId>,
 }
 
-impl TestEnv {
+impl OntolTest {
     pub fn get_package_id(&self, source_name: &str) -> PackageId {
         self.packages_by_source_name
             .get(source_name)
@@ -85,13 +85,13 @@ impl TestEnv {
 #[async_trait::async_trait]
 pub trait TestCompile: Sized {
     /// Compile
-    fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv;
+    fn compile_ok(self, validator: impl Fn(OntolTest)) -> OntolTest;
 
     /// Compile (async validator)
     async fn compile_ok_async<F: Future<Output = ()> + Send>(
         self,
-        validator: impl Fn(TestEnv) -> F + Send,
-    ) -> TestEnv;
+        validator: impl Fn(OntolTest) -> F + Send,
+    ) -> OntolTest;
 
     /// Compile, expect failure
     fn compile_fail(self) {
@@ -104,14 +104,14 @@ pub trait TestCompile: Sized {
 
 #[async_trait::async_trait]
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(TestEnv)) -> TestEnv {
+    fn compile_ok(self, validator: impl Fn(OntolTest)) -> OntolTest {
         TestPackages::with_root(self).compile_ok(validator)
     }
 
     async fn compile_ok_async<F: Future<Output = ()> + Send>(
         self,
-        validator: impl Fn(TestEnv) -> F + Send,
-    ) -> TestEnv {
+        validator: impl Fn(OntolTest) -> F + Send,
+    ) -> OntolTest {
         TestPackages::with_root(self)
             .compile_ok_async(validator)
             .await
@@ -209,16 +209,16 @@ impl TestPackages {
         }
     }
 
-    fn compile_topology(&mut self) -> Result<TestEnv, UnifiedCompileError> {
+    fn compile_topology(&mut self) -> Result<OntolTest, UnifiedCompileError> {
         let (package_topology, root_package) = self.load_topology()?;
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, self.sources.clone()).with_core();
 
         match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
-                let env = compiler.into_env();
-                Ok(TestEnv {
-                    env: Arc::new(env),
+                let ontology = compiler.into_ontology();
+                Ok(OntolTest {
+                    ontology: Arc::new(ontology),
                     root_package,
                     // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
                     compile_json_schema: false,
@@ -229,9 +229,9 @@ impl TestPackages {
         }
     }
 
-    fn compile_topology_ok(&mut self) -> TestEnv {
+    fn compile_topology_ok(&mut self) -> OntolTest {
         match self.compile_topology() {
-            Ok(test_env) => test_env,
+            Ok(ontol_test) => ontol_test,
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
@@ -246,20 +246,20 @@ impl TestPackages {
 
 #[async_trait::async_trait]
 impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(TestEnv)) -> TestEnv {
-        let test_env = self.compile_topology_ok();
-        validator(test_env.clone());
-        test_env
+    fn compile_ok(mut self, validator: impl Fn(OntolTest)) -> OntolTest {
+        let ontol_test = self.compile_topology_ok();
+        validator(ontol_test.clone());
+        ontol_test
     }
 
     async fn compile_ok_async<F: Future<Output = ()> + Send>(
         mut self,
-        validator: impl Fn(TestEnv) -> F + Send,
-    ) -> TestEnv {
-        let test_env = self.compile_topology_ok();
-        let fut = validator(test_env.clone());
+        validator: impl Fn(OntolTest) -> F + Send,
+    ) -> OntolTest {
+        let ontol_test = self.compile_topology_ok();
+        let fut = validator(ontol_test.clone());
         fut.await;
-        test_env
+        ontol_test
     }
 
     fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {

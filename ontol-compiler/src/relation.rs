@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    discriminator::UnionDiscriminator, env::Cardinality, value::PropertyId,
+    discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
     value_generator::ValueGenerator, DefId, RelationshipId,
 };
 

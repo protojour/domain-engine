@@ -2,8 +2,8 @@ use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    env::{Env, TypeInfo},
     json_schema::build_standalone_schema,
+    ontology::{Ontology, TypeInfo},
     query::{Query, StructQuery},
     serde::operator::SerdeOperatorId,
     serde::processor::{ProcessorLevel, ProcessorMode},
@@ -13,7 +13,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
 
-use crate::{serde_utils::create_de, TestEnv};
+use crate::{serde_utils::create_de, OntolTest};
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
@@ -22,31 +22,39 @@ pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 pub struct TypeBinding<'e> {
     pub type_info: TypeInfo,
     json_schema: Option<JSONSchema>,
-    env: &'e Env,
+    ontology: &'e Ontology,
 }
 
 impl<'e> TypeBinding<'e> {
-    pub fn new_n<const N: usize>(test_env: &'e TestEnv, type_names: [&str; N]) -> [Self; N] {
-        type_names.map(|type_name| Self::new(test_env, type_name))
+    pub fn new_n<const N: usize>(ontol_test: &'e OntolTest, type_names: [&str; N]) -> [Self; N] {
+        type_names.map(|type_name| Self::new(ontol_test, type_name))
     }
 
     /// Make a type binding with the given type name.
     /// The type name may be written as "SourceName::Type" to specify a specific domain.
-    pub fn new(test_env: &'e TestEnv, type_name: &str) -> Self {
+    pub fn new(ontol_test: &'e OntolTest, type_name: &str) -> Self {
         if type_name.contains("::") {
             let vector: Vec<&str> = type_name.split("::").collect();
             let source_name = vector.first().unwrap();
             let type_name = vector.get(1).unwrap();
 
-            Self::new_with_package(test_env, test_env.get_package_id(source_name), type_name)
+            Self::new_with_package(
+                ontol_test,
+                ontol_test.get_package_id(source_name),
+                type_name,
+            )
         } else {
-            Self::new_with_package(test_env, test_env.root_package, type_name)
+            Self::new_with_package(ontol_test, ontol_test.root_package, type_name)
         }
     }
 
-    pub fn new_with_package(test_env: &'e TestEnv, package_id: PackageId, type_name: &str) -> Self {
-        let env = &test_env.env;
-        let domain = env.find_domain(package_id).unwrap();
+    pub fn new_with_package(
+        ontol_test: &'e OntolTest,
+        package_id: PackageId,
+        type_name: &str,
+    ) -> Self {
+        let ontology = &ontol_test.ontology;
+        let domain = ontology.find_domain(package_id).unwrap();
         let def_id = domain
             .type_names
             .get(type_name)
@@ -60,15 +68,15 @@ impl<'e> TypeBinding<'e> {
         trace!(
             "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
             operator_id = type_info.operator_id,
-            processor = type_info.operator_id.map(|id| env.new_serde_processor(
+            processor = type_info.operator_id.map(|id| ontology.new_serde_processor(
                 id,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root()
             ))
         );
 
-        let json_schema = if test_env.compile_json_schema {
-            Some(compile_json_schema(env, &type_info))
+        let json_schema = if ontol_test.compile_json_schema {
+            Some(compile_json_schema(ontology, &type_info))
         } else {
             None
         };
@@ -76,20 +84,20 @@ impl<'e> TypeBinding<'e> {
         Self {
             type_info,
             json_schema,
-            env,
+            ontology,
         }
     }
 
-    pub fn from_def_id(def_id: DefId, env: &'e Env) -> Self {
+    pub fn from_def_id(def_id: DefId, ontology: &'e Ontology) -> Self {
         Self {
-            type_info: env.get_type_info(def_id).clone(),
+            type_info: ontology.get_type_info(def_id).clone(),
             json_schema: None,
-            env,
+            ontology,
         }
     }
 
-    pub fn env(&self) -> &Env {
-        self.env
+    pub fn ontology(&self) -> &Ontology {
+        self.ontology
     }
 
     pub fn value_builder(&self, data: serde_json::Value) -> ValueBuilder<'_, 'e> {
@@ -101,7 +109,7 @@ impl<'e> TypeBinding<'e> {
     }
 
     pub fn new_fake(&self, processor_mode: ProcessorMode) -> Value {
-        new_constant_fake(self.env, self.type_info.def_id, processor_mode).unwrap()
+        new_constant_fake(self.ontology, self.type_info.def_id, processor_mode).unwrap()
     }
 
     pub fn entity_builder(
@@ -140,7 +148,7 @@ impl<'e> TypeBinding<'e> {
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
-        self.env
+        self.ontology
             .new_serde_processor(
                 self.serde_operator_id(),
                 ProcessorMode::Create,
@@ -154,13 +162,15 @@ impl<'e> TypeBinding<'e> {
     }
 
     pub fn new_json_schema(&self, processor_mode: ProcessorMode) -> serde_json::Value {
-        let schema = build_standalone_schema(self.env, &self.type_info, processor_mode).unwrap();
+        let schema =
+            build_standalone_schema(self.ontology, &self.type_info, processor_mode).unwrap();
         serde_json::to_value(schema).unwrap()
     }
 }
 
-fn compile_json_schema(env: &Env, type_info: &TypeInfo) -> JSONSchema {
-    let standalone_schema = build_standalone_schema(env, type_info, ProcessorMode::Create).unwrap();
+fn compile_json_schema(ontology: &Ontology, type_info: &TypeInfo) -> JSONSchema {
+    let standalone_schema =
+        build_standalone_schema(ontology, type_info, ProcessorMode::Create).unwrap();
 
     debug!(
         "outputted json schema: {}",
@@ -234,7 +244,7 @@ impl<'t, 'e> ValueBuilder<'t, 'e> {
             .expect("Not an entity!");
         let id = self
             .binding
-            .env
+            .ontology
             .new_serde_processor(
                 entity_info.id_operator_id,
                 ProcessorMode::Create,

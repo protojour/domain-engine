@@ -156,10 +156,10 @@ fn generate(args: &Generate) -> Result<(), OntoolError> {
         let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
         match compiler.compile_package_topology(topology) {
             Ok(_) => {
-                let env = compiler.into_env();
+                let ontology = compiler.into_ontology();
                 if let Some(package_id) = root_package {
-                    let domain = env.find_domain(package_id).unwrap();
-                    let schemas = build_openapi_schemas(&env, package_id, domain);
+                    let domain = ontology.find_domain(package_id).unwrap();
+                    let schemas = build_openapi_schemas(&ontology, package_id, domain);
 
                     if args.json_schema {
                         let schemas_json = serde_json::to_string_pretty(&schemas)?;

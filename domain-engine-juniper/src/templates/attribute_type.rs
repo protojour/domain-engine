@@ -302,12 +302,12 @@ impl<'v> AttributeType<'v> {
             Err(scalar_ref) => match (
                 type_ref.modifier,
                 virtual_schema
-                    .env()
+                    .ontology()
                     .get_serde_operator(scalar_ref.operator_id),
             ) {
                 (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
                     let attributes = attribute.value.cast_ref::<Vec<_>>();
-                    let processor = virtual_schema.env().new_serde_processor(
+                    let processor = virtual_schema.ontology().new_serde_processor(
                         operator.ranges[0].operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
@@ -329,7 +329,7 @@ impl<'v> AttributeType<'v> {
                 }
                 _ => {
                     let scalar = virtual_schema
-                        .env()
+                        .ontology()
                         .new_serde_processor(
                             scalar_ref.operator_id,
                             ProcessorMode::Read,

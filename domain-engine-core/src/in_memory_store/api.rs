@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    env::Env,
+    ontology::Ontology,
     query::{EntityQuery, Query},
     value::{Attribute, Value},
     DefId, PackageId, RelationshipId,
@@ -51,8 +51,8 @@ impl DataStoreAPI for InMemoryDb {
 }
 
 impl InMemoryDb {
-    pub fn new(env: &Env, package_id: PackageId) -> Self {
-        let domain = env.find_domain(package_id).unwrap();
+    pub fn new(ontology: &Ontology, package_id: PackageId) -> Self {
+        let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
         let mut edge_collections: FnvHashMap<RelationshipId, EdgeCollection> = Default::default();

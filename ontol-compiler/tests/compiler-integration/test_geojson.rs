@@ -9,8 +9,8 @@ pub const GEOJSON: &str = include_str!("../../../examples/geojson.on");
 
 #[test]
 fn test_geojson() {
-    GEOJSON.compile_ok(|env| {
-        let geometry = TypeBinding::new(&env, "Geometry");
+    GEOJSON.compile_ok(|test| {
+        let geometry = TypeBinding::new(&test, "Geometry");
         assert_json_io_matches!(geometry, Create, {
             "type": "Point",
             "coordinates": [1, 2]
@@ -81,5 +81,5 @@ fn test_municipalities() {
             ",
         ),
     ])
-    .compile_ok(|_env| {});
+    .compile_ok(|_test| {});
 }

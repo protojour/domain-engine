@@ -14,8 +14,8 @@ fn test_fake_primitives() {
         rel .'i': int
     }
     "
-    .compile_ok(|test_env| {
-        let foo = TypeBinding::new(&test_env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
 
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
@@ -35,8 +35,8 @@ fn test_fake_string_like_types() {
         rel .'created_at': datetime
     }
     "
-    .compile_ok(|test_env| {
-        let foo = TypeBinding::new(&test_env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
 
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
@@ -50,8 +50,8 @@ fn test_fake_string_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    GEOJSON.compile_ok(|test_env| {
-        let geometry = TypeBinding::new(&test_env, "Geometry");
+    GEOJSON.compile_ok(|test| {
+        let geometry = TypeBinding::new(&test, "Geometry");
 
         expect_eq!(
             actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
@@ -71,8 +71,8 @@ fn test_fake_geojson() {
 
 #[test]
 fn test_fake_guitar_synth() {
-    GUITAR_SYNTH_UNION.compile_ok(|test_env| {
-        let artist = TypeBinding::new(&test_env, "artist");
+    GUITAR_SYNTH_UNION.compile_ok(|test| {
+        let artist = TypeBinding::new(&test, "artist");
 
         expect_eq!(
             actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),

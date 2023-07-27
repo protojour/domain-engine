@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ontol_runtime::{
     config::DataStoreConfig,
-    env::Env,
+    ontology::Ontology,
     query::{EntityQuery, Query},
     value::{Attribute, Value},
     PackageId,
@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct DomainEngine {
-    env: Arc<Env>,
+    ontology: Arc<Ontology>,
     config: Arc<Config>,
     resolver_graph: ResolverGraph,
 
@@ -24,9 +24,9 @@ pub struct DomainEngine {
 }
 
 impl DomainEngine {
-    pub fn builder(env: Arc<Env>) -> Builder {
+    pub fn builder(ontology: Arc<Ontology>) -> Builder {
         Builder {
-            env,
+            ontology,
             config: Config::default(),
             data_store: None,
         }
@@ -36,8 +36,8 @@ impl DomainEngine {
         &self.config
     }
 
-    pub fn env(&self) -> &Env {
-        &self.env
+    pub fn ontology(&self) -> &Ontology {
+        &self.ontology
     }
 
     fn get_data_store(&self) -> DomainResult<&DataStore> {
@@ -46,24 +46,24 @@ impl DomainEngine {
 
     pub async fn query_entities(&self, mut query: EntityQuery) -> DomainResult<Vec<Attribute>> {
         let data_store = self.get_data_store()?;
-        let env = self.env();
+        let ontology = self.ontology();
 
         let (mut cur_def_id, resolve_path) = self
             .resolver_graph
-            .probe_path_for_entity_query(env, &query, data_store)
+            .probe_path_for_entity_query(ontology, &query, data_store)
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
         let original_def_id = cur_def_id;
 
         // Transform query
         for next_def_id in resolve_path.iter() {
-            translate_entity_query(&mut query, cur_def_id.into(), next_def_id.into(), env);
+            translate_entity_query(&mut query, cur_def_id.into(), next_def_id.into(), ontology);
             cur_def_id = next_def_id;
         }
 
         debug!(
             "Resolve path: {resolve_path:?} to: {:?}",
-            env.get_type_info(cur_def_id)
+            ontology.get_type_info(cur_def_id)
         );
 
         let mut edges = data_store.api().query(self, query).await?;
@@ -74,12 +74,12 @@ impl DomainEngine {
 
         // Transform result
         for next_def_id in resolve_path.reverse(original_def_id) {
-            let procedure = env
+            let procedure = ontology
                 .get_mapper_proc(cur_def_id.into(), (next_def_id).into())
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {
-                attr.value = env.new_vm().eval(procedure, [attr.value.take()]);
+                attr.value = ontology.new_vm().eval(procedure, [attr.value.take()]);
             }
 
             cur_def_id = next_def_id;
@@ -100,7 +100,7 @@ impl DomainEngine {
 }
 
 pub struct Builder {
-    env: Arc<Env>,
+    ontology: Arc<Ontology>,
     config: Config,
     data_store: Option<DataStore>,
 }
@@ -128,12 +128,12 @@ impl Builder {
         let data_store = self.data_store.or_else(|| {
             let mut data_store: Option<DataStore> = None;
 
-            for (package_id, _) in self.env.domains() {
-                if let Some(config) = self.env.get_package_config(*package_id) {
+            for (package_id, _) in self.ontology.domains() {
+                if let Some(config) = self.ontology.get_package_config(*package_id) {
                     if let Some(DataStoreConfig::InMemory) = config.data_store {
                         data_store = Some(DataStore::new(
                             *package_id,
-                            Box::new(InMemoryDb::new(&self.env, *package_id)),
+                            Box::new(InMemoryDb::new(&self.ontology, *package_id)),
                         ));
                     }
                 }
@@ -142,10 +142,10 @@ impl Builder {
             data_store
         });
 
-        let resolver_graph = ResolverGraph::new(&self.env);
+        let resolver_graph = ResolverGraph::new(&self.ontology);
 
         DomainEngine {
-            env: self.env,
+            ontology: self.ontology,
             config: Arc::new(self.config),
             resolver_graph,
             data_store,

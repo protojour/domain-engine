@@ -13,8 +13,8 @@ fn constant_string_pattern() {
     pub type foo
     fmt '' => 'foo' => foo
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_json_io_matches!(foo, Create, "foo");
         assert_error_msg!(
             create_de(&foo).data(json!("fo")),
@@ -29,8 +29,8 @@ fn concatenated_constant_string_constructor_pattern() {
     pub type foobar
     fmt '' => 'foo' => 'bar' => foobar
     "
-    .compile_ok(|env| {
-        let foobar = TypeBinding::new(&env, "foobar");
+    .compile_ok(|test| {
+        let foobar = TypeBinding::new(&test, "foobar");
         assert_json_io_matches!(foobar, Create, "foobar");
         assert_error_msg!(
             create_de(&foobar).data(json!("fooba")),
@@ -45,8 +45,8 @@ fn uuid_in_string_constructor_pattern() {
     pub type foo
     fmt '' => 'foo/' => uuid => foo
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
 
         assert_matches!(
             create_de(&foo).data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -77,8 +77,8 @@ fn test_string_pattern_constructor_union() {
     rel foobar is?: foo
     rel foobar is?: bar
     "
-    .compile_ok(|env| {
-        let foobar = TypeBinding::new(&env, "foobar");
+    .compile_ok(|test| {
+        let foobar = TypeBinding::new(&test, "foobar");
         assert_matches!(
             create_de(&foobar).data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Struct(attrs)) if attrs.len() == 1
@@ -102,8 +102,8 @@ fn test_regex_property() {
     pub type foo
     rel foo 'prop': /abc*/
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_json_io_matches!(foo, Create, { "prop": "abc" });
         assert_json_io_matches!(foo, Create, { "prop": "123abc" });
         assert_json_io_matches!(foo, Create, { "prop": "123abcccc" });
@@ -120,8 +120,8 @@ fn test_simple_regex_pattern_constructor() {
     pub type re
     fmt '' => /a/ => /bc*/ => re
     "
-    .compile_ok(|env| {
-        let re = TypeBinding::new(&env, "re");
+    .compile_ok(|test| {
+        let re = TypeBinding::new(&test, "re");
         assert_json_io_matches!(re, Create, "ab");
         assert_json_io_matches!(re, Create, "abc" == "ab");
         assert_json_io_matches!(re, Create, "abccccc" == "ab");

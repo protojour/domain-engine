@@ -8,8 +8,8 @@ use test_log::test;
 
 #[test]
 fn deserialize_empty_type() {
-    "pub type foo".compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    "pub type foo".compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_error_msg!(
             create_de(&foo).data(json!(42)),
             "invalid type: integer `42`, expected type `foo` at line 1 column 2"
@@ -31,8 +31,8 @@ fn deserialize_int() {
     pub type foo
     rel foo is?: int
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(create_de(&foo).data_variant(json!(42)), Ok(Data::Int(42)));
         assert_matches!(create_de(&foo).data_variant(json!(-42)), Ok(Data::Int(-42)));
 
@@ -53,8 +53,8 @@ fn deserialize_string() {
     pub type foo
     rel foo is?: string
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data_variant(json!("hei")),
             Ok(Data::String(s)) if s == "hei"
@@ -74,8 +74,8 @@ fn deserialize_object_properties() {
     rel obj 'a': string
     rel obj 'b': int
     "
-    .compile_ok(|env| {
-        let obj = TypeBinding::new(&env, "obj");
+    .compile_ok(|test| {
+        let obj = TypeBinding::new(&test, "obj");
         assert_matches!(
             create_de(&obj).data(json!({ "a": "hei", "b": 42 })),
             Ok(Data::Struct(_))
@@ -102,8 +102,8 @@ fn deserialize_read_only_property_error() {
     pub type obj
     rel obj 'created'(rel .gen: create_time): datetime
     "
-    .compile_ok(|env| {
-        let obj = TypeBinding::new(&env, "obj");
+    .compile_ok(|test| {
+        let obj = TypeBinding::new(&test, "obj");
         assert_error_msg!(
             create_de(&obj).data(json!({ "created": "something" })),
             "property `created` is read-only at line 1 column 10"
@@ -122,8 +122,8 @@ fn deserialize_nested() {
     rel two 'y': three
     rel three is?: string
     "
-    .compile_ok(|env| {
-        let one = TypeBinding::new(&env, "one");
+    .compile_ok(|test| {
+        let one = TypeBinding::new(&test, "one");
         assert_matches!(
             create_de(&one).data(json!({
                 "x": {
@@ -144,8 +144,8 @@ fn deserialize_recursive() {
     rel foo 'b': bar
     rel bar 'f': foo
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_error_msg!(
             create_de(&foo).data(json!({
                 "b": {
@@ -166,8 +166,8 @@ fn deserialize_union_of_primitives() {
     rel foo is?: string
     rel foo is?: int
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data_variant(json!(42)),
             Ok(Data::Int(42))
@@ -186,8 +186,8 @@ fn deserialize_string_constant() {
     pub type foo
     rel foo is?: 'my_value'
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data_variant(json!("my_value")),
             Ok(Data::String(s)) if s == "my_value"
@@ -210,8 +210,8 @@ fn deserialize_finite_non_uniform_sequence() {
     rel foo 0: int
     rel foo 1: 'a'
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data(json!([42, "a"])),
             Ok(Data::Sequence(vec)) if vec.len() == 2
@@ -237,8 +237,8 @@ fn deserialize_finite_uniform_sequence() {
     pub type foo
     rel foo ..2: int
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data(json!([42, 42])),
             Ok(Data::Sequence(vector)) if vector.len() == 2
@@ -265,8 +265,8 @@ fn deserialize_string_union() {
     rel foo is?: 'a'
     rel foo is?: 'b'
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_matches!(
             create_de(&foo).data_variant(json!("a")),
             Ok(Data::String(a)) if a == "a"
@@ -291,8 +291,8 @@ fn deserialize_map_union() {
     rel union is?: foo
     rel union is?: bar
     "
-    .compile_ok(|env| {
-        let union = TypeBinding::new(&env, "union");
+    .compile_ok(|test| {
+        let union = TypeBinding::new(&test, "union");
         assert_matches!(
             create_de(&union).data_variant(json!({ "variant": "foo" })),
             Ok(Data::Struct(attrs)) if attrs.len() == 1

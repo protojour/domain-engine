@@ -19,12 +19,12 @@ Ideal high level data flow:
 
 1. Create _compiler_. The compiler is single threaded.
 2. Feed domain source code into the compiler.
-3. The compiler finally produces a shared, immutable and thread safe _environment_.
-4. Execute code by creating a _virtual machine_ which holds a reference to the environment.
+3. The compiler finally produces a shared, immutable and thread safe _ontology_.
+4. Execute code by creating a _virtual machine_ which holds a reference to the ontology.
 
-Any number of virtual machines may be created and executed in parallel, because of the immutable environment.
+Any number of virtual machines may be created and executed in parallel, because of the immutable ontology.
 
-In the future, we may support precompiled environments.
+In the future, we may support precompiled ontology.
 
 ### ONTOL compiler transformation steps
 

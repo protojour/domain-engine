@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
-    env::Env,
+    ontology::Ontology,
     serde::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -32,7 +32,7 @@ impl From<ontol_runtime::serde::processor::RecursionLimitError> for Error {
 }
 
 pub fn new_constant_fake(
-    env: &Env,
+    ontology: &Ontology,
     def_id: DefId,
     processor_mode: ProcessorMode,
 ) -> Result<Value, Error> {
@@ -42,7 +42,7 @@ pub fn new_constant_fake(
     ];
     let mut rng = StdRng::from_seed(seed);
     FakeGenerator {
-        env,
+        ontology,
         rng: &mut rng,
         processor_mode,
     }
@@ -50,18 +50,18 @@ pub fn new_constant_fake(
 }
 
 struct FakeGenerator<'a, R: Rng> {
-    env: &'a Env,
+    ontology: &'a Ontology,
     rng: &'a mut R,
     processor_mode: ProcessorMode,
 }
 
 impl<'a, R: Rng> FakeGenerator<'a, R> {
     pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
-        let type_info = self.env.get_type_info(def_id);
+        let type_info = self.ontology.get_type_info(def_id);
         let operator_id = type_info.operator_id.ok_or(Error::NoSerializationInfo)?;
 
         Ok(self
-            .fake_attribute(self.env.new_serde_processor(
+            .fake_attribute(self.ontology.new_serde_processor(
                 operator_id,
                 self.processor_mode,
                 ProcessorLevel::new_root_with_recursion_limit(32),
@@ -104,7 +104,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 Value::new(Data::String(s.clone()), *def_id)
             }
             SerdeOperator::StringPattern(def_id) => {
-                if let Some(string_like_type) = self.env.get_string_like_type(*def_id) {
+                if let Some(string_like_type) = self.ontology.get_string_like_type(*def_id) {
                     match string_like_type {
                         StringLikeType::Uuid => {
                             Value::new(Data::Uuid(Faker.fake_with_rng(self.rng)), *def_id)
@@ -114,7 +114,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                         }
                     }
                 } else {
-                    let pattern = self.env.get_string_pattern(*def_id).unwrap();
+                    let pattern = self.ontology.get_string_pattern(*def_id).unwrap();
                     let rand_regex =
                         rand_regex::Regex::compile(pattern.regex.as_str(), MAX_REPEAT).unwrap();
                     let string: std::string::String = self.rng.sample(&rand_regex);
@@ -122,7 +122,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 }
             }
             SerdeOperator::CapturingStringPattern(def_id) => {
-                let string_pattern = self.env.get_string_pattern(*def_id).unwrap();
+                let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
                 let mut parser = regex_syntax::ast::parse::Parser::new();
 
                 if let Some(ast) =
@@ -140,7 +140,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     let string: std::string::String = self.rng.sample(&rand_regex);
 
                     let data = string_pattern
-                        .try_capturing_match(&string, self.env)
+                        .try_capturing_match(&string, self.ontology)
                         .unwrap();
 
                     Value::new(data, *def_id)

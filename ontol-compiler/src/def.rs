@@ -4,7 +4,7 @@ use derive_debug_extras::DebugExtras;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    env::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
+    ontology::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
     PackageId, RelationshipId, Role,
 };
 use smallvec::SmallVec;

@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    env::Env,
+    ontology::Ontology,
     serde::processor::{ProcessorLevel, ProcessorMode},
     smart_format,
     string_types::ParseError,
@@ -21,7 +21,11 @@ pub struct StringPattern {
 }
 
 impl StringPattern {
-    pub fn try_capturing_match(&self, input: &str, env: &Env) -> Result<Data, ParseError> {
+    pub fn try_capturing_match(
+        &self,
+        input: &str,
+        ontology: &Ontology,
+    ) -> Result<Data, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
                 Ok(Data::String(match_.as_str().into()))
@@ -49,8 +53,8 @@ impl StringPattern {
                             .expect("expected property match")
                             .as_str();
 
-                        let type_info = env.get_type_info(property.type_def_id);
-                        let processor = env.new_serde_processor(
+                        let type_info = ontology.get_type_info(property.type_def_id);
+                        let processor = ontology.new_serde_processor(
                             type_info
                                 .operator_id
                                 .expect("No operator id for pattern constant part"),

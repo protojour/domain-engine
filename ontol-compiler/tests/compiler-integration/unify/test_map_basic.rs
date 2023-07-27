@@ -15,15 +15,15 @@ fn test_map_simple() {
         bar { 'b': x }
     }
     "
-    .compile_ok(|env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("foo", "bar"),
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("bar", "foo"),
             json!({ "b": "my_value"}),
             json!({ "f": "my_value"}),
@@ -43,9 +43,9 @@ fn test_meters() {
         millimeters: x
     }
     "
-    .compile_ok(|env| {
-        assert_domain_map(&env, ("meters", "millimeters"), json!(5), json!(5000));
-        assert_domain_map(&env, ("millimeters", "meters"), json!(5000), json!(5));
+    .compile_ok(|test| {
+        assert_domain_map(&test, ("meters", "millimeters"), json!(5), json!(5000));
+        assert_domain_map(&test, ("millimeters", "meters"), json!(5000), json!(5));
     });
 }
 
@@ -64,9 +64,9 @@ fn test_temperature() {
         fahrenheit: x * 9 / 5 + 32
     }
     "
-    .compile_ok(|env| {
-        assert_domain_map(&env, ("celsius", "fahrenheit"), json!(10), json!(50));
-        assert_domain_map(&env, ("fahrenheit", "celsius"), json!(50), json!(10));
+    .compile_ok(|test| {
+        assert_domain_map(&test, ("celsius", "fahrenheit"), json!(10), json!(50));
+        assert_domain_map(&test, ("fahrenheit", "celsius"), json!(50), json!(10));
     });
 }
 
@@ -117,28 +117,28 @@ fn test_nested_optional_attribute() {
         }
     }
     "
-    .compile_ok(|env| {
-        assert_domain_map(&env, ("person", "creature"), json!({}), json!({}));
+    .compile_ok(|test| {
+        assert_domain_map(&test, ("person", "creature"), json!({}), json!({}));
         assert_domain_map(
-            &env,
+            &test,
             ("person", "creature"),
             json!({ "age": 42 }),
             json!({ "age": 1324512000 }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("person_container", "creature_container"),
             json!({}),
             json!({}),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("person_container", "creature_container"),
             json!({ "person": {} }),
             json!({ "creature": {} }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("person_container", "creature_container"),
             json!({ "person": { "age": 42 } }),
             json!({ "creature": { "age": 1324512000 } }),
@@ -160,9 +160,9 @@ fn test_map_value_to_map_no_func() {
         }
     }
     "
-    .compile_ok(|env| {
-        assert_domain_map(&env, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
-        assert_domain_map(&env, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
+    .compile_ok(|test| {
+        assert_domain_map(&test, ("one", "two"), json!("foo"), json!({ "a": "foo" }));
+        assert_domain_map(&test, ("two", "one"), json!({ "a": "foo" }), json!("foo"));
     });
 }
 
@@ -180,9 +180,9 @@ fn test_map_value_to_map_func() {
         }
     }
     "
-    .compile_ok(|env| {
-        assert_domain_map(&env, ("one", "two"), json!(2), json!({ "a": 4 }));
-        assert_domain_map(&env, ("two", "one"), json!({ "a": 4 }), json!(2));
+    .compile_ok(|test| {
+        assert_domain_map(&test, ("one", "two"), json!(2), json!({ "a": 4 }));
+        assert_domain_map(&test, ("two", "one"), json!({ "a": 4 }), json!(2));
     });
 }
 
@@ -231,15 +231,15 @@ fn test_deep_structural_map() {
         }
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("foo", "bar"),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
         );
         assert_domain_map(
-            &test_env,
+            &test,
             ("bar", "foo"),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
@@ -263,15 +263,15 @@ fn test_map_matching_array() {
         }
     }
     "
-    .compile_ok(|env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("foo", "bar"),
             json!({ "a": [42] }),
             json!({ "b": [42] }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("bar", "foo"),
             json!({ "b": [42] }),
             json!({ "a": [42] }),
@@ -298,15 +298,15 @@ map {
 
 #[test]
 fn test_map_in_array_item_empty() {
-    MAP_IN_ARRAY.compile_ok(|env| {
+    MAP_IN_ARRAY.compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("foos", "bars"),
             json!({ "foos": [] }),
             json!({ "bars": [] }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("bars", "foos"),
             json!({ "bars": [] }),
             json!({ "foos": [] }),
@@ -316,15 +316,15 @@ fn test_map_in_array_item_empty() {
 
 #[test]
 fn test_map_in_array_item_one() {
-    MAP_IN_ARRAY.compile_ok(|env| {
+    MAP_IN_ARRAY.compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }] }),
             json!({ "bars": [{ "b": "42" }] }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("bars", "foos"),
             json!({ "bars": [{ "b": "42" }] }),
             json!({ "foos": [{ "f": "42" }] }),
@@ -334,15 +334,15 @@ fn test_map_in_array_item_one() {
 
 #[test]
 fn test_map_in_array_item_many() {
-    MAP_IN_ARRAY.compile_ok(|env| {
+    MAP_IN_ARRAY.compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
             json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("bars", "foos"),
             json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
             json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
@@ -379,9 +379,9 @@ fn test_aggr_cross_parallel() {
         }
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("foos", "bars"),
             json!({ "f1": [{ "f": "1A" }, { "f": "1B" }], "f2": [{ "f": "2" }] }),
             json!({ "b1": [{ "b": "1A" }, { "b": "1B" }], "b2": [{ "b": "2" }] }),
@@ -438,9 +438,9 @@ fn test_aggr_multi_level() {
         }
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("f1", "b1"),
             json!({ "a": [{ "a": [{ "P": "0" }], "b": [{ "P": "1" }]}], "b": [{ "a": [{ "P": "2" }], "b": [{ "P": "3" }]}]}),
             json!({ "a": [{ "a": [{ "Q": "0" }], "b": [{ "Q": "1" }]}], "b": [{ "a": [{ "Q": "2" }], "b": [{ "Q": "3" }]}]}),
@@ -480,9 +480,9 @@ fn test_flat_map1() {
         }]
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("foo", "bar".seq()),
             json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
             json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B1" }]),
@@ -521,9 +521,9 @@ fn test_map_complex_flow() {
         }
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("one", "two"),
             json!({ "a": "X", "b": "Y" }),
             json!({ "a": "X", "b": "Y", "c": "X", "d": "Y" }),
@@ -573,15 +573,15 @@ fn test_map_delegation() {
             ",
         ),
     ])
-    .compile_ok(|env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &env,
+            &test,
             ("car", "vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
         );
         assert_domain_map(
-            &env,
+            &test,
             ("vehicle", "car"),
             json!({ "length": 2000 }),
             json!({ "length": 2 }),
@@ -612,16 +612,16 @@ fn test_map_dependent_scoping() {
         }
     }
     "
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("one", "two"),
             json!({ "total_weight": 100, "net_weight": 75 }),
             json!({ "net_weight": 75, "container_weight": 25 }),
         );
 
         assert_domain_map(
-            &test_env,
+            &test,
             ("two", "one"),
             json!({ "net_weight": 75, "container_weight": 25 }),
             json!({ "total_weight": 100, "net_weight": 75 }),

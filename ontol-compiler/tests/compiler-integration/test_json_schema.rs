@@ -22,9 +22,9 @@ fn json_schema_from_simple_entity() {
         rel .'baz': int
     }
     "
-    .compile_ok(|env| {
+    .compile_ok(|test| {
         expect_eq!(
-            actual = TypeBinding::new(&env, "entity").new_json_schema(Create),
+            actual = TypeBinding::new(&test, "entity").new_json_schema(Create),
             expected = json!({
                 "$defs": {
                     "1_entity": {

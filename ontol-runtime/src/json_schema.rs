@@ -7,19 +7,19 @@ use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
 use urlencoding::encode;
 
-use crate::env::TypeInfo;
+use crate::ontology::TypeInfo;
 use crate::serde::operator::{
     SequenceRange, SerdeOperator, SerdeOperatorId, StructOperator, UnionOperator,
 };
 use crate::serde::processor::ProcessorMode;
 use crate::{
-    env::{Domain, Env},
+    ontology::{Domain, Ontology},
     DefId, PackageId,
 };
 use crate::{smart_format, DataModifier, DefVariant};
 
 pub fn build_openapi_schemas<'e>(
-    env: &'e Env,
+    ontology: &'e Ontology,
     package_id: PackageId,
     domain: &'e Domain,
 ) -> OpenApiSchemas<'e> {
@@ -28,19 +28,19 @@ pub fn build_openapi_schemas<'e>(
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
         if let Some(operator_id) = &type_info.operator_id {
-            graph_builder.visit(*operator_id, env);
+            graph_builder.visit(*operator_id, ontology);
         }
     }
 
     OpenApiSchemas {
         schema_graph: graph_builder.graph,
         package_id,
-        env,
+        ontology,
     }
 }
 
 pub fn build_standalone_schema<'e>(
-    env: &'e Env,
+    ontology: &'e Ontology,
     type_info: &TypeInfo,
     mode: ProcessorMode,
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
@@ -49,13 +49,13 @@ pub fn build_standalone_schema<'e>(
     let operator_id = type_info
         .operator_id
         .ok_or("no serde operator id available")?;
-    graph_builder.visit(operator_id, env);
+    graph_builder.visit(operator_id, ontology);
 
     Ok(StandaloneJsonSchema {
         operator_id,
         def_id: type_info.def_id,
         defs: graph_builder.graph,
-        env,
+        ontology,
         mode,
     })
 }
@@ -66,7 +66,7 @@ type DefMap = BTreeMap<DefVariant, SerdeOperatorId>;
 pub struct OpenApiSchemas<'e> {
     schema_graph: BTreeMap<DefVariant, SerdeOperatorId>,
     package_id: PackageId,
-    env: &'e Env,
+    ontology: &'e Ontology,
 }
 
 impl<'e> Serialize for OpenApiSchemas<'e> {
@@ -77,7 +77,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::ComponentsSchemas,
-            env: self.env,
+            ontology: self.ontology,
             docs: None,
             rel_params_operator_id: None,
             mode: ProcessorMode::Create,
@@ -106,16 +106,16 @@ pub struct StandaloneJsonSchema<'e> {
     operator_id: SerdeOperatorId,
     def_id: DefId,
     defs: BTreeMap<DefVariant, SerdeOperatorId>,
-    env: &'e Env,
+    ontology: &'e Ontology,
     mode: ProcessorMode,
 }
 
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let docs = self.env.get_docs(self.def_id);
+        let docs = self.ontology.get_docs(self.def_id);
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::Defs,
-            env: self.env,
+            ontology: self.ontology,
             docs: docs.as_deref(),
             rel_params_operator_id: None,
             mode: self.mode,
@@ -137,7 +137,7 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
 #[derive(Clone, Copy)]
 struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
-    env: &'e Env,
+    ontology: &'e Ontology,
     docs: Option<&'e str>,
     rel_params_operator_id: Option<SerdeOperatorId>,
     mode: ProcessorMode,
@@ -147,7 +147,7 @@ impl<'e> SchemaCtx<'e> {
     fn definition(self, operator_id: SerdeOperatorId) -> SchemaDefinition<'e> {
         SchemaDefinition {
             ctx: self,
-            value_operator: self.env.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(operator_id),
         }
     }
 
@@ -186,7 +186,7 @@ impl<'e> SchemaCtx<'e> {
     fn with_rel_params(&self, rel_params_operator_id: Option<SerdeOperatorId>) -> Self {
         Self {
             link_anchor: self.link_anchor,
-            env: self.env,
+            ontology: self.ontology,
             rel_params_operator_id,
             docs: self.docs,
             mode: self.mode,
@@ -196,7 +196,7 @@ impl<'e> SchemaCtx<'e> {
     fn with_docs(&self, docs: Option<&'e str>) -> Self {
         Self {
             link_anchor: self.link_anchor,
-            env: self.env,
+            ontology: self.ontology,
             rel_params_operator_id: self.rel_params_operator_id,
             docs,
             mode: self.mode,
@@ -214,13 +214,15 @@ impl<'e> SchemaCtx<'e> {
         if def_variant.modifier.contains(DataModifier::ARRAY) {
             modifier.push_str("_array");
         }
-        self.env.find_domain(def_variant.def_id.0).map(|domain| {
-            smart_format!(
-                "{}{}",
-                domain.type_info(def_variant.def_id).name.as_ref().unwrap(),
-                modifier
-            )
-        })
+        self.ontology
+            .find_domain(def_variant.def_id.0)
+            .map(|domain| {
+                smart_format!(
+                    "{}{}",
+                    domain.type_info(def_variant.def_id).name.as_ref().unwrap(),
+                    modifier
+                )
+            })
     }
 
     fn format_key(&self, def_variant: DefVariant) -> String {
@@ -353,7 +355,7 @@ fn serialize_schema_inline<S: Serializer>(
             }
         }
         SerdeOperator::StringPattern(def_id) | SerdeOperator::CapturingStringPattern(def_id) => {
-            let pattern = ctx.env.string_patterns.get(def_id).unwrap();
+            let pattern = ctx.ontology.string_patterns.get(def_id).unwrap();
             map.serialize_entry("type", "string")?;
             map.serialize_entry("pattern", pattern.regex.as_str())?;
             if let Some(docs) = ctx.docs {
@@ -414,7 +416,7 @@ fn serialize_schema_inline<S: Serializer>(
         SerdeOperator::ValueType(value_op) => {
             serialize_schema_inline::<S>(
                 ctx,
-                ctx.env.get_serde_operator(value_op.inner_operator_id),
+                ctx.ontology.get_serde_operator(value_op.inner_operator_id),
                 None,
                 map,
             )?;
@@ -472,7 +474,7 @@ struct SchemaReference<'d, 'e> {
 
 impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.env.get_serde_operator(self.operator_id);
+        let value_operator = self.ctx.ontology.get_serde_operator(self.operator_id);
 
         match value_operator {
             SerdeOperator::Unit
@@ -639,7 +641,7 @@ impl<'e> Serialize for MapProperties<'e> {
         for (key, property) in &self.map_type.properties {
             let docs = self
                 .ctx
-                .env
+                .ontology
                 .get_docs(property.property_id.relationship_id.0);
             map.serialize_entry(
                 key,
@@ -748,12 +750,12 @@ struct SchemaGraphBuilder {
 }
 
 impl SchemaGraphBuilder {
-    fn visit(&mut self, operator_id: SerdeOperatorId, env: &Env) {
+    fn visit(&mut self, operator_id: SerdeOperatorId, ontology: &Ontology) {
         if !self.mark_visited(operator_id) {
             return;
         }
 
-        let operator = env.get_serde_operator(operator_id);
+        let operator = ontology.get_serde_operator(operator_id);
 
         match operator {
             SerdeOperator::Unit
@@ -770,36 +772,36 @@ impl SchemaGraphBuilder {
             SerdeOperator::ConstructorSequence(seq_op) => {
                 self.add_to_graph(seq_op.def_variant, operator_id);
                 for range in &seq_op.ranges {
-                    self.visit(range.operator_id, env);
+                    self.visit(range.operator_id, ontology);
                 }
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 for range in &seq_op.ranges {
-                    self.visit(range.operator_id, env);
+                    self.visit(range.operator_id, ontology);
                 }
             }
             SerdeOperator::ValueType(value_op) => {
                 self.add_to_graph(value_op.def_variant, operator_id);
-                self.visit(value_op.inner_operator_id, env);
+                self.visit(value_op.inner_operator_id, ontology);
             }
             SerdeOperator::Union(union_op) => {
                 self.add_to_graph(union_op.union_def_variant(), operator_id);
 
                 for discriminator in union_op.unfiltered_variants() {
-                    self.visit(discriminator.operator_id, env);
+                    self.visit(discriminator.operator_id, ontology);
                 }
             }
             SerdeOperator::PrimaryId(_, id_operator_id) => {
                 // id is not represented in the graph
-                self.visit(*id_operator_id, env);
+                self.visit(*id_operator_id, ontology);
             }
             SerdeOperator::Struct(struct_op) => {
                 self.add_to_graph(struct_op.def_variant, operator_id);
 
                 for (_, property) in &struct_op.properties {
-                    self.visit(property.value_operator_id, env);
+                    self.visit(property.value_operator_id, ontology);
                     if let Some(operator_id) = &property.rel_params_operator_id {
-                        self.visit(*operator_id, env);
+                        self.visit(*operator_id, ontology);
                     }
                 }
             }

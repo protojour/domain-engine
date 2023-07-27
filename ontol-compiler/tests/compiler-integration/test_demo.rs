@@ -8,9 +8,9 @@ pub const DEMO: &str = include_str!("../../../examples/demo.on");
 
 #[test]
 fn test_demo() {
-    DEMO.compile_ok(|test_env| {
+    DEMO.compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("archive_group", "ArchiveCollection"),
             json!({
                 "id": "archive_group/a27214f3-1bde-492f-9dc0-a47b57b4b6d3",

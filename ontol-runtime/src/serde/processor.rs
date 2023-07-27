@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display};
 
 use crate::{
-    env::Env,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
+    ontology::Ontology,
     value::PropertyId,
 };
 
@@ -95,7 +95,7 @@ pub struct SubProcessorContext {
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
-/// in the runtime environment.
+/// in the runtime ontology.
 #[derive(Clone, Copy)]
 pub struct SerdeProcessor<'e> {
     /// The operator used for (de)serializing this value
@@ -103,8 +103,8 @@ pub struct SerdeProcessor<'e> {
 
     pub ctx: SubProcessorContext,
 
-    /// The environment, via which new SerdeOperators can be created.
-    pub(crate) env: &'e Env,
+    /// The ontology, via which new SerdeOperators can be created.
+    pub(crate) ontology: &'e Ontology,
 
     pub(crate) mode: ProcessorMode,
     pub(crate) level: ProcessorLevel,
@@ -118,8 +118,8 @@ impl<'e> SerdeProcessor<'e> {
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
         Self {
-            env: self.env,
-            value_operator: self.env.get_serde_operator(operator_id),
+            ontology: self.ontology,
+            value_operator: self.ontology.get_serde_operator(operator_id),
             ctx: self.ctx,
             mode: self.mode,
             level: self.level,
@@ -132,8 +132,8 @@ impl<'e> SerdeProcessor<'e> {
         ctx: SubProcessorContext,
     ) -> Self {
         Self {
-            env: self.env,
-            value_operator: self.env.get_serde_operator(operator_id),
+            ontology: self.ontology,
+            value_operator: self.ontology.get_serde_operator(operator_id),
             ctx,
             mode: self.mode,
             level: self.level,
@@ -143,8 +143,8 @@ impl<'e> SerdeProcessor<'e> {
     /// Return a processor that processes a new value that is a child value of this processor.
     pub fn new_child(&self, operator_id: SerdeOperatorId) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            env: self.env,
-            value_operator: self.env.get_serde_operator(operator_id),
+            ontology: self.ontology,
+            value_operator: self.ontology.get_serde_operator(operator_id),
             ctx: Default::default(),
             mode: self.mode,
             level: self.level.child()?,
@@ -157,8 +157,8 @@ impl<'e> SerdeProcessor<'e> {
         ctx: SubProcessorContext,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            env: self.env,
-            value_operator: self.env.get_serde_operator(operator_id),
+            ontology: self.ontology,
+            value_operator: self.ontology.get_serde_operator(operator_id),
             ctx,
             mode: self.mode,
             level: self.level.child()?,

@@ -9,7 +9,7 @@ use ontol_runtime::{
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     DefId, PackageId,
 };
-use ontol_test_utils::{expect_eq, SourceName, TestEnv, TestPackages};
+use ontol_test_utils::{expect_eq, OntolTest, SourceName, TestPackages};
 use test_log::test;
 use unimock::{matching, MockFn};
 
@@ -29,8 +29,8 @@ fn conduit_db_only() -> TestPackages {
 #[test(tokio::test)]
 async fn test_graphql_in_memory_conduit_db() {
     let test_packages = conduit_db_only();
-    let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
+    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let gql_context: GqlContext = DomainEngine::builder(test.ontology.clone()).build().into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -88,8 +88,8 @@ async fn test_graphql_in_memory_conduit_db() {
 #[test(tokio::test)]
 async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
-    let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
+    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let gql_context: GqlContext = DomainEngine::builder(test.ontology.clone()).build().into();
 
     let response = r#"mutation {
         createUser(
@@ -153,7 +153,7 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
 }
 
 struct BlogPostConduit {
-    test_env: TestEnv,
+    test: OntolTest,
     domain_engine: Arc<DomainEngine>,
     db_schema: Schema,
     blog_schema: Schema,
@@ -173,11 +173,10 @@ impl BlogPostConduit {
         ])
         .with_data_store(CONDUIT_DB, DataStoreConfig::InMemory);
 
-        let (test_env, [db_schema, blog_schema]) =
-            test_packages.compile_schemas([CONDUIT_DB, ROOT]);
+        let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
         Self {
-            domain_engine: Arc::new(DomainEngine::builder(test_env.env.clone()).build()),
-            test_env,
+            domain_engine: Arc::new(DomainEngine::builder(test.ontology.clone()).build()),
+            test,
             db_schema,
             blog_schema,
         }
@@ -330,7 +329,7 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
         .exec(
             &ctx.blog_schema,
             &gql_ctx_mock_data_store(
-                &ctx.test_env,
+                &ctx.test,
                 CONDUIT_DB,
                 DataStoreAPIMock::query
                     .next_call(matching!(

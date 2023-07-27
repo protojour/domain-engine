@@ -49,7 +49,7 @@ impl<'b, 'e> Deserializer<'b, 'e> {
 
         let attribute_result = self
             .binding
-            .env()
+            .ontology()
             .new_serde_processor(self.binding.serde_operator_id(), self.mode, self.level)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
@@ -108,10 +108,10 @@ impl<'b, 'e> Serializer<'b, 'e> {
     fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.binding
-            .env()
+            .ontology()
             .new_serde_processor(
                 if dynamic_seq {
-                    self.binding.env().dynamic_sequence_operator_id()
+                    self.binding.ontology().dynamic_sequence_operator_id()
                 } else {
                     self.binding.serde_operator_id()
                 },

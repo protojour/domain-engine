@@ -3,7 +3,7 @@ use ontol_test_utils::{
     expect_eq,
     serde_utils::{inspect_de, inspect_ser},
     type_binding::TypeBinding,
-    TestEnv,
+    OntolTest,
 };
 
 mod test_map_basic;
@@ -56,7 +56,7 @@ impl Key {
 }
 
 pub fn assert_domain_map(
-    test_env: &TestEnv,
+    test: &OntolTest,
     (from, to): (impl IntoKey, impl IntoKey),
     input: serde_json::Value,
     expected: serde_json::Value,
@@ -64,8 +64,8 @@ pub fn assert_domain_map(
     let from = from.into_key();
     let to = to.into_key();
 
-    let input_binding = TypeBinding::new(test_env, from.typename());
-    let output_binding = TypeBinding::new(test_env, to.typename());
+    let input_binding = TypeBinding::new(test, from.typename());
+    let output_binding = TypeBinding::new(test, to.typename());
 
     let value = inspect_de(&input_binding).value(input).unwrap();
 
@@ -77,7 +77,7 @@ pub fn assert_domain_map(
         }
     }
 
-    let procedure = match test_env.env.get_mapper_proc(
+    let procedure = match test.ontology.get_mapper_proc(
         get_map_key(&from, &input_binding),
         get_map_key(&to, &output_binding),
     ) {
@@ -88,7 +88,7 @@ pub fn assert_domain_map(
         ),
     };
 
-    let mut mapper = test_env.env.new_vm();
+    let mut mapper = test.ontology.new_vm();
     let value = mapper.eval(procedure, [value]);
 
     let output_json = match &to {

@@ -15,7 +15,7 @@ fn test_compile_conduit_public() {
 
 #[test]
 fn test_compile_conduit_db() {
-    CONDUIT_DB.compile_ok(|_env| {});
+    CONDUIT_DB.compile_ok(|_test| {});
 }
 
 #[test]
@@ -24,9 +24,9 @@ fn test_map_conduit_blog_post() {
         (SourceName("conduit_db"), CONDUIT_DB),
         (SourceName::root(), BLOG_POST_PUBLIC),
     ])
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("conduit_db::Article", "BlogPost"),
             json!({
                 "article_id": "11111111-1111-1111-1111-111111111111",
@@ -59,9 +59,9 @@ fn test_map_conduit_not_tags_in_db_object() {
         (SourceName("conduit_db"), CONDUIT_DB),
         (SourceName::root(), BLOG_POST_PUBLIC),
     ])
-    .compile_ok(|test_env| {
+    .compile_ok(|test| {
         assert_domain_map(
-            &test_env,
+            &test,
             ("conduit_db::Article", "BlogPost"),
             json!({
                 "article_id": "11111111-1111-1111-1111-111111111111",

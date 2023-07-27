@@ -31,8 +31,8 @@ fn entity_without_inherent_id() {
         rel .'foo': string
     }
     "
-    .compile_ok(|env| {
-        let entity = TypeBinding::new(&env, "entity");
+    .compile_ok(|test| {
+        let entity = TypeBinding::new(&test, "entity");
         assert_json_io_matches!(entity, Create, { "foo": "foo" });
     });
 }
@@ -47,8 +47,8 @@ fn inherent_id_no_autogen() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_json_io_matches!(foo, Create, { "key": "id", "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
@@ -68,8 +68,8 @@ fn inherent_id_autogen() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_json_io_matches!(foo, Create, { "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
@@ -88,8 +88,8 @@ fn id_and_inherent_property_inline_type() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|env| {
-        let foo = TypeBinding::new(&env, "foo");
+    .compile_ok(|test| {
+        let foo = TypeBinding::new(&test, "foo");
         assert_json_io_matches!(foo, Create, {
             "key": "outer",
             "children": [{ "key": "inner" }]
@@ -116,8 +116,8 @@ fn entity_id_inline_fmt() {
 
 #[test]
 fn artist_and_instrument_io_artist() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(&env, "artist");
+    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+        let artist = TypeBinding::new(&test, "artist");
         assert_json_io_matches!(artist, Create, {
             "name": "Zappa",
             "plays": [
@@ -134,8 +134,8 @@ fn artist_and_instrument_io_artist() {
 
 #[test]
 fn artist_and_instrument_io_instrument() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let instrument = TypeBinding::new(&env, "instrument");
+    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+        let instrument = TypeBinding::new(&test, "instrument");
         assert_json_io_matches!(instrument, Create, {
             "name": "guitar",
             "played_by": [
@@ -152,8 +152,8 @@ fn artist_and_instrument_io_instrument() {
 
 #[test]
 fn artist_and_instrument_error_artist() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let artist = TypeBinding::new(&env, "artist");
+    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+        let artist = TypeBinding::new(&test, "artist");
         assert_error_msg!(
             create_de(&artist).data(json!({
                 "name": "Herbie Hancock",
@@ -166,8 +166,8 @@ fn artist_and_instrument_error_artist() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|env| {
-        let [artist, instrument_id] = TypeBinding::new_n(&env, ["artist", "instrument-id"]);
+    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+        let [artist, instrument_id] = TypeBinding::new_n(&test, ["artist", "instrument-id"]);
         let plays = artist.find_property("plays").unwrap();
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
@@ -254,8 +254,8 @@ fn test_entity_self_relationship_optional_object() {
         rel .'children'::'parent'? [node]
     }
     "
-    .compile_ok(|env| {
-        let node = TypeBinding::new(&env, "node");
+    .compile_ok(|test| {
+        let node = TypeBinding::new(&test, "node");
 
         assert_error_msg!(
             create_de(&node).data(json!({})),
@@ -292,8 +292,8 @@ fn test_entity_self_relationship_mandatory_object() {
         rel .'children'::'parent' [.]
     }
     "
-    .compile_ok(|env| {
-        let node = TypeBinding::new(&env, "node");
+    .compile_ok(|test| {
+        let node = TypeBinding::new(&test, "node");
         assert_error_msg!(
             create_de(&node).data(json!({})),
             r#"missing properties, expected "parent" at line 1 column 2"#
@@ -303,8 +303,8 @@ fn test_entity_self_relationship_mandatory_object() {
 
 #[test]
 fn entity_union_simple() {
-    GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let instrument = TypeBinding::new(&env, "instrument");
+    GUITAR_SYNTH_UNION.compile_ok(|test| {
+        let instrument = TypeBinding::new(&test, "instrument");
         assert_json_io_matches!(
             instrument,
             Create,
@@ -318,8 +318,8 @@ fn entity_union_simple() {
 
 #[test]
 fn entity_union_with_object_relation() {
-    GUITAR_SYNTH_UNION.compile_ok(|env| {
-        let instrument = TypeBinding::new(&env, "instrument");
+    GUITAR_SYNTH_UNION.compile_ok(|test| {
+        let instrument = TypeBinding::new(&test, "instrument");
 
         assert_json_io_matches!(instrument, Create, {
             "type": "synth",
@@ -333,9 +333,9 @@ fn entity_union_with_object_relation() {
 
 #[test]
 fn entity_union_in_relation_with_ids() {
-    GUITAR_SYNTH_UNION.compile_ok(|env| {
+    GUITAR_SYNTH_UNION.compile_ok(|test| {
         let [artist, guitar_id, synth_id] =
-            TypeBinding::new_n(&env, ["artist", "guitar_id", "synth_id"]);
+            TypeBinding::new_n(&test, ["artist", "guitar_id", "synth_id"]);
         let plays = artist.find_property("plays").unwrap();
 
         assert!(artist.type_info.entity_info.is_some());
@@ -388,8 +388,8 @@ fn entity_relationship_without_reverse() {
         rel .'favorite-language': language
     }
     "
-    .compile_ok(|env| {
-        let programmer = TypeBinding::new(&env, "programmer");
+    .compile_ok(|test| {
+        let programmer = TypeBinding::new(&test, "programmer");
         assert_json_io_matches!(programmer, Create, {
             "name": "audun",
             "favorite-language": { "lang-id": "rust" }
@@ -423,8 +423,8 @@ fn recursive_entity_union() {
         rel .'owns': [lifeform]
     }
     "
-    .compile_ok(|env| {
-        let lifeform = TypeBinding::new(&env, "lifeform");
+    .compile_ok(|test| {
+        let lifeform = TypeBinding::new(&test, "lifeform");
         assert_json_io_matches!(lifeform, Create, {
             "class": "animal",
             "eats": [

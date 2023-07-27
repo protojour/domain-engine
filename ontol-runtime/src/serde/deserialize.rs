@@ -140,7 +140,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::String(def_id) => deserializer.deserialize_str(
                 StringMatcher {
                     def_id: *def_id,
-                    env: self.env,
+                    ontology: self.ontology,
                 }
                 .into_visitor_no_params(self),
             ),
@@ -153,17 +153,17 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             ),
             SerdeOperator::StringPattern(def_id) => deserializer.deserialize_str(
                 StringPatternMatcher {
-                    pattern: self.env.string_patterns.get(def_id).unwrap(),
+                    pattern: self.ontology.string_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
-                    env: self.env,
+                    ontology: self.ontology,
                 }
                 .into_visitor_no_params(self),
             ),
             SerdeOperator::CapturingStringPattern(def_id) => deserializer.deserialize_str(
                 CapturingStringPatternMatcher {
-                    pattern: self.env.string_patterns.get(def_id).unwrap(),
+                    pattern: self.ontology.string_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
-                    env: self.env,
+                    ontology: self.ontology,
                 }
                 .into_visitor_no_params(self),
             ),
@@ -195,7 +195,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                     UnionMatcher {
                         typename: union_op.typename(),
                         variants,
-                        env: self.env,
+                        ontology: self.ontology,
                         ctx: self.ctx,
                         mode: self.mode,
                         level: self.level,
@@ -544,7 +544,7 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                 if !property.is_optional() && !attributes.contains_key(&property.property_id) {
-                    let value = processor.env.new_vm().eval(
+                    let value = processor.ontology.new_vm().eval(
                         Procedure {
                             address,
                             n_params: NParams(0),

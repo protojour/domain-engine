@@ -22,8 +22,8 @@ use crate::{
     DefId, MapKey, PackageId, RelationshipId,
 };
 
-/// Runtime environment
-pub struct Env {
+/// Ontology is the ONTOL runtime environment
+pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
@@ -39,10 +39,10 @@ pub struct Env {
     property_flows: Vec<PropertyFlow>,
 }
 
-impl Env {
-    pub fn builder() -> EnvBuilder {
-        EnvBuilder {
-            env: Self {
+impl Ontology {
+    pub fn builder() -> OntologyBuilder {
+        OntologyBuilder {
+            ontology: Self {
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
                 string_like_types: Default::default(),
@@ -134,7 +134,7 @@ impl Env {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
             ctx: Default::default(),
             level,
-            env: self,
+            ontology: self,
             mode,
         }
     }
@@ -239,36 +239,38 @@ pub enum PropertyFlowData {
     DependentOn(PropertyId),
 }
 
-pub struct EnvBuilder {
-    env: Env,
+pub struct OntologyBuilder {
+    ontology: Ontology,
 }
 
-impl EnvBuilder {
+impl OntologyBuilder {
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
-        self.env.domain_table.insert(package_id, domain);
+        self.ontology.domain_table.insert(package_id, domain);
     }
 
     pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
-        self.env.package_config_table.insert(package_id, config);
+        self.ontology
+            .package_config_table
+            .insert(package_id, config);
     }
 
     pub fn docs(mut self, docs: FnvHashMap<DefId, Vec<String>>) -> Self {
-        self.env.docs = docs;
+        self.ontology.docs = docs;
         self
     }
 
     pub fn lib(mut self, lib: Lib) -> Self {
-        self.env.lib = lib;
+        self.ontology.lib = lib;
         self
     }
 
     pub fn const_procs(mut self, const_procs: FnvHashMap<DefId, Procedure>) -> Self {
-        self.env.const_proc_table = const_procs;
+        self.ontology.const_proc_table = const_procs;
         self
     }
 
     pub fn map_meta_table(mut self, map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>) -> Self {
-        self.env.map_meta_table = map_meta_table;
+        self.ontology.map_meta_table = map_meta_table;
         self
     }
 
@@ -277,8 +279,8 @@ impl EnvBuilder {
         operators: Vec<SerdeOperator>,
         per_def: HashMap<SerdeKey, SerdeOperatorId>,
     ) -> Self {
-        self.env.serde_operators = operators;
-        self.env.serde_operators_per_def = per_def;
+        self.ontology.serde_operators = operators;
+        self.ontology.serde_operators_per_def = per_def;
         self
     }
 
@@ -286,27 +288,27 @@ impl EnvBuilder {
         mut self,
         dynamic_sequence_operator_id: SerdeOperatorId,
     ) -> Self {
-        self.env.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
+        self.ontology.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
         self
     }
 
     pub fn property_flows(mut self, flows: Vec<PropertyFlow>) -> Self {
-        self.env.property_flows = flows;
+        self.ontology.property_flows = flows;
         self
     }
 
     pub fn string_like_types(mut self, types: FnvHashMap<DefId, StringLikeType>) -> Self {
-        self.env.string_like_types = types;
+        self.ontology.string_like_types = types;
         self
     }
 
     pub fn string_patterns(mut self, patterns: FnvHashMap<DefId, StringPattern>) -> Self {
-        self.env.string_patterns = patterns;
+        self.ontology.string_patterns = patterns;
         self
     }
 
-    pub fn build(self) -> Env {
-        self.env
+    pub fn build(self) -> Ontology {
+        self.ontology
     }
 }
 
