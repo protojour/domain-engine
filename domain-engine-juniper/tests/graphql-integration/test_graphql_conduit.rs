@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
-use domain_engine_juniper::{gql_scalar::GqlScalar, GqlContext, Schema};
+use domain_engine_juniper::{GqlContext, Schema};
 use fnv::FnvHashMap;
-use juniper::{graphql_value, InputValue, Value};
+use juniper::{graphql_value, InputValue};
 use ontol_runtime::{
     config::DataStoreConfig,
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
@@ -91,7 +91,7 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     let (test_env, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: GqlContext = DomainEngine::builder(test_env.env.clone()).build().into();
 
-    let create_user_value = r#"mutation {
+    let response = r#"mutation {
         createUser(
             input: {
                 username: "u1",
@@ -106,16 +106,14 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     .await
     .unwrap();
 
-    let user_id = match &create_user_value {
-        Value::Object(object) => match object.get_field_value("createUser") {
-            Some(Value::Object(object)) => match object.get_field_value("user_id") {
-                Some(Value::Scalar(GqlScalar::String(user_id))) => user_id.clone(),
-                _ => panic!(),
-            },
-            _ => panic!(),
-        },
-        _ => panic!(),
-    };
+    let user_id = response
+        .as_object_value()
+        .and_then(|response| response.get_field_value("createUser"))
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|create_user| create_user.get_field_value("user_id"))
+        .and_then(juniper::Value::as_scalar_value)
+        .unwrap()
+        .clone();
 
     expect_eq!(
         actual = r#"mutation new_article($authorId: ID!) {
@@ -137,7 +135,7 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
         .exec(
             &schema,
             &gql_context,
-            [("authorId".to_owned(), InputValue::Scalar(user_id.into()))]
+            [("authorId".to_owned(), InputValue::Scalar(user_id))]
         )
         .await,
         expected = Ok(graphql_value!({
