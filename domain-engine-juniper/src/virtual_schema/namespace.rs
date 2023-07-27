@@ -156,7 +156,7 @@ impl<'a> ProcessName for Typename<'a> {
         match &type_info.name {
             Some(name) => namespace.rewrite(name),
             None => namespace.rewrite(&smart_format!(
-                "__anon{}_{}",
+                "_anon{}_{}",
                 type_info.def_id.0 .0,
                 type_info.def_id.1
             )),
