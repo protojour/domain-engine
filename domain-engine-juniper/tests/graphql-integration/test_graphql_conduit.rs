@@ -130,6 +130,9 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
                 }
             ) {
                 slug
+                author {
+                    username
+                }
             }
         }"#
         .exec(
@@ -139,7 +142,12 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createArticle": { "slug": "the-slug" }
+            "createArticle": {
+                "slug": "the-slug",
+                "author": {
+                    "username": "u1"
+                }
+            }
         })),
     );
 }
