@@ -1,6 +1,6 @@
 [package]
 name = "ontol-lsp"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 
 [lib]
@@ -11,8 +11,16 @@ ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
 chumsky = "0.9"
+console_error_panic_hook = "0.1.7"
+futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
+js-sys = "0.3.64"
 lsp-types = "0.94.0"
-tokio = { workspace = true, features = ["full"] }
-tower-lsp = "0.19.0"
-substring = "1.4.5"
 regex = "1.9.1"
+serde_json = { workspace = true }
+substring = "1.4.5"
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = { version = "0.4.37", features = ["futures-core-03-stream"] }
+wasm-streams = "0.3.0"
+web-sys = { version = "0.3.64", features = ["console", "ReadableStream", "WritableStream"] }
+tokio = { workspace = true, default-features = false }
+tower-lsp = { version = "0.19.0", default-features = false }
