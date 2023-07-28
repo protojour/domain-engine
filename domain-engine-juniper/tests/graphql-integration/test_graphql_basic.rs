@@ -1,11 +1,7 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
 use juniper::graphql_value;
 use ontol_runtime::value::Attribute;
-use ontol_test_utils::{
-    expect_eq,
-    type_binding::{ToSequence, TypeBinding},
-    SourceName, TestPackages,
-};
+use ontol_test_utils::{expect_eq, type_binding::ToSequence, SourceName, TestPackages};
 use serde_json::json;
 use test_log::test;
 use unimock::*;
@@ -34,7 +30,7 @@ async fn test_graphql_basic_schema() {
     }
     "
     .compile_schemas([ROOT]);
-    let foo = TypeBinding::new(&test, "foo");
+    let [foo] = test.bind(["foo"]);
     let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
 
     expect_eq!(
@@ -162,7 +158,7 @@ async fn test_inner_struct() {
     "
     .compile_schemas([ROOT]);
 
-    let foo = TypeBinding::new(&test, "foo");
+    let [foo] = test.bind(["foo"]);
     let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
 
     expect_eq!(
@@ -273,7 +269,7 @@ async fn test_docs_introspection() {
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
     let (test, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([ROOT]);
-    let [artist, instrument, plays] = TypeBinding::new_n(&test, ["artist", "instrument", "plays"]);
+    let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -430,7 +426,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([ROOT]);
-    let artist = TypeBinding::new(&test, "artist");
+    let [artist] = test.bind(["artist"]);
     let artist_entity: Attribute = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),

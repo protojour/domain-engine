@@ -1,9 +1,6 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
-use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, serde_utils::*, type_binding::TypeBinding,
-    TestCompile,
-};
+use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_utils::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -14,7 +11,7 @@ fn constant_string_pattern() {
     fmt '' => 'foo' => foo
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, "foo");
         assert_error_msg!(
             create_de(&foo).data(json!("fo")),
@@ -30,7 +27,7 @@ fn concatenated_constant_string_constructor_pattern() {
     fmt '' => 'foo' => 'bar' => foobar
     "
     .compile_ok(|test| {
-        let foobar = TypeBinding::new(&test, "foobar");
+        let [foobar] = test.bind(["foobar"]);
         assert_json_io_matches!(foobar, Create, "foobar");
         assert_error_msg!(
             create_de(&foobar).data(json!("fooba")),
@@ -46,7 +43,7 @@ fn uuid_in_string_constructor_pattern() {
     fmt '' => 'foo/' => uuid => foo
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
 
         assert_matches!(
             create_de(&foo).data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -78,7 +75,7 @@ fn test_string_pattern_constructor_union() {
     rel foobar is?: bar
     "
     .compile_ok(|test| {
-        let foobar = TypeBinding::new(&test, "foobar");
+        let [foobar] = test.bind(["foobar"]);
         assert_matches!(
             create_de(&foobar).data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Struct(attrs)) if attrs.len() == 1
@@ -103,7 +100,7 @@ fn test_regex_property() {
     rel foo 'prop': /abc*/
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "prop": "abc" });
         assert_json_io_matches!(foo, Create, { "prop": "123abc" });
         assert_json_io_matches!(foo, Create, { "prop": "123abcccc" });
@@ -121,7 +118,7 @@ fn test_simple_regex_pattern_constructor() {
     fmt '' => /a/ => /bc*/ => re
     "
     .compile_ok(|test| {
-        let re = TypeBinding::new(&test, "re");
+        let [re] = test.bind(["re"]);
         assert_json_io_matches!(re, Create, "ab");
         assert_json_io_matches!(re, Create, "abc" == "ab");
         assert_json_io_matches!(re, Create, "abccccc" == "ab");

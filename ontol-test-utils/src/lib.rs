@@ -12,6 +12,7 @@ use ontol_runtime::{
     ontology::Ontology,
     PackageId,
 };
+use type_binding::TypeBinding;
 
 pub mod diagnostics;
 pub mod serde_utils;
@@ -80,6 +81,13 @@ impl OntolTest {
             .get(source_name)
             .cloned()
             .unwrap_or_else(|| panic!("PackageId for `{}` not found", source_name))
+    }
+
+    /// Make new type bindings with the given type names.
+    /// The type name may be written as "SourceName::Type" to specify a specific domain.
+    /// A type without prefix is interpreted as the root domain/package.
+    pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [TypeBinding; N] {
+        type_names.map(|type_name| TypeBinding::new(self, type_name))
     }
 }
 

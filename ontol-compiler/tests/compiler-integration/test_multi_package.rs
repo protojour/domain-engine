@@ -1,7 +1,4 @@
-use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, type_binding::TypeBinding, SourceName, TestCompile,
-    TestPackages,
-};
+use ontol_test_utils::{assert_json_io_matches, expect_eq, SourceName, TestCompile, TestPackages};
 use test_log::test;
 
 #[test]
@@ -37,7 +34,7 @@ fn load_package() {
         ),
     ])
     .compile_ok(|test| {
-        let bar = TypeBinding::new(&test, "bar");
+        let [bar] = test.bind(["bar"]);
         assert_json_io_matches!(bar, Create, {
             "foo": {
                 "prop": 42
@@ -85,8 +82,8 @@ fn dependency_dag() {
         // four user domains, plus core:
         expect_eq!(actual = test.ontology.domains().count(), expected = 5);
 
-        let bar = TypeBinding::new(&test, "foobar");
-        assert_json_io_matches!(bar, Create, {
+        let [foobar] = test.bind(["foobar"]);
+        assert_json_io_matches!(foobar, Create, {
             "a": { "c": 42 },
             "b": { "c": 43 }
         });

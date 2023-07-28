@@ -1,5 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode::*;
-use ontol_test_utils::{expect_eq, type_binding::TypeBinding, TestCompile};
+use ontol_test_utils::{expect_eq, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -23,8 +23,9 @@ fn json_schema_from_simple_entity() {
     }
     "
     .compile_ok(|test| {
+        let [entity] = test.bind(["entity"]);
         expect_eq!(
-            actual = TypeBinding::new(&test, "entity").new_json_schema(Create),
+            actual = entity.new_json_schema(Create),
             expected = json!({
                 "$defs": {
                     "1_entity": {

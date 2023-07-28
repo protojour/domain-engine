@@ -33,7 +33,7 @@ async fn test_conduit_db_in_memory_id_generation() {
         .compile_ok_async(|test| async move {
             let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
             let [user, article, comment, tag_entity] =
-                TypeBinding::new_n(&test, ["User", "Article", "Comment", "TagEntity"]);
+                test.bind(["User", "Article", "Comment", "TagEntity"]);
 
             domain_engine
                 .store_new_entity(
@@ -125,8 +125,7 @@ async fn test_conduit_db_store_entity_tree() {
     conduit_db()
         .compile_ok_async(|test| async move {
             let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
-            let [user_type, article_type, comment_type] =
-                TypeBinding::new_n(&test, ["User", "Article", "Comment"]);
+            let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
             let pre_existing_user_id: Uuid = domain_engine
                 .store_new_entity(
@@ -269,7 +268,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
     conduit_db()
         .compile_ok_async(|test| async move {
             let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
-            let article = TypeBinding::new(&test, "Article");
+            let [article] = test.bind(["Article"]);
 
             assert_error_msg!(
                 domain_engine
@@ -299,7 +298,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     artist_and_instrument()
         .compile_ok_async(|test| async move {
             let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
-            let artist = TypeBinding::new(&test, "artist");
+            let [artist] = test.bind(["artist"]);
             let artist_id = TypeBinding::from_def_id(
                 artist
                     .type_info

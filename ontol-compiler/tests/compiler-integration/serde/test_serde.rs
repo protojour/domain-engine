@@ -1,16 +1,13 @@
 use assert_matches::assert_matches;
 use ontol_runtime::value::Data;
-use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, serde_utils::*, type_binding::TypeBinding,
-    TestCompile,
-};
+use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_utils::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
     "pub type foo".compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {});
     });
 }
@@ -22,7 +19,7 @@ fn test_serde_value_type() {
     rel foo is: string
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, "string");
     });
 }
@@ -35,7 +32,7 @@ fn test_serde_booleans() {
     pub type b { rel .is: bool }
     "
     .compile_ok(|test| {
-        let [f, t, b] = TypeBinding::new_n(&test, ["f", "t", "b"]);
+        let [f, t, b] = test.bind(["f", "t", "b"]);
 
         assert_json_io_matches!(f, Create, false);
         assert_json_io_matches!(t, Create, true);
@@ -60,7 +57,7 @@ fn test_serde_map_type() {
     rel foo 'a': string
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "string" });
     });
 }
@@ -75,7 +72,7 @@ fn test_serde_complex_type() {
     rel bar 'c': string
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "A", "b": { "c": "C" }});
     });
 }
@@ -88,7 +85,7 @@ fn test_serde_sequence() {
     rel t 1: int
     "
     .compile_ok(|test| {
-        let t = TypeBinding::new(&test, "t");
+        let [t] = test.bind(["t"]);
         assert_json_io_matches!(t, Create, ["a", 1]);
     });
 }
@@ -101,7 +98,7 @@ fn test_serde_value_union1() {
     rel u is?: 'b'
     "
     .compile_ok(|test| {
-        let u = TypeBinding::new(&test, "u");
+        let [u] = test.bind(["u"]);
         assert_json_io_matches!(u, Create, "a");
     });
 }
@@ -117,7 +114,7 @@ fn test_serde_string_or_unit() {
     rel foo 'a': string-or-unit
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "string" });
         assert_json_io_matches!(foo, Create, { "a": null });
     });
@@ -138,7 +135,7 @@ fn test_serde_map_union() {
     rel u is?: bar
     "
     .compile_ok(|test| {
-        let u = TypeBinding::new(&test, "u");
+        let [u] = test.bind(["u"]);
         assert_json_io_matches!(u, Create, { "type": "foo", "c": 7});
     });
 }
@@ -153,7 +150,7 @@ fn test_serde_noop_intersection() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "foobar": {} });
     });
 }
@@ -165,7 +162,7 @@ fn test_serde_many_cardinality() {
     rel foo 's': [string]
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "s": []});
         assert_json_io_matches!(foo, Create, { "s": ["a", "b"]});
     });
@@ -181,7 +178,7 @@ fn test_serde_infinite_sequence() {
     rel foo 6.. : int
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44, 45, 46]);
         assert_error_msg!(
@@ -198,7 +195,7 @@ fn test_serde_uuid() {
     rel my_id is: uuid
     "
     .compile_ok(|test| {
-        let my_id = TypeBinding::new(&test, "my_id");
+        let [my_id] = test.bind(["my_id"]);
         assert_matches!(
             create_de(&my_id).data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::Uuid(_))
@@ -222,7 +219,7 @@ fn test_serde_datetime() {
     rel my_dt is: datetime
     "
     .compile_ok(|test| {
-        let my_dt = TypeBinding::new(&test, "my_dt");
+        let [my_dt] = test.bind(["my_dt"]);
         assert_matches!(
             create_de(&my_dt).data(json!("1983-10-01T01:31:32.59+01:00")),
             Ok(Data::ChronoDateTime(_))
@@ -251,7 +248,7 @@ fn test_num_default() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": 1 } == { "bar": 1 });
         assert_json_io_matches!(foo, Create, {} == { "bar": 42 });
     });
@@ -265,7 +262,7 @@ fn test_string_default() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
+        let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": "yay" } == { "bar": "yay" });
         assert_json_io_matches!(foo, Create, {} == { "bar": "baz" });
     });
@@ -282,7 +279,7 @@ fn test_prop_union() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "vec3");
+        let [foo] = test.bind(["vec3"]);
         assert_json_io_matches!(foo, Create, { "x": 1, "y": 2, "z": 3 });
     });
 }
@@ -315,7 +312,7 @@ fn test_jsonml() {
     rel attributes 'class'?: string
     "
     .compile_ok(|test| {
-        let element = TypeBinding::new(&test, "element");
+        let [element] = test.bind(["element"]);
 
         assert_json_io_matches!(element, Create, "text");
         assert_json_io_matches!(element, Create, ["div", {}]);

@@ -26,13 +26,7 @@ pub struct TypeBinding<'e> {
 }
 
 impl<'e> TypeBinding<'e> {
-    pub fn new_n<const N: usize>(ontol_test: &'e OntolTest, type_names: [&str; N]) -> [Self; N] {
-        type_names.map(|type_name| Self::new(ontol_test, type_name))
-    }
-
-    /// Make a type binding with the given type name.
-    /// The type name may be written as "SourceName::Type" to specify a specific domain.
-    pub fn new(ontol_test: &'e OntolTest, type_name: &str) -> Self {
+    pub(crate) fn new(ontol_test: &'e OntolTest, type_name: &str) -> Self {
         if type_name.contains("::") {
             let vector: Vec<&str> = type_name.split("::").collect();
             let source_name = vector.first().unwrap();
@@ -48,11 +42,7 @@ impl<'e> TypeBinding<'e> {
         }
     }
 
-    pub fn new_with_package(
-        ontol_test: &'e OntolTest,
-        package_id: PackageId,
-        type_name: &str,
-    ) -> Self {
+    fn new_with_package(ontol_test: &'e OntolTest, package_id: PackageId, type_name: &str) -> Self {
         let ontology = &ontol_test.ontology;
         let domain = ontology.find_domain(package_id).unwrap();
         let def_id = domain

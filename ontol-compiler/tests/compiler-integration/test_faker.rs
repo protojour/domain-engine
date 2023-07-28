@@ -1,5 +1,5 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{expect_eq, serde_utils::*, type_binding::TypeBinding, TestCompile};
+use ontol_test_utils::{expect_eq, serde_utils::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -15,8 +15,7 @@ fn test_fake_primitives() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
-
+        let [foo] = test.bind(["foo"]);
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
             expected = json!({
@@ -36,8 +35,7 @@ fn test_fake_string_like_types() {
     }
     "
     .compile_ok(|test| {
-        let foo = TypeBinding::new(&test, "foo");
-
+        let [foo] = test.bind(["foo"]);
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
             expected = json!({
@@ -51,8 +49,7 @@ fn test_fake_string_like_types() {
 #[test]
 fn test_fake_geojson() {
     GEOJSON.compile_ok(|test| {
-        let geometry = TypeBinding::new(&test, "Geometry");
-
+        let [geometry] = test.bind(["Geometry"]);
         expect_eq!(
             actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
             expected = json!({
@@ -72,8 +69,7 @@ fn test_fake_geojson() {
 #[test]
 fn test_fake_guitar_synth() {
     GUITAR_SYNTH_UNION.compile_ok(|test| {
-        let artist = TypeBinding::new(&test, "artist");
-
+        let [artist] = test.bind(["artist"]);
         expect_eq!(
             actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),
             expected = json!({

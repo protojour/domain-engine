@@ -61,9 +61,7 @@ impl OntolTest {
         let from = from.into_key();
         let to = to.into_key();
 
-        let input_binding = TypeBinding::new(self, from.typename());
-        let output_binding = TypeBinding::new(self, to.typename());
-
+        let [input_binding, output_binding] = self.bind([from.typename(), to.typename()]);
         let value = inspect_de(&input_binding).value(input).unwrap();
 
         fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
