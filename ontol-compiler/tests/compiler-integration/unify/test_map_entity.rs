@@ -1,4 +1,3 @@
-use crate::unify::assert_domain_map;
 use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
@@ -22,8 +21,7 @@ fn should_map_inherent_capturing_pattern_id() {
     }
     "
     .compile_ok(|test| {
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("foo", "bar"),
             json!({ "id": "foo/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
             json!({ "id": "bar/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
@@ -77,8 +75,7 @@ fn test_extract_rel_params() {
     }
     "
     .compile_ok(|test| {
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("a1", "b1"),
             json!({
                 "foreign": {
@@ -96,8 +93,7 @@ fn test_extract_rel_params() {
             }),
         );
 
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("b1", "a1"),
             json!({
                 "foreign": {
@@ -160,8 +156,7 @@ fn test_rel_params_implicit_map() {
     }
     "
     .compile_ok(|test| {
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("a", "b"),
             json!({
                 "foreign": {
@@ -210,14 +205,12 @@ fn test_map_relation_sequence_default_fallback() {
         // The point of this test is to show that a
         // "foos" in input is not needed to produce a "foo" in output,
         // since the input "foo" is an inverted/object relation sequence property:
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("bar_inner", "bar"),
             json!({ "bar_id": "B" }),
             json!({ "id": "B", "foos": [] }),
         );
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("bar_inner", "bar"),
             json!({ "bar_id": "B", "foos": [{ "foo_id": "F" }]}),
             json!({ "id": "B", "foos": ["F"] }),

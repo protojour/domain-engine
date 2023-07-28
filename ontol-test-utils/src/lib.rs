@@ -15,6 +15,7 @@ use ontol_runtime::{
 
 pub mod diagnostics;
 pub mod serde_utils;
+pub mod test_map;
 pub mod type_binding;
 
 pub const ROOT_SRC_NAME: &str = "test_root.on";

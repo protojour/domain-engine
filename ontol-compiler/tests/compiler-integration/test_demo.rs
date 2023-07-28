@@ -2,15 +2,12 @@ use ontol_test_utils::TestCompile;
 use serde_json::json;
 use test_log::test;
 
-use crate::unify::assert_domain_map;
-
 pub const DEMO: &str = include_str!("../../../examples/demo.on");
 
 #[test]
 fn test_demo() {
     DEMO.compile_ok(|test| {
-        assert_domain_map(
-            &test,
+        test.assert_domain_map(
             ("archive_group", "ArchiveCollection"),
             json!({
                 "id": "archive_group/a27214f3-1bde-492f-9dc0-a47b57b4b6d3",
