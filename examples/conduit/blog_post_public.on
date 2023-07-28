@@ -4,8 +4,7 @@ pub type BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
     rel .'contents': string
     rel .'written_by': string
-    // BUG: Could use [string], but currently does not auto-map:
-    rel .'tags': [db.tag]
+    rel .'tags': [string]
 }
 
 map => {

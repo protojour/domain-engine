@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::{GetKind, HasDefault, PropPattern};
 use ontol_runtime::{
+    smart_format,
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
 };
@@ -11,7 +12,7 @@ use crate::{
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
-    CompileErrors, Compiler, SpannedCompileError, NO_SPAN,
+    CompileErrors, Compiler, SourceSpan, SpannedCompileError, NO_SPAN,
 };
 
 use super::{
@@ -66,7 +67,7 @@ pub(super) fn map_codegen<'m>(
     let return_ty = func.body.ty();
 
     let mut builder = ProcBuilder::new(NParams(0));
-    let mut block = builder.new_block(Delta(1), func.body.span());
+    let mut root_block = builder.new_block(Delta(1), func.body.span());
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
@@ -75,12 +76,12 @@ pub(super) fn map_codegen<'m>(
         type_mapper,
     };
     generator.scope.insert(func.arg.var, Local(0));
-    generator.gen_node(func.body, &mut block);
-    builder.commit(block, Terminator::Return(builder.top()));
+    generator.gen_node(func.body, &mut root_block);
+    builder.commit(root_block, Terminator::Return(builder.top()));
 
     match (
-        type_mapper.find_mapping_info(func.arg.ty),
-        type_mapper.find_mapping_info(return_ty),
+        type_mapper.find_domain_mapping_info(func.arg.ty),
+        type_mapper.find_domain_mapping_info(return_ty),
     ) {
         (Some(from_info), Some(to_info)) => {
             proc_table
@@ -174,30 +175,62 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
             }
             ontol_hir::Kind::Map(param) => {
-                let from = self.type_mapper.find_mapping_info(param.ty()).unwrap();
-                let to = self.type_mapper.find_mapping_info(ty).unwrap();
+                let param_ty = param.ty();
+                match (
+                    self.type_mapper.find_domain_mapping_info(param_ty),
+                    self.type_mapper.find_domain_mapping_info(ty),
+                ) {
+                    (Some(from), Some(to)) => {
+                        self.gen_node(*param, block);
 
-                self.gen_node(*param, block);
+                        match (from.punned, to.punned) {
+                            (Some(from_pun), Some(to_pun)) if from.anonymous && to.anonymous => {
+                                if from_pun == to_pun {
+                                    self.gen_pun(block, to.key.def_id, span);
+                                } else {
+                                    let proc = Procedure {
+                                        address: self.proc_table.gen_mapping_addr(from_pun, to_pun),
+                                        n_params: NParams(1),
+                                    };
 
-                if from.key == to.key {
-                    if let Some(alias) = to.alias {
-                        let local = self.builder.top();
-                        self.builder
-                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
-                    } else {
-                        // Nothing needs to be done
+                                    self.builder.append(block, Ir::Call(proc), Delta(0), span);
+                                }
+                            }
+                            (Some(from_pun), Some(to_pun))
+                                if from_pun == to_pun && from.anonymous && to.anonymous =>
+                            {
+                                self.gen_pun(block, to.key.def_id, span);
+                            }
+                            (None, Some(to_pun)) if from.key == to_pun => {
+                                self.gen_pun(block, from.key.def_id, span);
+                            }
+                            _ => {
+                                // Real map happens here
+                                let proc = Procedure {
+                                    address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                                    n_params: NParams(1),
+                                };
+
+                                self.builder.append(block, Ir::Call(proc), Delta(0), span);
+                            }
+                        }
                     }
-                } else {
-                    let proc = Procedure {
-                        address: self.proc_table.gen_mapping_addr(from.key, to.key),
-                        n_params: NParams(1),
-                    };
-
-                    self.builder.append(block, Ir::Call(proc), Delta(0), span);
-                    if let Some(alias) = to.alias {
-                        let local = self.builder.top();
-                        self.builder
-                            .append(block, Ir::TypePun(local, alias), Delta(0), span);
+                    (Some(from), None) => {
+                        if from.punned.map(|key| key.def_id) == ty.get_single_def_id() {
+                            self.gen_pun(block, ty.get_single_def_id().unwrap(), span);
+                        } else {
+                            self.report_not_mappable(span);
+                        }
+                    }
+                    (None, Some(to)) => {
+                        if param_ty.get_single_def_id() == to.punned.map(|key| key.def_id) {
+                            self.gen_pun(block, param_ty.get_single_def_id().unwrap(), span);
+                        } else {
+                            self.report_not_mappable(span);
+                        }
+                    }
+                    _ => {
+                        self.report_not_mappable(span);
                     }
                 }
             }
@@ -520,5 +553,19 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             .scope
             .get(&var)
             .unwrap_or_else(|| panic!("Variable {var} not in scope"))
+    }
+
+    fn gen_pun(&mut self, block: &mut Block, def_id: DefId, span: SourceSpan) {
+        let local = self.builder.top();
+        self.builder
+            .append(block, Ir::TypePun(local, def_id), Delta(0), span);
+    }
+
+    fn report_not_mappable(&mut self, span: SourceSpan) {
+        self.errors.push(SpannedCompileError {
+            error: CompileError::TODO(smart_format!("type not mappable")),
+            span,
+            notes: vec![],
+        });
     }
 }

@@ -133,11 +133,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 {
                     Ok(_) => {}
                     Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
-                        match (actual, expected) {
-                            (
-                                Type::Domain(first_def_id) | Type::Anonymous(first_def_id),
-                                Type::Domain(second_def_id) | Type::Anonymous(second_def_id),
-                            ) => {
+                        match (actual.get_single_def_id(), expected.get_single_def_id()) {
+                            (Some(first_def_id), Some(second_def_id))
+                                if actual.is_domain_specific() || expected.is_domain_specific() =>
+                            {
                                 ctx.variable_mapping.insert(
                                     explicit_var.variable,
                                     VariableMapping {
@@ -147,10 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 );
 
                                 self.codegen_tasks.add_map_task(
-                                    MapKeyPair::new(
-                                        (*first_def_id).into(),
-                                        (*second_def_id).into(),
-                                    ),
+                                    MapKeyPair::new(first_def_id.into(), second_def_id.into()),
                                     MapCodegenTask::Auto,
                                 );
                             }

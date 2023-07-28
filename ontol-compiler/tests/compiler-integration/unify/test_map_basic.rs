@@ -32,6 +32,33 @@ fn test_map_simple() {
 }
 
 #[test]
+fn test_map_value_to_primitive() {
+    "
+    pub type my_string { rel.is: string }
+    pub type foo { rel .'a': my_string }
+    pub type bar { rel .'b': string }
+    map {
+        foo { 'a': x }
+        bar { 'b': x }
+    }
+    "
+    .compile_ok(|test| {
+        assert_domain_map(
+            &test,
+            ("foo", "bar"),
+            json!({ "a": "my_value"}),
+            json!({ "b": "my_value"}),
+        );
+        assert_domain_map(
+            &test,
+            ("bar", "foo"),
+            json!({ "b": "my_value"}),
+            json!({ "a": "my_value"}),
+        );
+    });
+}
+
+#[test]
 fn test_meters() {
     "
     pub type meters

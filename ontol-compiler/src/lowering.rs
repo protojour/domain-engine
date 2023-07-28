@@ -145,64 +145,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_type(&mut self, type_stmt: ast::TypeStatement, span: Span) -> Res<RootDefs> {
-        let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
-            Ok(def_id) => def_id,
-            Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
-        };
-        let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-        debug!("type `{ident}`: got {def_id:?}");
-        let params = type_stmt.params.map(|(ast_params, _span)| {
-            ast_params
-                .into_iter()
-                .map(|(param, _span)| {
-                    let ident = self.compiler.strings.intern(param.ident.0.as_str());
-                    let id = self.compiler.defs.alloc_def_param_id();
-
-                    (ident, TypeDefParam { id })
-                })
-                .collect()
-        });
-
-        self.set_def_kind(
-            def_id,
-            DefKind::Type(TypeDef {
-                public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
-                ident: Some(ident),
-                params,
-                rel_type_for: None,
-            }),
-            &span,
-        );
-
-        let mut root_defs: RootDefs = [def_id].into();
-
-        self.compiler.namespaces.docs.insert(def_id, type_stmt.docs);
-
-        if let Some((ctx_block, _span)) = type_stmt.ctx_block {
-            // The inherent relation block on the type uses the just defined
-            // type as its context
-            let def = DefReference {
-                def_id,
-                pattern_bindings: Default::default(),
-            };
-            let context_fn = move || def.clone();
-
-            for spanned_stmt in ctx_block {
-                match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
-                    Ok(mut defs) => {
-                        root_defs.append(&mut defs);
-                    }
-                    Err(error) => {
-                        self.report_error(error);
-                    }
-                }
-            }
-        }
-
-        Ok(root_defs)
-    }
-
     fn ast_relationship_to_def(
         &mut self,
         rel: ast::RelStatement,
@@ -970,9 +912,68 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
+    fn define_type(&mut self, type_stmt: ast::TypeStatement, span: Span) -> Res<RootDefs> {
+        let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
+            Ok(def_id) => def_id,
+            Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
+        };
+        let ident = self.compiler.strings.intern(&type_stmt.ident.0);
+        debug!("type `{ident}`: got {def_id:?}");
+        let params = type_stmt.params.map(|(ast_params, _span)| {
+            ast_params
+                .into_iter()
+                .map(|(param, _span)| {
+                    let ident = self.compiler.strings.intern(param.ident.0.as_str());
+                    let id = self.compiler.defs.alloc_def_param_id();
+
+                    (ident, TypeDefParam { id })
+                })
+                .collect()
+        });
+
+        self.set_def_kind(
+            def_id,
+            DefKind::Type(TypeDef {
+                public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
+                ident: Some(ident),
+                params,
+                rel_type_for: None,
+            }),
+            &span,
+        );
+
+        let mut root_defs: RootDefs = [def_id].into();
+
+        self.compiler.namespaces.docs.insert(def_id, type_stmt.docs);
+
+        if let Some((ctx_block, _span)) = type_stmt.ctx_block {
+            // The inherent relation block on the type uses the just defined
+            // type as its context
+            let def = DefReference {
+                def_id,
+                pattern_bindings: Default::default(),
+            };
+            let context_fn = move || def.clone();
+
+            for spanned_stmt in ctx_block {
+                match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
+                    Ok(mut defs) => {
+                        root_defs.append(&mut defs);
+                    }
+                    Err(error) => {
+                        self.report_error(error);
+                    }
+                }
+            }
+        }
+
+        Ok(root_defs)
+    }
+
     fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
+        debug!("anonymous: {anonymous_def_id:?}");
         DefReference {
             def_id: anonymous_def_id,
             pattern_bindings: Default::default(),

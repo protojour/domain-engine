@@ -192,8 +192,7 @@ fn test_map_relation_sequence_default_fallback() {
 
     pub type bar {
         rel .'id'|id: { rel .is: string }
-        // BUG: want to use string here:
-        rel .'foos': [{rel .is: string }]
+        rel .'foos': [string]
     }
 
     map => {
