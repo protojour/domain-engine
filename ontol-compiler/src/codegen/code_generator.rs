@@ -196,16 +196,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                     self.builder.append(block, Ir::Call(proc), Delta(0), span);
                                 }
                             }
-                            (Some(from_pun), Some(to_pun))
-                                if from_pun == to_pun && from.anonymous && to.anonymous =>
-                            {
-                                self.gen_pun(block, to.key.def_id, span);
-                            }
-                            (None, Some(to_pun)) if from.key == to_pun => {
-                                self.gen_pun(block, from.key.def_id, span);
-                            }
                             _ => {
-                                // Real map happens here
                                 let proc = Procedure {
                                     address: self.proc_table.gen_mapping_addr(from.key, to.key),
                                     n_params: NParams(1),
