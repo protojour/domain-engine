@@ -17,11 +17,11 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 uuid.workspace = true
+chrono.workspace = true
 num = "0.4"
 serde-value = "0.7"
 derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-inline"] }
 time = { version = "0.3", features = ["serde-well-known"] }
-chrono = { version = "0.4" , features = ["serde"] }
 regex = "1"
 bitflags = "2"
 urlencoding = "2"

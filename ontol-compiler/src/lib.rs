@@ -272,6 +272,7 @@ impl<'m> Compiler<'m> {
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .string_patterns(self.patterns.string_patterns)
+            .value_generators(self.relations.value_generators)
             .build()
     }
 

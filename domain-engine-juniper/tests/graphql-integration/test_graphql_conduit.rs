@@ -30,7 +30,9 @@ fn conduit_db_only() -> TestPackages {
 async fn test_graphql_in_memory_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::builder(test.ontology.clone()).build().into();
+    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+        .build()
+        .into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -89,7 +91,9 @@ async fn test_graphql_in_memory_conduit_db() {
 async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::builder(test.ontology.clone()).build().into();
+    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+        .build()
+        .into();
 
     let response = r#"mutation {
         createUser(
@@ -175,7 +179,7 @@ impl BlogPostConduit {
 
         let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
         Self {
-            domain_engine: Arc::new(DomainEngine::builder(test.ontology.clone()).build()),
+            domain_engine: Arc::new(DomainEngine::test_builder(test.ontology.clone()).build()),
             test,
             db_schema,
             blog_schema,

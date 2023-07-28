@@ -564,7 +564,8 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
     {
         debug!(
-            "Missing attributes. Rel params match: {}, special_rel: {} parent_relationship: {:?}",
+            "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?}",
+            processor.mode,
             rel_params.is_unit(),
             special_operator_ids.rel_params.is_none(),
             processor.ctx.parent_property_id,
@@ -574,9 +575,10 @@ fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
         }
         for prop in properties {
             debug!(
-                "    prop {:?} '{}' visible={} optional={}",
+                "    prop {:?}('{}') {:?} visible={} optional={}",
                 prop.1.property_id,
                 prop.0,
+                prop.1.flags,
                 prop.1
                     .filter(processor.mode, processor.ctx.parent_property_id)
                     .is_some(),

@@ -36,6 +36,7 @@ pub struct Ontology {
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_id: SerdeOperatorId,
+    value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
 
@@ -54,6 +55,7 @@ impl Ontology {
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_id: SerdeOperatorId(u32::MAX),
+                value_generators: Default::default(),
                 property_flows: Default::default(),
             },
         }
@@ -145,6 +147,10 @@ impl Ontology {
 
     pub fn dynamic_sequence_operator_id(&self) -> SerdeOperatorId {
         self.dynamic_sequence_operator_id
+    }
+
+    pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
+        self.value_generators.get(&relationship_id)
     }
 }
 
@@ -304,6 +310,14 @@ impl OntologyBuilder {
 
     pub fn string_patterns(mut self, patterns: FnvHashMap<DefId, StringPattern>) -> Self {
         self.ontology.string_patterns = patterns;
+        self
+    }
+
+    pub fn value_generators(
+        mut self,
+        generators: FnvHashMap<RelationshipId, ValueGenerator>,
+    ) -> Self {
+        self.ontology.value_generators = generators;
         self
     }
 

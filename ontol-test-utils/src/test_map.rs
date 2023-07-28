@@ -83,8 +83,7 @@ impl OntolTest {
             ),
         };
 
-        let mut mapper = self.ontology.new_vm();
-        let value = mapper.eval(procedure, [value]);
+        let value = self.ontology.new_vm().eval(procedure, [value]);
 
         let output_json = match &to {
             Key::Unit(_) => inspect_ser(&output_binding).json(&value),

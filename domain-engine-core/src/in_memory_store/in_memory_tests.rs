@@ -31,7 +31,7 @@ fn artist_and_instrument() -> TestPackages {
 async fn test_conduit_db_in_memory_id_generation() {
     conduit_db()
         .compile_ok_async(|test| async move {
-            let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
+            let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
             let [user, article, comment, tag_entity] =
                 test.bind(["User", "Article", "Comment", "TagEntity"]);
 
@@ -124,7 +124,7 @@ async fn test_conduit_db_in_memory_id_generation() {
 async fn test_conduit_db_store_entity_tree() {
     conduit_db()
         .compile_ok_async(|test| async move {
-            let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
+            let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
             let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
             let pre_existing_user_id: Uuid = domain_engine
@@ -246,13 +246,17 @@ async fn test_conduit_db_store_entity_tree() {
                             "title": "Foo",
                             "description": "An article",
                             "body": "The body",
+                            "created_at": "1970-01-01T00:00:00+00:00",
+                            "updated_at": "1970-01-01T00:00:00+00:00",
                             "comments": [
                                 {
                                     "id": 0,
                                     "body": "First post!",
                                     "author": {
                                         "user_id": pre_existing_user_id.to_string(),
-                                    }
+                                    },
+                                    "created_at": "1970-01-01T00:00:00+00:00",
+                                    "updated_at": "1970-01-01T00:00:00+00:00",
                                 }
                             ]
                         }
@@ -267,7 +271,7 @@ async fn test_conduit_db_store_entity_tree() {
 async fn test_conduit_db_unresolved_foreign_key() {
     conduit_db()
         .compile_ok_async(|test| async move {
-            let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
+            let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
             let [article] = test.bind(["Article"]);
 
             assert_error_msg!(
@@ -297,7 +301,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 async fn test_artist_and_instrument_fmt_id_generation() {
     artist_and_instrument()
         .compile_ok_async(|test| async move {
-            let domain_engine = DomainEngine::builder(test.ontology.clone()).build();
+            let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
             let [artist] = test.bind(["artist"]);
             let artist_id = TypeBinding::from_def_id(
                 artist

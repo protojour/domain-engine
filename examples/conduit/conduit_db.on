@@ -27,17 +27,15 @@ pub type Article {
     rel .'title': string
     rel .'description': string
     rel .'body': string
-    // TODO: Make these required generated properties:
-    rel .'createdAt'(rel .gen: create_time)?: datetime
-    rel .'updatedAt'(rel .gen: update_time)?: datetime
+    rel .'created_at'(rel .gen: create_time): datetime
+    rel .'updated_at'(rel .gen: update_time): datetime
 }
 
 pub type Comment {
     rel .'id'(rel .gen: auto)|id: { rel .is: int }
     rel .'body': string
-    // TODO: Make these required generated properties:
-    rel .'createdAt'(rel .gen: create_time)?: datetime
-    rel .'updatedAt'(rel .gen: update_time)?: datetime
+    rel .'created_at'(rel .gen: create_time): datetime
+    rel .'updated_at'(rel .gen: update_time): datetime
 }
 
 pub type TagEntity {

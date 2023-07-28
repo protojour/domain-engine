@@ -37,7 +37,9 @@ fn test_map_conduit_blog_post() {
                     "email": "e@mail",
                     "password_hash": "h",
                 },
-                "tags": [{ "tag": "foobar" }]
+                "tags": [{ "tag": "foobar" }],
+                "created_at": "2023-01-01T00:00:00.000+00:00",
+                "updated_at": "2023-01-01T00:00:00.000+00:00",
             }),
             json!({
                 "post_id": "11111111-1111-1111-1111-111111111111",
@@ -65,6 +67,8 @@ fn test_map_conduit_no_tags_in_db_object() {
                 "title": "t",
                 "description": "d",
                 "body": "THE BODY",
+                "created_at": "2023-01-01T00:00:00.000+00:00",
+                "updated_at": "2023-01-01T00:00:00.000+00:00",
                 "author": {
                     "user_id": "22222222-2222-2222-2222-222222222222",
                     "username": "some_user",

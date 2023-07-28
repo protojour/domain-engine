@@ -4,23 +4,29 @@ use ontol_runtime::{
     config::DataStoreConfig,
     ontology::Ontology,
     query::{EntityQuery, Query},
+    serde::processor::ProcessorMode,
     value::{Attribute, Value},
     PackageId,
 };
 use tracing::debug;
 
 use crate::{
-    data_store::DataStore, domain_error::DomainResult, in_memory_store::api::InMemoryDb,
-    query_data_flow::translate_entity_query, resolve_path::ResolverGraph, Config, DomainError,
+    data_store::DataStore,
+    domain_error::DomainResult,
+    in_memory_store::api::InMemoryDb,
+    query_data_flow::translate_entity_query,
+    resolve_path::ResolverGraph,
+    system::{SystemAPI, TestSystem},
+    value_generator::Generator,
+    Config, DomainError,
 };
 
 pub struct DomainEngine {
     ontology: Arc<Ontology>,
     config: Arc<Config>,
     resolver_graph: ResolverGraph,
-
-    #[allow(unused)]
     data_store: Option<DataStore>,
+    system: Box<dyn SystemAPI + Send + Sync>,
 }
 
 impl DomainEngine {
@@ -29,7 +35,12 @@ impl DomainEngine {
             ontology,
             config: Config::default(),
             data_store: None,
+            system: None,
         }
+    }
+
+    pub fn test_builder(ontology: Arc<Ontology>) -> Builder {
+        Self::builder(ontology).system(Box::new(TestSystem))
     }
 
     pub fn config(&self) -> &Config {
@@ -38,6 +49,10 @@ impl DomainEngine {
 
     pub fn ontology(&self) -> &Ontology {
         &self.ontology
+    }
+
+    pub fn system(&self) -> &dyn SystemAPI {
+        self.system.as_ref()
     }
 
     fn get_data_store(&self) -> DomainResult<&DataStore> {
@@ -90,8 +105,11 @@ impl DomainEngine {
         Ok(edges)
     }
 
-    pub async fn store_new_entity(&self, entity: Value, query: Query) -> DomainResult<Value> {
+    pub async fn store_new_entity(&self, mut entity: Value, query: Query) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
+
+        Generator::new(self, ProcessorMode::Create).generate_values(&mut entity);
+
         self.get_data_store()?
             .api()
             .store_new_entity(self, entity, query)
@@ -103,6 +121,7 @@ pub struct Builder {
     ontology: Arc<Ontology>,
     config: Config,
     data_store: Option<DataStore>,
+    system: Option<Box<dyn SystemAPI + Send + Sync>>,
 }
 
 impl Builder {
@@ -113,6 +132,11 @@ impl Builder {
 
     pub fn data_store(mut self, data_store: DataStore) -> Self {
         self.data_store = Some(data_store);
+        self
+    }
+
+    pub fn system(mut self, system: Box<dyn SystemAPI + Send + Sync>) -> Self {
+        self.system = Some(system);
         self
     }
 
@@ -149,6 +173,7 @@ impl Builder {
             config: Arc::new(self.config),
             resolver_graph,
             data_store,
+            system: self.system.expect("No system API provided!"),
         }
     }
 }

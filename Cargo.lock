@@ -477,6 +477,7 @@ name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "fnv",
  "indexmap",
  "itertools",
