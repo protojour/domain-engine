@@ -48,7 +48,13 @@
       {
         "language": "ontol",
         "scopeName": "source.ontol",
-        "path": "./syntaxes/ONTOL.tmLanguage.json"
+        "path": "./ontol.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ontol",
+        "path": "./ontol.tmSnippet.json"
       }
     ]
   },

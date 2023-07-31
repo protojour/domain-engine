@@ -1,0 +1,195 @@
+{
+    "use": {
+        "prefix": "use",
+        "body": [
+            "use '${1:file}'",
+			"$2"
+        ],
+        "description": "Import domain"
+    },
+    "use as": {
+        "prefix": "use as",
+        "body": [
+            "use '${1:file}' as ${2:name}",
+			"$3"
+        ],
+        "description": "Import domain alias"
+    },
+	"type scalar": {
+        "prefix": "type scalar",
+        "body": [
+            "type ${1:name}",
+			"$2"
+        ],
+        "description": "Type definition"
+    },
+	"pub type scalar": {
+        "prefix": "pub type scalar",
+        "body": [
+            "pub type ${name}"
+        ],
+        "description": "Type definition"
+    },
+    "type block": {
+        "prefix": "type block",
+        "body": [
+            "type ${1:name} {",
+            "\t$2",
+            "}"
+        ],
+        "description": "Type definition block"
+    },
+    "pub type block": {
+        "prefix": "pub type block",
+        "body": [
+            "pub type ${1:name} {",
+            "\t$2",
+            "}"
+        ],
+        "description": "Public type definition block"
+    },
+    "with block": {
+        "prefix": "with block",
+        "body": [
+            "with ${1:name} {",
+            "\t$2",
+            "}"
+        ],
+        "description": "With block"
+    },
+    "rel local": {
+        "prefix": "rel .",
+        "body": [
+            "rel .'${1:name}'$2: ${3:object}"
+        ],
+        "description": "Relation"
+    },
+	"rel is": {
+        "prefix": "rel .is",
+        "body": [
+            "rel .is$1: ${2:object}"
+        ],
+        "description": "Relation"
+    },
+    "rel block": {
+        "prefix": "rel . block",
+        "body": [
+            "rel .'${1:name}'$2: ${3:object} {",
+            "\t$4",
+            "}"
+        ],
+        "description": "Relation block"
+    },
+    "rel id": {
+        "prefix": "rel .id",
+        "body": [
+            "rel .'${1:id}'$2|id: ${3:object}"
+        ],
+        "description": "Relation id"
+    },
+	"rel .-1": {
+        "prefix": "rel .::1",
+        "body": [
+            "rel .'${1:name_a}'::'${2:name_b}': ${3:object}"
+        ],
+        "description": "Relation .-to-one"
+    },
+	"rel .-m": {
+        "prefix": "rel .::m",
+        "body": [
+            "rel .'${1:name_a}'::'${2:name_b}': [${3:object}]"
+        ],
+        "description": "Relation .-to-many"
+    },
+	"rel [.]-m": {
+        "prefix": "rel [.]::m",
+        "body": [
+            "rel [.]'${1:name_a}'::'${2:name_b}': [${3:object}]"
+        ],
+        "description": "Relation [.]-to-many"
+    },
+	"rel 1-1": {
+        "prefix": "rel 1::1",
+        "body": [
+            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': ${4:object}"
+        ],
+        "description": "Relation one-to-one"
+    },
+	"rel 1-m": {
+        "prefix": "rel 1::m",
+        "body": [
+            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': [${4:object}]"
+        ],
+        "description": "Relation one-to-many"
+    },
+	"rel m-m": {
+        "prefix": "rel m::m",
+        "body": [
+            "rel [${1:subject}] '${2:name_a}'::'${3:name_b}': [${4:object}]"
+        ],
+        "description": "Relation many-to-many"
+    },
+	"rel gen auto": {
+        "prefix": "rel .gen auto",
+        "body": [
+            "rel .gen: auto"
+        ],
+        "description": "Relation gen auto"
+    },
+	"rel gen create_time": {
+        "prefix": "rel .gen create",
+        "body": [
+            "rel .gen: create_time"
+        ],
+        "description": "Relation gen create_time"
+    },
+	"rel gen update_time": {
+        "prefix": "rel .gen update",
+        "body": [
+            "rel .gen: update_time"
+        ],
+        "description": "Relation gen update_time"
+    },
+	"rel default": {
+        "prefix": "rel .default",
+        "body": [
+            "rel .default := $1"
+        ],
+        "description": "Relation default"
+    },
+    "fmt": {
+        "prefix": "fmt",
+        "body": [
+            "fmt $1 => $2 => $3"
+        ],
+        "description": "Formatter"
+    },
+    "map": {
+        "prefix": "map",
+        "body": [
+            "map {",
+            "\t${1:a} {",
+            "\t\t$3",
+            "\t}",
+            "\t${2:b} {",
+            "\t\t$4",
+            "\t}",
+            "}"
+        ],
+        "description": "Mapping block"
+    },
+    "map oneway": {
+        "prefix": "map oneway",
+        "body": [
+            "map => {",
+            "\t${1:a} {",
+            "\t\t$3",
+            "\t}",
+            "\t${2:b} {",
+            "\t\t$4",
+            "\t}",
+            "}"
+        ],
+        "description": "Mapping block one way"
+    }
+}

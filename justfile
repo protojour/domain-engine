@@ -9,10 +9,9 @@ lsp: ontool
     cd ontol-language
     for dest in ontol-sublime/bin/ ontol-vscode/bin/; do
         mkdir -p "$dest"  && cp ~/.cargo/bin/ontool "$dest"; done
-    npx js-yaml ONTOL.tmLanguage.yaml > ONTOL.tmLanguage.json
-    cp ONTOL.tmLanguage.yaml ontol-sublime/
-    mkdir -p ontol-vscode/syntaxes
-    cp ONTOL.tmLanguage.json ontol-vscode/syntaxes/
+    npx js-yaml ontol.tmLanguage.yaml > ontol.tmLanguage.json
+    cp ontol.tmLanguage.yaml ontol-sublime/
+    cp ontol.tmLanguage.json ontol.tmSnippet.json ontol-vscode/
     cd ontol-vscode
     npm run build && \
     npm run package

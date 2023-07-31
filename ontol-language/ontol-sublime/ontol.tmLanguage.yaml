@@ -1,0 +1,141 @@
+# [PackageDev] target_format: json, ext: json
+---
+name: ONTOL
+scopeName: source.ontol
+fileTypes: ['on']
+uuid: 4fc14b00-3ee2-4804-9036-e70090594121
+
+patterns:
+  # "use .. as .." is one statement
+  - comment: use declaration
+    name: keyword.import.ontol
+    match: \b(use)\b
+
+  - comment: use as declaration
+    name: keyword.import.as.ontol
+    match: \b(as)\b
+
+  - comment: pub export modifier
+    name: storage.modifier.pub.ontol
+    match: \b(pub)\b
+
+  # "pub type .. { }" is one statement
+  - comment: type declaration
+    name: keyword.declaration.type.ontol
+    match: \b(type)\b
+
+  # "with .. { }" should include block
+  - comment: with context block
+    name: keyword.context.block.with.ontol
+    match: \b(with)\b
+
+  # "rel .. .. .. { }" should include block
+  - comment: rel declaration
+    name: keyword.declaration.rel.ontol
+    match: \b(rel)\b
+
+  # "fmt .. .. .." should include arrows etc.
+  - comment: fmt expression
+    name: keyword.declaration.fmt.ontol
+    match: \b(fmt)\b
+
+  - comment: fat arrow (fmt expression)
+    name: keyword.operator.fatarrow.ontol
+    match: (=>)
+
+  # "map { }" should include
+  # block, path, expressions etc.
+  - comment: map declaration
+    match: \b(map)\b({)\b(.*)\b(})
+    captures:
+      '1': { name: keyword.declaration.map.ontol }
+      '2': { name: keyword.context.block.ontol }
+      '3': { name: variable.parameter.ontol }
+      '4': { name: keyword.context.block.ontol }
+
+  - comment: built-in types
+    name: storage.type.ontol
+    match: \b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)\b
+
+  - comment: number literal
+    name: constant.numeric.ontol
+    match: \b\-?(\d+(\.?\d+)?)\b
+
+  - comment: built-in constant value
+    name: constant.language.ontol
+    match: \b(true|false|null|inf|nan|\(\)|\[\]PI|GET|POST|PUT|PATCH|DELETE)\b
+
+  - comment: built-in assigment keywords
+    name: variable.function.ontol
+    match: \b(is|identifies|query)\b
+
+  - comment: unit/self underscore
+    name: variable.language.ontol
+    match: \b(_)\b
+
+  - comment: single quoted string literal
+    name: string.quoted.single.ontol
+    begin: \'
+    end: \'
+    patterns:
+      - include: '#escaped_char'
+
+  - comment: double quoted string literal
+    name: string.quoted.double.ontol
+    begin: \"
+    end: \"
+    patterns:
+      - include: '#escaped_char'
+
+  - comment: regex literal
+    name: string.regexp.ontol
+    begin: /[^/\s]
+    end: '[^\\]/'
+    # TODO: include regex
+    # patterns:
+    #   - include: source.regexp.embedded
+
+  - comment: comment
+    name: comment.line.double-slash.ontol
+    begin: //[^/]
+    end: $
+
+  - comment: doc comment
+    name: comment.block.documentation.ontol
+    begin: ^\s*+///
+    end: $
+    # TODO: include markdown in comments
+    # patterns:
+    #   - include: text.html.markdown
+
+  - comment: sigil
+    name: keyword.operator.ontol
+    match: '[.,:?+*=]+'
+
+  - comment: special case sigil
+    name: keyword.operator.ontol
+    match: '[^\w\s][<>_-]+[^\w\s]'
+
+repository:
+  escaped_char:
+    patterns:
+    - name: constant.character.escape.backslash.ontol
+      match: \\\\
+    - name: constant.character.escape.slash.ontol
+      match: \\/
+    - name: constant.character.escape.single-quote.ontol
+      match: \\'
+    - name: constant.character.escape.double-quote.ontol
+      match: \\"
+    - name: constant.character.escape.backspace.ontol
+      match: \\b
+    - name: constant.character.escape.formfeed.ontol
+      match: \\f
+    - name: constant.character.escape.newline.ontol
+      match: \\n
+    - name: constant.character.escape.carriagereturn.ontol
+      match: \\c|\\r
+    - name: constant.character.escape.linefeed.ontol
+      match: \\l
+    - name: constant.character.escape.tabulator.ontol
+      match: \\t
