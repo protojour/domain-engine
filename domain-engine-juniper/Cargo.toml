@@ -17,6 +17,7 @@ indexmap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
+thiserror.workspace = true
 juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods", default-features = false, features = ["schema-language"] }
 convert_case = "0.6"
 

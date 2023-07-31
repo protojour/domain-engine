@@ -18,6 +18,10 @@ pub struct Src {
 }
 
 impl Src {
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
     pub fn span(&self, range: &Range<usize>) -> SourceSpan {
         SourceSpan {
             source_id: self.id,

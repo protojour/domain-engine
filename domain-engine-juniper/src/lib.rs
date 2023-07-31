@@ -3,6 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{ontology::Ontology, PackageId};
+use thiserror::Error;
 use tracing::debug;
 
 pub mod gql_scalar;
@@ -14,6 +15,7 @@ mod query_analyzer;
 mod templates;
 mod virtual_registry;
 
+#[derive(Clone)]
 pub struct GqlContext {
     pub domain_engine: Arc<DomainEngine>,
 }
@@ -22,6 +24,14 @@ impl From<DomainEngine> for GqlContext {
     fn from(value: DomainEngine) -> Self {
         Self {
             domain_engine: Arc::new(value),
+        }
+    }
+}
+
+impl From<Arc<DomainEngine>> for GqlContext {
+    fn from(value: Arc<DomainEngine>) -> Self {
+        Self {
+            domain_engine: value,
         }
     }
 }
@@ -40,8 +50,9 @@ pub type Schema = juniper::RootNode<
     GqlScalar,
 >;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum SchemaBuildError {
+    #[error("unknown package")]
     UnknownPackage,
 }
 

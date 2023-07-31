@@ -3,6 +3,7 @@ members = [
     "domain-engine-core",
     "domain-engine-juniper",
     "domain-engine-wasm",
+    "domain-service",
     "ontol-faker",
     "ontol-hir",
     "ontol-runtime",
@@ -30,6 +31,8 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi"]}
 chrono = { version = "0.4" , features = ["serde"] }
+clap = { version = "4.3.4", features = ["derive"] }
+bincode = "1"
 
 [profile.release]
 strip = true

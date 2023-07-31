@@ -1,12 +1,12 @@
 pub mod data_store;
-mod domain_engine;
 pub mod domain_error;
+pub mod system;
 
+mod domain_engine;
 mod entity_id_utils;
 mod in_memory_store;
 mod query_data_flow;
 mod resolve_path;
-mod system;
 mod value_generator;
 
 pub use domain_engine::DomainEngine;

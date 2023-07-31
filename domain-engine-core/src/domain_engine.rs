@@ -51,6 +51,10 @@ impl DomainEngine {
         &self.ontology
     }
 
+    pub fn ontology_owned(&self) -> Arc<Ontology> {
+        self.ontology.clone()
+    }
+
     pub fn system(&self) -> &dyn SystemAPI {
         self.system.as_ref()
     }
