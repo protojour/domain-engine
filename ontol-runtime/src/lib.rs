@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use ::serde::{Deserialize, Serialize};
 use derive_debug_extras::DebugExtras;
 use value::Value;
 
@@ -21,12 +22,14 @@ pub mod vm;
 /// One package represents a domain,
 /// but one package can consist of internal subdomains (probably).
 /// So this is called package id (for now) until we have fleshed out a full architecture..
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, DebugExtras,
+)]
 #[debug_single_tuple_inline]
 pub struct PackageId(pub u16);
 
 /// One definition inside some domain.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct DefId(pub PackageId, pub u16);
 
 impl DefId {
@@ -48,7 +51,7 @@ impl DefId {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub struct MapKey {
     pub def_id: DefId,
     pub seq: bool,
@@ -65,7 +68,7 @@ impl From<DefId> for MapKey {
 
 bitflags::bitflags! {
     /// Modifier for (de)serializers.
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
     pub struct DataModifier: u32 {
         const NONE           = 0b00000000;
         const ARRAY          = 0b00000001;
@@ -82,7 +85,7 @@ impl Default for DataModifier {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct DefVariant {
     pub def_id: DefId,
     pub modifier: DataModifier,
@@ -139,12 +142,14 @@ pub enum DefParam {
     Const(Value),
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub enum Role {
     Subject,
     Object,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, DebugExtras,
+)]
 #[debug_single_tuple_inline]
 pub struct RelationshipId(pub DefId);

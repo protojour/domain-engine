@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 
+use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use smartstring::alias::String;
@@ -23,6 +24,8 @@ use crate::{
 };
 
 /// Ontology is the ONTOL runtime environment
+///
+#[derive(Serialize, Deserialize)]
 pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
@@ -154,7 +157,7 @@ impl Ontology {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Domain {
     /// Map that stores types in insertion/definition order
     pub type_names: IndexMap<String, DefId>,
@@ -197,7 +200,7 @@ impl Domain {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
     pub def_id: DefId,
     pub public: bool,
@@ -207,7 +210,7 @@ pub struct TypeInfo {
     pub operator_id: Option<SerdeOperatorId>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
@@ -219,25 +222,25 @@ pub struct EntityInfo {
     pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntityRelationship {
     pub cardinality: Cardinality,
     pub target: DefId,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapMeta {
     pub procedure: Procedure,
     pub propflow_range: Range<u32>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct PropertyFlow {
     pub id: PropertyId,
     pub data: PropertyFlowData,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub enum PropertyFlowData {
     Type(DefId),
     Cardinality(Cardinality),
@@ -328,7 +331,7 @@ impl OntologyBuilder {
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub enum PropertyCardinality {
     Optional,
     Mandatory,
@@ -344,7 +347,7 @@ impl PropertyCardinality {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub enum ValueCardinality {
     One,
     Many,

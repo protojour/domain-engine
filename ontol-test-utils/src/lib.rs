@@ -225,7 +225,12 @@ impl TestPackages {
 
         match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
-                let ontology = compiler.into_ontology();
+                let ontology: Ontology = {
+                    let binary_ontology: Vec<u8> =
+                        bincode::serialize(&compiler.into_ontology()).unwrap();
+                    bincode::deserialize(&binary_ontology).unwrap()
+                };
+
                 Ok(OntolTest {
                     ontology: Arc::new(ontology),
                     root_package,

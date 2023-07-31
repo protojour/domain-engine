@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use ::serde::{Deserialize, Serialize};
+
 use crate::{DataModifier, DefId, DefVariant};
 
 use self::operator::{SerdeOperatorId, StructOperator};
@@ -13,7 +15,7 @@ pub mod processor;
 
 const EDGE_PROPERTY: &str = "_edge";
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum SerdeKey {
     Def(DefVariant),
     Intersection(Box<BTreeSet<SerdeKey>>),

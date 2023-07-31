@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use ::serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 use crate::{cast::Cast, DefId, PackageId, RelationshipId, Role};
@@ -144,7 +145,7 @@ impl<'d> Display for FormatStringData<'d> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct PropertyId {
     pub role: Role,
     pub relationship_id: RelationshipId,

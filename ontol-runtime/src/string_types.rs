@@ -1,3 +1,4 @@
+use ::serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 use uuid::Uuid;
 
@@ -7,7 +8,7 @@ use crate::{
     DefId,
 };
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum StringLikeType {
     Uuid,
     DateTime,

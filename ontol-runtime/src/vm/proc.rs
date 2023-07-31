@@ -1,3 +1,4 @@
+use ::serde::{Deserialize, Serialize};
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
@@ -6,7 +7,7 @@ use crate::{value::PropertyId, DefId};
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
 /// Handles to procedures are held outside the Lib itself.
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Lib {
     pub opcodes: Vec<OpCode>,
 }
@@ -24,17 +25,17 @@ impl Lib {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Address(pub u32);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct AddressOffset(pub u32);
 
 /// Handle to an ONTOL procedure.
 ///
 /// The VM is a stack machine, the arguments to the called procedure
 /// must be top of the stack when it's called.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Procedure {
     /// 'Pointer' to the first OpCode
     pub address: Address,
@@ -43,13 +44,13 @@ pub struct Procedure {
 }
 
 /// The number of parameters to a procedure.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct NParams(pub u8);
 
 /// ONTOL opcode.
 ///
 /// When the documentation mentions the stack, the _leftmost_ value is the top of the stack.
-#[derive(DebugExtras)]
+#[derive(DebugExtras, Serialize, Deserialize)]
 pub enum OpCode {
     /// Return a specific local
     Return(Local),
@@ -94,11 +95,11 @@ pub enum OpCode {
 }
 
 /// A reference to a local on the value stack during procedure execution.
-#[derive(Clone, Copy, Eq, PartialEq, DebugExtras)]
+#[derive(Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize, DebugExtras)]
 pub struct Local(pub u16);
 
 /// Builtin procedures.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BuiltinProc {
     Add,
     Sub,
@@ -110,7 +111,7 @@ pub enum BuiltinProc {
     NewUnit,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
     /// Test if true. NB: Yanks from stack.

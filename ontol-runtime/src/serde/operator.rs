@@ -1,5 +1,6 @@
 use std::{fmt::Debug, ops::Range};
 
+use ::serde::{Deserialize, Serialize};
 use derive_debug_extras::DebugExtras;
 use indexmap::IndexMap;
 use smallvec::SmallVec;
@@ -15,11 +16,11 @@ use crate::{
 use super::processor::{ProcessorLevel, ProcessorMode};
 
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, DebugExtras)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, DebugExtras)]
 #[debug_single_tuple_inline]
 pub struct SerdeOperatorId(pub u32);
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SerdeOperator {
     Unit,
     True(DefId),
@@ -62,14 +63,14 @@ pub enum SerdeOperator {
     PrimaryId(String, SerdeOperatorId),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
     pub def_variant: DefVariant,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def_variant: DefVariant,
@@ -95,7 +96,7 @@ impl ConstructorSequenceOperator {
 }
 
 /// A matcher for a range within a sequence
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SequenceRange {
     /// Operator to use for this range
     pub operator_id: SerdeOperatorId,
@@ -105,14 +106,14 @@ pub struct SequenceRange {
     pub finite_repetition: Option<u16>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ValueOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub inner_operator_id: SerdeOperatorId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UnionOperator {
     typename: String,
     union_def_variant: DefVariant,
@@ -185,13 +186,13 @@ pub enum FilteredVariants<'e> {
     Union(&'e [ValueUnionVariant]),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValueUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub operator_id: SerdeOperatorId,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StructOperator {
     pub typename: String,
     pub def_variant: DefVariant,
@@ -220,7 +221,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
@@ -272,7 +273,7 @@ impl SerdeProperty {
 }
 
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct SerdePropertyFlags: u32 {
         const OPTIONAL       = 0b00000001;
         const READ_ONLY      = 0b00000010;

@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, fmt::Display};
 
+use ::serde::{Deserialize, Serialize};
 use regex::Regex;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
@@ -14,8 +15,9 @@ use crate::{
     DefId,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StringPattern {
+    #[serde(with = "serde_regex")]
     pub regex: Regex,
     pub constant_parts: Vec<StringPatternConstantPart>,
 }
@@ -80,14 +82,14 @@ impl StringPattern {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum StringPatternConstantPart {
     AllStrings,
     Literal(String),
     Property(StringPatternProperty),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StringPatternProperty {
     pub property_id: PropertyId,
     pub type_def_id: DefId,
@@ -119,5 +121,24 @@ impl<'a> Display for FormatPattern<'a> {
             }
         }
         Ok(())
+    }
+}
+
+mod serde_regex {
+    use super::*;
+
+    pub fn serialize<S>(regex: &Regex, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(regex.as_str())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Regex, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Regex::new(&s).map_err(|e| ::serde::de::Error::custom(format!("{e}")))
     }
 }
