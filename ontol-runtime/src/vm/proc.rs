@@ -95,7 +95,7 @@ pub enum OpCode {
 }
 
 /// A reference to a local on the value stack during procedure execution.
-#[derive(Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize, DebugExtras)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, DebugExtras)]
 pub struct Local(pub u16);
 
 /// Builtin procedures.
