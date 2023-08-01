@@ -43,7 +43,7 @@ specifies that it represents the data store:
 
 ```
 cd ontool
-cargo run ../examples/demo.on --data-store ../examples/demo.on -o ../ontology
+cargo run compile ../examples/demo.on --data-store ../examples/demo.on -o ../ontology
 ```
 
 ### Run the domain service
