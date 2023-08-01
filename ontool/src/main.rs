@@ -182,17 +182,17 @@ fn compile(
         return Err(OntoolError::NoInputFiles);
     }
 
-    let root_file_name = get_file_name(paths.first().unwrap());
+    let root_file_name = get_source_name(paths.first().unwrap());
     let mut ontol_sources = Sources::default();
     let mut sources_by_name: HashMap<String, String> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
 
     for path in paths {
         let source = fs::read_to_string(&path)?;
-        let file_name = get_file_name(&path);
+        let source_name = get_source_name(&path);
 
-        sources_by_name.insert(file_name.clone(), source);
-        paths_by_name.insert(file_name, path);
+        sources_by_name.insert(source_name.clone(), source);
+        paths_by_name.insert(source_name, path);
     }
 
     let mut source_code_registry = SourceCodeRegistry::default();
@@ -284,8 +284,15 @@ fn compile(
     }
 }
 
-fn get_file_name(path: &Path) -> String {
-    path.file_name().unwrap().to_str().unwrap().to_string()
+/// Get a source name from a path.
+/// Strips away the path and removes the `.on` suffix (if present)
+fn get_source_name(path: &Path) -> String {
+    let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+
+    match file_name.strip_suffix(".on") {
+        Some(stripped) => stripped.to_string(),
+        None => file_name,
+    }
 }
 
 async fn lsp() -> Result<(), OntoolError> {

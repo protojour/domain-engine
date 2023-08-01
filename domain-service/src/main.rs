@@ -34,7 +34,11 @@ async fn main() -> anyhow::Result<()> {
 
     let mut router: axum::Router = axum::Router::new();
 
-    for (index, (package_id, _domain)) in ontology.domains().enumerate() {
+    for (index, (package_id, _domain)) in ontology
+        .domains()
+        .filter(|(package_id, _)| **package_id != PackageId(0))
+        .enumerate()
+    {
         let domain_path = format!("/{index}");
         router = router.nest(
             &domain_path,
