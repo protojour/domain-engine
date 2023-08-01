@@ -36,6 +36,23 @@ The compiler goes through a number of transformation steps before producing exec
 4. `hir_unify`: Unify map arms to produce `ontol-hir` functions.
 5. `codegen`: Turn `ontol-hir` functions into `ontol-vm` stack machine assembly-like language.
 
+## Running the domain service locally
+### Compile ONTOL files
+The following command compiles a domain into an ontology and also
+specifies that it represents the data store:
+
+```
+cd ontool
+cargo run ../examples/demo.on --data-store ../examples/demo.on -o ../ontology
+```
+
+### Run the domain service
+```
+cd domain-service
+cargo run -- --ontology ../ontology
+```
+
+
 ## Testing
 
 Every feature must be properly tested and every encountered bug must have a regression test.
