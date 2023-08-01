@@ -7,6 +7,7 @@ use domain_engine_core::DomainEngine;
 use domain_engine_juniper::create_graphql_schema;
 use graphql::{graphiql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::graphql::graphql_handler;
 
@@ -22,7 +23,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_target(false).init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::filter::FilterFn::new(|metadata| {
+            let target = metadata.target();
+            target.starts_with("domain_engine")
+                || target.starts_with("ontol")
+                || target.starts_with("tower_http")
+        }))
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let args: Args = Args::parse();
     let ontology = Arc::new(load_ontology(args.ontology)?);
@@ -45,6 +55,8 @@ async fn main() -> anyhow::Result<()> {
             domain_router(engine.clone(), &domain_path, *package_id)?,
         );
     }
+
+    router = router.layer(tower_http::trace::TraceLayer::new_for_http());
 
     axum::Server::bind(&"0.0.0.0:8080".parse()?)
         .serve(router.into_make_service())

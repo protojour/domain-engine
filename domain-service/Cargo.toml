@@ -18,3 +18,4 @@ serde_json.workspace = true
 tokio = { workspace = true, features = ["full"] }
 axum = "0.6"
 anyhow = "1"
+tower-http = { version = "0.4", features = ["trace"] }
