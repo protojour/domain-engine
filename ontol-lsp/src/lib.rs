@@ -1,9 +1,5 @@
 use futures_util::stream::TryStreamExt;
 use js_sys::{AsyncIterator, Uint8Array};
-use lsp_types::request::{
-    GotoDeclarationParams, GotoDeclarationResponse, GotoTypeDefinitionParams,
-    GotoTypeDefinitionResponse,
-};
 use state::{get_builtins, Document, State};
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::{Error as RpcError, Result};
@@ -51,9 +47,10 @@ impl WasmServer {
         let output =
             JsCast::unchecked_into::<wasm_streams::writable::sys::WritableStream>(self.from_server);
         let output = wasm_streams::WritableStream::from_raw(output);
-        let output = output.try_into_async_write().map_err(|err| err.0)?;
+        let output = output.into_async_write();
 
         let (service, messages) = LspService::new(Backend::new);
+
         Server::new(input, output, messages).serve(service).await;
 
         Ok(())
@@ -214,57 +211,6 @@ impl LanguageServer for Backend {
     }
 
     async fn completion_resolve(&self, _params: CompletionItem) -> Result<CompletionItem> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn goto_definition(
-        &self,
-        _params: GotoDefinitionParams,
-    ) -> Result<Option<GotoDefinitionResponse>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn goto_type_definition(
-        &self,
-        _params: GotoTypeDefinitionParams,
-    ) -> Result<Option<GotoTypeDefinitionResponse>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn references(&self, _params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn goto_declaration(
-        &self,
-        _params: GotoDeclarationParams,
-    ) -> Result<Option<GotoDeclarationResponse>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn document_link(
-        &self,
-        _params: DocumentLinkParams,
-    ) -> Result<Option<Vec<DocumentLink>>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn document_link_resolve(&self, _params: DocumentLink) -> Result<DocumentLink> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn document_symbol(
-        &self,
-        _params: DocumentSymbolParams,
-    ) -> Result<Option<DocumentSymbolResponse>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn signature_help(&self, _params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
-        Err(RpcError::method_not_found())
-    }
-
-    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         Err(RpcError::method_not_found())
     }
 }
