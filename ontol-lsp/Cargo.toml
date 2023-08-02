@@ -19,8 +19,9 @@ regex = "1.9.1"
 serde_json = { workspace = true }
 substring = "1.4.5"
 tokio = { workspace = true, default-features = false }
-tower-lsp = { version = "0.19.0", default-features = false }
+tower-lsp = { version = "0.19.0" }
 futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
+async-compat = "0.2"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.64", optional = true }
 wasm-bindgen = { version = "0.2.87", optional = true }

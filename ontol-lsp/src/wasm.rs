@@ -45,7 +45,13 @@ impl WasmServer {
 
         let (service, messages) = LspService::new(Backend::new);
 
-        Server::new(input, output, messages).serve(service).await;
+        Server::new(
+            async_compat::Compat::new(input),
+            async_compat::Compat::new(output),
+            messages,
+        )
+        .serve(service)
+        .await;
 
         Ok(())
     }
