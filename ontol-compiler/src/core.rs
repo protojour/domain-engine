@@ -31,12 +31,12 @@ impl<'m> Compiler<'m> {
         self.register_named_builtin_relation(self.primitives.relations.gen, "gen");
         self.register_named_builtin_relation(self.primitives.relations.route, "route");
 
+        self.register_named_type(self.primitives.bool, "bool", Type::Bool);
         self.register_named_type(self.primitives.false_value, "false", Type::Bool);
         self.register_named_type(self.primitives.true_value, "true", Type::Bool);
-        self.register_named_type(self.primitives.bool, "bool", Type::Bool);
 
-        let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let _ = self.register_named_type(self.primitives.number, "number", Type::Number);
+        let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let string_ty = self.register_named_type(self.primitives.string, "string", Type::String);
 
         let int_int_ty = self.types.intern([int_ty, int_ty]);

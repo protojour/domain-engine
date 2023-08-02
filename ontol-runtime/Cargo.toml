@@ -9,10 +9,10 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-smartstring.workspace = true
+smartstring = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
+indexmap = { workspace = true, features = ["serde"] }
 tracing.workspace = true
-indexmap.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 fnv.workspace = true

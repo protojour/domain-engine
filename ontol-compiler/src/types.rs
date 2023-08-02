@@ -18,15 +18,15 @@ pub enum Type<'m> {
     // This is the "type" of an equivalence assertion.
     // It has no specific meaning.
     Tautology,
-    IntConstant(i64),
     Unit(DefId),
     // The DefId encodes which variant this is, false, true or bool
     Bool(DefId),
     EmptySequence(DefId),
-    /// Any integer
-    Int(DefId),
     /// Any number
     Number(DefId),
+    /// Any integer
+    Int(DefId),
+    IntConstant(i64),
     /// Any string
     String(DefId),
     /// A specific string
@@ -59,9 +59,9 @@ impl<'m> Type<'m> {
             Self::Unit(def_id) => Some(*def_id),
             Self::Bool(def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
-            Self::IntConstant(_) => todo!(),
-            Self::Int(def_id) => Some(*def_id),
             Self::Number(def_id) => Some(*def_id),
+            Self::Int(def_id) => Some(*def_id),
+            Self::IntConstant(_) => todo!(),
             Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
@@ -163,7 +163,6 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
         match ty {
             Type::Tautology => write!(f, "tautology"),
-            Type::IntConstant(val) => write!(f, "int({val})"),
             Type::Unit(_) => write!(f, "unit"),
             Type::Bool(def_id) => {
                 if *def_id == primitives.true_value {
@@ -175,8 +174,9 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 }
             }
             Type::EmptySequence(_) => write!(f, "[]"),
-            Type::Int(_) => write!(f, "int"),
             Type::Number(_) => write!(f, "number"),
+            Type::Int(_) => write!(f, "int"),
+            Type::IntConstant(val) => write!(f, "int({val})"),
             Type::String(_) => write!(f, "string"),
             Type::StringConstant(def_id) => {
                 let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {

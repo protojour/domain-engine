@@ -24,7 +24,7 @@ fn test_map_conduit_blog_post() {
     ])
     .compile_ok(|test| {
         test.assert_domain_map(
-            ("conduit_db::Article", "BlogPost"),
+            ("conduit_db.Article", "BlogPost"),
             json!({
                 "article_id": "11111111-1111-1111-1111-111111111111",
                 "slug": "s",
@@ -60,7 +60,7 @@ fn test_map_conduit_no_tags_in_db_object() {
     ])
     .compile_ok(|test| {
         test.assert_domain_map(
-            ("conduit_db::Article", "BlogPost"),
+            ("conduit_db.Article", "BlogPost"),
             json!({
                 "article_id": "11111111-1111-1111-1111-111111111111",
                 "slug": "s",

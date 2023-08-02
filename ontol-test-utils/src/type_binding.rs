@@ -27,8 +27,8 @@ pub struct TypeBinding<'e> {
 
 impl<'e> TypeBinding<'e> {
     pub(crate) fn new(ontol_test: &'e OntolTest, type_name: &str) -> Self {
-        if type_name.contains("::") {
-            let vector: Vec<&str> = type_name.split("::").collect();
+        if type_name.contains('.') {
+            let vector: Vec<&str> = type_name.split('.').collect();
             let source_name = vector.first().unwrap();
             let type_name = vector.get(1).unwrap();
 
