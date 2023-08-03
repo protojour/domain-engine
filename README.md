@@ -18,19 +18,22 @@ Work in progress. See
 
 ## ONTOL Architecture
 
-Ideal high level data flow:
+High level data flow:
 
 1. Create _compiler_. The compiler is single threaded.
 2. Feed domain source code into the compiler.
 3. The compiler finally produces a shared, immutable and thread safe
-   _environment_.
+   _ontology_.
 4. Execute code by creating a _virtual machine_ which holds a reference to the
-   environment.
+   ontology.
 
 Any number of virtual machines may be created and executed in parallel, because
-of the immutable environment.
+of the immutable ontology.
 
-In the future, we may support precompiled environments.
+The _domain engine_ encapsulates the ONTOL virtual machine, and provides
+a high level interface for interacting with the ontology.
+
+The _domain service_ encapsulates the domain engine, turning it into an internet service.
 
 ### ONTOL compiler transformation steps
 
@@ -41,8 +44,9 @@ executable code:
 2. `lowering`: Lower these statements into various maps for representing
    relationships and `Expr` for representing expressions (used in map/unify).
 3. `type_check`: Type check the expressions and output typed `ontol-hir`.
-4. `hir_unify`: Unify map arms to produce `ontol-hir` functions.
-5. `codegen`: Turn `ontol-hir` functions into `ontol-vm` stack machine
+4. `repr_check`: Check that every entity consists only of concrete types.
+5. `hir_unify`: Unify map arms to produce `ontol-hir` functions.
+6. `codegen`: Turn `ontol-hir` functions into `ontol-vm` stack machine
    assembly-like language.
 
 ## Testing
