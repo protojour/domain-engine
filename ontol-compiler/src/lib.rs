@@ -32,6 +32,7 @@ pub mod hir_unify;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
+pub mod repr_check;
 pub mod serde_codegen;
 pub mod source;
 pub mod typed_hir;
@@ -161,8 +162,11 @@ impl<'m> Compiler<'m> {
         // Call this after all source files have been compiled
         compile_all_patterns(self);
 
-        self.type_check().check_domain_types();
-        self.type_check().check_unions();
+        let mut type_check = self.type_check();
+        type_check.check_domain_types();
+        type_check.check_unions();
+        self.repr_check();
+
         self.check_error()?;
 
         execute_codegen_tasks(self);

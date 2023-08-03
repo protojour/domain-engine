@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -24,6 +26,8 @@ pub struct Relations {
     pub value_generators_unchecked: FnvHashMap<RelationshipId, (DefId, SourceSpan)>,
     /// `gen` relations after proper type check:
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
+
+    pub ontology_mesh: FnvHashMap<DefId, BTreeSet<DefId>>,
 }
 
 impl Relations {

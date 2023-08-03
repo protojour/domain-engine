@@ -87,7 +87,10 @@ pub fn diff_errors(
         spanned_message: SpannedMessage,
     ) {
         let source_id = spanned_message.span.source_id;
-        let builder = builders.get_mut(&source_id).unwrap();
+        let builder = match builders.get_mut(&source_id) {
+            Some(builder) => builder,
+            None => panic!("No builder for {source_id:?}"),
+        };
 
         let byte_pos = spanned_message.span.start as usize;
 

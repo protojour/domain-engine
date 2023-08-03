@@ -39,6 +39,10 @@ impl<'m> Compiler<'m> {
         let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let string_ty = self.register_named_type(self.primitives.string, "string", Type::String);
 
+        self.is(self.primitives.int, self.primitives.number);
+        self.is(self.primitives.true_value, self.primitives.bool);
+        self.is(self.primitives.false_value, self.primitives.bool);
+
         let int_int_ty = self.types.intern([int_ty, int_ty]);
         let string_string_ty = self.types.intern([string_ty, string_ty]);
 
@@ -162,5 +166,13 @@ impl<'m> Compiler<'m> {
         self.def_types.table.insert(def_id, ty);
 
         def_id
+    }
+
+    fn is(&mut self, def_id: DefId, other_def_id: DefId) {
+        self.relations
+            .ontology_mesh
+            .entry(def_id)
+            .or_default()
+            .insert(other_def_id);
     }
 }

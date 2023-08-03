@@ -80,6 +80,7 @@ pub enum CompileError {
     NoRelationParametersExpected,
     IncompatibleLiteral,
     CannotGenerateValue(String),
+    EntityNotRepresentable,
     TODO(String),
 }
 
@@ -203,6 +204,7 @@ impl std::fmt::Display for CompileError {
             Self::NoRelationParametersExpected => write!(f, "no relation parameters expected"),
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
             Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
+            Self::EntityNotRepresentable => write!(f, "Entity not representable"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }
@@ -218,6 +220,8 @@ pub struct SpannedNote {
 pub enum Note {
     #[error("Consider using a one way mapping (`map => {{ .. }}`) here")]
     ConsiderUsingOneWayMap,
+    #[error("Type is abstract")]
+    TypeIsAbstract,
 }
 
 #[derive(Debug)]

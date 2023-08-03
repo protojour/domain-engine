@@ -152,14 +152,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ))
             }
             SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
-                let map = self
+                let table = self
                     .relations
                     .properties_by_def_id
                     .get(&def_variant.def_id)?
                     .table
                     .as_ref()?;
 
-                let (property_id, _) = map.iter().find(|(_, property)| property.is_entity_id)?;
+                let (property_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
 
                 let meta = self
                     .defs

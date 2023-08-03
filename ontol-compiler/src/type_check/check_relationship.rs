@@ -75,6 +75,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
+
+                self.relations
+                    .ontology_mesh
+                    .entry(subject.0.def_id)
+                    .or_default()
+                    .insert(object.0.def_id);
+
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
 
                 match (

@@ -9,7 +9,7 @@ mod test_fundamentals;
 mod test_geojson;
 mod test_json_schema;
 mod test_multi_package;
-mod test_number;
+mod test_repr;
 mod test_stix_lite;
 mod test_string_patterns;
 mod unify;
