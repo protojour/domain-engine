@@ -101,7 +101,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         let mut has_repr = false;
 
         for mesh_def_id in &ontology_mesh {
-            match self.def_types.table.get(&mesh_def_id).unwrap() {
+            match self.def_types.table.get(mesh_def_id).unwrap() {
                 Type::Int(_)
                 | Type::Bool(_)
                 | Type::String(_)
