@@ -10,6 +10,10 @@ use ontol_runtime::PackageId;
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct SourceId(pub u32);
 
+/// Native source means that it is not possible to point
+/// to an ONTOL file, usually because something is built-in.
+pub const NATIVE_SOURCE: SourceId = SourceId(0);
+
 #[derive(Clone, Debug)]
 pub struct Src {
     pub id: SourceId,
@@ -39,7 +43,7 @@ pub struct SourceSpan {
 }
 
 pub const NO_SPAN: SourceSpan = SourceSpan {
-    source_id: SourceId(0),
+    source_id: NATIVE_SOURCE,
     start: 0,
     end: 0,
 };

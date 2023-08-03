@@ -15,7 +15,7 @@ use crate::{
     error::CompileError,
     relation::{Constructor, Properties, Relations},
     types::{DefTypes, Type},
-    Compiler, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote,
+    Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
 };
 
 impl<'m> Compiler<'m> {
@@ -27,7 +27,7 @@ impl<'m> Compiler<'m> {
                     continue;
                 }
 
-                let mut repr_check = ReprCheck::new(self);
+                let mut repr_check = ReprCheck::new(*def_id, self);
                 repr_check.check_entity_repr(*def_id, def, properties);
 
                 if !repr_check.abstract_notes.is_empty() {
@@ -43,6 +43,7 @@ impl<'m> Compiler<'m> {
 }
 
 struct ReprCheck<'c, 'm> {
+    entity_def_id: DefId,
     defs: &'c Defs<'m>,
     def_types: &'c DefTypes<'m>,
     relations: &'c Relations,
@@ -52,15 +53,26 @@ struct ReprCheck<'c, 'm> {
     /// Cycles appear in recursive types (tree structures, for example).
     visited: FnvHashSet<DefId>,
 
-    span_stack: Vec<SourceSpan>,
+    span_stack: Vec<SpanNode>,
 
     /// If this is non-empty, the type is not representable
     abstract_notes: Vec<SpannedNote>,
 }
 
+struct SpanNode {
+    span: SourceSpan,
+    kind: SpanKind,
+}
+
+enum SpanKind {
+    Type(DefId),
+    Field,
+}
+
 impl<'c, 'm> ReprCheck<'c, 'm> {
-    fn new(compiler: &'c Compiler<'m>) -> Self {
+    fn new(entity_def_id: DefId, compiler: &'c Compiler<'m>) -> Self {
         Self {
+            entity_def_id,
             defs: &compiler.defs,
             def_types: &compiler.def_types,
             relations: &compiler.relations,
@@ -80,15 +92,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         self.visited.insert(def_id);
-        self.span_stack.push(def.span);
+        self.span_stack.push(SpanNode {
+            span: def.span,
+            kind: SpanKind::Type(def_id),
+        });
 
         let ontology_mesh = self.collect_ontology_mesh(def_id);
-        // if ontology_mesh.len() > 1 {
-        //     panic!("{def:?}: {ontology_mesh:?}");
-        // }
         let mut has_repr = false;
 
-        for mesh_def_id in ontology_mesh {
+        for mesh_def_id in &ontology_mesh {
             match self.def_types.table.get(&mesh_def_id).unwrap() {
                 Type::Int(_)
                 | Type::Bool(_)
@@ -97,7 +109,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 | Type::StringLike(..)
                 | Type::IntConstant(_) => has_repr = true,
                 Type::Domain(_) | Type::Anonymous(_) => {
-                    if let Some(mesh_properties) = self.relations.properties_by_def_id(mesh_def_id)
+                    if let Some(mesh_properties) = self.relations.properties_by_def_id(*mesh_def_id)
                     {
                         if mesh_properties.table.is_some() {
                             has_repr = true;
@@ -128,7 +140,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 let object_def = self.defs.table.get(&object_def_id).unwrap();
                 if let Some(object_properties) = self.relations.properties_by_def_id(object_def_id)
                 {
-                    self.span_stack.push(meta.relationship.object.1);
+                    self.span_stack.push(SpanNode {
+                        span: meta.relationship.object.1,
+                        kind: SpanKind::Field,
+                    });
                     self.check_type_repr(object_def_id, object_def, object_properties);
                     self.span_stack.pop();
                 }
@@ -136,13 +151,26 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if !has_repr {
-            for span in self.span_stack.iter().rev() {
-                if span.source_id != SourceId(0) {
-                    self.abstract_notes.push(SpannedNote {
-                        note: Note::TypeIsAbstract,
-                        span: *span,
-                    });
-                    break;
+            for span_node in self.span_stack.iter().rev() {
+                if span_node.span.source_id == NATIVE_SOURCE {
+                    continue;
+                }
+
+                match span_node.kind {
+                    SpanKind::Type(span_def_id) => {
+                        if span_def_id != self.entity_def_id {
+                            self.abstract_notes.push(SpannedNote {
+                                note: Note::TypeIsAbstract,
+                                span: span_node.span,
+                            });
+                        }
+                    }
+                    SpanKind::Field => {
+                        self.abstract_notes.push(SpannedNote {
+                            note: Note::FieldTypeIsAbstract,
+                            span: span_node.span,
+                        });
+                    }
                 }
             }
         }

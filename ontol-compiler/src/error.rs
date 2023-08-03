@@ -222,6 +222,8 @@ pub enum Note {
     ConsiderUsingOneWayMap,
     #[error("Type is abstract")]
     TypeIsAbstract,
+    #[error("Type of field is abstract")]
+    FieldTypeIsAbstract,
 }
 
 #[derive(Debug)]
