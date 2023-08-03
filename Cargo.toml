@@ -33,6 +33,7 @@ tracing-subscriber = {version = "0.3", default-features = false, features = ["en
 chrono = { version = "0.4" , features = ["serde"] }
 clap = { version = "4.3.4", features = ["derive"] }
 bincode = "1"
+chumsky = "0.9"
 
 [profile.release]
 strip = true

@@ -12,7 +12,7 @@ doctest = false
 ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
 smartstring.workspace = true
-chumsky = "0.9"
+chumsky.workspace = true
 
 [dev-dependencies]
 assert_matches = "1"

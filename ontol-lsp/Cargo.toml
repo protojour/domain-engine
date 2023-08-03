@@ -8,24 +8,32 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [features]
-wasm = ["dep:console_error_panic_hook", "dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:wasm-streams", "dep:web-sys"]
+wasm = [
+    "dep:console_error_panic_hook",
+    "dep:js-sys",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:wasm-streams",
+    "dep:web-sys",
+    "dep:async-compat"
+]
 
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
-chumsky = "0.9"
+chumsky.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
 lsp-types = "0.94.0"
 regex = "1.9.1"
-serde_json = { workspace = true }
 substring = "1.4.5"
-tokio = { workspace = true, default-features = false }
 tower-lsp = { version = "0.19.0" }
 futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
-async-compat = "0.2"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.64", optional = true }
 wasm-bindgen = { version = "0.2.87", optional = true }
 wasm-bindgen-futures = { version = "0.4.37", features = ["futures-core-03-stream"], optional = true  }
 wasm-streams = { version = "0.3.0", optional = true  }
 web-sys = { version = "0.3.64", features = ["console", "ReadableStream", "WritableStream"], optional = true  }
+async-compat = { version = "0.2", optional = true }
