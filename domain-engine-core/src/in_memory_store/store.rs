@@ -473,7 +473,7 @@ impl InMemoryStore {
             }
             Data::String(string) => Ok(DynamicKey::String(string.clone())),
             Data::Uuid(uuid) => Ok(DynamicKey::Uuid(*uuid)),
-            Data::Int(int) => Ok(DynamicKey::Int(*int)),
+            Data::I64(int) => Ok(DynamicKey::Int(*int)),
             _ => Err(DomainError::IdNotFound),
         }
     }
@@ -528,7 +528,7 @@ impl InMemoryStore {
             (SerdeOperator::Int(def_id), ValueGenerator::Autoincrement) => {
                 let id_value = self.int_id_counter;
                 self.int_id_counter += 1;
-                Ok(Value::new(Data::Int(id_value), *def_id))
+                Ok(Value::new(Data::I64(id_value), *def_id))
             }
             (
                 SerdeOperator::ValueType(ValueOperator {

@@ -125,8 +125,8 @@ impl<'e> SerdeProcessor<'e> {
 impl<'e> SerdeProcessor<'e> {
     fn serialize_number<S: Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
         match &value.data {
-            Data::Int(num) => serializer.serialize_i64(*num),
-            Data::Float(f) => serializer.serialize_f64(*f),
+            Data::I64(num) => serializer.serialize_i64(*num),
+            Data::F64(f) => serializer.serialize_f64(*f),
             other => panic!("BUG: Serialize expected number, got {other:?}"),
         }
     }

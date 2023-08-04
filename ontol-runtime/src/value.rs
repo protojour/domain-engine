@@ -97,8 +97,8 @@ impl Value {
 #[derive(Clone, Debug)]
 pub enum Data {
     Unit,
-    Int(i64),
-    Float(f64),
+    I64(i64),
+    F64(f64),
     Rational(Box<num::rational::BigRational>),
     String(String),
     Uuid(uuid::Uuid),
@@ -247,8 +247,8 @@ impl<'v> Display for ValueDebug<'v> {
         let value = &self.0;
         match &value.data {
             Data::Unit => write!(f, "#u"),
-            Data::Int(i) => write!(f, "int({i})"),
-            Data::Float(n) => write!(f, "flt({n})"),
+            Data::I64(i) => write!(f, "int({i})"),
+            Data::F64(n) => write!(f, "flt({n})"),
             Data::Rational(r) => write!(f, "rat({r})"),
             Data::String(s) => write!(f, "'{s}'"),
             Data::Uuid(u) => write!(f, "uuid({u})"),
@@ -336,7 +336,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert(
             RelationshipId(DefId(PackageId(0), 666)),
-            Value::new(Data::Int(42), DefId(PackageId(0), 42)).to_unit_attr(),
+            Value::new(Data::I64(42), DefId(PackageId(0), 42)).to_unit_attr(),
         );
     }
 }

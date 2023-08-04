@@ -21,6 +21,7 @@ use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Property, Relations};
+use repr::repr_model::ReprCtx;
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
@@ -32,7 +33,7 @@ pub mod hir_unify;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
-pub mod repr_check;
+pub mod repr;
 pub mod serde_codegen;
 pub mod source;
 pub mod typed_hir;
@@ -69,6 +70,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
+    pub(crate) repr: ReprCtx,
     pub(crate) patterns: Patterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
@@ -93,6 +95,7 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
+            repr: Default::default(),
             patterns: Patterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),

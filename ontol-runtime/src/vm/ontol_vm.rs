@@ -139,12 +139,12 @@ impl Processor for OntolProcessor {
         let map = self.struct_local_mut(source);
         match map.remove(&key) {
             Some(attribute) => {
-                self.stack.push(Value::new(Data::Int(1), DefId::unit()));
+                self.stack.push(Value::new(Data::I64(1), DefId::unit()));
                 self.stack.push(attribute.rel_params);
                 self.stack.push(attribute.value);
             }
             None => {
-                self.stack.push(Value::new(Data::Int(0), DefId::unit()));
+                self.stack.push(Value::new(Data::I64(0), DefId::unit()));
             }
         }
     }
@@ -169,7 +169,7 @@ impl Processor for OntolProcessor {
 
     #[inline(always)]
     fn push_i64(&mut self, k: i64, result_type: DefId) {
-        self.stack.push(Value::new(Data::Int(k), result_type));
+        self.stack.push(Value::new(Data::I64(k), result_type));
     }
 
     #[inline(always)]
@@ -192,8 +192,8 @@ impl Processor for OntolProcessor {
                 let value = self.local(*local);
                 value.type_def_id == *def_id
             }
-            Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::Int(0)),
-            Predicate::YankFalse(local) => matches!(self.yank(*local).data, Data::Int(0)),
+            Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::I64(0)),
+            Predicate::YankFalse(local) => matches!(self.yank(*local).data, Data::I64(0)),
         }
     }
 
@@ -208,19 +208,19 @@ impl OntolProcessor {
         match proc {
             BuiltinProc::Add => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Data::Int(a + b)
+                Data::I64(a + b)
             }
             BuiltinProc::Sub => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Data::Int(a - b)
+                Data::I64(a - b)
             }
             BuiltinProc::Mul => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Data::Int(a * b)
+                Data::I64(a * b)
             }
             BuiltinProc::Div => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Data::Int(a / b)
+                Data::I64(a / b)
             }
             BuiltinProc::Append => {
                 let [b, a]: [String; 2] = self.pop_n();
@@ -245,7 +245,7 @@ impl OntolProcessor {
     #[inline(always)]
     fn int_local_mut(&mut self, local: Local) -> &mut i64 {
         match &mut self.local_mut(local).data {
-            Data::Int(int) => int,
+            Data::I64(int) => int,
             _ => panic!("Value at {local:?} is not an int"),
         }
     }
@@ -412,15 +412,15 @@ mod tests {
                     [
                         (
                             "S:0:1".parse().unwrap(),
-                            Value::new(Data::Int(333), def_id(0)).into(),
+                            Value::new(Data::I64(333), def_id(0)).into(),
                         ),
                         (
                             "S:0:2".parse().unwrap(),
-                            Value::new(Data::Int(10), def_id(0)).into(),
+                            Value::new(Data::I64(10), def_id(0)).into(),
                         ),
                         (
                             "S:0:3".parse().unwrap(),
-                            Value::new(Data::Int(11), def_id(0)).into(),
+                            Value::new(Data::I64(11), def_id(0)).into(),
                         ),
                     ]
                     .into(),
@@ -432,10 +432,10 @@ mod tests {
         let Data::Struct(mut attrs) = output.data else {
             panic!();
         };
-        let Data::Int(a) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().value.data else {
+        let Data::I64(a) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
-        let Data::Int(b) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().value.data else {
+        let Data::I64(b) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().value.data else {
             panic!();
         };
         assert_eq!(666, a);
@@ -472,8 +472,8 @@ mod tests {
             proc,
             [Value::new(
                 Data::Sequence(vec![
-                    Value::new(Data::Int(1), def_id(0)).into(),
-                    Value::new(Data::Int(2), def_id(0)).into(),
+                    Value::new(Data::I64(1), def_id(0)).into(),
+                    Value::new(Data::I64(2), def_id(0)).into(),
                 ]),
                 def_id(0),
             )],

@@ -22,6 +22,7 @@ use crate::{
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
     relation::{Constructor, Properties, Relations},
+    repr::repr_model::ReprCtx,
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
@@ -34,6 +35,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) primitives: &'c Primitives,
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
+    pub(super) repr: &'c ReprCtx,
     pub(super) patterns: &'c Patterns,
     pub(super) codegen_tasks: &'c CodegenTasks<'m>,
     pub(super) operators_by_id: Vec<SerdeOperator>,
@@ -236,6 +238,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_def_type_operator(&mut self, def_variant: DefVariant) -> Option<OperatorAllocation> {
         match self.get_def_type(def_variant.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
+                self.repr.table.get(&def_variant.def_id)?;
+
                 let properties = self.relations.properties_by_def_id.get(def_id);
                 let typename = match self.defs.get_def_kind(*def_id) {
                     Some(DefKind::Type(TypeDef {

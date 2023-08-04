@@ -436,8 +436,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .into(),
                     );
                 }
-                (Some(_), Type::Domain(_), Some(map)) => {
-                    if map
+                (Some(_), Type::Domain(_), Some(table)) => {
+                    if table
                         .insert(
                             PropertyId::object(relationship.0),
                             Property {

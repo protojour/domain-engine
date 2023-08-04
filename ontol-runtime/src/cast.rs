@@ -47,14 +47,14 @@ impl Cast<bool> for Value {
 
     fn cast_into(self) -> bool {
         match self.data {
-            Data::Int(i) => i != 0,
+            Data::I64(i) => i != 0,
             _ => panic!("not a unit"),
         }
     }
 
     fn cast_ref(&self) -> &Self::Ref {
         match self.data {
-            Data::Int(i) => {
+            Data::I64(i) => {
                 if i != 0 {
                     &true
                 } else {
@@ -89,14 +89,14 @@ impl Cast<i64> for Value {
 
     fn cast_into(self) -> i64 {
         match self.data {
-            Data::Int(n) => n,
+            Data::I64(n) => n,
             _ => panic!("not an integer"),
         }
     }
 
     fn cast_ref(&self) -> &Self::Ref {
         match &self.data {
-            Data::Int(n) => n,
+            Data::I64(n) => n,
             _ => panic!("not an integer"),
         }
     }

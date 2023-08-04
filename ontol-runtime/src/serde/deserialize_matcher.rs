@@ -92,9 +92,9 @@ impl ValueMatcher for BoolMatcher {
     fn match_bool(&self, val: bool) -> Result<Value, ()> {
         let int = if val { 1 } else { 0 };
         match (self, val) {
-            (Self::False(def_id), false) => Ok(Value::new(Data::Int(int), *def_id)),
-            (Self::True(def_id), true) => Ok(Value::new(Data::Int(int), *def_id)),
-            (Self::Bool(def_id), _) => Ok(Value::new(Data::Int(int), *def_id)),
+            (Self::False(def_id), false) => Ok(Value::new(Data::I64(int), *def_id)),
+            (Self::True(def_id), true) => Ok(Value::new(Data::I64(int), *def_id)),
+            (Self::Bool(def_id), _) => Ok(Value::new(Data::I64(int), *def_id)),
             _ => Err(()),
         }
     }

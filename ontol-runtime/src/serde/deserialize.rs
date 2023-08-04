@@ -248,7 +248,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             .map_err(|_| Error::invalid_type(Unexpected::Unsigned(v), &self))?;
 
         Ok(Value {
-            data: Data::Int(
+            data: Data::I64(
                 v.try_into()
                     .map_err(|_| Error::custom("u64 overflow".to_string()))?,
             ),
@@ -264,7 +264,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
             .map_err(|_| Error::invalid_type(Unexpected::Signed(v), &self))?;
 
         Ok(Value {
-            data: Data::Int(v),
+            data: Data::I64(v),
             type_def_id,
         }
         .into())

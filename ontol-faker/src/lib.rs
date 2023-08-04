@@ -73,15 +73,15 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         debug!("fake attribute {processor:?}");
         let value = match processor.value_operator {
             SerdeOperator::Unit => Value::unit(),
-            SerdeOperator::False(def_id) => Value::new(Data::Int(0), *def_id),
-            SerdeOperator::True(def_id) => Value::new(Data::Int(1), *def_id),
+            SerdeOperator::False(def_id) => Value::new(Data::I64(0), *def_id),
+            SerdeOperator::True(def_id) => Value::new(Data::I64(1), *def_id),
             SerdeOperator::Bool(def_id) => {
                 let value: bool = Faker.fake_with_rng(self.rng);
-                Value::new(Data::Int(if value { 1 } else { 0 }), *def_id)
+                Value::new(Data::I64(if value { 1 } else { 0 }), *def_id)
             }
             SerdeOperator::Int(def_id) => {
                 let int: i32 = Faker.fake_with_rng(self.rng);
-                Value::new(Data::Int(int.into()), *def_id)
+                Value::new(Data::I64(int.into()), *def_id)
             }
             SerdeOperator::Number(def_id) => Value::new(
                 Data::new_rational_i64(
