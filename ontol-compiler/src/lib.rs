@@ -165,10 +165,9 @@ impl<'m> Compiler<'m> {
         // Call this after all source files have been compiled
         compile_all_patterns(self);
 
-        let mut type_check = self.type_check();
-        type_check.check_domain_types();
-        type_check.check_unions();
+        self.type_check().check_domain_types();
         self.repr_check();
+        self.type_check().check_unions();
 
         self.check_error()?;
 

@@ -12,7 +12,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
-    relation::{Constructor, Properties, Property},
+    relation::{Constructor, Is, Properties, Property},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -80,7 +80,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .ontology_mesh
                     .entry(subject.0.def_id)
                     .or_default()
-                    .insert(object.0.def_id);
+                    .insert(
+                        Is {
+                            def_id: object.0.def_id,
+                            cardinality: relationship.1.subject_cardinality.0,
+                        },
+                        *span,
+                    );
 
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
 

@@ -1,6 +1,8 @@
 //! The core domain
 
-use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{
+    ontology::PropertyCardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId,
+};
 
 use crate::{
     def::{DefKind, TypeDef},
@@ -9,7 +11,7 @@ use crate::{
     package::CORE_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
     regex_util,
-    relation::Constructor,
+    relation::{Constructor, Is},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -173,6 +175,12 @@ impl<'m> Compiler<'m> {
             .ontology_mesh
             .entry(def_id)
             .or_default()
-            .insert(other_def_id);
+            .insert(
+                Is {
+                    def_id: other_def_id,
+                    cardinality: PropertyCardinality::Mandatory,
+                },
+                NO_SPAN,
+            );
     }
 }

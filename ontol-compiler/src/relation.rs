@@ -1,10 +1,11 @@
-use std::collections::BTreeSet;
-
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
-    value_generator::ValueGenerator, DefId, RelationshipId,
+    discriminator::UnionDiscriminator,
+    ontology::{Cardinality, PropertyCardinality},
+    value::PropertyId,
+    value_generator::ValueGenerator,
+    DefId, RelationshipId,
 };
 
 use crate::{def::RelationId, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
@@ -27,7 +28,7 @@ pub struct Relations {
     /// `gen` relations after proper type check:
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
 
-    pub ontology_mesh: FnvHashMap<DefId, BTreeSet<DefId>>,
+    pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
 }
 
 impl Relations {
@@ -38,6 +39,12 @@ impl Relations {
     pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
         self.properties_by_def_id.entry(domain_type_id).or_default()
     }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct Is {
+    pub def_id: DefId,
+    pub cardinality: PropertyCardinality,
 }
 
 #[derive(Default, Debug)]
@@ -68,6 +75,9 @@ pub struct Property {
 /// The "Constructor" represents different (exclusive) ways
 /// a type may be represented.
 /// Not sure about the naming of this type.
+///
+/// TODO: Replace this with ReprKind..
+/// A "constructor" concept may still nice to have, e.g. in relation to deserialization.
 #[derive(Default, Debug)]
 pub enum Constructor {
     /// There is nothing special about this type, it is just a "struct" consisting of relations to other types.

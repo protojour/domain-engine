@@ -5,18 +5,19 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
-use std::collections::BTreeSet;
-
 use fnv::FnvHashSet;
-use ontol_runtime::DefId;
-use tracing::{trace, warn};
+use indexmap::IndexMap;
+use ontol_runtime::{ontology::PropertyCardinality, smart_format, DefId};
+use tracing::trace;
 
 use crate::{
     def::{Def, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
+    package::CORE_PKG,
     relation::{Constructor, Properties, Relations},
     types::{DefTypes, Type},
     CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
+    NO_SPAN,
 };
 
 use super::repr_model::{ReprCtx, ReprKind};
@@ -179,7 +180,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if let Some(repr) = repr {
-            trace!("def {def_id:?} repr: {repr:?}");
+            trace!("def {def_id:?} result repr: {repr:?}");
             self.repr.table.insert(def_id, repr);
             Ok(())
         } else {
@@ -190,81 +191,150 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<ReprKind> {
         let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
 
-        let mut repr: Option<ReprKind> = None;
+        if leaf_def_id.package_id() != CORE_PKG {
+            trace!("mesh for {leaf_def_id:?}: {:?}", ontology_mesh.keys());
+        }
 
-        for def_id in &ontology_mesh {
-            match self.def_types.table.get(def_id) {
+        let mut rec = ReprRecord { repr: None };
+
+        for (def_id, data) in &ontology_mesh {
+            let def_id = *def_id;
+
+            if leaf_def_id.package_id() != CORE_PKG {
+                trace!("next repr {leaf_def_id:?}=>{def_id:?} prev={:?}", rec.repr);
+            }
+
+            match self.def_types.table.get(&def_id) {
                 Some(Type::Int(_) | Type::IntConstant(_)) => {
-                    self.merge_repr(&mut repr, ReprKind::I64);
+                    self.merge_repr(&mut rec, ReprKind::I64, def_id, data);
                 }
                 Some(Type::Bool(_)) => {
-                    self.merge_repr(&mut repr, ReprKind::Bool);
+                    self.merge_repr(&mut rec, ReprKind::Bool, def_id, data);
                 }
                 Some(Type::String(_) | Type::StringConstant(_) | Type::StringLike(..)) => {
-                    self.merge_repr(&mut repr, ReprKind::String)
+                    self.merge_repr(&mut rec, ReprKind::String, def_id, data)
                 }
                 Some(Type::Domain(_) | Type::Anonymous(_)) => {
-                    if let Some(properties) = self.relations.properties_by_def_id(*def_id) {
+                    if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+                        let mut has_table = false;
                         if properties.table.is_some() {
-                            self.merge_repr(&mut repr, ReprKind::Struct);
+                            trace!("table: {:?} {data:?}", properties.table);
+                            self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                            has_table = true;
                         }
 
                         match &properties.constructor {
                             Constructor::StringFmt(_) => {
-                                self.merge_repr(&mut repr, ReprKind::String);
+                                assert!(!has_table);
+                                self.merge_repr(&mut rec, ReprKind::String, def_id, data);
                             }
                             Constructor::Struct => {
-                                self.merge_repr(&mut repr, ReprKind::Struct);
+                                if !has_table {
+                                    self.merge_repr(&mut rec, ReprKind::EmptyDict, def_id, data);
+                                }
                             }
                             Constructor::Sequence(_) => {
-                                self.merge_repr(&mut repr, ReprKind::Seq);
+                                assert!(!has_table);
+                                self.merge_repr(&mut rec, ReprKind::Seq, def_id, data);
                             }
                             _ => {}
                         }
                     } else {
-                        self.merge_repr(&mut repr, ReprKind::Struct);
+                        self.merge_repr(&mut rec, ReprKind::EmptyDict, def_id, data);
                     }
                 }
                 _ => {}
             }
         }
 
-        repr
+        rec.repr
     }
 
-    fn merge_repr(&mut self, repr: &mut Option<ReprKind>, kind: ReprKind) {
-        match repr {
-            None => *repr = Some(kind),
-            Some(repr) => {
-                if *repr != kind {
-                    warn!("Conflicting repr: {repr:?} and {kind:?}");
+    fn merge_repr(&mut self, rec: &mut ReprRecord, kind: ReprKind, def_id: DefId, data: &IsData) {
+        match (&mut rec.repr, data.is_relation, kind) {
+            (None, IsRelation::Origin | IsRelation::Mandatory, kind) => {
+                rec.repr = Some(kind);
+            }
+            (Some(repr), IsRelation::Mandatory, kind) if *repr != kind => {
+                rec.repr = Some(ReprKind::Intersection(vec![(def_id, data.rel_span)]));
+            }
+            (Some(_), IsRelation::Mandatory, _) => {}
+            (Some(repr), IsRelation::Origin, _) => {
+                unreachable!("in origin relation, repr was {repr:?}");
+            }
+            (None, IsRelation::Optional, _) => {
+                rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+            }
+            (Some(_), IsRelation::Optional, _) => {
+                rec.repr = Some(ReprKind::Union(vec![]));
+            }
+        }
+    }
+
+    fn collect_ontology_mesh(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
+        let mut output = IndexMap::default();
+
+        self.traverse_ontology_mesh(def_id, IsRelation::Origin, NO_SPAN, &mut output);
+
+        output
+    }
+
+    fn traverse_ontology_mesh(
+        &mut self,
+        def_id: DefId,
+        is_relation: IsRelation,
+        span: SourceSpan,
+        output: &mut IndexMap<DefId, IsData>,
+    ) {
+        if let Some(data) = output.get(&def_id) {
+            if data.is_relation != is_relation {
+                self.errors.push(SpannedCompileError {
+                    error: CompileError::TODO(smart_format!(
+                        "Conflicting optionality for is relation"
+                    )),
+                    span,
+                    notes: vec![],
+                });
+            }
+        } else {
+            output.insert(
+                def_id,
+                IsData {
+                    is_relation,
+                    rel_span: span,
+                },
+            );
+
+            if let Some(entries) = self.relations.ontology_mesh.get(&def_id) {
+                for (is, span) in entries {
+                    let next_relation = match (is_relation, is.cardinality) {
+                        (
+                            IsRelation::Origin | IsRelation::Mandatory,
+                            PropertyCardinality::Mandatory,
+                        ) => IsRelation::Mandatory,
+                        _ => IsRelation::Optional,
+                    };
+
+                    self.traverse_ontology_mesh(is.def_id, next_relation, *span, output);
                 }
             }
         }
     }
+}
 
-    fn collect_ontology_mesh(&self, def_id: DefId) -> BTreeSet<DefId> {
-        let mut output = BTreeSet::default();
+#[derive(Debug)]
+struct IsData {
+    is_relation: IsRelation,
+    rel_span: SourceSpan,
+}
 
-        fn traverse(def_id: DefId, output: &mut BTreeSet<DefId>, check: &ReprCheck) {
-            if output.contains(&def_id) {
-                return;
-            }
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+enum IsRelation {
+    Origin,
+    Mandatory,
+    Optional,
+}
 
-            output.insert(def_id);
-
-            let mesh = match check.relations.ontology_mesh.get(&def_id) {
-                Some(mesh) => mesh,
-                None => return,
-            };
-
-            for is_def_id in mesh {
-                traverse(*is_def_id, output, check);
-            }
-        }
-
-        traverse(def_id, &mut output, self);
-
-        output
-    }
+struct ReprRecord {
+    repr: Option<ReprKind>,
 }

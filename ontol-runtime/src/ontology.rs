@@ -331,7 +331,7 @@ impl OntologyBuilder {
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub enum PropertyCardinality {
     Optional,
     Mandatory,
