@@ -116,7 +116,7 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmOnto
     };
 
     let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
+    let mut compiler = Compiler::new(&mem, sources.clone()).with_ontol();
     compiler
         .compile_package_topology(topology)
         .map_err(|err| convert_compile_error_to_wasm(err, &sources, &source_code_registry))?;
@@ -230,7 +230,7 @@ impl WasmSources {
         };
 
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, sources.clone()).with_core();
+        let mut compiler = Compiler::new(&mem, sources.clone()).with_ontol();
         compiler
             .compile_package_topology(topology)
             .map_err(|err| convert_compile_error_to_wasm(err, &sources, &source_code_registry))?;

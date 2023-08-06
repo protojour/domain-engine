@@ -21,7 +21,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     namespace::Space,
-    package::{PackageReference, CORE_PKG},
+    package::{PackageReference, ONTOL_PKG},
     Compiler, Src,
 };
 
@@ -560,7 +560,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let lit = self.compiler.strings.intern(&lit);
                 let def_id = self.compiler.defs.add_def(
                     DefKind::NumberLiteral(lit),
-                    CORE_PKG,
+                    ONTOL_PKG,
                     self.src.span(span),
                 );
                 Ok(DefReference {
@@ -845,11 +845,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
-        // A single ident looks in both core and the current package
+        // A single ident looks in both ONTOL_PKG and the current package
         match self
             .compiler
             .namespaces
-            .lookup(&[self.src.package_id, CORE_PKG], Space::Type, ident)
+            .lookup(&[self.src.package_id, ONTOL_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
             None => Err((CompileError::TypeNotFound, span.clone())),

@@ -67,7 +67,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ) {
                     (
                         Some(Def {
-                            kind: DefKind::CoreFn(proc),
+                            kind: DefKind::Fn(proc),
                             ..
                         }),
                         Some(Type::Function { params, output }),

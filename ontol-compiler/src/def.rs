@@ -14,7 +14,7 @@ use crate::{
     expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
-    package::CORE_PKG,
+    package::ONTOL_PKG,
     primitive::PrimitiveKind,
     regex_util::parse_literal_regex_to_hir,
     source::SourceSpan,
@@ -48,7 +48,7 @@ pub enum DefKind<'m> {
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
-    CoreFn(BuiltinProc),
+    Fn(BuiltinProc),
     Constant(ExprId),
     Mapping(MapDirection, Variables, ExprId, ExprId),
 }
@@ -68,7 +68,7 @@ impl<'m> DefKind<'m> {
             Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
-            Self::CoreFn(_) => None,
+            Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
             Self::Relation(_) => None,
             Self::Relationship(_) => None,
@@ -293,7 +293,7 @@ impl<'m> Defs<'m> {
                 kind: RelationKind::Builtin(kind),
                 subject_prop: None,
             }),
-            CORE_PKG,
+            ONTOL_PKG,
             NO_SPAN,
         )
     }
@@ -303,7 +303,7 @@ impl<'m> Defs<'m> {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::StringLiteral(lit), CORE_PKG, NO_SPAN);
+                let def_id = self.add_def(DefKind::StringLiteral(lit), ONTOL_PKG, NO_SPAN);
                 self.string_literals.insert(lit, def_id);
                 def_id
             }
@@ -321,7 +321,7 @@ impl<'m> Defs<'m> {
             None => {
                 let hir = parse_literal_regex_to_hir(lit, span)?;
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::Regex(lit), CORE_PKG, NO_SPAN);
+                let def_id = self.add_def(DefKind::Regex(lit), ONTOL_PKG, NO_SPAN);
                 self.regex_strings.insert(lit, def_id);
                 self.literal_regex_hirs.insert(def_id, hir);
 
@@ -339,7 +339,7 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_primitive(&mut self, kind: PrimitiveKind) -> DefId {
-        self.add_def(DefKind::Primitive(kind), CORE_PKG, NO_SPAN)
+        self.add_def(DefKind::Primitive(kind), ONTOL_PKG, NO_SPAN)
     }
 }
 

@@ -5,7 +5,7 @@ use smartstring::alias::String;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, Relation, RelationKind},
-    package::CORE_PKG,
+    package::ONTOL_PKG,
     Compiler,
 };
 
@@ -162,7 +162,7 @@ impl<'g, 'm> serde::Serialize for Nodes<'g, 'm> {
         let mut list = serializer.serialize_seq(None)?;
 
         for (def_id, node_meta) in &state.node_meta_table {
-            if def_id.package_id() == CORE_PKG && node_meta.ref_count == 0 {
+            if def_id.package_id() == ONTOL_PKG && node_meta.ref_count == 0 {
                 continue;
             }
 

@@ -221,7 +221,7 @@ impl TestPackages {
     fn compile_topology(&mut self) -> Result<OntolTest, UnifiedCompileError> {
         let (package_topology, root_package) = self.load_topology()?;
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, self.sources.clone()).with_core();
+        let mut compiler = Compiler::new(&mem, self.sources.clone()).with_ontol();
 
         match compiler.compile_package_topology(package_topology) {
             Ok(()) => {

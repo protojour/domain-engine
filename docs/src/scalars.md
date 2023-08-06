@@ -1,6 +1,6 @@
-# Core scalar types
+# Ontol scalar types
 
-(This documentation should be extracted from the core domain)
+(This documentation should be extracted from the ontol domain)
 
 ```ontol
 bool

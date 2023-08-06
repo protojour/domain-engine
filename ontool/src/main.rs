@@ -238,7 +238,7 @@ fn compile(
     };
 
     let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_core();
+    let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
     match compiler.compile_package_topology(topology) {
         Ok(()) => Ok(CompileOutput {
             ontology: compiler.into_ontology(),

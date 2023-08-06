@@ -13,7 +13,7 @@ use tracing::trace;
 use crate::{
     def::{Def, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
-    package::CORE_PKG,
+    package::ONTOL_PKG,
     relation::{Constructor, Properties, Relations},
     types::{DefTypes, Type},
     CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
@@ -191,7 +191,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<ReprKind> {
         let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
 
-        if leaf_def_id.package_id() != CORE_PKG {
+        if leaf_def_id.package_id() != ONTOL_PKG {
             trace!("mesh for {leaf_def_id:?}: {:?}", ontology_mesh.keys());
         }
 
@@ -200,7 +200,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         for (def_id, data) in &ontology_mesh {
             let def_id = *def_id;
 
-            if leaf_def_id.package_id() != CORE_PKG {
+            if leaf_def_id.package_id() != ONTOL_PKG {
                 trace!("next repr {leaf_def_id:?}=>{def_id:?} prev={:?}", rec.repr);
             }
 

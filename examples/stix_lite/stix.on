@@ -3,7 +3,7 @@ type spec_version {
     rel .is?: '2.1'
 }
 
-// FIXME: should probably be defined in core
+// FIXME: should maybe be defined in ONTOL_PKG?
 type url {
     rel .is: string
 }

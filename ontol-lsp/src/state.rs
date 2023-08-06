@@ -222,7 +222,7 @@ impl Document {
                         } else {
                             match val.as_str() {
                                 "id" => {
-                                    dp.path = "core.id".to_string();
+                                    dp.path = "ontol.id".to_string();
                                     dp.signature = self.get_signature(&Range {
                                         start: last_rel,
                                         end: range.end(),
@@ -231,7 +231,7 @@ impl Document {
                                         "### Relation prop\nBinds an id to an entity".to_string();
                                 }
                                 "is" => {
-                                    dp.path = "core.is".to_string();
+                                    dp.path = "ontol.is".to_string();
                                     dp.signature = self.get_signature(&Range {
                                         start: last_rel,
                                         end: range.end(),
@@ -240,7 +240,7 @@ impl Document {
                                         "### Relation prop\nBinds a type to a union".to_string();
                                 }
                                 "gen" => {
-                                    dp.path = "core.gen".to_string();
+                                    dp.path = "ontol.gen".to_string();
                                     dp.signature = self.get_signature(&Range {
                                         start: last_rel,
                                         end: range.end(),
@@ -248,7 +248,7 @@ impl Document {
                                     dp.docs = "### Relation prop\nHave id be generated".to_string();
                                 }
                                 "auto" => {
-                                    dp.path = "core.auto".to_string();
+                                    dp.path = "ontol.auto".to_string();
                                     dp.signature = self.get_signature(&Range {
                                         start: last_rel,
                                         end: range.end(),
@@ -257,7 +257,7 @@ impl Document {
                                         .to_string();
                                 }
                                 "default" => {
-                                    dp.path = "core.default".to_string();
+                                    dp.path = "ontol.default".to_string();
                                     dp.signature = self.get_signature(&Range {
                                         start: last_rel,
                                         end: range.end(),
@@ -266,55 +266,55 @@ impl Document {
                                         "### Relation prop\nAssigns a default to value".to_string();
                                 }
                                 "bool" => {
-                                    dp.path = "core.bool".to_string();
+                                    dp.path = "ontol.bool".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nBoolean".to_string();
                                 }
                                 "int" => {
-                                    dp.path = "core.int".to_string();
+                                    dp.path = "ontol.int".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nUnsigned integer".to_string();
                                 }
                                 "float" => {
-                                    dp.path = "core.float".to_string();
+                                    dp.path = "ontol.float".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nFloating point number".to_string();
                                 }
                                 "number" => {
-                                    dp.path = "core.number".to_string();
+                                    dp.path = "ontol.number".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nNumber".to_string();
                                 }
                                 "string" => {
-                                    dp.path = "core.string".to_string();
+                                    dp.path = "ontol.string".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nUTF-8 string".to_string();
                                 }
                                 "datetime" => {
-                                    dp.path = "core.datetime".to_string();
+                                    dp.path = "ontol.datetime".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nRFC 3339-formatted datetime string"
                                         .to_string();
                                 }
                                 "date" => {
-                                    dp.path = "core.date".to_string();
+                                    dp.path = "ontol.date".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs =
                                         "### Scalar\nRFC 3339-formatted date string".to_string();
                                 }
                                 "time" => {
-                                    dp.path = "core.time".to_string();
+                                    dp.path = "ontol.time".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs =
                                         "### Scalar\nRFC 3339-formatted time string".to_string();
                                 }
                                 "uuid" => {
-                                    dp.path = "core.uuid".to_string();
+                                    dp.path = "ontol.uuid".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nUUID v4".to_string();
                                 }
                                 "regex" => {
-                                    dp.path = "core.regex".to_string();
+                                    dp.path = "ontol.regex".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nRegular expression".to_string();
                                 }

@@ -19,7 +19,7 @@ use crate::SpannedCompileError;
 use crate::Src;
 use crate::NO_SPAN;
 
-pub const CORE_PKG: PackageId = PackageId(0);
+pub const ONTOL_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
 
 /// The compiler's loaded packages

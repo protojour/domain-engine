@@ -255,7 +255,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )
             }
             Some(type_ref) => match def_variant.modifier {
-                DataModifier::NONE => self.alloc_core_type_serde_operator(def_variant, type_ref),
+                DataModifier::NONE => self.alloc_ontol_type_serde_operator(def_variant, type_ref),
                 _ => Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
                     DataModifier::NONE,
@@ -268,7 +268,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn alloc_core_type_serde_operator(
+    fn alloc_ontol_type_serde_operator(
         &mut self,
         def_variant: DefVariant,
         type_ref: TypeRef,

@@ -40,11 +40,11 @@ pub mod typed_hir;
 
 mod codegen;
 mod compiler_queries;
-mod core;
 mod def;
 mod expr;
 mod lowering;
 mod namespace;
+mod ontol;
 mod patterns;
 mod primitive;
 mod regex_util;

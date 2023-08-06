@@ -1,4 +1,4 @@
-//! The core domain
+//! The ontol (builtin-in) domain
 
 use ontol_runtime::{
     ontology::PropertyCardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId,
@@ -8,7 +8,7 @@ use crate::{
     def::{DefKind, TypeDef},
     mem::Intern,
     namespace::Space,
-    package::CORE_PKG,
+    package::ONTOL_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
     regex_util,
     relation::{Constructor, Is},
@@ -17,8 +17,8 @@ use crate::{
 };
 
 impl<'m> Compiler<'m> {
-    pub fn with_core(mut self) -> Self {
-        self.define_package(CORE_PKG);
+    pub fn with_ontol(mut self) -> Self {
+        self.define_package(ONTOL_PKG);
 
         // fundamental types
         self.register_type(self.primitives.unit, Type::Unit);
@@ -59,15 +59,15 @@ impl<'m> Compiler<'m> {
 
         // Built-in functions
         // arithmetic
-        self.def_core_proc("+", DefKind::CoreFn(BuiltinProc::Add), int_int_to_int);
-        self.def_core_proc("-", DefKind::CoreFn(BuiltinProc::Sub), int_int_to_int);
-        self.def_core_proc("*", DefKind::CoreFn(BuiltinProc::Mul), int_int_to_int);
-        self.def_core_proc("/", DefKind::CoreFn(BuiltinProc::Div), int_int_to_int);
+        self.def_proc("+", DefKind::Fn(BuiltinProc::Add), int_int_to_int);
+        self.def_proc("-", DefKind::Fn(BuiltinProc::Sub), int_int_to_int);
+        self.def_proc("*", DefKind::Fn(BuiltinProc::Mul), int_int_to_int);
+        self.def_proc("/", DefKind::Fn(BuiltinProc::Div), int_int_to_int);
 
         // string manipulation
-        self.def_core_proc(
+        self.def_proc(
             "append",
-            DefKind::CoreFn(BuiltinProc::Append),
+            DefKind::Fn(BuiltinProc::Append),
             string_string_to_string,
         );
 
@@ -119,7 +119,7 @@ impl<'m> Compiler<'m> {
             .insert(datetime, StringLikeType::DateTime);
     }
 
-    /// Define a core _domain_ type, i.e. not a primitive
+    /// Define am ontol _domain_ type, i.e. not a primitive
     fn define_domain_type(
         &mut self,
         ident: &'static str,
@@ -132,7 +132,7 @@ impl<'m> Compiler<'m> {
                 params: None,
                 rel_type_for: None,
             }),
-            CORE_PKG,
+            ONTOL_PKG,
             NO_SPAN,
         );
         let type_ref = self.register_named_type(def_id, ident, ty_fn);
@@ -153,7 +153,7 @@ impl<'m> Compiler<'m> {
     ) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
         self.namespaces
-            .get_namespace_mut(CORE_PKG, Space::Type)
+            .get_namespace_mut(ONTOL_PKG, Space::Type)
             .insert(ident.into(), def_id);
         self.def_types.table.insert(def_id, ty);
         ty
@@ -163,8 +163,8 @@ impl<'m> Compiler<'m> {
         self.register_named_type(def_id, ident, |_| Type::BuiltinRelation)
     }
 
-    fn def_core_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(ident, Space::Type, def_kind, CORE_PKG, NO_SPAN);
+    fn def_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
+        let def_id = self.add_named_def(ident, Space::Type, def_kind, ONTOL_PKG, NO_SPAN);
         self.def_types.table.insert(def_id, ty);
 
         def_id

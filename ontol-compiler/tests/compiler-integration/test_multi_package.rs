@@ -79,7 +79,7 @@ fn dependency_dag() {
         (SourceName("c"), "pub type c { rel .is: int }"),
     ])
     .compile_ok(|test| {
-        // four user domains, plus core:
+        // four user domains, plus `ontol`:
         expect_eq!(actual = test.ontology.domains().count(), expected = 5);
 
         let [foobar] = test.bind(["foobar"]);
