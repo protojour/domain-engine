@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::DefId;
+use smallvec::SmallVec;
 
 use crate::SourceSpan;
 
@@ -13,9 +14,10 @@ pub enum ReprKind {
     I64,
     Bool,
     String,
-    Struct,
+    // Struct,
     EmptyDict,
     Seq,
+    StructIntersection(SmallVec<[(DefId, SourceSpan); 1]>),
     Intersection(Vec<(DefId, SourceSpan)>),
     Union(Vec<(DefId, SourceSpan)>),
 }

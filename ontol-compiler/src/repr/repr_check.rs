@@ -192,7 +192,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
 
         if leaf_def_id.package_id() != ONTOL_PKG {
-            trace!("mesh for {leaf_def_id:?}: {:?}", ontology_mesh.keys());
+            trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh.keys());
         }
 
         let mut rec = ReprRecord { repr: None };
@@ -201,7 +201,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             let def_id = *def_id;
 
             if leaf_def_id.package_id() != ONTOL_PKG {
-                trace!("next repr {leaf_def_id:?}=>{def_id:?} prev={:?}", rec.repr);
+                trace!(
+                    "    next repr {leaf_def_id:?}=>{def_id:?} prev={:?}",
+                    rec.repr
+                );
             }
 
             match self.def_types.table.get(&def_id) {
@@ -218,8 +221,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     if let Some(properties) = self.relations.properties_by_def_id(def_id) {
                         let mut has_table = false;
                         if properties.table.is_some() {
-                            trace!("table: {:?} {data:?}", properties.table);
-                            self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                            trace!("    table: {:?} {data:?}", properties.table);
+                            self.merge_repr(
+                                &mut rec,
+                                ReprKind::StructIntersection([(def_id, data.rel_span)].into()),
+                                def_id,
+                                data,
+                            );
                             has_table = true;
                         }
 
@@ -230,7 +238,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             }
                             Constructor::Struct => {
                                 if !has_table {
-                                    self.merge_repr(&mut rec, ReprKind::EmptyDict, def_id, data);
+                                    self.merge_repr(
+                                        &mut rec,
+                                        ReprKind::StructIntersection(Default::default()),
+                                        def_id,
+                                        data,
+                                    );
                                 }
                             }
                             Constructor::Sequence(_) => {
@@ -250,8 +263,24 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         rec.repr
     }
 
-    fn merge_repr(&mut self, rec: &mut ReprRecord, kind: ReprKind, def_id: DefId, data: &IsData) {
-        match (&mut rec.repr, data.is_relation, kind) {
+    fn merge_repr(&mut self, rec: &mut ReprRecord, next: ReprKind, def_id: DefId, data: &IsData) {
+        trace!("    merge repr {next:?}");
+
+        match (&mut rec.repr, data.is_relation, next) {
+            (
+                None,
+                IsRelation::Origin | IsRelation::Mandatory,
+                ReprKind::StructIntersection(members),
+            ) => {
+                rec.repr = Some(ReprKind::StructIntersection(members));
+            }
+            (
+                Some(ReprKind::StructIntersection(members)),
+                IsRelation::Origin | IsRelation::Mandatory,
+                ReprKind::StructIntersection(new_members),
+            ) => {
+                members.extend(new_members);
+            }
             (None, IsRelation::Origin | IsRelation::Mandatory, kind) => {
                 rec.repr = Some(kind);
             }

@@ -40,7 +40,7 @@ impl DefId {
 
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DefId({}, {})", self.0 .0, self.1)
+        write!(f, "#def{}:{}", self.0 .0, self.1)
     }
 }
 
@@ -120,11 +120,7 @@ impl DefVariant {
 
 impl Debug for DefVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "DefVariant({}, {}, {:?})",
-            self.def_id.0 .0, self.def_id.1, self.modifier,
-        )
+        write!(f, "DefVariant({:?}, {:?})", self.def_id, self.modifier)
     }
 }
 
