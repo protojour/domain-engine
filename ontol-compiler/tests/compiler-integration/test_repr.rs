@@ -29,6 +29,20 @@ fn test_repr_error2() {
 }
 
 #[test]
+// BUG: This should not type check
+#[should_panic = "Scripts did not fail to compile"]
+fn test_repr_error3() {
+    "
+    type meters { rel .is: number }
+    type has_length {
+        rel .is: meters
+        rel .is: string
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn test_repr_tuple() {
     "
     pub type tup {
@@ -43,8 +57,6 @@ fn test_repr_tuple() {
 }
 
 #[test]
-// BUG: the intersection logic is broken (does not consider representational vs. semantic types)
-#[should_panic = "Classic intersection (repr = I64)"]
 fn test_repr_valid_mesh1() {
     TestPackages::with_sources([
         (SourceName("si"), "pub type meters { rel .is: number }"),
@@ -65,5 +77,16 @@ fn test_repr_valid_mesh1() {
             ",
         ),
     ])
-    .compile_ok(|_test| {});
+    .compile_ok(|test| {
+        let [meters, length] = test.bind(["si.meters", "length"]);
+
+        assert!(
+            meters.type_info.operator_id.is_none(),
+            "meters is an abstract type"
+        );
+        assert!(
+            length.type_info.operator_id.is_some(),
+            "length is a concrete type"
+        );
+    });
 }

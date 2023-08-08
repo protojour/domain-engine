@@ -50,7 +50,8 @@ pub const NO_SPAN: SourceSpan = SourceSpan {
 
 impl Debug for SourceSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#({:?}):{}..{}", self.source_id, self.start, self.end)
+        let len = self.end - self.start;
+        write!(f, "src@{:?}[{};{}]", self.source_id.0, self.start, len)
     }
 }
 

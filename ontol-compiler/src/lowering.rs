@@ -283,6 +283,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ident: None,
                     params: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
+                    concrete: true,
                 },
                 &span,
             );
@@ -397,6 +398,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ident: None,
                     params: None,
                     rel_type_for: None,
+                    concrete: true,
                 },
                 &span,
             );
@@ -522,6 +524,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             ident: None,
                             params: None,
                             rel_type_for: None,
+                            concrete: true,
                         },
                         span,
                     );
@@ -938,6 +941,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident: Some(ident),
                 params,
                 rel_type_for: None,
+                concrete: true,
             }),
             &span,
         );

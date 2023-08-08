@@ -14,7 +14,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, LookupRelationshipMeta, RelationId, RelationKind},
+    def::{Def, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},
@@ -23,32 +23,30 @@ use crate::{
     SourceSpan, SpannedCompileError,
 };
 
-use super::TypeCheck;
+use super::{repr::repr_model::ReprKind, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_unions(&mut self) {
-        let value_unions = std::mem::take(&mut self.relations.value_unions);
-
-        for value_union_def_id in value_unions {
-            for error in self.check_value_union(value_union_def_id) {
-                self.errors.push(error);
-            }
-        }
-    }
-
     pub fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 
         let union_def = self.defs.table.get(&value_union_def_id).unwrap();
 
-        let properties = self
-            .relations
-            .properties_by_def_id(value_union_def_id)
+        let repr_kind = &self
+            .sealed_defs
+            .repr_table
+            .get(&value_union_def_id)
             .unwrap();
-        let Constructor::Union(relationship_ids) = &properties.constructor else {
-            panic!("not a union");
+
+        let union_variants = match repr_kind {
+            ReprKind::Union(variants) => variants,
+            ReprKind::StructUnion(variants) => variants,
+            _ => panic!("not a union"),
         };
+
+        // let Constructor::Union(relationship_ids) = &properties.constructor else {
+        //     panic!("not a union");
+        // };
 
         let mut inherent_builder = DiscriminatorBuilder::default();
         // Also verify that entity ids are disjoint:
@@ -56,31 +54,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut used_variants: FnvHashSet<DefId> = Default::default();
 
-        for (relationship_id, span) in relationship_ids {
-            let meta = self
-                .defs
-                .lookup_relationship_meta(*relationship_id)
-                .expect("BUG: problem getting relationship meta");
+        for (variant_def_id, span) in union_variants {
+            let variant_def_id = *variant_def_id;
 
-            debug!("check union {:?}", meta.relationship);
+            self.add_variant_to_builder(
+                &mut inherent_builder,
+                variant_def_id,
+                &mut error_set,
+                span,
+            );
 
-            let variant_def = match &meta.relation.kind {
-                RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => def.def_id,
-                _ => meta.relationship.object.0.def_id,
-            };
-
-            if used_variants.contains(&variant_def) {
-                error_set.report(
-                    variant_def,
-                    UnionCheckError::DuplicateAnonymousRelation,
-                    span,
-                );
-                continue;
-            }
-
-            self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
-
-            if let Some(properties) = self.relations.properties_by_def_id(variant_def) {
+            if let Some(properties) = self.relations.properties_by_def_id(variant_def_id) {
                 if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self
                         .defs
@@ -96,8 +80,51 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
 
-            used_variants.insert(variant_def);
+            used_variants.insert(variant_def_id);
         }
+
+        // for (relationship_id, span) in relationship_ids {
+        //     let meta = self
+        //         .defs
+        //         .lookup_relationship_meta(*relationship_id)
+        //         .expect("BUG: problem getting relationship meta");
+        //
+        //     debug!("check union {:?}", meta.relationship);
+        //
+        //     let variant_def = match &meta.relation.kind {
+        //         RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => def.def_id,
+        //         _ => meta.relationship.object.0.def_id,
+        //     };
+        //
+        //     if used_variants.contains(&variant_def) {
+        //         error_set.report(
+        //             variant_def,
+        //             UnionCheckError::DuplicateAnonymousRelation,
+        //             span,
+        //         );
+        //         continue;
+        //     }
+        //
+        //     self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
+        //
+        //     if let Some(properties) = self.relations.properties_by_def_id(variant_def) {
+        //         if let Some(id_relationship_id) = &properties.identified_by {
+        //             let identifies_meta = self
+        //                 .defs
+        //                 .lookup_relationship_meta(*id_relationship_id)
+        //                 .expect("BUG: problem getting relationship meta");
+        //
+        //             self.add_variant_to_builder(
+        //                 &mut entity_id_builder,
+        //                 identifies_meta.relationship.subject.0.def_id,
+        //                 &mut error_set,
+        //                 span,
+        //             );
+        //         }
+        //     }
+        //
+        //     used_variants.insert(variant_def);
+        // }
 
         self.limit_property_discriminators(
             value_union_def_id,
@@ -199,16 +226,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         mut def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
         loop {
+            debug!("find domain type match data {def_id:?}");
+
             match self.relations.properties_by_def_id(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Struct => match &properties.table {
-                        Some(property_set) => {
-                            return Ok(DomainTypeMatchData::Map(property_set));
+                    Constructor::Struct => {
+                        debug!("got struct: {properties:?}");
+                        match &properties.table {
+                            Some(property_set) => {
+                                return Ok(DomainTypeMatchData::Map(property_set));
+                            }
+                            None => {
+                                debug!("Error ok");
+                                return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
+                            }
                         }
-                        None => {
-                            return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
-                        }
-                    },
+                    }
                     Constructor::Value(
                         relationship_id,
                         _,
@@ -229,7 +262,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         todo!()
                     }
                     Constructor::Union(_) => {
-                        return Err(UnionCheckError::UnionTreeNotSupported);
+                        unreachable!()
                     }
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
@@ -519,10 +552,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ))
             }
             UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
-            UnionCheckError::UnionTreeNotSupported => CompileError::UnionTreeNotSupported,
-            UnionCheckError::DuplicateAnonymousRelation => {
-                CompileError::DuplicateAnonymousRelationship
-            }
             UnionCheckError::NoUniformDiscriminatorFound => {
                 CompileError::NoUniformDiscriminatorFound
             }
@@ -608,8 +637,6 @@ impl ErrorSet {
 enum UnionCheckError {
     UnitTypePartOfUnion(DefId),
     CannotDiscriminateType,
-    UnionTreeNotSupported,
-    DuplicateAnonymousRelation,
     NoUniformDiscriminatorFound,
     SharedPrefixInPatternUnion,
     NonDisjointIdsInEntityUnion,

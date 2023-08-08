@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
     value_generator::ValueGenerator,
-    DataModifier, DefId, DefVariant, RelationshipId, Role,
+    DataModifier, DefId, DefVariant, Role,
 };
 use tracing::{debug, trace};
 
@@ -359,11 +359,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr_kind = self
-            .sealed_defs
-            .repr_table
-            .get(&def_variant.def_id)
-            .unwrap();
+        let repr_kind = self.sealed_defs.repr_table.get(&def_variant.def_id)?;
 
         let properties = match (properties, def_variant.modifier) {
             (None, DataModifier::NONE) => {
@@ -385,48 +381,68 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (Some(properties), _) => properties,
         };
 
-        if let ReprKind::StructIntersection(members) = repr_kind {
-            if members.len() == 1 {
-                let (member_def_id, _) = members.first().unwrap();
-                if member_def_id == &def_variant.def_id {
+        match repr_kind {
+            ReprKind::Scalar(def_id, _span) => {
+                if def_id == &def_variant.def_id {
+                    // If it's a "self-scalar" it must be a string fmt (for now).
+                    if let Constructor::StringFmt(segment) = &properties.constructor {
+                        return self.alloc_string_fmt_operator(def_variant, segment);
+                    } else {
+                        panic!("Self-scalar without fmt: {def_id:?}");
+                    }
+                }
+
+                let (requirement, inner_operator_id) = self.get_property_operator(
+                    *def_id,
+                    (PropertyCardinality::Mandatory, ValueCardinality::One),
+                );
+
+                if !matches!(requirement, PropertyCardinality::Mandatory) {
+                    panic!("Scalar cardinality must be mandatory, fix this during type check");
+                }
+
+                let operator_id = self.alloc_operator_id(&def_variant);
+
+                return Some(OperatorAllocation::Allocated(
+                    operator_id,
+                    SerdeOperator::ValueType(ValueOperator {
+                        typename: typename.into(),
+                        def_variant,
+                        inner_operator_id,
+                    }),
+                ));
+            }
+            ReprKind::Struct => {
+                return self.alloc_struct_constructor_operator(def_variant, typename, properties);
+            }
+            ReprKind::StructIntersection(members) => {
+                if members.len() == 1 {
+                    let (member_def_id, _) = members.first().unwrap();
+                    if member_def_id == &def_variant.def_id {
+                        return self.alloc_struct_constructor_operator(
+                            def_variant,
+                            typename,
+                            properties,
+                        );
+                    }
+                } else if members.is_empty() {
                     return self.alloc_struct_constructor_operator(
                         def_variant,
                         typename,
                         properties,
                     );
                 }
-            } else if members.is_empty() {
-                return self.alloc_struct_constructor_operator(def_variant, typename, properties);
-            }
 
-            return self.alloc_struct_intersection_operator2(
-                def_variant,
-                typename,
-                properties,
-                members.as_slice(),
-            );
-        }
-
-        match &properties.constructor {
-            Constructor::Struct => {
-                self.alloc_struct_constructor_operator(def_variant, typename, properties)
-            }
-            Constructor::Value(relationship_id, span, cardinality) => {
-                // panic!("Value");
-                self.alloc_intersection_operator(
+                return self.alloc_struct_intersection_operator(
                     def_variant,
                     typename,
                     properties,
-                    &[(*relationship_id, *span, *cardinality)],
-                )
+                    members.as_slice(),
+                );
             }
-            Constructor::Intersection(_) => {
-                // Is this used?
-                panic!("Classic intersection (repr = {repr_kind:?}): ");
-            }
-            Constructor::Union(_) => {
+            ReprKind::Union(_) | ReprKind::StructUnion(_) => {
                 let operator_id = self.alloc_operator_id(&def_variant);
-                Some(OperatorAllocation::Allocated(
+                return Some(OperatorAllocation::Allocated(
                     operator_id,
                     if def_variant.modifier.contains(DataModifier::UNION) {
                         self.create_union_operator(def_variant, typename, properties)
@@ -435,8 +451,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         // Don't build a union
                         self.create_struct_operator(def_variant, typename, properties)
                     },
-                ))
+                ));
             }
+            _ => {}
+        }
+
+        match &properties.constructor {
             Constructor::Sequence(sequence) => {
                 let mut sequence_range_builder = SequenceRangeBuilder::default();
 
@@ -480,7 +500,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }),
                 ))
             }
-            Constructor::StringFmt(segment) => self.alloc_string_fmt_operator(def_variant, segment),
+            constructor => {
+                unreachable!(
+                    "{:?}: {constructor:?}: repr {repr_kind:?}",
+                    def_variant.def_id
+                )
+            }
         }
     }
 
@@ -577,94 +602,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn alloc_intersection_operator(
-        &mut self,
-        def_variant: DefVariant,
-        typename: &str,
-        properties: &Properties,
-        items: &[(RelationshipId, SourceSpan, Cardinality)],
-    ) -> Option<OperatorAllocation> {
-        let modifier = &def_variant.modifier;
-        if items.is_empty() {
-            Some(OperatorAllocation::Redirect(
-                def_variant.remove_modifier(DataModifier::INTERSECTION),
-            ))
-        } else if modifier.contains(DataModifier::INTERSECTION) {
-            if items.len() == 1 && properties.table.is_none() {
-                Some(OperatorAllocation::Redirect(def_variant.remove_modifier(
-                    DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
-                )))
-            } else if items.len() == 1 {
-                self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
-                    [
-                        // Require intersected properties via [is] relation:
-                        SerdeKey::Def(def_variant.remove_modifier(
-                            DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
-                        )),
-                        // Require inherent propserties:
-                        SerdeKey::Def(def_variant.remove_modifier(DataModifier::INTERSECTION)),
-                    ]
-                    .into(),
-                )))
-            } else {
-                let mut intersection_keys = BTreeSet::new();
-                for (relationship_id, _, _cardinality) in items {
-                    let Ok(meta) = self.defs.lookup_relationship_meta(*relationship_id) else {
-                        panic!("Problem getting relationship meta");
-                    };
-
-                    intersection_keys.insert(SerdeKey::Def(DefVariant::new(
-                        meta.relationship.object.0.def_id,
-                        DataModifier::default(),
-                    )));
-                }
-
-                if properties.table.is_some() {
-                    intersection_keys.insert(SerdeKey::Def(
-                        def_variant.remove_modifier(DataModifier::INTERSECTION),
-                    ));
-                }
-
-                self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
-                    intersection_keys,
-                )))
-            }
-        } else if modifier.contains(DataModifier::INHERENT_PROPS) {
-            let operator_id = self.alloc_operator_id(&def_variant);
-            Some(OperatorAllocation::Allocated(
-                operator_id,
-                self.create_struct_operator(def_variant, typename, properties),
-            ))
-        } else {
-            let (relationship_id, _, cardinality) = items[0];
-
-            let Ok(meta) = self.defs.lookup_relationship_meta(relationship_id) else {
-                panic!("Problem getting relationship meta");
-            };
-
-            let value_def = meta.relationship.object.0.def_id;
-
-            let (requirement, inner_operator_id) =
-                self.get_property_operator(value_def, cardinality);
-
-            if !matches!(requirement, PropertyCardinality::Mandatory) {
-                panic!("Value properties must be mandatory, fix this during type check");
-            }
-
-            let operator_id = self.alloc_operator_id(&def_variant);
-
-            Some(OperatorAllocation::Allocated(
-                operator_id,
-                SerdeOperator::ValueType(ValueOperator {
-                    typename: typename.into(),
-                    def_variant,
-                    inner_operator_id,
-                }),
-            ))
-        }
-    }
-
-    fn alloc_struct_intersection_operator2(
+    fn alloc_struct_intersection_operator(
         &mut self,
         def_variant: DefVariant,
         typename: &str,
@@ -696,22 +634,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )))
             } else {
                 let mut intersection_keys = BTreeSet::new();
+
+                if properties.table.is_some() {
+                    // inherent properties:
+                    intersection_keys.insert(SerdeKey::Def(DefVariant::new(
+                        def_variant.def_id,
+                        def_variant
+                            .remove_modifier(DataModifier::INTERSECTION)
+                            .modifier,
+                    )));
+                }
+
                 for (def_id, _span) in members {
-                    if def_id == &def_variant.def_id {
-                        if properties.table.is_some() {
-                            intersection_keys.insert(SerdeKey::Def(DefVariant::new(
-                                *def_id,
-                                def_variant
-                                    .remove_modifier(DataModifier::INTERSECTION)
-                                    .modifier,
-                            )));
-                        }
-                    } else {
-                        intersection_keys.insert(SerdeKey::Def(DefVariant::new(
-                            *def_id,
-                            DataModifier::default(),
-                        )));
-                    }
+                    intersection_keys.insert(SerdeKey::Def(DefVariant::new(
+                        *def_id,
+                        DataModifier::default(),
+                    )));
                 }
 
                 self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
@@ -726,8 +664,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ))
         } else {
             let (value_def, _span) = members[0];
-
-            // let value_def = meta.relationship.object.0.def_id;
 
             let (requirement, inner_operator_id) = self.get_property_operator(
                 value_def,

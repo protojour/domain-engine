@@ -17,7 +17,6 @@ pub struct Relations {
     /// A map from "idenfities" relationship to named relationship:
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
 
-    pub value_unions: FnvHashSet<DefId>,
     pub string_pattern_constructors: FnvHashSet<DefId>,
     pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,
 
@@ -41,10 +40,21 @@ impl Relations {
     }
 }
 
+#[derive(Default, Debug)]
+pub struct UnionCtx {
+    /// Register of all types that are unions
+    pub union_set: FnvHashSet<DefId>,
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Is {
     pub def_id: DefId,
     pub cardinality: PropertyCardinality,
+
+    /// Special optimization in the `ontol` domain:
+    /// `bool` is (maybe) `true` or `false`,
+    /// but don't treat that as a union _proper_, because `bool` should just be used directly as an alias for the union.
+    pub is_ontol_alias: bool,
 }
 
 #[derive(Default, Debug)]

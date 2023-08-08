@@ -41,9 +41,9 @@ impl<'m> Compiler<'m> {
         let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let string_ty = self.register_named_type(self.primitives.string, "string", Type::String);
 
-        self.is(self.primitives.int, self.primitives.number);
-        self.is(self.primitives.true_value, self.primitives.bool);
-        self.is(self.primitives.false_value, self.primitives.bool);
+        self.is_maybe(self.primitives.number, self.primitives.int);
+        self.is_maybe(self.primitives.bool, self.primitives.true_value);
+        self.is_maybe(self.primitives.bool, self.primitives.false_value);
 
         let int_int_ty = self.types.intern([int_ty, int_ty]);
         let string_string_ty = self.types.intern([string_ty, string_ty]);
@@ -94,7 +94,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_uuid(&mut self) {
-        let (uuid, _) = self.define_domain_type("uuid", |def_id| {
+        let (uuid, _) = self.define_concrete_domain_type("uuid", |def_id| {
             Type::StringLike(def_id, StringLikeType::Uuid)
         });
         let segment = StringPatternSegment::Regex(regex_util::uuid());
@@ -106,7 +106,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_datetime(&mut self) {
-        let (datetime, _) = self.define_domain_type("datetime", |def_id| {
+        let (datetime, _) = self.define_concrete_domain_type("datetime", |def_id| {
             Type::StringLike(def_id, StringLikeType::DateTime)
         });
         let segment = StringPatternSegment::Regex(regex_util::datetime_rfc3339());
@@ -119,8 +119,8 @@ impl<'m> Compiler<'m> {
             .insert(datetime, StringLikeType::DateTime);
     }
 
-    /// Define am ontol _domain_ type, i.e. not a primitive
-    fn define_domain_type(
+    /// Define an ontol _domain_ type, i.e. not a primitive
+    fn define_concrete_domain_type(
         &mut self,
         ident: &'static str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
@@ -131,6 +131,7 @@ impl<'m> Compiler<'m> {
                 ident: Some(ident),
                 params: None,
                 rel_type_for: None,
+                concrete: true,
             }),
             ONTOL_PKG,
             NO_SPAN,
@@ -170,7 +171,7 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
-    fn is(&mut self, def_id: DefId, other_def_id: DefId) {
+    fn is_maybe(&mut self, def_id: DefId, other_def_id: DefId) {
         self.relations
             .ontology_mesh
             .entry(def_id)
@@ -178,7 +179,8 @@ impl<'m> Compiler<'m> {
             .insert(
                 Is {
                     def_id: other_def_id,
-                    cardinality: PropertyCardinality::Mandatory,
+                    cardinality: PropertyCardinality::Optional,
+                    is_ontol_alias: true,
                 },
                 NO_SPAN,
             );

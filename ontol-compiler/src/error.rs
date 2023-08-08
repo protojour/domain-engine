@@ -56,7 +56,6 @@ pub enum CompileError {
     UnboundVariable,
     VariableMustBeSequenceEnclosed(String),
     CannotDiscriminateType,
-    UnionTreeNotSupported,
     UnitTypePartOfUnion(String),
     NoUniformDiscriminatorFound,
     SharedPrefixInPatternUnion,
@@ -156,7 +155,6 @@ impl std::fmt::Display for CompileError {
                 write!(f, "[{var}] variable must be enclosed in []")
             }
             Self::CannotDiscriminateType => write!(f, "cannot discriminate type"),
-            Self::UnionTreeNotSupported => write!(f, "union tree not supported"),
             Self::UnitTypePartOfUnion(name) => {
                 write!(f, "unit type `{name}` cannot be part of a union",)
             }

@@ -315,3 +315,32 @@ fn deserialize_map_union() {
         );
     });
 }
+
+#[test]
+fn union_tree() {
+    "
+    type u1 {
+        rel .is?: '1a'
+        rel .is?: '1b'
+    }
+    type u2 {
+        rel .is?: '2a'
+        rel .is?: '2b'
+    }
+    type u3 {
+        rel .is?: u1
+        rel .is?: u2
+    }
+    "
+    .compile_ok(|test| {
+        let [u3] = test.bind(["u3"]);
+        assert_matches!(
+            create_de(&u3).data_variant(json!("1a")),
+            Ok(Data::String(s)) if s == "1a"
+        );
+        assert_error_msg!(
+            create_de(&u3).data_variant(json!("ugh")),
+            r#"invalid type: string "ugh", expected `u3` (one of "1a", "1b", "2a", "2b") at line 1 column 5"#
+        );
+    });
+}

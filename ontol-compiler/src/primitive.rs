@@ -16,12 +16,19 @@ pub enum PrimitiveKind {
     True,
     /// The set of false and true
     Bool,
-    /// All the integers
-    Int,
     /// All numbers (realistically all rational numbers, as all computer numbers are rational)
     Number,
+    /// All the integers
+    Int,
     /// Set of all strings
     String,
+}
+
+impl PrimitiveKind {
+    pub fn is_concrete(&self) -> bool {
+        // FIXME:
+        !matches!(self, Self::Number)
+    }
 }
 
 /// Set of fundamental/primitive definitions
@@ -48,11 +55,11 @@ pub struct Primitives {
     /// The string type: All valid unicode strings.
     pub string: DefId,
 
-    /// The integer type. TODO: Implementation details.
-    pub int: DefId,
-
     /// The abstract type of a number. Supertype of integers and fractionals.
     pub number: DefId,
+
+    /// The integer type. TODO: Implementation details.
+    pub int: DefId,
 
     /// Builtin relations
     pub relations: Relations,
@@ -115,8 +122,8 @@ impl Primitives {
 
             empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
             empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),
-            int: defs.add_primitive(PrimitiveKind::Int),
             number: defs.add_primitive(PrimitiveKind::Number),
+            int: defs.add_primitive(PrimitiveKind::Int),
             string: defs.add_primitive(PrimitiveKind::String),
 
             relations: Relations {

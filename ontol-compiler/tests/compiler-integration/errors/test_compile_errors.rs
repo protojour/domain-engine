@@ -138,25 +138,6 @@ fn non_disjoint_string_union() {
 }
 
 #[test]
-fn union_tree() {
-    "
-    type u1 {
-        rel .is?: '1a'
-        rel .is?: '1b'
-    }
-    type u2 {
-        rel .is?: '2a'
-        rel .is?: '2b'
-    }
-    type u3 {
-        rel .is?: u1 // ERROR union tree not supported
-        rel .is?: u2 // ERROR union tree not supported
-    }
-    "
-    .compile_fail()
-}
-
-#[test]
 fn sequence_mix1() {
     "
     type u {

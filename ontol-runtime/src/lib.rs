@@ -40,7 +40,7 @@ impl DefId {
 
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#def{}:{}", self.0 .0, self.1)
+        write!(f, "def@{}:{}", self.0 .0, self.1)
     }
 }
 

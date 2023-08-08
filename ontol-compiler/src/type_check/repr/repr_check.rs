@@ -11,12 +11,12 @@ use ontol_runtime::{ontology::PropertyCardinality, smart_format, DefId};
 use tracing::trace;
 
 use crate::{
-    def::{Def, Defs, LookupRelationshipMeta, RelParams},
+    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
-    relation::{Constructor, Properties, Relations},
+    relation::{Constructor, Properties, Relations, UnionCtx},
     type_check::seal::SealedDefs,
-    types::{DefTypes, Type},
+    types::DefTypes,
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
@@ -28,6 +28,7 @@ pub struct ReprCheck<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
+    pub union_ctx: &'c mut UnionCtx,
     pub sealed_defs: &'c mut SealedDefs,
 
     #[allow(unused)]
@@ -47,6 +48,8 @@ pub struct State {
 
     /// If this is non-empty, the type is not representable
     pub abstract_notes: Vec<SpannedNote>,
+
+    do_trace: bool,
 }
 
 pub struct SpanNode {
@@ -69,6 +72,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             .properties_by_def_id(self.root_def_id)
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false);
+        self.state.do_trace = self.root_def_id.package_id() != ONTOL_PKG;
 
         self.check_def_repr(
             self.root_def_id,
@@ -177,7 +181,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if let Some(repr) = repr {
-            trace!("def {def_id:?} result repr: {repr:?}");
+            if self.state.do_trace {
+                trace!(" => {def_id:?} result repr: {repr:?}");
+            }
+
             self.sealed_defs.repr_table.insert(def_id, repr);
             Ok(())
         } else {
@@ -188,8 +195,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<ReprKind> {
         let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
 
-        if leaf_def_id.package_id() != ONTOL_PKG {
-            trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh.keys());
+        if ontology_mesh.len() > 1 && self.state.do_trace {
+            trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh);
         }
 
         let mut rec = ReprRecord { repr: None };
@@ -197,108 +204,125 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         for (def_id, data) in &ontology_mesh {
             let def_id = *def_id;
 
-            if leaf_def_id.package_id() != ONTOL_PKG {
-                trace!(
-                    "    next repr {leaf_def_id:?}=>{def_id:?} prev={:?}",
-                    rec.repr
-                );
-            }
+            match self.defs.get_def_kind(def_id).unwrap() {
+                DefKind::Primitive(kind) => {
+                    if kind.is_concrete() {
+                        self.merge_repr(
+                            &mut rec,
+                            ReprKind::Scalar(def_id, data.rel_span),
+                            def_id,
+                            data,
+                        );
+                    }
+                }
+                DefKind::StringLiteral(_) | DefKind::NumberLiteral(_) => {
+                    self.merge_repr(
+                        &mut rec,
+                        ReprKind::Scalar(def_id, data.rel_span),
+                        def_id,
+                        data,
+                    );
+                }
+                DefKind::Type(type_def) => {
+                    // Some `ontol` types are "domain types" but still scalars
+                    if self.defs.string_like_types.get(&def_id).is_some() {
+                        self.merge_repr(
+                            &mut rec,
+                            ReprKind::Scalar(def_id, data.rel_span),
+                            def_id,
+                            data,
+                        )
+                    } else if type_def.concrete {
+                        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+                            let mut has_table = false;
+                            if properties.table.is_some() {
+                                if self.state.do_trace {
+                                    trace!(
+                                        "    table({def_id:?}): {:?} {data:?}",
+                                        properties.table
+                                    );
+                                }
 
-            match self.def_types.table.get(&def_id) {
-                Some(Type::Int(_) | Type::IntConstant(_)) => {
-                    self.merge_repr(&mut rec, ReprKind::I64, def_id, data);
-                }
-                Some(Type::Bool(_)) => {
-                    self.merge_repr(&mut rec, ReprKind::Bool, def_id, data);
-                }
-                Some(Type::String(_) | Type::StringConstant(_)) => {
-                    self.merge_repr(&mut rec, ReprKind::String, def_id, data)
-                }
-                Some(Type::StringLike(ontol_def_id, string_like)) => self.merge_repr(
-                    &mut rec,
-                    ReprKind::StringLike(*ontol_def_id, string_like.clone()),
-                    def_id,
-                    data,
-                ),
-                Some(Type::Domain(_) | Type::Anonymous(_)) => {
-                    if let Some(properties) = self.relations.properties_by_def_id(def_id) {
-                        let mut has_table = false;
-                        if properties.table.is_some() {
-                            trace!("    table: {:?} {data:?}", properties.table);
-                            self.merge_repr(
-                                &mut rec,
-                                ReprKind::StructIntersection([(def_id, data.rel_span)].into()),
-                                def_id,
-                                data,
-                            );
-                            has_table = true;
-                        }
-
-                        match &properties.constructor {
-                            Constructor::StringFmt(_) => {
-                                assert!(!has_table);
-                                self.merge_repr(&mut rec, ReprKind::String, def_id, data);
+                                self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                                has_table = true;
                             }
-                            Constructor::Struct => {
-                                if !has_table {
+
+                            match &properties.constructor {
+                                Constructor::StringFmt(_) => {
+                                    assert!(!has_table);
                                     self.merge_repr(
                                         &mut rec,
-                                        ReprKind::StructIntersection(Default::default()),
+                                        ReprKind::Scalar(def_id, data.rel_span),
                                         def_id,
                                         data,
                                     );
                                 }
+                                Constructor::Struct => {
+                                    if !has_table {
+                                        self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                                    }
+                                }
+                                Constructor::Sequence(_) => {
+                                    assert!(!has_table);
+                                    self.merge_repr(&mut rec, ReprKind::Seq, def_id, data);
+                                }
+                                _ => {}
                             }
-                            Constructor::Sequence(_) => {
-                                assert!(!has_table);
-                                self.merge_repr(&mut rec, ReprKind::Seq, def_id, data);
-                            }
-                            _ => {}
+                        } else {
+                            self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
                         }
-                    } else {
-                        self.merge_repr(&mut rec, ReprKind::EmptyDict, def_id, data);
                     }
                 }
                 _ => {}
             }
         }
 
+        if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) = &rec.repr {
+            self.union_ctx.union_set.insert(leaf_def_id);
+        }
+
         rec.repr
     }
 
     fn merge_repr(&mut self, rec: &mut ReprRecord, next: ReprKind, def_id: DefId, data: &IsData) {
-        trace!("    merge repr {next:?}");
+        trace!("{:?} merge repr {next:?}", self.root_def_id);
 
-        match (&mut rec.repr, data.is_relation, next) {
-            (
-                None,
-                IsRelation::Origin | IsRelation::Mandatory,
-                ReprKind::StructIntersection(members),
-            ) => {
-                rec.repr = Some(ReprKind::StructIntersection(members));
+        use IsRelation::*;
+        match (data.is_relation, &mut rec.repr, next) {
+            (Origin, _, next) => {
+                rec.repr = Some(next);
             }
-            (
-                Some(ReprKind::StructIntersection(members)),
-                IsRelation::Origin | IsRelation::Mandatory,
-                ReprKind::StructIntersection(new_members),
-            ) => {
-                members.extend(new_members);
+            (Is, None | Some(ReprKind::Struct), ReprKind::Struct) => {
+                rec.repr = Some(ReprKind::StructIntersection(
+                    [(def_id, data.rel_span)].into(),
+                ));
             }
-            (None, IsRelation::Origin | IsRelation::Mandatory, kind) => {
-                rec.repr = Some(kind);
+            (Is, None, next) => {
+                rec.repr = Some(next);
             }
-            (Some(repr), IsRelation::Mandatory, kind) if *repr != kind => {
+            (Is, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
+                members.push((def_id, data.rel_span));
+            }
+            (Is, Some(repr), kind) if *repr != kind => {
                 rec.repr = Some(ReprKind::Intersection(vec![(def_id, data.rel_span)]));
             }
-            (Some(_), IsRelation::Mandatory, _) => {}
-            (Some(repr), IsRelation::Origin, _) => {
-                unreachable!("in origin relation, repr was {repr:?}");
+            (IsMaybe, Some(ReprKind::Struct), ReprKind::Struct) => {
+                rec.repr = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
-            (None, IsRelation::Optional, _) => {
+            (IsMaybe, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
+                variants.push((def_id, data.rel_span));
+            }
+            (IsMaybe, None, ReprKind::Struct) => {
+                rec.repr = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
+            }
+            (IsMaybe, None, _) => {
                 rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
-            (Some(_), IsRelation::Optional, _) => {
-                rec.repr = Some(ReprKind::Union(vec![]));
+            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
+                variants.push((def_id, span));
+            }
+            (old, is_relation, new) => {
+                panic!("Invalid repr transition: {old:?} =({is_relation:?})> {new:?}")
             }
         }
     }
@@ -339,12 +363,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
             if let Some(entries) = self.relations.ontology_mesh.get(&def_id) {
                 for (is, span) in entries {
+                    if is.is_ontol_alias {
+                        continue;
+                    }
+
                     let next_relation = match (is_relation, is.cardinality) {
-                        (
-                            IsRelation::Origin | IsRelation::Mandatory,
-                            PropertyCardinality::Mandatory,
-                        ) => IsRelation::Mandatory,
-                        _ => IsRelation::Optional,
+                        (IsRelation::Origin | IsRelation::Is, PropertyCardinality::Mandatory) => {
+                            IsRelation::Is
+                        }
+                        _ => IsRelation::IsMaybe,
                     };
 
                     self.traverse_ontology_mesh(is.def_id, next_relation, *span, output);
@@ -363,8 +390,8 @@ struct IsData {
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 enum IsRelation {
     Origin,
-    Mandatory,
-    Optional,
+    Is,
+    IsMaybe,
 }
 
 struct ReprRecord {

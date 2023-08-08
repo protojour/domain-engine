@@ -1,3 +1,4 @@
+use indexmap::map::Entry;
 use ontol_runtime::{
     ontology::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
 };
@@ -76,17 +77,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
 
-                self.relations
+                let prev_entry = self
+                    .relations
                     .ontology_mesh
                     .entry(subject.0.def_id)
                     .or_default()
-                    .insert(
-                        Is {
-                            def_id: object.0.def_id,
-                            cardinality: relationship.1.subject_cardinality.0,
-                        },
-                        *span,
-                    );
+                    .entry(Is {
+                        def_id: object.0.def_id,
+                        cardinality: relationship.1.subject_cardinality.0,
+                        is_ontol_alias: false,
+                    });
+
+                match prev_entry {
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(*span);
+                    }
+                    Entry::Occupied(_) => {
+                        self.error(CompileError::DuplicateAnonymousRelationship, span);
+                    }
+                }
 
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
 
@@ -132,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         properties.constructor =
                             Constructor::Union([(relationship.0, *span)].into());
                         // Register union for check later
-                        self.relations.value_unions.insert(subject.0.def_id);
+                        self.union_ctx.union_set.insert(subject.0.def_id);
                     }
                     (PropertyCardinality::Optional, Constructor::Union(variants)) => {
                         variants.push((relationship.0, *span));
