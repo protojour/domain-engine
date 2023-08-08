@@ -24,6 +24,8 @@ use crate::{
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
 
+/// This is the type check of map statements.
+/// The types that are used must be checked with `check_def_sealed`.
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn build_root_expr(
         &mut self,
@@ -106,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 expected_ty,
             ) => {
-                let struct_ty = self.check_def(type_path.def_id);
+                let struct_ty = self.check_def_sealed(type_path.def_id);
                 match struct_ty {
                     Type::Domain(def_id) => {
                         assert_eq!(*def_id, type_path.def_id);
@@ -144,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 Some(expected_struct_ty @ Type::Anonymous(def_id)),
             ) => {
-                let actual_ty = self.check_def(*def_id);
+                let actual_ty = self.check_def_sealed(*def_id);
                 if actual_ty != expected_struct_ty {
                     return self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
@@ -417,7 +419,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.used = true;
 
                             let rel_params_ty = match match_property.rel_params_def {
-                                Some(rel_def_id) => self.check_def(rel_def_id),
+                                Some(rel_def_id) => self.check_def_sealed(rel_def_id),
                                 None => self.unit_type(),
                             };
                             debug!("rel_params_ty: {rel_params_ty:?}");
@@ -455,7 +457,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
                             };
 
-                            let value_ty = self.check_def(match_property.value_def);
+                            let value_ty = self.check_def_sealed(match_property.value_def);
                             debug!("value_ty: {value_ty:?}");
 
                             let prop_variant = match match_property.cardinality.1 {
@@ -577,7 +579,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .lookup_relationship_meta(*relationship_id)
                     .expect("BUG: problem getting anonymous relationship meta");
 
-                let value_object_ty = self.check_def(meta.relationship.object.0.def_id);
+                let value_object_ty = self.check_def_sealed(meta.relationship.object.0.def_id);
                 debug!("value_object_ty: {value_object_ty:?}");
 
                 match value_object_ty {
@@ -593,7 +595,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 bind_option: _,
                                 value,
                             }) if def.def_id == DefId::unit() => {
-                                let object_ty = self.check_def(meta.relationship.object.0.def_id);
+                                let object_ty =
+                                    self.check_def_sealed(meta.relationship.object.0.def_id);
                                 let inner_node = self.build_node(value, Some(object_ty), ctx);
 
                                 inner_node.into_kind()

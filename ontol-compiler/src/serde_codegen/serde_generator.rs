@@ -22,8 +22,8 @@ use crate::{
     patterns::{Patterns, StringPatternSegment},
     primitive::Primitives,
     relation::{Constructor, Properties, Relations},
-    repr::repr_model::{ReprCtx, ReprKind},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
+    type_check::{repr::repr_model::ReprKind, seal::SealedDefs},
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
 };
@@ -35,7 +35,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) primitives: &'c Primitives,
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
-    pub(super) repr: &'c ReprCtx,
+    pub(super) sealed_defs: &'c SealedDefs,
     pub(super) patterns: &'c Patterns,
     pub(super) codegen_tasks: &'c CodegenTasks<'m>,
     pub(super) operators_by_id: Vec<SerdeOperator>,
@@ -359,7 +359,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr_kind = self.repr.table.get(&def_variant.def_id).unwrap();
+        let repr_kind = self
+            .sealed_defs
+            .repr_table
+            .get(&def_variant.def_id)
+            .unwrap();
 
         let properties = match (properties, def_variant.modifier) {
             (None, DataModifier::NONE) => {
@@ -407,19 +411,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Constructor::Struct => {
                 self.alloc_struct_constructor_operator(def_variant, typename, properties)
             }
-            Constructor::Value(relationship_id, span, cardinality) => self
-                .alloc_intersection_operator(
+            Constructor::Value(relationship_id, span, cardinality) => {
+                // panic!("Value");
+                self.alloc_intersection_operator(
                     def_variant,
                     typename,
                     properties,
                     &[(*relationship_id, *span, *cardinality)],
-                ),
-            Constructor::Intersection(items) => self.alloc_intersection_operator(
-                def_variant,
-                typename,
-                properties,
-                items.as_slice(),
-            ),
+                )
+            }
+            Constructor::Intersection(_) => {
+                // Is this used?
+                panic!("Classic intersection (repr = {repr_kind:?}): ");
+            }
             Constructor::Union(_) => {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(

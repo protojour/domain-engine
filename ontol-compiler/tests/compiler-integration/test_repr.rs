@@ -44,7 +44,7 @@ fn test_repr_tuple() {
 
 #[test]
 // BUG: the intersection logic is broken (does not consider representational vs. semantic types)
-#[should_panic = "Initial map not found for intersection"]
+#[should_panic = "Classic intersection (repr = I64)"]
 fn test_repr_valid_mesh1() {
     TestPackages::with_sources([
         (SourceName("si"), "pub type meters { rel .is: number }"),

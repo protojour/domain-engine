@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+    pub fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 

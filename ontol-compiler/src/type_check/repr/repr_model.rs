@@ -1,20 +1,14 @@
-use fnv::FnvHashMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{string_types::StringLikeType, DefId};
 use smallvec::SmallVec;
 
 use crate::SourceSpan;
-
-#[derive(Default, Debug)]
-pub struct ReprCtx {
-    pub table: FnvHashMap<DefId, ReprKind>,
-}
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReprKind {
     I64,
     Bool,
     String,
-    // Struct,
+    StringLike(DefId, StringLikeType),
     EmptyDict,
     Seq,
     StructIntersection(SmallVec<[(DefId, SourceSpan); 1]>),

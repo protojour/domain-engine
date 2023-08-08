@@ -448,3 +448,21 @@ fn nonsense_value_generator() {
     "
     .compile_fail();
 }
+
+#[test]
+fn sealed_def() {
+    "
+    type foo { rel .'prop': string }
+    type bar { rel .'prop': string }
+
+    map {
+        foo { 'prop': prop }
+        bar { 'prop': prop }
+    }
+
+    rel
+        foo // ERROR Type is sealed and cannot be changed
+        'fail': string
+    "
+    .compile_fail();
+}

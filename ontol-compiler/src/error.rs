@@ -81,6 +81,7 @@ pub enum CompileError {
     IncompatibleLiteral,
     CannotGenerateValue(String),
     EntityNotRepresentable,
+    MutationOfSealedType,
     TODO(String),
 }
 
@@ -205,6 +206,7 @@ impl std::fmt::Display for CompileError {
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
             Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
             Self::EntityNotRepresentable => write!(f, "Entity not representable"),
+            Self::MutationOfSealedType => write!(f, "Type is sealed and cannot be changed"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }

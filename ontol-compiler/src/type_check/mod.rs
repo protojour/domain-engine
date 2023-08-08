@@ -13,10 +13,14 @@ use crate::{
     CompileErrors, Compiler, SourceSpan, SpannedCompileError, SpannedNote,
 };
 
+use self::{repr::repr_check::ReprCheck, seal::SealedDefs};
+
 pub mod check_def;
 pub mod check_domain_types;
 pub mod check_union;
 pub mod inference;
+pub mod repr;
+pub mod seal;
 
 mod check_map;
 mod check_relationship;
@@ -47,15 +51,16 @@ pub struct TypeEquation<'m> {
 /// but also actually produces more output for later compile stages.
 pub struct TypeCheck<'c, 'm> {
     /// This map stores the expected type of constants
-    expected_constant_types: FnvHashMap<DefId, TypeRef<'m>>,
-    types: &'c mut Types<'m>,
-    def_types: &'c mut DefTypes<'m>,
-    relations: &'c mut Relations,
-    errors: &'c mut CompileErrors,
-    codegen_tasks: &'c mut CodegenTasks<'m>,
-    expressions: &'c mut Expressions,
-    defs: &'c Defs<'m>,
-    primitives: &'c Primitives,
+    pub expected_constant_types: FnvHashMap<DefId, TypeRef<'m>>,
+    pub types: &'c mut Types<'m>,
+    pub def_types: &'c mut DefTypes<'m>,
+    pub relations: &'c mut Relations,
+    pub errors: &'c mut CompileErrors,
+    pub codegen_tasks: &'c mut CodegenTasks<'m>,
+    pub expressions: &'c mut Expressions,
+    pub sealed_defs: &'c mut SealedDefs,
+    pub defs: &'c Defs<'m>,
+    pub primitives: &'c Primitives,
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -123,6 +128,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
     }
+
+    fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
+        ReprCheck {
+            root_def_id,
+            is_entity_root: false,
+            defs: self.defs,
+            def_types: self.def_types,
+            relations: self.relations,
+            sealed_defs: self.sealed_defs,
+            errors: self.errors,
+            state: Default::default(),
+        }
+    }
 }
 
 impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
@@ -147,6 +165,7 @@ impl<'m> Compiler<'m> {
             relations: &mut self.relations,
             codegen_tasks: &mut self.codegen_tasks,
             expressions: &mut self.expressions,
+            sealed_defs: &mut self.sealed_defs,
             defs: &self.defs,
             primitives: &self.primitives,
         }

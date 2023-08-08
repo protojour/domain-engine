@@ -21,11 +21,11 @@ use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Property, Relations};
-use repr::repr_model::ReprCtx;
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
+use type_check::seal::SealedDefs;
 use types::{DefTypes, Types};
 
 pub mod error;
@@ -33,7 +33,6 @@ pub mod hir_unify;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
-pub mod repr;
 pub mod serde_codegen;
 pub mod source;
 pub mod typed_hir;
@@ -70,7 +69,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
-    pub(crate) repr: ReprCtx,
+    pub(crate) sealed_defs: SealedDefs,
     pub(crate) patterns: Patterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
@@ -95,7 +94,7 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
-            repr: Default::default(),
+            sealed_defs: Default::default(),
             patterns: Patterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
@@ -159,16 +158,13 @@ impl<'m> Compiler<'m> {
     fn compile_all_packages(&mut self, root_defs: Vec<DefId>) -> Result<(), UnifiedCompileError> {
         let mut type_check = self.type_check();
         for root_def in root_defs {
-            type_check.check_def(root_def);
+            type_check.check_def_shallow(root_def);
         }
 
         // Call this after all source files have been compiled
         compile_all_patterns(self);
 
-        self.type_check().check_domain_types();
-        self.repr_check();
-        self.type_check().check_unions();
-
+        self.type_check().seal_all_defs();
         self.check_error()?;
 
         execute_codegen_tasks(self);

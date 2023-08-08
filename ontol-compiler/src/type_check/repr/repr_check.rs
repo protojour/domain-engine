@@ -15,70 +15,41 @@ use crate::{
     error::CompileError,
     package::ONTOL_PKG,
     relation::{Constructor, Properties, Relations},
+    type_check::seal::SealedDefs,
     types::{DefTypes, Type},
-    CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
-    NO_SPAN,
+    CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
-use super::repr_model::{ReprCtx, ReprKind};
+use super::repr_model::ReprKind;
 
-impl<'m> Compiler<'m> {
-    pub fn repr_check(&mut self) {
-        for (def_id, def) in &self.defs.table {
-            let properties = self.relations.properties_by_def_id(*def_id);
-
-            let mut repr_check = ReprCheck {
-                root_def_id: *def_id,
-                is_entity_root: properties
-                    .map(|properties| properties.identified_by.is_some())
-                    .unwrap_or(false),
-                defs: &self.defs,
-                def_types: &self.def_types,
-                relations: &self.relations,
-                repr: &mut self.repr,
-                errors: &mut self.errors,
-                visited: Default::default(),
-                span_stack: vec![],
-                abstract_notes: vec![],
-            };
-
-            repr_check.check_def_repr(*def_id, def, properties);
-
-            let abstract_notes = std::mem::take(&mut repr_check.abstract_notes);
-            if !abstract_notes.is_empty() {
-                self.errors.push(SpannedCompileError {
-                    error: CompileError::EntityNotRepresentable,
-                    span: def.span,
-                    notes: abstract_notes,
-                });
-            }
-        }
-    }
-}
-
-struct ReprCheck<'c, 'm> {
-    root_def_id: DefId,
-    is_entity_root: bool,
-    defs: &'c Defs<'m>,
-    def_types: &'c DefTypes<'m>,
-    relations: &'c Relations,
-    repr: &'c mut ReprCtx,
+pub struct ReprCheck<'c, 'm> {
+    pub root_def_id: DefId,
+    pub is_entity_root: bool,
+    pub defs: &'c Defs<'m>,
+    pub def_types: &'c DefTypes<'m>,
+    pub relations: &'c Relations,
+    pub sealed_defs: &'c mut SealedDefs,
 
     #[allow(unused)]
-    errors: &'c mut CompileErrors,
+    pub errors: &'c mut CompileErrors,
 
+    pub state: State,
+}
+
+#[derive(Default)]
+pub struct State {
     /// The repr check is coinductive,
     /// i.e. cycles mean that the repr is OK.
     /// Cycles appear in recursive types (tree structures, for example).
-    visited: FnvHashSet<DefId>,
+    pub visited: FnvHashSet<DefId>,
 
-    span_stack: Vec<SpanNode>,
+    pub span_stack: Vec<SpanNode>,
 
     /// If this is non-empty, the type is not representable
-    abstract_notes: Vec<SpannedNote>,
+    pub abstract_notes: Vec<SpannedNote>,
 }
 
-struct SpanNode {
+pub struct SpanNode {
     span: SourceSpan,
     kind: SpanKind,
 }
@@ -89,13 +60,39 @@ enum SpanKind {
 }
 
 impl<'c, 'm> ReprCheck<'c, 'm> {
+    /// Check the representation of a type
+    pub fn check_repr_root(&mut self) {
+        let def = self.defs.table.get(&self.root_def_id).unwrap();
+
+        self.is_entity_root = self
+            .relations
+            .properties_by_def_id(self.root_def_id)
+            .map(|properties| properties.identified_by.is_some())
+            .unwrap_or(false);
+
+        self.check_def_repr(
+            self.root_def_id,
+            def,
+            self.relations.properties_by_def_id(self.root_def_id),
+        );
+
+        let abstract_notes = std::mem::take(&mut self.state.abstract_notes);
+        if !abstract_notes.is_empty() {
+            self.errors.push(SpannedCompileError {
+                error: CompileError::EntityNotRepresentable,
+                span: def.span,
+                notes: abstract_notes,
+            });
+        }
+    }
+
     fn check_def_repr(&mut self, def_id: DefId, def: &Def, properties: Option<&Properties>) {
-        if self.visited.contains(&def_id) {
+        if self.state.visited.contains(&def_id) {
             return;
         }
 
-        self.visited.insert(def_id);
-        self.span_stack.push(SpanNode {
+        self.state.visited.insert(def_id);
+        self.state.span_stack.push(SpanNode {
             span: def.span,
             kind: SpanKind::Type(def_id),
         });
@@ -103,7 +100,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         let repr_result = self.compute_repr_cached(def_id, properties);
 
         if repr_result.is_err() && self.is_entity_root {
-            for span_node in self.span_stack.iter().rev() {
+            for span_node in self.state.span_stack.iter().rev() {
                 if span_node.span.source_id == NATIVE_SOURCE {
                     continue;
                 }
@@ -111,14 +108,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 match span_node.kind {
                     SpanKind::Type(span_def_id) => {
                         if span_def_id != self.root_def_id {
-                            self.abstract_notes.push(SpannedNote {
+                            self.state.abstract_notes.push(SpannedNote {
                                 note: Note::TypeIsAbstract,
                                 span: span_node.span,
                             });
                         }
                     }
                     SpanKind::Field => {
-                        self.abstract_notes.push(SpannedNote {
+                        self.state.abstract_notes.push(SpannedNote {
                             note: Note::FieldTypeIsAbstract,
                             span: span_node.span,
                         });
@@ -127,7 +124,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
         }
 
-        self.span_stack.pop();
+        self.state.span_stack.pop();
     }
 
     fn compute_repr_cached(
@@ -135,7 +132,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         def_id: DefId,
         properties: Option<&Properties>,
     ) -> Result<(), ()> {
-        if self.repr.table.contains_key(&def_id) {
+        if self.sealed_defs.repr_table.contains_key(&def_id) {
             return Ok(());
         }
 
@@ -151,7 +148,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 let object_def_id = meta.relationship.object.0.def_id;
                 let object_def = self.defs.table.get(&object_def_id).unwrap();
 
-                self.span_stack.push(SpanNode {
+                self.state.span_stack.push(SpanNode {
                     span: meta.relationship.object.1,
                     kind: SpanKind::Field,
                 });
@@ -160,12 +157,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     object_def,
                     self.relations.properties_by_def_id(object_def_id),
                 );
-                self.span_stack.pop();
+                self.state.span_stack.pop();
 
                 if let RelParams::Type(def_ref) = &meta.relationship.rel_params {
                     let rel_def = self.defs.table.get(&def_ref.def_id).unwrap();
 
-                    self.span_stack.push(SpanNode {
+                    self.state.span_stack.push(SpanNode {
                         span: rel_def.span,
                         kind: SpanKind::Field,
                     });
@@ -174,14 +171,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         object_def,
                         self.relations.properties_by_def_id(def_ref.def_id),
                     );
-                    self.span_stack.pop();
+                    self.state.span_stack.pop();
                 }
             }
         }
 
         if let Some(repr) = repr {
             trace!("def {def_id:?} result repr: {repr:?}");
-            self.repr.table.insert(def_id, repr);
+            self.sealed_defs.repr_table.insert(def_id, repr);
             Ok(())
         } else {
             Err(())
@@ -214,9 +211,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 Some(Type::Bool(_)) => {
                     self.merge_repr(&mut rec, ReprKind::Bool, def_id, data);
                 }
-                Some(Type::String(_) | Type::StringConstant(_) | Type::StringLike(..)) => {
+                Some(Type::String(_) | Type::StringConstant(_)) => {
                     self.merge_repr(&mut rec, ReprKind::String, def_id, data)
                 }
+                Some(Type::StringLike(ontol_def_id, string_like)) => self.merge_repr(
+                    &mut rec,
+                    ReprKind::StringLike(*ontol_def_id, string_like.clone()),
+                    def_id,
+                    data,
+                ),
                 Some(Type::Domain(_) | Type::Anonymous(_)) => {
                     if let Some(properties) = self.relations.properties_by_def_id(def_id) {
                         let mut has_table = false;

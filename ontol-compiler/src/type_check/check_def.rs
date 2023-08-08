@@ -13,7 +13,20 @@ use crate::{
 use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
+    /// Do type check of a type and then seal it.
+    ///
+    /// The type must be complete at the first usage site, e.g. in a map expression.
+    pub fn check_def_sealed(&mut self, def_id: DefId) -> TypeRef<'m> {
+        let ty = self.check_def_shallow(def_id);
+        self.seal_def(def_id);
+        ty
+    }
+
+    /// Compute the immediate type of a definition.
+    /// Does not perform deep type check.
+    ///
+    /// This function is called for every definition in a loop.
+    pub fn check_def_shallow(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.table.get(&def_id) {
             return type_ref;
         }

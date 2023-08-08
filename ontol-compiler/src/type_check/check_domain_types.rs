@@ -47,7 +47,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
+    pub fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_def_id.get(&def_id)?;
         let table = properties.table.as_ref()?;
 

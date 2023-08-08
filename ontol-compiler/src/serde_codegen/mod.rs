@@ -14,7 +14,7 @@ impl<'m> Compiler<'m> {
             primitives: &self.primitives,
             def_types: &self.def_types,
             relations: &self.relations,
-            repr: &self.repr,
+            sealed_defs: &self.sealed_defs,
             patterns: &self.patterns,
             codegen_tasks: &self.codegen_tasks,
             operators_by_id: Default::default(),

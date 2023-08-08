@@ -37,7 +37,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match &relation.kind {
             RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => {
-                self.check_def(def.def_id);
+                self.check_def_shallow(def.def_id);
             }
             _ => {}
         };
@@ -70,8 +70,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> TypeRef<'m> {
         match &relation.1.kind {
             RelationKind::Builtin(BuiltinRelationKind::Is) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -143,8 +143,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             RelationKind::Builtin(BuiltinRelationKind::Identifies) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -176,8 +176,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("This should not have been lowered");
             }
             RelationKind::Builtin(BuiltinRelationKind::Indexed) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -210,8 +210,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             RelationKind::Named(_) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -244,14 +244,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             RelationKind::FmtTransition(_, _) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let _ = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let _ = self.check_def_shallow(object.0.def_id);
 
                 subject_ty
             }
             RelationKind::Builtin(BuiltinRelationKind::Route) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 self.check_package_data_type(subject_ty, &subject.1);
                 self.check_package_data_type(object_ty, &object.1);
@@ -259,7 +259,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             RelationKind::Builtin(BuiltinRelationKind::Default) => {
-                let _subject_ty = self.check_def(subject.0.def_id);
+                let _subject_ty = self.check_def_shallow(subject.0.def_id);
                 let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
 
                 match subject_def_kind {
@@ -301,8 +301,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             RelationKind::Builtin(BuiltinRelationKind::Gen) => {
-                let _subject_ty = self.check_def(subject.0.def_id);
-                let object_ty = self.check_def(object.0.def_id);
+                let _subject_ty = self.check_def_shallow(subject.0.def_id);
+                let object_ty = self.check_def_shallow(object.0.def_id);
 
                 let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
 
@@ -355,8 +355,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 | BuiltinRelationKind::Doc
                 | BuiltinRelationKind::Example,
             ) => {
-                let subject_ty = self.check_def(subject.0.def_id);
-                let _ = self.check_def(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0.def_id);
+                let _ = self.check_def_shallow(object.0.def_id);
 
                 subject_ty
             }
@@ -372,8 +372,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         subject: &(DefReference, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let object_ty = self.check_def(object.0.def_id);
-        let subject_ty = self.check_def(subject.0.def_id);
+        let object_ty = self.check_def_shallow(object.0.def_id);
+        let subject_ty = self.check_def_shallow(subject.0.def_id);
 
         if let RelationKind::FmtTransition(_, final_state) = &relation.1.kind {
             match subject_ty {
@@ -475,6 +475,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.error(CompileError::SubjectMustBeDomainType, span);
             }
         }
+        self.check_not_sealed(ty, span);
     }
 
     fn check_object_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
@@ -489,6 +490,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.error(CompileError::ObjectMustBeDataType, span);
             }
             _ => {}
+        }
+    }
+
+    fn check_not_sealed(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
+        if let Some(def_id) = ty.get_single_def_id() {
+            if self.sealed_defs.sealed_set.contains(&def_id) {
+                self.error(CompileError::MutationOfSealedType, span);
+            }
         }
     }
 
