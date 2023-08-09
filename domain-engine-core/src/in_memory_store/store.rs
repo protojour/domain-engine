@@ -243,7 +243,24 @@ impl InMemoryStore {
                     },
                 )
             }
-            _ => todo!(),
+            Query::StructUnion(_, _) => todo!(),
+            Query::EntityId => todo!(),
+            Query::Entity(entity) => {
+                let entity_key = entity_key.clone();
+                let entities = self.query_entities(engine, entity)?;
+                for entity in entities {
+                    let id = find_inherent_entity_id(engine.ontology(), &entity)?;
+                    if let Some(id) = id {
+                        let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+
+                        if dynamic_key == entity_key {
+                            return Ok(entity);
+                        }
+                    }
+                }
+
+                panic!("Not found")
+            }
         }
     }
 

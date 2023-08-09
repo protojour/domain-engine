@@ -156,6 +156,72 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     );
 }
 
+#[test(tokio::test)]
+async fn test_graphql_in_memory_conduit_db_query_article_with_tags() {
+    let test_packages = conduit_db_only();
+    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+        .build()
+        .into();
+
+    let _response = r#"mutation {
+        createArticle(
+            input: {
+                slug: "the-slug",
+                title: "The title",
+                description: "An article",
+                body: "THE BODY",
+                author: {
+                    username: "u1",
+                    email: "a@b",
+                    password_hash: "s3cr3t",
+                }
+                tags: [{ tag: "foobar" }]
+            }
+        ) {
+            slug
+        }
+    }"#
+    .exec(&schema, &gql_context, [])
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = r#"{
+            ArticleList {
+                edges {
+                    node {
+                        tags {
+                            edges {
+                                node {
+                                    tag
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"#
+        .exec(&schema, &gql_context, [])
+        .await,
+        expected = Ok(graphql_value!({
+            "ArticleList": {
+                "edges": [{
+                    "node": {
+                        "tags": {
+                            "edges": [{
+                                "node": {
+                                    "tag": "foobar"
+                                }
+                            }]
+                        }
+                    }
+                }]
+            }
+        })),
+    );
+}
+
 struct BlogPostConduit {
     test: OntolTest,
     domain_engine: Arc<DomainEngine>,
