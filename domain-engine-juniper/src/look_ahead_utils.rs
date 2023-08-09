@@ -246,7 +246,10 @@ where
     }
 
     fn size_hint(&self) -> Option<usize> {
-        serde::__private::size_hint::from_bounds(&self.iter)
+        match self.iter.size_hint() {
+            (lower, Some(upper)) if lower == upper => Some(upper),
+            _ => None,
+        }
     }
 }
 
