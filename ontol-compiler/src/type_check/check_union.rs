@@ -44,10 +44,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => panic!("not a union"),
         };
 
-        // let Constructor::Union(relationship_ids) = &properties.constructor else {
-        //     panic!("not a union");
-        // };
-
         let mut inherent_builder = DiscriminatorBuilder::default();
         // Also verify that entity ids are disjoint:
         let mut entity_id_builder = DiscriminatorBuilder::default();
@@ -82,49 +78,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             used_variants.insert(variant_def_id);
         }
-
-        // for (relationship_id, span) in relationship_ids {
-        //     let meta = self
-        //         .defs
-        //         .lookup_relationship_meta(*relationship_id)
-        //         .expect("BUG: problem getting relationship meta");
-        //
-        //     debug!("check union {:?}", meta.relationship);
-        //
-        //     let variant_def = match &meta.relation.kind {
-        //         RelationKind::Named(def) | RelationKind::FmtTransition(def, _) => def.def_id,
-        //         _ => meta.relationship.object.0.def_id,
-        //     };
-        //
-        //     if used_variants.contains(&variant_def) {
-        //         error_set.report(
-        //             variant_def,
-        //             UnionCheckError::DuplicateAnonymousRelation,
-        //             span,
-        //         );
-        //         continue;
-        //     }
-        //
-        //     self.add_variant_to_builder(&mut inherent_builder, variant_def, &mut error_set, span);
-        //
-        //     if let Some(properties) = self.relations.properties_by_def_id(variant_def) {
-        //         if let Some(id_relationship_id) = &properties.identified_by {
-        //             let identifies_meta = self
-        //                 .defs
-        //                 .lookup_relationship_meta(*id_relationship_id)
-        //                 .expect("BUG: problem getting relationship meta");
-        //
-        //             self.add_variant_to_builder(
-        //                 &mut entity_id_builder,
-        //                 identifies_meta.relationship.subject.0.def_id,
-        //                 &mut error_set,
-        //                 span,
-        //             );
-        //         }
-        //     }
-        //
-        //     used_variants.insert(variant_def);
-        // }
 
         self.limit_property_discriminators(
             value_union_def_id,

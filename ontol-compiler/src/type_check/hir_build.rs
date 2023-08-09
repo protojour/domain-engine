@@ -12,10 +12,10 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
-    relation::Constructor,
     type_check::{
         hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
+        repr::repr_model::ReprKind,
     },
     typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode, TypedLabel},
     types::{Type, TypeRef},
@@ -115,8 +115,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
                 };
-                let struct_node =
-                    self.build_struct(type_path.def_id, struct_ty, attributes, expr.span, ctx);
+                let struct_node = self.build_property_matcher(
+                    type_path.def_id,
+                    struct_ty,
+                    attributes,
+                    expr.span,
+                    ctx,
+                );
 
                 let meta = *struct_node.meta();
                 match expected_ty {
@@ -157,7 +162,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                self.build_struct(*def_id, actual_ty, attributes, expr.span, ctx)
+                self.build_property_matcher(*def_id, actual_ty, attributes, expr.span, ctx)
             }
             (
                 ExprKind::Struct {
@@ -322,7 +327,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         node
     }
 
-    fn build_struct(
+    fn build_property_matcher(
         &mut self,
         struct_def_id: DefId,
         struct_ty: TypeRef<'m>,
@@ -340,8 +345,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
-        let node_kind = match properties.map(|props| &props.constructor) {
-            Some(Constructor::Struct) | None => {
+        let node_kind = match self.sealed_defs.repr_table.get(&struct_def_id).unwrap() {
+            ReprKind::Struct => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
                         let struct_binder = TypedBinder {
@@ -573,18 +578,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            Some(Constructor::Value(relationship_id, _, _)) => {
-                let meta = self
-                    .defs
-                    .lookup_relationship_meta(*relationship_id)
-                    .expect("BUG: problem getting anonymous relationship meta");
+            ReprKind::StructIntersection(members) => {
+                let mut member_iter = members.iter();
+                let single_def_id = match member_iter.next() {
+                    Some((def_id, _span)) => {
+                        if member_iter.next().is_some() {
+                            todo!("More members");
+                        }
+                        *def_id
+                    }
+                    None => panic!("No members"),
+                };
 
-                let value_object_ty = self.check_def_sealed(meta.relationship.object.0.def_id);
+                let value_object_ty = self.check_def_sealed(single_def_id);
                 debug!("value_object_ty: {value_object_ty:?}");
 
                 match value_object_ty {
                     Type::Domain(def_id) => {
-                        return self.build_struct(*def_id, value_object_ty, attributes, span, ctx);
+                        return self.build_property_matcher(
+                            *def_id,
+                            value_object_ty,
+                            attributes,
+                            span,
+                            ctx,
+                        );
                     }
                     _ => {
                         let mut attributes = attributes.iter();
@@ -595,8 +612,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 bind_option: _,
                                 value,
                             }) if def.def_id == DefId::unit() => {
-                                let object_ty =
-                                    self.check_def_sealed(meta.relationship.object.0.def_id);
+                                let object_ty = self.check_def_sealed(single_def_id);
                                 let inner_node = self.build_node(value, Some(object_ty), ctx);
 
                                 inner_node.into_kind()
@@ -609,14 +625,34 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            Some(Constructor::Intersection(_)) => {
-                todo!()
+            ReprKind::Scalar(scalar_def_id, _) => {
+                let scalar_def_id = *scalar_def_id;
+
+                let scalar_object_ty = self.check_def_sealed(scalar_def_id);
+                debug!("scalar_object_ty: {scalar_object_ty:?}");
+
+                let mut attributes = attributes.iter();
+                match attributes.next() {
+                    Some(ExprStructAttr {
+                        key: (def, _),
+                        rel: _,
+                        bind_option: _,
+                        value,
+                    }) if def.def_id == DefId::unit() => {
+                        let object_ty = self.check_def_sealed(scalar_def_id);
+                        let inner_node = self.build_node(value, Some(object_ty), ctx);
+
+                        inner_node.into_kind()
+                    }
+                    _ => {
+                        return self.error_node(CompileError::ExpectedExpressionAttribute, &span);
+                    }
+                }
             }
-            Some(Constructor::Union(_property_set)) => {
+            ReprKind::Union(_) | ReprKind::StructUnion(_) => {
                 return self.error_node(CompileError::CannotMapUnion, &span)
             }
-            Some(Constructor::Sequence(_)) => todo!(),
-            Some(Constructor::StringFmt(_)) => todo!(),
+            kind => todo!("{kind:?}"),
         };
 
         debug!("Struct type: {struct_ty:?}");

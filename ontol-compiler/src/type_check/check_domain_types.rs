@@ -10,7 +10,7 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, DefKind, LookupRelationshipMeta, RelationId, RelationKind},
+    def::{Def, LookupRelationshipMeta, RelationId, RelationKind},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},
@@ -39,14 +39,6 @@ enum Action {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_domain_types(&mut self) {
-        for (def_id, def) in &self.defs.table {
-            if let DefKind::Type(_) = &def.kind {
-                self.check_domain_type_properties(*def_id, def);
-            }
-        }
-    }
-
     pub fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_def_id.get(&def_id)?;
         let table = properties.table.as_ref()?;
