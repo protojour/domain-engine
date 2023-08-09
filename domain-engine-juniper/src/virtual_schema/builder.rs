@@ -3,8 +3,8 @@ use ontol_runtime::{
     ontology::{Ontology, TypeInfo},
     serde::{
         operator::{
-            FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty, SerdePropertyFlags,
-            StructOperator, ValueOperator,
+            AliasOperator, FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty,
+            SerdePropertyFlags, StructOperator,
         },
         processor::{ProcessorLevel, ProcessorMode},
     },
@@ -133,14 +133,14 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
                             struct_op.def_variant.def_id
                         }
-                        SerdeOperator::ValueType(value_op) => {
+                        SerdeOperator::Alias(alias_op) => {
                             self.register_value_op_fields(
-                                value_op,
+                                alias_op,
                                 &mut fields,
                                 &FieldKind::EdgeProperty,
                                 &mut field_namespace,
                             );
-                            value_op.def_variant.def_id
+                            alias_op.def_variant.def_id
                         }
                         other => {
                             panic!("Tried to register edge rel_params for {other:?}");
@@ -299,7 +299,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     }
                 }
             }
-            SerdeOperator::ValueType(value_op) => {
+            SerdeOperator::Alias(alias_op) => {
                 let type_index = self.alloc_def_type_index(type_info.def_id, QueryLevel::Node);
                 NewType::Indexed(
                     type_index,
@@ -307,7 +307,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                         typename: self.namespace.typename(type_info),
                         input_typename: Some(self.namespace.input(type_info)),
                         partial_input_typename: Some(self.namespace.partial_input(type_info)),
-                        kind: self.make_value_op_type_kind(type_info, value_op),
+                        kind: self.make_value_op_type_kind(type_info, alias_op),
                     },
                 )
             }
@@ -343,8 +343,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
             | SerdeOperator::StringPattern(_)
             | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
-            SerdeOperator::ValueType(value_op) => self.get_native_scalar_kind(
-                self.ontology.get_serde_operator(value_op.inner_operator_id),
+            SerdeOperator::Alias(alias_op) => self.get_native_scalar_kind(
+                self.ontology.get_serde_operator(alias_op.inner_operator_id),
             ),
             op @ (SerdeOperator::Union(_)
             | SerdeOperator::Struct(_)
@@ -357,10 +357,10 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn make_value_op_type_kind(
         &mut self,
         type_info: &TypeInfo,
-        value_op: &ValueOperator,
+        value_op: &AliasOperator,
     ) -> TypeKind {
         match self.ontology.get_serde_operator(value_op.inner_operator_id) {
-            SerdeOperator::ValueType(inner_value_op) => {
+            SerdeOperator::Alias(inner_value_op) => {
                 self.make_value_op_type_kind(type_info, inner_value_op)
             }
             SerdeOperator::Struct(struct_op) => self.make_struct_op_type_kind(type_info, struct_op),
@@ -401,7 +401,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
 
     fn register_value_op_fields(
         &mut self,
-        value_op: &ValueOperator,
+        value_op: &AliasOperator,
         fields: &mut IndexMap<String, FieldData>,
         make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
         field_namespace: &mut Namespace,
@@ -415,7 +415,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     field_namespace,
                 );
             }
-            SerdeOperator::ValueType(inner) => self.register_value_op_fields(
+            SerdeOperator::Alias(inner) => self.register_value_op_fields(
                 inner,
                 fields,
                 make_property_field_kind,

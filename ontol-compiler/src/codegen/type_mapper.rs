@@ -41,7 +41,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
             Type::Domain(def_id) | Type::Anonymous(def_id) => {
                 match self.relations.properties_by_def_id(*def_id) {
                     Some(Properties {
-                        constructor: Constructor::Value(relationship_id, ..),
+                        constructor: Constructor::Alias(relationship_id, ..),
                         ..
                     }) => {
                         let meta = self

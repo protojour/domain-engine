@@ -40,7 +40,7 @@ pub fn autogenerate_mapping<'m>(
                 (second_def_id, second_fmt),
             )
         }
-        (Constructor::Value(first_rel_id, ..), Constructor::Value(second_rel_id, ..)) => {
+        (Constructor::Alias(first_rel_id, ..), Constructor::Alias(second_rel_id, ..)) => {
             let first_meta = compiler
                 .defs
                 .lookup_relationship_meta(*first_rel_id)

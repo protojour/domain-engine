@@ -94,7 +94,7 @@ pub enum Constructor {
     #[default]
     Transparent,
     /// The type represents an abstraction of another type, using one [is] relation.
-    Value(RelationshipId, SourceSpan, Cardinality),
+    Alias(RelationshipId, SourceSpan, Cardinality),
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern

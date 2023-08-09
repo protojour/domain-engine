@@ -176,8 +176,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                 Value::new(Data::Sequence(seq), seq_op.def_variant.def_id)
             }
-            SerdeOperator::ValueType(value_op) => {
-                return self.fake_attribute(processor.narrow(value_op.inner_operator_id));
+            SerdeOperator::Alias(alias_op) => {
+                return self.fake_attribute(processor.narrow(alias_op.inner_operator_id));
             }
             SerdeOperator::Union(union_op) => {
                 return match union_op.variants(self.processor_mode, processor.level()) {

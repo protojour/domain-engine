@@ -125,8 +125,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     }
                 }
             }
-            SerdeOperator::ValueType(value_op) => {
-                self.collect_operator_arguments(value_op.inner_operator_id, output, typing_purpose);
+            SerdeOperator::Alias(alias_op) => {
+                self.collect_operator_arguments(alias_op.inner_operator_id, output, typing_purpose);
             }
             SerdeOperator::PrimaryId(property_name, id_operator_id) => {
                 output.push(self.get_operator_argument(
@@ -205,9 +205,9 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 return self.registry.arg::<bool>(name, &());
                 // registry.arg::<CustomScalar>(name, &()),
             }
-            SerdeOperator::ValueType(value_op) => self.get_operator_argument(
+            SerdeOperator::Alias(alias_op) => self.get_operator_argument(
                 name,
-                value_op.inner_operator_id,
+                alias_op.inner_operator_id,
                 rel_params,
                 property_flags,
                 modifier,

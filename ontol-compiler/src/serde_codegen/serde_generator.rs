@@ -5,8 +5,8 @@ use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     serde::operator::{
-        ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange, SerdeOperator,
-        SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator, ValueOperator,
+        AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange,
+        SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator,
         ValueUnionVariant,
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
@@ -235,7 +235,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     result
                 }
             }
-            SerdeOperator::ValueType(value_op) => {
+            SerdeOperator::Alias(value_op) => {
                 self.find_unambiguous_struct_operator(value_op.inner_operator_id)
             }
             _ => Err(operator),
@@ -405,7 +405,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 return Some(OperatorAllocation::Allocated(
                     operator_id,
-                    SerdeOperator::ValueType(ValueOperator {
+                    SerdeOperator::Alias(AliasOperator {
                         typename: typename.into(),
                         def_variant,
                         inner_operator_id,
@@ -678,7 +678,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             Some(OperatorAllocation::Allocated(
                 operator_id,
-                SerdeOperator::ValueType(ValueOperator {
+                SerdeOperator::Alias(AliasOperator {
                     typename: typename.into(),
                     def_variant,
                     inner_operator_id,

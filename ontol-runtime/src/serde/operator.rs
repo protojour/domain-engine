@@ -51,7 +51,7 @@ pub enum SerdeOperator {
     ConstructorSequence(ConstructorSequenceOperator),
 
     /// A type with just one anonymous property
-    ValueType(ValueOperator),
+    Alias(AliasOperator),
 
     /// A type with multiple anonymous properties, equivalent to a union of types
     Union(UnionOperator),
@@ -107,7 +107,7 @@ pub struct SequenceRange {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ValueOperator {
+pub struct AliasOperator {
     pub typename: String,
     pub def_variant: DefVariant,
     pub inner_operator_id: SerdeOperatorId,

@@ -104,7 +104,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     &mut properties.constructor,
                 ) {
                     (PropertyCardinality::Mandatory, Constructor::Transparent) => {
-                        properties.constructor = Constructor::Value(
+                        properties.constructor = Constructor::Alias(
                             relationship.0,
                             *span,
                             relationship.1.subject_cardinality,

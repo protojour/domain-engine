@@ -178,7 +178,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def_variant.def_id, self.ctx)
                     .into_visitor(self),
             ),
-            SerdeOperator::ValueType(value_op) => {
+            SerdeOperator::Alias(value_op) => {
                 let mut typed_attribute = self
                     .narrow(value_op.inner_operator_id)
                     .deserialize(deserializer)?;

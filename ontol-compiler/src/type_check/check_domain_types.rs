@@ -262,7 +262,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_def_id.get(&object_def_id);
         let constructor = properties.map(|p| &p.constructor);
 
-        if let Some(Constructor::Value(value_relationship_id, ..)) = constructor {
+        if let Some(Constructor::Alias(value_relationship_id, ..)) = constructor {
             let relationship_meta = self
                 .defs
                 .lookup_relationship_meta(*value_relationship_id)

@@ -159,7 +159,7 @@ impl<'e> Generator<'e> {
             SerdeOperator::DynamicSequence => panic!(),
             SerdeOperator::RelationSequence(_) => panic!(),
             SerdeOperator::ConstructorSequence(seq_op) => seq_op.def_variant.def_id,
-            SerdeOperator::ValueType(value_op) => value_op.def_variant.def_id,
+            SerdeOperator::Alias(alias_op) => alias_op.def_variant.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def_variant().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def_variant.def_id,
             SerdeOperator::PrimaryId(_, operator_id) => {

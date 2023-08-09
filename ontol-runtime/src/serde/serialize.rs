@@ -74,7 +74,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::ConstructorSequence(seq_op) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
-            SerdeOperator::ValueType(value_op) => self
+            SerdeOperator::Alias(value_op) => self
                 .narrow(value_op.inner_operator_id)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {

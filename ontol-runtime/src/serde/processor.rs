@@ -250,7 +250,7 @@ impl<'e> Display for SerdeProcessor<'e> {
                     processors = CommaSeparated(&processors)
                 )
             }
-            SerdeOperator::ValueType(value_op) => Backticks(&value_op.typename).fmt(f),
+            SerdeOperator::Alias(alias_op) => Backticks(&alias_op.typename).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
             SerdeOperator::PrimaryId(..) => write!(f, "id"),
             SerdeOperator::Struct(struct_op) => Backticks(&struct_op.typename).fmt(f),

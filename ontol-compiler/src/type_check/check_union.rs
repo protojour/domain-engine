@@ -194,7 +194,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
                     }
-                    Constructor::Value(
+                    Constructor::Alias(
                         relationship_id,
                         _,
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
@@ -207,7 +207,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         def_id = meta.relationship.object.0.def_id;
                         continue;
                     }
-                    Constructor::Value(_, _, _) => {
+                    Constructor::Alias(_, _, _) => {
                         todo!("test non-standard value cardinality");
                     }
                     Constructor::Sequence(sequence) => {

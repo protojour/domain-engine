@@ -413,7 +413,7 @@ fn serialize_schema_inline<S: Serializer>(
                 }
             }
         }
-        SerdeOperator::ValueType(value_op) => {
+        SerdeOperator::Alias(value_op) => {
             serialize_schema_inline::<S>(
                 ctx,
                 ctx.ontology.get_serde_operator(value_op.inner_operator_id),
@@ -501,7 +501,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::ConstructorSequence(seq_op) => self
                 .compose(self.ctx.ref_link(seq_op.def_variant))
                 .serialize(serializer),
-            SerdeOperator::ValueType(value_op) => self
+            SerdeOperator::Alias(value_op) => self
                 .compose(self.ctx.ref_link(value_op.def_variant))
                 .serialize(serializer),
             SerdeOperator::Union(union_op) => self
@@ -780,7 +780,7 @@ impl SchemaGraphBuilder {
                     self.visit(range.operator_id, ontology);
                 }
             }
-            SerdeOperator::ValueType(value_op) => {
+            SerdeOperator::Alias(value_op) => {
                 self.add_to_graph(value_op.def_variant, operator_id);
                 self.visit(value_op.inner_operator_id, ontology);
             }

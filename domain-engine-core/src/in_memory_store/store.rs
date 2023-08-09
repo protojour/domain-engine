@@ -6,7 +6,7 @@ use ontol_runtime::{
     ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     serde::{
-        operator::{SerdeOperator, SerdeOperatorId, ValueOperator},
+        operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode},
     },
     smart_format,
@@ -548,7 +548,7 @@ impl InMemoryStore {
                 Ok(Value::new(Data::I64(id_value), *def_id))
             }
             (
-                SerdeOperator::ValueType(ValueOperator {
+                SerdeOperator::Alias(AliasOperator {
                     def_variant,
                     inner_operator_id,
                     ..
