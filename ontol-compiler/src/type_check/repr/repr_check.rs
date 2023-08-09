@@ -14,7 +14,7 @@ use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
-    relation::{Constructor, Properties, Relations, UnionCtx},
+    relation::{Constructor, Properties, Relations},
     type_check::seal::SealedDefs,
     types::DefTypes,
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
@@ -28,7 +28,6 @@ pub struct ReprCheck<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
-    pub union_ctx: &'c mut UnionCtx,
     pub sealed_defs: &'c mut SealedDefs,
 
     #[allow(unused)]
@@ -275,10 +274,6 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
                 _ => {}
             }
-        }
-
-        if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) = &rec.repr {
-            self.union_ctx.union_set.insert(leaf_def_id);
         }
 
         rec.repr

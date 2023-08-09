@@ -40,12 +40,6 @@ impl Relations {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct UnionCtx {
-    /// Register of all types that are unions
-    pub union_set: FnvHashSet<DefId>,
-}
-
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Is {
     pub def_id: DefId,

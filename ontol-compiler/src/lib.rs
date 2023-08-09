@@ -20,7 +20,7 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
-use relation::{Properties, Property, Relations, UnionCtx};
+use relation::{Properties, Property, Relations};
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
@@ -69,7 +69,6 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
-    pub(crate) union_ctx: UnionCtx,
     pub(crate) sealed_defs: SealedDefs,
     pub(crate) patterns: Patterns,
 
@@ -95,7 +94,6 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
-            union_ctx: UnionCtx::default(),
             sealed_defs: Default::default(),
             patterns: Patterns::default(),
             codegen_tasks: Default::default(),

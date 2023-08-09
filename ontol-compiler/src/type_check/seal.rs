@@ -40,7 +40,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         self.repr_check(def_id).check_repr_root();
 
-        if self.union_ctx.union_set.contains(&def_id) {
+        if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) =
+            self.sealed_defs.repr_table.get(&def_id)
+        {
             for error in self.check_value_union(def_id) {
                 self.errors.push(error);
             }
