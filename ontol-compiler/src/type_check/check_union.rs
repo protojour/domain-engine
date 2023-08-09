@@ -210,9 +210,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Constructor::Value(_, _, _) => {
                         todo!("test non-standard value cardinality");
                     }
-                    Constructor::Intersection(_) => {
-                        todo!()
-                    }
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
                     }

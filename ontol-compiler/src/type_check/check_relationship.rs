@@ -110,33 +110,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             relationship.1.subject_cardinality,
                         );
                     }
-                    (
-                        PropertyCardinality::Mandatory,
-                        Constructor::Value(
-                            existing_relationship_id,
-                            existing_span,
-                            existing_cardinality,
-                        ),
-                    ) => {
-                        properties.constructor = Constructor::Intersection(
-                            [
-                                (
-                                    *existing_relationship_id,
-                                    *existing_span,
-                                    *existing_cardinality,
-                                ),
-                                (relationship.0, *span, relationship.1.subject_cardinality),
-                            ]
-                            .into(),
-                        );
-                    }
-                    (PropertyCardinality::Mandatory, Constructor::Intersection(intersection)) => {
-                        intersection.push((
-                            relationship.0,
-                            *span,
-                            relationship.1.subject_cardinality,
-                        ));
-                    }
+                    (PropertyCardinality::Mandatory, _) => {}
                     (PropertyCardinality::Optional, Constructor::Transparent) => {}
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }

@@ -101,9 +101,6 @@ pub enum Constructor {
     Transparent,
     /// The type represents an abstraction of another type, using one [is] relation.
     Value(RelationshipId, SourceSpan, Cardinality),
-    /// The type represents an intersection any number of other types.
-    /// It has several [is] relations.
-    Intersection(Vec<(RelationshipId, SourceSpan, Cardinality)>),
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern
