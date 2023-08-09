@@ -1,7 +1,5 @@
 use indexmap::map::Entry;
-use ontol_runtime::{
-    ontology::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
-};
+use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId};
 use tracing::debug;
 
 use crate::{
@@ -77,6 +75,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
 
+                // Ensure properties
+                self.relations.properties_by_def_id_mut(subject.0.def_id);
+
                 let prev_entry = self
                     .relations
                     .ontology_mesh
@@ -95,17 +96,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Entry::Occupied(_) => {
                         self.error(CompileError::DuplicateAnonymousRelationship, span);
                     }
-                }
-
-                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
-
-                match (
-                    relationship.1.subject_cardinality.0,
-                    &mut properties.constructor,
-                ) {
-                    (PropertyCardinality::Mandatory, _) => {}
-                    (PropertyCardinality::Optional, Constructor::Transparent) => {}
-                    _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
 
                 object_ty

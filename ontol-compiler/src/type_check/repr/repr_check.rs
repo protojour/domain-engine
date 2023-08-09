@@ -315,9 +315,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Is, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
                 members.push((def_id, data.rel_span));
             }
-            (Is, Some(repr), kind) if *repr != kind => {
-                rec.repr = Some(ReprKind::Intersection(vec![(def_id, data.rel_span)]));
-            }
+            (Is, Some(repr), kind) if *repr != kind => match repr {
+                ReprKind::Scalar(def0, span0) => {
+                    rec.repr = Some(ReprKind::Intersection(vec![
+                        (*def0, *span0),
+                        (def_id, data.rel_span),
+                    ]));
+                }
+                _ => {
+                    todo!("{repr:?}");
+                }
+            },
             (IsMaybe, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
                     rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
