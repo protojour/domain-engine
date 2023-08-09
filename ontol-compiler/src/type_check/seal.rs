@@ -19,6 +19,8 @@ pub struct SealedDefs {
 ///
 /// Sealed definitions are interpreted as immutable.
 impl<'c, 'm> TypeCheck<'c, 'm> {
+    /// Seal all definitions processed so far.
+    /// FIXME: Should seal per-package instead of looping over everything each time
     pub fn seal_all_defs(&mut self) {
         debug!("seal all defs");
 
@@ -34,11 +36,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         if let Some(def) = self.defs.table.get(&def_id) {
             if let DefKind::Type(_) = def.kind {
-                self.check_domain_type_properties(def_id, def);
+                self.check_domain_type_pre_repr(def_id, def);
             }
         }
 
         self.repr_check(def_id).check_repr_root();
+
+        if let Some(def) = self.defs.table.get(&def_id) {
+            if let DefKind::Type(_) = def.kind {
+                self.check_domain_type_post_repr(def_id, def);
+            }
+        }
 
         if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) =
             self.sealed_defs.repr_table.get(&def_id)

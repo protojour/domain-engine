@@ -28,7 +28,7 @@ pub(super) fn const_codegen<'m>(
     def_id: DefId,
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.sealed_defs);
     let mut errors = CompileErrors::default();
 
     debug!("Generating code for\n{}", expr);
@@ -57,7 +57,7 @@ pub(super) fn map_codegen<'m>(
     func: HirFunc<'m>,
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs);
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.sealed_defs);
 
     debug!("Generating code for\n{}", func);
 

@@ -18,7 +18,7 @@ use crate::{
     SourceSpan,
 };
 
-use super::TypeCheck;
+use super::{repr::repr_model::ReprKind, TypeCheck};
 
 #[derive(Debug)]
 enum Action {
@@ -39,16 +39,14 @@ enum Action {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
+    pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_def_id.get(&def_id)?;
-        let ontology_mesh = self.relations.ontology_mesh.get(&def_id);
         let table = properties.table.as_ref()?;
 
         let mut actions = vec![];
-        let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
 
         for (property_id, cardinality) in table {
-            trace!("check {def_id:?} {property_id:?} {cardinality:?}");
+            trace!("check pre-repr {def_id:?} {property_id:?} {cardinality:?}");
 
             match property_id.role {
                 Role::Subject => {
@@ -56,18 +54,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .defs
                         .lookup_relationship_meta(property_id.relationship_id)
                         .unwrap();
-
-                    // Check that the same relation_id is not reused for subject properties
-                    if !subject_relation_set.insert(meta.relationship.relation_id) {
-                        let spanned_relationship_def = self
-                            .defs
-                            .get_spanned_def_kind(meta.relationship_id.0)
-                            .unwrap();
-                        self.errors.push(
-                            CompileError::UnionInNamedRelationshipNotSupported
-                                .spanned(spanned_relationship_def.span),
-                        );
-                    }
 
                     let object_properties = self
                         .relations
@@ -94,6 +80,50 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             });
                         }
                     }
+                }
+                Role::Object => {}
+            }
+        }
+
+        self.perform_actions(actions);
+
+        None
+    }
+
+    pub fn check_domain_type_post_repr(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
+        let properties = self.relations.properties_by_def_id.get(&def_id)?;
+        let ontology_mesh = self.relations.ontology_mesh.get(&def_id);
+        let table = properties.table.as_ref()?;
+
+        let mut actions = vec![];
+        let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
+
+        for (property_id, cardinality) in table {
+            trace!("check post-repr {def_id:?} {property_id:?} {cardinality:?}");
+
+            match property_id.role {
+                Role::Subject => {
+                    let meta = self
+                        .defs
+                        .lookup_relationship_meta(property_id.relationship_id)
+                        .unwrap();
+
+                    // Check that the same relation_id is not reused for subject properties
+                    if !subject_relation_set.insert(meta.relationship.relation_id) {
+                        let spanned_relationship_def = self
+                            .defs
+                            .get_spanned_def_kind(meta.relationship_id.0)
+                            .unwrap();
+                        self.errors.push(
+                            CompileError::UnionInNamedRelationshipNotSupported
+                                .spanned(spanned_relationship_def.span),
+                        );
+                    }
+
+                    let object_properties = self
+                        .relations
+                        .properties_by_def_id(meta.relationship.object.0.def_id)
+                        .unwrap();
 
                     if properties.identified_by.is_some()
                         && object_properties.identified_by.is_some()
@@ -260,29 +290,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object_def_id: DefId,
     ) -> Result<ValueGenerator, ()> {
         let properties = self.relations.properties_by_def_id.get(&object_def_id);
-        let constructor = properties.map(|p| &p.constructor);
+        let repr = self
+            .sealed_defs
+            .repr_table
+            .get(&object_def_id)
+            .unwrap_or_else(|| {
+                panic!(
+                    "No repr for {object_def_id:?} {:?}",
+                    self.defs.table.get(&object_def_id)
+                );
+            });
 
-        if let Some(Constructor::Alias(value_relationship_id, ..)) = constructor {
-            let relationship_meta = self
-                .defs
-                .lookup_relationship_meta(*value_relationship_id)
-                .unwrap();
-            return self.determine_value_generator(
-                generator_def_id,
-                relationship_meta.relationship.object.0.def_id,
-            );
-        }
+        let scalar_def_id = match repr {
+            ReprKind::Scalar(scalar_def_id, _) => *scalar_def_id,
+            _ => return Err(()),
+        };
 
         let generators = &self.primitives.generators;
 
-        // Now looking at a primitive type
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
-                match self.def_types.table.get(&object_def_id) {
+                match self.def_types.table.get(&scalar_def_id) {
                     Some(Type::Int(_)) => Ok(ValueGenerator::Autoincrement),
                     Some(Type::String(_)) => Ok(ValueGenerator::UuidV4),
                     Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
-                    _ => match constructor {
+                    _ => match properties.map(|p| &p.constructor) {
                         Some(Constructor::StringFmt(segment)) => {
                             self.auto_generator_for_string_pattern_segment(segment)
                         }
@@ -291,7 +323,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.create_time => {
-                match self.def_types.table.get(&object_def_id) {
+                match self.def_types.table.get(&scalar_def_id) {
                     Some(Type::StringLike(_, StringLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
                     }
@@ -299,7 +331,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.update_time => {
-                match self.def_types.table.get(&object_def_id) {
+                match self.def_types.table.get(&scalar_def_id) {
                     Some(Type::StringLike(_, StringLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
                     }

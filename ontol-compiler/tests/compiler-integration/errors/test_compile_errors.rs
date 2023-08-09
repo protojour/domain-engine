@@ -330,7 +330,7 @@ fn compile_error_in_dependency() {
 fn rel_wildcard_span() {
     "
     with int {
-        rel . // ERROR subject must be a domain type
+        rel . // ERROR subject must be a domain type// ERROR Type is sealed and cannot be changed
             'likes': int
     }
     "

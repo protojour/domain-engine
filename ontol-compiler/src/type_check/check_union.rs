@@ -4,7 +4,6 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
-    ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
     value::PropertyId,
     DataModifier, DefId, DefVariant,
@@ -176,51 +175,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn find_domain_type_match_data(
         &self,
-        mut def_id: DefId,
+        def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
-        loop {
-            debug!("find domain type match data {def_id:?}");
+        debug!("find domain type match data {def_id:?}");
 
-            match self.relations.properties_by_def_id(def_id) {
-                Some(properties) => match &properties.constructor {
-                    Constructor::Transparent => {
-                        debug!("was Transparent: {properties:?}");
-                        match &properties.table {
-                            Some(property_set) => {
-                                return Ok(DomainTypeMatchData::Struct(property_set));
-                            }
-                            None => {
-                                return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
-                            }
-                        }
+        match self.relations.properties_by_def_id(def_id) {
+            Some(properties) => match &properties.constructor {
+                Constructor::Transparent => {
+                    debug!("was Transparent: {properties:?}");
+                    match &properties.table {
+                        Some(property_set) => Ok(DomainTypeMatchData::Struct(property_set)),
+                        None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
                     }
-                    Constructor::Alias(
-                        relationship_id,
-                        _,
-                        (PropertyCardinality::Mandatory, ValueCardinality::One),
-                    ) => {
-                        let meta = self
-                            .defs
-                            .lookup_relationship_meta(*relationship_id)
-                            .expect("BUG: problem getting realtionship meta");
-
-                        def_id = meta.relationship.object.0.def_id;
-                        continue;
-                    }
-                    Constructor::Alias(_, _, _) => {
-                        todo!("test non-standard value cardinality");
-                    }
-                    Constructor::Sequence(sequence) => {
-                        return Ok(DomainTypeMatchData::Sequence(sequence));
-                    }
-                    Constructor::StringFmt(segment) => {
-                        return Ok(DomainTypeMatchData::ConstructorStringPattern(segment));
-                    }
-                },
-                None => {
-                    return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                 }
-            }
+                Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),
+                Constructor::StringFmt(segment) => {
+                    Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
+                }
+            },
+            None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
         }
     }
 

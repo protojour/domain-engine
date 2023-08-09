@@ -2,8 +2,9 @@ use ontol_runtime::MapKey;
 use tracing::warn;
 
 use crate::{
-    def::{Defs, LookupRelationshipMeta},
-    relation::{Constructor, Properties, Relations},
+    def::Defs,
+    relation::Relations,
+    type_check::{repr::repr_model::ReprKind, seal::SealedDefs},
     types::{Type, TypeRef},
 };
 
@@ -20,11 +21,16 @@ pub struct MapInfo {
 pub struct TypeMapper<'c, 'm> {
     pub relations: &'c Relations,
     pub defs: &'c Defs<'m>,
+    pub sealed_defs: &'c SealedDefs,
 }
 
 impl<'c, 'm> TypeMapper<'c, 'm> {
-    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>) -> Self {
-        Self { relations, defs }
+    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, sealed_defs: &'c SealedDefs) -> Self {
+        Self {
+            relations,
+            defs,
+            sealed_defs,
+        }
     }
 
     pub fn find_map_key_pair(&self, first: TypeRef, second: TypeRef) -> Option<MapKeyPair> {
@@ -39,27 +45,42 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
 
         match ty {
             Type::Domain(def_id) | Type::Anonymous(def_id) => {
-                match self.relations.properties_by_def_id(*def_id) {
-                    Some(Properties {
-                        constructor: Constructor::Alias(relationship_id, ..),
-                        ..
-                    }) => {
-                        let meta = self
-                            .defs
-                            .lookup_relationship_meta(*relationship_id)
-                            .expect("BUG: problem getting anonymous relationship meta");
+                let repr = self.sealed_defs.repr_table.get(def_id).unwrap();
 
-                        Some(MapInfo {
-                            key: MapKey {
-                                def_id: *def_id,
+                match repr {
+                    ReprKind::Scalar(scalar_def_id, _) => Some(MapInfo {
+                        key: MapKey {
+                            def_id: *def_id,
+                            seq: false,
+                        },
+                        punned: if scalar_def_id != def_id {
+                            Some(MapKey {
+                                def_id: *scalar_def_id,
                                 seq: false,
-                            },
-                            punned: Some(MapKey {
-                                def_id: meta.relationship.object.0.def_id,
-                                seq: false,
-                            }),
-                            anonymous,
-                        })
+                            })
+                        } else {
+                            None
+                        },
+                        anonymous,
+                    }),
+                    ReprKind::StructIntersection(members) => {
+                        if members.len() == 1 {
+                            let (member_def_id, _) = members.iter().next().unwrap();
+
+                            Some(MapInfo {
+                                key: MapKey {
+                                    def_id: *def_id,
+                                    seq: false,
+                                },
+                                punned: Some(MapKey {
+                                    def_id: *member_def_id,
+                                    seq: false,
+                                }),
+                                anonymous,
+                            })
+                        } else {
+                            todo!("Unhandled({def_id:?}): {repr:?}");
+                        }
                     }
                     _ => Some(MapInfo {
                         key: MapKey {

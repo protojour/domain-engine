@@ -93,8 +93,6 @@ pub enum Constructor {
     /// There is nothing special about this type, it is just a "struct" consisting of relations to other types.
     #[default]
     Transparent,
-    /// The type represents an abstraction of another type, using one [is] relation.
-    Alias(RelationshipId, SourceSpan, Cardinality),
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern

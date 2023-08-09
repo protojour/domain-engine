@@ -462,7 +462,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ImplicitRelationId::Reused(relation_id) => relation_id,
         };
 
-        debug!("define transition relation {relation_id:?}");
+        debug!("{:?}: <transition>", relation_id.0);
 
         Ok(self.define(
             DefKind::Relationship(Relationship {
@@ -921,7 +921,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
         };
         let ident = self.compiler.strings.intern(&type_stmt.ident.0);
-        debug!("type `{ident}`: got {def_id:?}");
+        debug!("{def_id:?}: `{ident}`");
         let params = type_stmt.params.map(|(ast_params, _span)| {
             ast_params
                 .into_iter()
@@ -977,7 +977,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
-        debug!("anonymous: {anonymous_def_id:?}");
+        debug!("{anonymous_def_id:?}: <anonymous>");
         DefReference {
             def_id: anonymous_def_id,
             pattern_bindings: Default::default(),

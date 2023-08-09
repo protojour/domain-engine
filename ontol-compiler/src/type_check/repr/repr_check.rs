@@ -247,6 +247,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             }
 
                             match &properties.constructor {
+                                Constructor::Transparent => {
+                                    // The type can be represented as a Unit
+                                    // if there is an _empty type_ (a leaf type) somewhere in the mesh
+                                    if !has_table && data.is_leaf {
+                                        self.merge_repr(&mut rec, ReprKind::Unit, def_id, data);
+                                    }
+                                }
                                 Constructor::StringFmt(_) => {
                                     assert!(!has_table);
                                     self.merge_repr(
@@ -256,16 +263,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         data,
                                     );
                                 }
-                                Constructor::Transparent => {
-                                    if !has_table {
-                                        self.merge_repr(&mut rec, ReprKind::Unit, def_id, data);
-                                    }
-                                }
                                 Constructor::Sequence(_) => {
                                     assert!(!has_table);
                                     self.merge_repr(&mut rec, ReprKind::Seq, def_id, data);
                                 }
-                                _ => {}
                             }
                         } else {
                             self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);

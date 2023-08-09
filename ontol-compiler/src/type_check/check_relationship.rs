@@ -103,13 +103,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     relationship.1.subject_cardinality.0,
                     &mut properties.constructor,
                 ) {
-                    (PropertyCardinality::Mandatory, Constructor::Transparent) => {
-                        properties.constructor = Constructor::Alias(
-                            relationship.0,
-                            *span,
-                            relationship.1.subject_cardinality,
-                        );
-                    }
                     (PropertyCardinality::Mandatory, _) => {}
                     (PropertyCardinality::Optional, Constructor::Transparent) => {}
                     _ => return self.error(CompileError::ConstructorMismatch, span),
