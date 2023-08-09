@@ -257,9 +257,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         data,
                                     );
                                 }
-                                Constructor::Struct => {
+                                Constructor::Transparent => {
                                     if !has_table {
-                                        self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                                        self.merge_repr(&mut rec, ReprKind::Unit, def_id, data);
                                     }
                                 }
                                 Constructor::Sequence(_) => {
@@ -285,11 +285,27 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     }
 
     fn merge_repr(&mut self, rec: &mut ReprRecord, next: ReprKind, def_id: DefId, data: &IsData) {
-        trace!("{:?} merge repr {next:?}", self.root_def_id);
+        if self.state.do_trace {
+            trace!(
+                "{:?} merge repr {:?}=>{:?} {next:?}",
+                self.root_def_id,
+                data.is_relation,
+                def_id,
+            );
+        }
 
         use IsRelation::*;
         match (data.is_relation, &mut rec.repr, next) {
             (Origin, _, next) => {
+                rec.repr = Some(next);
+            }
+            (Is, None, ReprKind::Unit) => {
+                rec.repr = Some(ReprKind::Unit);
+            }
+            (Is, Some(_), ReprKind::Unit) => {
+                // Unit does not add additional information to an existing repr
+            }
+            (Is, Some(ReprKind::Unit), next) => {
                 rec.repr = Some(next);
             }
             (Is, None | Some(ReprKind::Struct), ReprKind::Struct) => {
@@ -306,11 +322,29 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Is, Some(repr), kind) if *repr != kind => {
                 rec.repr = Some(ReprKind::Intersection(vec![(def_id, data.rel_span)]));
             }
+            (IsMaybe, Some(ReprKind::Unit), ReprKind::Unit) => {
+                if data.is_leaf {
+                    rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                }
+            }
+            (IsMaybe, Some(ReprKind::Unit), _) => {
+                rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+            }
             (IsMaybe, Some(ReprKind::Struct), ReprKind::Struct) => {
                 rec.repr = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
             (IsMaybe, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
                 variants.push((def_id, data.rel_span));
+            }
+            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
+                let mut variants = std::mem::take(variants);
+                variants.push((def_id, data.rel_span));
+                rec.repr = Some(ReprKind::StructUnion(variants));
+            }
+            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
+                if data.is_leaf {
+                    variants.push((def_id, data.rel_span));
+                }
             }
             (IsMaybe, None, ReprKind::Struct) => {
                 rec.repr = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
@@ -318,12 +352,26 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (IsMaybe, None, _) => {
                 rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
+            (IsMaybe, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
+                rec.repr = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
+            }
             (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
                 variants.push((def_id, span));
             }
-            (old, is_relation, new) => {
+            (Is | IsMaybe, Some(ReprKind::Seq), _) => {
+                self.errors.push(SpannedCompileError {
+                    error: CompileError::InvalidMixOfRelationshipTypeForSubject,
+                    span: data.rel_span,
+                    notes: vec![],
+                });
+            }
+            (is_relation, old, new) => {
                 panic!("Invalid repr transition: {old:?} =({is_relation:?})> {new:?}")
             }
+        }
+
+        if self.state.do_trace {
+            trace!("    tmp repr: {:?}", rec.repr);
         }
     }
 
@@ -357,9 +405,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 def_id,
                 IsData {
                     is_relation,
+                    is_leaf: true,
                     rel_span: span,
                 },
             );
+
+            let mut was_leaf = true;
 
             if let Some(entries) = self.relations.ontology_mesh.get(&def_id) {
                 for (is, span) in entries {
@@ -375,8 +426,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     };
 
                     self.traverse_ontology_mesh(is.def_id, next_relation, *span, output);
+                    was_leaf = false;
                 }
             }
+
+            output.get_mut(&def_id).unwrap().is_leaf = was_leaf;
         }
     }
 }
@@ -384,6 +438,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 #[derive(Debug)]
 struct IsData {
     is_relation: IsRelation,
+    is_leaf: bool,
     rel_span: SourceSpan,
 }
 

@@ -57,6 +57,12 @@ pub struct Is {
     pub is_ontol_alias: bool,
 }
 
+impl Is {
+    pub fn is_optional(&self) -> bool {
+        matches!(self.cardinality, PropertyCardinality::Optional)
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
@@ -92,16 +98,12 @@ pub struct Property {
 pub enum Constructor {
     /// There is nothing special about this type, it is just a "struct" consisting of relations to other types.
     #[default]
-    Struct,
+    Transparent,
     /// The type represents an abstraction of another type, using one [is] relation.
     Value(RelationshipId, SourceSpan, Cardinality),
     /// The type represents an intersection any number of other types.
     /// It has several [is] relations.
     Intersection(Vec<(RelationshipId, SourceSpan, Cardinality)>),
-    /// The type represents a union (either-or) of other types.
-    /// Union uses a Vec even if we have to prove that properties have disjoint types.
-    /// serializers etc should try things in sequence anyway.
-    Union(Vec<(RelationshipId, SourceSpan)>),
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern

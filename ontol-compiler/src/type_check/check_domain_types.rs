@@ -10,7 +10,7 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, LookupRelationshipMeta, RelationId, RelationKind},
+    def::{Def, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
     relation::{Constructor, Property},
@@ -41,6 +41,7 @@ enum Action {
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_domain_type_properties(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
         let properties = self.relations.properties_by_def_id.get(&def_id)?;
+        let ontology_mesh = self.relations.ontology_mesh.get(&def_id);
         let table = properties.table.as_ref()?;
 
         let mut actions = vec![];
@@ -118,27 +119,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 Role::Object => {
                     if properties.identified_by.is_none() {
-                        match &properties.constructor {
-                            Constructor::Union(relationships) => {
+                        match ontology_mesh {
+                            Some(mesh)
+                                if mesh.iter().any(|(is, _)| {
+                                    matches!(is.cardinality, PropertyCardinality::Optional)
+                                }) =>
+                            {
                                 if let Some(table) = &properties.table {
                                     assert!(table.get(property_id).is_some());
 
-                                    let all_entities =
-                                        relationships.iter().all(|(relationship_id, _span)| {
-                                            let meta = self
-                                                .defs
-                                                .lookup_relationship_meta(*relationship_id)
-                                                .expect("BUG: problem getting relationship meta");
-
-                                            let variant_def = match &meta.relation.kind {
-                                                RelationKind::Named(def)
-                                                | RelationKind::FmtTransition(def, _) => def.def_id,
-                                                _ => meta.relationship.object.0.def_id,
-                                            };
-
+                                    let all_entities = mesh
+                                        .iter()
+                                        .filter(|(is, _)| is.is_optional())
+                                        .any(|(is, _)| {
                                             let subject_properties = self
                                                 .relations
-                                                .properties_by_def_id(variant_def)
+                                                .properties_by_def_id(is.def_id)
                                                 .unwrap();
 
                                             subject_properties.identified_by.is_some()

@@ -346,7 +346,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let node_kind = match self.sealed_defs.repr_table.get(&struct_def_id).unwrap() {
-            ReprKind::Struct => {
+            ReprKind::Struct | ReprKind::Unit => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
                         let struct_binder = TypedBinder {

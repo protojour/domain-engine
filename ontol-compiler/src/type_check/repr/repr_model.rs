@@ -5,6 +5,7 @@ use crate::SourceSpan;
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReprKind {
+    Unit,
     /// Scalar type without further attributes
     Scalar(DefId, SourceSpan),
     /// Sequence

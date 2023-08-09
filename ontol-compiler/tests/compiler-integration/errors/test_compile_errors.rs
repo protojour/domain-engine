@@ -141,8 +141,8 @@ fn non_disjoint_string_union() {
 fn sequence_mix1() {
     "
     type u {
-        rel .is?: int
-        rel .0: string // ERROR invalid mix of relationship type for subject
+        rel .is?: int // ERROR invalid mix of relationship type for subject
+        rel .0: string
     }
     "
     .compile_fail();

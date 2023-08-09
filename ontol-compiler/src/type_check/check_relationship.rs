@@ -103,7 +103,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     relationship.1.subject_cardinality.0,
                     &mut properties.constructor,
                 ) {
-                    (PropertyCardinality::Mandatory, Constructor::Struct) => {
+                    (PropertyCardinality::Mandatory, Constructor::Transparent) => {
                         properties.constructor = Constructor::Value(
                             relationship.0,
                             *span,
@@ -137,15 +137,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             relationship.1.subject_cardinality,
                         ));
                     }
-                    (PropertyCardinality::Optional, Constructor::Struct) => {
-                        properties.constructor =
-                            Constructor::Union([(relationship.0, *span)].into());
-                        // Register union for check later
-                        self.union_ctx.union_set.insert(subject.0.def_id);
-                    }
-                    (PropertyCardinality::Optional, Constructor::Union(variants)) => {
-                        variants.push((relationship.0, *span));
-                    }
+                    (PropertyCardinality::Optional, Constructor::Transparent) => {}
                     _ => return self.error(CompileError::ConstructorMismatch, span),
                 }
 
@@ -192,7 +184,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
                 let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
                 match (&properties.table, &mut properties.constructor) {
-                    (None, Constructor::Struct) => {
+                    (None, Constructor::Transparent) => {
                         let mut sequence = Sequence::default();
 
                         if let Err(error) =
@@ -566,7 +558,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_properties = self.relations.properties_by_def_id_mut(object_def);
 
         match &mut object_properties.constructor {
-            Constructor::Struct => {
+            Constructor::Transparent => {
                 object_properties.constructor =
                     Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
 

@@ -412,7 +412,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }),
                 ));
             }
-            ReprKind::Struct => {
+            ReprKind::Unit | ReprKind::Struct => {
                 return self.alloc_struct_constructor_operator(def_variant, typename, properties);
             }
             ReprKind::StructIntersection(members) => {

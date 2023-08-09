@@ -141,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 builder.add_string_literal(string_literal, *def_id);
             }
             Type::Domain(domain_def_id) => match self.find_domain_type_match_data(*domain_def_id) {
-                Ok(DomainTypeMatchData::Map(property_set)) => {
+                Ok(DomainTypeMatchData::Struct(property_set)) => {
                     self.add_property_set_to_discriminator(
                         builder,
                         variant_def,
@@ -183,14 +183,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             match self.relations.properties_by_def_id(def_id) {
                 Some(properties) => match &properties.constructor {
-                    Constructor::Struct => {
-                        debug!("got struct: {properties:?}");
+                    Constructor::Transparent => {
+                        debug!("was Transparent: {properties:?}");
                         match &properties.table {
                             Some(property_set) => {
-                                return Ok(DomainTypeMatchData::Map(property_set));
+                                return Ok(DomainTypeMatchData::Struct(property_set));
                             }
                             None => {
-                                debug!("Error ok");
                                 return Err(UnionCheckError::UnitTypePartOfUnion(def_id));
                             }
                         }
@@ -213,9 +212,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Constructor::Intersection(_) => {
                         todo!()
-                    }
-                    Constructor::Union(_) => {
-                        unreachable!()
                     }
                     Constructor::Sequence(sequence) => {
                         return Ok(DomainTypeMatchData::Sequence(sequence));
@@ -517,7 +513,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Map(&'a IndexMap<PropertyId, Property>),
+    Struct(&'a IndexMap<PropertyId, Property>),
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a StringPatternSegment),
 }
