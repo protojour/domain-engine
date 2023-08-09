@@ -90,7 +90,7 @@ impl<'m> Compiler<'m> {
             Type::ValueGenerator,
         );
 
-        self.type_check().seal_all_defs();
+        self.seal_domain(ONTOL_PKG);
 
         self
     }

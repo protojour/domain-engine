@@ -268,6 +268,16 @@ impl<'m> Defs<'m> {
         def_id
     }
 
+    pub fn iter_package_def_ids(&self, package_id: PackageId) -> impl Iterator<Item = DefId> {
+        let max_idx = self
+            .def_id_allocators
+            .get(&package_id)
+            .cloned()
+            .unwrap_or(0);
+
+        (0..max_idx).map(move |idx| DefId(package_id, idx))
+    }
+
     pub fn alloc_def_param_id(&mut self) -> DefParamId {
         let id = self.next_def_param;
         self.next_def_param.0 += 1;

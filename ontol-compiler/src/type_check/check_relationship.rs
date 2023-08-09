@@ -381,27 +381,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
         } else {
-            let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
+            // Ensure properties in object
+            self.relations.properties_by_def_id_mut(object.0.def_id);
 
-            match (
-                &relationship.1.object_prop,
-                object_ty,
-                &mut object_properties.table,
-            ) {
-                (Some(_), Type::Domain(_), None) => {
-                    object_properties.table = Some(
-                        [(
-                            PropertyId::object(relationship.0),
-                            Property {
-                                cardinality: relationship.1.object_cardinality,
-                                is_entity_id: false,
-                            },
-                        )]
-                        .into(),
-                    );
-                }
-                (Some(_), Type::Domain(_), Some(table)) => {
-                    if table
+            match (&relationship.1.object_prop, object_ty) {
+                (Some(_), Type::Domain(_)) => {
+                    self.check_not_sealed(object_ty, &object.1);
+
+                    if self
+                        .relations
+                        .properties_by_def_id_mut(object.0.def_id)
+                        .table_mut()
                         .insert(
                             PropertyId::object(relationship.0),
                             Property {
@@ -415,11 +405,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .error(CompileError::UnionInNamedRelationshipNotSupported, span);
                     }
                 }
-                (Some(_), _, _) => {
+                (Some(_), _) => {
                     // non-domain type in object
                     return self.error(CompileError::NonEntityInReverseRelationship, span);
                 }
-                (None, _, _) => {}
+                (None, _) => {}
             }
         }
 
@@ -427,8 +417,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_subject_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
-        match ty {
-            Type::Domain(_) | Type::Anonymous(_) => {}
+        let def_id = match ty.get_single_def_id() {
+            Some(def_id) => def_id,
+            None => {
+                self.error(CompileError::SubjectMustBeDomainType, span);
+                return;
+            }
+        };
+
+        match self.defs.get_def_kind(def_id) {
+            Some(DefKind::Primitive(_) | DefKind::Type(_)) => {}
             _ => {
                 self.error(CompileError::SubjectMustBeDomainType, span);
             }

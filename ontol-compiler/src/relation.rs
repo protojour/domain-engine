@@ -70,9 +70,9 @@ impl Properties {
         &self.constructor
     }
 
-    pub fn insert_map_property(&mut self, property_id: PropertyId, property: Property) {
-        let table = self.table.get_or_insert_with(Default::default);
-        table.insert(property_id, property);
+    /// Get the property table, create it if None
+    pub fn table_mut(&mut self) -> &mut IndexMap<PropertyId, Property> {
+        self.table.get_or_insert_with(Default::default)
     }
 }
 

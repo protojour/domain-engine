@@ -1,6 +1,5 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::DefId;
-use tracing::debug;
 
 use crate::def::DefKind;
 
@@ -19,16 +18,6 @@ pub struct SealedDefs {
 ///
 /// Sealed definitions are interpreted as immutable.
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    /// Seal all definitions processed so far.
-    /// FIXME: Should seal per-package instead of looping over everything each time
-    pub fn seal_all_defs(&mut self) {
-        debug!("seal all defs");
-
-        for def_id in self.defs.table.keys() {
-            self.seal_def(*def_id);
-        }
-    }
-
     pub fn seal_def(&mut self, def_id: DefId) {
         if !self.sealed_defs.sealed_set.insert(def_id) {
             return;

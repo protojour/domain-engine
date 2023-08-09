@@ -330,7 +330,7 @@ fn compile_error_in_dependency() {
 fn rel_wildcard_span() {
     "
     with int {
-        rel . // ERROR subject must be a domain type// ERROR Type is sealed and cannot be changed
+        rel . // ERROR Type is sealed and cannot be modified
             'likes': int
     }
     "
@@ -431,7 +431,7 @@ fn nonsense_value_generator() {
 }
 
 #[test]
-fn sealed_def() {
+fn test_lazy_seal_by_map() {
     "
     type foo { rel .'prop': string }
     type bar { rel .'prop': string }
@@ -442,8 +442,31 @@ fn sealed_def() {
     }
 
     rel
-        foo // ERROR Type is sealed and cannot be changed
+        foo // ERROR Type is sealed and cannot be modified
         'fail': string
     "
+    .compile_fail();
+}
+
+#[test]
+fn test_error_object_property_in_foreign_domain() {
+    TestPackages::with_sources([
+        (SourceName("foreign"), "pub type foo"),
+        (
+            SourceName::root(),
+            "
+            use 'foreign' as foreign
+
+            pub type bar {
+                rel .'foo': foreign.foo // This is OK
+            }
+
+            pub type baz {
+                rel .'foo'::'baz'
+                    foreign.foo // ERROR Type is sealed and cannot be modified
+            }
+            ",
+        ),
+    ])
     .compile_fail();
 }

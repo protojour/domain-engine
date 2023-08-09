@@ -17,7 +17,7 @@ use ontol_runtime::{
     DataModifier, DefId, DefVariant, PackageId,
 };
 use ontology_graph::OntologyGraph;
-use package::{PackageTopology, Packages};
+use package::{PackageTopology, Packages, ParsedPackage};
 use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Property, Relations};
@@ -106,8 +106,6 @@ impl<'m> Compiler<'m> {
         &mut self,
         topology: PackageTopology,
     ) -> Result<(), UnifiedCompileError> {
-        let mut root_defs = vec![];
-
         for parsed_package in topology.packages {
             debug!(
                 "lower package {:?}: {:?}",
@@ -122,55 +120,61 @@ impl<'m> Compiler<'m> {
                 .get_source(source_id)
                 .expect("no compiled source available");
 
-            for error in parsed_package.parser_errors {
-                self.push_error(match error {
-                    ontol_parser::Error::Lex(lex_error) => {
-                        let span = lex_error.span();
-                        CompileError::Lex(LexError::new(lex_error)).spanned(&src.span(&span))
-                    }
-                    ontol_parser::Error::Parse(parse_error) => {
-                        let span = parse_error.span();
-                        CompileError::Parse(ParseError::new(parse_error)).spanned(&src.span(&span))
-                    }
-                });
-            }
+            self.lower_and_check_next_domain(parsed_package, src)?;
+        }
 
-            let package_def_id = self.define_package(parsed_package.package_id);
-            self.packages
-                .loaded_packages
-                .insert(parsed_package.reference, package_def_id);
+        compile_all_patterns(self);
+        execute_codegen_tasks(self);
+        self.check_error()
+    }
 
-            self.package_config_table
-                .insert(parsed_package.package_id, parsed_package.config);
+    /// Lower statements from the next domain,
+    /// perform type check against its dependent domains,
+    /// and seal the types at the end.
+    fn lower_and_check_next_domain(
+        &mut self,
+        package: ParsedPackage,
+        src: Src,
+    ) -> Result<(), UnifiedCompileError> {
+        for error in package.parser_errors {
+            self.push_error(match error {
+                ontol_parser::Error::Lex(lex_error) => {
+                    let span = lex_error.span();
+                    CompileError::Lex(LexError::new(lex_error)).spanned(&src.span(&span))
+                }
+                ontol_parser::Error::Parse(parse_error) => {
+                    let span = parse_error.span();
+                    CompileError::Parse(ParseError::new(parse_error)).spanned(&src.span(&span))
+                }
+            });
+        }
 
+        let package_def_id = self.define_package(package.package_id);
+        self.packages
+            .loaded_packages
+            .insert(package.reference, package_def_id);
+
+        self.package_config_table
+            .insert(package.package_id, package.config);
+
+        let root_defs = {
             let mut lowering = Lowering::new(self, &src);
 
-            for stmt in parsed_package.statements {
+            for stmt in package.statements {
                 let _ignored = lowering.lower_statement(stmt);
             }
 
-            root_defs.append(&mut lowering.finish());
-        }
+            lowering.finish()
+        };
 
-        self.compile_all_packages(root_defs)
-    }
-
-    fn compile_all_packages(&mut self, root_defs: Vec<DefId>) -> Result<(), UnifiedCompileError> {
         let mut type_check = self.type_check();
         for root_def in root_defs {
             type_check.check_def_shallow(root_def);
         }
 
-        // Call this after all source files have been compiled
-        compile_all_patterns(self);
+        self.seal_domain(package.package_id);
 
-        self.type_check().seal_all_defs();
-        self.check_error()?;
-
-        execute_codegen_tasks(self);
-        self.check_error()?;
-
-        Ok(())
+        self.check_error()
     }
 
     /// Get the current ontology graph (which is serde-serializable)
@@ -386,6 +390,16 @@ impl<'m> Compiler<'m> {
 
     fn package_ids(&self) -> Vec<PackageId> {
         self.namespaces.namespaces.keys().copied().collect()
+    }
+
+    /// Seal all the types in a single domain.
+    fn seal_domain(&mut self, package_id: PackageId) {
+        let iterator = self.defs.iter_package_def_ids(package_id);
+        let mut type_check = self.type_check();
+
+        for def_id in iterator {
+            type_check.seal_def(def_id);
+        }
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.

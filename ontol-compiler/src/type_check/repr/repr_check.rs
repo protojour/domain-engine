@@ -64,7 +64,13 @@ enum SpanKind {
 impl<'c, 'm> ReprCheck<'c, 'm> {
     /// Check the representation of a type
     pub fn check_repr_root(&mut self) {
-        let def = self.defs.table.get(&self.root_def_id).unwrap();
+        let def = match self.defs.table.get(&self.root_def_id) {
+            Some(def) => def,
+            None => {
+                // This can happen in case of errors
+                return;
+            }
+        };
 
         self.is_entity_root = self
             .relations
