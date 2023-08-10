@@ -81,6 +81,7 @@ pub enum CompileError {
     CannotGenerateValue(String),
     EntityNotRepresentable,
     MutationOfSealedType,
+    IntersectionOfDisjointTypes,
     TODO(String),
 }
 
@@ -205,6 +206,7 @@ impl std::fmt::Display for CompileError {
             Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
             Self::EntityNotRepresentable => write!(f, "Entity not representable"),
             Self::MutationOfSealedType => write!(f, "Type is sealed and cannot be modified"),
+            Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }
@@ -224,6 +226,8 @@ pub enum Note {
     TypeIsAbstract,
     #[error("Type of field is abstract")]
     FieldTypeIsAbstract,
+    #[error("Base type is {0}")]
+    BaseTypeIs(String),
 }
 
 #[derive(Debug)]

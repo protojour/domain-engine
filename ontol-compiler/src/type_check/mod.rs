@@ -136,6 +136,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             defs: self.defs,
             def_types: self.def_types,
             relations: self.relations,
+            primitives: self.primitives,
             seal_ctx: self.seal_ctx,
             errors: self.errors,
             state: Default::default(),

@@ -14,6 +14,7 @@ use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
+    primitive::Primitives,
     relation::{Constructor, Properties, Relations, TypeRelation},
     type_check::seal::SealCtx,
     types::DefTypes,
@@ -29,6 +30,7 @@ pub struct ReprCheck<'c, 'm> {
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
     pub seal_ctx: &'c mut SealCtx,
+    pub primitives: &'c Primitives,
 
     #[allow(unused)]
     pub errors: &'c mut CompileErrors,
@@ -394,7 +396,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn collect_ontology_mesh(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
         let mut output = IndexMap::default();
 
-        self.traverse_ontology_mesh(def_id, IsRelation::Origin, NO_SPAN, &mut output);
+        self.traverse_ontology_mesh(def_id, IsRelation::Origin, 0, NO_SPAN, &mut output);
 
         output
     }
@@ -403,10 +405,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         &mut self,
         def_id: DefId,
         is_relation: IsRelation,
+        level: u16,
         span: SourceSpan,
         output: &mut IndexMap<DefId, IsData>,
     ) {
-        if let Some(data) = output.get(&def_id) {
+        if let Some(data) = output.get_mut(&def_id) {
+            data.level = u16::min(level, data.level);
+
             if data.rel != is_relation {
                 self.errors.push(SpannedCompileError {
                     error: CompileError::TODO(smart_format!(
@@ -423,6 +428,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     rel: is_relation,
                     is_leaf: true,
                     rel_span: span,
+                    level,
                 },
             );
 
@@ -441,7 +447,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         _ => IsRelation::Sub,
                     };
 
-                    self.traverse_ontology_mesh(is.def_id, next_relation, *span, output);
+                    self.traverse_ontology_mesh(is.def_id, next_relation, level + 1, *span, output);
                     was_leaf = false;
                 }
             }
@@ -451,11 +457,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct IsData {
-    rel: IsRelation,
-    is_leaf: bool,
-    rel_span: SourceSpan,
+    pub rel: IsRelation,
+    pub is_leaf: bool,
+    pub rel_span: SourceSpan,
+    pub level: u16,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]

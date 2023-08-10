@@ -28,28 +28,27 @@ fn test_repr_error2() {
     .compile_fail();
 }
 
-// FIXME: The error message can be improved
 #[test]
 fn test_repr_error3() {
     "
     type meters { rel .is: number }
-    type has_length { // ERROR TODO: Invalid type intersection
-        rel .is: meters
-        rel .is: string
+    type has_length { // ERROR Intersection of disjoint types
+        rel .is: meters // NOTE Base type is number
+        rel .is: string // NOTE Base type is string
     }
     "
     .compile_fail();
 }
 
-// FIXME: The error message can be improved
 #[test]
 fn test_repr_error4() {
     "
-    // A concrete type in meters
+    // NB: meters is a concrete type here:
     type meters { rel .is: int }
-    type has_length { // ERROR TODO: Invalid type intersection
-        rel .is: meters
-        rel .is: string
+
+    type has_length { // ERROR Intersection of disjoint types
+        rel .is: meters // NOTE Base type is number
+        rel .is: string // NOTE Base type is string
     }
     "
     .compile_fail();
