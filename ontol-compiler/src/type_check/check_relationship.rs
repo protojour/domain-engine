@@ -1,5 +1,7 @@
 use indexmap::map::Entry;
-use ontol_runtime::{smart_format, value::PropertyId, DefId, RelationshipId};
+use ontol_runtime::{
+    ontology::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
+};
 use tracing::debug;
 
 use crate::{
@@ -11,7 +13,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
-    relation::{Constructor, Is, Properties, Property},
+    relation::{Constructor, Is, Properties, Property, TypeRelation},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -85,7 +87,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .or_default()
                     .entry(Is {
                         def_id: object.0.def_id,
-                        cardinality: relationship.1.subject_cardinality.0,
+                        rel: match relationship.1.subject_cardinality.0 {
+                            PropertyCardinality::Mandatory => TypeRelation::Super,
+                            PropertyCardinality::Optional => TypeRelation::Sub,
+                        },
                         is_ontol_alias: false,
                     });
 

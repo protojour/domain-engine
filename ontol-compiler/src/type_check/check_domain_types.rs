@@ -13,7 +13,7 @@ use crate::{
     def::{Def, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
-    relation::{Constructor, Property},
+    relation::{Constructor, Property, TypeRelation},
     types::{FormatType, Type},
     SourceSpan,
 };
@@ -151,17 +151,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if properties.identified_by.is_none() {
                         match ontology_mesh {
                             Some(mesh)
-                                if mesh.iter().any(|(is, _)| {
-                                    matches!(is.cardinality, PropertyCardinality::Optional)
-                                }) =>
+                                if mesh
+                                    .iter()
+                                    .any(|(is, _)| matches!(is.rel, TypeRelation::Sub)) =>
                             {
                                 if let Some(table) = &properties.table {
                                     assert!(table.get(property_id).is_some());
 
-                                    let all_entities = mesh
-                                        .iter()
-                                        .filter(|(is, _)| is.is_optional())
-                                        .any(|(is, _)| {
+                                    let all_entities =
+                                        mesh.iter().filter(|(is, _)| is.is_sub()).any(|(is, _)| {
                                             let subject_properties = self
                                                 .relations
                                                 .properties_by_def_id(is.def_id)

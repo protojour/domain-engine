@@ -1,8 +1,6 @@
 //! The ontol (builtin-in) domain
 
-use ontol_runtime::{
-    ontology::PropertyCardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId,
-};
+use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
     def::{DefKind, TypeDef},
@@ -11,7 +9,7 @@ use crate::{
     package::ONTOL_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
     regex_util,
-    relation::{Constructor, Is},
+    relation::{Constructor, Is, TypeRelation},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -41,9 +39,9 @@ impl<'m> Compiler<'m> {
         let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
         let string_ty = self.register_named_type(self.primitives.string, "string", Type::String);
 
-        self.is_maybe(self.primitives.number, self.primitives.int);
-        self.is_maybe(self.primitives.bool, self.primitives.true_value);
-        self.is_maybe(self.primitives.bool, self.primitives.false_value);
+        self.is(self.primitives.int, self.primitives.number);
+        self.is(self.primitives.true_value, self.primitives.bool);
+        self.is(self.primitives.false_value, self.primitives.bool);
 
         let int_int_ty = self.types.intern([int_ty, int_ty]);
         let string_string_ty = self.types.intern([string_ty, string_ty]);
@@ -173,15 +171,27 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
-    fn is_maybe(&mut self, def_id: DefId, other_def_id: DefId) {
+    fn is(&mut self, sub_def_id: DefId, super_def_id: DefId) {
         self.relations
             .ontology_mesh
-            .entry(def_id)
+            .entry(sub_def_id)
             .or_default()
             .insert(
                 Is {
-                    def_id: other_def_id,
-                    cardinality: PropertyCardinality::Optional,
+                    def_id: super_def_id,
+                    rel: TypeRelation::Super,
+                    is_ontol_alias: true,
+                },
+                NO_SPAN,
+            );
+        self.relations
+            .ontology_mesh
+            .entry(super_def_id)
+            .or_default()
+            .insert(
+                Is {
+                    def_id: sub_def_id,
+                    rel: TypeRelation::Sub,
                     is_ontol_alias: true,
                 },
                 NO_SPAN,

@@ -28,16 +28,43 @@ fn test_repr_error2() {
     .compile_fail();
 }
 
+// FIXME: The error message can be improved
 #[test]
-// BUG: This should not type check
-#[should_panic = "Scripts did not fail to compile"]
 fn test_repr_error3() {
     "
     type meters { rel .is: number }
-    type has_length {
+    type has_length { // ERROR TODO: Invalid type intersection
         rel .is: meters
         rel .is: string
     }
+    "
+    .compile_fail();
+}
+
+// FIXME: The error message can be improved
+#[test]
+fn test_repr_error4() {
+    "
+    // A concrete type in meters
+    type meters { rel .is: int }
+    type has_length { // ERROR TODO: Invalid type intersection
+        rel .is: meters
+        rel .is: string
+    }
+    "
+    .compile_fail();
+}
+
+// FIXME: The error message can be improved
+#[test]
+fn test_circular_subtyping() {
+    "
+    type foo
+    type bar
+    type baz
+    rel foo is: bar // ERROR TODO: Conflicting optionality for is relation
+    rel bar is: baz // ERROR TODO: Conflicting optionality for is relation
+    rel baz is: foo // ERROR TODO: Conflicting optionality for is relation
     "
     .compile_fail();
 }

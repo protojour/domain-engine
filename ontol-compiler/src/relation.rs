@@ -1,11 +1,8 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    discriminator::UnionDiscriminator,
-    ontology::{Cardinality, PropertyCardinality},
-    value::PropertyId,
-    value_generator::ValueGenerator,
-    DefId, RelationshipId,
+    discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
+    value_generator::ValueGenerator, DefId, RelationshipId,
 };
 
 use crate::{def::RelationId, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
@@ -43,7 +40,7 @@ impl Relations {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Is {
     pub def_id: DefId,
-    pub cardinality: PropertyCardinality,
+    pub rel: TypeRelation,
 
     /// Special optimization in the `ontol` domain:
     /// `bool` is (maybe) `true` or `false`,
@@ -52,9 +49,19 @@ pub struct Is {
 }
 
 impl Is {
-    pub fn is_optional(&self) -> bool {
-        matches!(self.cardinality, PropertyCardinality::Optional)
+    pub fn is_super(&self) -> bool {
+        matches!(self.rel, TypeRelation::Super)
     }
+
+    pub fn is_sub(&self) -> bool {
+        matches!(self.rel, TypeRelation::Sub)
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum TypeRelation {
+    Super,
+    Sub,
 }
 
 #[derive(Default, Debug)]

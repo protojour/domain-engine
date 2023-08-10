@@ -7,14 +7,14 @@
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::PropertyCardinality, smart_format, DefId};
+use ontol_runtime::{smart_format, DefId};
 use tracing::trace;
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
-    relation::{Constructor, Properties, Relations},
+    relation::{Constructor, Properties, Relations, TypeRelation},
     type_check::seal::SealCtx,
     types::DefTypes,
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
@@ -283,6 +283,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
         }
 
+        if let Some(repr) = &mut rec.repr {
+            self.check_soundness(repr, &ontology_mesh);
+        }
+
         rec.repr
     }
 
@@ -291,37 +295,38 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             trace!(
                 "{:?} merge repr {:?}=>{:?} {next:?}",
                 self.root_def_id,
-                data.is_relation,
+                data.rel,
                 def_id,
             );
         }
 
         use IsRelation::*;
-        match (data.is_relation, &mut rec.repr, next) {
+        match (data.rel, &mut rec.repr, next) {
             (Origin, _, next) => {
                 rec.repr = Some(next);
             }
-            (Is, None, ReprKind::Unit) => {
+            // Handle supertypes - results in intersections
+            (Super, None, ReprKind::Unit) => {
                 rec.repr = Some(ReprKind::Unit);
             }
-            (Is, Some(_), ReprKind::Unit) => {
+            (Super, Some(_), ReprKind::Unit) => {
                 // Unit does not add additional information to an existing repr
             }
-            (Is, Some(ReprKind::Unit), next) => {
+            (Super, Some(ReprKind::Unit), next) => {
                 rec.repr = Some(next);
             }
-            (Is, None | Some(ReprKind::Struct), ReprKind::Struct) => {
+            (Super, None | Some(ReprKind::Struct), ReprKind::Struct) => {
                 rec.repr = Some(ReprKind::StructIntersection(
                     [(def_id, data.rel_span)].into(),
                 ));
             }
-            (Is, None, next) => {
+            (Super, None, next) => {
                 rec.repr = Some(next);
             }
-            (Is, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
+            (Super, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
                 members.push((def_id, data.rel_span));
             }
-            (Is, Some(repr), kind) if *repr != kind => match repr {
+            (Super, Some(repr), kind) if *repr != kind => match repr {
                 ReprKind::Scalar(def0, span0) => {
                     rec.repr = Some(ReprKind::Intersection(vec![
                         (*def0, *span0),
@@ -332,43 +337,44 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     todo!("{repr:?}");
                 }
             },
-            (IsMaybe, Some(ReprKind::Unit), ReprKind::Unit) => {
+            // Handle subtypes - results in unions
+            (Sub, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
                     rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
                 }
             }
-            (IsMaybe, Some(ReprKind::Unit), _) => {
+            (Sub, Some(ReprKind::Unit), _) => {
                 rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
-            (IsMaybe, Some(ReprKind::Struct), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::Struct), ReprKind::Struct) => {
                 rec.repr = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
-            (IsMaybe, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
                 variants.push((def_id, data.rel_span));
             }
-            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
                 variants.push((def_id, data.rel_span));
                 rec.repr = Some(ReprKind::StructUnion(variants));
             }
-            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
+            (Sub, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
                 if data.is_leaf {
                     variants.push((def_id, data.rel_span));
                 }
             }
-            (IsMaybe, None, ReprKind::Struct) => {
+            (Sub, None, ReprKind::Struct) => {
                 rec.repr = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
             }
-            (IsMaybe, None, _) => {
+            (Sub, None, _) => {
                 rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
-            (IsMaybe, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
+            (Sub, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
                 rec.repr = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
             }
-            (IsMaybe, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
+            (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
                 variants.push((def_id, span));
             }
-            (Is | IsMaybe, Some(ReprKind::Seq), _) => {
+            (Super | Sub, Some(ReprKind::Seq), _) => {
                 self.errors.push(SpannedCompileError {
                     error: CompileError::InvalidMixOfRelationshipTypeForSubject,
                     span: data.rel_span,
@@ -401,7 +407,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         output: &mut IndexMap<DefId, IsData>,
     ) {
         if let Some(data) = output.get(&def_id) {
-            if data.is_relation != is_relation {
+            if data.rel != is_relation {
                 self.errors.push(SpannedCompileError {
                     error: CompileError::TODO(smart_format!(
                         "Conflicting optionality for is relation"
@@ -414,7 +420,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             output.insert(
                 def_id,
                 IsData {
-                    is_relation,
+                    rel: is_relation,
                     is_leaf: true,
                     rel_span: span,
                 },
@@ -428,11 +434,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         continue;
                     }
 
-                    let next_relation = match (is_relation, is.cardinality) {
-                        (IsRelation::Origin | IsRelation::Is, PropertyCardinality::Mandatory) => {
-                            IsRelation::Is
+                    let next_relation = match (is_relation, is.rel) {
+                        (IsRelation::Origin | IsRelation::Super, TypeRelation::Super) => {
+                            IsRelation::Super
                         }
-                        _ => IsRelation::IsMaybe,
+                        _ => IsRelation::Sub,
                     };
 
                     self.traverse_ontology_mesh(is.def_id, next_relation, *span, output);
@@ -446,19 +452,19 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 }
 
 #[derive(Debug)]
-struct IsData {
-    is_relation: IsRelation,
+pub(super) struct IsData {
+    rel: IsRelation,
     is_leaf: bool,
     rel_span: SourceSpan,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-enum IsRelation {
+pub(super) enum IsRelation {
     Origin,
-    Is,
-    IsMaybe,
+    Super,
+    Sub,
 }
 
-struct ReprRecord {
+pub(super) struct ReprRecord {
     repr: Option<ReprKind>,
 }
