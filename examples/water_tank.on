@@ -1,17 +1,17 @@
 type cubic_meters {
-    rel _ is: int
+    rel _ is: i64
 }
 
 type meters {
-    rel _ is: int
+    rel _ is: i64
 }
 
 type meters_per_second {
-    rel _ is: int
+    rel _ is: i64
 }
 
 type seconds {
-    rel _ is: int
+    rel _ is: i64
 }
 
 type water_tank {

@@ -17,7 +17,7 @@ type archive_item {
     rel .'archived': datetime
     rel .'name': string
     rel .'description': string
-    rel .'asset_score': int
+    rel .'asset_score': i64
     rel .'type': ItemType
 }
 type archive_group {
@@ -56,7 +56,7 @@ pub type ArchiveObject {
     /// Description of the object
     rel .'description': string
     /// Relative value of the object
-    rel .'assetScoreTimesTen': int
+    rel .'assetScoreTimesTen': i64
     /// Classification of the object
     rel .'kind': ItemType
 }

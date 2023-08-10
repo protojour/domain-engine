@@ -150,7 +150,7 @@ impl<'e> Generator<'e> {
             SerdeOperator::True(def_id)
             | SerdeOperator::False(def_id)
             | SerdeOperator::Bool(def_id)
-            | SerdeOperator::Int(def_id)
+            | SerdeOperator::I64(def_id)
             | SerdeOperator::Number(def_id)
             | SerdeOperator::String(def_id)
             | SerdeOperator::StringConstant(_, def_id)

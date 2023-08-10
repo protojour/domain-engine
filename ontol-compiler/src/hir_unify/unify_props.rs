@@ -46,7 +46,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .iter()
                     .map(TypedHirNode::ty)
                     .last()
-                    .unwrap_or_else(|| unifier.unit_type());
+                    .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
                     ontol_hir::MatchArm {
@@ -74,7 +74,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .iter()
                     .map(TypedHirNode::ty)
                     .last()
-                    .unwrap_or_else(|| unifier.unit_type());
+                    .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
                     ontol_hir::MatchArm {
@@ -127,7 +127,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .iter()
                     .map(TypedHirNode::ty)
                     .last()
-                    .unwrap_or_else(|| unifier.unit_type());
+                    .unwrap_or_else(|| unifier.types.unit_type());
 
                 let node = TypedHirNode(
                     ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),

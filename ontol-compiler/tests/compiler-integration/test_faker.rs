@@ -11,7 +11,7 @@ fn test_fake_primitives() {
     "
     pub type foo {
         rel .'s': string
-        rel .'i': int
+        rel .'i': i64
     }
     "
     .compile_ok(|test| {

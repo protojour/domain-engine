@@ -26,7 +26,7 @@ async fn test_graphql_basic_schema() {
     pub type foo_id { fmt '' => string => . }
     pub type foo {
         rel foo_id identifies: .
-        rel .'prop': int
+        rel .'prop': i64
     }
     "
     .compile_schemas([ROOT]);
@@ -80,7 +80,8 @@ async fn test_graphql_basic_schema() {
         .await,
         expected = Ok(graphql_value!({
             "createfoo": {
-                // BUG: floating point
+                // BUG: Floating point. The ontol type should be `i32` to make this an integer.
+                // BUG: Also, `i64` cannot be serialized to floating point.
                 "prop": 42.0
             }
         })),

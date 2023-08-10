@@ -26,10 +26,10 @@ fn deserialize_empty_type() {
 }
 
 #[test]
-fn deserialize_int() {
+fn deserialize_i64() {
     "
     pub type foo
-    rel foo is?: int
+    rel foo is?: i64
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -72,7 +72,7 @@ fn deserialize_object_properties() {
     "
     pub type obj
     rel obj 'a': string
-    rel obj 'b': int
+    rel obj 'b': i64
     "
     .compile_ok(|test| {
         let [obj] = test.bind(["obj"]);
@@ -164,7 +164,7 @@ fn deserialize_union_of_primitives() {
     "
     pub type foo
     rel foo is?: string
-    rel foo is?: int
+    rel foo is?: i64
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -207,7 +207,7 @@ fn deserialize_string_constant() {
 fn deserialize_finite_non_uniform_sequence() {
     "
     pub type foo
-    rel foo 0: int
+    rel foo 0: i64
     rel foo 1: 'a'
     "
     .compile_ok(|test| {
@@ -235,7 +235,7 @@ fn deserialize_finite_non_uniform_sequence() {
 fn deserialize_finite_uniform_sequence() {
     "
     pub type foo
-    rel foo ..2: int
+    rel foo ..2: i64
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -285,7 +285,7 @@ fn deserialize_map_union() {
     pub type bar
     rel foo 'variant': 'foo'
     rel bar 'variant': 'bar'
-    rel bar 'prop': int
+    rel bar 'prop': i64
 
     pub type union
     rel union is?: foo

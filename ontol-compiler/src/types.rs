@@ -6,7 +6,7 @@ use ontol_runtime::{string_types::StringLikeType, DefId};
 use crate::{
     def::{DefKind, Defs},
     mem::{Intern, Mem},
-    primitive::Primitives,
+    primitive::{PrimitiveKind, Primitives},
     type_check::inference::TypeVar,
 };
 
@@ -18,17 +18,9 @@ pub enum Type<'m> {
     // This is the "type" of an equivalence assertion.
     // It has no specific meaning.
     Tautology,
-    Unit(DefId),
-    // The DefId encodes which variant this is, false, true or bool
-    Bool(DefId),
+    Primitive(PrimitiveKind, DefId),
     EmptySequence(DefId),
-    /// Any number
-    Number(DefId),
-    /// Any integer
-    Int(DefId),
     IntConstant(i64),
-    /// Any string
-    String(DefId),
     /// A specific string
     StringConstant(DefId),
     Regex(DefId),
@@ -56,13 +48,9 @@ impl<'m> Type<'m> {
     pub fn get_single_def_id(&self) -> Option<DefId> {
         match self {
             Self::Tautology => None,
-            Self::Unit(def_id) => Some(*def_id),
-            Self::Bool(def_id) => Some(*def_id),
+            Self::Primitive(_, def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
-            Self::Number(def_id) => Some(*def_id),
-            Self::Int(def_id) => Some(*def_id),
             Self::IntConstant(_) => todo!(),
-            Self::String(def_id) => Some(*def_id),
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::StringLike(def_id, _) => Some(*def_id),
@@ -102,6 +90,10 @@ impl<'m> Types<'m> {
             types: Default::default(),
             slices: Default::default(),
         }
+    }
+
+    pub fn unit_type(&mut self) -> TypeRef<'m> {
+        self.intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()))
     }
 }
 
@@ -163,21 +155,9 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
         match ty {
             Type::Tautology => write!(f, "tautology"),
-            Type::Unit(_) => write!(f, "unit"),
-            Type::Bool(def_id) => {
-                if *def_id == primitives.true_value {
-                    write!(f, "true")
-                } else if *def_id == primitives.false_value {
-                    write!(f, "false")
-                } else {
-                    write!(f, "bool")
-                }
-            }
+            Type::Primitive(kind, _) => write!(f, "{}", kind.ident()),
             Type::EmptySequence(_) => write!(f, "[]"),
-            Type::Number(_) => write!(f, "number"),
-            Type::Int(_) => write!(f, "int"),
             Type::IntConstant(val) => write!(f, "int({val})"),
-            Type::String(_) => write!(f, "string"),
             Type::StringConstant(def_id) => {
                 let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
                     panic!();

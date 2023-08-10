@@ -542,7 +542,7 @@ impl InMemoryStore {
                     Err(DomainError::TypeCannotBeUsedForIdGeneration)
                 }
             }
-            (SerdeOperator::Int(def_id), ValueGenerator::Autoincrement) => {
+            (SerdeOperator::I64(def_id), ValueGenerator::Autoincrement) => {
                 let id_value = self.int_id_counter;
                 self.int_id_counter += 1;
                 Ok(Value::new(Data::I64(id_value), *def_id))

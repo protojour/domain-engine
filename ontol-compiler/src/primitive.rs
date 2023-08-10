@@ -6,28 +6,48 @@ use crate::{
     NO_SPAN,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum PrimitiveKind {
     /// The unit data type which contains no information
     Unit,
+    /// The set of false and true
+    Bool,
     /// The false value
     False,
     /// The true value
     True,
-    /// The set of false and true
-    Bool,
     /// All numbers (realistically all rational numbers, as all computer numbers are rational)
     Number,
     /// All the integers
     Int,
+    /// 64-bit signed integers
+    I64,
+    /// All the floats
+    Float,
     /// Set of all strings
     String,
 }
 
 impl PrimitiveKind {
     pub fn is_concrete(&self) -> bool {
-        // FIXME:
-        !matches!(self, Self::Number)
+        matches!(
+            self,
+            Self::Unit | Self::Bool | Self::True | Self::False | Self::I64 | Self::String
+        )
+    }
+
+    pub fn ident(&self) -> &'static str {
+        match self {
+            Self::Unit => "unit",
+            Self::Bool => "bool",
+            Self::False => "false",
+            Self::True => "true",
+            Self::Number => "number",
+            Self::Int => "int",
+            Self::I64 => "i64",
+            Self::Float => "float",
+            Self::String => "string",
+        }
     }
 }
 
@@ -58,8 +78,14 @@ pub struct Primitives {
     /// The abstract type of a number. Supertype of integers and fractionals.
     pub number: DefId,
 
-    /// The integer type. TODO: Implementation details.
+    /// The integer type.
     pub int: DefId,
+
+    /// The 64 bit signed integer type
+    pub i64: DefId,
+
+    /// The float type.
+    pub float: DefId,
 
     /// Builtin relations
     pub relations: Relations,
@@ -68,6 +94,35 @@ pub struct Primitives {
 
     /// Documentation relations
     pub doc: Doc,
+}
+
+impl Primitives {
+    pub fn list_primitives(&self) -> [(DefId, Option<&'static str>, PrimitiveKind); 9] {
+        [
+            (self.unit, None, PrimitiveKind::Unit),
+            (self.bool, Some("bool"), PrimitiveKind::Bool),
+            (self.false_value, Some("false"), PrimitiveKind::False),
+            (self.true_value, Some("true"), PrimitiveKind::True),
+            (self.number, Some("number"), PrimitiveKind::Number),
+            (self.int, Some("int"), PrimitiveKind::Int),
+            (self.i64, Some("i64"), PrimitiveKind::I64),
+            (self.float, Some("float"), PrimitiveKind::Float),
+            (self.string, Some("string"), PrimitiveKind::String),
+        ]
+    }
+
+    pub fn list_relations(&self) -> [(DefId, &'static str); 8] {
+        [
+            (self.relations.is, "is"),
+            (self.relations.identifies, "identifies"),
+            (self.relations.id, "id"),
+            (self.relations.min, "min"),
+            (self.relations.max, "max"),
+            (self.relations.default, "default"),
+            (self.relations.gen, "gen"),
+            (self.relations.route, "route"),
+        ]
+    }
 }
 
 #[derive(Debug)]
@@ -124,6 +179,8 @@ impl Primitives {
             empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),
             number: defs.add_primitive(PrimitiveKind::Number),
             int: defs.add_primitive(PrimitiveKind::Int),
+            i64: defs.add_primitive(PrimitiveKind::I64),
+            float: defs.add_primitive(PrimitiveKind::Float),
             string: defs.add_primitive(PrimitiveKind::String),
 
             relations: Relations {

@@ -334,7 +334,7 @@ fn serialize_schema_inline<S: Serializer>(
             }
         }
         // FIXME: Distinguish different number types
-        SerdeOperator::Int(_) | SerdeOperator::Number(_) => {
+        SerdeOperator::I64(_) | SerdeOperator::Number(_) => {
             map.serialize_entry("type", "integer")?;
             map.serialize_entry("format", "int64")?;
             if let Some(docs) = ctx.docs {
@@ -481,7 +481,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
             | SerdeOperator::Bool(_)
-            | SerdeOperator::Int(_)
+            | SerdeOperator::I64(_)
             | SerdeOperator::Number(_)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
@@ -762,7 +762,7 @@ impl SchemaGraphBuilder {
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
             | SerdeOperator::Bool(_)
-            | SerdeOperator::Int(_)
+            | SerdeOperator::I64(_)
             | SerdeOperator::Number(_)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)

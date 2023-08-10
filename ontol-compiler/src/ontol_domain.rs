@@ -8,6 +8,7 @@ use crate::{
     namespace::Space,
     package::ONTOL_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
+    primitive::PrimitiveKind,
     regex_util,
     relation::{Constructor, Is, TypeRelation},
     types::{Type, TypeRef},
@@ -19,36 +20,36 @@ impl<'m> Compiler<'m> {
         self.define_package(ONTOL_PKG);
 
         // fundamental types
-        self.register_type(self.primitives.unit, Type::Unit);
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
-        self.register_named_builtin_relation(self.primitives.relations.is, "is");
-        self.register_named_builtin_relation(self.primitives.relations.identifies, "identifies");
-        self.register_named_builtin_relation(self.primitives.relations.id, "id");
-        self.register_named_builtin_relation(self.primitives.relations.min, "min");
-        self.register_named_builtin_relation(self.primitives.relations.max, "max");
-        self.register_named_builtin_relation(self.primitives.relations.default, "default");
-        self.register_named_builtin_relation(self.primitives.relations.gen, "gen");
-        self.register_named_builtin_relation(self.primitives.relations.route, "route");
+        for (def_id, ident, kind) in self.primitives.list_primitives() {
+            self.register_primitive(def_id, ident, kind);
+        }
+        for (def_id, ident) in self.primitives.list_relations() {
+            self.register_named_builtin_relation(def_id, ident);
+        }
 
-        self.register_named_type(self.primitives.bool, "bool", Type::Bool);
-        self.register_named_type(self.primitives.false_value, "false", Type::Bool);
-        self.register_named_type(self.primitives.true_value, "true", Type::Bool);
-
-        let _ = self.register_named_type(self.primitives.number, "number", Type::Number);
-        let int_ty = self.register_named_type(self.primitives.int, "int", Type::Int);
-        let string_ty = self.register_named_type(self.primitives.string, "string", Type::String);
-
-        self.is(self.primitives.int, self.primitives.number);
+        // bools
         self.is(self.primitives.true_value, self.primitives.bool);
         self.is(self.primitives.false_value, self.primitives.bool);
 
-        let int_int_ty = self.types.intern([int_ty, int_ty]);
+        // integers
+        self.is(self.primitives.int, self.primitives.number);
+        self.is(self.primitives.i64, self.primitives.int);
+
+        // floats
+        self.is(self.primitives.float, self.primitives.number);
+
+        let i64_ty = *self.def_types.table.get(&self.primitives.i64).unwrap();
+
+        let i64_i64_ty = self.types.intern([i64_ty, i64_ty]);
+
+        let string_ty = *self.def_types.table.get(&self.primitives.string).unwrap();
         let string_string_ty = self.types.intern([string_ty, string_ty]);
 
-        let int_int_to_int = self.types.intern(Type::Function {
-            params: int_int_ty,
-            output: int_ty,
+        let i64_i64_to_i64 = self.types.intern(Type::Function {
+            params: i64_i64_ty,
+            output: i64_ty,
         });
         let string_string_to_string = self.types.intern(Type::Function {
             params: string_string_ty,
@@ -57,10 +58,10 @@ impl<'m> Compiler<'m> {
 
         // Built-in functions
         // arithmetic
-        self.def_proc("+", DefKind::Fn(BuiltinProc::Add), int_int_to_int);
-        self.def_proc("-", DefKind::Fn(BuiltinProc::Sub), int_int_to_int);
-        self.def_proc("*", DefKind::Fn(BuiltinProc::Mul), int_int_to_int);
-        self.def_proc("/", DefKind::Fn(BuiltinProc::Div), int_int_to_int);
+        self.def_proc("+", DefKind::Fn(BuiltinProc::Add), i64_i64_to_i64);
+        self.def_proc("-", DefKind::Fn(BuiltinProc::Sub), i64_i64_to_i64);
+        self.def_proc("*", DefKind::Fn(BuiltinProc::Mul), i64_i64_to_i64);
+        self.def_proc("/", DefKind::Fn(BuiltinProc::Div), i64_i64_to_i64);
 
         // string manipulation
         self.def_proc(
@@ -156,6 +157,22 @@ impl<'m> Compiler<'m> {
         self.namespaces
             .get_namespace_mut(ONTOL_PKG, Space::Type)
             .insert(ident.into(), def_id);
+        self.def_types.table.insert(def_id, ty);
+        ty
+    }
+
+    fn register_primitive(
+        &mut self,
+        def_id: DefId,
+        ident: Option<&str>,
+        kind: PrimitiveKind,
+    ) -> TypeRef<'m> {
+        let ty = self.types.intern(Type::Primitive(kind, def_id));
+        if let Some(ident) = ident {
+            self.namespaces
+                .get_namespace_mut(ONTOL_PKG, Space::Type)
+                .insert(ident.into(), def_id);
+        }
         self.def_types.table.insert(def_id, ty);
         ty
     }

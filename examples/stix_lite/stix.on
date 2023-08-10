@@ -15,7 +15,7 @@ type lang-rfc5646 {
 
 type confidence {
     // BUG: Must be an integer percentage between 0 and 100
-    rel .is: int
+    rel .is: i64
 }
 
 type attack-pattern-id {

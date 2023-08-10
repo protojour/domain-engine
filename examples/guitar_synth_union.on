@@ -12,13 +12,13 @@ pub type guitar {
     rel guitar_id identifies: .
     rel .'instrument-id'(rel .gen: auto): guitar_id
     rel .'type': 'guitar'
-    rel .'string_count': int
+    rel .'string_count': i64
 }
 pub type synth {
     rel synth_id identifies: .
     rel .'instrument-id'(rel .gen: auto): synth_id
     rel .'type': 'synth'
-    rel .'polyphony': int
+    rel .'polyphony': i64
 }
 pub type instrument {
     rel .is?: guitar

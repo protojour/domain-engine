@@ -19,7 +19,7 @@ fn json_schema_from_simple_entity() {
         rel .'bar': true
 
         // This is just a regular comment
-        rel .'baz': int
+        rel .'baz': i64
     }
     "
     .compile_ok(|test| {

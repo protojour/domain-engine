@@ -16,6 +16,7 @@ use crate::{
     def::{Def, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
+    primitive::PrimitiveKind,
     relation::{Constructor, Property},
     sequence::Sequence,
     types::{FormatType, Type},
@@ -125,9 +126,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         debug!("Add variant to builder variant_ty: {variant_ty:?}");
 
         match variant_ty {
-            Type::Unit(def_id) => builder.unit = Some(*def_id),
-            Type::Int(_) => builder.number = Some(IntDiscriminator(variant_def)),
-            Type::String(_) => {
+            Type::Primitive(PrimitiveKind::Unit, def_id) => builder.unit = Some(*def_id),
+            Type::Primitive(PrimitiveKind::I64, _) => {
+                builder.number = Some(IntDiscriminator(variant_def));
+            }
+            Type::Primitive(PrimitiveKind::String, _) => {
                 builder.string = StringDiscriminator::Any(variant_def);
                 builder.any_string.push(variant_def);
             }

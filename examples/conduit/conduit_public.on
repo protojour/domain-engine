@@ -24,12 +24,12 @@ pub type Article {
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
     rel .'favorited': bool
-    rel .'favoritesCount': int
+    rel .'favoritesCount': i64
     rel .'author': Profile
 }
 
 pub type Comment {
-    rel .'id'|id: { rel .is: int }
+    rel .'id'|id: { rel .is: i64 }
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
     rel .'body': string
@@ -42,7 +42,7 @@ pub type SingleArticle {
 
 pub type MultipleArticles {
     rel .'articles': [Article]
-    rel .'articlesCount': int
+    rel .'articlesCount': i64
 }
 
 pub type SingleComment {
@@ -62,8 +62,8 @@ type ArticleFilter {
     rel .'tag'?: [string]
     rel .'author'?: [username]
     rel .'favorited'?: [username]
-    rel .'limit'?: int
-    rel .'offset'?: int
+    rel .'limit'?: i64
+    rel .'offset'?: i64
 }
 
 map {

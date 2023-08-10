@@ -131,7 +131,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 .deserialize_bool(BoolMatcher::True(*def_id).into_visitor_no_params(self)),
             SerdeOperator::Bool(def_id) => deserializer
                 .deserialize_bool(BoolMatcher::Bool(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::Int(def_id) => {
+            SerdeOperator::I64(def_id) => {
                 deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
             }
             SerdeOperator::Number(def_id) => {

@@ -58,8 +58,8 @@ fn test_meters() {
     "
     pub type meters
     pub type millimeters
-    rel meters is: int
-    rel millimeters is: int
+    rel meters is: i64
+    rel millimeters is: i64
     map {
         meters: x / 1000
         millimeters: x
@@ -75,10 +75,10 @@ fn test_meters() {
 fn test_temperature() {
     "
     pub type celsius {
-        rel .is: int
+        rel .is: i64
     }
     pub type fahrenheit {
-        rel .is: int
+        rel .is: i64
     }
 
     map {
@@ -96,10 +96,10 @@ fn test_temperature() {
 fn test_nested_optional_attribute() {
     "
     type seconds {
-        rel .is: int
+        rel .is: i64
     }
     type years {
-        rel .is: int
+        rel .is: i64
     }
 
     map {
@@ -189,8 +189,8 @@ fn test_map_value_to_map_func() {
     "
     pub type one
     pub type two
-    rel one is: int
-    rel two 'a': int
+    rel one is: i64
+    rel two 'a': i64
     map {
         one: x
         two {
@@ -268,8 +268,8 @@ fn test_map_matching_array() {
     "
     pub type foo
     pub type bar
-    rel foo 'a': [int]
-    rel bar 'b': [int]
+    rel foo 'a': [i64]
+    rel bar 'b': [i64]
     map {
         foo {
             'a': [x]
@@ -556,10 +556,10 @@ fn test_map_delegation() {
             SourceName("si"),
             "
             pub type meters {
-                rel .is: int
+                rel .is: i64
             }
             pub type millimeters {
-                rel .is: int
+                rel .is: i64
             }
 
             map {
@@ -587,12 +587,12 @@ fn test_map_delegation() {
 fn test_map_dependent_scoping() {
     "
     pub type one {
-        rel .'total_weight': int
-        rel .'net_weight': int
+        rel .'total_weight': i64
+        rel .'net_weight': i64
     }
     pub type two {
-        rel .'net_weight': int
-        rel .'container_weight': int
+        rel .'net_weight': i64
+        rel .'container_weight': i64
     }
 
     map {

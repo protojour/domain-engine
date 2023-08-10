@@ -37,7 +37,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop0': bar
     rel foo 'prop1': bar
     rel foo 'prop2': bar
-    rel bar is: int
+    rel bar is: i64
     map { // NOTE Consider using a one way mapping (`map => { .. }`) here
         foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`
             x
@@ -98,14 +98,14 @@ fn map_type_mismatch_simple() {
     type foo
     type bar
     rel foo 'prop': string
-    rel bar 'prop': int
+    rel bar 'prop': i64
     map {
         foo {
             'prop': x
         }
         bar {
             'prop':
-                x // ERROR type mismatch: expected `int`, found `string`
+                x // ERROR type mismatch: expected `i64`, found `string`
         }
     }
     "
@@ -120,14 +120,14 @@ fn map_type_mismatch_in_func() {
     type foo
     type bar
     rel foo 'prop': string
-    rel bar 'prop': int
+    rel bar 'prop': i64
     map {
         foo {
             'prop': x
         }
         bar {
             'prop':
-                x // ERROR type mismatch: expected `int`, found `string`
+                x // ERROR type mismatch: expected `i64`, found `string`
                 * 2
         }
     }
@@ -144,7 +144,7 @@ fn map_array_mismatch() {
 
     type bar
     rel bar 'a': string
-    rel bar 'b': [int]
+    rel bar 'b': [i64]
 
     map {
         foo {
@@ -153,7 +153,7 @@ fn map_array_mismatch() {
         }
         bar {
             'a': x
-            'b': y // ERROR [int] variable must be enclosed in []
+            'b': y // ERROR [i64] variable must be enclosed in []
         }
     }
     "
@@ -192,8 +192,8 @@ fn only_entities_may_have_reverse_relationship() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a { rel .is?: int }
-    type b { rel .is?: int }
+    type a { rel .is?: i64 }
+    type b { rel .is?: i64 }
 
     type c { rel .'p0': a }
     type d { rel .'p1': b }

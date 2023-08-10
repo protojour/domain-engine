@@ -1,13 +1,12 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
-use ontol_runtime::DefId;
 use tracing::debug;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
     typed_hir::{Meta, TypedBinder, TypedHirNode},
-    types::{Type, TypeRef, Types},
+    types::{Type, Types},
     NO_SPAN,
 };
 
@@ -277,7 +276,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: seq_var,
-                        ty: self.unit_type(),
+                        ty: self.types.unit_type(),
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::Push(
@@ -467,7 +466,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     .iter()
                     .map(TypedHirNode::ty)
                     .last()
-                    .unwrap_or_else(|| self.unit_type());
+                    .unwrap_or_else(|| self.types.unit_type());
 
                 let node = TypedHirNode(
                     ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
@@ -560,12 +559,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
     pub(super) fn unit_meta(&mut self) -> Meta<'m> {
         Meta {
-            ty: self.unit_type(),
+            ty: self.types.unit_type(),
             span: NO_SPAN,
         }
-    }
-
-    pub(super) fn unit_type(&mut self) -> TypeRef<'m> {
-        self.types.intern(Type::Unit(DefId::unit()))
     }
 }

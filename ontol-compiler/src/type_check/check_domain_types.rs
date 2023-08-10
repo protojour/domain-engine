@@ -13,6 +13,7 @@ use crate::{
     def::{Def, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
+    primitive::PrimitiveKind,
     relation::{Constructor, Property, TypeRelation},
     types::{FormatType, Type},
     SourceSpan,
@@ -309,8 +310,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
                 match self.def_types.table.get(&scalar_def_id) {
-                    Some(Type::Int(_)) => Ok(ValueGenerator::Autoincrement),
-                    Some(Type::String(_)) => Ok(ValueGenerator::UuidV4),
+                    Some(Type::Primitive(PrimitiveKind::I64, _)) => {
+                        Ok(ValueGenerator::Autoincrement)
+                    }
+                    Some(Type::Primitive(PrimitiveKind::String, _)) => Ok(ValueGenerator::UuidV4),
                     Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
                     _ => match properties.map(|p| &p.constructor) {
                         Some(Constructor::StringFmt(segment)) => {

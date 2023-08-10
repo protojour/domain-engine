@@ -7,6 +7,7 @@ use crate::{
     def::MapDirection,
     mem::Intern,
     patterns::StringPatternSegment,
+    primitive::PrimitiveKind,
     relation::Constructor,
     typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef},
@@ -22,7 +23,9 @@ pub fn autogenerate_mapping<'m>(
     let first_def_id = key_pair.first().def_id;
     let second_def_id = key_pair.second().def_id;
 
-    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
+    let unit_type = compiler
+        .types
+        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
 
     let first_properties = compiler.relations.properties_by_def_id(first_def_id)?;
     let second_properties = compiler.relations.properties_by_def_id(second_def_id)?;

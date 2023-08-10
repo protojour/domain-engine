@@ -7,6 +7,7 @@ use ontol_runtime::DefId;
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     mem::Intern,
+    primitive::PrimitiveKind,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
     Compiler, SourceSpan,
@@ -44,7 +45,9 @@ pub fn unify_to_function<'m>(
     let scope_ty = scope.ty();
     let expr_ty = expr.ty();
 
-    let unit_type = compiler.types.intern(Type::Unit(DefId::unit()));
+    let unit_type = compiler
+        .types
+        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
 
     let (scope_binder, var_allocator) = {
         let mut scope_builder = ScopeBuilder::new(var_tracker.var_allocator(), unit_type);

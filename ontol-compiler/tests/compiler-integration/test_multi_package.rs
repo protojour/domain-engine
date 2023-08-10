@@ -18,7 +18,7 @@ fn load_package() {
             SourceName("pkg"),
             "
             pub type foo {
-                rel .'prop': int
+                rel .'prop': i64
             }
             ",
         ),
@@ -76,7 +76,7 @@ fn dependency_dag() {
             }
             ",
         ),
-        (SourceName("c"), "pub type c { rel .is: int }"),
+        (SourceName("c"), "pub type c { rel .is: i64 }"),
     ])
     .compile_ok(|test| {
         // four user domains, plus `ontol`:

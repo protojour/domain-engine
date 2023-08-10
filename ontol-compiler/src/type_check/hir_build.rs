@@ -12,6 +12,7 @@ use crate::{
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr},
     mem::Intern,
+    primitive::PrimitiveKind,
     type_check::{
         hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
@@ -207,7 +208,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (ExprKind::ConstI64(int), Some(expected_ty)) => {
-                if matches!(expected_ty, Type::Int(_)) {
+                if matches!(expected_ty, Type::Primitive(PrimitiveKind::I64, _)) {
                     TypedHirNode(
                         ontol_hir::Kind::Int(*int),
                         Meta {
@@ -220,7 +221,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (ExprKind::ConstString(string), Some(expected_ty)) => match expected_ty {
-                Type::String(_) => TypedHirNode(
+                Type::Primitive(PrimitiveKind::String, _) => TypedHirNode(
                     ontol_hir::Kind::String(string.clone()),
                     Meta {
                         ty: expected_ty,
@@ -430,17 +431,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             debug!("rel_params_ty: {rel_params_ty:?}");
 
                             let rel_node = match (rel_params_ty, rel) {
-                                (Type::Unit(_), Some(rel)) => self.error_node(
-                                    CompileError::NoRelationParametersExpected,
-                                    &rel.span,
-                                ),
-                                (ty @ Type::Unit(_), None) => TypedHirNode(
-                                    ontol_hir::Kind::Unit,
-                                    Meta {
-                                        ty,
-                                        span: *prop_span,
-                                    },
-                                ),
+                                (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => self
+                                    .error_node(
+                                        CompileError::NoRelationParametersExpected,
+                                        &rel.span,
+                                    ),
+                                (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => {
+                                    TypedHirNode(
+                                        ontol_hir::Kind::Unit,
+                                        Meta {
+                                            ty,
+                                            span: *prop_span,
+                                        },
+                                    )
+                                }
                                 (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
                                 (ty @ Type::Anonymous(def_id), None) => {
                                     match self.relations.properties_by_def_id(*def_id) {
@@ -542,7 +546,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     prop_variants,
                                 ),
                                 Meta {
-                                    ty: self.types.intern(Type::Unit(DefId::unit())),
+                                    ty: self.types.intern(Type::Primitive(
+                                        PrimitiveKind::Unit,
+                                        DefId::unit(),
+                                    )),
                                     span: *prop_span,
                                 },
                             ));
@@ -731,13 +738,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         TypedHirNode(
             ontol_hir::Kind::Unit,
             Meta {
-                ty: self.types.intern(Type::Unit(DefId::unit())),
+                ty: self.unit_type(),
                 span: NO_SPAN,
             },
         )
     }
 
     fn unit_type(&mut self) -> TypeRef<'m> {
-        self.types.intern(Type::Unit(DefId::unit()))
+        self.types
+            .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()))
     }
 }

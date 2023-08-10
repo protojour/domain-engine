@@ -82,7 +82,7 @@ fn test_serde_sequence() {
     "
     pub type t
     rel t 0: string
-    rel t 1: int
+    rel t 1: i64
     "
     .compile_ok(|test| {
         let [t] = test.bind(["t"]);
@@ -126,9 +126,9 @@ fn test_serde_map_union() {
     type foo
     type bar
     rel foo 'type': 'foo'
-    rel foo 'c': int
+    rel foo 'c': i64
     rel bar 'type': 'bar'
-    rel bar 'd': int
+    rel bar 'd': i64
 
     pub type u
     rel u is?: foo
@@ -172,10 +172,10 @@ fn test_serde_many_cardinality() {
 fn test_serde_infinite_sequence() {
     "
     pub type foo
-    rel foo  ..2: int
+    rel foo  ..2: i64
     rel foo 2..4: string
-    rel foo 5..6: int
-    rel foo 6.. : int
+    rel foo 5..6: i64
+    rel foo 6.. : i64
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -244,7 +244,7 @@ fn test_serde_datetime() {
 fn test_num_default() {
     "
     pub type foo {
-        rel .'bar'(rel .default := 42): int
+        rel .'bar'(rel .default := 42): i64
     }
     "
     .compile_ok(|test| {
@@ -274,7 +274,7 @@ fn test_prop_union() {
     pub type vec3 {
         /// A vector component
         rel .'x'|'y'|'z': {
-            rel .is: int
+            rel .is: i64
         }
     }
     "

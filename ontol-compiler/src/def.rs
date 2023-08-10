@@ -57,13 +57,7 @@ impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Package(_) => None,
-            Self::Primitive(PrimitiveKind::Unit) => Some("unit".into()),
-            Self::Primitive(PrimitiveKind::False) => Some("false".into()),
-            Self::Primitive(PrimitiveKind::True) => Some("true".into()),
-            Self::Primitive(PrimitiveKind::Bool) => Some("bool".into()),
-            Self::Primitive(PrimitiveKind::Int) => Some("int".into()),
-            Self::Primitive(PrimitiveKind::Number) => Some("number".into()),
-            Self::Primitive(PrimitiveKind::String) => Some("string".into()),
+            Self::Primitive(kind) => Some(kind.ident().into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,

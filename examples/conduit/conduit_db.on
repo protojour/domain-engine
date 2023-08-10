@@ -32,7 +32,7 @@ pub type Article {
 }
 
 pub type Comment {
-    rel .'id'(rel .gen: auto)|id: { rel .is: int }
+    rel .'id'(rel .gen: auto)|id: { rel .is: i64 }
     rel .'body': string
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime

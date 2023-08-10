@@ -45,7 +45,7 @@ fn test_repr_error3() {
 fn test_repr_error4() {
     "
     // NB: meters is a concrete type here:
-    type meters { rel .is: int }
+    type meters { rel .is: i64 }
 
     type my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
@@ -72,7 +72,7 @@ fn test_circular_subtyping() {
 fn test_repr_tuple() {
     "
     pub type tup {
-        rel .0..2: int
+        rel .0..2: i64
     }
 
     pub type bar {
@@ -93,7 +93,7 @@ fn test_repr_valid_mesh1() {
 
             type length {
                 rel .is: si.meters
-                rel .is: int
+                rel .is: i64
             }
 
             type bar {

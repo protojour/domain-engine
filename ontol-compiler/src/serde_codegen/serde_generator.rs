@@ -20,7 +20,7 @@ use crate::{
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
     patterns::{Patterns, StringPatternSegment},
-    primitive::Primitives,
+    primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     type_check::{repr::repr_model::ReprKind, seal::SealCtx},
@@ -279,33 +279,36 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_ref: TypeRef,
     ) -> Option<OperatorAllocation> {
         match type_ref {
-            Type::Unit(_) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::Unit,
-            )),
-            Type::Bool(def_id) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                if *def_id == self.primitives.false_value {
-                    SerdeOperator::False(def_variant.def_id)
-                } else if *def_id == self.primitives.true_value {
-                    SerdeOperator::True(def_variant.def_id)
-                } else {
-                    SerdeOperator::Bool(def_variant.def_id)
-                },
-            )),
+            Type::Primitive(kind, _) => match kind {
+                PrimitiveKind::Unit => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::Unit,
+                )),
+                PrimitiveKind::Bool => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::Bool(def_variant.def_id),
+                )),
+                PrimitiveKind::False => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::False(def_variant.def_id),
+                )),
+                PrimitiveKind::True => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::True(def_variant.def_id),
+                )),
+                PrimitiveKind::Number => None,
+                PrimitiveKind::Int => None,
+                PrimitiveKind::I64 => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::I64(def_variant.def_id),
+                )),
+                PrimitiveKind::Float => None,
+                PrimitiveKind::String => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::String(def_variant.def_id),
+                )),
+            },
             Type::IntConstant(_) => todo!(),
-            Type::Int(_) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::Int(def_variant.def_id),
-            )),
-            Type::Number(_) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::Number(def_variant.def_id),
-            )),
-            Type::String(_) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def_variant),
-                SerdeOperator::String(def_variant.def_id),
-            )),
             Type::StringConstant(def_id) => {
                 assert_eq!(def_variant.def_id, *def_id);
 

@@ -1,6 +1,6 @@
 /// A position is the fundamental geometry construct.
 type position {
-    rel .0..2: int
+    rel .0..2: i64
 }
 
 /// A list of two positions or more.

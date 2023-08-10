@@ -5,7 +5,6 @@ use crate::{
     codegen::task::ConstCodegenTask,
     def::{DefKind, MapDirection, TypeDef},
     mem::Intern,
-    primitive::PrimitiveKind,
     type_check::hir_build_ctx::HirBuildCtx,
     types::{Type, TypeRef},
 };
@@ -55,8 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
-            DefKind::Primitive(PrimitiveKind::Int) => self.types.intern(Type::Int(def_id)),
-            DefKind::Primitive(PrimitiveKind::Number) => self.types.intern(Type::Number(def_id)),
+            DefKind::Primitive(kind) => self.types.intern(Type::Primitive(*kind, def_id)),
             DefKind::Mapping(direction, variables, first_id, second_id) => {
                 match self.check_map(def, *direction, variables, *first_id, *second_id) {
                     Ok(ty) => ty,
