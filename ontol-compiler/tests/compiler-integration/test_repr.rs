@@ -55,16 +55,15 @@ fn test_repr_error4() {
     .compile_fail();
 }
 
-// FIXME: The error message can be improved
 #[test]
 fn test_circular_subtyping() {
     "
     type foo
     type bar
     type baz
-    rel foo is: bar // ERROR TODO: Conflicting optionality for is relation
-    rel bar is: baz // ERROR TODO: Conflicting optionality for is relation
-    rel baz is: foo // ERROR TODO: Conflicting optionality for is relation
+    rel foo is: bar // ERROR Circular subtyping relation
+    rel bar is: baz // ERROR Circular subtyping relation
+    rel baz is: foo // ERROR Circular subtyping relation
     "
     .compile_fail();
 }

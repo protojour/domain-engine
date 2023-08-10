@@ -7,7 +7,7 @@
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 use tracing::trace;
 
 use crate::{
@@ -49,6 +49,8 @@ pub struct State {
 
     /// If this is non-empty, the type is not representable
     pub abstract_notes: Vec<SpannedNote>,
+
+    circular_spans: Vec<SourceSpan>,
 
     do_trace: bool,
 }
@@ -398,6 +400,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         self.traverse_ontology_mesh(def_id, IsRelation::Origin, 0, NO_SPAN, &mut output);
 
+        if !self.state.circular_spans.is_empty() {
+            let spans = std::mem::take(&mut self.state.circular_spans);
+            let initial_span = spans.into_iter().next().unwrap();
+
+            self.errors.push(SpannedCompileError {
+                error: CompileError::CircularSubtypingRelation,
+                span: initial_span,
+                notes: vec![],
+            })
+        }
+
         output
     }
 
@@ -413,13 +426,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             data.level = u16::min(level, data.level);
 
             if data.rel != is_relation {
-                self.errors.push(SpannedCompileError {
-                    error: CompileError::TODO(smart_format!(
-                        "Conflicting optionality for is relation"
-                    )),
-                    span,
-                    notes: vec![],
-                });
+                self.state.circular_spans.push(span);
             }
         } else {
             output.insert(

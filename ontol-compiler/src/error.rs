@@ -82,6 +82,7 @@ pub enum CompileError {
     EntityNotRepresentable,
     MutationOfSealedType,
     IntersectionOfDisjointTypes,
+    CircularSubtypingRelation,
     TODO(String),
 }
 
@@ -207,6 +208,7 @@ impl std::fmt::Display for CompileError {
             Self::EntityNotRepresentable => write!(f, "Entity not representable"),
             Self::MutationOfSealedType => write!(f, "Type is sealed and cannot be modified"),
             Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
+            Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }

@@ -32,7 +32,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     self.collect_base_defs(*mesh_def_id, &mut base_defs);
                 }
 
-                self.validate_base_defs(base_defs, collected_mesh);
+                self.validate_base_defs_intersection(base_defs, collected_mesh);
             }
             ReprKind::Scalar(def_id, _) => {
                 let mut base_defs: BTreeSet<DefId> = Default::default();
@@ -43,7 +43,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     self.collect_base_defs(*mesh_def_id, &mut base_defs);
                 }
 
-                self.validate_base_defs(base_defs, collected_mesh);
+                self.validate_base_defs_intersection(base_defs, collected_mesh);
             }
             _ => {}
         }
@@ -67,7 +67,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
     }
 
-    fn validate_base_defs(
+    fn validate_base_defs_intersection(
         &mut self,
         base_defs: BTreeSet<DefId>,
         collected_mesh: &IndexMap<DefId, IsData>,
@@ -132,10 +132,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         if let Some(mesh) = self.relations.ontology_mesh.get(&sub_def_id) {
             for (is, _) in mesh {
-                if matches!(is.rel, TypeRelation::Super) {
-                    if self.has_path_to_base(is.def_id, super_def_id, visited) {
-                        return true;
-                    }
+                if matches!(is.rel, TypeRelation::Super)
+                    && self.has_path_to_base(is.def_id, super_def_id, visited)
+                {
+                    return true;
                 }
             }
         }
