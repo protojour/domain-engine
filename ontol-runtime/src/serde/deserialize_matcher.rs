@@ -49,6 +49,10 @@ pub trait ValueMatcher {
         Err(())
     }
 
+    fn match_f64(&self, _: f64) -> Result<DefId, ()> {
+        Err(())
+    }
+
     fn match_str(&self, _: &str) -> Result<Value, ()> {
         Err(())
     }
@@ -100,10 +104,10 @@ impl ValueMatcher for BoolMatcher {
     }
 }
 
-/// match any integer
-pub struct IntMatcher(pub DefId);
+/// match any 64 bit signed integer
+pub struct I64Matcher(pub DefId);
 
-impl ValueMatcher for IntMatcher {
+impl ValueMatcher for I64Matcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "integer")
     }
@@ -117,19 +121,15 @@ impl ValueMatcher for IntMatcher {
     }
 }
 
-/// match any number
-pub struct NumberMatcher(pub DefId);
+/// match a 64 bit floating point number
+pub struct F64Matcher(pub DefId);
 
-impl ValueMatcher for NumberMatcher {
+impl ValueMatcher for F64Matcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "number")
+        write!(f, "float")
     }
 
-    fn match_u64(&self, _: u64) -> Result<DefId, ()> {
-        Ok(self.0)
-    }
-
-    fn match_i64(&self, _: i64) -> Result<DefId, ()> {
+    fn match_f64(&self, _: f64) -> Result<DefId, ()> {
         Ok(self.0)
     }
 }

@@ -86,6 +86,8 @@ pub enum OpCode {
     AppendAttr2(Local),
     /// Push a constant i64 to the stack.
     I64(i64, DefId),
+    /// Push a constant f64 to the stack.
+    F64(f64, DefId),
     /// Push a constant string to the stack.
     String(String, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.

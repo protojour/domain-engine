@@ -241,7 +241,7 @@ fn test_serde_datetime() {
 }
 
 #[test]
-fn test_num_default() {
+fn test_int_default() {
     "
     pub type foo {
         rel .'bar'(rel .default := 42): i64
@@ -251,6 +251,20 @@ fn test_num_default() {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": 1 } == { "bar": 1 });
         assert_json_io_matches!(foo, Create, {} == { "bar": 42 });
+    });
+}
+
+#[test]
+fn test_float_default() {
+    "
+    pub type foo {
+        rel .'bar'(rel .default := 42): f64
+    }
+    "
+    .compile_ok(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(foo, Create, { "bar": 1.618 } == { "bar": 1.618 });
+        assert_json_io_matches!(foo, Create, {} == { "bar": 42.0 });
     });
 }
 

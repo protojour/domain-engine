@@ -85,19 +85,20 @@ impl<'m> ScopeBuilder<'m> {
                     },
                 ),
             }),
-            ontol_hir::Kind::Unit | ontol_hir::Kind::Int(_) | ontol_hir::Kind::String(_) => {
-                Ok(ScopeBinder {
-                    binder: None,
-                    scope: scope::Scope(
-                        scope::Kind::Const,
-                        scope::Meta {
-                            vars: VarSet::default(),
-                            dependencies: VarSet::default(),
-                            hir_meta,
-                        },
-                    ),
-                })
-            }
+            ontol_hir::Kind::Unit
+            | ontol_hir::Kind::I64(_)
+            | ontol_hir::Kind::F64(_)
+            | ontol_hir::Kind::String(_) => Ok(ScopeBinder {
+                binder: None,
+                scope: scope::Scope(
+                    scope::Kind::Const,
+                    scope::Meta {
+                        vars: VarSet::default(),
+                        dependencies: VarSet::default(),
+                        hir_meta,
+                    },
+                ),
+            }),
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let (defined_var, dependencies) = match &self.current_prop_analysis_map {

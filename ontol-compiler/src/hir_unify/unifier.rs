@@ -70,9 +70,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 typed_binder: None,
                 node: TypedHirNode(ontol_hir::Kind::Unit, expr_meta.hir_meta),
             }),
-            (expr::Kind::Int(int), _) => Ok(UnifiedNode {
+            (expr::Kind::I64(int), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::Int(int), expr_meta.hir_meta),
+                node: TypedHirNode(ontol_hir::Kind::I64(int), expr_meta.hir_meta),
+            }),
+            (expr::Kind::F64(float), _) => Ok(UnifiedNode {
+                typed_binder: None,
+                node: TypedHirNode(ontol_hir::Kind::F64(float), expr_meta.hir_meta),
             }),
             (expr::Kind::String(string), _) => Ok(UnifiedNode {
                 typed_binder: None,

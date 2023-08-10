@@ -83,7 +83,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 let int: i32 = Faker.fake_with_rng(self.rng);
                 Value::new(Data::I64(int.into()), *def_id)
             }
-            SerdeOperator::Number(def_id) => Value::new(
+            SerdeOperator::F64(def_id) => Value::new(
                 Data::new_rational_i64(
                     Faker.fake_with_rng(self.rng),
                     match Faker.fake_with_rng(self.rng) {

@@ -150,6 +150,7 @@ impl ProcBuilder {
                     Ir::PutAttr2(local, property_id) => OpCode::PutAttr2(local, property_id),
                     Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
                     Ir::I64(value, def_id) => OpCode::I64(value, def_id),
+                    Ir::F64(value, def_id) => OpCode::F64(value, def_id),
                     Ir::String(value, def_id) => OpCode::String(value, def_id),
                     Ir::Cond(predicate, block_index) => OpCode::Cond(
                         predicate,

@@ -337,7 +337,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                 NativeScalarKind::Bool
             }
             SerdeOperator::I64(def_id) => NativeScalarKind::Int(*def_id),
-            SerdeOperator::Number(def_id) => NativeScalarKind::Number(*def_id),
+            SerdeOperator::F64(def_id) => NativeScalarKind::Number(*def_id),
             SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::StringPattern(_)

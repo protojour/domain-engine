@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
@@ -207,19 +209,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 )
             }
-            (ExprKind::ConstI64(int), Some(expected_ty)) => {
-                if matches!(expected_ty, Type::Primitive(PrimitiveKind::I64, _)) {
-                    TypedHirNode(
-                        ontol_hir::Kind::Int(*int),
-                        Meta {
-                            ty: expected_ty,
-                            span: expr.span,
-                        },
-                    )
-                } else {
-                    self.error_node(CompileError::IncompatibleLiteral, &expr.span)
+            (ExprKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
+                Type::Primitive(PrimitiveKind::I64, _) => TypedHirNode(
+                    ontol_hir::Kind::I64(*int),
+                    Meta {
+                        ty: expected_ty,
+                        span: expr.span,
+                    },
+                ),
+                Type::Primitive(PrimitiveKind::F64, _) => {
+                    // Didn't find a way to go from i64 to f64 in Rust std..
+                    match f64::from_str(&int.to_string()) {
+                        Ok(float) => TypedHirNode(
+                            ontol_hir::Kind::F64(float),
+                            Meta {
+                                ty: expected_ty,
+                                span: expr.span,
+                            },
+                        ),
+                        Err(_) => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                    }
                 }
-            }
+                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+            },
             (ExprKind::ConstString(string), Some(expected_ty)) => match expected_ty {
                 Type::Primitive(PrimitiveKind::String, _) => TypedHirNode(
                     ontol_hir::Kind::String(string.clone()),

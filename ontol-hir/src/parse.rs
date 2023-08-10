@@ -44,7 +44,8 @@ pub enum Token<'s> {
     LParen,
     RParen,
     Symbol(&'s str),
-    Int(i64),
+    I64(i64),
+    F64(f64),
     Dollar,
     Hash,
     At,
@@ -83,7 +84,8 @@ impl<L: Lang> Parser<L> {
                 },
                 (token, _) => Err(Error::InvalidToken(token)),
             },
-            (Token::Int(num), next) => Ok((self.make_node(Kind::Int(num)), next)),
+            (Token::I64(num), next) => Ok((self.make_node(Kind::I64(num)), next)),
+            (Token::F64(num), next) => Ok((self.make_node(Kind::F64(num)), next)),
             (token, _) => Err(Error::InvalidToken(token)),
         }
     }
@@ -428,12 +430,12 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
         Some((_, '_')) => Ok((Token::Underscore, chars.as_str())),
         Some((_, char)) if char.is_numeric() => {
             for (index, char) in chars.by_ref() {
-                if !char.is_numeric() {
-                    return Ok((parse_int(&next[0..index])?, &next[index..]));
+                if !char.is_numeric() && char != '.' {
+                    return Ok((parse_number(&next[0..index])?, &next[index..]));
                 }
             }
 
-            Ok((parse_int(next)?, chars.as_str()))
+            Ok((parse_number(next)?, chars.as_str()))
         }
         Some((_, char)) if char.is_ascii() => {
             for (index, char) in chars.by_ref() {
@@ -448,11 +450,19 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
     }
 }
 
-fn parse_int(num: &str) -> Result<Token, Error> {
-    let result: Result<i64, _> = num.parse();
-    match result {
-        Ok(num) => Ok(Token::Int(num)),
-        Err(_) => Err(Error::InvalidNumber),
+fn parse_number(num: &str) -> Result<Token, Error> {
+    if num.contains('.') {
+        let result: Result<f64, _> = num.parse();
+        match result {
+            Ok(num) => Ok(Token::F64(num)),
+            Err(_) => Err(Error::InvalidNumber),
+        }
+    } else {
+        let result: Result<i64, _> = num.parse();
+        match result {
+            Ok(num) => Ok(Token::I64(num)),
+            Err(_) => Err(Error::InvalidNumber),
+        }
     }
 }
 

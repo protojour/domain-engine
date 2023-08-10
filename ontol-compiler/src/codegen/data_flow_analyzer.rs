@@ -71,7 +71,8 @@ where
         match node.kind() {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
             ontol_hir::Kind::Unit => VarSet::default(),
-            ontol_hir::Kind::Int(_) => VarSet::default(),
+            ontol_hir::Kind::I64(_) => VarSet::default(),
+            ontol_hir::Kind::F64(_) => VarSet::default(),
             ontol_hir::Kind::String(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
                 let var_deps = self.analyze_node(definition);

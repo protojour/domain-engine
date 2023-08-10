@@ -24,6 +24,8 @@ pub enum PrimitiveKind {
     I64,
     /// All the floats
     Float,
+    /// 64-bit floating point
+    F64,
     /// Set of all strings
     String,
 }
@@ -46,6 +48,7 @@ impl PrimitiveKind {
             Self::Int => "int",
             Self::I64 => "i64",
             Self::Float => "float",
+            Self::F64 => "f64",
             Self::String => "string",
         }
     }
@@ -87,6 +90,8 @@ pub struct Primitives {
     /// The float type.
     pub float: DefId,
 
+    pub f64: DefId,
+
     /// Builtin relations
     pub relations: Relations,
 
@@ -97,7 +102,7 @@ pub struct Primitives {
 }
 
 impl Primitives {
-    pub fn list_primitives(&self) -> [(DefId, Option<&'static str>, PrimitiveKind); 9] {
+    pub fn list_primitives(&self) -> [(DefId, Option<&'static str>, PrimitiveKind); 10] {
         [
             (self.unit, None, PrimitiveKind::Unit),
             (self.bool, Some("bool"), PrimitiveKind::Bool),
@@ -107,6 +112,7 @@ impl Primitives {
             (self.int, Some("int"), PrimitiveKind::Int),
             (self.i64, Some("i64"), PrimitiveKind::I64),
             (self.float, Some("float"), PrimitiveKind::Float),
+            (self.f64, Some("f64"), PrimitiveKind::F64),
             (self.string, Some("string"), PrimitiveKind::String),
         ]
     }
@@ -181,6 +187,7 @@ impl Primitives {
             int: defs.add_primitive(PrimitiveKind::Int),
             i64: defs.add_primitive(PrimitiveKind::I64),
             float: defs.add_primitive(PrimitiveKind::Float),
+            f64: defs.add_primitive(PrimitiveKind::F64),
             string: defs.add_primitive(PrimitiveKind::String),
 
             relations: Relations {

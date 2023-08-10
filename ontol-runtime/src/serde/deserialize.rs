@@ -20,7 +20,7 @@ use crate::{
 use super::{
     deserialize_matcher::{
         BoolMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        IntMatcher, MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher,
+        F64Matcher, I64Matcher, MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
@@ -132,10 +132,10 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
             SerdeOperator::Bool(def_id) => deserializer
                 .deserialize_bool(BoolMatcher::Bool(*def_id).into_visitor_no_params(self)),
             SerdeOperator::I64(def_id) => {
-                deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
+                deserializer.deserialize_i64(I64Matcher(*def_id).into_visitor_no_params(self))
             }
-            SerdeOperator::Number(def_id) => {
-                deserializer.deserialize_i64(IntMatcher(*def_id).into_visitor_no_params(self))
+            SerdeOperator::F64(def_id) => {
+                deserializer.deserialize_i64(F64Matcher(*def_id).into_visitor_no_params(self))
             }
             SerdeOperator::String(def_id) => deserializer.deserialize_str(
                 StringMatcher {
@@ -265,6 +265,33 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
 
         Ok(Value {
             data: Data::I64(v),
+            type_def_id,
+        }
+        .into())
+    }
+
+    fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
+        let double: f64 = v.into();
+        let type_def_id = self
+            .matcher
+            .match_f64(double)
+            .map_err(|_| Error::invalid_type(Unexpected::Float(double), &self))?;
+
+        Ok(Value {
+            data: Data::F64(double),
+            type_def_id,
+        }
+        .into())
+    }
+
+    fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
+        let type_def_id = self
+            .matcher
+            .match_f64(v)
+            .map_err(|_| Error::invalid_type(Unexpected::Float(v), &self))?;
+
+        Ok(Value {
+            data: Data::F64(v),
             type_def_id,
         }
         .into())

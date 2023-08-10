@@ -303,6 +303,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::I64(def_variant.def_id),
                 )),
                 PrimitiveKind::Float => None,
+                PrimitiveKind::F64 => Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::F64(def_variant.def_id),
+                )),
                 PrimitiveKind::String => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::String(def_variant.def_id),

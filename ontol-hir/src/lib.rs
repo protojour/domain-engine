@@ -64,7 +64,8 @@ type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 pub enum Kind<'a, L: Lang> {
     Var(Var),
     Unit,
-    Int(i64),
+    I64(i64),
+    F64(f64),
     String(String),
     Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
     Call(BuiltinProc, Nodes<'a, L>),

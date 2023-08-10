@@ -38,8 +38,12 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 write!(f, "{sep}#u")?;
                 Ok(sep.multiline())
             }
-            Kind::Int(int) => {
+            Kind::I64(int) => {
                 write!(f, "{sep}{int}")?;
+                Ok(sep.multiline())
+            }
+            Kind::F64(float) => {
+                write!(f, "{sep}{float}")?;
                 Ok(sep.multiline())
             }
             Kind::String(string) => {

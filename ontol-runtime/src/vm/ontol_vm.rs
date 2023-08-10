@@ -173,6 +173,11 @@ impl Processor for OntolProcessor {
     }
 
     #[inline(always)]
+    fn push_f64(&mut self, k: f64, result_type: DefId) {
+        self.stack.push(Value::new(Data::F64(k), result_type));
+    }
+
+    #[inline(always)]
     fn push_string(&mut self, k: &str, result_type: DefId) {
         self.stack
             .push(Value::new(Data::String(k.into()), result_type));

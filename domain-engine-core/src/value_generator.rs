@@ -151,7 +151,7 @@ impl<'e> Generator<'e> {
             | SerdeOperator::False(def_id)
             | SerdeOperator::Bool(def_id)
             | SerdeOperator::I64(def_id)
-            | SerdeOperator::Number(def_id)
+            | SerdeOperator::F64(def_id)
             | SerdeOperator::String(def_id)
             | SerdeOperator::StringConstant(_, def_id)
             | SerdeOperator::StringPattern(def_id)

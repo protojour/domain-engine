@@ -46,8 +46,15 @@ impl<'m> ExprBuilder<'m> {
                     free_vars: Default::default(),
                 },
             ),
-            ontol_hir::Kind::Int(int) => expr::Expr(
-                expr::Kind::Int(*int),
+            ontol_hir::Kind::I64(int) => expr::Expr(
+                expr::Kind::I64(*int),
+                expr::Meta {
+                    hir_meta: *meta,
+                    free_vars: Default::default(),
+                },
+            ),
+            ontol_hir::Kind::F64(float) => expr::Expr(
+                expr::Kind::F64(*float),
                 expr::Meta {
                     hir_meta: *meta,
                     free_vars: Default::default(),

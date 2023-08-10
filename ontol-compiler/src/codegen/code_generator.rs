@@ -137,10 +137,18 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                 );
             }
-            ontol_hir::Kind::Int(int) => {
+            ontol_hir::Kind::I64(int) => {
                 self.builder.append(
                     block,
                     Ir::I64(int, ty.get_single_def_id().unwrap()),
+                    Delta(1),
+                    span,
+                );
+            }
+            ontol_hir::Kind::F64(float) => {
+                self.builder.append(
+                    block,
+                    Ir::F64(float, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
                 );
