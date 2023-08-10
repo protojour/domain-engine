@@ -13,6 +13,9 @@ use crate::graphql::graphql_handler;
 
 mod graphql;
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
