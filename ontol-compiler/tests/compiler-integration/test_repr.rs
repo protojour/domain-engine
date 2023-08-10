@@ -32,7 +32,8 @@ fn test_repr_error2() {
 fn test_repr_error3() {
     "
     type meters { rel .is: number }
-    type has_length { // ERROR Intersection of disjoint types
+
+    type my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
         rel .is: string // NOTE Base type is string
     }
@@ -46,7 +47,7 @@ fn test_repr_error4() {
     // NB: meters is a concrete type here:
     type meters { rel .is: int }
 
-    type has_length { // ERROR Intersection of disjoint types
+    type my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
         rel .is: string // NOTE Base type is string
     }
