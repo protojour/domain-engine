@@ -25,7 +25,7 @@ use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
 use tracing::debug;
-use type_check::seal::SealedDefs;
+use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
 pub mod error;
@@ -69,7 +69,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
-    pub(crate) sealed_defs: SealedDefs,
+    pub(crate) seal_ctx: SealCtx,
     pub(crate) patterns: Patterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
@@ -94,7 +94,7 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
-            sealed_defs: Default::default(),
+            seal_ctx: Default::default(),
             patterns: Patterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
@@ -394,12 +394,16 @@ impl<'m> Compiler<'m> {
 
     /// Seal all the types in a single domain.
     fn seal_domain(&mut self, package_id: PackageId) {
+        debug!("seal {package_id:?}");
+
         let iterator = self.defs.iter_package_def_ids(package_id);
         let mut type_check = self.type_check();
 
         for def_id in iterator {
             type_check.seal_def(def_id);
         }
+
+        self.seal_ctx.mark_domain_sealed(package_id);
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.

@@ -291,7 +291,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<ValueGenerator, ()> {
         let properties = self.relations.properties_by_def_id.get(&object_def_id);
         let repr = self
-            .sealed_defs
+            .seal_ctx
             .repr_table
             .get(&object_def_id)
             .unwrap_or_else(|| {

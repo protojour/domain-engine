@@ -15,7 +15,7 @@ use crate::{
     error::CompileError,
     package::ONTOL_PKG,
     relation::{Constructor, Properties, Relations},
-    type_check::seal::SealedDefs,
+    type_check::seal::SealCtx,
     types::DefTypes,
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
@@ -28,7 +28,7 @@ pub struct ReprCheck<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
-    pub sealed_defs: &'c mut SealedDefs,
+    pub seal_ctx: &'c mut SealCtx,
 
     #[allow(unused)]
     pub errors: &'c mut CompileErrors,
@@ -141,7 +141,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         def_id: DefId,
         properties: Option<&Properties>,
     ) -> Result<(), ()> {
-        if self.sealed_defs.repr_table.contains_key(&def_id) {
+        if self.seal_ctx.repr_table.contains_key(&def_id) {
             return Ok(());
         }
 
@@ -190,7 +190,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 trace!(" => {def_id:?} result repr: {repr:?}");
             }
 
-            self.sealed_defs.repr_table.insert(def_id, repr);
+            self.seal_ctx.repr_table.insert(def_id, repr);
             Ok(())
         } else {
             Err(())

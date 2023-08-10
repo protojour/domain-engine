@@ -4,7 +4,7 @@ use tracing::warn;
 use crate::{
     def::Defs,
     relation::Relations,
-    type_check::{repr::repr_model::ReprKind, seal::SealedDefs},
+    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
     types::{Type, TypeRef},
 };
 
@@ -21,15 +21,15 @@ pub struct MapInfo {
 pub struct TypeMapper<'c, 'm> {
     pub relations: &'c Relations,
     pub defs: &'c Defs<'m>,
-    pub sealed_defs: &'c SealedDefs,
+    pub seal_ctx: &'c SealCtx,
 }
 
 impl<'c, 'm> TypeMapper<'c, 'm> {
-    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, sealed_defs: &'c SealedDefs) -> Self {
+    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, seal_ctx: &'c SealCtx) -> Self {
         Self {
             relations,
             defs,
-            sealed_defs,
+            seal_ctx,
         }
     }
 
@@ -45,7 +45,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
 
         match ty {
             Type::Domain(def_id) | Type::Anonymous(def_id) => {
-                let repr = self.sealed_defs.repr_table.get(def_id).unwrap();
+                let repr = self.seal_ctx.repr_table.get(def_id).unwrap();
 
                 match repr {
                     ReprKind::Scalar(scalar_def_id, _) => Some(MapInfo {

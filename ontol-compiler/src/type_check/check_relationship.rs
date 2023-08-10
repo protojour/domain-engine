@@ -426,12 +426,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match self.defs.get_def_kind(def_id) {
-            Some(DefKind::Primitive(_) | DefKind::Type(_)) => {}
+            Some(DefKind::Primitive(_) | DefKind::Type(_)) => {
+                self.check_not_sealed(ty, span);
+            }
             _ => {
                 self.error(CompileError::SubjectMustBeDomainType, span);
             }
         }
-        self.check_not_sealed(ty, span);
     }
 
     fn check_object_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
@@ -451,7 +452,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_not_sealed(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
         if let Some(def_id) = ty.get_single_def_id() {
-            if self.sealed_defs.sealed_set.contains(&def_id) {
+            if self.seal_ctx.is_sealed(def_id) {
                 self.error(CompileError::MutationOfSealedType, span);
             }
         }

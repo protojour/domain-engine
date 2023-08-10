@@ -13,7 +13,7 @@ use crate::{
     CompileErrors, Compiler, SourceSpan, SpannedCompileError, SpannedNote,
 };
 
-use self::{repr::repr_check::ReprCheck, seal::SealedDefs};
+use self::{repr::repr_check::ReprCheck, seal::SealCtx};
 
 pub mod check_def;
 pub mod check_domain_types;
@@ -58,7 +58,7 @@ pub struct TypeCheck<'c, 'm> {
     pub errors: &'c mut CompileErrors,
     pub codegen_tasks: &'c mut CodegenTasks<'m>,
     pub expressions: &'c mut Expressions,
-    pub sealed_defs: &'c mut SealedDefs,
+    pub seal_ctx: &'c mut SealCtx,
     pub defs: &'c Defs<'m>,
     pub primitives: &'c Primitives,
 }
@@ -136,7 +136,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             defs: self.defs,
             def_types: self.def_types,
             relations: self.relations,
-            sealed_defs: self.sealed_defs,
+            seal_ctx: self.seal_ctx,
             errors: self.errors,
             state: Default::default(),
         }
@@ -165,7 +165,7 @@ impl<'m> Compiler<'m> {
             relations: &mut self.relations,
             codegen_tasks: &mut self.codegen_tasks,
             expressions: &mut self.expressions,
-            sealed_defs: &mut self.sealed_defs,
+            seal_ctx: &mut self.seal_ctx,
             defs: &self.defs,
             primitives: &self.primitives,
         }

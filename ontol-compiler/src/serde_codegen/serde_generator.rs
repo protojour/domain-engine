@@ -23,7 +23,7 @@ use crate::{
     primitive::Primitives,
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
-    type_check::{repr::repr_model::ReprKind, seal::SealedDefs},
+    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
 };
@@ -35,7 +35,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) primitives: &'c Primitives,
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
-    pub(super) sealed_defs: &'c SealedDefs,
+    pub(super) seal_ctx: &'c SealCtx,
     pub(super) patterns: &'c Patterns,
     pub(super) codegen_tasks: &'c CodegenTasks<'m>,
     pub(super) operators_by_id: Vec<SerdeOperator>,
@@ -359,7 +359,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr_kind = self.sealed_defs.repr_table.get(&def_variant.def_id)?;
+        let repr_kind = self.seal_ctx.repr_table.get(&def_variant.def_id)?;
 
         let properties = match (properties, def_variant.modifier) {
             (None, DataModifier::NONE) => {
