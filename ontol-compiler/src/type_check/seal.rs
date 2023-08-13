@@ -3,12 +3,15 @@ use ontol_runtime::{DefId, PackageId};
 
 use crate::def::DefKind;
 
-use super::{repr::repr_model::ReprKind, TypeCheck};
+use super::{
+    repr::repr_model::{Repr, ReprKind},
+    TypeCheck,
+};
 
 #[derive(Default, Debug)]
 pub struct SealCtx {
     /// Map of repr results
-    pub repr_table: FnvHashMap<DefId, ReprKind>,
+    pub repr_table: FnvHashMap<DefId, Repr>,
 
     /// Set of completely sealed domains
     sealed_domains: FnvHashSet<PackageId>,
@@ -18,6 +21,10 @@ pub struct SealCtx {
 }
 
 impl SealCtx {
+    pub fn get_repr_kind(&self, def_id: &DefId) -> Option<&ReprKind> {
+        self.repr_table.get(def_id).map(|repr| &repr.kind)
+    }
+
     pub fn mark_domain_sealed(&mut self, package_id: PackageId) {
         self.sealed_domains.insert(package_id);
         self.partially_sealed_defs.clear();
@@ -56,7 +63,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) =
-            self.seal_ctx.repr_table.get(&def_id)
+            self.seal_ctx.get_repr_kind(&def_id)
         {
             for error in self.check_value_union(def_id) {
                 self.errors.push(error);

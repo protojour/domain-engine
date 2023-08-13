@@ -300,7 +300,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
             });
 
-        let scalar_def_id = match repr {
+        let scalar_def_id = match &repr.kind {
             ReprKind::Scalar(scalar_def_id, _) => *scalar_def_id,
             _ => return Err(()),
         };

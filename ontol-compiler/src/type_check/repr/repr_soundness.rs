@@ -11,16 +11,16 @@ use crate::{
 
 use super::{
     repr_check::{IsData, ReprCheck},
-    repr_model::ReprKind,
+    repr_model::{Repr, ReprKind},
 };
 
 impl<'c, 'm> ReprCheck<'c, 'm> {
     pub(super) fn check_soundness(
         &mut self,
-        repr: &mut ReprKind,
+        repr: &mut Repr,
         collected_mesh: &IndexMap<DefId, IsData>,
-    ) {
-        match repr {
+    ) -> Result<(), ()> {
+        match &mut repr.kind {
             ReprKind::Intersection(members) => {
                 let mut base_defs: BTreeSet<DefId> = Default::default();
 
@@ -32,7 +32,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     self.collect_base_defs(*mesh_def_id, &mut base_defs);
                 }
 
-                self.validate_base_defs_intersection(base_defs, collected_mesh);
+                let base_def_id = self.check_valid_intersection(base_defs, collected_mesh)?;
+                self.check_type_params(base_def_id, repr)?;
             }
             ReprKind::Scalar(def_id, _) => {
                 let mut base_defs: BTreeSet<DefId> = Default::default();
@@ -43,10 +44,28 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     self.collect_base_defs(*mesh_def_id, &mut base_defs);
                 }
 
-                self.validate_base_defs_intersection(base_defs, collected_mesh);
+                let base_def_id = self.check_valid_intersection(base_defs, collected_mesh)?;
+                self.check_type_params(base_def_id, repr)?;
             }
             _ => {}
         }
+
+        Ok(())
+    }
+
+    fn check_type_params(&mut self, base_def_id: DefId, repr: &Repr) -> Result<(), ()> {
+        let rels = &self.primitives.relations;
+
+        for (relation_id, _) in &repr.type_params {
+            if relation_id.0 == rels.min {
+                assert_eq!(base_def_id, self.primitives.number);
+            }
+            if relation_id.0 == rels.max {
+                assert_eq!(base_def_id, self.primitives.number);
+            }
+        }
+
+        Ok(())
     }
 
     fn collect_base_defs(&self, def_id: DefId, output: &mut BTreeSet<DefId>) {
@@ -67,13 +86,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
     }
 
-    fn validate_base_defs_intersection(
+    fn check_valid_intersection(
         &mut self,
         base_defs: BTreeSet<DefId>,
         collected_mesh: &IndexMap<DefId, IsData>,
-    ) {
-        if base_defs.len() < 2 {
-            return;
+    ) -> Result<DefId, ()> {
+        match base_defs.len() {
+            0 => panic!("Empty intersection"),
+            1 => return base_defs.into_iter().next().ok_or(()),
+            _ => {}
         }
 
         let root_def = self.defs.table.get(&self.root_def_id).unwrap();
@@ -98,6 +119,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             span: root_def.span,
             notes,
         });
+
+        Err(())
     }
 
     fn level1_path_to_base<'d>(

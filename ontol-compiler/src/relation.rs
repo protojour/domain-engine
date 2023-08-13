@@ -25,6 +25,8 @@ pub struct Relations {
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
 
     pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
+
+    pub type_params: FnvHashMap<DefId, IndexMap<RelationId, DefId>>,
 }
 
 impl Relations {

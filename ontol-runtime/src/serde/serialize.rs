@@ -38,7 +38,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::False(_) => serializer.serialize_bool(false),
             SerdeOperator::True(_) => serializer.serialize_bool(true),
             SerdeOperator::Bool(_) => serializer.serialize_bool(*cast_ref::<bool>(value)),
-            SerdeOperator::I64(_) | SerdeOperator::F64(_) => {
+            SerdeOperator::I64(..) | SerdeOperator::F64(..) => {
                 self.serialize_number(value, serializer)
             }
             SerdeOperator::String(_)

@@ -255,6 +255,25 @@ fn test_int_default() {
 }
 
 #[test]
+fn test_int_quantity_constrained() {
+    "
+    pub type percentage {
+        rel .is: i64
+        rel .min: 0
+        rel .max: 100
+    }
+    "
+    .compile_ok(|test| {
+        let [percentage] = test.bind(["percentage"]);
+        assert_json_io_matches!(percentage, Create, 0 == 0);
+        assert_error_msg!(
+            create_de(&percentage).data(json!(1000)),
+            r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
+        );
+    });
+}
+
+#[test]
 fn test_float_default() {
     "
     pub type foo {

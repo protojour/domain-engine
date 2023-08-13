@@ -20,7 +20,7 @@ use crate::{
 use super::{
     deserialize_matcher::{
         BoolMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        F64Matcher, I64Matcher, MapMatchKind, SequenceMatcher, StringMatcher, StringPatternMatcher,
+        MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, StringPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
@@ -131,12 +131,20 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 .deserialize_bool(BoolMatcher::True(*def_id).into_visitor_no_params(self)),
             SerdeOperator::Bool(def_id) => deserializer
                 .deserialize_bool(BoolMatcher::Bool(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::I64(def_id) => {
-                deserializer.deserialize_i64(I64Matcher(*def_id).into_visitor_no_params(self))
-            }
-            SerdeOperator::F64(def_id) => {
-                deserializer.deserialize_i64(F64Matcher(*def_id).into_visitor_no_params(self))
-            }
+            SerdeOperator::I64(def_id, range) => deserializer.deserialize_i64(
+                NumberMatcher {
+                    def_id: *def_id,
+                    range: range.clone(),
+                }
+                .into_visitor_no_params(self),
+            ),
+            SerdeOperator::F64(def_id, range) => deserializer.deserialize_f64(
+                NumberMatcher {
+                    def_id: *def_id,
+                    range: range.clone(),
+                }
+                .into_visitor_no_params(self),
+            ),
             SerdeOperator::String(def_id) => deserializer.deserialize_str(
                 StringMatcher {
                     def_id: *def_id,

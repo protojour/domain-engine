@@ -214,8 +214,8 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::False(_) => write!(f, "false"),
             SerdeOperator::True(_) => write!(f, "true"),
             SerdeOperator::Bool(_) => write!(f, "bool"),
-            SerdeOperator::I64(_) => write!(f, "`int`"),
-            SerdeOperator::F64(_) => write!(f, "`float`"),
+            SerdeOperator::I64(..) => write!(f, "`int`"),
+            SerdeOperator::F64(..) => write!(f, "`float`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
             SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {

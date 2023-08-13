@@ -45,7 +45,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
 
         match ty {
             Type::Domain(def_id) | Type::Anonymous(def_id) => {
-                let repr = self.seal_ctx.repr_table.get(def_id).unwrap();
+                let repr = self.seal_ctx.get_repr_kind(def_id).unwrap();
 
                 match repr {
                     ReprKind::Scalar(scalar_def_id, _) => Some(MapInfo {

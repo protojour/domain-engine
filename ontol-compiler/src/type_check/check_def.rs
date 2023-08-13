@@ -1,4 +1,7 @@
+use std::str::FromStr;
+
 use ontol_runtime::DefId;
+use ordered_float::NotNan;
 use tracing::debug;
 
 use crate::{
@@ -78,6 +81,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .add_const_task(ConstCodegenTask { def_id, node });
 
                 ty
+            }
+            DefKind::NumberLiteral(lit) => {
+                if lit.contains('.') {
+                    match NotNan::<f64>::from_str(lit) {
+                        Ok(num) => self.types.intern(Type::FloatConstant(num)),
+                        Err(_) => self.types.intern(Type::Error),
+                    }
+                } else {
+                    match i64::from_str(lit) {
+                        Ok(num) => self.types.intern(Type::IntConstant(num)),
+                        Err(_) => self.types.intern(Type::Error),
+                    }
+                }
             }
             other => {
                 panic!("failed def typecheck: {other:?}");

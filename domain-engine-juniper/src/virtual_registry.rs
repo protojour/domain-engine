@@ -169,8 +169,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
                 self.get_native_argument::<bool>(name, modifier)
             }
-            SerdeOperator::I64(_) => return self.get_native_argument::<i32>(name, modifier),
-            SerdeOperator::F64(_) => return self.get_native_argument::<f64>(name, modifier),
+            SerdeOperator::I64(_, _) => return self.get_native_argument::<i32>(name, modifier),
+            SerdeOperator::F64(_, _) => return self.get_native_argument::<f64>(name, modifier),
             SerdeOperator::String(_) => return self.get_native_argument::<String>(name, modifier),
             SerdeOperator::StringConstant(_, _) => {
                 self.get_native_argument::<String>(name, modifier)

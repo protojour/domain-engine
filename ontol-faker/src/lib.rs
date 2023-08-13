@@ -79,20 +79,31 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 let value: bool = Faker.fake_with_rng(self.rng);
                 Value::new(Data::I64(if value { 1 } else { 0 }), *def_id)
             }
-            SerdeOperator::I64(def_id) => {
-                let int: i32 = Faker.fake_with_rng(self.rng);
-                Value::new(Data::I64(int.into()), *def_id)
+            SerdeOperator::I64(def_id, range) => {
+                let int: i64 = if let Some(range) = range {
+                    self.rng.gen_range(range.clone())
+                } else {
+                    // limit range
+                    let int: i32 = self.rng.gen();
+                    int.into()
+                };
+                Value::new(Data::I64(int), *def_id)
             }
-            SerdeOperator::F64(def_id) => Value::new(
-                Data::new_rational_i64(
-                    Faker.fake_with_rng(self.rng),
-                    match Faker.fake_with_rng(self.rng) {
-                        0 => 1,
-                        other => other,
-                    },
-                ),
-                *def_id,
-            ),
+            SerdeOperator::F64(def_id, range) => {
+                let float: f64 = if let Some(range) = range {
+                    self.rng.gen_range(range.clone())
+                } else {
+                    self.rng.gen()
+                };
+                Value::new(
+                    Data::F64(if float == 0.0 || float == -0.0 {
+                        0.1
+                    } else {
+                        float
+                    }),
+                    *def_id,
+                )
+            }
             SerdeOperator::String(def_id) => {
                 let mut string: std::string::String =
                     fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);

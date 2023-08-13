@@ -321,6 +321,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_ty = self.check_def_shallow(subject.0.def_id);
                 let _ = self.check_def_shallow(object.0.def_id);
 
+                self.relations
+                    .type_params
+                    .entry(subject.0.def_id)
+                    .or_default()
+                    .insert(relation.0, object.0.def_id);
+
                 subject_ty
             }
         }

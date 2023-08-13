@@ -5,13 +5,13 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{smart_format, DefId};
 use tracing::trace;
 
 use crate::{
-    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
+    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, RelationId},
     error::CompileError,
     package::ONTOL_PKG,
     primitive::Primitives,
@@ -21,7 +21,7 @@ use crate::{
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
-use super::repr_model::ReprKind;
+use super::repr_model::{Repr, ReprKind};
 
 pub struct ReprCheck<'c, 'm> {
     pub root_def_id: DefId,
@@ -201,14 +201,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
     }
 
-    fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<ReprKind> {
+    fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<Repr> {
         let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
 
         if ontology_mesh.len() > 1 && self.state.do_trace {
             trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh);
         }
 
-        let mut rec = ReprRecord { repr: None };
+        let mut rec = ReprRecord {
+            kind: None,
+            type_params: Default::default(),
+        };
 
         for (def_id, data) in &ontology_mesh {
             let def_id = *def_id;
@@ -285,13 +288,39 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
                 _ => {}
             }
+
+            if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
+                if let Some(type_params) = self.relations.type_params.get(&def_id) {
+                    for (relation_id, value_def_id) in type_params {
+                        if rec
+                            .type_params
+                            .insert(*relation_id, *value_def_id)
+                            .is_some()
+                        {
+                            let def = self.defs.table.get(&self.root_def_id).unwrap();
+                            self.errors.push(SpannedCompileError {
+                                error: CompileError::TODO(smart_format!(
+                                    "Duplicate type parameter"
+                                )),
+                                span: def.span,
+                                notes: vec![],
+                            });
+                        }
+                    }
+                }
+            }
         }
 
-        if let Some(repr) = &mut rec.repr {
-            self.check_soundness(repr, &ontology_mesh);
+        let mut repr = rec.kind.map(|kind| Repr {
+            kind,
+            type_params: rec.type_params,
+        });
+
+        if let Some(repr) = repr.as_mut() {
+            let _ = self.check_soundness(repr, &ontology_mesh);
         }
 
-        rec.repr
+        repr
     }
 
     fn merge_repr(&mut self, rec: &mut ReprRecord, next: ReprKind, def_id: DefId, data: &IsData) {
@@ -305,34 +334,34 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         use IsRelation::*;
-        match (data.rel, &mut rec.repr, next) {
+        match (data.rel, &mut rec.kind, next) {
             (Origin, _, next) => {
-                rec.repr = Some(next);
+                rec.kind = Some(next);
             }
             // Handle supertypes - results in intersections
             (Super, None, ReprKind::Unit) => {
-                rec.repr = Some(ReprKind::Unit);
+                rec.kind = Some(ReprKind::Unit);
             }
             (Super, Some(_), ReprKind::Unit) => {
                 // Unit does not add additional information to an existing repr
             }
             (Super, Some(ReprKind::Unit), next) => {
-                rec.repr = Some(next);
+                rec.kind = Some(next);
             }
             (Super, None | Some(ReprKind::Struct), ReprKind::Struct) => {
-                rec.repr = Some(ReprKind::StructIntersection(
+                rec.kind = Some(ReprKind::StructIntersection(
                     [(def_id, data.rel_span)].into(),
                 ));
             }
             (Super, None, next) => {
-                rec.repr = Some(next);
+                rec.kind = Some(next);
             }
             (Super, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
                 members.push((def_id, data.rel_span));
             }
             (Super, Some(repr), kind) if *repr != kind => match repr {
                 ReprKind::Scalar(def0, span0) => {
-                    rec.repr = Some(ReprKind::Intersection(vec![
+                    rec.kind = Some(ReprKind::Intersection(vec![
                         (*def0, *span0),
                         (def_id, data.rel_span),
                     ]));
@@ -344,14 +373,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             // Handle subtypes - results in unions
             (Sub, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
-                    rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                    rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
                 }
             }
             (Sub, Some(ReprKind::Unit), _) => {
-                rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
             (Sub, Some(ReprKind::Struct), ReprKind::Struct) => {
-                rec.repr = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
+                rec.kind = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
             (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
                 variants.push((def_id, data.rel_span));
@@ -359,7 +388,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
                 variants.push((def_id, data.rel_span));
-                rec.repr = Some(ReprKind::StructUnion(variants));
+                rec.kind = Some(ReprKind::StructUnion(variants));
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
                 if data.is_leaf {
@@ -367,13 +396,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
             }
             (Sub, None, ReprKind::Struct) => {
-                rec.repr = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
+                rec.kind = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
             }
             (Sub, None, _) => {
-                rec.repr = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
             (Sub, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
-                rec.repr = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
+                rec.kind = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
                 variants.push((def_id, span));
@@ -391,7 +420,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if self.state.do_trace {
-            trace!("    tmp repr: {:?}", rec.repr);
+            trace!("    tmp repr: {:?}", rec.kind);
         }
     }
 
@@ -480,5 +509,8 @@ pub(super) enum IsRelation {
 }
 
 pub(super) struct ReprRecord {
-    repr: Option<ReprKind>,
+    kind: Option<ReprKind>,
+
+    /// Params at type level (i.e. no string/member relations)
+    type_params: FnvHashMap<RelationId, DefId>,
 }

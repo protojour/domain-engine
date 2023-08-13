@@ -300,19 +300,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 PrimitiveKind::Int => None,
                 PrimitiveKind::I64 => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::I64(def_variant.def_id),
+                    SerdeOperator::I64(def_variant.def_id, None),
                 )),
                 PrimitiveKind::Float => None,
                 PrimitiveKind::F64 => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::F64(def_variant.def_id),
+                    SerdeOperator::F64(def_variant.def_id, None),
                 )),
                 PrimitiveKind::String => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::String(def_variant.def_id),
                 )),
             },
-            Type::IntConstant(_) => todo!(),
+            Type::IntConstant(_) | Type::FloatConstant(_) => todo!(),
             Type::StringConstant(def_id) => {
                 assert_eq!(def_variant.def_id, *def_id);
 
@@ -366,7 +366,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr_kind = self.seal_ctx.repr_table.get(&def_variant.def_id)?;
+        let repr = self.seal_ctx.repr_table.get(&def_variant.def_id)?;
 
         let properties = match (properties, def_variant.modifier) {
             (None, DataModifier::NONE) => {
@@ -388,7 +388,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (Some(properties), _) => properties,
         };
 
-        match repr_kind {
+        match &repr.kind {
             ReprKind::Scalar(def_id, _span) => {
                 if def_id == &def_variant.def_id {
                     // If it's a "self-scalar" it must be a string fmt (for now).
@@ -508,10 +508,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ))
             }
             constructor => {
-                unreachable!(
-                    "{:?}: {constructor:?}: repr {repr_kind:?}",
-                    def_variant.def_id
-                )
+                unreachable!("{:?}: {constructor:?}: repr {repr:?}", def_variant.def_id)
             }
         }
     }

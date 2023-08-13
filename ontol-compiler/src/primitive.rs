@@ -131,6 +131,7 @@ impl Primitives {
     }
 }
 
+/// Built-in relation types
 #[derive(Debug)]
 pub struct Relations {
     /// Relation between a type and a representation of the type.

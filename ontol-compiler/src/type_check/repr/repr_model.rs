@@ -1,7 +1,17 @@
+use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smallvec::SmallVec;
 
-use crate::SourceSpan;
+use crate::{def::RelationId, SourceSpan};
+
+#[derive(Eq, PartialEq, Debug)]
+pub struct Repr {
+    pub kind: ReprKind,
+
+    /// Params at type level (i.e. no string/member relations).
+    /// These are collected from all supertypes.
+    pub type_params: FnvHashMap<RelationId, DefId>,
+}
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReprKind {

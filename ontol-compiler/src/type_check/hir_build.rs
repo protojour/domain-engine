@@ -358,7 +358,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
-        let node_kind = match self.seal_ctx.repr_table.get(&struct_def_id).unwrap() {
+        let node_kind = match self.seal_ctx.get_repr_kind(&struct_def_id).unwrap() {
             ReprKind::Struct | ReprKind::Unit => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {

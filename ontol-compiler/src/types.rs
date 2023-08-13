@@ -2,6 +2,7 @@ use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{string_types::StringLikeType, DefId};
+use ordered_float::NotNan;
 
 use crate::{
     def::{DefKind, Defs},
@@ -21,6 +22,7 @@ pub enum Type<'m> {
     Primitive(PrimitiveKind, DefId),
     EmptySequence(DefId),
     IntConstant(i64),
+    FloatConstant(NotNan<f64>),
     /// A specific string
     StringConstant(DefId),
     Regex(DefId),
@@ -50,7 +52,7 @@ impl<'m> Type<'m> {
             Self::Tautology => None,
             Self::Primitive(_, def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
-            Self::IntConstant(_) => todo!(),
+            Self::IntConstant(_) | Self::FloatConstant(_) => todo!(),
             Self::StringConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::StringLike(def_id, _) => Some(*def_id),
@@ -158,6 +160,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Primitive(kind, _) => write!(f, "{}", kind.ident()),
             Type::EmptySequence(_) => write!(f, "[]"),
             Type::IntConstant(val) => write!(f, "int({val})"),
+            Type::FloatConstant(val) => write!(f, "float({val})"),
             Type::StringConstant(def_id) => {
                 let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
                     panic!();

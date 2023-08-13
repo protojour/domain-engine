@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Range};
 
 use crate::{
     discriminator::Discriminant,
@@ -104,33 +104,32 @@ impl ValueMatcher for BoolMatcher {
     }
 }
 
-/// match any 64 bit signed integer
-pub struct I64Matcher(pub DefId);
+pub struct NumberMatcher<T> {
+    pub def_id: DefId,
+    pub range: Option<Range<T>>,
+}
 
-impl ValueMatcher for I64Matcher {
+impl ValueMatcher for NumberMatcher<i64> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "integer")
     }
 
     fn match_u64(&self, _: u64) -> Result<DefId, ()> {
-        Ok(self.0)
+        Ok(self.def_id)
     }
 
     fn match_i64(&self, _: i64) -> Result<DefId, ()> {
-        Ok(self.0)
+        Ok(self.def_id)
     }
 }
 
-/// match a 64 bit floating point number
-pub struct F64Matcher(pub DefId);
-
-impl ValueMatcher for F64Matcher {
+impl ValueMatcher for NumberMatcher<f64> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "float")
     }
 
     fn match_f64(&self, _: f64) -> Result<DefId, ()> {
-        Ok(self.0)
+        Ok(self.def_id)
     }
 }
 

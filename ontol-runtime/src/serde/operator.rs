@@ -26,8 +26,8 @@ pub enum SerdeOperator {
     True(DefId),
     False(DefId),
     Bool(DefId),
-    I64(DefId),
-    F64(DefId),
+    I64(DefId, Option<Range<i64>>),
+    F64(DefId, Option<Range<f64>>),
     String(DefId),
     StringConstant(String, DefId),
 
