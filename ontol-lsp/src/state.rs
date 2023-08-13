@@ -1,21 +1,28 @@
 use chumsky::prelude::*;
-use lsp_types::{CompletionItem, CompletionItemKind};
+use lsp_types::{CompletionItem, CompletionItemKind, Position, Range};
+use ontol_compiler::{
+    error::{CompileError, UnifiedCompileError},
+    mem::Mem,
+    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
+    Compiler, SourceCodeRegistry, SourceSpan, Sources, SpannedCompileError,
+};
 use ontol_parser::{
     ast::{DefStatement, MapArm, Path, Statement},
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
+use ontol_runtime::config::PackageConfig;
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
     format,
-    ops::Range,
 };
 use substring::Substring;
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct State {
     pub docs: HashMap<String, Document>,
+    pub root: Option<String>,
 }
 
 impl State {
@@ -77,6 +84,66 @@ impl State {
             doc.statements = statements;
         }
     }
+
+    pub fn compile(&self) -> Result<(), UnifiedCompileError> {
+        if let Some(root) = &self.root {
+            let root_name = get_source_name(root);
+            let mut ontol_sources = Sources::default();
+            let mut source_code_registry = SourceCodeRegistry::default();
+            let mut package_graph_builder = PackageGraphBuilder::new(root_name.into());
+
+            let topology = loop {
+                match package_graph_builder.transition().unwrap() {
+                    GraphState::RequestPackages { builder, requests } => {
+                        package_graph_builder = builder;
+
+                        for request in requests {
+                            let source_name = match &request.reference {
+                                PackageReference::Named(source_name) => source_name.as_str(),
+                            };
+                            let package_config = PackageConfig::default();
+
+                            match self.docs.get(source_name) {
+                                Some(source_text) => {
+                                    package_graph_builder.provide_package(ParsedPackage::parse(
+                                        request,
+                                        &source_text.text,
+                                        package_config,
+                                        &mut ontol_sources,
+                                        &mut source_code_registry,
+                                    ));
+                                }
+                                None => {
+                                    // return Ok(());
+                                    return Err(UnifiedCompileError {
+                                        errors: vec![SpannedCompileError {
+                                            error: CompileError::PackageNotFound,
+                                            span: SourceSpan::default(),
+                                            notes: vec![],
+                                        }],
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    GraphState::Built(topology) => break topology,
+                }
+            };
+
+            let mem = Mem::default();
+            let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
+            return compiler.compile_package_topology(topology);
+        }
+        // TODO: Handle
+        Ok(())
+    }
+}
+
+fn get_source_name(name: &str) -> &str {
+    match name.strip_suffix(".on") {
+        Some(stripped) => stripped,
+        None => name,
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -96,8 +163,33 @@ pub struct DocPanel {
     pub docs: String,
 }
 
+pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
+    let mut range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let mut counter = 0;
+
+    for (index, line) in text.lines().enumerate() {
+        if span.start > 0 && range.start.line == 0 && range.start.character == 0 {
+            if counter + line.len() < span.start as usize {
+                counter += line.len() + 1;
+            } else {
+                range.start.line = index as u32;
+                range.start.character = span.start - counter as u32;
+            }
+        } else if span.end > 0 {
+            if counter + line.len() < span.end as usize {
+                counter += line.len() + 1;
+            } else {
+                range.end.line = index as u32;
+                range.end.character = span.end - counter as u32;
+                break;
+            }
+        }
+    }
+    range
+}
+
 impl Document {
-    pub fn get_signature(&self, range: &Range<usize>) -> String {
+    pub fn get_signature(&self, range: &std::ops::Range<usize>) -> String {
         let sig = self.text.substring(range.start(), range.end());
 
         let comments = Regex::new(r"(?m-s)^\s*?\/\/.*\n?").unwrap();
@@ -208,7 +300,7 @@ impl Document {
                             match val.as_str() {
                                 "id" => {
                                     dp.path = "ontol.id".to_string();
-                                    dp.signature = self.get_signature(&Range {
+                                    dp.signature = self.get_signature(&std::ops::Range {
                                         start: last_rel,
                                         end: range.end(),
                                     });
@@ -217,7 +309,7 @@ impl Document {
                                 }
                                 "is" => {
                                     dp.path = "ontol.is".to_string();
-                                    dp.signature = self.get_signature(&Range {
+                                    dp.signature = self.get_signature(&std::ops::Range {
                                         start: last_rel,
                                         end: range.end(),
                                     });
@@ -226,7 +318,7 @@ impl Document {
                                 }
                                 "gen" => {
                                     dp.path = "ontol.gen".to_string();
-                                    dp.signature = self.get_signature(&Range {
+                                    dp.signature = self.get_signature(&std::ops::Range {
                                         start: last_rel,
                                         end: range.end(),
                                     });
@@ -234,7 +326,7 @@ impl Document {
                                 }
                                 "auto" => {
                                     dp.path = "ontol.auto".to_string();
-                                    dp.signature = self.get_signature(&Range {
+                                    dp.signature = self.get_signature(&std::ops::Range {
                                         start: last_rel,
                                         end: range.end(),
                                     });
@@ -243,7 +335,7 @@ impl Document {
                                 }
                                 "default" => {
                                     dp.path = "ontol.default".to_string();
-                                    dp.signature = self.get_signature(&Range {
+                                    dp.signature = self.get_signature(&std::ops::Range {
                                         start: last_rel,
                                         end: range.end(),
                                     });

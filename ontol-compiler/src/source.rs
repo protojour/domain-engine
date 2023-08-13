@@ -7,7 +7,7 @@ use std::{
 use fnv::FnvHashMap;
 use ontol_runtime::PackageId;
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SourceId(pub u32);
 
 /// Native source means that it is not possible to point
@@ -35,7 +35,7 @@ impl Src {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub struct SourceSpan {
     pub source_id: SourceId,
     pub start: u32,
