@@ -986,17 +986,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn define_relation_if_undefined(&mut self, key: RelationKey) -> ImplicitRelationId {
         match key {
-            RelationKey::Named(def_ref) => {
-                match self.compiler.relations.relations.entry(def_ref.def_id) {
-                    Entry::Vacant(vacant) => ImplicitRelationId::New(
-                        RelationKind::Named(def_ref),
-                        *vacant.insert(RelationId(
-                            self.compiler.defs.alloc_def_id(self.src.package_id),
-                        )),
-                    ),
-                    Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
-                }
-            }
+            RelationKey::Named(def_ref) => ImplicitRelationId::Reused(RelationId(def_ref.def_id)),
             RelationKey::FmtTransition(def_ref, final_state) => {
                 match self.compiler.relations.relations.entry(def_ref.def_id) {
                     Entry::Vacant(vacant) => ImplicitRelationId::New(

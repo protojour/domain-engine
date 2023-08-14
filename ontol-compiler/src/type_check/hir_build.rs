@@ -375,11 +375,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .lookup_relationship_meta(property_id.relationship_id)
                                     .expect("BUG: problem getting relationship meta");
                                 let property_name = match property_id.role {
-                                    Role::Subject => Some(
-                                        meta.relation
-                                            .subject_prop(self.defs)
-                                            .expect("BUG: Expected named subject property"),
-                                    ),
+                                    Role::Subject => match meta.relation_def_kind.value {
+                                        DefKind::StringLiteral(lit) => Some(*lit),
+                                        _ => panic!("BUG: Expected named subject property"),
+                                    },
                                     Role::Object => meta.relationship.object_prop,
                                 };
                                 let (_, _, owner_cardinality) =

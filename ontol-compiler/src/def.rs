@@ -118,25 +118,10 @@ pub struct Relation<'m> {
     pub subject_prop: Option<&'m str>,
 }
 
-impl<'m> Relation<'m> {
-    pub fn named_ident(&self, defs: &'m Defs) -> Option<&'m str> {
-        match &self.kind {
-            RelationKind::Named(def) => match defs.get_def_kind(def.def_id) {
-                Some(DefKind::StringLiteral(lit)) => Some(lit),
-                _ => panic!(),
-            },
-            _ => None,
-        }
-    }
-
-    pub fn subject_prop(&self, defs: &'m Defs) -> Option<&'m str> {
-        self.subject_prop.or_else(|| self.named_ident(defs))
-    }
-}
+impl<'m> Relation<'m> {}
 
 #[derive(Clone, Debug)]
 pub enum RelationKind {
-    Named(DefReference),
     FmtTransition(DefReference, FmtFinalState),
     Builtin(BuiltinRelationKind),
 }
@@ -208,7 +193,7 @@ pub enum RelParams {
 pub struct RelationshipMeta<'m> {
     pub relationship_id: RelationshipId,
     pub relationship: SpannedBorrow<'m, Relationship<'m>>,
-    pub relation: SpannedBorrow<'m, Relation<'m>>,
+    pub relation_def_kind: SpannedBorrow<'m, DefKind<'m>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -371,19 +356,15 @@ impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
             })
             .ok_or(())?;
 
-        let relation = self
+        let relation_def_kind = self
             .get_spanned_def_kind(relationship.relation_id.0)
-            .ok_or(())?
-            .filter(|kind| match kind {
-                DefKind::Relation(relation) => Some(relation),
-                _ => None,
-            })
+            .or_else(|| panic!("No def for relation id"))
             .ok_or(())?;
 
         Ok(RelationshipMeta {
             relationship_id,
             relationship,
-            relation,
+            relation_def_kind,
         })
     }
 }

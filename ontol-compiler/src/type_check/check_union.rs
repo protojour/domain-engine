@@ -13,7 +13,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, LookupRelationshipMeta, RelationId},
+    def::{Def, DefKind, LookupRelationshipMeta, RelationId},
     error::CompileError,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
@@ -217,13 +217,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let (object_reference, _) = &meta.relationship.object;
             let object_ty = self.def_types.table.get(&object_reference.def_id).unwrap();
-            let Some(property_name) = meta.relationship.object_prop.or(meta.relation.named_ident(self.defs)) else {
+            let Some(property_name) = meta.relationship.object_prop.or(match meta.relation_def_kind.value {
+                DefKind::StringLiteral(lit) => Some(lit),
+                _ => None
+            }) else {
                 continue;
             };
 
             debug!(
                 "trying rel {:?} {:?} ty: {object_ty:?}",
-                meta.relationship, meta.relation
+                meta.relationship, meta.relation_def_kind
             );
 
             match object_ty {

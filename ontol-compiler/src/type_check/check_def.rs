@@ -70,7 +70,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Constant(expr_id) => {
                 let expr = self.expressions.table.remove(expr_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
-                    None => return self.types.intern(Type::Error),
+                    None => self.types.intern(Type::Error),
                     Some(ty) => ty,
                 };
 

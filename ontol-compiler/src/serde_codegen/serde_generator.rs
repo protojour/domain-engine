@@ -175,7 +175,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .lookup_relationship_meta(property_id.relationship_id)
                     .expect("Problem getting relationship meta");
 
-                let property_name = meta.relation.subject_prop(self.defs)?;
+                let property_name = match meta.relation_def_kind.value {
+                    DefKind::StringLiteral(literal) => *literal,
+                    _ => return None,
+                };
 
                 let object_operator_id = self
                     .gen_operator_id(SerdeKey::no_modifier(meta.relationship.object.0.def_id))
@@ -789,10 +792,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .expect("Problem getting subject relationship meta");
                         let object = meta.relationship.object.0.def_id;
 
-                        let prop_key = meta
-                            .relation
-                            .subject_prop(self.defs)
-                            .expect("Subject property has no name");
+                        let prop_key = match meta.relation_def_kind.value {
+                            DefKind::StringLiteral(literal) => *literal,
+                            _ => panic!("Subject property is not a string literal"),
+                        };
 
                         (meta, prop_key, object)
                     }

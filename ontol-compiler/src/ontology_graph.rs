@@ -4,7 +4,7 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use smartstring::alias::String;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, Relation, RelationKind},
+    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelationKind},
     package::ONTOL_PKG,
     Compiler,
 };
@@ -136,8 +136,7 @@ struct Node<'g> {
 struct Edge<'g, 'm> {
     source_meta: &'g NodeMeta,
     target_meta: &'g NodeMeta,
-    relation: Option<&'g Relation<'m>>,
-    compiler: &'g Compiler<'m>,
+    relation_def_kind: Option<&'g DefKind<'m>>,
 }
 
 impl<'g, 'm> serde::Serialize for OntologyGraph<'g, 'm> {
@@ -210,8 +209,7 @@ impl<'g, 'm> serde::Serialize for Edges<'g, 'm> {
                             list.serialize_element(&Edge {
                                 source_meta,
                                 target_meta,
-                                relation: Some(&meta.relation),
-                                compiler,
+                                relation_def_kind: Some(&meta.relation_def_kind),
                             })?
                         }
                     }
@@ -219,8 +217,7 @@ impl<'g, 'm> serde::Serialize for Edges<'g, 'm> {
                         list.serialize_element(&Edge {
                             source_meta,
                             target_meta,
-                            relation: None,
-                            compiler,
+                            relation_def_kind: None,
                         })?;
                     }
                 }
@@ -236,19 +233,17 @@ impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
     where
         S: serde::Serializer,
     {
-        let compiler = &self.compiler;
-
         let mut map = serializer.serialize_map(None)?;
 
         map.serialize_entry("source", &self.source_meta.node_id)?;
         map.serialize_entry("target", &self.target_meta.node_id)?;
 
-        if let Some(relation) = self.relation {
-            match &relation.kind {
-                RelationKind::Named(_) => {
-                    map.serialize_entry("kind", "prop")?;
-                    map.serialize_entry("name", &relation.subject_prop(&compiler.defs))?;
-                }
+        match self.relation_def_kind {
+            Some(DefKind::StringLiteral(literal)) => {
+                map.serialize_entry("kind", "prop")?;
+                map.serialize_entry("name", literal)?;
+            }
+            Some(DefKind::Relation(relation)) => match &relation.kind {
                 RelationKind::FmtTransition(..) => {
                     map.serialize_entry("kind", "fmt")?;
                 }
@@ -287,11 +282,13 @@ impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
                         map.serialize_entry("kind", "example")?;
                     }
                 },
+            },
+            Some(_) => unreachable!(),
+            None => {
+                // A mapping
+                map.serialize_entry("kind", "map")?;
             }
-        } else {
-            // A mapping
-            map.serialize_entry("kind", "map")?;
-        }
+        };
 
         map.end()
     }

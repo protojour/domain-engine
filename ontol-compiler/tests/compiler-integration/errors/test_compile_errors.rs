@@ -388,7 +388,7 @@ fn namespace_not_found() {
 fn constant_in_weird_place() {
     "
     type foo {
-        rel .'prop' := 42 // ERROR object must be a data type
+        rel .'prop' := 42 // ERROR Incompatible literal// ERROR object must be a data type
     }
     "
     .compile_fail();

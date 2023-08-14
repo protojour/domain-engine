@@ -10,8 +10,8 @@ use unimock::{matching, MockFn, Unimock};
 use crate::{
     codegen::data_flow_analyzer::DataFlowAnalyzer,
     def::{
-        DefReference, LookupRelationshipMetaMock, RelParams, Relation, RelationId, RelationKind,
-        Relationship, RelationshipMeta,
+        DefKind, DefReference, LookupRelationshipMetaMock, RelParams, RelationId, Relationship,
+        RelationshipMeta,
     },
     typed_hir::TypedHir,
     SpannedBorrow, NO_SPAN,
@@ -38,13 +38,7 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
     object_prop: None,
     rel_params: RelParams::Unit,
 };
-const MOCK_RELATION: Relation = Relation {
-    kind: RelationKind::Named(DefReference {
-        def_id: DefId::unit(),
-        pattern_bindings: None,
-    }),
-    subject_prop: None,
-};
+const MOCK_RELATION: DefKind = DefKind::StringLiteral("mock-relation");
 
 fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
     let node = ontol_hir::parse::Parser::new(TypedHir)
@@ -61,7 +55,7 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
                         value: &MOCK_RELATIONSHIP,
                         span: &NO_SPAN,
                     },
-                    relation: SpannedBorrow {
+                    relation_def_kind: SpannedBorrow {
                         value: &MOCK_RELATION,
                         span: &NO_SPAN,
                     },
