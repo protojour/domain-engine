@@ -1,7 +1,4 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::Range,
-};
+use std::{collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
@@ -16,7 +13,7 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, DefParamBinding, DefReference, FmtFinalState, MapDirection, RelParams,
-        Relation, RelationId, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
+        Relation, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -249,20 +246,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(key) {
-            ImplicitRelationId::New(kind, relation_id) => {
-                self.set_def_kind(
-                    relation_id.0,
-                    DefKind::Relation(Relation {
-                        kind,
-                        subject_prop: None,
-                    }),
-                    &ident_span,
-                );
-                relation_id
-            }
-            ImplicitRelationId::Reused(relation_id) => relation_id,
-        };
+        let relation_def_id = self.define_relation_if_undefined(key, &ident_span);
 
         let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.compiler.namespaces.docs.insert(relationship_id, docs);
@@ -315,7 +299,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let object_prop = object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
 
         let mut relationship = Relationship {
-            relation_id,
+            relation_def_id,
             subject: (subject.0, self.src.span(subject.1)),
             subject_cardinality: subject_cardinality
                 .map(convert_cardinality)
@@ -339,9 +323,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         // HACK(for now): invert relationship
-        if relation_id.0 == self.compiler.primitives.relations.id {
+        if relation_def_id == self.compiler.primitives.relations.id {
             relationship = Relationship {
-                relation_id: RelationId(self.compiler.primitives.relations.identifies),
+                relation_def_id: self.compiler.primitives.relations.identifies,
                 subject: relationship.object,
                 subject_cardinality: relationship.object_cardinality,
                 object: relationship.subject,
@@ -447,26 +431,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used
-        let relation_id = match self.define_relation_if_undefined(relation_key) {
-            ImplicitRelationId::New(kind, relation_id) => {
-                self.set_def_kind(
-                    relation_id.0,
-                    DefKind::Relation(Relation {
-                        kind,
-                        subject_prop: None,
-                    }),
-                    &transition.1,
-                );
-                relation_id
-            }
-            ImplicitRelationId::Reused(relation_id) => relation_id,
-        };
+        let relation_def_id = self.define_relation_if_undefined(relation_key, &transition.1);
 
-        debug!("{:?}: <transition>", relation_id.0);
+        debug!("{:?}: <transition>", relation_def_id.0);
 
         Ok(self.define(
             DefKind::Relationship(Relationship {
-                relation_id,
+                relation_def_id,
                 subject: (from.0, self.src.span(from.1)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 object: (to.0, self.src.span(to.1)),
@@ -984,24 +955,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_relation_if_undefined(&mut self, key: RelationKey) -> ImplicitRelationId {
+    fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
         match key {
-            RelationKey::Named(def_ref) => ImplicitRelationId::Reused(RelationId(def_ref.def_id)),
+            RelationKey::Named(def_ref) => def_ref.def_id,
             RelationKey::FmtTransition(def_ref, final_state) => {
-                match self.compiler.relations.relations.entry(def_ref.def_id) {
-                    Entry::Vacant(vacant) => ImplicitRelationId::New(
-                        RelationKind::FmtTransition(def_ref, final_state),
-                        *vacant.insert(RelationId(
-                            self.compiler.defs.alloc_def_id(self.src.package_id),
-                        )),
-                    ),
-                    Entry::Occupied(occupied) => ImplicitRelationId::Reused(*occupied.get()),
-                }
+                let relation_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+                self.set_def_kind(
+                    relation_def_id,
+                    DefKind::Relation(Relation {
+                        kind: RelationKind::FmtTransition(def_ref, final_state),
+                        subject_prop: None,
+                    }),
+                    &span,
+                );
+
+                relation_def_id
             }
-            RelationKey::Builtin(def_id) => ImplicitRelationId::Reused(RelationId(def_id)),
-            RelationKey::Indexed => {
-                ImplicitRelationId::Reused(RelationId(self.compiler.primitives.relations.indexed))
-            }
+            RelationKey::Builtin(def_id) => def_id,
+            RelationKey::Indexed => self.compiler.primitives.relations.indexed,
         }
     }
 
@@ -1056,11 +1027,6 @@ enum RelationKey {
 enum BlockContext<'a> {
     NoContext,
     Context(&'a dyn Fn() -> DefReference),
-}
-
-enum ImplicitRelationId {
-    New(RelationKind, RelationId),
-    Reused(RelationId),
 }
 
 #[derive(Default)]

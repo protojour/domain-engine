@@ -5,11 +5,10 @@ use ontol_runtime::{
     value_generator::ValueGenerator, DefId, RelationshipId,
 };
 
-use crate::{def::RelationId, patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
+use crate::{patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
 
 #[derive(Default, Debug)]
 pub struct Relations {
-    pub relations: FnvHashMap<DefId, RelationId>,
     pub properties_by_def_id: FnvHashMap<DefId, Properties>,
     /// A map from "idenfities" relationship to named relationship:
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
@@ -26,7 +25,7 @@ pub struct Relations {
 
     pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
 
-    pub type_params: FnvHashMap<DefId, IndexMap<RelationId, DefId>>,
+    pub type_params: FnvHashMap<DefId, IndexMap<DefId, DefId>>,
 }
 
 impl Relations {

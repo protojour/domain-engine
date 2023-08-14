@@ -13,7 +13,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, LookupRelationshipMeta, RelationId},
+    def::{Def, DefKind, LookupRelationshipMeta},
     error::CompileError,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
@@ -237,7 +237,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let string_literal = self.defs.get_string_representation(*def_id);
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
-                            relation_id: meta.relationship.relation_id,
+                            relation_def_id: meta.relationship.relation_def_id,
                             discriminant: Discriminant::HasStringAttribute(
                                 property_id.relationship_id,
                                 property_name.into(),
@@ -273,12 +273,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         }
 
-        let mut relation_counters: FnvHashMap<RelationId, usize> = Default::default();
+        let mut relation_counters: FnvHashMap<DefId, usize> = Default::default();
 
         for discriminator in &builder.map_discriminator_candidates {
             for property_candidate in &discriminator.property_candidates {
                 *relation_counters
-                    .entry(property_candidate.relation_id)
+                    .entry(property_candidate.relation_def_id)
                     .or_default() += 1;
             }
         }
@@ -293,7 +293,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 discriminator
                     .property_candidates
                     .retain(|property_candidate| {
-                        property_candidate.relation_id == selected_relation
+                        property_candidate.relation_def_id == selected_relation
                     })
             }
         } else {
@@ -535,7 +535,7 @@ struct MapDiscriminatorCandidate {
 }
 
 struct PropertyDiscriminatorCandidate {
-    relation_id: RelationId,
+    relation_def_id: DefId,
     discriminant: Discriminant,
 }
 

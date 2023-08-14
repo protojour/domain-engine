@@ -56,11 +56,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn check_type_params(&mut self, base_def_id: DefId, repr: &Repr) -> Result<(), ()> {
         let rels = &self.primitives.relations;
 
-        for (relation_id, _) in &repr.type_params {
-            if relation_id.0 == rels.min {
+        for (relation_def_id, _) in &repr.type_params {
+            if relation_def_id == &rels.min {
                 assert_eq!(base_def_id, self.primitives.number);
             }
-            if relation_id.0 == rels.max {
+            if relation_def_id == &rels.max {
                 assert_eq!(base_def_id, self.primitives.number);
             }
         }

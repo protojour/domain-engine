@@ -10,7 +10,7 @@ use unimock::{matching, MockFn, Unimock};
 use crate::{
     codegen::data_flow_analyzer::DataFlowAnalyzer,
     def::{
-        DefKind, DefReference, LookupRelationshipMetaMock, RelParams, RelationId, Relationship,
+        DefKind, DefReference, LookupRelationshipMetaMock, RelParams, Relationship,
         RelationshipMeta,
     },
     typed_hir::TypedHir,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 const MOCK_RELATIONSHIP: Relationship = Relationship {
-    relation_id: RelationId(DefId::unit()),
+    relation_def_id: DefId::unit(),
     subject: (
         DefReference {
             def_id: DefId::unit(),

@@ -11,7 +11,7 @@ use ontol_runtime::{smart_format, DefId};
 use tracing::trace;
 
 use crate::{
-    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, RelationId},
+    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
     primitive::Primitives,
@@ -291,10 +291,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
             if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
                 if let Some(type_params) = self.relations.type_params.get(&def_id) {
-                    for (relation_id, value_def_id) in type_params {
+                    for (relation_def_id, value_def_id) in type_params {
                         if rec
                             .type_params
-                            .insert(*relation_id, *value_def_id)
+                            .insert(*relation_def_id, *value_def_id)
                             .is_some()
                         {
                             let def = self.defs.table.get(&self.root_def_id).unwrap();
@@ -511,6 +511,6 @@ pub(super) enum IsRelation {
 pub(super) struct ReprRecord {
     kind: Option<ReprKind>,
 
-    /// Params at type level (i.e. no string/member relations)
-    type_params: FnvHashMap<RelationId, DefId>,
+    /// Typed relation parameters
+    type_params: FnvHashMap<DefId, DefId>,
 }

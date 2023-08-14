@@ -411,18 +411,18 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
                         // Just update as necessary, the point is the structure, not the property IDs.
                         eq!(&EntityQuery {
                             source: StructOrUnionQuery::Struct(StructQuery {
-                                def_id: DefId(PackageId(2), 28),
+                                def_id: DefId(PackageId(2), 21),
                                 properties: FnvHashMap::from_iter([
                                     // This is the "body" property:
-                                    ("S:2:43".parse().unwrap(), Query::Leaf),
+                                    ("S:2:31".parse().unwrap(), Query::Leaf),
                                     (
                                         // This is the `author` property:
-                                        "S:2:72".parse().unwrap(),
+                                        "S:2:55".parse().unwrap(),
                                         Query::Struct(StructQuery {
                                             def_id: DefId(PackageId(2), 7),
                                             properties: FnvHashMap::from_iter([(
                                                 // This is the `username` property:
-                                                "S:2:14".parse().unwrap(),
+                                                "S:2:12".parse().unwrap(),
                                                 Query::Leaf
                                             )])
                                         })

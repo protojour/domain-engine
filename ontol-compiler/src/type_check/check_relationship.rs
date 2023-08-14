@@ -6,8 +6,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        BuiltinRelationKind, DefKind, DefReference, FmtFinalState, Relation, RelationId,
-        RelationKind, Relationship, TypeDef,
+        BuiltinRelationKind, DefKind, DefReference, FmtFinalState, Relation, RelationKind,
+        Relationship, TypeDef,
     },
     error::CompileError,
     mem::Intern,
@@ -28,7 +28,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let relation_def_kind = &self.defs.get_def_kind(relationship.relation_id.0).unwrap();
+        let relation_def_kind = &self
+            .defs
+            .get_def_kind(relationship.relation_def_id)
+            .unwrap();
 
         match relation_def_kind {
             DefKind::StringLiteral(_) => {
@@ -58,7 +61,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_def_shallow(def_reference.def_id);
                 self.check_fmt_relation(
                     (RelationshipId(def_id), relationship),
-                    (RelationId(def_reference.def_id), final_state),
+                    (def_reference.def_id, final_state),
                     &relationship.subject,
                     &relationship.object,
                     span,
@@ -210,7 +213,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(id) => {
                         debug!(
                             "Object is identified by {id:?}, this relation is {:?}",
-                            relationship.1.relation_id
+                            relationship.1.relation_def_id
                         );
                         return self.error(CompileError::AlreadyIdentified, span);
                     }
@@ -369,7 +372,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .type_params
                     .entry(subject.0.def_id)
                     .or_default()
-                    .insert(relationship.1.relation_id, object.0.def_id);
+                    .insert(relationship.1.relation_def_id, object.0.def_id);
 
                 subject_ty
             }
@@ -379,7 +382,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_fmt_relation(
         &mut self,
         relationship: (RelationshipId, &Relationship),
-        (relation_id, final_state): (RelationId, &FmtFinalState),
+        (relation_def_id, final_state): (DefId, &FmtFinalState),
         subject: &(DefReference, SourceSpan),
         object: &(DefReference, SourceSpan),
         span: &SourceSpan,
@@ -387,14 +390,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def_shallow(subject.0.def_id);
         let object_ty = self.check_def_shallow(object.0.def_id);
 
-        debug!("relation_id: {relation_id:?}");
-
         match subject_ty {
             Type::StringConstant(subject_def_id)
                 if *subject_def_id == self.primitives.empty_string =>
             {
                 if let Err(e) = self.extend_string_pattern_fmt_constructor(
-                    relation_id,
+                    relation_def_id,
                     relationship,
                     object.0.def_id,
                     object_ty,
@@ -415,7 +416,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match subject_constructor {
                     Some(Constructor::StringFmt(subject_pattern)) => {
                         if let Err(e) = self.extend_string_pattern_fmt_constructor(
-                            relation_id,
+                            relation_def_id,
                             relationship,
                             object.0.def_id,
                             object_ty,
@@ -493,7 +494,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     #[allow(clippy::too_many_arguments)]
     fn extend_string_pattern_fmt_constructor(
         &mut self,
-        relation_id: RelationId,
+        relation_def_id: DefId,
         relationship: (RelationshipId, &Relationship),
         object_def: DefId,
         object_ty: TypeRef<'m>,
@@ -501,27 +502,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         final_state: FmtFinalState,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
-        let rel_def_id = relation_id.0;
-
-        let appendee = match self.defs.get_def_kind(rel_def_id) {
+        let appendee = match self.defs.get_def_kind(relation_def_id) {
             Some(DefKind::Primitive(PrimitiveKind::String)) => StringPatternSegment::AllStrings,
             Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
             Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
                 self.defs
                     .literal_regex_hirs
-                    .get(&rel_def_id)
+                    .get(&relation_def_id)
                     .expect("regex hir not found for literal regex")
                     .clone(),
             ),
             _ => {
                 match self
                     .relations
-                    .properties_by_def_id(rel_def_id)
+                    .properties_by_def_id(relation_def_id)
                     .map(Properties::constructor)
                 {
                     Some(Constructor::StringFmt(rel_segment)) => StringPatternSegment::Property {
                         property_id: PropertyId::subject(relationship.0),
-                        type_def_id: rel_def_id,
+                        type_def_id: relation_def_id,
                         segment: Box::new(rel_segment.clone()),
                     },
                     _ => {

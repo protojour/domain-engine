@@ -1,6 +1,5 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
-use derive_debug_extras::DebugExtras;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -144,14 +143,10 @@ pub enum BuiltinRelationKind {
     Example,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, DebugExtras)]
-#[debug_single_tuple_inline]
-pub struct RelationId(pub DefId);
-
 /// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]
 pub struct Relationship<'m> {
-    pub relation_id: RelationId,
+    pub relation_def_id: DefId,
 
     pub subject: (DefReference, SourceSpan),
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
@@ -357,7 +352,7 @@ impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
             .ok_or(())?;
 
         let relation_def_kind = self
-            .get_spanned_def_kind(relationship.relation_id.0)
+            .get_spanned_def_kind(relationship.relation_def_id)
             .or_else(|| panic!("No def for relation id"))
             .ok_or(())?;
 

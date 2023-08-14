@@ -10,7 +10,7 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, LookupRelationshipMeta, RelationId},
+    def::{Def, LookupRelationshipMeta},
     error::CompileError,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
@@ -97,7 +97,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let table = properties.table.as_ref()?;
 
         let mut actions = vec![];
-        let mut subject_relation_set: FnvHashSet<RelationId> = Default::default();
+        let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
 
         for (property_id, cardinality) in table {
             trace!("check post-repr {def_id:?} {property_id:?} {cardinality:?}");
@@ -109,8 +109,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .lookup_relationship_meta(property_id.relationship_id)
                         .unwrap();
 
-                    // Check that the same relation_id is not reused for subject properties
-                    if !subject_relation_set.insert(meta.relationship.relation_id) {
+                    // Check that the same relation_def_id is not reused for subject properties
+                    if !subject_relation_set.insert(meta.relationship.relation_def_id) {
                         let spanned_relationship_def = self
                             .defs
                             .get_spanned_def_kind(meta.relationship_id.0)

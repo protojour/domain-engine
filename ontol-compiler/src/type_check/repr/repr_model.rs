@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smallvec::SmallVec;
 
-use crate::{def::RelationId, SourceSpan};
+use crate::SourceSpan;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Repr {
@@ -10,7 +10,7 @@ pub struct Repr {
 
     /// Params at type level (i.e. no string/member relations).
     /// These are collected from all supertypes.
-    pub type_params: FnvHashMap<RelationId, DefId>,
+    pub type_params: FnvHashMap<DefId, DefId>,
 }
 
 #[derive(Eq, PartialEq, Debug)]
