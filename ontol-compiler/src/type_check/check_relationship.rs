@@ -6,8 +6,7 @@ use tracing::debug;
 
 use crate::{
     def::{
-        BuiltinRelationKind, DefKind, DefReference, FmtFinalState, Relation, RelationKind,
-        Relationship, TypeDef,
+        BuiltinRelationKind, DefKind, FmtFinalState, Relation, RelationKind, Relationship, TypeDef,
     },
     error::CompileError,
     mem::Intern,
@@ -35,24 +34,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match relation_def_kind {
             DefKind::StringLiteral(_) => {
-                self.check_string_literal_relation(
-                    (RelationshipId(def_id), relationship),
-                    &relationship.subject,
-                    &relationship.object,
-                    span,
-                );
+                self.check_string_literal_relation(RelationshipId(def_id), relationship, span);
             }
             DefKind::Relation(Relation {
                 kind: RelationKind::Builtin(builtin),
                 ..
             }) => {
-                self.check_typed_relation(
-                    (RelationshipId(def_id), relationship),
-                    builtin,
-                    &relationship.subject,
-                    &relationship.object,
-                    span,
-                );
+                self.check_typed_relation(RelationshipId(def_id), relationship, builtin, span);
             }
             DefKind::Relation(Relation {
                 kind: RelationKind::FmtTransition(def_reference, final_state),
@@ -60,10 +48,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }) => {
                 self.check_def_shallow(def_reference.def_id);
                 self.check_fmt_relation(
-                    (RelationshipId(def_id), relationship),
-                    (def_reference.def_id, final_state),
-                    &relationship.subject,
-                    &relationship.object,
+                    RelationshipId(def_id),
+                    relationship,
+                    def_reference.def_id,
+                    final_state,
                     span,
                 );
             }
@@ -77,11 +65,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_string_literal_relation(
         &mut self,
-        relationship: (RelationshipId, &Relationship),
-        subject: &(DefReference, SourceSpan),
-        object: &(DefReference, SourceSpan),
+        relationship_id: RelationshipId,
+        relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        let subject = &relationship.subject;
+        let object = &relationship.object;
+
         let subject_ty = self.check_def_shallow(subject.0.def_id);
         let object_ty = self.check_def_shallow(object.0.def_id);
 
@@ -93,9 +83,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             None => {
                 properties.table = Some(
                     [(
-                        PropertyId::subject(relationship.0),
+                        PropertyId::subject(relationship_id),
                         Property {
-                            cardinality: relationship.1.subject_cardinality,
+                            cardinality: relationship.subject_cardinality,
                             is_entity_id: false,
                         },
                     )]
@@ -104,9 +94,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             Some(map) => {
                 map.insert(
-                    PropertyId::subject(relationship.0),
+                    PropertyId::subject(relationship_id),
                     Property {
-                        cardinality: relationship.1.subject_cardinality,
+                        cardinality: relationship.subject_cardinality,
                         is_entity_id: false,
                     },
                 );
@@ -116,7 +106,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // Ensure properties in object
         self.relations.properties_by_def_id_mut(object.0.def_id);
 
-        match (&relationship.1.object_prop, object_ty) {
+        match (&relationship.object_prop, object_ty) {
             (Some(_), Type::Domain(_)) => {
                 self.check_not_sealed(object_ty, &object.1);
 
@@ -125,9 +115,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_def_id_mut(object.0.def_id)
                     .table_mut()
                     .insert(
-                        PropertyId::object(relationship.0),
+                        PropertyId::object(relationship_id),
                         Property {
-                            cardinality: relationship.1.object_cardinality,
+                            cardinality: relationship.object_cardinality,
                             is_entity_id: false,
                         },
                     )
@@ -148,12 +138,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_typed_relation(
         &mut self,
-        relationship: (RelationshipId, &Relationship),
+        relationship_id: RelationshipId,
+        relationship: &Relationship,
         relation: &BuiltinRelationKind,
-        subject: &(DefReference, SourceSpan),
-        object: &(DefReference, SourceSpan),
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        let subject = &relationship.subject;
+        let object = &relationship.object;
+
         // TODO: Check the object property is undefined
 
         match relation {
@@ -174,7 +166,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .or_default()
                     .entry(Is {
                         def_id: object.0.def_id,
-                        rel: match relationship.1.subject_cardinality.0 {
+                        rel: match relationship.subject_cardinality.0 {
                             PropertyCardinality::Mandatory => TypeRelation::Super,
                             PropertyCardinality::Optional => TypeRelation::Sub,
                         },
@@ -207,17 +199,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::MustIdentifyWithinDomain, span);
                 }
 
-                properties.identifies = Some(relationship.0);
+                properties.identifies = Some(relationship_id);
                 let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
                 match object_properties.identified_by {
                     Some(id) => {
                         debug!(
                             "Object is identified by {id:?}, this relation is {:?}",
-                            relationship.1.relation_def_id
+                            relationship.relation_def_id
                         );
                         return self.error(CompileError::AlreadyIdentified, span);
                     }
-                    None => object_properties.identified_by = Some(relationship.0),
+                    None => object_properties.identified_by = Some(relationship_id),
                 }
 
                 object_ty
@@ -237,7 +229,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let mut sequence = Sequence::default();
 
                         if let Err(error) =
-                            sequence.define_relationship(&relationship.1.rel_params, relationship.0)
+                            sequence.define_relationship(&relationship.rel_params, relationship_id)
                         {
                             return self.error(error, span);
                         }
@@ -246,7 +238,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     (None, Constructor::Sequence(sequence)) => {
                         if let Err(error) =
-                            sequence.define_relationship(&relationship.1.rel_params, relationship.0)
+                            sequence.define_relationship(&relationship.rel_params, relationship_id)
                         {
                             return self.error(error, span);
                         }
@@ -372,7 +364,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .type_params
                     .entry(subject.0.def_id)
                     .or_default()
-                    .insert(relationship.1.relation_def_id, object.0.def_id);
+                    .insert(relationship.relation_def_id, object.0.def_id);
 
                 subject_ty
             }
@@ -381,12 +373,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_fmt_relation(
         &mut self,
-        relationship: (RelationshipId, &Relationship),
-        (relation_def_id, final_state): (DefId, &FmtFinalState),
-        subject: &(DefReference, SourceSpan),
-        object: &(DefReference, SourceSpan),
+        relationship_id: RelationshipId,
+        relationship: &Relationship,
+        relation_def_id: DefId,
+        final_state: &FmtFinalState,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        let subject = &relationship.subject;
+        let object = &relationship.object;
+
         let subject_ty = self.check_def_shallow(subject.0.def_id);
         let object_ty = self.check_def_shallow(object.0.def_id);
 
@@ -396,7 +391,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             {
                 if let Err(e) = self.extend_string_pattern_fmt_constructor(
                     relation_def_id,
-                    relationship,
+                    (relationship_id, relationship),
                     object.0.def_id,
                     object_ty,
                     StringPatternSegment::EmptyString,
@@ -417,7 +412,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Constructor::StringFmt(subject_pattern)) => {
                         if let Err(e) = self.extend_string_pattern_fmt_constructor(
                             relation_def_id,
-                            relationship,
+                            (relationship_id, relationship),
                             object.0.def_id,
                             object_ty,
                             subject_pattern.clone(),
