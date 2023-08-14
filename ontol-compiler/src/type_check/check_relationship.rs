@@ -5,9 +5,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    def::{
-        BuiltinRelationKind, DefKind, FmtFinalState, Relation, RelationKind, Relationship, TypeDef,
-    },
+    def::{BuiltinRelationKind, DefKind, FmtFinalState, Relationship, TypeDef},
     error::CompileError,
     mem::Intern,
     patterns::StringPatternSegment,
@@ -27,6 +25,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
+        let relationship_id = RelationshipId(def_id);
         let relation_def_kind = &self
             .defs
             .get_def_kind(relationship.relation_def_id)
@@ -34,21 +33,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match relation_def_kind {
             DefKind::StringLiteral(_) => {
-                self.check_string_literal_relation(RelationshipId(def_id), relationship, span);
+                self.check_string_literal_relation(relationship_id, relationship, span);
             }
-            DefKind::Relation(Relation {
-                kind: RelationKind::Builtin(builtin),
-                ..
-            }) => {
-                self.check_typed_relation(RelationshipId(def_id), relationship, builtin, span);
+            DefKind::BuiltinRelType(builtin) => {
+                self.check_builtin_relation(relationship_id, relationship, builtin, span);
             }
-            DefKind::Relation(Relation {
-                kind: RelationKind::FmtTransition(def_reference, final_state),
-                ..
-            }) => {
+            DefKind::FmtTransition(def_reference, final_state) => {
                 self.check_def_shallow(def_reference.def_id);
                 self.check_fmt_relation(
-                    RelationshipId(def_id),
+                    relationship_id,
                     relationship,
                     def_reference.def_id,
                     final_state,
@@ -63,6 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.types.intern(Type::Tautology)
     }
 
+    /// This defines a property on a compound type
     fn check_string_literal_relation(
         &mut self,
         relationship_id: RelationshipId,
@@ -136,7 +130,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object_ty
     }
 
-    fn check_typed_relation(
+    fn check_builtin_relation(
         &mut self,
         relationship_id: RelationshipId,
         relationship: &Relationship,

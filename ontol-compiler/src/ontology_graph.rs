@@ -4,7 +4,7 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use smartstring::alias::String;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelationKind},
+    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta},
     package::ONTOL_PKG,
     Compiler,
 };
@@ -243,45 +243,43 @@ impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
                 map.serialize_entry("kind", "prop")?;
                 map.serialize_entry("name", literal)?;
             }
-            Some(DefKind::Relation(relation)) => match &relation.kind {
-                RelationKind::FmtTransition(..) => {
-                    map.serialize_entry("kind", "fmt")?;
+            Some(DefKind::FmtTransition(..)) => {
+                map.serialize_entry("kind", "fmt")?;
+            }
+            Some(DefKind::BuiltinRelType(kind)) => match kind {
+                BuiltinRelationKind::Is => {
+                    map.serialize_entry("kind", "is")?;
                 }
-                RelationKind::Builtin(kind) => match kind {
-                    BuiltinRelationKind::Is => {
-                        map.serialize_entry("kind", "is")?;
-                    }
-                    BuiltinRelationKind::Identifies => {
-                        map.serialize_entry("kind", "identifies")?;
-                    }
-                    BuiltinRelationKind::Id => {
-                        map.serialize_entry("kind", "id")?;
-                    }
-                    BuiltinRelationKind::Indexed => {
-                        map.serialize_entry("kind", "indexed")?;
-                    }
-                    BuiltinRelationKind::Min => {
-                        map.serialize_entry("kind", "min")?;
-                    }
-                    BuiltinRelationKind::Max => {
-                        map.serialize_entry("kind", "max")?;
-                    }
-                    BuiltinRelationKind::Default => {
-                        map.serialize_entry("kind", "default")?;
-                    }
-                    BuiltinRelationKind::Gen => {
-                        map.serialize_entry("kind", "gen")?;
-                    }
-                    BuiltinRelationKind::Route => {
-                        map.serialize_entry("kind", "route")?;
-                    }
-                    BuiltinRelationKind::Doc => {
-                        map.serialize_entry("kind", "doc")?;
-                    }
-                    BuiltinRelationKind::Example => {
-                        map.serialize_entry("kind", "example")?;
-                    }
-                },
+                BuiltinRelationKind::Identifies => {
+                    map.serialize_entry("kind", "identifies")?;
+                }
+                BuiltinRelationKind::Id => {
+                    map.serialize_entry("kind", "id")?;
+                }
+                BuiltinRelationKind::Indexed => {
+                    map.serialize_entry("kind", "indexed")?;
+                }
+                BuiltinRelationKind::Min => {
+                    map.serialize_entry("kind", "min")?;
+                }
+                BuiltinRelationKind::Max => {
+                    map.serialize_entry("kind", "max")?;
+                }
+                BuiltinRelationKind::Default => {
+                    map.serialize_entry("kind", "default")?;
+                }
+                BuiltinRelationKind::Gen => {
+                    map.serialize_entry("kind", "gen")?;
+                }
+                BuiltinRelationKind::Route => {
+                    map.serialize_entry("kind", "route")?;
+                }
+                BuiltinRelationKind::Doc => {
+                    map.serialize_entry("kind", "doc")?;
+                }
+                BuiltinRelationKind::Example => {
+                    map.serialize_entry("kind", "example")?;
+                }
             },
             Some(_) => unreachable!(),
             None => {

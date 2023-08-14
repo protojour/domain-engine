@@ -13,7 +13,7 @@ use tracing::debug;
 use crate::{
     def::{
         Def, DefKind, DefParamBinding, DefReference, FmtFinalState, MapDirection, RelParams,
-        Relation, RelationKind, Relationship, TypeDef, TypeDefParam, Variables,
+        Relationship, TypeDef, TypeDefParam, Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -234,7 +234,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         Some(DefKind::StringLiteral(_)) => {
                             (RelationKey::Named(def_ref), span.clone(), None)
                         }
-                        Some(DefKind::Relation(_relation)) => {
+                        Some(DefKind::BuiltinRelType(_relation)) => {
                             (RelationKey::Builtin(def_ref.def_id), span.clone(), None)
                         }
                         _ => return Err((CompileError::InvalidRelationType, span)),
@@ -962,11 +962,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let relation_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
                 self.set_def_kind(
                     relation_def_id,
-                    DefKind::Relation(Relation {
-                        kind: RelationKind::FmtTransition(def_ref, final_state),
-                        subject_prop: None,
-                    }),
-                    &span,
+                    DefKind::FmtTransition(def_ref, final_state),
+                    span,
                 );
 
                 relation_def_id

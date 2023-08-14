@@ -42,7 +42,8 @@ pub enum DefKind<'m> {
     Regex(&'m str),
     /// A type definition in some domain:
     Type(TypeDef<'m>),
-    Relation(Relation<'m>),
+    BuiltinRelType(BuiltinRelationKind),
+    FmtTransition(DefReference, FmtFinalState),
     Relationship(Relationship<'m>),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
@@ -63,7 +64,8 @@ impl<'m> DefKind<'m> {
             Self::EmptySequence => None,
             Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
-            Self::Relation(_) => None,
+            Self::BuiltinRelType(_) => None,
+            Self::FmtTransition(..) => None,
             Self::Relationship(_) => None,
             Self::Constant(_) => None,
             Self::Mapping(..) => None,
@@ -108,21 +110,6 @@ impl From<DefId> for DefReference {
 pub enum DefParamBinding {
     Bound(u32),
     Provided(DefReference, SourceSpan),
-}
-
-/// This definition expresses that a relation _exists_
-#[derive(Debug)]
-pub struct Relation<'m> {
-    pub kind: RelationKind,
-    pub subject_prop: Option<&'m str>,
-}
-
-impl<'m> Relation<'m> {}
-
-#[derive(Clone, Debug)]
-pub enum RelationKind {
-    FmtTransition(DefReference, FmtFinalState),
-    Builtin(BuiltinRelationKind),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -274,14 +261,7 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_builtin_relation(&mut self, kind: BuiltinRelationKind) -> DefId {
-        self.add_def(
-            DefKind::Relation(Relation {
-                kind: RelationKind::Builtin(kind),
-                subject_prop: None,
-            }),
-            ONTOL_PKG,
-            NO_SPAN,
-        )
+        self.add_def(DefKind::BuiltinRelType(kind), ONTOL_PKG, NO_SPAN)
     }
 
     pub fn def_string_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
