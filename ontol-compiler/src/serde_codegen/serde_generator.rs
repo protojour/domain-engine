@@ -401,7 +401,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ReprScalarKind::I64(range) => {
                         return Some(OperatorAllocation::Allocated(
                             self.alloc_operator_id(&def_variant),
-                            SerdeOperator::I64(*def_id, Some(range.clone())),
+                            SerdeOperator::I64(
+                                *def_id,
+                                if *range == (i64::MIN..i64::MAX) {
+                                    None
+                                } else {
+                                    Some(range.clone())
+                                },
+                            ),
                         ));
                     }
                     ReprScalarKind::F64(_range) => todo!(),

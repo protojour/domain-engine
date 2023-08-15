@@ -268,7 +268,7 @@ fn test_int_range_constrained() {
         assert_json_io_matches!(percentage, Create, 0 == 0);
         assert_error_msg!(
             create_de(&percentage).data_variant(json!(1000)),
-            r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
+            r#"invalid type: integer `1000`, expected integer in range 0..100 at line 1 column 4"#
         );
     });
 }
