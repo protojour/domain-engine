@@ -24,6 +24,8 @@ pub enum PrimitiveKind {
     I64,
     /// All the floats
     Float,
+    /// 32-bit floating point
+    F32,
     /// 64-bit floating point
     F64,
     /// Set of all strings
@@ -32,10 +34,7 @@ pub enum PrimitiveKind {
 
 impl PrimitiveKind {
     pub fn is_concrete(&self) -> bool {
-        matches!(
-            self,
-            Self::Unit | Self::Bool | Self::True | Self::False | Self::I64 | Self::String
-        )
+        !matches!(self, Self::Number | Self::Int | Self::Float)
     }
 
     pub fn ident(&self) -> &'static str {
@@ -48,6 +47,7 @@ impl PrimitiveKind {
             Self::Int => "int",
             Self::I64 => "i64",
             Self::Float => "float",
+            Self::F32 => "f32",
             Self::F64 => "f64",
             Self::String => "string",
         }
@@ -89,6 +89,8 @@ pub struct Primitives {
 
     /// The float type.
     pub float: DefId,
+
+    pub f32: DefId,
 
     pub f64: DefId,
 
@@ -190,6 +192,7 @@ impl Primitives {
             int: defs.add_primitive(PrimitiveKind::Int),
             i64: defs.add_primitive(PrimitiveKind::I64),
             float: defs.add_primitive(PrimitiveKind::Float),
+            f32: defs.add_primitive(PrimitiveKind::F32),
             f64: defs.add_primitive(PrimitiveKind::F64),
             string: defs.add_primitive(PrimitiveKind::String),
 

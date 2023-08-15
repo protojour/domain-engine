@@ -83,11 +83,13 @@ pub enum CompileError {
     MutationOfSealedType,
     IntersectionOfDisjointTypes,
     CircularSubtypingRelation,
+    AmbiguousNumberResolution,
     TODO(String),
 }
 
 impl std::error::Error for CompileError {}
 
+// TODO: Should be consistent on casing
 impl std::fmt::Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -209,6 +211,7 @@ impl std::fmt::Display for CompileError {
             Self::MutationOfSealedType => write!(f, "Type is sealed and cannot be modified"),
             Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
             Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
+            Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }
@@ -230,6 +233,8 @@ pub enum Note {
     FieldTypeIsAbstract,
     #[error("Base type is {0}")]
     BaseTypeIs(String),
+    #[error("Number type is abstract")]
+    NumberTypeIsAbstract,
 }
 
 #[derive(Debug)]

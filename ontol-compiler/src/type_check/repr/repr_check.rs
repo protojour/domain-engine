@@ -5,7 +5,7 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
 use tracing::trace;
@@ -14,14 +14,19 @@ use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
     error::CompileError,
     package::ONTOL_PKG,
-    primitive::Primitives,
-    relation::{Constructor, Properties, Relations, TypeParam, TypeRelation},
+    primitive::{PrimitiveKind, Primitives},
+    relation::{Constructor, Properties, Relations, TypeRelation},
     type_check::seal::SealCtx,
     types::DefTypes,
-    CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
+    CompileErrors, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
+    NO_SPAN,
 };
 
-use super::repr_model::{Repr, ReprKind};
+use super::repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind};
+
+/// If there are repr problems in the ONTOL domain, turn this on.
+/// Otherwise, it's too verbose.
+const TRACE_BUILTIN: bool = false;
 
 pub struct ReprCheck<'c, 'm> {
     pub root_def_id: DefId,
@@ -81,7 +86,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             .properties_by_def_id(self.root_def_id)
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false);
-        self.state.do_trace = self.root_def_id.package_id() != ONTOL_PKG;
+        self.state.do_trace = TRACE_BUILTIN || self.root_def_id.package_id() != ONTOL_PKG;
 
         self.check_def_repr(
             self.root_def_id,
@@ -191,7 +196,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         if let Some(repr) = repr {
             if self.state.do_trace {
-                trace!(" => {def_id:?} result repr: {repr:?}");
+                trace!(
+                    " => {def_id:?}({:?}) result repr: {repr:?}",
+                    self.defs.def_kind(def_id).opt_identifier()
+                );
             }
 
             self.seal_ctx.repr_table.insert(def_id, repr);
@@ -208,8 +216,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh);
         }
 
-        let mut rec = ReprRecord {
+        let mut builder = ReprBuilder {
             kind: None,
+            number_resolutions: Default::default(),
             type_params: Default::default(),
         };
 
@@ -218,18 +227,74 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind) => {
-                    if kind.is_concrete() {
+                    if matches!(data.rel, IsRelation::Sub) {
+                        // union-like containing a primitive variant.
+                        // This only occurs in user domains.
                         self.merge_repr(
-                            &mut rec,
+                            &mut builder,
                             ReprKind::Scalar(def_id, data.rel_span),
                             def_id,
                             data,
                         );
+                    } else {
+                        match kind {
+                            PrimitiveKind::Bool
+                            | PrimitiveKind::False
+                            | PrimitiveKind::True
+                            | PrimitiveKind::String
+                            | PrimitiveKind::Number
+                            | PrimitiveKind::Unit => {
+                                self.merge_repr(
+                                    &mut builder,
+                                    ReprKind::Scalar(def_id, data.rel_span),
+                                    def_id,
+                                    data,
+                                );
+                            }
+                            PrimitiveKind::Int => {
+                                self.merge_number_resolution(
+                                    &mut builder,
+                                    NumberResolution::Integer,
+                                    data.rel_span,
+                                );
+                            }
+                            PrimitiveKind::Float => {
+                                self.merge_number_resolution(
+                                    &mut builder,
+                                    NumberResolution::Float,
+                                    data.rel_span,
+                                );
+                            }
+                            PrimitiveKind::F32 => {
+                                self.merge_number_resolution(
+                                    &mut builder,
+                                    NumberResolution::F32,
+                                    data.rel_span,
+                                );
+                            }
+                            PrimitiveKind::F64 => {
+                                self.merge_number_resolution(
+                                    &mut builder,
+                                    NumberResolution::F64,
+                                    data.rel_span,
+                                );
+                            }
+                            _ => {}
+                        }
                     }
+
+                    // if kind.is_concrete() {
+                    //     self.merge_repr(
+                    //         &mut builder,
+                    //         ReprKind::Scalar(def_id, data.rel_span),
+                    //         def_id,
+                    //         data,
+                    //     );
+                    // }
                 }
                 DefKind::StringLiteral(_) | DefKind::NumberLiteral(_) => {
                     self.merge_repr(
-                        &mut rec,
+                        &mut builder,
                         ReprKind::Scalar(def_id, data.rel_span),
                         def_id,
                         data,
@@ -239,7 +304,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     // Some `ontol` types are "domain types" but still scalars
                     if self.defs.string_like_types.get(&def_id).is_some() {
                         self.merge_repr(
-                            &mut rec,
+                            &mut builder,
                             ReprKind::Scalar(def_id, data.rel_span),
                             def_id,
                             data,
@@ -255,7 +320,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     );
                                 }
 
-                                self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                                self.merge_repr(&mut builder, ReprKind::Struct, def_id, data);
                                 has_table = true;
                             }
 
@@ -264,13 +329,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     // The type can be represented as a Unit
                                     // if there is an _empty type_ (a leaf type) somewhere in the mesh
                                     if !has_table && data.is_leaf {
-                                        self.merge_repr(&mut rec, ReprKind::Unit, def_id, data);
+                                        self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
                                     }
                                 }
                                 Constructor::StringFmt(_) => {
                                     assert!(!has_table);
                                     self.merge_repr(
-                                        &mut rec,
+                                        &mut builder,
                                         ReprKind::Scalar(def_id, data.rel_span),
                                         def_id,
                                         data,
@@ -278,11 +343,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 }
                                 Constructor::Sequence(_) => {
                                     assert!(!has_table);
-                                    self.merge_repr(&mut rec, ReprKind::Seq, def_id, data);
+                                    self.merge_repr(&mut builder, ReprKind::Seq, def_id, data);
                                 }
                             }
                         } else {
-                            self.merge_repr(&mut rec, ReprKind::Struct, def_id, data);
+                            self.merge_repr(&mut builder, ReprKind::Struct, def_id, data);
                         }
                     }
                 }
@@ -292,7 +357,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
                 if let Some(type_params) = self.relations.type_params.get(&def_id) {
                     for (relation_def_id, type_param) in type_params {
-                        if rec
+                        if builder
                             .type_params
                             .insert(*relation_def_id, type_param.clone())
                             .is_some()
@@ -308,19 +373,16 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
         }
 
-        let mut repr = rec.kind.map(|kind| Repr {
-            kind,
-            type_params: rec.type_params,
-        });
-
-        if let Some(repr) = repr.as_mut() {
-            let _ = self.check_soundness(repr, &ontology_mesh);
-        }
-
-        repr
+        self.check_soundness(builder, &ontology_mesh)
     }
 
-    fn merge_repr(&mut self, rec: &mut ReprRecord, next: ReprKind, def_id: DefId, data: &IsData) {
+    fn merge_repr(
+        &mut self,
+        builder: &mut ReprBuilder,
+        next: ReprKind,
+        def_id: DefId,
+        data: &IsData,
+    ) {
         if self.state.do_trace {
             trace!(
                 "{:?} merge repr {:?}=>{:?} {next:?}",
@@ -331,34 +393,34 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         use IsRelation::*;
-        match (data.rel, &mut rec.kind, next) {
+        match (data.rel, &mut builder.kind, next) {
             (Origin, _, next) => {
-                rec.kind = Some(next);
+                builder.kind = Some(next);
             }
             // Handle supertypes - results in intersections
             (Super, None, ReprKind::Unit) => {
-                rec.kind = Some(ReprKind::Unit);
+                builder.kind = Some(ReprKind::Unit);
             }
             (Super, Some(_), ReprKind::Unit) => {
                 // Unit does not add additional information to an existing repr
             }
             (Super, Some(ReprKind::Unit), next) => {
-                rec.kind = Some(next);
+                builder.kind = Some(next);
             }
             (Super, None | Some(ReprKind::Struct), ReprKind::Struct) => {
-                rec.kind = Some(ReprKind::StructIntersection(
+                builder.kind = Some(ReprKind::StructIntersection(
                     [(def_id, data.rel_span)].into(),
                 ));
             }
             (Super, None, next) => {
-                rec.kind = Some(next);
+                builder.kind = Some(next);
             }
             (Super, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
                 members.push((def_id, data.rel_span));
             }
             (Super, Some(repr), kind) if *repr != kind => match repr {
                 ReprKind::Scalar(def0, span0) => {
-                    rec.kind = Some(ReprKind::Intersection(vec![
+                    builder.kind = Some(ReprKind::Intersection(vec![
                         (*def0, *span0),
                         (def_id, data.rel_span),
                     ]));
@@ -370,14 +432,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             // Handle subtypes - results in unions
             (Sub, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
-                    rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                    builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
                 }
             }
             (Sub, Some(ReprKind::Unit), _) => {
-                rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
             (Sub, Some(ReprKind::Struct), ReprKind::Struct) => {
-                rec.kind = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
+                builder.kind = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
             (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
                 variants.push((def_id, data.rel_span));
@@ -385,7 +447,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
                 variants.push((def_id, data.rel_span));
-                rec.kind = Some(ReprKind::StructUnion(variants));
+                builder.kind = Some(ReprKind::StructUnion(variants));
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
                 if data.is_leaf {
@@ -393,13 +455,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
             }
             (Sub, None, ReprKind::Struct) => {
-                rec.kind = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
             }
             (Sub, None, _) => {
-                rec.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
             (Sub, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
-                rec.kind = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
+                builder.kind = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
                 variants.push((def_id, span));
@@ -416,8 +478,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if self.state.do_trace {
-            trace!("    tmp repr: {:?}", rec.kind);
+            trace!("    tmp repr: {:?}", builder.kind);
         }
+    }
+
+    fn merge_number_resolution(
+        &mut self,
+        builder: &mut ReprBuilder,
+        resolution: NumberResolution,
+        span: SourceSpan,
+    ) {
+        builder.number_resolutions.entry(resolution).or_insert(span);
     }
 
     fn collect_ontology_mesh(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
@@ -467,19 +538,35 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             let mut was_leaf = true;
 
             if let Some(entries) = self.relations.ontology_mesh.get(&def_id) {
-                for (is, span) in entries {
-                    if is.is_ontol_alias {
-                        continue;
-                    }
-
+                for (is, next_span) in entries {
                     let next_relation = match (is_relation, is.rel) {
+                        (_, TypeRelation::ImplicitSuper | TypeRelation::Subset) => {
+                            continue;
+                        }
                         (IsRelation::Origin | IsRelation::Super, TypeRelation::Super) => {
                             IsRelation::Super
+                        }
+                        (IsRelation::Sub, TypeRelation::Super) => {
+                            // If traversing _down_ once, don't traverse _up_ again.
+                            continue;
                         }
                         _ => IsRelation::Sub,
                     };
 
-                    self.traverse_ontology_mesh(is.def_id, next_relation, level + 1, *span, output);
+                    // Don't traverse built-in spans:
+                    let next_span = if next_span.source_id == SourceId(0) {
+                        span
+                    } else {
+                        *next_span
+                    };
+
+                    self.traverse_ontology_mesh(
+                        is.def_id,
+                        next_relation,
+                        level + 1,
+                        next_span,
+                        output,
+                    );
                     was_leaf = false;
                 }
             }
@@ -502,11 +589,4 @@ pub(super) enum IsRelation {
     Origin,
     Super,
     Sub,
-}
-
-pub(super) struct ReprRecord {
-    kind: Option<ReprKind>,
-
-    /// Typed relation parameters
-    type_params: FnvHashMap<DefId, TypeParam>,
 }

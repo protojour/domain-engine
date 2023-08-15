@@ -306,6 +306,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::I64(def_variant.def_id, None),
                 )),
                 PrimitiveKind::Float => None,
+                PrimitiveKind::F32 => todo!(),
                 PrimitiveKind::F64 => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::F64(def_variant.def_id, None),
@@ -421,6 +422,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }),
                     ));
                 }
+            }
+            ReprKind::I64(def_id, range, _span) => {
+                return Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::I64(*def_id, Some(range.clone())),
+                ));
             }
             ReprKind::Unit | ReprKind::Struct => {
                 return self.alloc_struct_constructor_operator(def_variant, typename, properties);

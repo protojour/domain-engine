@@ -643,7 +643,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            ReprKind::Scalar(scalar_def_id, _) => {
+            ReprKind::Scalar(scalar_def_id, _) | ReprKind::I64(scalar_def_id, ..) => {
                 let scalar_def_id = *scalar_def_id;
 
                 let scalar_object_ty = self.check_def_sealed(scalar_def_id);

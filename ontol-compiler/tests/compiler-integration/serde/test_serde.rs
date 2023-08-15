@@ -255,10 +255,10 @@ fn test_int_default() {
 }
 
 #[test]
-fn test_int_quantity_constrained() {
+fn test_int_range_constrained() {
     "
     pub type percentage {
-        rel .is: i64
+        rel .is: int
         rel .min: 0
         rel .max: 100
     }

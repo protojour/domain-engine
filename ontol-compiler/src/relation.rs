@@ -48,11 +48,6 @@ impl Relations {
 pub struct Is {
     pub def_id: DefId,
     pub rel: TypeRelation,
-
-    /// Special optimization in the `ontol` domain:
-    /// `bool` is (maybe) `true` or `false`,
-    /// but don't treat that as a union _proper_, because `bool` should just be used directly as an alias for the union.
-    pub is_ontol_alias: bool,
 }
 
 impl Is {
@@ -61,14 +56,20 @@ impl Is {
     }
 
     pub fn is_sub(&self) -> bool {
-        matches!(self.rel, TypeRelation::Sub)
+        matches!(self.rel, TypeRelation::Subset)
     }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum TypeRelation {
+    /// Explicit supertype relation
     Super,
-    Sub,
+    /// Implicit supertype relation, no actual "inheritance" (built-in only)
+    ImplicitSuper,
+    /// Explicit subvariant relation
+    SubVariant,
+    /// Implicit subset relation (built-in only)
+    Subset,
 }
 
 #[derive(Default, Debug)]

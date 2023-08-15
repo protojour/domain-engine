@@ -154,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Some(mesh)
                                 if mesh
                                     .iter()
-                                    .any(|(is, _)| matches!(is.rel, TypeRelation::Sub)) =>
+                                    .any(|(is, _)| matches!(is.rel, TypeRelation::Subset)) =>
                             {
                                 if let Some(table) = &properties.table {
                                     assert!(table.get(property_id).is_some());

@@ -159,9 +159,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         def_id: object.0.def_id,
                         rel: match relationship.subject_cardinality.0 {
                             PropertyCardinality::Mandatory => TypeRelation::Super,
-                            PropertyCardinality::Optional => TypeRelation::Sub,
+                            PropertyCardinality::Optional => TypeRelation::SubVariant,
                         },
-                        is_ontol_alias: false,
                     });
 
                 match prev_entry {

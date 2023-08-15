@@ -26,7 +26,29 @@ fn deserialize_empty_type() {
 }
 
 #[test]
-fn deserialize_i64() {
+fn deserialize_is_i64() {
+    "
+    pub type foo
+    rel foo is: i64
+    "
+    .compile_ok(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_matches!(create_de(&foo).data(json!(42)), Ok(Data::I64(42)));
+        assert_matches!(create_de(&foo).data(json!(-42)), Ok(Data::I64(-42)));
+
+        assert_error_msg!(
+            create_de(&foo).data(json!({})),
+            "invalid type: map, expected integer at line 1 column 0"
+        );
+        assert_error_msg!(
+            create_de(&foo).data(json!("boom")),
+            "invalid type: string \"boom\", expected integer at line 1 column 6"
+        );
+    });
+}
+
+#[test]
+fn deserialize_is_maybe_i64() {
     "
     pub type foo
     rel foo is?: i64

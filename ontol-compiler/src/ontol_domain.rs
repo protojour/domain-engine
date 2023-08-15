@@ -1,5 +1,7 @@
 //! The ontol (builtin-in) domain
 
+use std::ops::Range;
+
 use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
@@ -10,7 +12,7 @@ use crate::{
     patterns::{store_string_pattern_segment, StringPatternSegment},
     primitive::PrimitiveKind,
     regex_util,
-    relation::{Constructor, Is, RelObjectConstraint, RelTypeConstraints, TypeRelation},
+    relation::{Constructor, Is, RelObjectConstraint, RelTypeConstraints, TypeParam, TypeRelation},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -30,15 +32,18 @@ impl<'m> Compiler<'m> {
         }
 
         // bools
-        self.is(self.primitives.true_value, self.primitives.bool);
-        self.is(self.primitives.false_value, self.primitives.bool);
+        self.is(
+            self.primitives.true_value,
+            (TypeRelation::Subset, TypeRelation::ImplicitSuper),
+            self.primitives.bool,
+        );
+        self.is(
+            self.primitives.false_value,
+            (TypeRelation::Subset, TypeRelation::ImplicitSuper),
+            self.primitives.bool,
+        );
 
-        // integers
-        self.is(self.primitives.int, self.primitives.number);
-        self.is(self.primitives.i64, self.primitives.int);
-
-        // floats
-        self.is(self.primitives.float, self.primitives.number);
+        self.setup_number_system();
 
         let i64_ty = *self.def_types.table.get(&self.primitives.i64).unwrap();
 
@@ -90,8 +95,71 @@ impl<'m> Compiler<'m> {
         );
 
         self.seal_domain(ONTOL_PKG);
+        self.repr_smoke_test();
 
         self
+    }
+
+    fn setup_number_system(&mut self) {
+        // integers
+        self.is(
+            self.primitives.int,
+            (TypeRelation::Subset, TypeRelation::Super),
+            self.primitives.number,
+        );
+        self.is(
+            self.primitives.i64,
+            (TypeRelation::Subset, TypeRelation::Super),
+            self.primitives.int,
+        );
+        self.define_number_range(
+            self.primitives.i64,
+            "-9223372036854775808".."9223372036854775807",
+        );
+
+        // floats
+        self.is(
+            self.primitives.float,
+            (TypeRelation::Subset, TypeRelation::Super),
+            self.primitives.number,
+        );
+        self.is(
+            self.primitives.f64,
+            (TypeRelation::Subset, TypeRelation::Super),
+            self.primitives.float,
+        );
+
+        self.define_number_range(
+            self.primitives.f64,
+            "-1.7976931348623157E+308".."1.7976931348623157E+308",
+        );
+    }
+
+    fn define_number_range(&mut self, def_id: DefId, range: Range<&'static str>) {
+        self.define_number_literal_type_param(def_id, self.primitives.relations.min, range.start);
+        self.define_number_literal_type_param(def_id, self.primitives.relations.max, range.end);
+    }
+
+    fn define_number_literal_type_param(
+        &mut self,
+        subject: DefId,
+        param: DefId,
+        literal: &'static str,
+    ) {
+        let literal = self
+            .defs
+            .add_def(DefKind::NumberLiteral(literal), ONTOL_PKG, NO_SPAN);
+        self.relations
+            .type_params
+            .entry(subject)
+            .or_default()
+            .insert(
+                param,
+                TypeParam {
+                    object: literal,
+                    span: NO_SPAN,
+                },
+            );
     }
 
     fn def_uuid(&mut self) {
@@ -207,7 +275,12 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
-    fn is(&mut self, sub_def_id: DefId, super_def_id: DefId) {
+    fn is(
+        &mut self,
+        sub_def_id: DefId,
+        (super_rel, sub_rel): (TypeRelation, TypeRelation),
+        super_def_id: DefId,
+    ) {
         self.relations
             .ontology_mesh
             .entry(sub_def_id)
@@ -215,8 +288,7 @@ impl<'m> Compiler<'m> {
             .insert(
                 Is {
                     def_id: super_def_id,
-                    rel: TypeRelation::Super,
-                    is_ontol_alias: true,
+                    rel: sub_rel,
                 },
                 NO_SPAN,
             );
@@ -227,10 +299,18 @@ impl<'m> Compiler<'m> {
             .insert(
                 Is {
                     def_id: sub_def_id,
-                    rel: TypeRelation::Sub,
-                    is_ontol_alias: true,
+                    rel: super_rel,
                 },
                 NO_SPAN,
             );
+    }
+
+    fn repr_smoke_test(&self) {
+        let repr_table = &self.seal_ctx.repr_table;
+        assert!(!repr_table.contains_key(&self.primitives.number));
+        assert!(!repr_table.contains_key(&self.primitives.int));
+        assert!(!repr_table.contains_key(&self.primitives.float));
+        assert!(repr_table.contains_key(&self.primitives.i64));
+        assert!(repr_table.contains_key(&self.primitives.f64));
     }
 }

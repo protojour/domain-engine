@@ -106,6 +106,9 @@ impl<'m> Compiler<'m> {
         &mut self,
         topology: PackageTopology,
     ) -> Result<(), UnifiedCompileError> {
+        // There could be errors in the ontol domain, this is useful for development:
+        self.check_error()?;
+
         for parsed_package in topology.packages {
             debug!(
                 "lower package {:?}: {:?}",

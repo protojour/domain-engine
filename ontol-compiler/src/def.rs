@@ -79,7 +79,7 @@ pub struct TypeDef<'m> {
     pub ident: Option<&'m str>,
     pub params: Option<IndexMap<&'m str, TypeDefParam>>,
     pub rel_type_for: Option<RelationshipId>,
-    // for now: Every user-domain defined type is concrete.
+    /// for now: Every user-domain defined type is concrete.
     pub concrete: bool,
 }
 

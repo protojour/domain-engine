@@ -23,6 +23,7 @@ struct SpannedMessage {
     span: SourceSpan,
 }
 
+#[derive(Debug)]
 enum Message {
     Error(CompileError),
     Note(Note),
@@ -89,7 +90,10 @@ pub fn diff_errors(
         let source_id = spanned_message.span.source_id;
         let builder = match builders.get_mut(&source_id) {
             Some(builder) => builder,
-            None => panic!("No builder for {source_id:?}"),
+            None => panic!(
+                "No builder for {source_id:?}: {:?}",
+                spanned_message.message
+            ),
         };
 
         let byte_pos = spanned_message.span.start as usize;

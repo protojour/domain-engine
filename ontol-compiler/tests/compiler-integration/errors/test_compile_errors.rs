@@ -138,7 +138,7 @@ fn non_disjoint_string_union() {
 }
 
 #[test]
-fn sequence_mix1() {
+fn error_sequence_mix1() {
     "
     type u {
         rel .is?: i64 // ERROR invalid mix of relationship type for subject
@@ -149,7 +149,7 @@ fn sequence_mix1() {
 }
 
 #[test]
-fn sequence_mix2() {
+fn error_sequence_mix2() {
     "
     type u
     rel u 'a': int
@@ -169,7 +169,7 @@ fn sequence_overlapping_indices() {
 }
 
 #[test]
-fn sequence_ambiguous_infinite_tail() {
+fn error_sequence_ambiguous_infinite_tail() {
     r#"
     type u
     rel u 0..: int
@@ -179,7 +179,7 @@ fn sequence_ambiguous_infinite_tail() {
 }
 
 #[test]
-fn union_in_named_relationship() {
+fn error_union_in_named_relationship() {
     "
     type foo
     rel foo 'a': string
@@ -189,7 +189,7 @@ fn union_in_named_relationship() {
 }
 
 #[test]
-fn various_monadic_properties() {
+fn error_various_monadic_properties() {
     "
     type foo
     rel foo 'a': string
@@ -211,7 +211,7 @@ fn various_monadic_properties() {
 }
 
 #[test]
-fn mix_of_index_and_edge_type() {
+fn error_mix_of_index_and_edge_type() {
     r#"
     type foo
     type bar
@@ -222,7 +222,7 @@ fn mix_of_index_and_edge_type() {
 }
 
 #[test]
-fn invalid_subject_types() {
+fn error_invalid_subject_types() {
     "
     rel
         'a' // ERROR subject must be a domain type
@@ -232,7 +232,7 @@ fn invalid_subject_types() {
 }
 
 #[test]
-fn invalid_relation_type() {
+fn error_invalid_relation_type() {
     "
     type foo
     type bar
@@ -244,7 +244,7 @@ fn invalid_relation_type() {
 }
 
 #[test]
-fn invalid_fmt_syntax() {
+fn error_invalid_fmt_syntax() {
     "
     fmt () => () () // ERROR parse error: found `(`, expected one of `type`, `with`, `rel`, `fmt`, `map`, `pub`, `=>`
     "
@@ -252,7 +252,7 @@ fn invalid_fmt_syntax() {
 }
 
 #[test]
-fn invalid_fmt_semantics() {
+fn error_invalid_fmt_semantics() {
     "
     fmt () // ERROR fmt needs at least two transitions: `fmt a => b => c`
     fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
@@ -262,7 +262,7 @@ fn invalid_fmt_semantics() {
 }
 
 #[test]
-fn spans_are_correct_projected_from_regex_syntax_errors() {
+fn error_spans_are_correct_projected_from_regex_syntax_errors() {
     r#"
     type lol
     rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
@@ -273,7 +273,7 @@ fn spans_are_correct_projected_from_regex_syntax_errors() {
 }
 
 #[test]
-fn complains_about_non_disambiguatable_string_id() {
+fn error_complains_about_non_disambiguatable_string_id() {
     "
     type animal_id { fmt '' => string => . }
     type plant_id { fmt '' => string => . }
@@ -294,7 +294,7 @@ fn complains_about_non_disambiguatable_string_id() {
 }
 
 #[test]
-fn complains_about_ambiguous_pattern_based_unions() {
+fn error_complains_about_ambiguous_pattern_based_unions() {
     "
     type foo
     type bar
@@ -313,7 +313,7 @@ fn complains_about_ambiguous_pattern_based_unions() {
 }
 
 #[test]
-fn compile_error_in_dependency() {
+fn error_compile_error_in_dependency() {
     TestPackages::with_sources([
         (
             SourceName("fail"),
@@ -327,7 +327,7 @@ fn compile_error_in_dependency() {
 }
 
 #[test]
-fn rel_wildcard_span() {
+fn error_rel_wildcard_span() {
     "
     with int {
         rel . // ERROR Type is sealed and cannot be modified
@@ -338,7 +338,7 @@ fn rel_wildcard_span() {
 }
 
 #[test]
-fn fail_import_private_type() {
+fn error_fail_import_private_type() {
     TestPackages::with_sources([
         (SourceName("dep"), "type foo"),
         (
@@ -468,5 +468,22 @@ fn test_error_object_property_in_foreign_domain() {
             ",
         ),
     ])
+    .compile_fail();
+}
+
+#[test]
+fn ambiguous_number_resolution() {
+    "
+    type a {
+        rel .is: float // NOTE Base type is float
+    }
+    type b {
+        rel .is: i64 // NOTE Base type is int
+    }
+    type c { // ERROR ambiguous number resolution
+        rel .is: a
+        rel .is: b
+    }
+    "
     .compile_fail();
 }
