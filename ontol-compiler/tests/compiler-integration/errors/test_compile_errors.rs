@@ -3,35 +3,35 @@ use test_log::test;
 
 // BUG: This should recognize the `//` comment token
 #[test]
-fn lex_error() {
+fn error_lex() {
     "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
 #[test]
-fn invalid_statement() {
+fn error_invalid_statement() {
     "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
 #[test]
-fn type_parse_error() {
+fn error_type_parse_error() {
     "type // ERROR parse error: expected identifier".compile_fail();
     "type {} // ERROR parse error: found `{`, expected identifier".compile_fail();
 }
 
 #[test]
-fn incomplete_statement() {
+fn error_incomplete_statement() {
     "use 'foobar' // ERROR parse error: expected `as`".compile_fail()
 }
 
 #[test]
-fn underscore_not_allowed_at_start_of_identifier() {
+fn error_underscore_not_allowed_at_start_of_identifier() {
     "type _foo // ERROR parse error: found `_`, expected identifier".compile_fail()
 }
 
 #[test]
-fn lex_error_recovery_works() {
+fn error_lex_recovery_works() {
     "
     type foo
     type bar
@@ -53,7 +53,7 @@ fn lex_error_recovery_works() {
 }
 
 #[test]
-fn rel_type_not_found() {
+fn error_rel_type_not_found() {
     "
     type foo
     rel foo 'bar':
@@ -63,7 +63,7 @@ fn rel_type_not_found() {
 }
 
 #[test]
-fn duplicate_type() {
+fn error_duplicate_type() {
     "
     type foo
     type foo // ERROR duplicate type definition
@@ -72,7 +72,7 @@ fn duplicate_type() {
 }
 
 #[test]
-fn rel_duplicate_anonymous_relation() {
+fn error_rel_duplicate_anonymous_relation() {
     "
     type foo
     type bar
@@ -85,7 +85,7 @@ fn rel_duplicate_anonymous_relation() {
 }
 
 #[test]
-fn map_union_unit_type() {
+fn error_map_union_unit_type() {
     "
     type foo
     type bar
@@ -98,7 +98,7 @@ fn map_union_unit_type() {
 }
 
 #[test]
-fn map_union_missing_discriminator() {
+fn error_map_union_missing_discriminator() {
     "
     type foo
     type bar
@@ -112,7 +112,7 @@ fn map_union_missing_discriminator() {
 }
 
 #[test]
-fn map_union_non_uniform_discriminators() {
+fn error_map_union_non_uniform_discriminators() {
     "
     type foo
     type bar
@@ -127,7 +127,7 @@ fn map_union_non_uniform_discriminators() {
 }
 
 #[test]
-fn non_disjoint_string_union() {
+fn error_non_disjoint_string_union() {
     "
     type u1 {
         rel .is?: 'a'
@@ -355,7 +355,7 @@ fn error_fail_import_private_type() {
 }
 
 #[test]
-fn domain_named_relation() {
+fn error_domain_named_relation() {
     TestPackages::with_sources([
         (SourceName("dep0"), ""),
         (SourceName("dep1"), ""),
@@ -373,7 +373,7 @@ fn domain_named_relation() {
 }
 
 #[test]
-fn namespace_not_found() {
+fn error_namespace_not_found() {
     "
     type foo {
         rel .'prop':
@@ -385,7 +385,7 @@ fn namespace_not_found() {
 }
 
 #[test]
-fn constant_in_weird_place() {
+fn error_constant_in_weird_place() {
     "
     type foo {
         rel .'prop' := 42 // ERROR Incompatible literal// ERROR object must be a data type
@@ -413,12 +413,12 @@ fn bad_domain_relation() {
 }
 
 #[test]
-fn value_generator_as_field_type() {
+fn error_value_generator_as_field_type() {
     "type foo { rel .'prop': auto } // ERROR object must be a data type".compile_fail();
 }
 
 #[test]
-fn nonsense_value_generator() {
+fn error_nonsense_value_generator() {
     "
     type bar { rel .'prop': string }
     type foo {
@@ -431,7 +431,7 @@ fn nonsense_value_generator() {
 }
 
 #[test]
-fn test_lazy_seal_by_map() {
+fn error_test_lazy_seal_by_map() {
     "
     type foo { rel .'prop': string }
     type bar { rel .'prop': string }
@@ -449,7 +449,7 @@ fn test_lazy_seal_by_map() {
 }
 
 #[test]
-fn test_error_object_property_in_foreign_domain() {
+fn error_test_error_object_property_in_foreign_domain() {
     TestPackages::with_sources([
         (SourceName("foreign"), "pub type foo"),
         (
@@ -472,7 +472,7 @@ fn test_error_object_property_in_foreign_domain() {
 }
 
 #[test]
-fn ambiguous_number_resolution() {
+fn error_ambiguous_number_resolution() {
     "
     type a {
         rel .is: float // NOTE Base type is float
