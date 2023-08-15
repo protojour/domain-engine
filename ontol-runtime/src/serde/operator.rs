@@ -1,4 +1,7 @@
-use std::{fmt::Debug, ops::Range};
+use std::{
+    fmt::Debug,
+    ops::{Range, RangeInclusive},
+};
 
 use ::serde::{Deserialize, Serialize};
 use derive_debug_extras::DebugExtras;
@@ -26,8 +29,8 @@ pub enum SerdeOperator {
     True(DefId),
     False(DefId),
     Bool(DefId),
-    I64(DefId, Option<Range<i64>>),
-    F64(DefId, Option<Range<f64>>),
+    I64(DefId, Option<RangeInclusive<i64>>),
+    F64(DefId, Option<RangeInclusive<f64>>),
     String(DefId),
     StringConstant(String, DefId),
 

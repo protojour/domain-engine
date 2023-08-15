@@ -82,7 +82,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         (Ok(min), Ok(max)) => Some(Repr {
                                             kind: ReprKind::Scalar(
                                                 self.primitives.i64,
-                                                ReprScalarKind::I64(min..max),
+                                                ReprScalarKind::I64(min..=max),
                                                 span,
                                             ),
                                             type_params: Default::default(),
@@ -98,7 +98,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         (Ok(min), Ok(max)) => Some(Repr {
                                             kind: ReprKind::Scalar(
                                                 self.primitives.i64,
-                                                ReprScalarKind::F64(min..max),
+                                                ReprScalarKind::F64(min..=max),
                                                 span,
                                             ),
                                             type_params: Default::default(),

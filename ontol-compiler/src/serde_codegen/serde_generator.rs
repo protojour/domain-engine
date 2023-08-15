@@ -403,7 +403,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             self.alloc_operator_id(&def_variant),
                             SerdeOperator::I64(
                                 *def_id,
-                                if *range == (i64::MIN..i64::MAX) {
+                                if *range == (i64::MIN..=i64::MAX) {
                                     None
                                 } else {
                                     Some(range.clone())
@@ -411,7 +411,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             ),
                         ));
                     }
-                    ReprScalarKind::F64(_range) => todo!(),
+                    ReprScalarKind::F64(range) => {
+                        let f64_range = range.start().into_inner()..=range.end().into_inner();
+                        return Some(OperatorAllocation::Allocated(
+                            self.alloc_operator_id(&def_variant),
+                            SerdeOperator::F64(
+                                *def_id,
+                                if f64_range == (f64::MIN..=f64::MAX) {
+                                    None
+                                } else {
+                                    Some(f64_range.clone())
+                                },
+                            ),
+                        ));
+                    }
                     _ => {
                         if def_id == &def_variant.def_id {
                             // If it's a "self-scalar" it must be a string fmt (for now).

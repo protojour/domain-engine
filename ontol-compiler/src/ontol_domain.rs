@@ -156,6 +156,7 @@ impl<'m> Compiler<'m> {
             .insert(
                 param,
                 TypeParam {
+                    definition_site: ONTOL_PKG,
                     object: literal,
                     span: NO_SPAN,
                 },

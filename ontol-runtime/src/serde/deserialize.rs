@@ -250,59 +250,37 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
-        let type_def_id = self
+        Ok(self
             .matcher
             .match_u64(v)
-            .map_err(|_| Error::invalid_type(Unexpected::Unsigned(v), &self))?;
-
-        Ok(Value {
-            data: Data::I64(
-                v.try_into()
-                    .map_err(|_| Error::custom("u64 overflow".to_string()))?,
-            ),
-            type_def_id,
-        }
-        .into())
+            .map_err(|_| Error::invalid_type(Unexpected::Unsigned(v), &self))?
+            .into())
     }
 
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        let type_def_id = self
+        Ok(self
             .matcher
             .match_i64(v)
-            .map_err(|_| Error::invalid_type(Unexpected::Signed(v), &self))?;
-
-        Ok(Value {
-            data: Data::I64(v),
-            type_def_id,
-        }
-        .into())
+            .map_err(|_| Error::invalid_type(Unexpected::Signed(v), &self))?
+            .into())
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
         let double: f64 = v.into();
-        let type_def_id = self
+        // FIXME: Should have a matcher for f32
+        Ok(self
             .matcher
             .match_f64(double)
-            .map_err(|_| Error::invalid_type(Unexpected::Float(double), &self))?;
-
-        Ok(Value {
-            data: Data::F64(double),
-            type_def_id,
-        }
-        .into())
+            .map_err(|_| Error::invalid_type(Unexpected::Float(double), &self))?
+            .into())
     }
 
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        let type_def_id = self
+        Ok(self
             .matcher
             .match_f64(v)
-            .map_err(|_| Error::invalid_type(Unexpected::Float(v), &self))?;
-
-        Ok(Value {
-            data: Data::F64(v),
-            type_def_id,
-        }
-        .into())
+            .map_err(|_| Error::invalid_type(Unexpected::Float(v), &self))?
+            .into())
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {

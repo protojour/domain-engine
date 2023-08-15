@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
@@ -37,8 +37,8 @@ pub enum ReprKind {
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReprScalarKind {
-    I64(Range<i64>),
-    F64(Range<NotNan<f64>>),
+    I64(RangeInclusive<i64>),
+    F64(RangeInclusive<NotNan<f64>>),
     Other,
 }
 

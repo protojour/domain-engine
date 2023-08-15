@@ -4,7 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
-    value_generator::ValueGenerator, DefId, RelationshipId,
+    value_generator::ValueGenerator, DefId, PackageId, RelationshipId,
 };
 
 use crate::{patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
@@ -133,5 +133,6 @@ pub enum RelObjectConstraint {
 #[derive(Clone, Debug)]
 pub struct TypeParam {
     pub object: DefId,
+    pub definition_site: PackageId,
     pub span: SourceSpan,
 }

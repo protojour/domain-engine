@@ -5,6 +5,8 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
+use std::collections::hash_map::Entry;
+
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
@@ -282,15 +284,6 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             _ => {}
                         }
                     }
-
-                    // if kind.is_concrete() {
-                    //     self.merge_repr(
-                    //         &mut builder,
-                    //         ReprKind::Scalar(def_id, data.rel_span),
-                    //         def_id,
-                    //         data,
-                    //     );
-                    // }
                 }
                 DefKind::StringLiteral(_) | DefKind::NumberLiteral(_) => {
                     self.merge_repr(
@@ -361,16 +354,29 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
                 if let Some(type_params) = self.relations.type_params.get(&def_id) {
                     for (relation_def_id, type_param) in type_params {
-                        if builder
-                            .type_params
-                            .insert(*relation_def_id, type_param.clone())
-                            .is_some()
-                        {
-                            let def = self.defs.table.get(&self.root_def_id).unwrap();
-                            self.errors.error(
-                                CompileError::TODO(smart_format!("Duplicate type parameter")),
-                                &def.span,
-                            );
+                        match builder.type_params.entry(*relation_def_id) {
+                            Entry::Vacant(vacant) => {
+                                vacant.insert(type_param.clone());
+                            }
+                            Entry::Occupied(mut occupied) => {
+                                if type_param.definition_site != self.root_def_id.package_id() {
+                                    // For now: Type parameters from the same package takes precedence
+                                } else if occupied.get().definition_site
+                                    == self.root_def_id.package_id()
+                                {
+                                    // Duplicate definition from the same package
+                                    let def = self.defs.table.get(&self.root_def_id).unwrap();
+                                    self.errors.error(
+                                        CompileError::TODO(smart_format!(
+                                            "Duplicate type parameter"
+                                        )),
+                                        &def.span,
+                                    );
+                                } else {
+                                    // Type params defined in the current package may override those in dependent packages
+                                    occupied.insert(type_param.clone());
+                                }
+                            }
                         }
                     }
                 }

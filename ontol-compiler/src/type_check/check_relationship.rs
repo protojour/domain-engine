@@ -357,6 +357,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .insert(
                         relationship.relation_def_id,
                         TypeParam {
+                            definition_site: relationship_id.0.package_id(),
                             object: object.0.def_id,
                             span: *span,
                         },

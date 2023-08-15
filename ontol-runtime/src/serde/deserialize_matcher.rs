@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Range};
+use std::{fmt::Display, ops::RangeInclusive};
 
 use crate::{
     discriminator::Discriminant,
@@ -41,15 +41,15 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_u64(&self, _: u64) -> Result<DefId, ()> {
+    fn match_u64(&self, _: u64) -> Result<Value, ()> {
         Err(())
     }
 
-    fn match_i64(&self, _: i64) -> Result<DefId, ()> {
+    fn match_i64(&self, _: i64) -> Result<Value, ()> {
         Err(())
     }
 
-    fn match_f64(&self, _: f64) -> Result<DefId, ()> {
+    fn match_f64(&self, _: f64) -> Result<Value, ()> {
         Err(())
     }
 
@@ -106,7 +106,7 @@ impl ValueMatcher for BoolMatcher {
 
 pub struct NumberMatcher<T> {
     pub def_id: DefId,
-    pub range: Option<Range<T>>,
+    pub range: Option<RangeInclusive<T>>,
 }
 
 impl ValueMatcher for NumberMatcher<i64> {
@@ -114,24 +114,21 @@ impl ValueMatcher for NumberMatcher<i64> {
         write!(f, "integer{}", OptWithinRangeDisplay(&self.range))
     }
 
-    fn match_u64(&self, value: u64) -> Result<DefId, ()> {
-        let result: Result<i64, _> = value.try_into();
-        match result {
-            Ok(value) => self.match_i64(value),
-            Err(_) => Err(()),
-        }
+    fn match_u64(&self, value: u64) -> Result<Value, ()> {
+        u64_to_i64(value).and_then(|value| self.match_i64(value))
     }
 
-    fn match_i64(&self, value: i64) -> Result<DefId, ()> {
+    fn match_i64(&self, value: i64) -> Result<Value, ()> {
         if let Some(range) = &self.range {
-            if range.contains(&value) {
-                Ok(self.def_id)
-            } else {
-                Err(())
+            if !range.contains(&value) {
+                return Err(());
             }
-        } else {
-            Ok(self.def_id)
         }
+
+        Ok(Value {
+            data: Data::I64(value),
+            type_def_id: self.def_id,
+        })
     }
 }
 
@@ -140,16 +137,25 @@ impl ValueMatcher for NumberMatcher<f64> {
         write!(f, "float{}", OptWithinRangeDisplay(&self.range))
     }
 
-    fn match_f64(&self, value: f64) -> Result<DefId, ()> {
+    fn match_u64(&self, value: u64) -> Result<Value, ()> {
+        self.match_f64(value as f64)
+    }
+
+    fn match_i64(&self, value: i64) -> Result<Value, ()> {
+        self.match_f64(value as f64)
+    }
+
+    fn match_f64(&self, value: f64) -> Result<Value, ()> {
         if let Some(range) = &self.range {
-            if range.contains(&value) {
-                Ok(self.def_id)
-            } else {
-                Err(())
+            if !range.contains(&value) {
+                return Err(());
             }
-        } else {
-            Ok(self.def_id)
         }
+
+        Ok(Value {
+            data: Data::F64(value),
+            type_def_id: self.def_id,
+        })
     }
 }
 
@@ -366,12 +372,16 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         Ok(Value::new(Data::Unit, def_id))
     }
 
-    fn match_u64(&self, _: u64) -> Result<DefId, ()> {
-        self.match_discriminant(Discriminant::IsInt)
+    fn match_u64(&self, value: u64) -> Result<Value, ()> {
+        u64_to_i64(value).and_then(|value| self.match_i64(value))
     }
 
-    fn match_i64(&self, _: i64) -> Result<DefId, ()> {
+    fn match_i64(&self, value: i64) -> Result<Value, ()> {
         self.match_discriminant(Discriminant::IsInt)
+            .map(|def_id| Value {
+                data: Data::I64(value),
+                type_def_id: def_id,
+            })
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -614,14 +624,18 @@ fn expecting_custom_string(
         .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))
 }
 
-struct OptWithinRangeDisplay<'a, T>(&'a Option<Range<T>>);
+struct OptWithinRangeDisplay<'a, T>(&'a Option<RangeInclusive<T>>);
 
 impl<'a, T: Display> Display for OptWithinRangeDisplay<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(range) = self.0 {
-            write!(f, " in range {}..{}", range.start, range.end)
+            write!(f, " in range {}..={}", range.start(), range.end())
         } else {
             Ok(())
         }
     }
+}
+
+fn u64_to_i64(value: u64) -> Result<i64, ()> {
+    i64::try_from(value).map_err(|_| ())
 }

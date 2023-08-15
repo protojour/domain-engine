@@ -266,9 +266,32 @@ fn test_int_range_constrained() {
     .compile_ok(|test| {
         let [percentage] = test.bind(["percentage"]);
         assert_json_io_matches!(percentage, Create, 0 == 0);
+        assert_json_io_matches!(percentage, Create, 100 == 100);
         assert_error_msg!(
             create_de(&percentage).data_variant(json!(1000)),
-            r#"invalid type: integer `1000`, expected integer in range 0..100 at line 1 column 4"#
+            r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
+        );
+    });
+}
+
+#[test]
+fn test_f64_range_constrained() {
+    "
+    pub type fraction {
+        rel .is: f64
+        rel .min: 0
+        rel .max: 1
+    }
+    "
+    .compile_ok(|test| {
+        let [fraction] = test.bind(["fraction"]);
+        assert_json_io_matches!(fraction, Create, 0 == 0.0);
+        assert_json_io_matches!(fraction, Create, 0.0 == 0.0);
+        assert_json_io_matches!(fraction, Create, 0.5 == 0.5);
+        assert_json_io_matches!(fraction, Create, 1.0 == 1.0);
+        assert_error_msg!(
+            create_de(&fraction).data_variant(json!(3.14)),
+            r#"invalid type: floating point `3.14`, expected float in range 0..=1 at line 1 column 4"#
         );
     });
 }
