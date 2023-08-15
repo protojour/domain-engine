@@ -103,14 +103,14 @@ impl<'m> Compiler<'m> {
     fn setup_number_system(&mut self) {
         // integers
         self.is(
-            self.primitives.int,
+            self.primitives.integer,
             (TypeRelation::Subset, TypeRelation::Super),
             self.primitives.number,
         );
         self.is(
             self.primitives.i64,
             (TypeRelation::Subset, TypeRelation::Super),
-            self.primitives.int,
+            self.primitives.integer,
         );
         self.define_number_range(
             self.primitives.i64,
@@ -309,7 +309,7 @@ impl<'m> Compiler<'m> {
     fn repr_smoke_test(&self) {
         let repr_table = &self.seal_ctx.repr_table;
         assert!(!repr_table.contains_key(&self.primitives.number));
-        assert!(!repr_table.contains_key(&self.primitives.int));
+        assert!(!repr_table.contains_key(&self.primitives.integer));
         assert!(!repr_table.contains_key(&self.primitives.float));
         assert!(repr_table.contains_key(&self.primitives.i64));
         assert!(repr_table.contains_key(&self.primitives.f64));

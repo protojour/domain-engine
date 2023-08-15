@@ -54,7 +54,7 @@ pub enum NumberResolution {
 impl NumberResolution {
     pub fn def_id(&self, primitives: &Primitives) -> DefId {
         match self {
-            Self::Integer => primitives.int,
+            Self::Integer => primitives.integer,
             Self::Float => primitives.float,
             Self::F32 => todo!(),
             Self::F64 => primitives.f64,

@@ -300,7 +300,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::True(def_variant.def_id),
                 )),
                 PrimitiveKind::Number => None,
-                PrimitiveKind::Int => None,
+                PrimitiveKind::Integer => None,
                 PrimitiveKind::I64 => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::I64(def_variant.def_id, None),

@@ -36,7 +36,7 @@ fn lex_error_recovery_works() {
     type foo
     type bar
     rel foo 'prop': string
-    rel bar 'prop': int
+    rel bar 'prop': integer
     map {
         foo {
             'prop': x
@@ -152,7 +152,7 @@ fn error_sequence_mix1() {
 fn error_sequence_mix2() {
     "
     type u
-    rel u 'a': int
+    rel u 'a': integer
     rel u 0: string // ERROR invalid mix of relationship type for subject
     "
     .compile_fail();
@@ -162,7 +162,7 @@ fn error_sequence_mix2() {
 fn sequence_overlapping_indices() {
     "
     type u
-    rel u 0..3: int
+    rel u 0..3: integer
     rel u 2..4: string // ERROR overlapping indexes
     "
     .compile_fail();
@@ -172,7 +172,7 @@ fn sequence_overlapping_indices() {
 fn error_sequence_ambiguous_infinite_tail() {
     r#"
     type u
-    rel u 0..: int
+    rel u 0..: integer
     rel u 1..: string // ERROR overlapping indexes
     "#
     .compile_fail();
@@ -183,7 +183,7 @@ fn error_union_in_named_relationship() {
     "
     type foo
     rel foo 'a': string
-    rel foo 'a': int // ERROR union in named relationship is not supported yet. Make a union type instead.
+    rel foo 'a': integer // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail();
 }
@@ -329,9 +329,9 @@ fn error_compile_error_in_dependency() {
 #[test]
 fn error_rel_wildcard_span() {
     "
-    with int {
+    with integer {
         rel . // ERROR Type is sealed and cannot be modified
-            'likes': int
+            'likes': integer
     }
     "
     .compile_fail()
@@ -478,7 +478,7 @@ fn ambiguous_number_resolution() {
         rel .is: float // NOTE Base type is float
     }
     type b {
-        rel .is: i64 // NOTE Base type is int
+        rel .is: i64 // NOTE Base type is integer
     }
     type c { // ERROR ambiguous number resolution
         rel .is: a

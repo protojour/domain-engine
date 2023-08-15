@@ -270,8 +270,8 @@ impl Document {
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nBoolean".to_string();
                                 }
-                                "int" => {
-                                    dp.path = "ontol.int".to_string();
+                                "integer" => {
+                                    dp.path = "ontol.integer".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nUnsigned integer".to_string();
                                 }

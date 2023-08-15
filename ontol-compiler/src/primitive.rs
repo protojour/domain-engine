@@ -19,7 +19,7 @@ pub enum PrimitiveKind {
     /// All numbers (realistically all rational numbers, as all computer numbers are rational)
     Number,
     /// All the integers
-    Int,
+    Integer,
     /// 64-bit signed integers
     I64,
     /// All the floats
@@ -34,7 +34,7 @@ pub enum PrimitiveKind {
 
 impl PrimitiveKind {
     pub fn is_concrete(&self) -> bool {
-        !matches!(self, Self::Number | Self::Int | Self::Float)
+        !matches!(self, Self::Number | Self::Integer | Self::Float)
     }
 
     pub fn ident(&self) -> &'static str {
@@ -44,7 +44,7 @@ impl PrimitiveKind {
             Self::False => "false",
             Self::True => "true",
             Self::Number => "number",
-            Self::Int => "int",
+            Self::Integer => "integer",
             Self::I64 => "i64",
             Self::Float => "float",
             Self::F32 => "f32",
@@ -82,7 +82,7 @@ pub struct Primitives {
     pub number: DefId,
 
     /// The integer type.
-    pub int: DefId,
+    pub integer: DefId,
 
     /// The 64 bit signed integer type
     pub i64: DefId,
@@ -111,7 +111,7 @@ impl Primitives {
             (self.false_value, Some("false"), PrimitiveKind::False),
             (self.true_value, Some("true"), PrimitiveKind::True),
             (self.number, Some("number"), PrimitiveKind::Number),
-            (self.int, Some("int"), PrimitiveKind::Int),
+            (self.integer, Some("integer"), PrimitiveKind::Integer),
             (self.i64, Some("i64"), PrimitiveKind::I64),
             (self.float, Some("float"), PrimitiveKind::Float),
             (self.f64, Some("f64"), PrimitiveKind::F64),
@@ -189,7 +189,7 @@ impl Primitives {
             empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
             empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),
             number: defs.add_primitive(PrimitiveKind::Number),
-            int: defs.add_primitive(PrimitiveKind::Int),
+            integer: defs.add_primitive(PrimitiveKind::Integer),
             i64: defs.add_primitive(PrimitiveKind::I64),
             float: defs.add_primitive(PrimitiveKind::Float),
             f32: defs.add_primitive(PrimitiveKind::F32),

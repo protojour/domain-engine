@@ -250,7 +250,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     data,
                                 );
                             }
-                            PrimitiveKind::Int => {
+                            PrimitiveKind::Integer => {
                                 self.merge_number_resolution(
                                     &mut builder,
                                     NumberResolution::Integer,

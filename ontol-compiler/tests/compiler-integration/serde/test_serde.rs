@@ -241,7 +241,7 @@ fn test_serde_datetime() {
 }
 
 #[test]
-fn test_int_default() {
+fn test_integer_default() {
     "
     pub type foo {
         rel .'bar'(rel .default := 42): i64
@@ -255,10 +255,30 @@ fn test_int_default() {
 }
 
 #[test]
-fn test_int_range_constrained() {
+fn test_i64_range_constrained() {
     "
     pub type percentage {
-        rel .is: int
+        rel .is: i64
+        rel .min: 0
+        rel .max: 100
+    }
+    "
+    .compile_ok(|test| {
+        let [percentage] = test.bind(["percentage"]);
+        assert_json_io_matches!(percentage, Create, 0 == 0);
+        assert_json_io_matches!(percentage, Create, 100 == 100);
+        assert_error_msg!(
+            create_de(&percentage).data_variant(json!(1000)),
+            r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
+        );
+    });
+}
+
+#[test]
+fn test_integer_range_constrained() {
+    "
+    pub type percentage {
+        rel .is: integer
         rel .min: 0
         rel .max: 100
     }

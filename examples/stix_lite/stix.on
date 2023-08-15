@@ -15,7 +15,7 @@ type lang-rfc5646 {
 
 /// The `confidence` property identifies the confidence that the creator has in the correctness of their data. The confidence value **MUST** be a number in the range of 0-100.
 type confidence {
-    rel .is: int
+    rel .is: integer
     rel .min: 0
     rel .max: 100
 }
