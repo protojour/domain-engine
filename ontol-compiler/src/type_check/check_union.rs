@@ -58,10 +58,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if let Some(properties) = self.relations.properties_by_def_id(variant_def_id) {
                 if let Some(id_relationship_id) = &properties.identified_by {
-                    let identifies_meta = self
-                        .defs
-                        .lookup_relationship_meta(*id_relationship_id)
-                        .expect("BUG: problem getting relationship meta");
+                    let identifies_meta = self.defs.relationship_meta(*id_relationship_id);
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
@@ -210,10 +207,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         for (property_id, _cardinality) in property_set {
-            let meta = self
-                .defs
-                .lookup_relationship_meta(property_id.relationship_id)
-                .expect("BUG: problem getting relationship meta");
+            let meta = self.defs.relationship_meta(property_id.relationship_id);
 
             let (object_reference, _) = &meta.relationship.object;
             let object_ty = self.def_types.table.get(&object_reference.def_id).unwrap();

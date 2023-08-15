@@ -51,10 +51,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             match property_id.role {
                 Role::Subject => {
-                    let meta = self
-                        .defs
-                        .lookup_relationship_meta(property_id.relationship_id)
-                        .unwrap();
+                    let meta = self.defs.relationship_meta(property_id.relationship_id);
 
                     let object_properties = self
                         .relations
@@ -63,10 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     // Check if the property is the primary id
                     if let Some(id_relationship_id) = object_properties.identifies {
-                        let id_meta = self
-                            .defs
-                            .lookup_relationship_meta(id_relationship_id)
-                            .unwrap();
+                        let id_meta = self.defs.relationship_meta(id_relationship_id);
 
                         if id_meta.relationship.object.0.def_id == def_id {
                             debug!(
@@ -104,10 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             match property_id.role {
                 Role::Subject => {
-                    let meta = self
-                        .defs
-                        .lookup_relationship_meta(property_id.relationship_id)
-                        .unwrap();
+                    let meta = self.defs.relationship_meta(property_id.relationship_id);
 
                     // Check that the same relation_def_id is not reused for subject properties
                     if !subject_relation_set.insert(meta.relationship.relation_def_id) {
@@ -191,10 +182,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
                     } else {
-                        let meta = self
-                            .defs
-                            .lookup_relationship_meta(property_id.relationship_id)
-                            .unwrap();
+                        let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let subject_properties = self
                             .relations
                             .properties_by_def_id(meta.relationship.subject.0.def_id)
@@ -221,7 +209,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             trace!("perform action {action:?}");
             match action {
                 Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
-                    let meta = self.defs.lookup_relationship_meta(relationship_id).unwrap();
+                    let meta = self.defs.relationship_meta(relationship_id);
 
                     self.error(
                         CompileError::NonEntityInReverseRelationship,

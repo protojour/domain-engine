@@ -293,10 +293,7 @@ impl<'m> Compiler<'m> {
         let properties = self.relations.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
-        let identifies_meta = self
-            .defs
-            .lookup_relationship_meta(id_relationship_id)
-            .expect("BUG: problem getting property meta");
+        let identifies_meta = self.defs.relationship_meta(id_relationship_id);
 
         let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
             IndexMap::default();
@@ -352,10 +349,7 @@ impl<'m> Compiler<'m> {
         property_id: PropertyId,
         property: &Property,
     ) -> Option<EntityRelationship> {
-        let meta = self
-            .defs
-            .lookup_relationship_meta(property_id.relationship_id)
-            .unwrap();
+        let meta = self.defs.relationship_meta(property_id.relationship_id);
 
         let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
 
@@ -388,7 +382,7 @@ impl<'m> Compiler<'m> {
         let map = properties.table.as_ref()?;
         let _property = map.get(&PropertyId::subject(inherent_id))?;
 
-        self.defs.lookup_relationship_meta(inherent_id).ok()
+        Some(self.defs.relationship_meta(inherent_id))
     }
 
     fn package_ids(&self) -> Vec<PackageId> {

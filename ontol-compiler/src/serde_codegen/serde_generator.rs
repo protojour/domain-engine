@@ -173,10 +173,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let (property_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
 
-                let meta = self
-                    .defs
-                    .lookup_relationship_meta(property_id.relationship_id)
-                    .expect("Problem getting relationship meta");
+                let meta = self.defs.relationship_meta(property_id.relationship_id);
 
                 let property_name = match meta.relation_def_kind.value {
                     DefKind::StringLiteral(literal) => *literal,
@@ -513,10 +510,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
                             .unwrap(),
                         Some(relationship_id) => {
-                            let meta = self
-                                .defs
-                                .lookup_relationship_meta(relationship_id)
-                                .expect("Problem getting relationship meta");
+                            let meta = self.defs.relationship_meta(relationship_id);
 
                             self.gen_operator_id(SerdeKey::Def(
                                 def_variant.with_def(meta.relationship.object.0.def_id),
@@ -583,10 +577,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let map_def_variant = def_variant.remove_modifier(union_id);
 
-            let identifies_meta = self
-                .defs
-                .lookup_relationship_meta(identifies_relationship_id)
-                .expect("Problem getting relationship meta");
+            let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
 
             // prevent recursion
             let new_operator_id = self.alloc_operator_id(&def_variant);
@@ -821,10 +812,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             // panic!();
                         }
 
-                        let meta = self
-                            .defs
-                            .lookup_relationship_meta(property_id.relationship_id)
-                            .expect("Problem getting subject relationship meta");
+                        let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let object = meta.relationship.object.0.def_id;
 
                         let prop_key = match meta.relation_def_kind.value {
@@ -835,10 +823,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         (meta, prop_key, object)
                     }
                     Role::Object => {
-                        let meta = self
-                            .defs
-                            .lookup_relationship_meta(property_id.relationship_id)
-                            .expect("Problem getting object relationship meta");
+                        let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let subject = meta.relationship.subject.0.def_id;
 
                         let prop_key = meta

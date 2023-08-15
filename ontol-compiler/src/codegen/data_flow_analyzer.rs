@@ -232,10 +232,7 @@ where
         property_id: PropertyId,
         value_def_id: DefId,
     ) {
-        let meta = self
-            .defs
-            .lookup_relationship_meta(property_id.relationship_id)
-            .unwrap();
+        let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (_, _, cardinality) = meta.relationship.left_side(property_id.role);
 
         self.property_flow.insert(PropertyFlow {

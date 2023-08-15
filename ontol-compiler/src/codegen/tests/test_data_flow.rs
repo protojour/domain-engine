@@ -46,10 +46,10 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
         .unwrap()
         .0;
     let deps = Unimock::new(
-        LookupRelationshipMetaMock::lookup_relationship_meta
+        LookupRelationshipMetaMock::relationship_meta
             .each_call(matching!(_))
             .returns({
-                Ok(RelationshipMeta {
+                RelationshipMeta {
                     relationship_id: RelationshipId(DefId::unit()),
                     relationship: SpannedBorrow {
                         value: &MOCK_RELATIONSHIP,
@@ -59,7 +59,7 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
                         value: &MOCK_RELATION,
                         span: &NO_SPAN,
                     },
-                })
+                }
             }),
     );
     let mut analyzer = DataFlowAnalyzer::new(&deps);

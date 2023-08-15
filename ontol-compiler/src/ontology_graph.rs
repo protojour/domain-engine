@@ -205,13 +205,12 @@ impl<'g, 'm> serde::Serialize for Edges<'g, 'm> {
             if let (Some(source_meta), Some(target_meta)) = (source_meta, target_meta) {
                 match &edge_meta.kind {
                     EdgeKind::Relationship(relationship_id) => {
-                        if let Ok(meta) = compiler.defs.lookup_relationship_meta(*relationship_id) {
-                            list.serialize_element(&Edge {
-                                source_meta,
-                                target_meta,
-                                relation_def_kind: Some(&meta.relation_def_kind),
-                            })?
-                        }
+                        let meta = compiler.defs.relationship_meta(*relationship_id);
+                        list.serialize_element(&Edge {
+                            source_meta,
+                            target_meta,
+                            relation_def_kind: Some(&meta.relation_def_kind),
+                        })?
                     }
                     EdgeKind::Map => {
                         list.serialize_element(&Edge {

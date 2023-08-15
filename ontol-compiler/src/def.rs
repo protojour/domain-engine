@@ -315,36 +315,31 @@ impl<'m> Defs<'m> {
 
 #[cfg_attr(test, unimock::unimock(api = LookupRelationshipMetaMock))]
 pub trait LookupRelationshipMeta<'m> {
-    fn lookup_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()>;
+    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'m>;
 }
 
 impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
-    fn lookup_relationship_meta(
-        &self,
-        relationship_id: RelationshipId,
-    ) -> Result<RelationshipMeta<'m>, ()> {
+    #[track_caller]
+    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'m> {
         let relationship = self
             .get_spanned_def_kind(relationship_id.0)
-            .ok_or(())?
+            .unwrap()
             .filter(|kind| match kind {
                 DefKind::Relationship(relationship) => Some(relationship),
                 _ => None,
             })
-            .ok_or(())?;
+            .unwrap();
 
         let relation_def_kind = self
             .get_spanned_def_kind(relationship.relation_def_id)
             .or_else(|| panic!("No def for relation id"))
-            .ok_or(())?;
+            .unwrap();
 
-        Ok(RelationshipMeta {
+        RelationshipMeta {
             relationship_id,
             relationship,
             relation_def_kind,
-        })
+        }
     }
 }
 

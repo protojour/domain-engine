@@ -161,10 +161,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         // traverse fields
         if let Some(table) = &properties.and_then(|properties| properties.table.as_ref()) {
             for (property_id, _property) in *table {
-                let meta = self
-                    .defs
-                    .lookup_relationship_meta(property_id.relationship_id)
-                    .expect("Problem getting relationship meta");
+                let meta = self.defs.relationship_meta(property_id.relationship_id);
                 let object_def_id = meta.relationship.object.0.def_id;
                 let object_def = self.defs.table.get(&object_def_id).unwrap();
 

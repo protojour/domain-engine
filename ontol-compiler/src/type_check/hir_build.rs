@@ -370,10 +370,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let mut match_properties = property_set
                             .iter()
                             .filter_map(|(property_id, _cardinality)| {
-                                let meta = self
-                                    .defs
-                                    .lookup_relationship_meta(property_id.relationship_id)
-                                    .expect("BUG: problem getting relationship meta");
+                                let meta = self.defs.relationship_meta(property_id.relationship_id);
                                 let property_name = match property_id.role {
                                     Role::Subject => match meta.relation_def_kind.value {
                                         DefKind::StringLiteral(lit) => Some(*lit),
