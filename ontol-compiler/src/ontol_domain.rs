@@ -3,14 +3,14 @@
 use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
-    def::{DefKind, TypeDef},
+    def::{BuiltinRelationKind, DefKind, TypeDef},
     mem::Intern,
     namespace::Space,
     package::ONTOL_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
     primitive::PrimitiveKind,
     regex_util,
-    relation::{Constructor, Is, TypeRelation},
+    relation::{Constructor, Is, RelObjectConstraint, RelTypeConstraints, TypeRelation},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -25,7 +25,7 @@ impl<'m> Compiler<'m> {
         for (def_id, ident, kind) in self.primitives.list_primitives() {
             self.register_primitive(def_id, ident, kind);
         }
-        for (def_id, ident) in self.primitives.list_relations() {
+        for (def_id, ident) in self.primitives.relations.list_relations() {
             self.register_named_builtin_relation(def_id, ident);
         }
 
@@ -178,7 +178,26 @@ impl<'m> Compiler<'m> {
     }
 
     fn register_named_builtin_relation(&mut self, def_id: DefId, ident: &str) -> TypeRef<'m> {
-        self.register_named_type(def_id, ident, |_| Type::BuiltinRelation)
+        let ty = self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
+
+        match self.defs.def_kind(def_id) {
+            DefKind::BuiltinRelType(kind) => {
+                let constraints = match kind {
+                    BuiltinRelationKind::Min | BuiltinRelationKind::Max => RelTypeConstraints {
+                        subject_set: [self.primitives.number].into(),
+                        object: vec![RelObjectConstraint::ConstantOfSubjectType],
+                    },
+                    _ => RelTypeConstraints::default(),
+                };
+
+                self.relations
+                    .rel_type_constraints
+                    .insert(def_id, constraints);
+            }
+            _ => unreachable!(),
+        }
+
+        ty
     }
 
     fn def_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {

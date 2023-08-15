@@ -162,14 +162,14 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::IntConstant(val) => write!(f, "int({val})"),
             Type::FloatConstant(val) => write!(f, "float({val})"),
             Type::StringConstant(def_id) => {
-                let Some(DefKind::StringLiteral(lit)) = defs.get_def_kind(*def_id) else {
+                let DefKind::StringLiteral(lit) = defs.def_kind(*def_id) else {
                     panic!();
                 };
 
                 write!(f, "\"{lit}\"")
             }
             Type::Regex(def_id) => {
-                let Some(DefKind::Regex(lit)) = defs.get_def_kind(*def_id) else {
+                let DefKind::Regex(lit) = defs.def_kind(*def_id) else {
                     panic!();
                 };
 
@@ -190,11 +190,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             }
             Type::Function { .. } => write!(f, "function"),
             Type::Domain(def_id) => {
-                let ident = defs
-                    .get_def_kind(*def_id)
-                    .unwrap()
-                    .opt_identifier()
-                    .unwrap();
+                let ident = defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "{ident}")
             }
             Type::Anonymous(_) => {

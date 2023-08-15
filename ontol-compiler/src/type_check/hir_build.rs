@@ -240,8 +240,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         span: expr.span,
                     },
                 ),
-                Type::StringConstant(def_id) => match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::StringLiteral(lit)) if string == lit => TypedHirNode(
+                Type::StringConstant(def_id) => match self.defs.def_kind(*def_id) {
+                    DefKind::StringLiteral(lit) if string == lit => TypedHirNode(
                         ontol_hir::Kind::String(string.clone()),
                         Meta {
                             ty: expected_ty,
@@ -415,8 +415,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             value,
                         } in attributes
                         {
-                            let attr_prop = match self.defs.get_def_kind(def.def_id) {
-                                Some(DefKind::StringLiteral(lit)) => lit,
+                            let attr_prop = match self.defs.def_kind(def.def_id) {
+                                DefKind::StringLiteral(lit) => lit,
                                 _ => {
                                     self.error(CompileError::NamedPropertyExpected, prop_span);
                                     continue;

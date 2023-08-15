@@ -230,11 +230,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ast::RelType::Type((ty, span)) => {
                     let def_ref = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
 
-                    match self.compiler.defs.get_def_kind(def_ref.def_id) {
-                        Some(DefKind::StringLiteral(_)) => {
+                    match self.compiler.defs.def_kind(def_ref.def_id) {
+                        DefKind::StringLiteral(_) => {
                             (RelationKey::Named(def_ref), span.clone(), None)
                         }
-                        Some(DefKind::BuiltinRelType(_relation)) => {
+                        DefKind::BuiltinRelType(_relation) => {
                             (RelationKey::Builtin(def_ref.def_id), span.clone(), None)
                         }
                         _ => return Err((CompileError::InvalidRelationType, span)),
@@ -577,7 +577,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         span: Range<usize>,
         def_id: DefId,
     ) -> FnvHashMap<DefParamId, DefParamBinding> {
-        match self.compiler.defs.get_def_kind(def_id).unwrap() {
+        match self.compiler.defs.def_kind(def_id) {
             DefKind::Type(TypeDef {
                 params: Some(params),
                 ..
@@ -849,8 +849,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     def_id = namespace.space(Space::Type).get(segment);
                     if segment_iter.peek().is_some() {
                         match def_id {
-                            Some(def_id) => match self.compiler.defs.get_def_kind(*def_id) {
-                                Some(DefKind::Package(package_id)) => {
+                            Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
+                                DefKind::Package(package_id) => {
                                     namespace = self
                                         .compiler
                                         .namespaces
@@ -874,8 +874,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
 
                 match def_id {
-                    Some(def_id) => match self.compiler.defs.get_def_kind(*def_id) {
-                        Some(DefKind::Type(TypeDef { public: false, .. })) => {
+                    Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
+                        DefKind::Type(TypeDef { public: false, .. }) => {
                             Err((CompileError::PrivateType, span.clone()))
                         }
                         _ => Ok(*def_id),

@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -23,9 +25,13 @@ pub struct Relations {
     /// `gen` relations after proper type check:
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
 
+    /// `is` relations
     pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
 
-    pub type_params: FnvHashMap<DefId, IndexMap<DefId, DefId>>,
+    /// `rel type` parameters (instantiated) for various types
+    pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
+
+    pub rel_type_constraints: FnvHashMap<DefId, RelTypeConstraints>,
 }
 
 impl Relations {
@@ -105,4 +111,26 @@ pub enum Constructor {
     Sequence(Sequence),
     /// The type is a string pattern
     StringFmt(StringPatternSegment),
+}
+
+#[derive(Default, Debug)]
+pub struct RelTypeConstraints {
+    /// Constraints for the subject type
+    pub subject_set: BTreeSet<DefId>,
+
+    /// Constraints for the object type
+    pub object: Vec<RelObjectConstraint>,
+}
+
+#[derive(Debug)]
+pub enum RelObjectConstraint {
+    /// The object type must be a constant of the subject type
+    ConstantOfSubjectType,
+    Generator,
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeParam {
+    pub object: DefId,
+    pub span: SourceSpan,
 }

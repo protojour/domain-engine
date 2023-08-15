@@ -119,7 +119,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         't: 'b,
     {
         let variant_ty = self.def_types.table.get(&variant_def).unwrap_or_else(|| {
-            let def = self.defs.get_def_kind(variant_def);
+            let def = self.defs.def_kind(variant_def);
             panic!("No type found for {def:?}");
         });
 

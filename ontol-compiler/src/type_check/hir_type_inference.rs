@@ -32,9 +32,9 @@ impl<'c, 'm> ontol_hir::visitor::HirMutVisitor<'m, TypedHir> for HirArmTypeInfer
             Ok(ty) => node.meta_mut().ty = ty,
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
-                self.errors.push(
-                    CompileError::TODO(smart_format!("Not enough type information"))
-                        .spanned(&node.span()),
+                self.errors.error(
+                    CompileError::TODO(smart_format!("Not enough type information")),
+                    &node.span(),
                 );
             }
             _ => panic!("Unexpected inference error"),

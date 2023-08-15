@@ -249,11 +249,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match self.get_def_type(def_variant.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
                 let properties = self.relations.properties_by_def_id.get(def_id);
-                let typename = match self.defs.get_def_kind(*def_id) {
-                    Some(DefKind::Type(TypeDef {
+                let typename = match self.defs.def_kind(*def_id) {
+                    DefKind::Type(TypeDef {
                         ident: Some(ident), ..
-                    })) => ident,
-                    Some(DefKind::Type(TypeDef { ident: None, .. })) => "<anonymous>",
+                    }) => ident,
+                    DefKind::Type(TypeDef { ident: None, .. }) => "<anonymous>",
                     _ => "Unknown type",
                 };
                 self.alloc_domain_type_serde_operator(
@@ -271,7 +271,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             },
             None => panic!(
                 "no type available for {def_variant:?} ({:?})",
-                self.defs.get_def_kind(def_variant.def_id)
+                self.defs.def_kind(def_variant.def_id)
             ),
         }
     }
@@ -397,30 +397,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     // If it's a "self-scalar" it must be a string fmt (for now).
                     if let Constructor::StringFmt(segment) = &properties.constructor {
                         return self.alloc_string_fmt_operator(def_variant, segment);
-                    } else {
-                        panic!("Self-scalar without fmt: {def_id:?}");
                     }
+
+                    panic!("Self-scalar without fmt: {def_id:?}");
+                } else {
+                    let (requirement, inner_operator_id) = self.get_property_operator(
+                        *def_id,
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                    );
+
+                    if !matches!(requirement, PropertyCardinality::Mandatory) {
+                        panic!("Scalar cardinality must be mandatory, fix this during type check");
+                    }
+
+                    let operator_id = self.alloc_operator_id(&def_variant);
+
+                    return Some(OperatorAllocation::Allocated(
+                        operator_id,
+                        SerdeOperator::Alias(AliasOperator {
+                            typename: typename.into(),
+                            def_variant,
+                            inner_operator_id,
+                        }),
+                    ));
                 }
-
-                let (requirement, inner_operator_id) = self.get_property_operator(
-                    *def_id,
-                    (PropertyCardinality::Mandatory, ValueCardinality::One),
-                );
-
-                if !matches!(requirement, PropertyCardinality::Mandatory) {
-                    panic!("Scalar cardinality must be mandatory, fix this during type check");
-                }
-
-                let operator_id = self.alloc_operator_id(&def_variant);
-
-                return Some(OperatorAllocation::Allocated(
-                    operator_id,
-                    SerdeOperator::Alias(AliasOperator {
-                        typename: typename.into(),
-                        def_variant,
-                        inner_operator_id,
-                    }),
-                ));
             }
             ReprKind::Unit | ReprKind::Struct => {
                 return self.alloc_struct_constructor_operator(def_variant, typename, properties);

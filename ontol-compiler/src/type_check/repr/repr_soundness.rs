@@ -5,8 +5,11 @@ use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
 
 use crate::{
-    error::CompileError, relation::TypeRelation, types::FormatType, Note, SpannedCompileError,
-    SpannedNote,
+    def::{BuiltinRelationKind, DefKind},
+    error::CompileError,
+    relation::{RelObjectConstraint, TypeRelation},
+    types::FormatType,
+    Note, SpannedNote,
 };
 
 use super::{
@@ -53,15 +56,54 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         Ok(())
     }
 
-    fn check_type_params(&mut self, base_def_id: DefId, repr: &Repr) -> Result<(), ()> {
-        let rels = &self.primitives.relations;
+    fn check_type_params(&mut self, base_def_id: DefId, repr: &mut Repr) -> Result<(), ()> {
+        let mut min = None;
+        let mut max = None;
 
-        for relation_def_id in repr.type_params.keys() {
-            if relation_def_id == &rels.min {
-                assert_eq!(base_def_id, self.primitives.number);
+        for (relation_def_id, type_param) in &repr.type_params {
+            if let Some(constraints) = self.relations.rel_type_constraints.get(relation_def_id) {
+                if !constraints.subject_set.is_empty()
+                    && !constraints.subject_set.contains(&base_def_id)
+                {
+                    self.errors.error(
+                        CompileError::TODO(smart_format!("Subject type constraint not satisfied")),
+                        &type_param.span,
+                    );
+                }
+
+                for obj_constraint in &constraints.object {
+                    match obj_constraint {
+                        RelObjectConstraint::ConstantOfSubjectType => {
+                            let _value_def_kind = self.defs.def_kind(type_param.object);
+                        }
+                        RelObjectConstraint::Generator => {}
+                    }
+                }
             }
-            if relation_def_id == &rels.max {
-                assert_eq!(base_def_id, self.primitives.number);
+
+            match self.defs.def_kind(*relation_def_id) {
+                DefKind::BuiltinRelType(BuiltinRelationKind::Min) => {
+                    min = Some(type_param.object);
+                }
+                DefKind::BuiltinRelType(BuiltinRelationKind::Max) => {
+                    max = Some(type_param.object);
+                }
+                _ => {}
+            }
+        }
+
+        if min.is_some() || max.is_some() {
+            match &mut repr.kind {
+                ReprKind::Scalar(def_id, _) => {
+                    // User-defined number
+                    *def_id = self.root_def_id;
+                }
+                _ => {
+                    self.errors.error(
+                        CompileError::TODO(smart_format!("Must be a scalar")),
+                        &self.defs.def_span(self.root_def_id),
+                    );
+                }
             }
         }
 
@@ -114,11 +156,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
         }
 
-        self.errors.push(SpannedCompileError {
-            error: CompileError::IntersectionOfDisjointTypes,
-            span: root_def.span,
+        self.errors.error_with_notes(
+            CompileError::IntersectionOfDisjointTypes,
+            &root_def.span,
             notes,
-        });
+        );
 
         Err(())
     }

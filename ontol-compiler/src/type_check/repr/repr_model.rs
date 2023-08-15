@@ -2,15 +2,15 @@ use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smallvec::SmallVec;
 
-use crate::SourceSpan;
+use crate::{relation::TypeParam, SourceSpan};
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Repr {
     pub kind: ReprKind,
 
     /// Params at type level (i.e. no string/member relations).
     /// These are collected from all supertypes.
-    pub type_params: FnvHashMap<DefId, DefId>,
+    pub type_params: FnvHashMap<DefId, TypeParam>,
 }
 
 #[derive(Eq, PartialEq, Debug)]

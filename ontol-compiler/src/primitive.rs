@@ -93,7 +93,7 @@ pub struct Primitives {
     pub f64: DefId,
 
     /// Builtin relations
-    pub relations: Relations,
+    pub relations: OntolRelations,
 
     pub generators: Generators,
 
@@ -116,24 +116,11 @@ impl Primitives {
             (self.string, Some("string"), PrimitiveKind::String),
         ]
     }
-
-    pub fn list_relations(&self) -> [(DefId, &'static str); 8] {
-        [
-            (self.relations.is, "is"),
-            (self.relations.identifies, "identifies"),
-            (self.relations.id, "id"),
-            (self.relations.min, "min"),
-            (self.relations.max, "max"),
-            (self.relations.default, "default"),
-            (self.relations.gen, "gen"),
-            (self.relations.route, "route"),
-        ]
-    }
 }
 
 /// Built-in relation types
 #[derive(Debug)]
-pub struct Relations {
+pub struct OntolRelations {
     /// Relation between a type and a representation of the type.
     pub is: DefId,
 
@@ -158,6 +145,21 @@ pub struct Relations {
 
     /// TODO: Remove, probably
     pub route: DefId,
+}
+
+impl OntolRelations {
+    pub fn list_relations(&self) -> [(DefId, &'static str); 8] {
+        [
+            (self.is, "is"),
+            (self.identifies, "identifies"),
+            (self.id, "id"),
+            (self.min, "min"),
+            (self.max, "max"),
+            (self.default, "default"),
+            (self.gen, "gen"),
+            (self.route, "route"),
+        ]
+    }
 }
 
 #[derive(Debug)]
@@ -191,7 +193,7 @@ impl Primitives {
             f64: defs.add_primitive(PrimitiveKind::F64),
             string: defs.add_primitive(PrimitiveKind::String),
 
-            relations: Relations {
+            relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is),
                 identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies),
                 id: defs.add_builtin_relation(BuiltinRelationKind::Id),

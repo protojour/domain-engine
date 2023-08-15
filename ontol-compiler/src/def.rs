@@ -210,8 +210,12 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn get_def_kind(&self, def_id: DefId) -> Option<&'m DefKind<'m>> {
-        self.table.get(&def_id).map(|def| &def.kind)
+    pub fn def_kind(&self, def_id: DefId) -> &'m DefKind<'m> {
+        self.table.get(&def_id).map(|def| &def.kind).unwrap()
+    }
+
+    pub fn def_span(&self, def_id: DefId) -> SourceSpan {
+        self.table.get(&def_id).map(|def| def.span).unwrap()
     }
 
     pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'m, DefKind<'m>>> {
@@ -297,9 +301,9 @@ impl<'m> Defs<'m> {
     }
 
     pub fn get_string_representation(&self, def_id: DefId) -> &str {
-        match self.get_def_kind(def_id) {
-            Some(DefKind::StringLiteral(lit)) => lit,
-            Some(DefKind::Regex(lit)) => lit,
+        match self.def_kind(def_id) {
+            DefKind::StringLiteral(lit) => lit,
+            DefKind::Regex(lit) => lit,
             kind => panic!("BUG: not a string literal: {kind:?}"),
         }
     }

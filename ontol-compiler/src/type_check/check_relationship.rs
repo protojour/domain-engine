@@ -10,7 +10,7 @@ use crate::{
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
-    relation::{Constructor, Is, Properties, Property, TypeRelation},
+    relation::{Constructor, Is, Properties, Property, TypeParam, TypeRelation},
     sequence::Sequence,
     types::{Type, TypeRef},
     SourceSpan,
@@ -26,10 +26,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
     ) -> TypeRef<'m> {
         let relationship_id = RelationshipId(def_id);
-        let relation_def_kind = &self
-            .defs
-            .get_def_kind(relationship.relation_def_id)
-            .unwrap();
+        let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
         match relation_def_kind {
             DefKind::StringLiteral(_) => {
@@ -256,17 +253,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             BuiltinRelationKind::Default => {
                 let _subject_ty = self.check_def_shallow(subject.0.def_id);
-                let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
+                let subject_def_kind = self.defs.def_kind(subject.0.def_id);
 
                 match subject_def_kind {
                     DefKind::Type(TypeDef {
                         rel_type_for: Some(RelationshipId(outer_relationship_id)),
                         ..
-                    }) => match self.defs.get_def_kind(*outer_relationship_id) {
-                        Some(DefKind::Relationship(Relationship {
+                    }) => match self.defs.def_kind(*outer_relationship_id) {
+                        DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        })) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
+                        }) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
                             Some(object_ty) => {
                                 // just copy the type, type check done later
                                 self.expected_constant_types
@@ -302,7 +299,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let _subject_ty = self.check_def_shallow(subject.0.def_id);
                 let object_ty = self.check_def_shallow(object.0.def_id);
 
-                let subject_def_kind = self.defs.get_def_kind(subject.0.def_id).unwrap();
+                let subject_def_kind = self.defs.def_kind(subject.0.def_id);
 
                 let value_generator_def_id = match object_ty {
                     Type::ValueGenerator(def_id) => *def_id,
@@ -318,11 +315,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     DefKind::Type(TypeDef {
                         rel_type_for: Some(RelationshipId(outer_relationship_id)),
                         ..
-                    }) => match self.defs.get_def_kind(*outer_relationship_id) {
-                        Some(DefKind::Relationship(Relationship {
+                    }) => match self.defs.def_kind(*outer_relationship_id) {
+                        DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        })) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
+                        }) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
                             Some(_outer_object_ty) => {
                                 self.relations.value_generators_unchecked.insert(
                                     RelationshipId(*outer_relationship_id),
@@ -358,7 +355,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .type_params
                     .entry(subject.0.def_id)
                     .or_default()
-                    .insert(relationship.relation_def_id, object.0.def_id);
+                    .insert(
+                        relationship.relation_def_id,
+                        TypeParam {
+                            object: object.0.def_id,
+                            span: *span,
+                        },
+                    );
 
                 subject_ty
             }
@@ -438,8 +441,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         };
 
-        match self.defs.get_def_kind(def_id) {
-            Some(DefKind::Primitive(_) | DefKind::Type(_)) => {
+        match self.defs.def_kind(def_id) {
+            DefKind::Primitive(_) | DefKind::Type(_) => {
                 self.check_not_sealed(ty, span);
             }
             _ => {
@@ -491,10 +494,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         final_state: FmtFinalState,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
-        let appendee = match self.defs.get_def_kind(relation_def_id) {
-            Some(DefKind::Primitive(PrimitiveKind::String)) => StringPatternSegment::AllStrings,
-            Some(DefKind::StringLiteral(str)) => StringPatternSegment::new_literal(str),
-            Some(DefKind::Regex(_)) => StringPatternSegment::Regex(
+        let appendee = match self.defs.def_kind(relation_def_id) {
+            DefKind::Primitive(PrimitiveKind::String) => StringPatternSegment::AllStrings,
+            DefKind::StringLiteral(str) => StringPatternSegment::new_literal(str),
+            DefKind::Regex(_) => StringPatternSegment::Regex(
                 self.defs
                     .literal_regex_hirs
                     .get(&relation_def_id)

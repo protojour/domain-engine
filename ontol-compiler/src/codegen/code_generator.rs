@@ -12,7 +12,7 @@ use crate::{
     error::CompileError,
     typed_hir::{HirFunc, TypedHir, TypedHirNode},
     types::Type,
-    CompileErrors, Compiler, SourceSpan, SpannedCompileError, NO_SPAN,
+    CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
 use super::{
@@ -122,11 +122,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         .append(block, Ir::Clone(*local), Delta(1), span);
                 }
                 None => {
-                    self.errors.push(SpannedCompileError {
-                        error: CompileError::UnboundVariable,
-                        span,
-                        notes: vec![],
-                    });
+                    self.errors.error(CompileError::UnboundVariable, &span);
                 }
             },
             ontol_hir::Kind::Unit => {
@@ -561,10 +557,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
     }
 
     fn report_not_mappable(&mut self, span: SourceSpan) {
-        self.errors.push(SpannedCompileError {
-            error: CompileError::TODO(smart_format!("type not mappable")),
-            span,
-            notes: vec![],
-        });
+        self.errors.error(
+            CompileError::TODO(smart_format!("type not mappable")),
+            &span,
+        );
     }
 }

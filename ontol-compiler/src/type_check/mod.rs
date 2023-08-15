@@ -10,7 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     types::{DefTypes, FormatType, Type, TypeRef, Types},
-    CompileErrors, Compiler, SourceSpan, SpannedCompileError, SpannedNote,
+    CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
 
 use self::{repr::repr_check::ReprCheck, seal::SealCtx};
@@ -74,11 +74,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
         notes: Vec<SpannedNote>,
     ) -> TypeRef<'m> {
-        self.errors.push(SpannedCompileError {
-            error,
-            span: *span,
-            notes,
-        });
+        self.errors.error_with_notes(error, span, notes);
         self.types.intern(Type::Error)
     }
 

@@ -352,4 +352,21 @@ impl CompileErrors {
     pub fn push(&mut self, error: SpannedCompileError) {
         self.errors.push(error);
     }
+
+    pub fn error(&mut self, error: CompileError, span: &SourceSpan) {
+        self.error_with_notes(error, span, vec![]);
+    }
+
+    pub fn error_with_notes(
+        &mut self,
+        error: CompileError,
+        span: &SourceSpan,
+        notes: Vec<SpannedNote>,
+    ) {
+        self.errors.push(SpannedCompileError {
+            error,
+            span: *span,
+            notes,
+        });
+    }
 }

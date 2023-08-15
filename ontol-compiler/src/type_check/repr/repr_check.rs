@@ -15,7 +15,7 @@ use crate::{
     error::CompileError,
     package::ONTOL_PKG,
     primitive::Primitives,
-    relation::{Constructor, Properties, Relations, TypeRelation},
+    relation::{Constructor, Properties, Relations, TypeParam, TypeRelation},
     type_check::seal::SealCtx,
     types::DefTypes,
     CompileErrors, Note, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE, NO_SPAN,
@@ -91,11 +91,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         let abstract_notes = std::mem::take(&mut self.state.abstract_notes);
         if !abstract_notes.is_empty() {
-            self.errors.push(SpannedCompileError {
-                error: CompileError::EntityNotRepresentable,
-                span: def.span,
-                notes: abstract_notes,
-            });
+            self.errors.error_with_notes(
+                CompileError::EntityNotRepresentable,
+                &def.span,
+                abstract_notes,
+            );
         }
     }
 
@@ -216,7 +216,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         for (def_id, data) in &ontology_mesh {
             let def_id = *def_id;
 
-            match self.defs.get_def_kind(def_id).unwrap() {
+            match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind) => {
                     if kind.is_concrete() {
                         self.merge_repr(
@@ -291,20 +291,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
             if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
                 if let Some(type_params) = self.relations.type_params.get(&def_id) {
-                    for (relation_def_id, value_def_id) in type_params {
+                    for (relation_def_id, type_param) in type_params {
                         if rec
                             .type_params
-                            .insert(*relation_def_id, *value_def_id)
+                            .insert(*relation_def_id, type_param.clone())
                             .is_some()
                         {
                             let def = self.defs.table.get(&self.root_def_id).unwrap();
-                            self.errors.push(SpannedCompileError {
-                                error: CompileError::TODO(smart_format!(
-                                    "Duplicate type parameter"
-                                )),
-                                span: def.span,
-                                notes: vec![],
-                            });
+                            self.errors.error(
+                                CompileError::TODO(smart_format!("Duplicate type parameter")),
+                                &def.span,
+                            );
                         }
                     }
                 }
@@ -408,11 +405,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 variants.push((def_id, span));
             }
             (Super | Sub, Some(ReprKind::Seq), _) => {
-                self.errors.push(SpannedCompileError {
-                    error: CompileError::InvalidMixOfRelationshipTypeForSubject,
-                    span: data.rel_span,
-                    notes: vec![],
-                });
+                self.errors.error(
+                    CompileError::InvalidMixOfRelationshipTypeForSubject,
+                    &data.rel_span,
+                );
             }
             (is_relation, old, new) => {
                 panic!("Invalid repr transition: {old:?} =({is_relation:?})> {new:?}")
@@ -512,5 +508,5 @@ pub(super) struct ReprRecord {
     kind: Option<ReprKind>,
 
     /// Typed relation parameters
-    type_params: FnvHashMap<DefId, DefId>,
+    type_params: FnvHashMap<DefId, TypeParam>,
 }

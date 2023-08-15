@@ -209,8 +209,8 @@ impl<'m> Compiler<'m> {
             for (type_name, type_def_id) in type_namespace {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    public: match self.defs.get_def_kind(type_def_id) {
-                        Some(DefKind::Type(TypeDef { public, .. })) => *public,
+                    public: match self.defs.def_kind(type_def_id) {
+                        DefKind::Type(TypeDef { public, .. }) => *public,
                         _ => true,
                     },
                     name: Some(type_name),
