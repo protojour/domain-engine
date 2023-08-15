@@ -313,15 +313,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     .number_resolutions
                     .iter()
                     .flat_map(|(resolution, span)| {
-                        let type_def_id = resolution.def_id(&self.primitives);
-                        if let Some(identifier) = self.defs.def_kind(type_def_id).opt_identifier() {
-                            Some(SpannedNote {
+                        let type_def_id = resolution.def_id(self.primitives);
+                        self.defs
+                            .def_kind(type_def_id)
+                            .opt_identifier()
+                            .map(|identifier| SpannedNote {
                                 note: Note::BaseTypeIs(identifier.into()),
                                 span: *span,
                             })
-                        } else {
-                            None
-                        }
                     })
                     .collect();
 
