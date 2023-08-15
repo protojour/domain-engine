@@ -22,7 +22,8 @@ fn test_stix_lite() {
             "spec_version": "2.1",
             "created": "2023-01-01T00:00:00+00:00",
             "modified": "2023-01-01T00:00:00+00:00",
-            "name": "My attack pattern"
+            "name": "My attack pattern",
+            "confidence": 42,
         });
 
         assert_json_io_matches!(attack_pattern, Create, {

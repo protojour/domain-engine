@@ -13,9 +13,11 @@ type lang-rfc5646 {
     rel .is: string
 }
 
+/// The `confidence` property identifies the confidence that the creator has in the correctness of their data. The confidence value **MUST** be a number in the range of 0-100.
 type confidence {
-    // BUG: Must be an integer percentage between 0 and 100
-    rel .is: i64
+    rel .is: int
+    rel .min: 0
+    rel .max: 100
 }
 
 type attack-pattern-id {
