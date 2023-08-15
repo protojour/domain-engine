@@ -22,7 +22,7 @@ use crate::{
     NO_SPAN,
 };
 
-use super::repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind};
+use super::repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind};
 
 /// If there are repr problems in the ONTOL domain, turn this on.
 /// Otherwise, it's too verbose.
@@ -232,7 +232,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         // This only occurs in user domains.
                         self.merge_repr(
                             &mut builder,
-                            ReprKind::Scalar(def_id, data.rel_span),
+                            ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                             def_id,
                             data,
                         );
@@ -246,7 +246,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             | PrimitiveKind::Unit => {
                                 self.merge_repr(
                                     &mut builder,
-                                    ReprKind::Scalar(def_id, data.rel_span),
+                                    ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                                     def_id,
                                     data,
                                 );
@@ -295,7 +295,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 DefKind::StringLiteral(_) | DefKind::NumberLiteral(_) => {
                     self.merge_repr(
                         &mut builder,
-                        ReprKind::Scalar(def_id, data.rel_span),
+                        ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                         def_id,
                         data,
                     );
@@ -305,7 +305,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     if self.defs.string_like_types.get(&def_id).is_some() {
                         self.merge_repr(
                             &mut builder,
-                            ReprKind::Scalar(def_id, data.rel_span),
+                            ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                             def_id,
                             data,
                         )
@@ -336,7 +336,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     assert!(!has_table);
                                     self.merge_repr(
                                         &mut builder,
-                                        ReprKind::Scalar(def_id, data.rel_span),
+                                        ReprKind::Scalar(
+                                            def_id,
+                                            ReprScalarKind::Other,
+                                            data.rel_span,
+                                        ),
                                         def_id,
                                         data,
                                     );
@@ -385,7 +389,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     ) {
         if self.state.do_trace {
             trace!(
-                "{:?} merge repr {:?}=>{:?} {next:?}",
+                "    {:?} merge repr {:?}=>{:?} {next:?}",
                 self.root_def_id,
                 data.rel,
                 def_id,
@@ -419,7 +423,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 members.push((def_id, data.rel_span));
             }
             (Super, Some(repr), kind) if *repr != kind => match repr {
-                ReprKind::Scalar(def0, span0) => {
+                ReprKind::Scalar(def0, _, span0) => {
                     builder.kind = Some(ReprKind::Intersection(vec![
                         (*def0, *span0),
                         (def_id, data.rel_span),
@@ -460,10 +464,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Sub, None, _) => {
                 builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
-            (Sub, Some(ReprKind::Scalar(scalar1, span1)), ReprKind::Scalar(scalar2, span2)) => {
+            (
+                Sub,
+                Some(ReprKind::Scalar(scalar1, _, span1)),
+                ReprKind::Scalar(scalar2, _, span2),
+            ) => {
                 builder.kind = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
             }
-            (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, span)) => {
+            (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, _, span)) => {
                 variants.push((def_id, span));
             }
             (Super | Sub, Some(ReprKind::Seq), _) => {

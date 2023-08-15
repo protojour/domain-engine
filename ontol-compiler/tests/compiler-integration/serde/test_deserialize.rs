@@ -33,8 +33,8 @@ fn deserialize_is_i64() {
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_matches!(create_de(&foo).data(json!(42)), Ok(Data::I64(42)));
-        assert_matches!(create_de(&foo).data(json!(-42)), Ok(Data::I64(-42)));
+        assert_matches!(create_de(&foo).data_variant(json!(42)), Ok(Data::I64(42)));
+        assert_matches!(create_de(&foo).data_variant(json!(-42)), Ok(Data::I64(-42)));
 
         assert_error_msg!(
             create_de(&foo).data(json!({})),

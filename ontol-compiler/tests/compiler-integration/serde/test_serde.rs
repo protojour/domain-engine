@@ -267,7 +267,7 @@ fn test_int_range_constrained() {
         let [percentage] = test.bind(["percentage"]);
         assert_json_io_matches!(percentage, Create, 0 == 0);
         assert_error_msg!(
-            create_de(&percentage).data(json!(1000)),
+            create_de(&percentage).data_variant(json!(1000)),
             r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
         );
     });

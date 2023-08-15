@@ -643,11 +643,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            ReprKind::Scalar(scalar_def_id, _) | ReprKind::I64(scalar_def_id, ..) => {
+            ReprKind::Scalar(scalar_def_id, ..) => {
                 let scalar_def_id = *scalar_def_id;
 
                 let scalar_object_ty = self.check_def_sealed(scalar_def_id);
-                debug!("scalar_object_ty: {scalar_object_ty:?}");
+                debug!("scalar_object_ty: {struct_def_id:?}: {scalar_object_ty:?}");
 
                 let mut attributes = attributes.iter();
                 match attributes.next() {

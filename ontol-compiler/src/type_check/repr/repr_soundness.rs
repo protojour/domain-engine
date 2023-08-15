@@ -4,14 +4,14 @@ use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
 use ordered_float::NotNan;
-use tracing::debug;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
     relation::{RelObjectConstraint, TypeRelation},
+    type_check::repr::repr_model::ReprScalarKind,
     types::FormatType,
-    Note, SpannedNote, NO_SPAN,
+    Note, SpannedNote,
 };
 
 use super::{
@@ -53,10 +53,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
                         Some(repr)
                     }
-                    ReprKind::Scalar(def_id, _) => {
+                    ReprKind::Scalar(def_id, _, span) => {
+                        let def_id = *def_id;
+                        let span = *span;
                         let mut base_defs: BTreeSet<DefId> = Default::default();
 
-                        self.collect_base_defs(*def_id, &mut base_defs);
+                        self.collect_base_defs(def_id, &mut base_defs);
 
                         for mesh_def_id in collected_mesh.keys() {
                             self.collect_base_defs(*mesh_def_id, &mut base_defs);
@@ -73,33 +75,36 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 checked_type_params.max,
                             ) {
                                 (Some(NumberResolution::Integer), Some(min), Some(max)) => {
-                                    debug!("Concrete number({:?}): {repr:?}", self.root_def_id);
-
                                     let min: Result<i64, _> = min.parse();
                                     let max: Result<i64, _> = max.parse();
 
                                     match (min, max) {
                                         (Ok(min), Ok(max)) => Some(Repr {
-                                            kind: ReprKind::I64(
-                                                self.root_def_id,
-                                                min..max,
-                                                NO_SPAN,
+                                            kind: ReprKind::Scalar(
+                                                self.primitives.i64,
+                                                ReprScalarKind::I64(min..max),
+                                                span,
                                             ),
                                             type_params: Default::default(),
                                         }),
                                         _ => todo!("Report error"),
                                     }
                                 }
-                                (Some(NumberResolution::F64), Some(_min), Some(_max)) => {
-                                    Some(Repr {
-                                        kind: ReprKind::F64(
-                                            self.root_def_id,
-                                            NotNan::new(f64::MIN).unwrap()
-                                                ..NotNan::new(f64::MAX).unwrap(),
-                                            NO_SPAN,
-                                        ),
-                                        type_params: Default::default(),
-                                    })
+                                (Some(NumberResolution::F64), Some(min), Some(max)) => {
+                                    let min: Result<NotNan<f64>, _> = min.parse();
+                                    let max: Result<NotNan<f64>, _> = max.parse();
+
+                                    match (min, max) {
+                                        (Ok(min), Ok(max)) => Some(Repr {
+                                            kind: ReprKind::Scalar(
+                                                self.primitives.i64,
+                                                ReprScalarKind::F64(min..max),
+                                                span,
+                                            ),
+                                            type_params: Default::default(),
+                                        }),
+                                        _ => todo!("Report error"),
+                                    }
                                 }
                                 _ => {
                                     // FIXME: Report this?
@@ -162,7 +167,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         if output.min.is_some() || output.max.is_some() {
             match &mut repr.kind {
-                ReprKind::Scalar(_def_id, _) => {
+                ReprKind::Scalar(_def_id, _, _) => {
                     // User-defined number
                     // *def_id = self.root_def_id;
                 }
@@ -272,7 +277,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         if let Some(mesh) = self.relations.ontology_mesh.get(&sub_def_id) {
             for (is, _) in mesh {
-                if matches!(is.rel, TypeRelation::Super)
+                if matches!(is.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
                     && self.has_path_to_base(is.def_id, super_def_id, visited)
                 {
                     return true;
@@ -299,10 +304,6 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             {
                 builder.number_resolutions.remove(resolution);
             }
-        }
-
-        if !builder.number_resolutions.is_empty() {
-            debug!("resolutions: {:?}", builder.number_resolutions);
         }
 
         match builder.number_resolutions.len() {

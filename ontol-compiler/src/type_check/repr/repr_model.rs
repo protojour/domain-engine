@@ -22,9 +22,7 @@ pub enum ReprKind {
     Unit,
     /// Scalar type without further attributes.
     /// Currently placeholder for bool, unit, string
-    Scalar(DefId, SourceSpan),
-    I64(DefId, Range<i64>, SourceSpan),
-    F64(DefId, Range<NotNan<f64>>, SourceSpan),
+    Scalar(DefId, ReprScalarKind, SourceSpan),
     /// Sequence
     Seq,
     /// Just a plain old struct, no `is` business
@@ -35,6 +33,13 @@ pub enum ReprKind {
     Intersection(Vec<(DefId, SourceSpan)>),
     StructUnion(Vec<(DefId, SourceSpan)>),
     Union(Vec<(DefId, SourceSpan)>),
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum ReprScalarKind {
+    I64(Range<i64>),
+    F64(Range<NotNan<f64>>),
+    Other,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]

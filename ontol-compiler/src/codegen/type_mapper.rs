@@ -48,7 +48,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                 let repr = self.seal_ctx.get_repr_kind(def_id).unwrap();
 
                 match repr {
-                    ReprKind::Scalar(scalar_def_id, _) => Some(MapInfo {
+                    ReprKind::Scalar(scalar_def_id, _, _) => Some(MapInfo {
                         key: MapKey {
                             def_id: *def_id,
                             seq: false,

@@ -152,9 +152,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if properties.identified_by.is_none() {
                         match ontology_mesh {
                             Some(mesh)
-                                if mesh
-                                    .iter()
-                                    .any(|(is, _)| matches!(is.rel, TypeRelation::Subset)) =>
+                                if mesh.iter().any(|(is, _)| {
+                                    matches!(
+                                        is.rel,
+                                        TypeRelation::SubVariant | TypeRelation::Subset
+                                    )
+                                }) =>
                             {
                                 if let Some(table) = &properties.table {
                                     assert!(table.get(property_id).is_some());
@@ -301,7 +304,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             });
 
         let scalar_def_id = match &repr.kind {
-            ReprKind::Scalar(scalar_def_id, _) => *scalar_def_id,
+            ReprKind::Scalar(scalar_def_id, _, _) => *scalar_def_id,
             _ => return Err(()),
         };
 

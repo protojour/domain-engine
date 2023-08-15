@@ -52,11 +52,11 @@ pub struct Is {
 
 impl Is {
     pub fn is_super(&self) -> bool {
-        matches!(self.rel, TypeRelation::Super)
+        matches!(self.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
     }
 
     pub fn is_sub(&self) -> bool {
-        matches!(self.rel, TypeRelation::Subset)
+        matches!(self.rel, TypeRelation::Subset | TypeRelation::SubVariant)
     }
 }
 

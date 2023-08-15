@@ -23,7 +23,10 @@ use crate::{
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
-    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
+    type_check::{
+        repr::repr_model::{ReprKind, ReprScalarKind},
+        seal::SealCtx,
+    },
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
 };
@@ -393,41 +396,46 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         };
 
         match &repr.kind {
-            ReprKind::Scalar(def_id, _span) => {
-                if def_id == &def_variant.def_id {
-                    // If it's a "self-scalar" it must be a string fmt (for now).
-                    if let Constructor::StringFmt(segment) = &properties.constructor {
-                        return self.alloc_string_fmt_operator(def_variant, segment);
+            ReprKind::Scalar(def_id, scalar_kind, _span) => {
+                match scalar_kind {
+                    ReprScalarKind::I64(range) => {
+                        return Some(OperatorAllocation::Allocated(
+                            self.alloc_operator_id(&def_variant),
+                            SerdeOperator::I64(*def_id, Some(range.clone())),
+                        ));
                     }
+                    ReprScalarKind::F64(_range) => todo!(),
+                    _ => {
+                        if def_id == &def_variant.def_id {
+                            // If it's a "self-scalar" it must be a string fmt (for now).
+                            if let Constructor::StringFmt(segment) = &properties.constructor {
+                                return self.alloc_string_fmt_operator(def_variant, segment);
+                            }
 
-                    panic!("Self-scalar without fmt: {def_id:?}");
-                } else {
-                    let (requirement, inner_operator_id) = self.get_property_operator(
-                        *def_id,
-                        (PropertyCardinality::Mandatory, ValueCardinality::One),
-                    );
+                            panic!("Self-scalar without fmt: {def_id:?}");
+                        } else {
+                            let (requirement, inner_operator_id) = self.get_property_operator(
+                                *def_id,
+                                (PropertyCardinality::Mandatory, ValueCardinality::One),
+                            );
 
-                    if !matches!(requirement, PropertyCardinality::Mandatory) {
-                        panic!("Scalar cardinality must be mandatory, fix this during type check");
+                            if !matches!(requirement, PropertyCardinality::Mandatory) {
+                                panic!("Scalar cardinality must be mandatory, fix this during type check");
+                            }
+
+                            let operator_id = self.alloc_operator_id(&def_variant);
+
+                            return Some(OperatorAllocation::Allocated(
+                                operator_id,
+                                SerdeOperator::Alias(AliasOperator {
+                                    typename: typename.into(),
+                                    def_variant,
+                                    inner_operator_id,
+                                }),
+                            ));
+                        }
                     }
-
-                    let operator_id = self.alloc_operator_id(&def_variant);
-
-                    return Some(OperatorAllocation::Allocated(
-                        operator_id,
-                        SerdeOperator::Alias(AliasOperator {
-                            typename: typename.into(),
-                            def_variant,
-                            inner_operator_id,
-                        }),
-                    ));
                 }
-            }
-            ReprKind::I64(def_id, range, _span) => {
-                return Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def_variant),
-                    SerdeOperator::I64(*def_id, Some(range.clone())),
-                ));
             }
             ReprKind::Unit | ReprKind::Struct => {
                 return self.alloc_struct_constructor_operator(def_variant, typename, properties);
