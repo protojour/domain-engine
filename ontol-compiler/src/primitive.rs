@@ -169,7 +169,8 @@ impl Primitives {
 
             doc: Doc {
                 doc_relation: defs.add_builtin_relation(BuiltinRelationKind::Doc, None),
-                example_relation: defs.add_builtin_relation(BuiltinRelationKind::Example, None),
+                example_relation: defs
+                    .add_builtin_relation(BuiltinRelationKind::Example, Some("example")),
             },
         };
 

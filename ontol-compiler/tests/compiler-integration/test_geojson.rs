@@ -4,11 +4,13 @@ use ontol_test_utils::{
 use serde_json::json;
 use test_log::test;
 
-pub const GEOJSON: &str = include_str!("../../../examples/geojson.on");
+use crate::examples::{GEOJSON, WGS};
 
 #[test]
 fn test_geojson() {
-    GEOJSON.compile_ok(|test| {
+    TestPackages::with_sources(
+        [(SourceName::root(), GEOJSON.1), WGS]
+    ).compile_ok(|test| {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(geometry, Create, {
             "type": "Point",
@@ -63,7 +65,8 @@ fn test_geojson() {
 #[test]
 fn test_municipalities() {
     TestPackages::with_sources([
-        (SourceName("geojson"), GEOJSON),
+        GEOJSON,
+        WGS,
         (
             SourceName::root(),
             "

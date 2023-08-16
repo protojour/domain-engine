@@ -518,6 +518,7 @@ async fn test_graphql_municipalities() {
             SourceName("geojson"),
             include_str!("../../../examples/geojson.on"),
         ),
+        (SourceName("wgs"), include_str!("../../../examples/wgs.on")),
     ])
     .compile_schemas([ROOT]);
 

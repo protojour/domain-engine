@@ -3,9 +3,34 @@ pub type spec_version {
     rel .is?: '2.1'
 }
 
+// placeholder for ONTOL dictionary
+pub type dictionary
+
 // FIXME: should maybe be defined in ONTOL_PKG?
 pub type url {
     rel .is: string
+}
+
+/// The integer data type represents a whole number. Unless otherwise specified, all integers MUST be capable of being represented as a signed 54-bit value ([-(2**53)+1, (2**53)-1]) as defined in [RFC7493].
+/// Additional restrictions MAY be placed on the type as described where it is used. The integer size is limited to a 54-bit value not a 64-bit value as per the RFC.
+///
+/// In the JSON MTI serialization, integers are represented by the JSON Number type [RFC7493].
+pub type integer {
+    rel .is: i64
+}
+
+/// The timestamp type defines how dates and times are represented in STIX.
+///
+/// The JSON MTI serialization uses the JSON String type [RFC8259] when representing timestamp.
+pub type timestamp {
+    rel .is: datetime
+}
+
+/// The hex data type encodes an array of octets (8-bit bytes) as hexadecimal.
+/// The string MUST consist of an even number of hexadecimal characters, which are the digits '0' through '9' and the lower-case letters 'a' through 'f'.
+/// In order to allow pattern matching on custom objects, for all properties that use the hex type, the property name MUST end with '_hex'.
+pub type hex {
+    rel .is: /^[0-9a-f]*$/
 }
 
 /// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
@@ -39,7 +64,7 @@ pub type confidence {
 ///     "x_foo_hash": "aaaabbbbccccddddeeeeffff0123457890"
 /// }
 /// ```
-pub type Hashes {
+pub type hashes {
     // FIXME: Dictionary support:
     // rel ./(a-zA-Z0-9-_){3,250}/: string
 }
@@ -62,7 +87,7 @@ pub type external-reference {
     /// Dictionary keys **MUST** come from one of the entries listed in the `hash-algorithm-ov` open vocabulary.
     ///
     /// As stated in Section [2.7](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_odoabbtwuxyd), to ensure interoperability, a SHA-256 hash **SHOULD** be included whenever possible.
-    rel .'hashes'?: Hashes
+    rel .'hashes'?: hashes
 
     /// An identifier for the external reference content.
     rel .'external_id'?: string
@@ -79,6 +104,17 @@ pub type kill-chain-phase {
     rel .'phase_name': string
 }
 
+/// The identifier of a marking-defifition
 pub type marking-definition-id {
     fmt '' => 'marking-definition--' => uuid => .
+}
+
+/// The binary data type represents a sequence of bytes. In order to allow pattern matching on custom objects, for all properties that use the binary type, the property name MUST end with '_bin'.
+///
+/// The JSON MTI serialization represents this as a base64-­encoded string as specified in
+/// [RFC4648](https://docs.google.com/document/d/1fWHWyo9OBOUVDKEs0HsMKIWqR8HTl3P8aDyM5Mz3iSM/edit#bookmark=id.w5obc8apb1tn)​.
+/// Other serializations SHOULD use a native binary type, if available.
+pub type binary {
+    // FIXME: ONTOL support for binary?
+    rel .is: string
 }

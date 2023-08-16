@@ -4,15 +4,15 @@ use ontol_test_utils::{
 use serde_json::json;
 use test_log::test;
 
-const STIX_COMMON: &str = include_str!("../../../examples/stix_lite/stix_common.on");
-const STIX_META: &str = include_str!("../../../examples/stix_lite/stix_meta.on");
-const STIX_DOMAIN: &str = include_str!("../../../examples/stix_lite/stix_domain.on");
+use crate::examples::{SI, STIX, STIX_COMMON, STIX_META, STIX_OPEN_VOCAB};
 
 fn stix_bundle() -> TestPackages {
     TestPackages::with_sources([
-        (SourceName::root(), STIX_DOMAIN),
-        (SourceName("stix_meta"), STIX_META),
-        (SourceName("stix_common"), STIX_COMMON),
+        (SourceName::root(), STIX.1),
+        STIX_META,
+        STIX_COMMON,
+        STIX_OPEN_VOCAB,
+        SI,
     ])
 }
 

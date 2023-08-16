@@ -1,0 +1,931 @@
+/// A value from a STIX open or suggested vocabulary.
+type open-vocab {
+    rel .is: string
+}
+
+/// An open vocabulary of User Account types.
+pub type account-type-ov {
+    rel .is: open-vocab
+
+    rel .example: 'facebook'
+    rel .example: 'ldap'
+    rel .example: 'nis'
+    rel .example: 'openid'
+    rel .example: 'radius'
+    rel .example: 'skype'
+    rel .example: 'tacacs'
+    rel .example: 'twitter'
+    rel .example: 'unix'
+    rel .example: 'windows-local'
+    rel .example: 'windows-domain'
+}
+
+/// Knowing a Threat Actor or Intrusion Set's motivation may allow an analyst or defender to better understand likely targets and behaviors.
+/// Motivation shapes the intensity and the persistence of an attack. Threat Actors and Intrusion Sets usually act in a manner that reflects their underlying emotion or situation, and this informs defenders of the manner of attack. For example, a spy motivated by nationalism (ideology) likely has the patience to achieve long-term goals and work quietly for years, whereas a cyber-vandal out for notoriety can create an intense and attention-grabbing attack but may quickly lose interest and move on. Understanding these differences allows defenders to implement controls tailored to each type of attack for greatest efficiency.
+/// This section including vocabulary items and their descriptions is based on the Threat Agent Motivations publication from Intel Corp in February 2015 [Casey 2015].
+pub type attack-motivation-ov {
+    rel .is: open-vocab
+
+    /// A non-hostile actor whose benevolent or harmless intent inadvertently causes harm.
+    /// For example, a well-meaning and dedicated employee who through distraction or poor training unintentionally causes harm to his or her organization.
+    rel .example: 'accidental'
+
+    /// Being forced to act on someone else's behalf.
+    /// Adversaries who are motivated by coercion are often forced through intimidation or blackmail to act illegally for someone else’s benefit. Unlike the other motivations, a coerced person does not act for personal gain, but out of fear of incurring a loss.
+    rel .example: 'coercion'
+
+    /// A desire to assert superiority over someone or something else.
+    /// Adversaries who are seeking dominance over a target are focused on using their power to force their target into submission or irrelevance. Dominance may be found with ideology in some state-sponsored attacks and with notoriety in some cyber vandalism-based attacks.
+    rel .example: 'dominance'
+
+    /// A passion to express a set of ideas, beliefs, and values that may shape and drive harmful and illegal acts.
+    /// Adversaries who act for ideological reasons (e.g., political, religious, human rights, environmental, desire to cause chaos/anarchy, etc.) are not usually motivated primarily by the desire for profit; they are acting on their own sense of morality, justice, or political loyalty.
+    /// For example, an activist group may sabotage a company’s equipment because they believe the company is harming the environment.
+    rel .example: 'ideology'
+
+    /// Seeking prestige or to become well known through some activity.
+    /// Adversaries motivated by notoriety are often seeking either personal validation or respect within a community and staying covert is not a priority. In fact, one of the main goals is to garner the respect of their target audience.
+    rel .example: 'notoriety'
+
+    /// Seeking advantage over a competing organization, including a military organization.
+    /// Adversaries motivated by increased profit or other gains through an unfairly obtained competitive advantage are often seeking theft of intellectual property, business processes, or supply chain agreements and thus accelerating their position in a market or capability.
+    rel .example: 'organizational-gain'
+
+    /// The desire to improve one’s own financial status.
+    /// Adversaries motivated by a selfish desire for personal gain are often out for gains that come from financial fraud, hacking for hire, or intellectual property theft.
+    /// While a Threat Actor or Intrusion Set may be seeking personal gain, this does not mean they are acting alone. Individuals can band together solely to maximize their own personal profits.
+    rel .example: 'personal-gain'
+
+    /// A desire to satisfy a strictly personal goal, including curiosity, thrill-seeking, amusement, etc.
+    /// Threat Actors or Intrusion Set driven by personal satisfaction may incidentally receive some other gain from their actions, such as a profit, but their primary motivation is to gratify a personal, emotional need. Individuals can band together with others toward a mutual, but not necessarily organizational, objective.
+    rel .example: 'personal-satisfaction'
+
+    /// A desire to avenge perceived wrongs through harmful actions such as sabotage, violence, theft, fraud, or embarrassing certain individuals or the organization.
+    /// A disgruntled Threat Actor or Intrusion Set seeking revenge can include current or former employees, who may have extensive knowledge to leverage when conducting attacks. Individuals can band together with others if the individual believes that doing so will enable them to cause more harm.
+    rel .example: 'revenge'
+
+    /// Acting without identifiable reason or purpose and creating unpredictable events.
+    /// Unpredictable is not a miscellaneous or default category. Unpredictable means a truly random and likely bizarre event, which seems to have no logical purpose to the victims.
+    rel .example: 'unpredictable'
+}
+
+/// Attack Resource Level is an open vocabulary that captures the general level of resources that a threat actor, intrusion set, or campaign might have access to. It ranges from individual, a person acting alone, to government, the resources of a national government.
+///
+/// This section including vocabulary items and their descriptions is based on the Threat Agent Library publication from Intel Corp in September 2007 [Casey 2007].
+///
+pub type attack-resource-level-ov {
+    rel .is: open-vocab
+
+    /// Resources limited to the average individual; Threat Actor acts independently.
+    rel .example: 'individual'
+
+    /// Members interact on a social and volunteer basis, often with little personal interest in the specific target.
+    /// An example might be a core group of unrelated activists who regularly exchange tips on a particular blog.
+    /// Group persists long term.
+    rel .example: 'club'
+
+    /// A short-lived and perhaps anonymous interaction that concludes when the participants have achieved a single goal.
+    /// For example, people who break into systems just for thrills or prestige may hold a contest to see who can break into a specific target first.
+    /// It also includes announced "operations" to achieve a specific goal, such as the original "OpIsrael" call for volunteers to disrupt all of Israel's Internet functions for a day.
+    rel .example: 'contest'
+
+    /// A formally organized group with a leader, typically motivated by a specific goal and organized around that goal.
+    /// Group persists long term and typically operates within a single geography.
+    rel .example: 'team'
+
+    /// Larger and better resourced than a team; typically, a company or crime syndicate.
+    /// Usually operates in multiple geographic areas and persists long term.
+    rel .example: 'organization'
+
+    /// Controls public assets and functions within a jurisdiction; very well resourced and persists long term.
+    rel .example: 'government'
+}
+
+/// The Course of Action Type property uses an open vocabulary to describe the underlying language or structure of the Course of Action that is being represented.
+pub type course-of-action-type-ov {
+    rel .is: open-vocab
+
+    /// Unstructured textual/prose description of a course of action that does not conform to any standard language 
+    rel .example: 'textual:text/plain'
+
+    /// Prose description of a course of action defined in structured HTML content
+    rel .example: 'textual:text/html'
+
+    /// Prose description of a course of action defined in structured markdown content
+    rel .example: 'textual:text/md'
+
+    /// Prose description of a course of action defined in structured PDF content 
+    rel .example: 'textual:pdf'
+}
+
+/// An enumeration of encryption algorithms for sharing defanged and/or confidential artifacts.
+pub type encryption-algorithm-enum {
+    /// Specifies the AES-256-GCM cipher, as defined in [NIST SP800-38D](https://docs.oasis-open.org/cti/stix/v2.1/csprd01/stix-v2.1-csprd01.html#kix.58njqtoqcj7e)
+    rel .is?: 'AES-256-GCM'
+
+    /// Specifies the ChaCha20-Poly1305 stream cipher, as defined in [RFC7539](https://docs.oasis-open.org/cti/stix/v2.1/csprd01/stix-v2.1-csprd01.html#kix.x09sfhv094gd).
+    rel .is?: 'ChaCha20-Poly1305'
+
+    /// The encryption algorithm is self-defined by the artifact's data.
+    /// The specified mime-type tells you which format it is, e.g., Word Doc or GPG.
+    /// This is intended for formats like Zip files and Word files which take a simple password, or GPG armored files that contain the key blob along with the file.
+    rel .is?: 'mime-type-indicated'
+}
+
+/// Grouping context
+///
+/// While the majority of this vocabulary is undefined (producers may use custom vocabulary entries), it has been added specifically to capture the `suspicious-activity-event` value.
+/// That value indicates that the information contained in the Grouping relates to a suspicious event.
+pub type grouping-context-ov {
+    rel .is: open-vocab
+
+    /// A set of STIX content related to a particular suspicious activity event. 
+    rel .example: 'suspicious-activity'
+
+    /// A set of STIX content related to a particular malware instance or family.
+    rel .example: 'malware-analysis'
+
+    /// A set of STIX content contextually related but without any precise characterization of the contextual relationship between the objects.
+    rel .example: 'unspecified'
+}
+
+/// This vocabulary describes the type of entity that the Identity represents: whether it describes an organization, group, individual, or class.
+pub type identity-class-ov {
+    rel .is: open-vocab
+}
+
+/// This is a non-exhaustive, open vocabulary that covers common programming languages and is intended to characterize the languages that may have been used to implement a malware instance or family.
+pub type implementation-language-ov {
+    rel .is: open-vocab
+
+    /// Specifies the AppleScript programming language.
+    rel .example: 'applescript'
+
+    /// Specifies the Bash programming language.
+    rel .example: 'bash'
+
+    /// Specifies the C programming language.
+    rel .example: 'c'
+
+    /// Specifies the C++ programming language.
+    rel .example: 'c++'
+
+    /// Specifies the C# programming language.
+    rel .example: 'c#'
+
+    /// Specifies the Go (sometimes referred to as golang) programming language.
+    rel .example: 'go'
+
+    /// Specifies the JAVA programming language.
+    rel .example: 'java'
+
+    /// Specifies the JavaScript programming language.
+    rel .example: 'javascript'
+
+    /// Specifies the Lua programming language.
+    rel .example: 'lua'
+
+    /// Specifies the Objective-C programming language.
+    rel .example: 'objective-c'
+
+    /// Specifies the Perl programming language.
+    rel .example: 'perl'
+
+    /// Specifies the PHP programming language.
+    rel .example: 'php'
+
+    /// Specifies the Windows Powershell programming language.
+    rel .example: 'powershell'
+
+    /// Specifies the Python programming language.
+    rel .example: 'python'
+
+    /// Specifies the Ruby programming language.
+    rel .example: 'ruby'
+
+    /// Specifies the Scala programming language.
+    rel .example: 'scala'
+
+    /// Specifies the Swift programming language.
+    rel .example: 'swift'
+
+    /// Specifies the TypeScript programming language.
+    rel .example: 'typescript'
+
+    /// Specifies the Visual Basic programming language.
+    rel .example: 'visual-basic'
+
+    /// Specifies the x86 32-bit Assembly programming language.
+    rel .example: 'x86-32'
+
+    /// Specifies the x86 64-bit Assembly programming language.
+    rel .example: 'x86-64'
+}
+
+/// Indicator type is an open vocabulary used to categorize Indicators. It is intended to be high-level to promote consistent practices.
+/// Indicator types should not be used to capture information that can be better captured via related Malware or Attack Pattern objects.
+/// It is better to link an Indicator to a Malware object describing Poison Ivy rather than simply providing a type or label of "poison-ivy".
+pub type indicator-type-ov {
+    rel .is: open-vocab
+
+    /// Unexpected, or unusual activity that may not necessarily be malicious or indicate compromise. This type of activity may include reconnaissance-like behavior such as port scans or version identification, network behavior anomalies, and asset and/or user behavioral anomalies.
+    rel .example: 'anomalous-activity'
+
+    /// Suspected anonymization tools or infrastructure (proxy, TOR, VPN, etc.).
+    rel .example: 'anonymization'
+
+    /// Activity that is not suspicious or malicious in and of itself, but when combined with other activity may indicate suspicious or malicious behavior.
+    rel .example: 'benign'
+
+    /// Assets that are suspected to be compromised.
+    rel .example: 'compromised'
+
+    /// Patterns of suspected malicious objects and/or activity.
+    rel .example: 'malicious-activity'
+
+    /// Patterns of behavior that indicate attribution to a particular Threat Actor or Campaign.
+    rel .example: 'attribution'
+
+    /// There is not enough information available to determine the type of indicator.
+    rel .example: 'unknown'
+}
+
+/// Industry sector is an open vocabulary that describes industrial and commercial sectors.
+/// It is intended to be holistic; it has been derived from several other lists and is not limited to "critical infrastructure" sectors.
+pub type industry-sector-ov {
+    rel .is: open-vocab
+
+    rel .example: 'agriculture'
+    rel .example: 'aerospace'
+    rel .example: 'automotive'
+    rel .example: 'communications'
+    rel .example: 'construction'
+    rel .example: 'defence'
+    rel .example: 'education'
+    rel .example: 'energy'
+    rel .example: 'entertainment'
+    rel .example: 'financial-services'
+    rel .example: 'government-national'
+    rel .example: 'government-regional'
+    rel .example: 'government-local'
+    rel .example: 'government-public-services'
+    rel .example: 'healthcare'
+    rel .example: 'hospitality-leisure'
+    rel .example: 'infrastructure'
+    rel .example: 'insurance'
+    rel .example: 'manufacturing'
+    rel .example: 'mining'
+    rel .example: 'non-profit'
+    rel .example: 'pharmaceuticals'
+    rel .example: 'retail'
+    rel .example: 'technology'
+    rel .example: 'telecommunications'
+    rel .example: 'transportation'
+    rel .example: 'utilities'
+}
+
+/// A non-exhaustive enumeration of infrastructure types.
+pub type infrastructure-type-ov {
+    rel .is: open-vocab
+
+    /// Specifies infrastructure used for conducting amplification attacks.
+    rel .example: 'amplification'
+
+    /// Specific infrastructure used for anonymization, such as a proxy.
+    rel .example: 'anonymization'
+	
+    /// Specifies the membership/makeup of a botnet, in terms of the network addresses of the hosts that comprise the botnet.
+    rel .example: 'botnet'
+
+    /// Specifies infrastructure used for command and control (C2). This is typically a domain name or IP address.
+    rel .example: 'command-and-control'
+
+    /// Specifies infrastructure used as an endpoint for data exfiltration.
+    rel .example: 'exfiltration'
+
+    /// Specifies infrastructure used for hosting malware.
+    rel .example: 'hosting-malware'
+
+    /// Specifies infrastructure used for hosting a list of targets for DDOS attacks, phishing, and other malicious activities. This is typically a domain name or IP address.
+    rel .example: 'hosting-target-lists'
+
+    /// Specifies infrastructure used for conducting phishing attacks.
+    rel .example: 'phishing'
+
+    /// Specifies infrastructure used for conducting reconnaissance activities.
+    rel .example: 'reconnaissance'
+
+    /// Specifies infrastructure used for staging.
+    rel .example: 'staging'
+
+    /// Specifies an infrastructure of some undefined type.
+    rel .example: 'undefined'
+}
+
+/// This is a non-exhaustive, open vocabulary that captures common types of generic malware anti-virus (AV) tool results.
+pub type malware-av-result-ov {
+    rel .is: open-vocab
+
+    /// The AV tool reported the malware binary as malicious.
+    rel .example: 'malicious'
+
+    /// The AV tool reported the malware binary as suspicious but not definitively malicious.
+    rel .example: 'suspicious'
+
+    /// The AV tool reported the malware binary as benign.
+    rel .example: 'benign'
+
+    /// The AV tool was unable to determine whether the malware binary is malicious.
+    rel .example: 'unknown'
+}
+
+/// This is an open vocabulary that covers common capabilities that may be exhibited by a malware instance or family.
+pub type malware-capabilities-ov {
+    rel .is: open-vocab
+
+    /// Indicates that the malware instance or family is able to access one or more remote machines.
+    rel .example: 'accesses-remote-machines'
+	
+    /// Indicates that the malware instance or family is able to prevent itself from being debugged and/or from being run in a debugger or is able to make debugging more difficult.
+    rel .example: 'anti-debugging'
+	
+    /// Indicates that the malware instance or family is able to prevent itself from being disassembled or make disassembly more difficult.
+    rel .example: 'anti-disassembly'
+	
+    /// Indicates that the malware instance or family is able to prevent its execution inside of an emulator or is able to make emulation more difficult.
+    rel .example: 'anti-emulation'
+	
+    /// Indicates that the malware instance or family is able to prevent or make memory forensics more difficult.
+    rel .example: 'anti-memory-forensics'
+	
+    /// Indicates that the malware instance or family is able to prevent sandbox-based behavioral analysis or make it more difficult.
+    rel .example: 'anti-sandbox'
+	
+    /// Indicates that the malware instance or family is able to prevent virtual machine (VM) based behavioral analysis or make it more difficult.
+    rel .example: 'anti-vm'
+	
+    /// Indicates that the malware instance or family is able to capture data from a system's input peripheral devices, such as a keyboard or mouse. This includes things like keylogging.
+    rel .example: 'captures-input-peripherals'
+	
+    /// Indicates that the malware instance or family captures data sent to a system's output peripherals, such as a display. Examples include things like screen scraping.
+    rel .example: 'captures-output-peripherals'
+	
+    /// Indicates that the malware instance or family is able to capture information about a system's state (e.g., data currently in its RAM).
+    rel .example: 'captures-system-state-data'
+	
+    /// Indicates that the malware instance or family is able to clean traces of its infection (e.g., file system artifacts) from a system.
+    rel .example: 'cleans-traces-of-infection'
+	
+    /// Indicates that the malware instance or family commits fraud, such as click fraud (for example).
+    rel .example: 'commits-fraud'
+	
+    /// Indicates that the malware instance or family is able to communicate (i.e., send or receive data) with a command and control (C2) server.
+    rel .example: 'communicates-with-c2'
+
+    /// Indicates that the malware instance or family is able to compromise the availability of data on the local system on which it is executing and/or one or more remote systems. For example, encrypting data on disk, as done by ransomware.
+    rel .example: 'compromises-data-availability'
+
+    /// Indicates that the malware instance or family is able to compromise the integrity of some data that resides on (e.g., in the case of files) or is received/transmitted (e.g., in the case of network traffic) by the system on which it is executing.
+    rel .example: 'compromises-data-integrity'
+
+    /// Indicates that the malware instance or family is able to consume system resources for its malicious purposes, such as password cracking or participating in a DDoS botnet, thereby compromising the availability of the local system and/or one or more remote systems.
+    rel .example: 'compromises-system-availability'
+
+    /// Indicates that the malware instance or family is able to control the machine on which it is executing (e.g., RATs).
+    rel .example: 'controls-local-machine'
+
+    /// Indicates that the malware instance or family is able to bypass or disable security programs or operating system security features on a system (including mobile devices), either by stopping them from executing or by making changes to their code or configuration parameters. For example, malware that blocks the local machine from accessing the websites of security vendors.
+    rel .example: 'degrades-security-software'
+
+    /// Indicates that the malware instance or family is able to disable the downloading and installation of system updates and patches.
+    rel .example: 'degrades-system-updates'
+
+    /// Indicates that the malware instance or family is able to identify one or more command and control (C2) servers with which to communicate (e.g., DGA).
+    rel .example: 'determines-c2-server'
+
+    /// Indicates that the malware instance or family is able to send spam email messages.
+    rel .example: 'emails-spam'
+
+    /// Indicates that the malware instance or family is able to escalate the privileges under which it is executing.
+    rel .example: 'escalates-privileges'
+
+    /// Indicates that the malware instance or family is able to evade detection by antivirus tools.
+    rel .example: 'evades-av'
+
+    /// Indicates that the malware instance or family is able to gather, prepare, (possibly obfuscate) data and transmit it to exfiltration points.
+    rel .example: 'exfiltrates-data'
+
+    /// Indicates that the malware instance or family is able to fingerprint or probe the configuration of the host system on which it is executing for the purpose of altering its behavior based on this environment.
+    rel .example: 'fingerprints-host'
+
+    /// Indicates that the malware instance or family is able to hide its artifacts, such as files and open ports.
+    rel .example: 'hides-artifacts'
+
+    /// Indicates that the malware instance or family is able to hide its code by compromising the bootloader, kernel modules, hypervisor, etc.
+    rel .example: 'hides-executing-code'
+
+    /// Indicates that the malware instance or family is able to infect one or more files on the system on which it executes.
+    /// For example, malware which injects a malicious payload into all PDFs on a host as a means of propagation.
+    rel .example: 'infects-files'
+
+    /// Indicates that the malware instance or family is able to self-propagate to a remote machine or infect a remote machine with malware that is different than itself.
+    rel .example: 'infects-remote-machines'
+
+    /// Indicates that the malware instance or family is able to install additional components. This encompasses the dropping/downloading of other malicious components such as libraries, other malware, and tools.
+    rel .example: 'installs-other-components'
+
+    /// Indicates that the malware instance or family is able to continue executing after the reboot of the system on which it is resident.
+    rel .example: 'persists-after-system-reboot'
+
+    /// Indicates that the malware instance or family is able to prevent its artifacts (e.g., files, registry keys, etc.) from being accessed.
+    rel .example: 'prevents-artifact-access'
+
+    /// Indicates that the malware instance or family is able to prevent its artifacts (e.g., files, registry keys, etc.) from being deleted.
+    rel .example: 'prevents-artifact-deletion'
+
+    /// Indicates that the malware instance or family is able to probe the properties of its network environment, e.g. to determine whether it funnels traffic through a proxy.
+    rel .example: 'probes-network-environment'
+
+    /// Indicates that the malware instance or family is able to modify itself.
+    rel .example: 'self-modifies'
+
+    /// Indicates that the malware instance is able to steal authentication credentials.
+    rel .example: 'steals-authentication-credentials'
+
+    /// Indicates that the malware instance or family is able to compromise the operational integrity of the system on which it is executing and/or one or more remote systems, e.g., by causing them to operate beyond their set of specified operational parameters. For example, malware that causes the CPU fan on the machine that it is executing to spin at a higher than normal speed.
+    rel .example: 'violates-system-operational-integrity'
+}
+
+/// Malware type is an open vocabulary that represents different types and functions of malware.
+/// Malware types are not mutually exclusive; for example, a malware instance can be both spyware and a screen capture tool.
+pub type malware-type-ov {
+    rel .is: open-vocab
+
+    /// Any software that is funded by advertising. Adware may also gather sensitive user information from a system.
+    rel .example: 'adware'
+
+	/// A malicious program that allows an attacker to perform actions on a remote system, such as transferring files, acquiring passwords, or executing arbitrary commands [NIST800-83].
+    rel .example: 'backdoor'
+
+	/// A program that resides on an infected system, communicating with and forming part of a botnet. The bot may be implanted by a worm or Trojan, which opens a backdoor. The bot then monitors the backdoor for further instructions.
+    rel .example: 'bot'
+
+	/// A malicious program which targets the Master Boot Record of the target computer.
+    rel .example: 'bootkit'
+
+	/// A program that is used to perform a distributed denial of service attack.
+    rel .example: 'ddos'
+
+	/// A small trojan file programmed to download and execute other files, usually more complex malware.
+    rel .example: 'downloader'
+
+	/// A type of trojan that deposits an enclosed payload (generally, other malware) onto the target computer.
+    rel .example: 'dropper'
+
+	/// A software toolkit to target common vulnerabilities.
+    rel .example: 'exploit-kit'
+
+	/// A type of malware that surreptitiously monitors keystrokes and either records them for later retrieval or sends them back to a central collection point.
+    rel .example: 'keylogger'
+
+	/// A type of malware that encrypts files on a victim's system, demanding payment of ransom in return for the access codes required to unlock files.
+    rel .example: 'ransomware'
+
+	/// A remote access trojan program (or RAT), is a trojan horse capable of controlling a machine through commands issued by a remote attacker.
+    rel .example: 'remote-access-trojan'
+
+	/// A type of malware that steals a system's resources (e.g., CPU cycles), such as a malicious bitcoin miner.
+    rel .example: 'resource-exploitation'
+
+	/// A fake security product that demands money to clean phony infections.
+    rel .example: 'rogue-security-software'
+
+	/// A type of malware that hides its files or processes from normal methods of monitoring in order to conceal its presence and activities. Rootkits can operate at a number of levels, from the application level — simply replacing or adjusting the settings of system software to prevent the display of certain information — through hooking certain functions or inserting modules or drivers into the operating system kernel, to the deeper level of firmware or virtualization rootkits, which are activated before the operating system and thus even harder to detect while the system is running.
+    rel .example: 'rootkit'
+
+	/// A type of malware used to capture images from the target systems screen, used for exfiltration and command and control.
+    rel .example: 'screen-capture'
+
+	/// Software that gathers information on a user's system without their knowledge and sends it to another party. Spyware is generally used to track activities for the purpose of delivering advertising.
+    rel .example: 'spyware'
+
+	/// Any malicious computer program which is used to hack into a computer by misleading users of its true intent.
+    rel .example: 'trojan'
+
+	/// There is not enough information available to determine the type of malware.
+    rel .example: 'unknown'
+
+	/// A malicious computer program that replicates by reproducing itself or infecting other programs by modifying them.
+    rel .example: 'virus'
+
+	/// A malicious script used by an attacker with the intent to escalate and maintain persistent access on an already compromised web application.
+    rel .example: 'webshell'
+
+	/// A piece of malware whose primary aim is to delete files or entire disks on a machine.
+    rel .example: 'wiper'
+
+	/// A self-replicating, self-contained program that usually executes itself without user intervention.
+    rel .example: 'worm'
+}
+
+/// This enumeration captures a degree of agreement with the information in a STIX Object.
+/// It is an ordered enumeration, with the earlier terms representing disagreement, the middle term neutral, and the later terms representing agreement.
+pub type opinion-enum {
+    /// The creator strongly disagrees with the information and believes it is inaccurate or incorrect.
+    /// This MAY be considered equivalent to a 1 in a numeric scale.
+    rel .is?: 'strongly-disagree'
+
+    /// The creator disagrees with the information and believes it is inaccurate or incorrect.
+    /// This MAY be considered equivalent to a 2 in a numeric scale.
+    rel .is?: 'disagree'
+
+    /// The creator is neutral about the accuracy or correctness of the information.
+    /// This MAY be considered equivalent to a 3 in a numeric scale.
+    rel .is?: 'neutral'
+
+    /// The creator agrees with the information and believes that it is accurate and correct.
+    /// This MAY be considered equivalent to a 4 in a numeric scale.
+    rel .is?: 'agree'
+
+    /// The creator strongly agrees with the information and believes that it is accurate and correct.
+    /// This MAY be considered equivalent to a 5 in a numeric scale.
+    rel .is?: 'strongly-agree'
+}
+
+pub type pattern-type-ov {
+    rel .is: open-vocab
+
+    rel .example: 'stix'
+    rel .example: 'snort'
+    rel .example: 'yara'
+}
+
+/// This is a non-exhaustive, open vocabulary that covers common processor architectures and is intended to characterize the architectures that a malware instance or family may be able to execute on.
+pub type processor-architecture-ov {
+    rel .is: open-vocab
+
+    /// Specifies the Alpha architecture.
+    rel .example: 'alpha'
+
+    /// Specifies the ARM architecture.
+    rel .example: 'arm'
+
+    /// Specifies the 64-bit IA (Itanium) architecture.
+    rel .example: 'ia-64'
+
+    /// Specifies the MIPS architecture.
+    rel .example: 'mips'
+
+    /// Specifies the PowerPC architecture.
+    rel .example: 'powerpc'
+
+    /// Specifies the SPARC architecture.
+    rel .example: 'sparc'
+
+    /// Specifies the 32-bit x86 architecture.
+    rel .example: 'x86'
+
+    /// Specifies the 64-bit x86 architecture.
+    rel .example: 'x86-64'
+}
+
+/// A list of world regions based on the United Nations geoscheme [UNSD M49].
+pub type region-ov {
+    rel .is: open-vocab
+
+    rel .example: 'africa'
+    rel .example: 'eastern-africa'
+    rel .example: 'middle-africa'
+    rel .example: 'northern-africa'
+    rel .example: 'southern-africa'
+    rel .example: 'western-africa'
+    rel .example: 'americas'
+    rel .example: 'latin-america-caribbean'
+    rel .example: 'south-america'
+    rel .example: 'caribbean'
+    rel .example: 'central-america'
+    rel .example: 'northern-america'
+    rel .example: 'asia'
+    rel .example: 'central-asia'
+    rel .example: 'eastern-asia'
+    rel .example: 'southern-asia'
+    rel .example: 'western-asia'
+    rel .example: 'europe'
+    rel .example: 'eastern-europe'
+    rel .example: 'northern-europe'
+    rel .example: 'southern-europe'
+    rel .example: 'western-europe'
+    rel .example: 'oceania'
+    rel .example: 'australia-new-zealand'
+    rel .example: 'melanesia'
+    rel .example: 'micronesia'
+    rel .example: 'polynesia'
+    rel .example: 'antarctica'
+}
+
+/// Report type is an open vocabulary to describe the primary purpose or subject of a report.
+/// For example, a report that contains malware and indicators for that malware should have a report type of malware to capture that the malware is the primary purpose.
+/// Report types are not mutually exclusive: a Report can be both a malware report and a tool report.
+/// Just because a report contains objects of a type does not mean that the report should include that type.
+/// If the objects are there to simply provide evidence or context for other objects, it is not necessary to include them in the type.
+pub type report-type-ov {
+    rel .is: open-vocab
+
+    /// Report subject is a characterization of one or more attack patterns and related information.
+    rel .example: 'attack-pattern'
+
+    /// Report subject is a characterization of one or more campaigns and related information.
+    rel .example: 'campaign'
+
+    /// Report subject is a characterization of one or more identities and related information.
+    rel .example: 'identity'
+
+    /// Report subject is a characterization of one or more indicators and related information.
+    rel .example: 'indicator'
+
+    /// Report subject is a characterization of one or more intrusion sets and related information.
+    rel .example: 'intrusion-set'
+
+    /// Report subject is a characterization of one or more malware instances and related information.
+    rel .example: 'malware'
+
+    /// Report subject is a characterization of observed data and related information.
+    rel .example: 'observed-data'
+
+    /// Report subject is a characterization of one or more threat actors and related information.
+    rel .example: 'threat-actor'
+
+    /// Report subject is a broad characterization of a threat across multiple facets.
+    rel .example: 'threat-report'
+
+    /// Report subject is a characterization of one or more tools and related information.
+    rel .example: 'tool'
+
+    /// Report subject is a characterization of one or more vulnerabilities and related information.
+    rel .example: 'vulnerability'
+}
+
+/// Threat actor type is an open vocabulary used to describe what type of threat actor the individual or group is.
+/// For example, some threat actors are competitors who try to steal information, while others are activists who act in support of a social or political cause.
+/// Actor types are not mutually exclusive: a threat actor can be both a disgruntled insider and a spy. [[Casey 2007]](https://docs.oasis-open.org/cti/stix/v2.1/csprd01/stix-v2.1-csprd01.html#kix.odol9vccfh3b))
+pub type threat-actor-type-ov {
+    rel .is: open-vocab
+
+    /// Highly motivated, potentially destructive supporter of a social or political cause (e.g., trade, labor, environment, etc.) that attempts to disrupt an organization's business model or damage their image.
+    ///
+    /// This category includes actors sometimes referred to as anarchists, cyber vandals, extremists, and hacktivists.
+    rel .example: 'activist'
+
+    /// An organization that competes in the same economic marketplace.
+    ///
+    /// The goal of a competitor is to gain an advantage in business with respect to the rival organization it targets. It usually does this by copying intellectual property, trade secrets, acquisition strategies, or other technical or business data from a rival organization with the intention of using the data to bolster its own assets and market position.
+    rel .example: 'competitor'
+
+    /// An enterprise organized to conduct significant, large-scale criminal activity for profit.
+    ///
+    /// Crime syndicates, also known as organized crime, are generally large, well-resourced groups that operate to create profit from all types of crime.
+    rel .example: 'crime-syndicate'
+
+    /// Individual who commits computer crimes, often for personal financial gain and often involves the theft of something valuable.
+    ///
+    /// Intellectual property theft, extortion via ransomware, and physical destruction are common examples. A criminal as defined here refers to those acting individually or in very small or informal groups. For sophisticated organized criminal activity, see the crime syndicate descriptor.
+    rel .example: 'criminal'
+
+    /// An individual that tends to break into networks for the thrill or the challenge of doing so.
+    ///
+    /// Hackers may use advanced skills or simple attack scripts they have downloaded.
+    rel .example: 'hacker'
+
+    /// A non-hostile insider who unintentionally exposes the organization to harm.
+    ///
+    /// “Insider” in this context includes any person extended internal trust, such as regular employees, contractors, consultants, and temporary workers.
+    rel .example: 'insider-accidental'
+
+    /// Current or former insiders who seek revengeful and harmful retaliation for perceived wrongs.
+    ///
+    /// “Insider” in this context includes any person extended internal trust, such as regular employees, contractors, consultants, and temporary workers.
+    ///
+    /// Disgruntled threat actors may have extensive knowledge that can be leveraged when conducting attacks and can take any number of actions including sabotage, violence, theft, fraud, espionage, or embarrassing individuals or the organization.
+    rel .example: 'insider-disgruntled'
+
+    /// Entities who work for the government or military of a nation state or who work at their direction.
+    ///
+    /// These actors typically have access to significant support, resources, training, and tools and are capable of designing and executing very sophisticated and effective Intrusion Sets and Campaigns.
+    rel .example: 'nation-state'
+
+    /// Seeks to cause embarrassment and brand damage by exposing sensitive information in a manner designed to cause a public relations crisis.
+    ///
+    /// A sensationalist may be an individual or small group of people motivated primarily by a need for notoriety.
+    /// Unlike the activist, the sensationalist generally has no political goal, and is not using bad PR to influence the target to change its behavior or business practices.
+    rel .example: 'sensationalist'
+
+    /// Secretly collects sensitive information for use, dissemination, or sale.
+    ///
+    /// Traditional spies (governmental and industrial) are part of a well-resourced intelligence organization and are capable of very sophisticated clandestine operations. However, insiders such as employees or consultants acting as spies can be just as effective and damaging, even when their activities are largely opportunistic and not part of an overall campaign.
+    rel .example: 'spy'
+
+    /// Uses extreme violence to advance a social or political agenda as well as monetary crimes to support its activities.
+    ///
+    /// In this context a terrorist refers to individuals who target noncombatants with violence to send a message of fear far beyond the actual events.
+    /// They may act independently or as part of a terrorist organization.
+    ///
+    /// Terrorist organizations must typically raise much of their operating budget through criminal activity, which often occurs online.
+    /// Terrorists are also often adept at using and covertly manipulating social media for both recruitment and impact.
+    rel .example: 'terrorist'
+
+    /// There is not enough information available to determine the type of threat actor.
+    rel .example: 'unknown'
+}
+
+/// Threat actor role is an open vocabulary that is used to describe the different roles that a threat actor can play.
+/// For example, some threat actors author malware or operate botnets while other actors actually carry out attacks directly.
+///
+/// Threat actor roles are not mutually exclusive.
+/// For example, an actor can be both a financial backer for attacks and also direct attacks.
+pub type threat-actor-role-ov {
+    rel .is: open-vocab
+
+    /// Threat actor executes attacks either on behalf of themselves or at the direction of someone else.
+    rel .example: 'agent'
+
+    /// The threat actor who directs the activities, goals, and objectives of the malicious activities.
+    rel .example: 'director'
+
+    /// A threat actor acting by themselves.
+    rel .example: 'independent'
+
+    /// Someone who designs the battle space.
+    rel .example: 'infrastructure-architect'
+
+    /// The threat actor who provides and supports the attack infrastructure that is used to deliver the attack (botnet providers, cloud services, etc.).
+    rel .example: 'infrastructure-operator'
+
+    /// The threat actor who authors malware or other malicious tools.
+    rel .example: 'malware-author'
+
+    /// The threat actor who funds the malicious activities.
+    rel .example: 'sponsor'
+}
+
+/// Threat actor sophistication vocabulary captures the skill level of a threat actor.
+/// It ranges from "none", which describes a complete novice, to "strategic", which describes an attacker who is able to influence supply chains to introduce vulnerabilities.
+/// This vocabulary is separate from resource level because an innovative, highly-skilled threat actor may have access to very few resources while a minimal-level actor might have the resources of an organized crime ring.
+pub type threat-actor-sophistication-ov {
+    rel .is: open-vocab
+
+    /// Can carry out random acts of disruption or destruction by running tools they do not understand.
+    /// Actors in this category have average computer skills.
+    /// 
+    /// Example Roles: Average User
+    /// 
+    /// These actors:
+    /// * can not launch targeted attacks
+    rel .example: 'none'
+
+    /// Can minimally use existing and frequently well known and easy-to-find techniques and programs or scripts to search for and exploit weaknesses in other computers.
+    /// Commonly referred to as a script-kiddie.
+    /// 
+    /// These actors rely on others to develop the malicious tools, delivery mechanisms, and execution strategy and often do not fully understand the tool they are using or how they work.
+    /// They also lack the ability to conduct their own reconnaissance and targeting research.
+    /// 
+    /// Example Roles: Script-Kiddie
+    /// 
+    /// These actors:
+    /// * attack known weaknesses;
+    /// * use well known scripts and tools; and
+    /// * have minimal knowledge of the tools.
+    rel .example: 'minimal'
+
+    /// Can proficiently use existing attack frameworks and toolkits to search for and exploit vulnerabilities in computers or systems.
+    /// Actors in this category have computer skills equivalent to an IT professional and typically have a working knowledge of networks, operating systems, and possibly even defensive techniques and will typically exhibit some operational security.
+    /// 
+    /// These actors rely others to develop the malicious tools and delivery mechanisms but are able to plan their own execution strategy.
+    /// They are proficient in the tools they are using and how they work and can even make minimal modifications as needed.
+    /// 
+    /// Example Roles: Toolkit User
+    /// 
+    /// These actors:
+    /// * attack known vulnerabilities;
+    /// * use attack frameworks and toolkits; and
+    /// * have proficient knowledge of the tools.
+    rel .example: 'intermediate'
+
+    /// Can develop their own tools or scripts from publicly known vulnerabilities to target systems and users.
+    /// Actors in this category are very adept at IT systems and have a background in software development along with a solid understanding of defensive techniques and operational security.
+    /// 
+    /// These actors rely on others to find and identify weaknesses and vulnerabilities in systems, but are able to create their own tools, delivery mechanisms, and execution strategies.
+    /// 
+    /// Example Roles: Toolkit Developer
+    /// 
+    /// These actors:
+    /// * attack known vulnerabilities;
+    /// * can create their own tools; and
+    /// * have proficient knowledge of the tools.
+    rel .example: 'advanced'
+
+    /// Can focus on the discovery and use of unknown malicious code, are is adept at installing user and kernel mode rootkits, frequently use data mining tools, target corporate executives and key users (government and industry) for the purpose of stealing personal and corporate data. Actors in this category are very adept at IT systems and software development and are experts with security systems, defensive techniques, attack methods, and operational security.
+    /// 
+    /// Example Roles: Vulnerability Researcher, Reverse Engineer, Threat Researcher, Malware Creator
+    /// 
+    /// These actors:
+    /// * attack unknown and known vulnerabilities;
+    /// * can create their own tools from scratch; and
+    /// * have proficient knowledge of the tools.
+    rel .example: 'expert'
+
+    /// Typically, criminal or state actors who are organized, highly technical, proficient, well-funded professionals working in teams to discover new vulnerabilities and develop exploits.
+    /// 
+    /// Demonstrates sophisticated capability. An innovator has the ability to create and script unique programs and codes targeting virtually any form of technology.
+    /// At this level, this actor has a deep knowledge of networks, operating systems, programming languages, firmware, and infrastructure topologies and will demonstrate operational security when conducting his activities.
+    /// Innovators are largely responsible for the discovery of 0-day vulnerabilities and the development of new attack techniques.
+    /// 
+    /// Example Roles: Toolkit Innovator, 0-Day Exploit Author
+    /// 
+    /// These actors:
+    /// * attack unknown and known vulnerabilities;
+    /// * create attacks against 0-Day exploits from scratch; and
+    /// * create new and innovative attacks and toolkits.
+    rel .example: 'innovator'
+
+    /// State actors who create vulnerabilities through an active program to “influence” commercial products and services during design, development or manufacturing, or with the ability to impact products while in the supply chain to enable exploitation of networks and systems of interest.
+    /// 
+    /// These actors:
+    /// * can create or use entire supply chains to launch an attack;
+    /// * can create and design attacks for any systems, software package, or device; and
+    /// * are responsible for APT-level attacks.
+    rel .example: 'strategic'
+}
+
+/// Tool types describe the categories of tools that can be used to perform attacks.
+pub type tool-type-ov {
+    rel .is: open-vocab
+
+    /// Tools used to perform denial of service attacks or DDoS attacks, such as Low Orbit Ion Cannon (LOIC) and DHCPig.
+    rel .example: 'denial-of-service'
+
+    /// Tools used to exploit software and systems, such as sqlmap and Metasploit.
+    rel .example: 'exploitation'
+
+    /// Tools used to enumerate system and network information, e.g., NMAP.
+    rel .example: 'information-gathering'
+
+    /// Tools used to capture network traffic, such as Wireshark and Kismet.
+    rel .example: 'network-capture'
+
+    /// Tools used to crack password databases or otherwise exploit/discover credentials, either locally or remotely, such as John the Ripper and NCrack.
+    rel .example: 'credential-exploitation'
+
+    /// Tools used to access machines remotely, such as VNC and Remote Desktop.
+    rel .example: 'remote-access'
+
+    /// Tools used to scan systems and networks for vulnerabilities, e.g., Nessus.
+    rel .example: 'vulnerability-scanning'
+
+    /// There is not enough information available to determine the type of tool.
+    rel .example: 'unknown'
+}
+
+/// An enumeration of Windows registry data types.
+pub type windows-registry-datatype-enum {
+    /// No defined value type.
+    rel .is?: 'REG_NONE'
+
+    /// A null-terminated string. This will be either a Unicode or an ANSI string, depending on whether you use the Unicode or ANSI functions.
+    rel .is?: 'REG_SZ'
+
+    /// A null-terminated string that contains unexpanded references to environment variables (for example, "%PATH%"). It will be a Unicode or ANSI string depending on whether you use the Unicode or ANSI functions.
+    rel .is?: 'REG_EXPAND_SZ'
+
+    /// Binary data in any form.
+    rel .is?: 'REG_BINARY'
+
+    /// A 32-bit number.
+    rel .is?: 'REG_DWORD'
+
+    /// A 32-bit number in big-endian format.
+    rel .is?: 'REG_DWORD_BIG_ENDIAN'
+
+    /// A 32-bit number in little-endian format.
+    rel .is?: 'REG_DWORD_LITTLE_ENDIAN'
+
+    /// A null-terminated Unicode string that contains the target path of a symbolic link.
+    rel .is?: 'REG_LINK'
+
+    /// A sequence of null-terminated strings, terminated by an empty string (\0).
+    rel .is?: 'REG_MULTI_SZ'
+
+    /// A series of nested lists designed to store a resource list used by a hardware device driver or one of the physical devices it controls. This data is detected and written into the ResourceMap tree by the system and is displayed in Registry Editor in hexadecimal format as a Binary Value.
+    rel .is?: 'REG_RESOURCE_LIST'
+
+    /// A series of nested lists designed to store a resource list used by a physical hardware device. This data is detected and written into the HardwareDescription tree by the system and is displayed in Registry Editor in hexadecimal format as a Binary Value.
+    rel .is?: 'REG_FULL_RESOURCE_DESCRIPTION'
+
+    /// Device driver list of hardware resource requirements in Resource Map tree.
+    rel .is?: 'REG_RESOURCE_REQUIREMENTS_LIST'
+
+    /// A 64-bit number.
+    rel .is?: 'REG_QWORD'
+
+    /// Specifies an invalid key.
+    rel .is?: 'REG_INVALID_TYPE'
+}

@@ -1,6 +1,19 @@
+use 'wgs' as wgs
+
+type longitude {
+    rel .is: f64
+    rel .is: wgs.wgs84_longitude
+}
+
+type latitude {
+    rel .is: f64
+    rel .is: wgs.wgs84_latitude
+}
+
 /// A position is the fundamental geometry construct.
 type position {
-    rel .0..2: f64
+    rel .0: longitude
+    rel .1: latitude
 }
 
 /// A list of two positions or more.

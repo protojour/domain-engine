@@ -20,5 +20,9 @@ pub type stix_cyber_observable_object {
     /// The default value for this property is `false`.
     ///
     /// This property **MUST NOT** be used on any STIX Objects other than SCOs.
-    rel .'defanged'?: bool
+    rel .'defanged'?: boolean
+}
+
+pub type mime-part-type {
+    // TODO
 }

@@ -1,9 +1,10 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{expect_eq, serde_utils::*, TestCompile};
+use ontol_test_utils::{expect_eq, serde_utils::*, SourceName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
 
-const GEOJSON: &str = include_str!("../../../examples/geojson.on");
+use crate::examples::{GEOJSON, WGS};
+
 const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 #[test]
@@ -48,7 +49,7 @@ fn test_fake_string_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    GEOJSON.compile_ok(|test| {
+    TestPackages::with_sources([(SourceName::root(), GEOJSON.1), WGS]).compile_ok(|test| {
         let [geometry] = test.bind(["Geometry"]);
         expect_eq!(
             actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),

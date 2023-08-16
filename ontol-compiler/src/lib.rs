@@ -111,7 +111,7 @@ impl<'m> Compiler<'m> {
 
         for parsed_package in topology.packages {
             debug!(
-                "lower package {:?}: {:?}",
+                "lower {:?}: {:?}",
                 parsed_package.package_id, parsed_package.reference
             );
             let source_id = self

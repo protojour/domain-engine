@@ -1,4 +1,5 @@
 mod errors;
+mod examples;
 mod hir;
 mod serde;
 mod test_conduit;
