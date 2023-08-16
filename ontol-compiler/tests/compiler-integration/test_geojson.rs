@@ -12,16 +12,16 @@ fn test_geojson() {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(geometry, Create, {
             "type": "Point",
-            "coordinates": [1, 2]
+            "coordinates": [1.0, 2.0]
         });
         assert_json_io_matches!(geometry, Create, {
             "type": "Polygon",
-            "coordinates": [[1, 2], [3, 4], [5, 6], [1, 2]]
+            "coordinates": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [1.0, 2.0]]
         });
         assert_json_io_matches!(geometry, Create, {
             "type": "MultiPolygon", "coordinates": [
-                [[1, 2], [3, 4], [5, 6], [1, 2]],
-                [[2, 3], [4, 5], [6, 7], [2, 3]],
+                [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [1.0, 2.0]],
+                [[2.0, 3.0], [4.0, 5.0], [6.0, 7.0], [2.0, 3.0]],
             ]
         });
         assert_json_io_matches!(geometry, Create, {
@@ -29,25 +29,25 @@ fn test_geojson() {
             "geometries": [
                 {
                     "type": "Point",
-                    "coordinates": [1, 2],
+                    "coordinates": [1.0, 2.0],
                 }
             ]
         });
         assert_error_msg!(
-            create_de(&geometry).data_variant(json!({ "type": "Point", "coordinates": [[1, 2]] })),
-            "invalid type: sequence, expected integer at line 1 column 38"
+            create_de(&geometry).data_variant(json!({ "type": "Point", "coordinates": [[1.0, 2.0]] })),
+            "invalid type: sequence, expected float at line 1 column 42"
         );
         assert_error_msg!(
-            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [1, 2] })),
-            "invalid type: integer `1`, expected sequence with length 2 at line 1 column 38"
+            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [1.0, 2.0] })),
+            "invalid type: floating point `1`, expected sequence with length 2 at line 1 column 42"
         );
         assert_error_msg!(
-            create_de(&geometry).data_variant(json!({ "type": "LineString", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected sequence with minimum length 2 at line 1 column 43"
+            create_de(&geometry).data_variant(json!({ "type": "LineString", "coordinates": [[1.0, 2.0]] })),
+            "invalid length 1, expected sequence with minimum length 2 at line 1 column 47"
         );
         assert_error_msg!(
-            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [[1, 2]] })),
-            "invalid length 1, expected sequence with minimum length 4 at line 1 column 40"
+            create_de(&geometry).data_variant(json!({ "type": "Polygon", "coordinates": [[1.0, 2.0]] })),
+            "invalid length 1, expected sequence with minimum length 4 at line 1 column 44"
         );
         assert_error_msg!(
             create_de(&geometry).data_variant(json!([])),
