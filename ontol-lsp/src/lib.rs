@@ -1,6 +1,6 @@
 use state::{get_builtins, get_span_range, Document, State};
 use tokio::sync::RwLock;
-use tower_lsp::jsonrpc::{Error as RpcError, Result};
+use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
@@ -9,6 +9,7 @@ mod state;
 pub mod wasm;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const NAME: &str = env!("CARGO_PKG_NAME");
 
 pub struct Backend {
     pub client: Client,
@@ -23,37 +24,50 @@ impl Backend {
         }
     }
 
-    async fn compile(&self, doc: &Document, uri: &Url) {
+    async fn diagnose(&self, uri: &Url) {
+        let diags = self.get_diagnostics(uri).await;
+        self.client
+            .publish_diagnostics(uri.clone(), diags, None)
+            .await;
+    }
+
+    async fn get_diagnostics(&self, uri: &Url) -> Vec<Diagnostic> {
         let state = self.state.read().await;
-        if let Some(err) = state.compile().err() {
-            let mut diags = vec![];
-            for err in err.errors {
-                // TODO: improve some fields here
-                diags.push(Diagnostic {
-                    range: get_span_range(&doc.text, &err.span),
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    source: Some("ONTOL language server".to_string()),
-                    message: err.error.to_string(),
-                    related_information: Some(
-                        err.notes
-                            .iter()
-                            .map(|note| DiagnosticRelatedInformation {
-                                // TODO: might be wrong
-                                location: Location {
-                                    uri: uri.clone(),
-                                    range: get_span_range(&doc.text, &note.span),
-                                },
-                                message: note.note.to_string(),
+        let mut diags = vec![];
+        match state.compile() {
+            Ok(_) => {}
+            Err(err) => {
+                for err in err.errors {
+                    // TODO: improve some fields here
+                    match state.docs.get(uri.as_str()) {
+                        Some(doc) => {
+                            diags.push(Diagnostic {
+                                range: get_span_range(&doc.text, &err.span),
+                                severity: Some(DiagnosticSeverity::ERROR),
+                                source: Some(NAME.to_string()),
+                                message: err.error.to_string(),
+                                related_information: Some(
+                                    err.notes
+                                        .iter()
+                                        .map(|note| DiagnosticRelatedInformation {
+                                            // TODO: might be wrong
+                                            location: Location {
+                                                uri: uri.clone(),
+                                                range: get_span_range(&doc.text, &note.span),
+                                            },
+                                            message: note.note.to_string(),
+                                        })
+                                        .collect(),
+                                ),
+                                ..Default::default()
                             })
-                            .collect(),
-                    ),
-                    ..Default::default()
-                })
+                        }
+                        None => panic!("Doc should be readable at this point"),
+                    }
+                }
             }
-            self.client
-                .publish_diagnostics(uri.clone(), diags, None)
-                .await;
         }
+        diags
     }
 }
 
@@ -62,7 +76,7 @@ impl LanguageServer for Backend {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
-                name: "ONTOL language server".to_string(),
+                name: NAME.to_string(),
                 version: Some(VERSION.to_string()),
             }),
             capabilities: ServerCapabilities {
@@ -77,7 +91,7 @@ impl LanguageServer for Backend {
                 )),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(true),
+                    // resolve_provider: Some(true),
                     completion_item: Some(CompletionOptionsCompletionItem {
                         label_details_support: Some(true),
                     }),
@@ -102,54 +116,53 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let mut state = self.state.write().await;
-        // TODO: (pre-)compliler should figure out the root
-        if state.root.is_none() {
-            state.root = Some(params.text_document.uri.to_string())
+        {
+            let mut state = self.state.write().await;
+            // TODO: (pre-)compiler should figure out the root
+            if state.root.is_none() {
+                state.root = Some(params.text_document.uri.to_string())
+            }
+            state.docs.insert(
+                params.text_document.uri.to_string(),
+                Document {
+                    text: params.text_document.text,
+                    ..Default::default()
+                },
+            );
+            state.parse_statements(params.text_document.uri.as_str());
         }
-
-        self.client
-            .log_message(MessageType::LOG, params.text_document.uri.to_string())
-            .await;
-
-        let doc = Document {
-            text: params.text_document.text,
-            ..Default::default()
-        };
-        state
-            .docs
-            .insert(params.text_document.uri.to_string(), doc.clone());
-
-        state.parse_statements(params.text_document.uri.as_str());
-        // self.compile(&doc, &params.text_document.uri).await;
+        self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let mut state = self.state.write().await;
-        let mut doc = Document::default();
-        for change in params.content_changes {
-            doc = Document {
-                text: change.text,
-                ..Default::default()
-            };
-            state
-                .docs
-                .insert(params.text_document.uri.to_string(), doc.clone());
+        {
+            let mut state = self.state.write().await;
+            for change in params.content_changes {
+                state.docs.insert(
+                    params.text_document.uri.to_string(),
+                    Document {
+                        text: change.text,
+                        ..Default::default()
+                    },
+                );
+            }
+            state.parse_statements(params.text_document.uri.as_str());
         }
-        state.parse_statements(params.text_document.uri.as_str());
-        // self.compile(&doc, &params.text_document.uri).await;
+        self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        self.state
-            .write()
-            .await
-            .parse_statements(params.text_document.uri.as_str());
+        {
+            let mut state = self.state.write().await;
+            state.parse_statements(params.text_document.uri.as_str());
+        }
+        self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let mut state = self.state.write().await;
         state.docs.remove(params.text_document.uri.as_str());
+        // TODO: set a new state
         if Some(params.text_document.uri.to_string()) == state.root {
             state.root = None
         }
@@ -203,7 +216,7 @@ impl LanguageServer for Backend {
         }
     }
 
-    async fn completion_resolve(&self, _params: CompletionItem) -> Result<CompletionItem> {
-        Err(RpcError::method_not_found())
-    }
+    // async fn completion_resolve(&self, _params: CompletionItem) -> Result<CompletionItem> {
+    //     Err(RpcError::method_not_found())
+    // }
 }

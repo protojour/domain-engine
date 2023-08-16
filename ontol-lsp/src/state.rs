@@ -103,7 +103,7 @@ impl State {
                             };
                             let package_config = PackageConfig::default();
 
-                            match self.docs.get(source_name) {
+                            match self.docs.get(&format!("file:///{}.on", source_name)) {
                                 Some(source_text) => {
                                     package_graph_builder.provide_package(ParsedPackage::parse(
                                         request,
@@ -121,7 +121,7 @@ impl State {
                                             span: SourceSpan::default(),
                                             notes: vec![],
                                         }],
-                                    })
+                                    });
                                 }
                             }
                         }
@@ -140,8 +140,11 @@ impl State {
 }
 
 fn get_source_name(name: &str) -> &str {
-    match name.strip_suffix(".on") {
-        Some(stripped) => stripped,
+    match name.strip_prefix("file:///") {
+        Some(name) => match name.strip_suffix(".on") {
+            Some(name) => name,
+            None => name,
+        },
         None => name,
     }
 }
@@ -165,22 +168,25 @@ pub struct DocPanel {
 
 pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
     let mut range = Range::new(Position::new(0, 0), Position::new(0, 0));
-    let mut counter = 0;
+    let mut start_set = false;
+    let mut cursor = 0;
 
-    for (index, line) in text.lines().enumerate() {
-        if span.start > 0 && range.start.line == 0 && range.start.character == 0 {
-            if counter + line.len() < span.start as usize {
-                counter += line.len() + 1;
+    for (line_index, line) in text.lines().enumerate() {
+        if !start_set {
+            if cursor + line.len() < span.start as usize {
+                cursor += line.len() + 1;
             } else {
-                range.start.line = index as u32;
-                range.start.character = span.start - counter as u32;
+                range.start.line = line_index as u32;
+                range.start.character = span.start - cursor as u32;
+                start_set = true
             }
-        } else if span.end > 0 {
-            if counter + line.len() < span.end as usize {
-                counter += line.len() + 1;
+        }
+        if start_set {
+            if cursor + line.len() < span.end as usize {
+                cursor += line.len() + 1;
             } else {
-                range.end.line = index as u32;
-                range.end.character = span.end - counter as u32;
+                range.end.line = line_index as u32;
+                range.end.character = span.end - cursor as u32;
                 break;
             }
         }
@@ -347,20 +353,20 @@ impl Document {
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nBoolean".to_string();
                                 }
+                                "number" => {
+                                    dp.path = "ontol.number".to_string();
+                                    dp.signature = val.to_string();
+                                    dp.docs = "### Scalar\nNumber".to_string();
+                                }
                                 "integer" => {
                                     dp.path = "ontol.integer".to_string();
                                     dp.signature = val.to_string();
-                                    dp.docs = "### Scalar\nUnsigned integer".to_string();
+                                    dp.docs = "### Scalar\nInteger".to_string();
                                 }
                                 "float" => {
                                     dp.path = "ontol.float".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nFloating point number".to_string();
-                                }
-                                "number" => {
-                                    dp.path = "ontol.number".to_string();
-                                    dp.signature = val.to_string();
-                                    dp.docs = "### Scalar\nNumber".to_string();
                                 }
                                 "string" => {
                                     dp.path = "ontol.string".to_string();
