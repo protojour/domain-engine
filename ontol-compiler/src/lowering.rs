@@ -85,7 +85,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(Default::default())
             }
-            ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
+            ast::Statement::Type(type_stmt) => {
+                let ident_span = type_stmt.ident.1.clone();
+                self.define_type(type_stmt, ident_span)
+            }
             ast::Statement::With(with_stmt) => {
                 let mut root_defs = RootDefs::new();
                 let def_id = self.resolve_type_reference(

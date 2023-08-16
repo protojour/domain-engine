@@ -9,6 +9,22 @@ fn error_lex() {
 }
 
 #[test]
+fn error_comment_span() {
+    // This tests that the eror span is correct
+    r#"
+    /// A comment - don't remove this
+    pub type union // ERROR variants of the union have prefixes that are prefixes of other variants
+
+    type a { fmt '' => 'foo' => . }
+    type b { fmt '' => 'foobar' => . }
+
+    rel union is?: a
+    rel union is?: b
+    "#
+    .compile_fail();
+}
+
+#[test]
 fn error_invalid_statement() {
     "foobar // ERROR parse error: found `foobar`, expected one of `use`, `type`, `with`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
