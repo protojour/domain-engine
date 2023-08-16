@@ -155,7 +155,7 @@ impl Document {
                         dp.docs = stmt.docs.join("\n");
                     }
                     Statement::With(stmt) => {
-                        if let Type::Path(Path::Ident(id), _) = &stmt.ty.0 {
+                        if let Type::Path(Path::Ident(id)) = &stmt.ty.0 {
                             dp.path += &format!(".{}", id);
                         }
                     }

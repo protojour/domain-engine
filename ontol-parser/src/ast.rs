@@ -41,7 +41,6 @@ pub struct TypeStatement {
     pub visibility: Spanned<Visibility>,
     pub kw: Span,
     pub ident: Spanned<String>,
-    pub params: Option<Spanned<Vec<Spanned<TypeParam>>>>,
     pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
 }
 
@@ -164,7 +163,7 @@ pub enum TypeOrPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Unit,
-    Path(Path, Option<Spanned<Vec<Spanned<TypeParamPattern>>>>),
+    Path(Path),
     AnonymousStruct(Spanned<Vec<Spanned<Statement>>>),
     NumberLiteral(String),
     StringLiteral(String),

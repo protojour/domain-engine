@@ -22,7 +22,6 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
     subject: (
         DefReference {
             def_id: DefId::unit(),
-            pattern_bindings: None,
         },
         NO_SPAN,
     ),
@@ -30,7 +29,6 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
     object: (
         DefReference {
             def_id: DefId::unit(),
-            pattern_bindings: None,
         },
         NO_SPAN,
     ),

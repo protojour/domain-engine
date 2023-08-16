@@ -224,7 +224,6 @@ impl<'m> Compiler<'m> {
             DefKind::Type(TypeDef {
                 public: true,
                 ident: Some(ident),
-                params: None,
                 rel_type_for: None,
                 concrete: true,
             }),

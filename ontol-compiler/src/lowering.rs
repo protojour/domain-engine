@@ -1,10 +1,9 @@
 use std::{collections::HashMap, ops::Range};
 
-use fnv::FnvHashMap;
 use ontol_parser::{ast, Span};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
-    smart_format, DefId, DefParamId, RelationshipId,
+    smart_format, DefId, RelationshipId,
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -12,8 +11,8 @@ use tracing::debug;
 
 use crate::{
     def::{
-        Def, DefKind, DefParamBinding, DefReference, FmtFinalState, MapDirection, RelParams,
-        Relationship, TypeDef, TypeDefParam, Variables,
+        Def, DefKind, DefReference, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef,
+        Variables,
     },
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
@@ -178,7 +177,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 DefReference {
                     def_id: self.define(DefKind::Constant(expr_id), &object_span),
-                    pattern_bindings: Default::default(),
                 }
             }
             None => self.resolve_contextual_type_reference(
@@ -265,7 +263,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 TypeDef {
                     public: false,
                     ident: None,
-                    params: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
                     concrete: true,
                 },
@@ -380,7 +377,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 TypeDef {
                     public: false,
                     ident: None,
-                    params: None,
                     rel_type_for: None,
                     concrete: true,
                 },
@@ -472,20 +468,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match ast_ty {
             ast::Type::Unit => Ok(DefReference {
                 def_id: self.compiler.primitives.unit,
-                pattern_bindings: Default::default(),
             }),
-            ast::Type::Path(path, param_patterns) => {
+            ast::Type::Path(path) => {
                 let def_id = self.lookup_path(&path, span)?;
-                let args = if let Some((patterns, patterns_span)) = param_patterns {
-                    Some(self.resolve_type_pattern_bindings(patterns, patterns_span, def_id))
-                } else {
-                    None
-                };
 
-                Ok(DefReference {
-                    def_id,
-                    pattern_bindings: args,
-                })
+                Ok(DefReference { def_id })
             }
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
@@ -493,7 +480,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         TypeDef {
                             public: false,
                             ident: None,
-                            params: None,
                             rel_type_for: None,
                             concrete: true,
                         },
@@ -519,10 +505,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         }
                     }
 
-                    Ok(DefReference {
-                        def_id: def.def_id,
-                        pattern_bindings: Default::default(),
-                    })
+                    Ok(DefReference { def_id: def.def_id })
                 } else {
                     Err((
                         CompileError::TODO(smart_format!("Anonymous struct not allowed here")),
@@ -537,10 +520,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ONTOL_PKG,
                     self.src.span(span),
                 );
-                Ok(DefReference {
-                    def_id,
-                    pattern_bindings: Default::default(),
-                })
+                Ok(DefReference { def_id })
             }
             ast::Type::StringLiteral(lit) => {
                 let def_id = match lit.as_str() {
@@ -550,10 +530,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         .defs
                         .def_string_literal(&lit, &mut self.compiler.strings),
                 };
-                Ok(DefReference {
-                    def_id,
-                    pattern_bindings: Default::default(),
-                })
+                Ok(DefReference { def_id })
             }
             ast::Type::Regex(lit) => {
                 let def_id = self
@@ -563,61 +540,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
-                Ok(DefReference {
-                    def_id,
-                    pattern_bindings: Default::default(),
-                })
-            }
-        }
-    }
-
-    fn resolve_type_pattern_bindings(
-        &mut self,
-        ast_patterns: Vec<(ast::TypeParamPattern, Range<usize>)>,
-        span: Range<usize>,
-        def_id: DefId,
-    ) -> FnvHashMap<DefParamId, DefParamBinding> {
-        match self.compiler.defs.def_kind(def_id) {
-            DefKind::Type(TypeDef {
-                params: Some(params),
-                ..
-            }) => {
-                let mut args: FnvHashMap<DefParamId, DefParamBinding> = Default::default();
-                for (ast_pattern, _span) in ast_patterns {
-                    match params.get(ast_pattern.ident.0.as_str()) {
-                        Some(type_def_param) => match ast_pattern.binding {
-                            ast::TypeParamPatternBinding::None => {
-                                args.insert(type_def_param.id, DefParamBinding::Bound(0));
-                            }
-                            ast::TypeParamPatternBinding::Equals((ty, ty_span)) => {
-                                match self.resolve_type_reference(ty, &ty_span, None) {
-                                    Ok(value) => {
-                                        args.insert(
-                                            type_def_param.id,
-                                            DefParamBinding::Provided(
-                                                value,
-                                                self.src.span(&ty_span),
-                                            ),
-                                        );
-                                    }
-                                    Err(error) => {
-                                        self.report_error(error);
-                                    }
-                                }
-                            }
-                        },
-                        None => self.report_error((
-                            CompileError::UnknownTypeParameter,
-                            ast_pattern.ident.1,
-                        )),
-                    }
-                }
-
-                args
-            }
-            _ => {
-                self.report_error((CompileError::InvalidTypeParameters, span));
-                Default::default()
+                Ok(DefReference { def_id })
             }
         }
     }
@@ -660,7 +583,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let key = (
             DefReference {
                 def_id: DefId::unit(),
-                pattern_bindings: Default::default(),
             },
             self.src.span(&span),
         );
@@ -893,24 +815,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
         let ident = self.compiler.strings.intern(&type_stmt.ident.0);
         debug!("{def_id:?}: `{ident}`");
-        let params = type_stmt.params.map(|(ast_params, _span)| {
-            ast_params
-                .into_iter()
-                .map(|(param, _span)| {
-                    let ident = self.compiler.strings.intern(param.ident.0.as_str());
-                    let id = self.compiler.defs.alloc_def_param_id();
-
-                    (ident, TypeDefParam { id })
-                })
-                .collect()
-        });
 
         self.set_def_kind(
             def_id,
             DefKind::Type(TypeDef {
                 public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
                 ident: Some(ident),
-                params,
                 rel_type_for: None,
                 concrete: true,
             }),
@@ -924,10 +834,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         if let Some((ctx_block, _span)) = type_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
-            let def = DefReference {
-                def_id,
-                pattern_bindings: Default::default(),
-            };
+            let def = DefReference { def_id };
             let context_fn = move || def.clone();
 
             for spanned_stmt in ctx_block {
@@ -951,7 +858,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         debug!("{anonymous_def_id:?}: <anonymous>");
         DefReference {
             def_id: anonymous_def_id,
-            pattern_bindings: Default::default(),
         }
     }
 

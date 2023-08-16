@@ -82,7 +82,6 @@ fn type_statement(
             },
             kw,
             ident,
-            params: None,
             ctx_block,
         })
 }
@@ -399,7 +398,7 @@ fn named_type() -> impl AstParser<Type> {
     let unit = just(Token::Open('('))
         .then(just(Token::Close(')')))
         .map(|_| Type::Unit);
-    let path = path().map(|path| Type::Path(path, None));
+    let path = path().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
     let string_literal = string_literal().map(Type::StringLiteral);
     let regex = select! { Token::Regex(string) => string }.map(Type::Regex);

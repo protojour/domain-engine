@@ -1,7 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
     PackageId, RelationshipId, Role,
@@ -77,7 +76,6 @@ impl<'m> DefKind<'m> {
 pub struct TypeDef<'m> {
     pub public: bool,
     pub ident: Option<&'m str>,
-    pub params: Option<IndexMap<&'m str, TypeDefParam>>,
     pub rel_type_for: Option<RelationshipId>,
     /// for now: Every user-domain defined type is concrete.
     pub concrete: bool,
@@ -94,22 +92,12 @@ pub struct Variables(pub SmallVec<[ExprId; 2]>);
 #[derive(Debug, Clone)]
 pub struct DefReference {
     pub def_id: DefId,
-    pub pattern_bindings: Option<FnvHashMap<DefParamId, DefParamBinding>>,
 }
 
 impl From<DefId> for DefReference {
     fn from(value: DefId) -> Self {
-        Self {
-            def_id: value,
-            pattern_bindings: Default::default(),
-        }
+        Self { def_id: value }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum DefParamBinding {
-    Bound(u32),
-    Provided(DefReference, SourceSpan),
 }
 
 #[derive(Clone, Copy, Debug)]
