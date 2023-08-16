@@ -68,10 +68,11 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 
     doc_comment()
         .or(just("=>").map(|_| Token::FatArrow))
-        .or(one_of(".,:?_+-*=<>|").map(Token::Sigil))
+        .or(one_of(".,:?_+*=<>|").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
         .or(num().map(Token::Number))
+        .or(just('-').map(Token::Sigil))
         .or(double_quote_string_literal().map(Token::StringLiteral))
         .or(single_quote_string_literal().map(Token::StringLiteral))
         .or(regex().map(Token::Regex))
@@ -87,10 +88,21 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 }
 
 fn num() -> impl Parser<char, String, Error = Simple<char>> {
-    filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
-        .map(Some)
+    just('-')
+        .or_not()
         .chain::<char, Vec<_>, _>(
-            filter(|c: &char| c.is_ascii_digit() && !special_char(*c)).repeated(),
+            filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
+                .repeated()
+                .at_least(1),
+        )
+        .chain::<char, _, _>(
+            just('.')
+                .chain(
+                    filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
+                        .repeated()
+                        .at_least(1),
+                )
+                .or_not(),
         )
         .map(|vec| String::from_iter(vec.into_iter()))
 }
@@ -180,17 +192,26 @@ fn special_char(c: char) -> bool {
 mod tests {
     use assert_matches::assert_matches;
 
+    use super::Token::*;
     use super::*;
 
-    fn lex(input: &str) -> Result<Vec<Spanned<Token>>, Vec<Simple<char>>> {
+    fn lex(input: &str) -> Result<Vec<Token>, Vec<Simple<char>>> {
         let (tokens, errors) = lexer().parse_recovery(input);
         if !errors.is_empty() {
             Err(errors)
         } else if let Some(tokens) = tokens {
-            Ok(tokens)
+            Ok(tokens.into_iter().map(|(token, _)| token).collect())
         } else {
             Err(vec![])
         }
+    }
+
+    fn number(input: &str) -> Token {
+        Token::Number(input.into())
+    }
+
+    fn sym(input: &str) -> Token {
+        Token::Sym(input.into())
     }
 
     #[test]
@@ -205,7 +226,43 @@ mod tests {
         pub type PubType
         ";
         let tokens = lex(source).unwrap();
-        let doc_comment = &tokens.first().unwrap().0;
+        let doc_comment = &tokens.first().unwrap();
         assert_matches!(doc_comment, Token::DocComment(_))
+    }
+
+    #[test]
+    fn empty() {
+        assert_eq!(&lex("").unwrap(), &[]);
+    }
+
+    #[test]
+    fn integer() {
+        assert_eq!(&lex("42").unwrap(), &[number("42")]);
+        assert_eq!(&lex("-42").unwrap(), &[number("-42")]);
+        assert_eq!(&lex("--42").unwrap(), &[Sigil('-'), number("-42")]);
+        assert_eq!(&lex("42x").unwrap(), &[number("42"), sym("x")]);
+        assert_eq!(&lex("42 ").unwrap(), &[number("42")]);
+        assert_eq!(&lex("4-2").unwrap(), &[number("4"), number("-2")]);
+        assert_eq!(
+            &lex("4--2").unwrap(),
+            &[number("4"), Sigil('-'), number("-2")]
+        );
+    }
+
+    #[test]
+    fn decimal() {
+        assert_eq!(&lex(".42").unwrap(), &[Sigil('.'), number("42")]);
+        assert_eq!(&lex("42.").unwrap(), &[number("42"), Sigil('.')]);
+        assert_eq!(&lex("4.2").unwrap(), &[Number("4.2".into())]);
+        assert_eq!(&lex("42.42").unwrap(), &[number("42.42")]);
+        assert_eq!(&lex("-0.42").unwrap(), &[number("-0.42")]);
+        assert_eq!(
+            &lex("-.42").unwrap(),
+            &[Sigil('-'), Sigil('.'), number("42")]
+        );
+        assert_eq!(
+            &lex("4..2").unwrap(),
+            &[number("4"), Sigil('.'), Sigil('.'), number("2")]
+        );
     }
 }

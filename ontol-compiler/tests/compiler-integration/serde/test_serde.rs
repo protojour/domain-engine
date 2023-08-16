@@ -277,19 +277,19 @@ fn test_i64_range_constrained() {
 #[test]
 fn test_integer_range_constrained() {
     "
-    pub type percentage {
+    pub type foo {
         rel .is: integer
-        rel .min: 0
-        rel .max: 100
+        rel .min: -1
+        rel .max: 1
     }
     "
     .compile_ok(|test| {
-        let [percentage] = test.bind(["percentage"]);
-        assert_json_io_matches!(percentage, Create, 0 == 0);
-        assert_json_io_matches!(percentage, Create, 100 == 100);
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(foo, Create, 0 == 0);
+        assert_json_io_matches!(foo, Create, (-1) == (-1));
         assert_error_msg!(
-            create_de(&percentage).data_variant(json!(1000)),
-            r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
+            create_de(&foo).data_variant(json!(-2)),
+            r#"invalid type: integer `-2`, expected integer in range -1..=1 at line 1 column 2"#
         );
     });
 }
