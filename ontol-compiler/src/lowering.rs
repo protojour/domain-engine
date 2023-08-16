@@ -234,7 +234,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         DefKind::StringLiteral(_) => {
                             (RelationKey::Named(def_ref), span.clone(), None)
                         }
-                        DefKind::BuiltinRelType(_relation) => {
+                        DefKind::BuiltinRelType(..) => {
                             (RelationKey::Builtin(def_ref.def_id), span.clone(), None)
                         }
                         _ => return Err((CompileError::InvalidRelationType, span)),

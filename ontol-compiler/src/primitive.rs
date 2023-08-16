@@ -103,23 +103,6 @@ pub struct Primitives {
     pub doc: Doc,
 }
 
-impl Primitives {
-    pub fn list_primitives(&self) -> [(DefId, Option<&'static str>, PrimitiveKind); 10] {
-        [
-            (self.unit, None, PrimitiveKind::Unit),
-            (self.bool, Some("bool"), PrimitiveKind::Bool),
-            (self.false_value, Some("false"), PrimitiveKind::False),
-            (self.true_value, Some("true"), PrimitiveKind::True),
-            (self.number, Some("number"), PrimitiveKind::Number),
-            (self.integer, Some("integer"), PrimitiveKind::Integer),
-            (self.i64, Some("i64"), PrimitiveKind::I64),
-            (self.float, Some("float"), PrimitiveKind::Float),
-            (self.f64, Some("f64"), PrimitiveKind::F64),
-            (self.string, Some("string"), PrimitiveKind::String),
-        ]
-    }
-}
-
 /// Built-in relation types
 #[derive(Debug)]
 pub struct OntolRelations {
@@ -149,21 +132,6 @@ pub struct OntolRelations {
     pub route: DefId,
 }
 
-impl OntolRelations {
-    pub fn list_relations(&self) -> [(DefId, &'static str); 8] {
-        [
-            (self.is, "is"),
-            (self.identifies, "identifies"),
-            (self.id, "id"),
-            (self.min, "min"),
-            (self.max, "max"),
-            (self.default, "default"),
-            (self.gen, "gen"),
-            (self.route, "route"),
-        ]
-    }
-}
-
 #[derive(Debug)]
 pub struct Doc {
     pub doc_relation: DefId,
@@ -180,32 +148,33 @@ pub struct Generators {
 impl Primitives {
     pub fn new(defs: &mut Defs) -> Self {
         let primitives = Self {
-            unit: defs.add_primitive(PrimitiveKind::Unit),
+            unit: defs.add_primitive(PrimitiveKind::Unit, None),
 
-            false_value: defs.add_primitive(PrimitiveKind::False),
-            true_value: defs.add_primitive(PrimitiveKind::True),
-            bool: defs.add_primitive(PrimitiveKind::Bool),
+            false_value: defs.add_primitive(PrimitiveKind::False, Some("false")),
+            true_value: defs.add_primitive(PrimitiveKind::True, Some("true")),
+            bool: defs.add_primitive(PrimitiveKind::Bool, Some("bool")),
 
             empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
             empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),
-            number: defs.add_primitive(PrimitiveKind::Number),
-            integer: defs.add_primitive(PrimitiveKind::Integer),
-            i64: defs.add_primitive(PrimitiveKind::I64),
-            float: defs.add_primitive(PrimitiveKind::Float),
-            f32: defs.add_primitive(PrimitiveKind::F32),
-            f64: defs.add_primitive(PrimitiveKind::F64),
-            string: defs.add_primitive(PrimitiveKind::String),
+            number: defs.add_primitive(PrimitiveKind::Number, Some("number")),
+            integer: defs.add_primitive(PrimitiveKind::Integer, Some("integer")),
+            i64: defs.add_primitive(PrimitiveKind::I64, Some("i64")),
+            float: defs.add_primitive(PrimitiveKind::Float, Some("float")),
+            f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
+            f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
+            string: defs.add_primitive(PrimitiveKind::String, Some("string")),
 
             relations: OntolRelations {
-                is: defs.add_builtin_relation(BuiltinRelationKind::Is),
-                identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies),
-                id: defs.add_builtin_relation(BuiltinRelationKind::Id),
-                indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed),
-                min: defs.add_builtin_relation(BuiltinRelationKind::Min),
-                max: defs.add_builtin_relation(BuiltinRelationKind::Max),
-                default: defs.add_builtin_relation(BuiltinRelationKind::Default),
-                gen: defs.add_builtin_relation(BuiltinRelationKind::Gen),
-                route: defs.add_builtin_relation(BuiltinRelationKind::Route),
+                is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
+                identifies: defs
+                    .add_builtin_relation(BuiltinRelationKind::Identifies, Some("identifies")),
+                id: defs.add_builtin_relation(BuiltinRelationKind::Id, Some("id")),
+                indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
+                min: defs.add_builtin_relation(BuiltinRelationKind::Min, Some("min")),
+                max: defs.add_builtin_relation(BuiltinRelationKind::Max, Some("max")),
+                default: defs.add_builtin_relation(BuiltinRelationKind::Default, Some("default")),
+                gen: defs.add_builtin_relation(BuiltinRelationKind::Gen, Some("gen")),
+                route: defs.add_builtin_relation(BuiltinRelationKind::Route, Some("route")),
             },
 
             generators: Generators {
@@ -215,8 +184,8 @@ impl Primitives {
             },
 
             doc: Doc {
-                doc_relation: defs.add_builtin_relation(BuiltinRelationKind::Doc),
-                example_relation: defs.add_builtin_relation(BuiltinRelationKind::Example),
+                doc_relation: defs.add_builtin_relation(BuiltinRelationKind::Doc, None),
+                example_relation: defs.add_builtin_relation(BuiltinRelationKind::Example, None),
             },
         };
 

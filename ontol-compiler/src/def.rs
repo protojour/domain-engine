@@ -35,14 +35,14 @@ pub struct Def<'m> {
 #[derive(Debug)]
 pub enum DefKind<'m> {
     Package(PackageId),
-    Primitive(PrimitiveKind),
+    Primitive(PrimitiveKind, Option<&'static str>),
     StringLiteral(&'m str),
     NumberLiteral(&'m str),
     EmptySequence,
     Regex(&'m str),
     /// A type definition in some domain:
     Type(TypeDef<'m>),
-    BuiltinRelType(BuiltinRelationKind),
+    BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     FmtTransition(DefReference, FmtFinalState),
     Relationship(Relationship<'m>),
     // FIXME: This should not be builtin proc directly.
@@ -57,14 +57,14 @@ impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Package(_) => None,
-            Self::Primitive(kind) => Some(kind.ident().into()),
+            Self::Primitive(_, ident) => ident.map(|ident| ident.into()),
             Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
             Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
-            Self::BuiltinRelType(_) => None,
+            Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
             Self::FmtTransition(..) => None,
             Self::Relationship(_) => None,
             Self::Constant(_) => None,
@@ -264,8 +264,12 @@ impl<'m> Defs<'m> {
         def_id
     }
 
-    pub fn add_builtin_relation(&mut self, kind: BuiltinRelationKind) -> DefId {
-        self.add_def(DefKind::BuiltinRelType(kind), ONTOL_PKG, NO_SPAN)
+    pub fn add_builtin_relation(
+        &mut self,
+        kind: BuiltinRelationKind,
+        ident: Option<&'static str>,
+    ) -> DefId {
+        self.add_def(DefKind::BuiltinRelType(kind, ident), ONTOL_PKG, NO_SPAN)
     }
 
     pub fn def_string_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
@@ -308,8 +312,8 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn add_primitive(&mut self, kind: PrimitiveKind) -> DefId {
-        self.add_def(DefKind::Primitive(kind), ONTOL_PKG, NO_SPAN)
+    pub fn add_primitive(&mut self, kind: PrimitiveKind, ident: Option<&'static str>) -> DefId {
+        self.add_def(DefKind::Primitive(kind, ident), ONTOL_PKG, NO_SPAN)
     }
 }
 

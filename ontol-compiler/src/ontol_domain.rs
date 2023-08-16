@@ -10,7 +10,6 @@ use crate::{
     namespace::Space,
     package::ONTOL_PKG,
     patterns::{store_string_pattern_segment, StringPatternSegment},
-    primitive::PrimitiveKind,
     regex_util,
     relation::{Constructor, Is, RelObjectConstraint, RelTypeConstraints, TypeParam, TypeRelation},
     types::{Type, TypeRef},
@@ -24,11 +23,37 @@ impl<'m> Compiler<'m> {
         // fundamental types
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
-        for (def_id, ident, kind) in self.primitives.list_primitives() {
-            self.register_primitive(def_id, ident, kind);
-        }
-        for (def_id, ident) in self.primitives.relations.list_relations() {
-            self.register_named_builtin_relation(def_id, ident);
+        // Pre-processe primitive definitions
+        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+            match self.defs.def_kind(def_id) {
+                DefKind::Primitive(kind, ident) => {
+                    let ty = self.types.intern(Type::Primitive(*kind, def_id));
+                    if let Some(ident) = *ident {
+                        self.namespaces
+                            .get_namespace_mut(ONTOL_PKG, Space::Type)
+                            .insert(ident.into(), def_id);
+                    }
+                    self.def_types.table.insert(def_id, ty);
+                }
+                DefKind::BuiltinRelType(kind, ident) => {
+                    if let Some(ident) = ident {
+                        self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
+                    }
+
+                    let constraints = match kind {
+                        BuiltinRelationKind::Min | BuiltinRelationKind::Max => RelTypeConstraints {
+                            subject_set: [self.primitives.number].into(),
+                            object: vec![RelObjectConstraint::ConstantOfSubjectType],
+                        },
+                        _ => RelTypeConstraints::default(),
+                    };
+
+                    self.relations
+                        .rel_type_constraints
+                        .insert(def_id, constraints);
+                }
+                _ => {}
+            }
         }
 
         // bools
@@ -227,45 +252,6 @@ impl<'m> Compiler<'m> {
             .get_namespace_mut(ONTOL_PKG, Space::Type)
             .insert(ident.into(), def_id);
         self.def_types.table.insert(def_id, ty);
-        ty
-    }
-
-    fn register_primitive(
-        &mut self,
-        def_id: DefId,
-        ident: Option<&str>,
-        kind: PrimitiveKind,
-    ) -> TypeRef<'m> {
-        let ty = self.types.intern(Type::Primitive(kind, def_id));
-        if let Some(ident) = ident {
-            self.namespaces
-                .get_namespace_mut(ONTOL_PKG, Space::Type)
-                .insert(ident.into(), def_id);
-        }
-        self.def_types.table.insert(def_id, ty);
-        ty
-    }
-
-    fn register_named_builtin_relation(&mut self, def_id: DefId, ident: &str) -> TypeRef<'m> {
-        let ty = self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
-
-        match self.defs.def_kind(def_id) {
-            DefKind::BuiltinRelType(kind) => {
-                let constraints = match kind {
-                    BuiltinRelationKind::Min | BuiltinRelationKind::Max => RelTypeConstraints {
-                        subject_set: [self.primitives.number].into(),
-                        object: vec![RelObjectConstraint::ConstantOfSubjectType],
-                    },
-                    _ => RelTypeConstraints::default(),
-                };
-
-                self.relations
-                    .rel_type_constraints
-                    .insert(def_id, constraints);
-            }
-            _ => unreachable!(),
-        }
-
         ty
     }
 

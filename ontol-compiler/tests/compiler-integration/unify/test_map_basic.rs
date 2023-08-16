@@ -533,27 +533,23 @@ fn test_map_delegation() {
         (
             SourceName::root(),
             "
-            use 'si' as si
+            use 'SI' as SI
 
             pub type car {
-                rel .'length': si.meters
+                rel .'length': SI.meters
             }
             pub type vehicle {
-                rel .'length': si.millimeters
+                rel .'length': SI.millimeters
             }
 
             map {
-                car {
-                    'length': l
-                }
-                vehicle {
-                    'length': l
-                }
+                car { 'length': l }
+                vehicle { 'length': l }
             }
             ",
         ),
         (
-            SourceName("si"),
+            SourceName("SI"),
             "
             pub type meters {
                 rel .is: i64
@@ -577,6 +573,78 @@ fn test_map_delegation() {
         );
         test.assert_domain_map(
             ("vehicle", "car"),
+            json!({ "length": 2000 }),
+            json!({ "length": 2 }),
+        );
+    });
+}
+
+#[test]
+// BUG: Not yet implemented
+#[should_panic]
+fn test_map_delegation_abstract_types() {
+    TestPackages::with_sources([
+        (
+            SourceName("SI"),
+            "
+            pub type meters {
+                rel .is: number
+            }
+            pub type millimeters {
+                rel .is: number
+            }
+
+            map {
+                meters: m
+                millimeters: m * 1000
+            }
+            ",
+        ),
+        (
+            SourceName("car"),
+            "
+            use 'SI' as SI
+            pub type car {
+                rel .'length': {
+                    rel .is: f64
+                    rel .is: SI.meters
+                }
+            }
+            ",
+        ),
+        (
+            SourceName("vehicle"),
+            "
+            use 'SI' as SI
+            pub type vehicle {
+                rel .'length': {
+                    rel .is: f64
+                    rel .is: SI.millimeters
+                }
+            }
+            ",
+        ),
+        (
+            SourceName::root(),
+            "
+            use 'car' as c
+            use 'vehicle' as v
+
+            map {
+                c.car { 'length': len }
+                v.vehicle { 'length': len }
+            }
+            ",
+        ),
+    ])
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("c.car", "c.vehicle"),
+            json!({ "length": 3 }),
+            json!({ "length": 3000 }),
+        );
+        test.assert_domain_map(
+            ("v.vehicle", "c.car"),
             json!({ "length": 2000 }),
             json!({ "length": 2 }),
         );

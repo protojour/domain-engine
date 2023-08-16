@@ -32,8 +32,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::StringLiteral(_) => {
                 self.check_string_literal_relation(relationship_id, relationship, span);
             }
-            DefKind::BuiltinRelType(builtin) => {
-                self.check_builtin_relation(relationship_id, relationship, builtin, span);
+            DefKind::BuiltinRelType(kind, _) => {
+                self.check_builtin_relation(relationship_id, relationship, kind, span);
             }
             DefKind::FmtTransition(def_reference, final_state) => {
                 self.check_def_shallow(def_reference.def_id);
@@ -442,7 +442,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match self.defs.def_kind(def_id) {
-            DefKind::Primitive(_) | DefKind::Type(_) => {
+            DefKind::Primitive(..) | DefKind::Type(_) => {
                 self.check_not_sealed(ty, span);
             }
             _ => {
@@ -495,7 +495,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let appendee = match self.defs.def_kind(relation_def_id) {
-            DefKind::Primitive(PrimitiveKind::String) => StringPatternSegment::AllStrings,
+            DefKind::Primitive(PrimitiveKind::String, _) => StringPatternSegment::AllStrings,
             DefKind::StringLiteral(str) => StringPatternSegment::new_literal(str),
             DefKind::Regex(_) => StringPatternSegment::Regex(
                 self.defs

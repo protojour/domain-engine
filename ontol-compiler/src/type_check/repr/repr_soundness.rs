@@ -155,10 +155,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
 
             match self.defs.def_kind(*relation_def_id) {
-                DefKind::BuiltinRelType(BuiltinRelationKind::Min) => {
+                DefKind::BuiltinRelType(BuiltinRelationKind::Min, _) => {
                     output.min = Some(self.get_number_literal(type_param.object));
                 }
-                DefKind::BuiltinRelType(BuiltinRelationKind::Max) => {
+                DefKind::BuiltinRelType(BuiltinRelationKind::Max, _) => {
                     output.max = Some(self.get_number_literal(type_param.object));
                 }
                 _ => {}

@@ -57,7 +57,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
-            DefKind::Primitive(kind) => self.types.intern(Type::Primitive(*kind, def_id)),
+            DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
             DefKind::Mapping(direction, variables, first_id, second_id) => {
                 match self.check_map(def, *direction, variables, *first_id, *second_id) {
                     Ok(ty) => ty,

@@ -4,7 +4,7 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use smartstring::alias::String;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta},
+    def::{DefKind, LookupRelationshipMeta},
     package::ONTOL_PKG,
     Compiler,
 };
@@ -245,41 +245,11 @@ impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
             Some(DefKind::FmtTransition(..)) => {
                 map.serialize_entry("kind", "fmt")?;
             }
-            Some(DefKind::BuiltinRelType(kind)) => match kind {
-                BuiltinRelationKind::Is => {
-                    map.serialize_entry("kind", "is")?;
+            Some(DefKind::BuiltinRelType(_, ident)) => {
+                if let Some(ident) = ident {
+                    map.serialize_entry("kind", ident)?;
                 }
-                BuiltinRelationKind::Identifies => {
-                    map.serialize_entry("kind", "identifies")?;
-                }
-                BuiltinRelationKind::Id => {
-                    map.serialize_entry("kind", "id")?;
-                }
-                BuiltinRelationKind::Indexed => {
-                    map.serialize_entry("kind", "indexed")?;
-                }
-                BuiltinRelationKind::Min => {
-                    map.serialize_entry("kind", "min")?;
-                }
-                BuiltinRelationKind::Max => {
-                    map.serialize_entry("kind", "max")?;
-                }
-                BuiltinRelationKind::Default => {
-                    map.serialize_entry("kind", "default")?;
-                }
-                BuiltinRelationKind::Gen => {
-                    map.serialize_entry("kind", "gen")?;
-                }
-                BuiltinRelationKind::Route => {
-                    map.serialize_entry("kind", "route")?;
-                }
-                BuiltinRelationKind::Doc => {
-                    map.serialize_entry("kind", "doc")?;
-                }
-                BuiltinRelationKind::Example => {
-                    map.serialize_entry("kind", "example")?;
-                }
-            },
+            }
             Some(_) => unreachable!(),
             None => {
                 // A mapping

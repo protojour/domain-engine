@@ -56,7 +56,7 @@ fn test_repr_error4() {
 }
 
 #[test]
-fn test_circular_subtyping() {
+fn error_circular_subtyping() {
     "
     type foo
     type bar
@@ -64,6 +64,27 @@ fn test_circular_subtyping() {
     rel foo is: bar // ERROR Circular subtyping relation
     rel bar is: baz // ERROR Circular subtyping relation
     rel baz is: foo // ERROR Circular subtyping relation
+    "
+    .compile_fail();
+}
+
+#[test]
+fn error_duplicate_parameter() {
+    "
+    type a {
+        rel .max: 20 // NOTE defined here
+    }
+    type b {
+        rel .max: 10 // NOTE defined here
+    }
+    type c {
+        rel .max: 5 // NOTE defined here
+    }
+    type d { // ERROR duplicate type param `max`
+        rel .is: a
+        rel .is: b
+        rel .is: c
+    }
     "
     .compile_fail();
 }

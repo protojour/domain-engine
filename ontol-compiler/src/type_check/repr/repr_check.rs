@@ -9,7 +9,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 use tracing::trace;
 
 use crate::{
@@ -58,6 +58,8 @@ pub struct State {
     pub abstract_notes: Vec<SpannedNote>,
 
     circular_spans: Vec<SourceSpan>,
+
+    duplicate_type_params: IndexMap<DefId, Vec<SourceSpan>>,
 
     do_trace: bool,
 }
@@ -225,7 +227,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             let def_id = *def_id;
 
             match self.defs.def_kind(def_id) {
-                DefKind::Primitive(kind) => {
+                DefKind::Primitive(kind, _ident) => {
                     if matches!(data.rel, IsRelation::Sub) {
                         // union-like containing a primitive variant.
                         // This only occurs in user domains.
@@ -356,19 +358,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 vacant.insert(type_param.clone());
                             }
                             Entry::Occupied(mut occupied) => {
+                                let old = occupied.get();
                                 if type_param.definition_site != self.root_def_id.package_id() {
                                     // For now: Type parameters from the same package takes precedence
-                                } else if occupied.get().definition_site
-                                    == self.root_def_id.package_id()
-                                {
-                                    // Duplicate definition from the same package
-                                    let def = self.defs.table.get(&self.root_def_id).unwrap();
-                                    self.errors.error(
-                                        CompileError::TODO(smart_format!(
-                                            "Duplicate type parameter"
-                                        )),
-                                        &def.span,
-                                    );
+                                } else if old.definition_site == self.root_def_id.package_id() {
+                                    self.state
+                                        .duplicate_type_params
+                                        .entry(*relation_def_id)
+                                        .or_insert_with(|| vec![old.span])
+                                        .push(type_param.span);
                                 } else {
                                     // Type params defined in the current package may override those in dependent packages
                                     occupied.insert(type_param.clone());
@@ -378,6 +376,23 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     }
                 }
             }
+        }
+
+        for (relation_def_id, spans) in std::mem::take(&mut self.state.duplicate_type_params) {
+            self.errors.error_with_notes(
+                CompileError::DuplicateTypeParam(
+                    self.defs
+                        .def_kind(relation_def_id)
+                        .opt_identifier()
+                        .unwrap()
+                        .into(),
+                ),
+                &self.defs.def_span(self.root_def_id),
+                spans
+                    .into_iter()
+                    .map(|span| SpannedNote::new(Note::DefinedHere, span))
+                    .collect(),
+            );
         }
 
         self.check_soundness(builder, &ontology_mesh)

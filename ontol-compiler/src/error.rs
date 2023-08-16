@@ -84,6 +84,7 @@ pub enum CompileError {
     IntersectionOfDisjointTypes,
     CircularSubtypingRelation,
     AmbiguousNumberResolution,
+    DuplicateTypeParam(String),
     TODO(String),
 }
 
@@ -212,6 +213,7 @@ impl std::fmt::Display for CompileError {
             Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
             Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
             Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),
+            Self::DuplicateTypeParam(ident) => write!(f, "duplicate type param `{ident}`"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }
@@ -221,6 +223,12 @@ impl std::fmt::Display for CompileError {
 pub struct SpannedNote {
     pub note: Note,
     pub span: SourceSpan,
+}
+
+impl SpannedNote {
+    pub const fn new(note: Note, span: SourceSpan) -> Self {
+        Self { note, span }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -235,6 +243,8 @@ pub enum Note {
     BaseTypeIs(String),
     #[error("Number type is abstract")]
     NumberTypeIsAbstract,
+    #[error("defined here")]
+    DefinedHere,
 }
 
 #[derive(Debug)]
