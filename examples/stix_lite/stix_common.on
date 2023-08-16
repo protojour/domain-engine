@@ -1,0 +1,84 @@
+pub type spec_version {
+    rel .is?: '2.0'
+    rel .is?: '2.1'
+}
+
+// FIXME: should maybe be defined in ONTOL_PKG?
+pub type url {
+    rel .is: string
+}
+
+/// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
+pub type lang-rfc5646 {
+    rel .is: string
+}
+
+/// The `confidence` property identifies the confidence that the creator has in the correctness of their data. The confidence value **MUST** be a number in the range of 0-100.
+pub type confidence {
+    rel .is: integer
+    rel .min: 0
+    rel .max: 100
+}
+
+/// The `Hashes` type represents one or more cryptographic hashes, as a special set of key/value pairs.
+/// Accordingly, the name of each hashing algorithm MUST be specified as a key in the dictionary and **MUST** identify the name of the hashing algorithm used to generate the corresponding value.
+/// This name **SHOULD** come from one of the values defined in the `hash-algorithm-ov` open vocabulary.
+///
+/// Dictionary keys **MUST** be unique in each hashes property, **MUST** be in ASCII, and are limited to the characters a-z (lowercase ASCII), A-Z (uppercase ASCII), numerals 0-9, hyphen (-), and underscore (_).
+/// Dictionary keys MUST have a minimum length of 3 ASCII characters and MUST be no longer than 250 ASCII characters in length.
+/// The value MUST be a `string` in the appropriate format defined by the hash type indicated in the dictionary key.
+///
+/// To enhance compatibility, the SHA-256 hash `SHOULD` be used whenever possible.
+///
+/// ## Examples
+/// _SHA-256_ and _User-Defined Hash_
+///
+/// ```json
+/// {
+///     "SHA-256": "6db12788c37247f2316052e142f42f4b259d6561751e5f401a1ae2a6df9c674b",
+///     "x_foo_hash": "aaaabbbbccccddddeeeeffff0123457890"
+/// }
+/// ```
+pub type Hashes {
+    // FIXME: Dictionary support:
+    // rel ./(a-zA-Z0-9-_){3,250}/: string
+}
+
+/// External references are used to describe pointers to information represented outside of STIX.
+///
+/// For example, a Malware object could use an external reference to indicate an ID for that malware in an external database or a report could use references to represent source material.
+pub type external-reference {
+    /// The name of the source that the external-reference is defined within (system, registry, organization, etc.).
+    rel .'source_name': string
+
+    /// A human readable description.
+    rel .'description'?: string
+
+    /// A URL reference to an external resource [[RFC3986](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.vaucl8w7ov0y)].
+    rel .'url'?: url
+
+    /// Specifies a dictionary of hashes for the contents of the **url**. This **SHOULD** be provided when the **url** property is present.
+    ///
+    /// Dictionary keys **MUST** come from one of the entries listed in the `hash-algorithm-ov` open vocabulary.
+    ///
+    /// As stated in Section [2.7](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_odoabbtwuxyd), to ensure interoperability, a SHA-256 hash **SHOULD** be included whenever possible.
+    rel .'hashes'?: Hashes
+
+    /// An identifier for the external reference content.
+    rel .'external_id'?: string
+}
+
+/// The `kill-chain-phase` represents a phase in a kill chain, which describes the various phases an attacker may undertake in order to achieve their objectives.
+pub type kill-chain-phase {
+    /// The name of the kill chain.
+    /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
+    rel .'kill_chain_name': string
+
+    /// The name of the phase in the kill chain.
+    /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
+    rel .'phase_name': string
+}
+
+pub type marking-definition-id {
+    fmt '' => 'marking-definition--' => uuid => .
+}

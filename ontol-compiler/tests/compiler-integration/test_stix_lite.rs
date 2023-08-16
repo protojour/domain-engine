@@ -1,12 +1,24 @@
-use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_utils::*, TestCompile};
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, serde_utils::*, SourceName, TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
 
-pub const STIX_ON: &str = include_str!("../../../examples/stix_lite/stix.on");
+const STIX_COMMON: &str = include_str!("../../../examples/stix_lite/stix_common.on");
+const STIX_META: &str = include_str!("../../../examples/stix_lite/stix_meta.on");
+const STIX_DOMAIN: &str = include_str!("../../../examples/stix_lite/stix_domain.on");
+
+fn stix_bundle() -> TestPackages {
+    TestPackages::with_sources([
+        (SourceName::root(), STIX_DOMAIN),
+        (SourceName("stix_meta"), STIX_META),
+        (SourceName("stix_common"), STIX_COMMON),
+    ])
+}
 
 #[test]
 fn test_stix_lite() {
-    STIX_ON.compile_ok(|test| {
+    stix_bundle().compile_ok(|test| {
         let [attack_pattern] = test.bind(["attack-pattern"]);
         assert_error_msg!(
             create_de(&attack_pattern).data(json!({

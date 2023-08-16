@@ -1,0 +1,24 @@
+
+/// STIX defines a set of STIX Cyber-observable Objects (SCOs) for characterizing host-based and network-based information.
+/// SCOs are used by various STIX Domain Objects (SDOs) to provide supporting context.
+/// The Observed Data SDO, for example, indicates that the raw data was observed at a particular time.
+///
+/// STIX Cyber-observable Objects (SCOs) document the facts concerning what happened on a network or host, and do not capture the who, when, or why.
+/// By associating SCOs with STIX Domain Objects (SDOs), it is possible to convey a higher-level understanding of the threat landscape, and to potentially provide insight as to the who and the why particular intelligence may be relevant to an organization.
+/// For example, information about a file that existed, a process that was observed running, or that network traffic occurred between two IPs can all be captured as SCOs.
+///
+/// STIX Cyber-observable Objects (SCOs) are defined in section 6.
+///
+/// Previously, in STIX 2.0, Cyber-observable Objects could only exist as objects within an Observed Data object.
+/// It is still possible to represent Cyber-observable Objects in this way, but this method has been deprecated.
+/// See section 2.13.
+pub type stix_cyber_observable_object {
+    rel .is: stix_markings_object
+
+    /// This property defines whether or not the data contained within the object has been defanged.
+    ///
+    /// The default value for this property is `false`.
+    ///
+    /// This property **MUST NOT** be used on any STIX Objects other than SCOs.
+    rel .'defanged'?: bool
+}
