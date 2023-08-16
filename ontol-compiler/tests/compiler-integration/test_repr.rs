@@ -2,9 +2,9 @@ use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use test_log::test;
 
 #[test]
-fn test_repr_error1() {
+fn test_repr_abstract_error1() {
     "
-    type foo { // ERROR Entity not representable
+    type foo { // ERROR type not representable
         rel .'id'|id: { rel .is: string }
         rel .'n':
             number // NOTE Type of field is abstract
@@ -14,16 +14,24 @@ fn test_repr_error1() {
 }
 
 #[test]
-fn test_repr_error2() {
+fn test_repr_abstract_error2() {
     "
     type meters { // NOTE Type is abstract
         rel .is: number
     }
 
-    type bar { // ERROR Entity not representable
-        rel .'id'|id: { rel .is: string }
+    type bar { // ERROR type not representable
         rel .'len': meters // NOTE Type of field is abstract
     }
+    "
+    .compile_fail();
+}
+
+#[test]
+fn test_repr_abstract_seq_error() {
+    "
+    type foo { rel .is: number } // NOTE Type is abstract
+    type bar { rel .0: foo } // ERROR type not representable// NOTE Type of field is abstract
     "
     .compile_fail();
 }

@@ -165,10 +165,11 @@ fn error_sequence_mix1() {
 }
 
 #[test]
-fn error_sequence_mix2() {
+fn error_sequence_mix_abstract_object() {
     "
-    type u
-    rel u 'a': integer
+    type u // ERROR type not representable
+    rel u 'a':
+        integer // NOTE Type of field is abstract
     rel u 0: string // ERROR invalid mix of relationship type for subject
     "
     .compile_fail();
@@ -178,7 +179,7 @@ fn error_sequence_mix2() {
 fn sequence_overlapping_indices() {
     "
     type u
-    rel u 0..3: integer
+    rel u 0..3: i64
     rel u 2..4: string // ERROR overlapping indexes
     "
     .compile_fail();
@@ -188,7 +189,7 @@ fn sequence_overlapping_indices() {
 fn error_sequence_ambiguous_infinite_tail() {
     r#"
     type u
-    rel u 0..: integer
+    rel u 0..: i64
     rel u 1..: string // ERROR overlapping indexes
     "#
     .compile_fail();
@@ -199,7 +200,7 @@ fn error_union_in_named_relationship() {
     "
     type foo
     rel foo 'a': string
-    rel foo 'a': integer // ERROR union in named relationship is not supported yet. Make a union type instead.
+    rel foo 'a': i64 // ERROR union in named relationship is not supported yet. Make a union type instead.
     "
     .compile_fail();
 }
@@ -430,7 +431,7 @@ fn bad_domain_relation() {
 
 #[test]
 fn error_value_generator_as_field_type() {
-    "type foo { rel .'prop': auto } // ERROR object must be a data type".compile_fail();
+    "type foo { rel .'prop': auto } // ERROR object must be a data type// ERROR type not representable// NOTE Type of field is abstract".compile_fail();
 }
 
 #[test]
