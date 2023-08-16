@@ -1,8 +1,0 @@
-use 'api1' as api1
-use 'api2' as api2
-use 'back' as back
-
-ontology {
-    let [] [api1] [back] self
-    let [] [api2] [back] self
-}
