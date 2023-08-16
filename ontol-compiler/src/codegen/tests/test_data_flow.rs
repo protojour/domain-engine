@@ -9,29 +9,16 @@ use unimock::{matching, MockFn, Unimock};
 
 use crate::{
     codegen::data_flow_analyzer::DataFlowAnalyzer,
-    def::{
-        DefKind, DefReference, LookupRelationshipMetaMock, RelParams, Relationship,
-        RelationshipMeta,
-    },
+    def::{DefKind, LookupRelationshipMetaMock, RelParams, Relationship, RelationshipMeta},
     typed_hir::TypedHir,
     SpannedBorrow, NO_SPAN,
 };
 
 const MOCK_RELATIONSHIP: Relationship = Relationship {
     relation_def_id: DefId::unit(),
-    subject: (
-        DefReference {
-            def_id: DefId::unit(),
-        },
-        NO_SPAN,
-    ),
+    subject: (DefId::unit(), NO_SPAN),
     subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
-    object: (
-        DefReference {
-            def_id: DefId::unit(),
-        },
-        NO_SPAN,
-    ),
+    object: (DefId::unit(), NO_SPAN),
     object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
     object_prop: None,
     rel_params: RelParams::Unit,

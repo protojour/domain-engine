@@ -164,7 +164,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         if let Some(table) = &properties.and_then(|properties| properties.table.as_ref()) {
             for (property_id, _property) in *table {
                 let meta = self.defs.relationship_meta(property_id.relationship_id);
-                let object_def_id = meta.relationship.object.0.def_id;
+                let object_def_id = meta.relationship.object.0;
                 let object_def = self.defs.table.get(&object_def_id).unwrap();
 
                 self.state.span_stack.push(SpanNode {
@@ -178,17 +178,17 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 );
                 self.state.span_stack.pop();
 
-                if let RelParams::Type(def_ref) = &meta.relationship.rel_params {
-                    let rel_def = self.defs.table.get(&def_ref.def_id).unwrap();
+                if let RelParams::Type(def_id) = &meta.relationship.rel_params {
+                    let rel_def = self.defs.table.get(def_id).unwrap();
 
                     self.state.span_stack.push(SpanNode {
                         span: rel_def.span,
                         kind: SpanKind::Field,
                     });
                     self.check_def_repr(
-                        def_ref.def_id,
+                        *def_id,
                         object_def,
-                        self.relations.properties_by_def_id(def_ref.def_id),
+                        self.relations.properties_by_def_id(*def_id),
                     );
                     self.state.span_stack.pop();
                 }

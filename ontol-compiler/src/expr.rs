@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smartstring::alias::String;
 
-use crate::{def::DefReference, source::SourceSpan, Compiler};
+use crate::{source::SourceSpan, Compiler};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ExprId(pub u32);
@@ -14,7 +14,7 @@ pub struct Expr {
     pub span: SourceSpan,
 }
 
-type PropertyKey = (DefReference, SourceSpan);
+type PropertyKey = (DefId, SourceSpan);
 
 #[derive(Debug)]
 pub enum ExprKind {

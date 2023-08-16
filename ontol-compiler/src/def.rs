@@ -42,7 +42,7 @@ pub enum DefKind<'m> {
     /// A type definition in some domain:
     Type(TypeDef<'m>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
-    FmtTransition(DefReference, FmtFinalState),
+    FmtTransition(DefId, FmtFinalState),
     Relationship(Relationship<'m>),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
@@ -89,17 +89,6 @@ pub struct TypeDefParam {
 #[derive(Debug)]
 pub struct Variables(pub SmallVec<[ExprId; 2]>);
 
-#[derive(Debug, Clone)]
-pub struct DefReference {
-    pub def_id: DefId,
-}
-
-impl From<DefId> for DefReference {
-    fn from(value: DefId) -> Self {
-        Self { def_id: value }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);
 
@@ -123,11 +112,11 @@ pub enum BuiltinRelationKind {
 pub struct Relationship<'m> {
     pub relation_def_id: DefId,
 
-    pub subject: (DefReference, SourceSpan),
+    pub subject: (DefId, SourceSpan),
     /// The cardinality of the relationship, i.e. how many objects are related to the subject
     pub subject_cardinality: Cardinality,
 
-    pub object: (DefReference, SourceSpan),
+    pub object: (DefId, SourceSpan),
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
 
@@ -137,17 +126,17 @@ pub struct Relationship<'m> {
 }
 
 impl<'m> Relationship<'m> {
-    pub fn left_side(&self, role: Role) -> (&DefReference, SourceSpan, Cardinality) {
+    pub fn left_side(&self, role: Role) -> (DefId, SourceSpan, Cardinality) {
         match role {
-            Role::Subject => (&self.subject.0, self.subject.1, self.subject_cardinality),
-            Role::Object => (&self.object.0, self.object.1, self.object_cardinality),
+            Role::Subject => (self.subject.0, self.subject.1, self.subject_cardinality),
+            Role::Object => (self.object.0, self.object.1, self.object_cardinality),
         }
     }
 
-    pub fn right_side(&self, role: Role) -> (&DefReference, SourceSpan, Cardinality) {
+    pub fn right_side(&self, role: Role) -> (DefId, SourceSpan, Cardinality) {
         match role {
-            Role::Subject => (&self.object.0, self.object.1, self.object_cardinality),
-            Role::Object => (&self.subject.0, self.subject.1, self.subject_cardinality),
+            Role::Subject => (self.object.0, self.object.1, self.object_cardinality),
+            Role::Object => (self.subject.0, self.subject.1, self.subject_cardinality),
         }
     }
 }
@@ -155,7 +144,7 @@ impl<'m> Relationship<'m> {
 #[derive(Debug)]
 pub enum RelParams {
     Unit,
-    Type(DefReference),
+    Type(DefId),
     IndexRange(Range<Option<u16>>),
 }
 

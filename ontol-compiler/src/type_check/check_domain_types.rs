@@ -55,14 +55,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let object_properties = self
                         .relations
-                        .properties_by_def_id(meta.relationship.object.0.def_id)
+                        .properties_by_def_id(meta.relationship.object.0)
                         .unwrap();
 
                     // Check if the property is the primary id
                     if let Some(id_relationship_id) = object_properties.identifies {
                         let id_meta = self.defs.relationship_meta(id_relationship_id);
 
-                        if id_meta.relationship.object.0.def_id == def_id {
+                        if id_meta.relationship.object.0 == def_id {
                             debug!(
                                 "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
                                 property_id.relationship_id
@@ -114,7 +114,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let object_properties = self
                         .relations
-                        .properties_by_def_id(meta.relationship.object.0.def_id)
+                        .properties_by_def_id(meta.relationship.object.0)
                         .unwrap();
 
                     if properties.identified_by.is_some()
@@ -134,7 +134,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         actions.push(Action::CheckValueGenerator {
                             relationship_id: property_id.relationship_id,
                             generator_def_id,
-                            object_def_id: meta.relationship.object.0.def_id,
+                            object_def_id: meta.relationship.object.0,
                             span: gen_span,
                         });
                     }
@@ -185,7 +185,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let subject_properties = self
                             .relations
-                            .properties_by_def_id(meta.relationship.subject.0.def_id)
+                            .properties_by_def_id(meta.relationship.subject.0)
                             .unwrap();
 
                         if subject_properties.identified_by.is_some() {

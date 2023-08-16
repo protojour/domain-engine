@@ -380,7 +380,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 };
                                 let (_, _, owner_cardinality) =
                                     meta.relationship.left_side(property_id.role);
-                                let (value_def_ref, _, _) =
+                                let (value_def_id, _, _) =
                                     meta.relationship.right_side(property_id.role);
 
                                 property_name.map(|property_name| {
@@ -390,12 +390,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             property_id: *property_id,
                                             cardinality: owner_cardinality,
                                             rel_params_def: match &meta.relationship.rel_params {
-                                                RelParams::Type(def_reference) => {
-                                                    Some(def_reference.def_id)
-                                                }
+                                                RelParams::Type(def_id) => Some(*def_id),
                                                 _ => None,
                                             },
-                                            value_def: value_def_ref.def_id,
+                                            value_def: value_def_id,
                                             used: false,
                                         },
                                     )
@@ -406,13 +404,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let mut hir_props = vec![];
 
                         for ExprStructAttr {
-                            key: (def, prop_span),
+                            key: (def_id, prop_span),
                             rel,
                             bind_option,
                             value,
                         } in attributes
                         {
-                            let attr_prop = match self.defs.def_kind(def.def_id) {
+                            let attr_prop = match self.defs.def_kind(*def_id) {
                                 DefKind::StringLiteral(lit) => lit,
                                 _ => {
                                     self.error(CompileError::NamedPropertyExpected, prop_span);
@@ -622,11 +620,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let mut attributes = attributes.iter();
                         match attributes.next() {
                             Some(ExprStructAttr {
-                                key: (def, _),
+                                key: (def_id, _),
                                 rel: _,
                                 bind_option: _,
                                 value,
-                            }) if def.def_id == DefId::unit() => {
+                            }) if *def_id == DefId::unit() => {
                                 let object_ty = self.check_def_sealed(single_def_id);
                                 let inner_node = self.build_node(value, Some(object_ty), ctx);
 
@@ -649,11 +647,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut attributes = attributes.iter();
                 match attributes.next() {
                     Some(ExprStructAttr {
-                        key: (def, _),
+                        key: (def_id, _),
                         rel: _,
                         bind_option: _,
                         value,
-                    }) if def.def_id == DefId::unit() => {
+                    }) if *def_id == DefId::unit() => {
                         let object_ty = self.check_def_sealed(scalar_def_id);
                         let inner_node = self.build_node(value, Some(object_ty), ctx);
 

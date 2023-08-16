@@ -62,7 +62,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
-                        identifies_meta.relationship.subject.0.def_id,
+                        identifies_meta.relationship.subject.0,
                         &mut error_set,
                         span,
                     );
@@ -209,8 +209,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (property_id, _cardinality) in property_set {
             let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-            let (object_reference, _) = &meta.relationship.object;
-            let object_ty = self.def_types.table.get(&object_reference.def_id).unwrap();
+            let (object_def_id, _) = meta.relationship.object;
+            let object_ty = self.def_types.table.get(&object_def_id).unwrap();
             let Some(property_name) = meta.relationship.object_prop.or(match meta.relation_def_kind.value {
                 DefKind::StringLiteral(lit) => Some(lit),
                 _ => None

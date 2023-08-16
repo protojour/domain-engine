@@ -332,11 +332,11 @@ impl<'m> Compiler<'m> {
                 Some(inherent_meta) => inherent_meta.relationship_id,
                 None => id_relationship_id,
             },
-            id_value_def_id: identifies_meta.relationship.subject.0.def_id,
+            id_value_def_id: identifies_meta.relationship.subject.0,
             id_value_generator,
             id_operator_id: serde_generator
                 .gen_operator_id(SerdeKey::Def(DefVariant::new(
-                    identifies_meta.relationship.subject.0.def_id,
+                    identifies_meta.relationship.subject.0,
                     DataModifier::NONE,
                 )))
                 .unwrap(),
@@ -351,14 +351,13 @@ impl<'m> Compiler<'m> {
     ) -> Option<EntityRelationship> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-        let (target_def_ref, _, _) = meta.relationship.right_side(property_id.role);
+        let (target_def_id, _, _) = meta.relationship.right_side(property_id.role);
 
-        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_ref.def_id)
-        {
+        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
             if target_properties.identified_by.is_some() {
                 Some(EntityRelationship {
                     cardinality: property.cardinality,
-                    target: target_def_ref.def_id,
+                    target: target_def_id,
                 })
             } else {
                 None

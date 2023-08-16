@@ -181,7 +181,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 let object_operator_id = self
-                    .gen_operator_id(SerdeKey::no_modifier(meta.relationship.object.0.def_id))
+                    .gen_operator_id(SerdeKey::no_modifier(meta.relationship.object.0))
                     .expect("No object operator for primary id property");
 
                 Some(OperatorAllocation::Allocated(
@@ -514,7 +514,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             let meta = self.defs.relationship_meta(relationship_id);
 
                             self.gen_operator_id(SerdeKey::Def(
-                                def_variant.with_def(meta.relationship.object.0.def_id),
+                                def_variant.with_def(meta.relationship.object.0),
                             ))
                             .expect("no inner operator")
                         }
@@ -608,7 +608,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 ),
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
-                                    identifies_meta.relationship.subject.0.def_id,
+                                    identifies_meta.relationship.subject.0,
                                     DataModifier::NONE,
                                 ),
                             },
@@ -814,7 +814,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         }
 
                         let meta = self.defs.relationship_meta(property_id.relationship_id);
-                        let object = meta.relationship.object.0.def_id;
+                        let object = meta.relationship.object.0;
 
                         let prop_key = match meta.relation_def_kind.value {
                             DefKind::StringLiteral(literal) => *literal,
@@ -825,7 +825,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
                     Role::Object => {
                         let meta = self.defs.relationship_meta(property_id.relationship_id);
-                        let subject = meta.relationship.subject.0.def_id;
+                        let subject = meta.relationship.subject.0;
 
                         let prop_key = meta
                             .relationship
@@ -840,9 +840,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.get_property_operator(type_def_id, property.cardinality);
 
                 let rel_params_operator_id = match &meta.relationship.rel_params {
-                    RelParams::Type(def) => {
-                        let key =
-                            SerdeKey::Def(DefVariant::new(def.def_id, DataModifier::default()));
+                    RelParams::Type(def_id) => {
+                        let key = SerdeKey::Def(DefVariant::new(*def_id, DataModifier::default()));
                         match self.gen_operator(key.clone()) {
                             Some(SerdeOperator::Struct(struct_op)) => {
                                 if !struct_op.properties.is_empty() {

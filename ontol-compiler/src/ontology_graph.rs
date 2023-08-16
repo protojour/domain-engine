@@ -84,8 +84,8 @@ impl State {
 
         for (def_id, def) in &compiler.defs.table {
             if let DefKind::Relationship(relationship) = &def.kind {
-                let subject = relationship.subject.0.def_id;
-                let object = relationship.object.0.def_id;
+                let subject = relationship.subject.0;
+                let object = relationship.object.0;
 
                 if let Some(meta) = node_meta_table.get_mut(&subject) {
                     meta.ref_count += 1;

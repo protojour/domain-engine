@@ -10,10 +10,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{
-        Def, DefKind, DefReference, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef,
-        Variables,
-    },
+    def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef, Variables},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
     namespace::Space,
@@ -91,12 +88,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Type(type_stmt) => self.define_type(type_stmt, span),
             ast::Statement::With(with_stmt) => {
                 let mut root_defs = RootDefs::new();
-                let def = self.resolve_type_reference(
+                let def_id = self.resolve_type_reference(
                     with_stmt.ty.0,
                     &with_stmt.ty.1,
                     Some(&mut root_defs),
                 )?;
-                let context_fn = move || def.clone();
+                let context_fn = move || def_id;
 
                 for spanned_stmt in with_stmt.statements.0 {
                     match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
@@ -156,13 +153,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } = rel;
 
         let mut root_defs = RootDefs::default();
-        let subject_def = self.resolve_contextual_type_reference(
+        let subject_def_id = self.resolve_contextual_type_reference(
             subject,
             subject_span.clone(),
             &block_context,
             Some(&mut root_defs),
         )?;
-        let object_def = match object {
+        let object_def_id = match object {
             Some(ast::TypeOrPattern::Type(ty)) => self.resolve_contextual_type_reference(
                 Some(ty),
                 object_span.clone(),
@@ -175,9 +172,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let expr_id = self.compiler.expressions.alloc_expr_id();
                 self.compiler.expressions.table.insert(expr_id, expr);
 
-                DefReference {
-                    def_id: self.define(DefKind::Constant(expr_id), &object_span),
-                }
+                self.define(DefKind::Constant(expr_id), &object_span)
             }
             None => self.resolve_contextual_type_reference(
                 None,
@@ -192,9 +187,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         while let Some(relation) = relation_iter.next() {
             root_defs.extend(self.def_relationship(
-                (subject_def.clone(), &subject_span),
+                (subject_def_id, &subject_span),
                 relation,
-                (object_def.clone(), &object_span),
+                (object_def_id, &object_span),
                 span.clone(),
                 if relation_iter.peek().is_some() {
                     docs.clone().unwrap()
@@ -208,9 +203,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn def_relationship(
         &mut self,
-        subject: (DefReference, &Span),
+        subject: (DefId, &Span),
         ast_relation: ast::Relation,
-        object: (DefReference, &Span),
+        object: (DefId, &Span),
         span: Span,
         docs: Vec<String>,
     ) -> Res<RootDefs> {
@@ -226,14 +221,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let (key, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
             match relation_ty {
                 ast::RelType::Type((ty, span)) => {
-                    let def_ref = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
+                    let def_id = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
 
-                    match self.compiler.defs.def_kind(def_ref.def_id) {
+                    match self.compiler.defs.def_kind(def_id) {
                         DefKind::StringLiteral(_) => {
-                            (RelationKey::Named(def_ref), span.clone(), None)
+                            (RelationKey::Named(def_id), span.clone(), None)
                         }
                         DefKind::BuiltinRelType(..) => {
-                            (RelationKey::Builtin(def_ref.def_id), span.clone(), None)
+                            (RelationKey::Builtin(def_id), span.clone(), None)
                         }
                         _ => return Err((CompileError::InvalidRelationType, span)),
                     }
@@ -259,7 +254,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some((ctx_block, _)) = ctx_block {
-            let rel_def = self.define_anonymous(
+            let rel_def_id = self.define_anonymous(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -268,14 +263,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 },
                 &span,
             );
-            let context_fn = || rel_def.clone();
+            let context_fn = || rel_def_id;
 
-            root_defs.push(rel_def.def_id);
+            root_defs.push(rel_def_id);
 
             // This type needs to be part of the anonymous part of the namespace
             self.compiler
                 .namespaces
-                .add_anonymous(self.src.package_id, rel_def.def_id);
+                .add_anonymous(self.src.package_id, rel_def_id);
 
             for spanned_stmt in ctx_block {
                 match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
@@ -288,7 +283,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
             }
 
-            RelParams::Type(rel_def)
+            RelParams::Type(rel_def_id)
         } else {
             RelParams::Unit
         };
@@ -352,7 +347,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } = fmt;
 
         let mut root_defs = SmallVec::new();
-        let mut origin_def =
+        let mut origin_def_id =
             self.resolve_type_reference(origin, &origin_span, Some(&mut root_defs))?;
         let mut iter = transitions.into_iter().peekable();
 
@@ -373,7 +368,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            let target_def = self.define_anonymous(
+            let target_def_id = self.define_anonymous(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -384,16 +379,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
             );
 
             root_defs.push(self.ast_fmt_transition_to_def(
-                (origin_def, &origin_span),
+                (origin_def_id, &origin_span),
                 (transition, span.clone()),
-                (target_def.clone(), &span),
+                (target_def_id, &span),
                 FmtFinalState(false),
                 span.clone(),
             )?);
 
             transition = next_transition;
             transition_span = span.clone();
-            origin_def = target_def;
+            origin_def_id = target_def_id;
             origin_span = span;
         };
 
@@ -405,7 +400,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         )?;
 
         root_defs.push(self.ast_fmt_transition_to_def(
-            (origin_def, &origin_span),
+            (origin_def_id, &origin_span),
             (transition, transition_span),
             (end_def, &target.1),
             FmtFinalState(true),
@@ -417,9 +412,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn ast_fmt_transition_to_def(
         &mut self,
-        from: (DefReference, &Span),
+        from: (DefId, &Span),
         transition: (ast::Type, Span),
-        to: (DefReference, &Span),
+        to: (DefId, &Span),
         final_state: FmtFinalState,
         span: Span,
     ) -> Res<DefId> {
@@ -451,7 +446,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         span: Range<usize>,
         block_context: &BlockContext,
         root_defs: Option<&mut RootDefs>,
-    ) -> Res<DefReference> {
+    ) -> Res<DefId> {
         match (ast_ty, block_context) {
             (Some(ast_ty), _) => self.resolve_type_reference(ast_ty, &span, root_defs),
             (None, BlockContext::Context(func)) => Ok(func()),
@@ -464,19 +459,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ast_ty: ast::Type,
         span: &Span,
         root_defs: Option<&mut RootDefs>,
-    ) -> Res<DefReference> {
+    ) -> Res<DefId> {
         match ast_ty {
-            ast::Type::Unit => Ok(DefReference {
-                def_id: self.compiler.primitives.unit,
-            }),
-            ast::Type::Path(path) => {
-                let def_id = self.lookup_path(&path, span)?;
-
-                Ok(DefReference { def_id })
-            }
+            ast::Type::Unit => Ok(self.compiler.primitives.unit),
+            ast::Type::Path(path) => Ok(self.lookup_path(&path, span)?),
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
-                    let def = self.define_anonymous(
+                    let def_id = self.define_anonymous(
                         TypeDef {
                             public: false,
                             ident: None,
@@ -489,10 +478,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     // This type needs to be part of the anonymous part of the namespace
                     self.compiler
                         .namespaces
-                        .add_anonymous(self.src.package_id, def.def_id);
-                    root_defs.push(def.def_id);
+                        .add_anonymous(self.src.package_id, def_id);
+                    root_defs.push(def_id);
 
-                    let context_fn = || def.clone();
+                    let context_fn = || def_id;
 
                     for spanned_stmt in ctx_block {
                         match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
@@ -505,7 +494,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         }
                     }
 
-                    Ok(DefReference { def_id: def.def_id })
+                    Ok(def_id)
                 } else {
                     Err((
                         CompileError::TODO(smart_format!("Anonymous struct not allowed here")),
@@ -520,7 +509,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ONTOL_PKG,
                     self.src.span(span),
                 );
-                Ok(DefReference { def_id })
+                Ok(def_id)
             }
             ast::Type::StringLiteral(lit) => {
                 let def_id = match lit.as_str() {
@@ -530,7 +519,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         .defs
                         .def_string_literal(&lit, &mut self.compiler.strings),
                 };
-                Ok(DefReference { def_id })
+                Ok(def_id)
             }
             ast::Type::Regex(lit) => {
                 let def_id = self
@@ -540,7 +529,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
-                Ok(DefReference { def_id })
+                Ok(def_id)
             }
         }
     }
@@ -580,12 +569,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
         let type_def_id = self.lookup_path(&path.0, &path.1)?;
-        let key = (
-            DefReference {
-                def_id: DefId::unit(),
-            },
-            self.src.span(&span),
-        );
+        let key = (DefId::unit(), self.src.span(&span));
         let expr = self.lower_expr_pattern((expr.0, expr.1), var_table)?;
 
         Ok(self.expr(
@@ -834,8 +818,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         if let Some((ctx_block, _span)) = type_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
-            let def = DefReference { def_id };
-            let context_fn = move || def.clone();
+            let context_fn = move || def_id;
 
             for spanned_stmt in ctx_block {
                 match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
@@ -852,18 +835,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(root_defs)
     }
 
-    fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefReference {
+    fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefId {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         debug!("{anonymous_def_id:?}: <anonymous>");
-        DefReference {
-            def_id: anonymous_def_id,
-        }
+        anonymous_def_id
     }
 
     fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
         match key {
-            RelationKey::Named(def_ref) => def_ref.def_id,
+            RelationKey::Named(def_id) => def_id,
             RelationKey::FmtTransition(def_ref, final_state) => {
                 let relation_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
                 self.set_def_kind(
@@ -920,8 +901,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 }
 
 enum RelationKey {
-    Named(DefReference),
-    FmtTransition(DefReference, FmtFinalState),
+    Named(DefId),
+    FmtTransition(DefId, FmtFinalState),
     Builtin(DefId),
     Indexed,
 }
@@ -929,7 +910,7 @@ enum RelationKey {
 #[derive(Clone)]
 enum BlockContext<'a> {
     NoContext,
-    Context(&'a dyn Fn() -> DefReference),
+    Context(&'a dyn Fn() -> DefId),
 }
 
 #[derive(Default)]

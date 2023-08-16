@@ -35,15 +35,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::BuiltinRelType(kind, _) => {
                 self.check_builtin_relation(relationship_id, relationship, kind, span);
             }
-            DefKind::FmtTransition(def_reference, final_state) => {
-                self.check_def_shallow(def_reference.def_id);
-                self.check_fmt_relation(
-                    relationship_id,
-                    relationship,
-                    def_reference.def_id,
-                    final_state,
-                    span,
-                );
+            DefKind::FmtTransition(def_id, final_state) => {
+                self.check_def_shallow(*def_id);
+                self.check_fmt_relation(relationship_id, relationship, *def_id, final_state, span);
             }
             _ => {
                 panic!()
@@ -63,13 +57,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject = &relationship.subject;
         let object = &relationship.object;
 
-        let subject_ty = self.check_def_shallow(subject.0.def_id);
-        let object_ty = self.check_def_shallow(object.0.def_id);
+        let subject_ty = self.check_def_shallow(subject.0);
+        let object_ty = self.check_def_shallow(object.0);
 
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
 
-        let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
+        let properties = self.relations.properties_by_def_id_mut(subject.0);
         match &mut properties.table {
             None => {
                 properties.table = Some(
@@ -95,7 +89,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         // Ensure properties in object
-        self.relations.properties_by_def_id_mut(object.0.def_id);
+        self.relations.properties_by_def_id_mut(object.0);
 
         match (&relationship.object_prop, object_ty) {
             (Some(_), Type::Domain(_)) => {
@@ -103,7 +97,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if self
                     .relations
-                    .properties_by_def_id_mut(object.0.def_id)
+                    .properties_by_def_id_mut(object.0)
                     .table_mut()
                     .insert(
                         PropertyId::object(relationship_id),
@@ -141,22 +135,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match relation {
             BuiltinRelationKind::Is => {
-                let subject_ty = self.check_def_shallow(subject.0.def_id);
-                let object_ty = self.check_def_shallow(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
 
                 // Ensure properties
-                self.relations.properties_by_def_id_mut(subject.0.def_id);
+                self.relations.properties_by_def_id_mut(subject.0);
 
                 let prev_entry = self
                     .relations
                     .ontology_mesh
-                    .entry(subject.0.def_id)
+                    .entry(subject.0)
                     .or_default()
                     .entry(Is {
-                        def_id: object.0.def_id,
+                        def_id: object.0,
                         rel: match relationship.subject_cardinality.0 {
                             PropertyCardinality::Mandatory => TypeRelation::Super,
                             PropertyCardinality::Optional => TypeRelation::SubVariant,
@@ -175,22 +169,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Identifies => {
-                let subject_ty = self.check_def_shallow(subject.0.def_id);
-                let object_ty = self.check_def_shallow(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0);
 
                 if properties.identifies.is_some() {
                     return self.error(CompileError::AlreadyIdentifiesAType, span);
                 }
-                if subject.0.def_id.package_id() != object.0.def_id.package_id() {
+                if subject.0.package_id() != object.0.package_id() {
                     return self.error(CompileError::MustIdentifyWithinDomain, span);
                 }
 
                 properties.identifies = Some(relationship_id);
-                let object_properties = self.relations.properties_by_def_id_mut(object.0.def_id);
+                let object_properties = self.relations.properties_by_def_id_mut(object.0);
                 match object_properties.identified_by {
                     Some(id) => {
                         debug!(
@@ -208,12 +202,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("This should not have been lowered");
             }
             BuiltinRelationKind::Indexed => {
-                let subject_ty = self.check_def_shallow(subject.0.def_id);
-                let object_ty = self.check_def_shallow(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_def_id_mut(subject.0.def_id);
+                let properties = self.relations.properties_by_def_id_mut(subject.0);
                 match (&properties.table, &mut properties.constructor) {
                     (None, Constructor::Transparent) => {
                         let mut sequence = Sequence::default();
@@ -242,8 +236,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Route => {
-                let subject_ty = self.check_def_shallow(subject.0.def_id);
-                let object_ty = self.check_def_shallow(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
 
                 self.check_package_data_type(subject_ty, &subject.1);
                 self.check_package_data_type(object_ty, &object.1);
@@ -251,8 +245,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Default => {
-                let _subject_ty = self.check_def_shallow(subject.0.def_id);
-                let subject_def_kind = self.defs.def_kind(subject.0.def_id);
+                let _subject_ty = self.check_def_shallow(subject.0);
+                let subject_def_kind = self.defs.def_kind(subject.0);
 
                 match subject_def_kind {
                     DefKind::Type(TypeDef {
@@ -262,18 +256,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        }) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
+                        }) => match self.def_types.table.get(&outer_object.0).cloned() {
                             Some(object_ty) => {
                                 // just copy the type, type check done later
-                                self.expected_constant_types
-                                    .insert(object.0.def_id, object_ty);
+                                self.expected_constant_types.insert(object.0, object_ty);
 
-                                let _object_ty = self.check_def_shallow(object.0.def_id);
+                                let _object_ty = self.check_def_shallow(object.0);
 
-                                self.relations.default_const_objects.insert(
-                                    RelationshipId(*outer_relationship_id),
-                                    object.0.def_id,
-                                );
+                                self.relations
+                                    .default_const_objects
+                                    .insert(RelationshipId(*outer_relationship_id), object.0);
 
                                 object_ty
                             }
@@ -295,10 +287,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             BuiltinRelationKind::Gen => {
-                let _subject_ty = self.check_def_shallow(subject.0.def_id);
-                let object_ty = self.check_def_shallow(object.0.def_id);
+                let _subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
 
-                let subject_def_kind = self.defs.def_kind(subject.0.def_id);
+                let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let value_generator_def_id = match object_ty {
                     Type::ValueGenerator(def_id) => *def_id,
@@ -318,7 +310,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         DefKind::Relationship(Relationship {
                             object: outer_object,
                             ..
-                        }) => match self.def_types.table.get(&outer_object.0.def_id).cloned() {
+                        }) => match self.def_types.table.get(&outer_object.0).cloned() {
                             Some(_outer_object_ty) => {
                                 self.relations.value_generators_unchecked.insert(
                                     RelationshipId(*outer_relationship_id),
@@ -347,18 +339,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             | BuiltinRelationKind::Max
             | BuiltinRelationKind::Doc
             | BuiltinRelationKind::Example => {
-                let subject_ty = self.check_def_shallow(subject.0.def_id);
-                let _ = self.check_def_shallow(object.0.def_id);
+                let subject_ty = self.check_def_shallow(subject.0);
+                let _ = self.check_def_shallow(object.0);
 
                 self.relations
                     .type_params
-                    .entry(subject.0.def_id)
+                    .entry(subject.0)
                     .or_default()
                     .insert(
                         relationship.relation_def_id,
                         TypeParam {
                             definition_site: relationship_id.0.package_id(),
-                            object: object.0.def_id,
+                            object: object.0,
                             span: *span,
                         },
                     );
@@ -379,8 +371,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject = &relationship.subject;
         let object = &relationship.object;
 
-        let subject_ty = self.check_def_shallow(subject.0.def_id);
-        let object_ty = self.check_def_shallow(object.0.def_id);
+        let subject_ty = self.check_def_shallow(subject.0);
+        let object_ty = self.check_def_shallow(object.0);
 
         match subject_ty {
             Type::StringConstant(subject_def_id)
@@ -389,7 +381,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if let Err(e) = self.extend_string_pattern_fmt_constructor(
                     relation_def_id,
                     (relationship_id, relationship),
-                    object.0.def_id,
+                    object.0,
                     object_ty,
                     StringPatternSegment::EmptyString,
                     *final_state,
@@ -399,10 +391,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             Type::Anonymous(_) => {
-                debug!("Fmt subject anonymous object: {:?}", subject.0.def_id);
+                debug!("Fmt subject anonymous object: {:?}", subject.0);
                 let subject_constructor = self
                     .relations
-                    .properties_by_def_id(subject.0.def_id)
+                    .properties_by_def_id(subject.0)
                     .map(|props| &props.constructor);
 
                 match subject_constructor {
@@ -410,7 +402,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if let Err(e) = self.extend_string_pattern_fmt_constructor(
                             relation_def_id,
                             (relationship_id, relationship),
-                            object.0.def_id,
+                            object.0,
                             object_ty,
                             subject_pattern.clone(),
                             *final_state,
