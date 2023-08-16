@@ -46,7 +46,7 @@ fn error_lex_recovery_works() {
                 x
                 ;; // ERROR lex error: illegal character `;`
                 foobar
-        } // ERROR parse error: found `}`, expected one of `(`, `.`, `:`, `<`, `?`
+        } // ERROR parse error: found `}`, expected one of `(`, `.`, `:`, `?`
     }
     "
     .compile_fail()

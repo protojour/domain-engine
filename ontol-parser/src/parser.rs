@@ -5,8 +5,7 @@ use smartstring::alias::String;
 
 use crate::ast::{
     ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, StructPattern,
-    StructPatternAttr, TypeOrPattern, TypeParam, TypeParamPattern, TypeParamPatternBinding,
-    UnitOrSeq, UseStatement, Visibility, WithStatement,
+    StructPatternAttr, TypeOrPattern, UnitOrSeq, UseStatement, Visibility, WithStatement,
 };
 
 use super::{
@@ -70,41 +69,22 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
 fn type_statement(
     stmt_parser: impl AstParser<Spanned<Statement>>,
 ) -> impl AstParser<TypeStatement> {
-    fn generic_params() -> impl AstParser<Vec<Spanned<TypeParam>>> {
-        just(Token::Sigil('<'))
-            .ignore_then(spanned(generic_param()).separated_by(just(Token::Sigil(','))))
-            .then_ignore(just(Token::Sigil('>')))
-    }
-
-    fn generic_param() -> impl AstParser<TypeParam> {
-        spanned(ident())
-            .then(
-                just(Token::Sigil('='))
-                    .ignore_then(spanned(named_type()))
-                    .or_not(),
-            )
-            .map(|(ident, default)| TypeParam { ident, default })
-    }
-
     doc_comments()
         .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Type))
         .then(spanned(ident()))
-        .then(spanned(generic_params()).or_not())
         .then(spanned(stmt_parser.repeated().delimited_by(open('{'), close('}'))).or_not())
-        .map(
-            |(((((docs, public), kw), ident), params), ctx_block)| TypeStatement {
-                docs,
-                visibility: match public {
-                    Some(span) => (Visibility::Public, span),
-                    None => (Visibility::Private, kw.clone()),
-                },
-                kw,
-                ident,
-                params,
-                ctx_block,
+        .map(|((((docs, public), kw), ident), ctx_block)| TypeStatement {
+            docs,
+            visibility: match public {
+                Some(span) => (Visibility::Public, span),
+                None => (Visibility::Private, kw.clone()),
             },
-        )
+            kw,
+            ident,
+            params: None,
+            ctx_block,
+        })
 }
 
 fn with_statement(
@@ -416,43 +396,19 @@ fn spanned_named_or_anonymous_type_or_dot(
 
 /// Type parser
 fn named_type() -> impl AstParser<Type> {
-    recursive(|ty| {
-        let binding = just(Token::Sigil('='))
-            .ignore_then(spanned(ty))
-            .map(TypeParamPatternBinding::Equals);
+    let unit = just(Token::Open('('))
+        .then(just(Token::Close(')')))
+        .map(|_| Type::Unit);
+    let path = path().map(|path| Type::Path(path, None));
+    let number_literal = number_literal().map(Type::NumberLiteral);
+    let string_literal = string_literal().map(Type::StringLiteral);
+    let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
 
-        let param_pattern = spanned(ident())
-            .then(binding.or_not())
-            .map(|(ident, binding)| TypeParamPattern {
-                ident,
-                binding: binding.unwrap_or(TypeParamPatternBinding::None),
-            })
-            .labelled("parameter pattern");
-
-        let unit = just(Token::Open('('))
-            .then(just(Token::Close(')')))
-            .map(|_| Type::Unit);
-        let path = path()
-            .then(
-                spanned(
-                    just(Token::Sigil('<'))
-                        .ignore_then(spanned(param_pattern).separated_by(just(Token::Sigil(','))))
-                        .then_ignore(just(Token::Sigil('>')))
-                        .labelled("generic arguments"),
-                )
-                .or_not(),
-            )
-            .map(|(path, param_patterns)| Type::Path(path, param_patterns));
-        let number_literal = number_literal().map(Type::NumberLiteral);
-        let string_literal = string_literal().map(Type::StringLiteral);
-        let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
-
-        unit.or(path)
-            .or(number_literal)
-            .or(string_literal)
-            .or(regex)
-            .labelled("type")
-    })
+    unit.or(path)
+        .or(number_literal)
+        .or(string_literal)
+        .or(regex)
+        .labelled("type")
 }
 
 fn anonymous_type(
