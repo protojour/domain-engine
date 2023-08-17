@@ -60,6 +60,10 @@ pub struct State {
 
     duplicate_type_params: IndexMap<DefId, Vec<SourceSpan>>,
 
+    /// Diagnostics will be emitted if the root type
+    /// has to be concrete
+    do_emit_diagnostics: bool,
+
     do_trace: bool,
 }
 
@@ -92,20 +96,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             self.relations.properties_by_def_id(self.root_def_id),
         );
 
-        if let Some(repr) = self.seal_ctx.repr_table.get(&self.root_def_id) {
-            match &repr.kind {
-                ReprKind::Struct | ReprKind::StructIntersection(_) | ReprKind::Seq => {
-                    let abstract_notes = std::mem::take(&mut self.state.abstract_notes);
-                    if !abstract_notes.is_empty() {
-                        self.errors.error_with_notes(
-                            CompileError::TypeNotRepresentable,
-                            &def.span,
-                            abstract_notes,
-                        );
-                    }
-                }
-                _ => {}
-            }
+        if self.state.do_emit_diagnostics && !self.state.abstract_notes.is_empty() {
+            self.errors.error_with_notes(
+                CompileError::TypeNotRepresentable,
+                &def.span,
+                std::mem::take(&mut self.state.abstract_notes),
+            );
         }
     }
 
@@ -121,7 +117,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         let repr_result = self.compute_repr_cached_recursive(def_id, properties);
 
-        if repr_result.is_err() {
+        if repr_result.is_err() && self.state.do_emit_diagnostics {
             for span_node in self.state.span_stack.iter().rev() {
                 if span_node.span.source_id == NATIVE_SOURCE {
                     continue;
@@ -160,6 +156,18 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         let repr = self.compute_repr(def_id);
 
+        if def_id == self.root_def_id
+            && matches!(
+                repr.as_ref().map(|repr| &repr.kind),
+                Some(ReprKind::Struct | ReprKind::StructIntersection(_) | ReprKind::Seq)
+            )
+        {
+            // Failure to repr check any member type
+            // will result in error diagnostics for the root type:
+            self.state.do_emit_diagnostics = true;
+        }
+
+        // traverse members (i.e. properties)
         if let Some(properties) = properties {
             if let Some(table) = &properties.table {
                 for (property_id, _property) in table {
@@ -194,7 +202,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn traverse_property(&mut self, property_id: PropertyId) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-        let (value_def_id, ..) = meta.relationship.right_side(property_id.role);
+        let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
         let value_def = self.defs.table.get(&value_def_id).unwrap();
 
         if let Some(Type::Error) = self.def_types.table.get(&value_def_id) {

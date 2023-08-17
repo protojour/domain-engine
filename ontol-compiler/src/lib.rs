@@ -351,7 +351,7 @@ impl<'m> Compiler<'m> {
     ) -> Option<EntityRelationship> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-        let (target_def_id, _, _) = meta.relationship.right_side(property_id.role);
+        let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
 
         if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
             if target_properties.identified_by.is_some() {

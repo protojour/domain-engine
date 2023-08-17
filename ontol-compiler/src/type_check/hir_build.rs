@@ -378,10 +378,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     },
                                     Role::Object => meta.relationship.object_prop,
                                 };
-                                let (_, _, owner_cardinality) =
-                                    meta.relationship.left_side(property_id.role);
+                                let (_, owner_cardinality, _) =
+                                    meta.relationship.by(property_id.role);
                                 let (value_def_id, _, _) =
-                                    meta.relationship.right_side(property_id.role);
+                                    meta.relationship.by(property_id.role.opposite());
 
                                 property_name.map(|property_name| {
                                     (

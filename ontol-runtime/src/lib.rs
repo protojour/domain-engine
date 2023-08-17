@@ -144,6 +144,16 @@ pub enum Role {
     Object,
 }
 
+impl Role {
+    /// Get the role that is opposite to this role
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Subject => Self::Object,
+            Self::Object => Self::Subject,
+        }
+    }
+}
+
 #[derive(
     Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, DebugExtras,
 )]

@@ -126,17 +126,11 @@ pub struct Relationship<'m> {
 }
 
 impl<'m> Relationship<'m> {
-    pub fn left_side(&self, role: Role) -> (DefId, SourceSpan, Cardinality) {
+    /// Get relationship data by a specific role: subject or object
+    pub fn by(&self, role: Role) -> (DefId, Cardinality, SourceSpan) {
         match role {
-            Role::Subject => (self.subject.0, self.subject.1, self.subject_cardinality),
-            Role::Object => (self.object.0, self.object.1, self.object_cardinality),
-        }
-    }
-
-    pub fn right_side(&self, role: Role) -> (DefId, SourceSpan, Cardinality) {
-        match role {
-            Role::Subject => (self.object.0, self.object.1, self.object_cardinality),
-            Role::Object => (self.subject.0, self.subject.1, self.subject_cardinality),
+            Role::Subject => (self.subject.0, self.subject_cardinality, self.subject.1),
+            Role::Object => (self.object.0, self.object_cardinality, self.object.1),
         }
     }
 }

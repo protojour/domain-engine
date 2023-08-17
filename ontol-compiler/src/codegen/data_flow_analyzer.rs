@@ -233,7 +233,7 @@ where
         value_def_id: DefId,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
-        let (_, _, cardinality) = meta.relationship.left_side(property_id.role);
+        let (_, cardinality, _) = meta.relationship.by(property_id.role);
 
         self.property_flow.insert(PropertyFlow {
             id: property_id,
