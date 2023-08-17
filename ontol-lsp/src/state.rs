@@ -265,8 +265,8 @@ impl Document {
                                     dp.docs =
                                         "### Relation prop\nAssigns a default to value".to_string();
                                 }
-                                "bool" => {
-                                    dp.path = "ontol.bool".to_string();
+                                "boolean" => {
+                                    dp.path = "ontol.boolean".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nBoolean".to_string();
                                 }
@@ -418,7 +418,7 @@ pub fn get_builtins() -> Vec<CompletionItem> {
             ..Default::default()
         },
         CompletionItem {
-            label: "bool".to_string(),
+            label: "boolean".to_string(),
             kind: Some(CompletionItemKind::UNIT),
             detail: Some("boolean".to_string()),
             ..Default::default()
@@ -482,6 +482,6 @@ pub fn get_builtins() -> Vec<CompletionItem> {
 
 const RESERVED_WORDS: [&str; 24] = [
     "use", "as", "pub", "type", "with", "rel", "fmt", "map", "unify", "id", "is", "gen", "auto",
-    "default", "bool", "int", "float", "number", "string", "datetime", "date", "time", "uuid",
+    "default", "boolean", "int", "float", "number", "string", "datetime", "date", "time", "uuid",
     "regex",
 ];

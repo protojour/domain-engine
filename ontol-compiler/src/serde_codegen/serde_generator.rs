@@ -287,9 +287,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::Unit,
                 )),
-                PrimitiveKind::Bool => Some(OperatorAllocation::Allocated(
+                PrimitiveKind::Boolean => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::Bool(def_variant.def_id),
+                    SerdeOperator::Boolean(def_variant.def_id),
                 )),
                 PrimitiveKind::False => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),

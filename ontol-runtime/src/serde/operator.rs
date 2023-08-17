@@ -28,7 +28,7 @@ pub enum SerdeOperator {
     Unit,
     True(DefId),
     False(DefId),
-    Bool(DefId),
+    Boolean(DefId),
     I64(DefId, Option<RangeInclusive<i64>>),
     F64(DefId, Option<RangeInclusive<f64>>),
     String(DefId),

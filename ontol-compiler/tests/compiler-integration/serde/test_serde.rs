@@ -29,7 +29,7 @@ fn test_serde_booleans() {
     "
     pub type f { rel .is: false }
     pub type t { rel .is: true }
-    pub type b { rel .is: bool }
+    pub type b { rel .is: boolean }
     "
     .compile_ok(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);

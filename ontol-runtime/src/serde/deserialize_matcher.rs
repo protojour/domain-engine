@@ -37,7 +37,7 @@ pub trait ValueMatcher {
         Err(())
     }
 
-    fn match_bool(&self, _: bool) -> Result<Value, ()> {
+    fn match_boolean(&self, _: bool) -> Result<Value, ()> {
         Err(())
     }
 
@@ -78,27 +78,27 @@ impl ValueMatcher for UnitMatcher {
     }
 }
 
-pub enum BoolMatcher {
+pub enum BooleanMatcher {
     False(DefId),
     True(DefId),
-    Bool(DefId),
+    Boolean(DefId),
 }
 
-impl ValueMatcher for BoolMatcher {
+impl ValueMatcher for BooleanMatcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::False(_) => write!(f, "false"),
             Self::True(_) => write!(f, "true"),
-            Self::Bool(_) => write!(f, "bool"),
+            Self::Boolean(_) => write!(f, "boolean"),
         }
     }
 
-    fn match_bool(&self, val: bool) -> Result<Value, ()> {
+    fn match_boolean(&self, val: bool) -> Result<Value, ()> {
         let int = if val { 1 } else { 0 };
         match (self, val) {
             (Self::False(def_id), false) => Ok(Value::new(Data::I64(int), *def_id)),
             (Self::True(def_id), true) => Ok(Value::new(Data::I64(int), *def_id)),
-            (Self::Bool(def_id), _) => Ok(Value::new(Data::I64(int), *def_id)),
+            (Self::Boolean(def_id), _) => Ok(Value::new(Data::I64(int), *def_id)),
             _ => Err(()),
         }
     }

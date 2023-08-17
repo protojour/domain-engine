@@ -267,7 +267,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         );
                     } else {
                         match kind {
-                            PrimitiveKind::Bool
+                            PrimitiveKind::Boolean
                             | PrimitiveKind::False
                             | PrimitiveKind::True
                             | PrimitiveKind::String

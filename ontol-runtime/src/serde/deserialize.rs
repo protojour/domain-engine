@@ -19,7 +19,7 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        BoolMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
+        BooleanMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
         MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, StringPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
@@ -126,11 +126,11 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
             }
             SerdeOperator::False(def_id) => deserializer
-                .deserialize_bool(BoolMatcher::False(*def_id).into_visitor_no_params(self)),
+                .deserialize_bool(BooleanMatcher::False(*def_id).into_visitor_no_params(self)),
             SerdeOperator::True(def_id) => deserializer
-                .deserialize_bool(BoolMatcher::True(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::Bool(def_id) => deserializer
-                .deserialize_bool(BoolMatcher::Bool(*def_id).into_visitor_no_params(self)),
+                .deserialize_bool(BooleanMatcher::True(*def_id).into_visitor_no_params(self)),
+            SerdeOperator::Boolean(def_id) => deserializer
+                .deserialize_bool(BooleanMatcher::Boolean(*def_id).into_visitor_no_params(self)),
             SerdeOperator::I64(def_id, range) => deserializer.deserialize_i64(
                 NumberMatcher {
                     def_id: *def_id,
@@ -244,7 +244,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
         Ok(self
             .matcher
-            .match_bool(v)
+            .match_boolean(v)
             .map_err(|_| Error::invalid_type(Unexpected::Bool(v), &self))?
             .into())
     }

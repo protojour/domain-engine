@@ -147,7 +147,7 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
             LookAheadValue::Scalar(GqlScalar::Unit) => visitor.visit_unit(),
             LookAheadValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(*value),
             LookAheadValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
-            LookAheadValue::Scalar(GqlScalar::Bool(value)) => visitor.visit_bool(*value),
+            LookAheadValue::Scalar(GqlScalar::Boolean(value)) => visitor.visit_bool(*value),
             LookAheadValue::Scalar(GqlScalar::String(value)) => visitor.visit_str(value),
             LookAheadValue::Enum(value) => visitor.visit_str(value),
             LookAheadValue::List(vec) => {

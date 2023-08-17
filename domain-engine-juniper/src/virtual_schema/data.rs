@@ -60,7 +60,7 @@ pub struct NativeScalarRef {
 #[derive(Clone, Copy, Debug)]
 pub enum NativeScalarKind {
     Unit,
-    Bool,
+    Boolean,
     Int(DefId),
     Number(DefId),
     String,

@@ -10,7 +10,7 @@ pub enum GqlScalar {
     Unit,
     I32(i32),
     F64(f64),
-    Bool(bool),
+    Boolean(bool),
     String(String),
 }
 
@@ -28,7 +28,7 @@ impl From<f64> for GqlScalar {
 
 impl From<bool> for GqlScalar {
     fn from(value: bool) -> Self {
-        Self::Bool(value)
+        Self::Boolean(value)
     }
 }
 
@@ -50,7 +50,7 @@ impl Display for GqlScalar {
             Self::Unit => write!(f, "{{}}"),
             Self::I32(i) => write!(f, "{i}"),
             Self::F64(f64) => write!(f, "{f64}"),
-            Self::Bool(b) => write!(f, "{b}"),
+            Self::Boolean(b) => write!(f, "{b}"),
             Self::String(s) => write!(f, "{s}"),
         }
     }
@@ -66,7 +66,7 @@ impl ScalarValue for GqlScalar {
 
     fn as_bool(&self) -> Option<bool> {
         match self {
-            Self::Bool(b) => Some(*b),
+            Self::Boolean(b) => Some(*b),
             _ => None,
         }
     }
@@ -119,7 +119,7 @@ impl ser::Serialize for GqlScalar {
             Self::Unit => serializer.serialize_unit(),
             Self::I32(i) => serializer.serialize_i32(*i),
             Self::F64(f) => serializer.serialize_f64(*f),
-            Self::Bool(b) => serializer.serialize_bool(*b),
+            Self::Boolean(b) => serializer.serialize_bool(*b),
             Self::String(s) => serializer.serialize_str(s),
         }
     }
@@ -136,7 +136,7 @@ impl<'de> de::Visitor<'de> for ScalarDeserializeVisitor {
     }
 
     fn visit_bool<E: de::Error>(self, v: bool) -> Result<GqlScalar, E> {
-        Ok(GqlScalar::Bool(v))
+        Ok(GqlScalar::Boolean(v))
     }
 
     fn visit_i64<E: de::Error>(self, v: i64) -> Result<GqlScalar, E> {
@@ -211,7 +211,7 @@ impl ser::Serializer for GqlScalarSerializer {
     type SerializeStructVariant = Impossible;
 
     fn serialize_bool(self, v: bool) -> SerResult {
-        Ok(GqlScalar::Bool(v))
+        Ok(GqlScalar::Boolean(v))
     }
 
     fn serialize_i8(self, value: i8) -> SerResult {

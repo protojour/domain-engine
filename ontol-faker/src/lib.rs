@@ -75,7 +75,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::Unit => Value::unit(),
             SerdeOperator::False(def_id) => Value::new(Data::I64(0), *def_id),
             SerdeOperator::True(def_id) => Value::new(Data::I64(1), *def_id),
-            SerdeOperator::Bool(def_id) => {
+            SerdeOperator::Boolean(def_id) => {
                 let value: bool = Faker.fake_with_rng(self.rng);
                 Value::new(Data::I64(if value { 1 } else { 0 }), *def_id)
             }

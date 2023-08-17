@@ -333,8 +333,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
     fn get_native_scalar_kind(&mut self, serde_operator: &SerdeOperator) -> NativeScalarKind {
         match serde_operator {
             SerdeOperator::Unit => NativeScalarKind::Unit,
-            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
-                NativeScalarKind::Bool
+            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
+                NativeScalarKind::Boolean
             }
             SerdeOperator::I64(def_id, _) => NativeScalarKind::Int(*def_id),
             SerdeOperator::F64(def_id, _) => NativeScalarKind::Number(*def_id),
@@ -644,7 +644,7 @@ impl<'a> VirtualSchemaBuilder<'a> {
                     },
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
                         operator_id: SerdeOperatorId(42),
-                        kind: NativeScalarKind::Bool,
+                        kind: NativeScalarKind::Boolean,
                     })),
                 },
             );

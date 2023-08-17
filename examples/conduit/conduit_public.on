@@ -13,7 +13,7 @@ pub type Profile {
     rel .'username'|id: username
     rel .'bio': string
     rel .'image'?: string
-    rel .'following': bool
+    rel .'following': boolean
 }
 
 pub type Article {
@@ -23,7 +23,7 @@ pub type Article {
     rel .'body': string
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
-    rel .'favorited': bool
+    rel .'favorited': boolean
     rel .'favoritesCount': i64
     rel .'author': Profile
 }

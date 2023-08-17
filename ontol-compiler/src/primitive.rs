@@ -11,7 +11,7 @@ pub enum PrimitiveKind {
     /// The unit data type which contains no information
     Unit,
     /// The set of false and true
-    Bool,
+    Boolean,
     /// The false value
     False,
     /// The true value
@@ -35,22 +35,6 @@ pub enum PrimitiveKind {
 impl PrimitiveKind {
     pub fn is_concrete(&self) -> bool {
         !matches!(self, Self::Number | Self::Integer | Self::Float)
-    }
-
-    pub fn ident(&self) -> &'static str {
-        match self {
-            Self::Unit => "unit",
-            Self::Bool => "bool",
-            Self::False => "false",
-            Self::True => "true",
-            Self::Number => "number",
-            Self::Integer => "integer",
-            Self::I64 => "i64",
-            Self::Float => "float",
-            Self::F32 => "f32",
-            Self::F64 => "f64",
-            Self::String => "string",
-        }
     }
 }
 
@@ -152,7 +136,7 @@ impl Primitives {
 
             false_value: defs.add_primitive(PrimitiveKind::False, Some("false")),
             true_value: defs.add_primitive(PrimitiveKind::True, Some("true")),
-            bool: defs.add_primitive(PrimitiveKind::Bool, Some("bool")),
+            bool: defs.add_primitive(PrimitiveKind::Boolean, Some("boolean")),
 
             empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
             empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),

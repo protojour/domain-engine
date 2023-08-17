@@ -327,7 +327,7 @@ fn serialize_schema_inline<S: Serializer>(
                 map.serialize_entry("description", docs)?;
             }
         }
-        SerdeOperator::Bool(_) => {
+        SerdeOperator::Boolean(_) => {
             map.serialize_entry("type", "boolean")?;
             if let Some(docs) = ctx.docs {
                 map.serialize_entry("description", docs)?;
@@ -480,7 +480,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Unit
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
-            | SerdeOperator::Bool(_)
+            | SerdeOperator::Boolean(_)
             | SerdeOperator::I64(..)
             | SerdeOperator::F64(..)
             | SerdeOperator::String(_)
@@ -761,7 +761,7 @@ impl SchemaGraphBuilder {
             SerdeOperator::Unit
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
-            | SerdeOperator::Bool(_)
+            | SerdeOperator::Boolean(_)
             | SerdeOperator::I64(..)
             | SerdeOperator::F64(..)
             | SerdeOperator::String(_)

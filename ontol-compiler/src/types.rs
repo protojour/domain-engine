@@ -157,7 +157,16 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
         match ty {
             Type::Tautology => write!(f, "tautology"),
-            Type::Primitive(kind, _) => write!(f, "{}", kind.ident()),
+            Type::Primitive(kind, def_id) => {
+                // write!(f, "{}", kind.ident())
+                match (kind, self.1.def_kind(*def_id)) {
+                    (_, DefKind::Primitive(_, Some(ident))) => write!(f, "{ident}"),
+                    (_, DefKind::Primitive(primitive_kind, None)) => {
+                        write!(f, "{primitive_kind:?}")
+                    }
+                    _ => unreachable!(),
+                }
+            }
             Type::EmptySequence(_) => write!(f, "[]"),
             Type::IntConstant(val) => write!(f, "int({val})"),
             Type::FloatConstant(val) => write!(f, "float({val})"),

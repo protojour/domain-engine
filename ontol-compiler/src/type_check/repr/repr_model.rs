@@ -21,7 +21,7 @@ pub struct Repr {
 pub enum ReprKind {
     Unit,
     /// Scalar type without further attributes.
-    /// Currently placeholder for bool, unit, string
+    /// Currently placeholder for boolean, unit, string
     Scalar(DefId, ReprScalarKind, SourceSpan),
     /// Sequence
     Seq,

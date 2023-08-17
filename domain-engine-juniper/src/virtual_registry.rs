@@ -166,7 +166,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::Unit => {
                 todo!("unit argument")
             }
-            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Bool(_) => {
+            SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
                 self.get_native_argument::<bool>(name, modifier)
             }
             SerdeOperator::I64(_, _) => return self.get_native_argument::<i32>(name, modifier),
@@ -337,7 +337,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 NativeScalarKind::Unit => {
                     todo!("Unit type")
                 }
-                NativeScalarKind::Bool => self.get_modified_type::<bool>(&(), type_ref.modifier),
+                NativeScalarKind::Boolean => self.get_modified_type::<bool>(&(), type_ref.modifier),
                 NativeScalarKind::Int(_) => self.get_modified_type::<i32>(&(), type_ref.modifier),
                 NativeScalarKind::Number(_) => {
                     self.get_modified_type::<f64>(&(), type_ref.modifier)
