@@ -1,12 +1,14 @@
-# Ontol scalar types
+# ONTOL scalar types
 
 (This documentation should be extracted from the ontol domain)
 
 ```ontol
 bool
-int
-float
 number
+integer
+i64
+float
+f64
 string
 datetime
 date
