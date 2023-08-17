@@ -91,7 +91,6 @@ impl LanguageServer for Backend {
                 )),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
-                    // resolve_provider: Some(true),
                     completion_item: Some(CompletionOptionsCompletionItem {
                         label_details_support: Some(true),
                     }),
@@ -215,8 +214,4 @@ impl LanguageServer for Backend {
             None => Ok(None),
         }
     }
-
-    // async fn completion_resolve(&self, _params: CompletionItem) -> Result<CompletionItem> {
-    //     Err(RpcError::method_not_found())
-    // }
 }
