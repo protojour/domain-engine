@@ -104,11 +104,6 @@ pub type kill-chain-phase {
     rel .'phase_name': string
 }
 
-/// The identifier of a marking-defifition
-pub type marking-definition-id {
-    fmt '' => 'marking-definition--' => uuid => .
-}
-
 /// The binary data type represents a sequence of bytes. In order to allow pattern matching on custom objects, for all properties that use the binary type, the property name MUST end with '_bin'.
 ///
 /// The JSON MTI serialization represents this as a base64-­encoded string as specified in

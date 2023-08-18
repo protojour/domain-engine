@@ -24,7 +24,7 @@ fn test_stix_lite() {
             create_de(&attack_pattern).data(json!({
                 "type": "attack-pattern",
             })),
-            r#"missing properties, expected all of "spec_version", "created", "modified", "name" at line 1 column 25"#
+            r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#
         );
 
         // BUG: In this domain at least, the ID is allocated externally.
