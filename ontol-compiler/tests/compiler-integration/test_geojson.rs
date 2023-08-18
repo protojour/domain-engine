@@ -1,15 +1,16 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, serde_utils::*, SourceName, TestCompile, TestPackages,
+    assert_error_msg, assert_json_io_matches,
+    examples::{Root, GEOJSON, WGS},
+    serde_utils::*,
+    SourceName, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
 
-use crate::examples::{GEOJSON, WGS};
-
 #[test]
 fn test_geojson() {
     TestPackages::with_sources(
-        [(SourceName::root(), GEOJSON.1), WGS]
+        [GEOJSON.root(), WGS]
     ).compile_ok(|test| {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(geometry, Create, {

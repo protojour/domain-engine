@@ -1,28 +1,26 @@
-use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    examples::{
+        conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, CONDUIT_PUBLIC},
+        Root,
+    },
+    TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
 
-pub const CONDUIT_PUBLIC: &str = include_str!("../../../examples/conduit/conduit_public.on");
-pub const CONDUIT_DB: &str = include_str!("../../../examples/conduit/conduit_db.on");
-pub const BLOG_POST_PUBLIC: &str = include_str!("../../../examples/conduit/blog_post_public.on");
-
 #[test]
 fn test_compile_conduit_public() {
-    CONDUIT_PUBLIC.compile_fail();
+    CONDUIT_PUBLIC.1.compile_fail();
 }
 
 #[test]
 fn test_compile_conduit_db() {
-    CONDUIT_DB.compile_ok(|_test| {});
+    CONDUIT_DB.1.compile_ok(|_test| {});
 }
 
 #[test]
 fn test_map_conduit_blog_post() {
-    TestPackages::with_sources([
-        (SourceName("conduit_db"), CONDUIT_DB),
-        (SourceName::root(), BLOG_POST_PUBLIC),
-    ])
-    .compile_ok(|test| {
+    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile_ok(|test| {
         test.assert_domain_map(
             ("conduit_db.Article", "BlogPost"),
             json!({
@@ -54,11 +52,7 @@ fn test_map_conduit_blog_post() {
 /// Test that the mapping works without providing the "tags" property in the input.
 #[test]
 fn test_map_conduit_no_tags_in_db_object() {
-    TestPackages::with_sources([
-        (SourceName("conduit_db"), CONDUIT_DB),
-        (SourceName::root(), BLOG_POST_PUBLIC),
-    ])
-    .compile_ok(|test| {
+    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile_ok(|test| {
         test.assert_domain_map(
             ("conduit_db.Article", "BlogPost"),
             json!({

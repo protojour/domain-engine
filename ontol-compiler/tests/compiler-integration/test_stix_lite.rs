@@ -1,19 +1,17 @@
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, serde_utils::*, SourceName, TestCompile, TestPackages,
+    assert_error_msg, assert_json_io_matches,
+    examples::{
+        stix::{STIX, STIX_COMMON, STIX_META, STIX_OPEN_VOCAB},
+        Root, SI,
+    },
+    serde_utils::*,
+    TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
 
-use crate::examples::{SI, STIX, STIX_COMMON, STIX_META, STIX_OPEN_VOCAB};
-
 fn stix_bundle() -> TestPackages {
-    TestPackages::with_sources([
-        (SourceName::root(), STIX.1),
-        STIX_META,
-        STIX_COMMON,
-        STIX_OPEN_VOCAB,
-        SI,
-    ])
+    TestPackages::with_sources([STIX.root(), STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
 }
 
 #[test]

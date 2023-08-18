@@ -1,12 +1,13 @@
 use ontol_runtime::value::Value;
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, expect_eq, serde_utils::*, TestCompile,
+    assert_error_msg, assert_json_io_matches,
+    examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
+    expect_eq,
+    serde_utils::*,
+    TestCompile,
 };
 use serde_json::json;
 use test_log::test;
-
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 #[test]
 fn id_cannot_identify_two_things() {
@@ -115,7 +116,7 @@ fn entity_id_inline_fmt() {
 
 #[test]
 fn artist_and_instrument_io_artist() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
         let [artist] = test.bind(["artist"]);
         assert_json_io_matches!(artist, Create, {
             "name": "Zappa",
@@ -133,7 +134,7 @@ fn artist_and_instrument_io_artist() {
 
 #[test]
 fn artist_and_instrument_io_instrument() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
         let [instrument] = test.bind(["instrument"]);
         assert_json_io_matches!(instrument, Create, {
             "name": "guitar",
@@ -151,7 +152,7 @@ fn artist_and_instrument_io_instrument() {
 
 #[test]
 fn artist_and_instrument_error_artist() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
         let [artist] = test.bind(["artist"]);
         assert_error_msg!(
             create_de(&artist).data(json!({
@@ -165,7 +166,7 @@ fn artist_and_instrument_error_artist() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
-    ARTIST_AND_INSTRUMENT.compile_ok(|test| {
+    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
         let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
         let plays = artist.find_property("plays").unwrap();
         let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
@@ -301,7 +302,7 @@ fn test_entity_self_relationship_mandatory_object() {
 
 #[test]
 fn entity_union_simple() {
-    GUITAR_SYNTH_UNION.compile_ok(|test| {
+    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
         let [instrument] = test.bind(["instrument"]);
         assert_json_io_matches!(
             instrument,
@@ -316,7 +317,7 @@ fn entity_union_simple() {
 
 #[test]
 fn entity_union_with_object_relation() {
-    GUITAR_SYNTH_UNION.compile_ok(|test| {
+    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
         let [instrument] = test.bind(["instrument"]);
         assert_json_io_matches!(instrument, Create, {
             "type": "synth",
@@ -330,7 +331,7 @@ fn entity_union_with_object_relation() {
 
 #[test]
 fn entity_union_in_relation_with_ids() {
-    GUITAR_SYNTH_UNION.compile_ok(|test| {
+    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
         let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
         let plays = artist.find_property("plays").unwrap();
 

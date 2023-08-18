@@ -1,12 +1,10 @@
-use ontol_test_utils::TestCompile;
+use ontol_test_utils::{examples::DEMO, TestCompile};
 use serde_json::json;
 use test_log::test;
 
-pub const DEMO: &str = include_str!("../../../examples/demo.on");
-
 #[test]
 fn test_demo() {
-    DEMO.compile_ok(|test| {
+    DEMO.1.compile_ok(|test| {
         test.assert_domain_map(
             ("archive_group", "ArchiveCollection"),
             json!({

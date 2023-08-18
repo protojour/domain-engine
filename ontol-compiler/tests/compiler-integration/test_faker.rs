@@ -1,11 +1,12 @@
 use ontol_runtime::serde::processor::ProcessorMode;
-use ontol_test_utils::{expect_eq, serde_utils::*, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    examples::{Root, GEOJSON, GUITAR_SYNTH_UNION, WGS},
+    expect_eq,
+    serde_utils::*,
+    TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
-
-use crate::examples::{GEOJSON, WGS};
-
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 #[test]
 fn test_fake_primitives() {
@@ -49,7 +50,7 @@ fn test_fake_string_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    TestPackages::with_sources([(SourceName::root(), GEOJSON.1), WGS]).compile_ok(|test| {
+    TestPackages::with_sources([GEOJSON.root(), WGS]).compile_ok(|test| {
         let [geometry] = test.bind(["Geometry"]);
         expect_eq!(
             actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
@@ -69,7 +70,7 @@ fn test_fake_geojson() {
 
 #[test]
 fn test_fake_guitar_synth() {
-    GUITAR_SYNTH_UNION.compile_ok(|test| {
+    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
         let [artist] = test.bind(["artist"]);
         expect_eq!(
             actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),

@@ -1,7 +1,12 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
 use juniper::graphql_value;
 use ontol_runtime::value::Attribute;
-use ontol_test_utils::{expect_eq, type_binding::ToSequence, SourceName, TestPackages};
+use ontol_test_utils::{
+    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
+    expect_eq,
+    type_binding::ToSequence,
+    SourceName, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
 use unimock::*;
@@ -9,9 +14,6 @@ use unimock::*;
 use crate::{
     gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema,
 };
-
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../examples/artist_and_instrument.on");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../examples/guitar_synth_union.on");
 
 const ROOT: SourceName = SourceName::root();
 
@@ -269,7 +271,7 @@ async fn test_docs_introspection() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let (test, [schema]) = ARTIST_AND_INSTRUMENT.compile_schemas([ROOT]);
+    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
     let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
@@ -426,7 +428,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_smoke_test() {
-    let (test, [schema]) = GUITAR_SYNTH_UNION.compile_schemas([ROOT]);
+    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);
     let artist_entity: Attribute = artist
         .entity_builder(
@@ -512,15 +514,8 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (test, [schema]) = TestPackages::with_sources([
-        (ROOT, include_str!("../../../examples/municipalities.on")),
-        (
-            SourceName("geojson"),
-            include_str!("../../../examples/geojson.on"),
-        ),
-        (SourceName("wgs"), include_str!("../../../examples/wgs.on")),
-    ])
-    .compile_schemas([ROOT]);
+    let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
+        .compile_schemas([ROOT]);
 
     {
         expect_eq!(

@@ -1,6 +1,8 @@
 use ontol_runtime::{config::DataStoreConfig, query::Query};
 use ontol_test_utils::{
-    assert_error_msg, expect_eq,
+    assert_error_msg,
+    examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
+    expect_eq,
     serde_utils::{create_de, read_de, read_ser},
     type_binding::TypeBinding,
     SourceName, TestCompile, TestPackages,
@@ -12,19 +14,13 @@ use uuid::Uuid;
 use crate::domain_engine::DomainEngine;
 
 fn conduit_db() -> TestPackages {
-    TestPackages::with_sources([(
-        SourceName::root(),
-        include_str!("../../../examples/conduit/conduit_db.on"),
-    )])
-    .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+    TestPackages::with_sources([CONDUIT_DB.root()])
+        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
 }
 
 fn artist_and_instrument() -> TestPackages {
-    TestPackages::with_sources([(
-        SourceName::root(),
-        include_str!("../../../examples/artist_and_instrument.on"),
-    )])
-    .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+    TestPackages::with_sources([ARTIST_AND_INSTRUMENT.root()])
+        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
 }
 
 #[test(tokio::test)]

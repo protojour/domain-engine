@@ -9,21 +9,20 @@ use ontol_runtime::{
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     DefId, PackageId,
 };
-use ontol_test_utils::{expect_eq, OntolTest, SourceName, TestPackages};
+use ontol_test_utils::{
+    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
+    expect_eq, OntolTest, SourceName, TestPackages,
+};
 use test_log::test;
 use unimock::{matching, MockFn};
 
 use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 
 const ROOT: SourceName = SourceName::root();
-const CONDUIT_DB: SourceName = SourceName("conduit_db");
 
 fn conduit_db_only() -> TestPackages {
-    TestPackages::with_sources([(
-        ROOT,
-        include_str!("../../../examples/conduit/conduit_db.on"),
-    )])
-    .with_data_store(ROOT, DataStoreConfig::InMemory)
+    TestPackages::with_sources([(ROOT, CONDUIT_DB.1)])
+        .with_data_store(ROOT, DataStoreConfig::InMemory)
 }
 
 #[test(tokio::test)]
@@ -231,19 +230,10 @@ struct BlogPostConduit {
 
 impl BlogPostConduit {
     fn new() -> Self {
-        let test_packages = TestPackages::with_sources([
-            (
-                ROOT,
-                include_str!("../../../examples/conduit/blog_post_public.on"),
-            ),
-            (
-                CONDUIT_DB,
-                include_str!("../../../examples/conduit/conduit_db.on"),
-            ),
-        ])
-        .with_data_store(CONDUIT_DB, DataStoreConfig::InMemory);
+        let test_packages = TestPackages::with_sources([(ROOT, BLOG_POST_PUBLIC.1), CONDUIT_DB])
+            .with_data_store(CONDUIT_DB.0, DataStoreConfig::InMemory);
 
-        let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB, ROOT]);
+        let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB.0, ROOT]);
         Self {
             domain_engine: Arc::new(DomainEngine::test_builder(test.ontology.clone()).build()),
             test,
@@ -400,7 +390,7 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
             &ctx.blog_schema,
             &gql_ctx_mock_data_store(
                 &ctx.test,
-                CONDUIT_DB,
+                CONDUIT_DB.0,
                 DataStoreAPIMock::query
                     .next_call(matching!(
                         _,

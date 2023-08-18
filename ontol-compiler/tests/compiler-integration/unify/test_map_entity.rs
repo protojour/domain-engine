@@ -1,9 +1,9 @@
-use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
+    SourceName, TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
-
-const ARTIST_AND_INSTRUMENT: &str = include_str!("../../../../examples/artist_and_instrument.on");
-const GUITAR_SYNTH_UNION: &str = include_str!("../../../../examples/guitar_synth_union.on");
 
 #[test]
 fn should_map_inherent_capturing_pattern_id() {
@@ -300,8 +300,8 @@ fn test_map_invert() {
 #[test]
 fn artist_etc_routing() {
     TestPackages::with_sources([
-        (SourceName("gsu"), GUITAR_SYNTH_UNION),
-        (SourceName("ai"), ARTIST_AND_INSTRUMENT),
+        (SourceName("gsu"), GUITAR_SYNTH_UNION.1),
+        (SourceName("ai"), ARTIST_AND_INSTRUMENT.1),
         (
             SourceName::root(),
             "
