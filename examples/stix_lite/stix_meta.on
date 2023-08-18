@@ -95,5 +95,5 @@ pub type defanged_object {
     /// This property defines whether or not the data contained within the object has been defanged.
     /// The default value for this property is false.
     /// This property MUST NOT be used on any STIX Objects other than SCOs.
-    rel .'defanged': boolean
+    rel .'defanged'?: boolean
 }
