@@ -1,6 +1,7 @@
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use clap::{Args, Parser, Subcommand};
 use ontol_compiler::{
+    error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
@@ -200,7 +201,10 @@ fn compile(
     let mut root_package = None;
 
     let topology = loop {
-        match package_graph_builder.transition().unwrap() {
+        match package_graph_builder.transition().map_err(|err| {
+            print_unified_compile_error(err, &ontol_sources, &sources_by_name).unwrap();
+            OntoolError::Compile
+        })? {
             GraphState::RequestPackages { builder, requests } => {
                 package_graph_builder = builder;
 
@@ -215,19 +219,22 @@ fn compile(
 
                     let mut package_config = PackageConfig::default();
 
-                    let path = paths_by_name.get(source_name).unwrap();
-                    if Some(path) == data_store_path.as_ref() {
-                        package_config.data_store = Some(DataStoreConfig::InMemory);
-                    }
+                    if let Some(path) = paths_by_name.get(source_name) {
+                        if Some(path) == data_store_path.as_ref() {
+                            package_config.data_store = Some(DataStoreConfig::InMemory);
+                        }
 
-                    if let Some(source_text) = sources_by_name.get(source_name) {
-                        package_graph_builder.provide_package(ParsedPackage::parse(
-                            request,
-                            source_text,
-                            package_config,
-                            &mut ontol_sources,
-                            &mut source_code_registry,
-                        ));
+                        if let Some(source_text) = sources_by_name.get(source_name) {
+                            package_graph_builder.provide_package(ParsedPackage::parse(
+                                request,
+                                source_text,
+                                package_config,
+                                &mut ontol_sources,
+                                &mut source_code_registry,
+                            ));
+                        } else {
+                            eprintln!("Could not load `{source_name}`");
+                        }
                     } else {
                         eprintln!("Could not load `{source_name}`");
                     }
@@ -245,40 +252,7 @@ fn compile(
             root_package: root_package.expect("No root package"),
         }),
         Err(err) => {
-            let mut colors = ColorGenerator::new();
-            for error in err.errors.iter() {
-                let span = error.span.start as usize..error.span.end as usize;
-                let message = error.error.to_string();
-
-                let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
-                let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
-
-                Report::build(ReportKind::Error, ontol_source.name(), span.start)
-                    .with_label(
-                        Label::new((ontol_source.name(), span))
-                            .with_message(message)
-                            .with_color(colors.next()),
-                    )
-                    .finish()
-                    .eprint((ontol_source.name(), Source::from(&literal_source)))?;
-
-                for note in &error.notes {
-                    let span = note.span.start as usize..note.span.end as usize;
-                    let message = note.note.to_string();
-
-                    let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
-                    let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
-
-                    Report::build(ReportKind::Advice, ontol_source.name(), span.start)
-                        .with_label(
-                            Label::new((ontol_source.name(), span))
-                                .with_message(message)
-                                .with_color(colors.next()),
-                        )
-                        .finish()
-                        .eprint((ontol_source.name(), Source::from(&literal_source)))?;
-                }
-            }
+            print_unified_compile_error(err, &ontol_sources, &sources_by_name)?;
             Err(OntoolError::Compile)
         }
     }
@@ -293,6 +267,49 @@ fn get_source_name(path: &Path) -> String {
         Some(stripped) => stripped.to_string(),
         None => file_name,
     }
+}
+
+fn print_unified_compile_error(
+    unified_error: UnifiedCompileError,
+    ontol_sources: &Sources,
+    sources_by_name: &HashMap<String, String>,
+) -> Result<(), OntoolError> {
+    let mut colors = ColorGenerator::new();
+    for error in unified_error.errors.iter() {
+        let span = error.span.start as usize..error.span.end as usize;
+        let message = error.error.to_string();
+
+        let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
+        let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
+
+        Report::build(ReportKind::Error, ontol_source.name(), span.start)
+            .with_label(
+                Label::new((ontol_source.name(), span))
+                    .with_message(message)
+                    .with_color(colors.next()),
+            )
+            .finish()
+            .eprint((ontol_source.name(), Source::from(&literal_source)))?;
+
+        for note in &error.notes {
+            let span = note.span.start as usize..note.span.end as usize;
+            let message = note.note.to_string();
+
+            let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
+            let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
+
+            Report::build(ReportKind::Advice, ontol_source.name(), span.start)
+                .with_label(
+                    Label::new((ontol_source.name(), span))
+                        .with_message(message)
+                        .with_color(colors.next()),
+                )
+                .finish()
+                .eprint((ontol_source.name(), Source::from(&literal_source)))?;
+        }
+    }
+
+    Ok(())
 }
 
 async fn lsp() -> Result<(), OntoolError> {
