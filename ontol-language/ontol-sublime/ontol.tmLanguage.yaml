@@ -6,35 +6,30 @@ fileTypes: ['on']
 uuid: 4fc14b00-3ee2-4804-9036-e70090594121
 
 patterns:
-  # "use .. as .." is one statement
   - comment: use declaration
     name: keyword.import.ontol
-    match: \b(use)\b
+    match: ^(use)\s
 
   - comment: use as declaration
     name: keyword.import.as.ontol
-    match: \b(as)\b
+    match: \s(as)\s
 
   - comment: pub export modifier
     name: storage.modifier.pub.ontol
-    match: \b(pub)\b
+    match: ^(pub)\s
 
-  # "pub type .. { }" is one statement
   - comment: type declaration
     name: keyword.declaration.type.ontol
-    match: \b(type)\b
+    match: \b(type)\s
 
-  # "with .. { }" should include block
   - comment: with context block
     name: keyword.context.block.with.ontol
-    match: \b(with)\b
+    match: ^(with)\s
 
-  # "rel .. .. .. { }" should include block
   - comment: rel declaration
     name: keyword.declaration.rel.ontol
     match: \b(rel)\b
 
-  # "fmt .. .. .." should include arrows etc.
   - comment: fmt expression
     name: keyword.declaration.fmt.ontol
     match: \b(fmt)\b
@@ -43,35 +38,37 @@ patterns:
     name: keyword.operator.fatarrow.ontol
     match: (=>)
 
-  # "map { }" should include
-  # block, path, expressions etc.
   - comment: map declaration
-    match: \b(map)\b({)\b(.*)\b(})
-    captures:
-      '1': { name: keyword.declaration.map.ontol }
-      '2': { name: keyword.context.block.ontol }
-      '3': { name: variable.parameter.ontol }
-      '4': { name: keyword.context.block.ontol }
+    name: keyword.declaration.map.ontol
+    match: ^(map)\s
 
   - comment: built-in types
     name: storage.type.ontol
-    match: \b(bool|int|float|number|string|datetime|date|time|uuid|regex|array|seq|map|fn)\b
-
-  - comment: number literal
-    name: constant.numeric.ontol
-    match: \b\-?(\d+(\.?\d+)?)\b
+    match: \s(boolean|number|integer|i64|float|f64|string|datetime|date|time|uuid|regex|seq|dict|fn)\b
 
   - comment: built-in constant value
     name: constant.language.ontol
-    match: \b(true|false|null|inf|nan|\(\)|\[\]PI|GET|POST|PUT|PATCH|DELETE)\b
+    match: \s(true|false|inf|nan|\(\)|\[\])\b
 
-  - comment: built-in assigment keywords
+  - comment: built-in rel types and generators
     name: variable.function.ontol
-    match: \b(is|identifies|query)\b
+    match: \b(is|id|gen|default|example|auto|create_time|update_time)\b
 
-  - comment: unit/self underscore
+  - comment: numeric literal
+    name: constant.numeric.ontol
+    match: \b\-?(\d+(\.?\d+)?)
+
+  - comment: subject/self dot
     name: variable.language.ontol
-    match: \b(_)\b
+    match: \s\.
+
+  - comment: sigil
+    name: keyword.operator.ontol
+    match: '[.,:?+*=|]+'
+
+  - comment: special case sigil
+    name: keyword.operator.ontol
+    match: (?:[^\w\s])([_-]+)(?:[^\w\s])
 
   - comment: single quoted string literal
     name: string.quoted.single.ontol
@@ -89,11 +86,11 @@ patterns:
 
   - comment: regex literal
     name: string.regexp.ontol
-    begin: /[^/\s]
+    begin: \s/[^/\s]
     end: '[^\\]/'
-    # TODO: include regex
-    # patterns:
-    #   - include: source.regexp.embedded
+    patterns:
+      - include: source.regexp
+      - include: '#escaped_char'
 
   - comment: comment
     name: comment.line.double-slash.ontol
@@ -104,17 +101,8 @@ patterns:
     name: comment.block.documentation.ontol
     begin: ^\s*+///
     end: $
-    # TODO: include markdown in comments
-    # patterns:
-    #   - include: text.html.markdown
-
-  - comment: sigil
-    name: keyword.operator.ontol
-    match: '[.,:?+*=]+'
-
-  - comment: special case sigil
-    name: keyword.operator.ontol
-    match: '[^\w\s][<>_-]+[^\w\s]'
+    patterns:
+      - include: text.html.markdown#inline
 
 repository:
   escaped_char:

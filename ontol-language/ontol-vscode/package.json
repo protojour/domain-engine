@@ -2,14 +2,14 @@
   "name": "ontol",
   "displayName": "ONTOL",
   "description": "ONTOL language support for VS Code",
-  "version": "0.2.1",
+  "version": "0.2.5",
   "publisher": "Protojour",
   "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",
     "url": "https://gitlab.com/protojour/memoriam/domain-engine.git"
-  } ,
+  },
   "engines": {
     "vscode": "^1.79.0"
   },
@@ -48,7 +48,11 @@
       {
         "language": "ontol",
         "scopeName": "source.ontol",
-        "path": "./ontol.tmLanguage.json"
+        "path": "./ontol.tmLanguage.json",
+        "embeddedLanguages": {
+          "string.regexp.ontol": "regexp",
+          "comment.block.documentation.ontol": "markdown"
+        }
       }
     ],
     "snippets": [

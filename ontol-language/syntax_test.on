@@ -36,7 +36,7 @@ with test {
 //                   *^^^ constant.language.ontol
     rel .'ready?' true
 //                *^^^^ constant.language.ontol
-    rel .'regex' /test\s.*test/
+    rel .'regex' /test\b.*test/
 //               ^^^^^^^^^^^^^^ string.regexp.ontol
 }
 
@@ -62,4 +62,3 @@ type position-ring {
     rel ...4: position
     rel .4..: position
 }
-
