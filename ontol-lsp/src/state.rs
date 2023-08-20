@@ -346,7 +346,7 @@ impl Document {
                                         end: range.end(),
                                     });
                                     dp.docs =
-                                        "### Relation prop\nAssigns a default to value".to_string();
+                                        "### Relation prop\nAssigns a default value to a property if none is given".to_string();
                                 }
                                 "boolean" => {
                                     dp.path = "ontol.boolean".to_string();
@@ -363,10 +363,21 @@ impl Document {
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nInteger".to_string();
                                 }
+                                "i64" => {
+                                    dp.path = "ontol.i64".to_string();
+                                    dp.signature = val.to_string();
+                                    dp.docs = "### Scalar\n64 bit signed integer".to_string();
+                                }
                                 "float" => {
                                     dp.path = "ontol.float".to_string();
                                     dp.signature = val.to_string();
                                     dp.docs = "### Scalar\nFloating point number".to_string();
+                                }
+                                "f64" => {
+                                    dp.path = "ontol.f64".to_string();
+                                    dp.signature = val.to_string();
+                                    dp.docs =
+                                        "### Scalar\n64 bit floating point number".to_string();
                                 }
                                 "string" => {
                                     dp.path = "ontol.string".to_string();
@@ -563,8 +574,8 @@ pub fn get_builtins() -> Vec<CompletionItem> {
     ]
 }
 
-const RESERVED_WORDS: [&str; 24] = [
-    "use", "as", "pub", "type", "with", "rel", "fmt", "map", "unify", "id", "is", "gen", "auto",
-    "default", "boolean", "int", "float", "number", "string", "datetime", "date", "time", "uuid",
-    "regex",
+const RESERVED_WORDS: [&str; 30] = [
+    "use", "as", "pub", "type", "with", "rel", "fmt", "map", "unify", "id", "is", "has", "gen",
+    "auto", "default", "example", "number", "boolean", "integer", "i64", "float", "f64", "string",
+    "datetime", "date", "time", "uuid", "regex", "seq", "dict",
 ];

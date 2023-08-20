@@ -40,11 +40,11 @@ patterns:
 
   - comment: built-in defs
     name: storage.type.ontol
-    match: \s(boolean|number|integer|i64|float|f64|string|datetime|date|time|uuid|regex|seq|dict|fn)\b
+    match: \b(boolean|number|integer|i64|float|f64|string|datetime|date|time|uuid|regex|seq|dict|fn)\b
 
   - comment: built-in constant value
     name: constant.language.ontol
-    match: \s(true|false|inf|nan|\(\)|\[\])\b
+    match: \b(true|false|inf|nan|\(\)|\[\])\b
 
   - comment: built-in rel defs and generators
     name: variable.function.ontol
@@ -52,7 +52,7 @@ patterns:
 
   - comment: numeric literal
     name: constant.numeric.ontol
-    match: \b\-?(\d+(\.?\d+)?)
+    match: \b\-?(\d+(\.?\d+)?)\b
 
   - comment: spread operator
     name: keyword.operator.spread.ontol
