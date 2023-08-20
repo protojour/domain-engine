@@ -1,4 +1,6 @@
-use state::{get_builtins, get_span_range, Document, State};
+use core::panic;
+
+use state::{get_builtins, get_domain_name, get_path_and_name, get_span_range, Document, State};
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -24,24 +26,26 @@ impl Backend {
         }
     }
 
+    /// Diagnose from the given root document and publish findings to client
     async fn diagnose(&self, uri: &Url) {
-        let diags = self.get_diagnostics(uri).await;
+        let diagnostics = self.get_diagnostics(uri).await;
         self.client
-            .publish_diagnostics(uri.clone(), diags, None)
+            .publish_diagnostics(uri.clone(), diagnostics, None)
             .await;
     }
 
+    /// Compile code and convert errors to Diagnostics
     async fn get_diagnostics(&self, uri: &Url) -> Vec<Diagnostic> {
         let state = self.state.read().await;
-        let mut diags = vec![];
-        match state.compile() {
+        let mut diagnostics = vec![];
+
+        match state.compile(uri.as_str()) {
             Ok(_) => {}
             Err(err) => {
                 for err in err.errors {
-                    // TODO: improve some fields here
                     match state.docs.get(uri.as_str()) {
                         Some(doc) => {
-                            diags.push(Diagnostic {
+                            diagnostics.push(Diagnostic {
                                 range: get_span_range(&doc.text, &err.span),
                                 severity: Some(DiagnosticSeverity::ERROR),
                                 source: Some(NAME.to_string()),
@@ -50,7 +54,6 @@ impl Backend {
                                     err.notes
                                         .iter()
                                         .map(|note| DiagnosticRelatedInformation {
-                                            // TODO: might be wrong
                                             location: Location {
                                                 uri: uri.clone(),
                                                 range: get_span_range(&doc.text, &note.span),
@@ -60,20 +63,20 @@ impl Backend {
                                         .collect(),
                                 ),
                                 ..Default::default()
-                            })
+                            });
                         }
-                        None => panic!("Doc should be readable at this point"),
+                        None => panic!("Cannot find document {uri}"),
                     }
                 }
             }
         }
-        diags
+        diagnostics
     }
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
-    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: NAME.to_string(),
@@ -84,8 +87,8 @@ impl LanguageServer for Backend {
                     TextDocumentSyncOptions {
                         open_close: Some(true),
                         change: Some(TextDocumentSyncKind::FULL),
-                        will_save: Some(false),
-                        will_save_wait_until: Some(false),
+                        will_save: None,
+                        will_save_wait_until: None,
                         save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                     },
                 )),
@@ -116,55 +119,58 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         {
+            let uri = params.text_document.uri.to_string();
             let mut state = self.state.write().await;
-            // TODO: (pre-)compiler should figure out the root
-            if state.root.is_none() {
-                state.root = Some(params.text_document.uri.to_string())
-            }
+            let (path, filename) = get_path_and_name(uri.as_str());
+            let name = get_domain_name(filename);
+
+            state.roots.insert(uri.to_string());
             state.docs.insert(
-                params.text_document.uri.to_string(),
+                uri.to_string(),
                 Document {
+                    uri: uri.to_string(),
+                    path: path.to_string(),
+                    name: name.to_string(),
                     text: params.text_document.text,
                     ..Default::default()
                 },
             );
-            state.parse_statements(params.text_document.uri.as_str());
+            state.parse_statements(&uri);
         }
         self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         {
+            let uri = params.text_document.uri.as_str();
             let mut state = self.state.write().await;
-            for change in params.content_changes {
-                state.docs.insert(
-                    params.text_document.uri.to_string(),
-                    Document {
-                        text: change.text,
-                        ..Default::default()
-                    },
-                );
+            match state.docs.get_mut(uri) {
+                Some(doc) => {
+                    for change in params.content_changes {
+                        doc.text = change.text;
+                    }
+                }
+                None => todo!(), // unlikely, but could happen
             }
-            state.parse_statements(params.text_document.uri.as_str());
+            state.parse_statements(uri);
         }
         self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         {
+            let uri = params.text_document.uri.as_str();
             let mut state = self.state.write().await;
-            state.parse_statements(params.text_document.uri.as_str());
+            state.parse_statements(uri);
         }
         self.diagnose(&params.text_document.uri).await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        let uri = params.text_document.uri.as_str();
         let mut state = self.state.write().await;
-        state.docs.remove(params.text_document.uri.as_str());
-        // TODO: set a new state
-        if Some(params.text_document.uri.to_string()) == state.root {
-            state.root = None
-        }
+        state.docs.remove(uri);
+        state.roots.remove(uri);
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -208,6 +214,7 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     })
                     .collect::<Vec<CompletionItem>>();
+
                 symbols.append(&mut builtin);
                 Ok(Some(CompletionResponse::Array(symbols)))
             }

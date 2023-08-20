@@ -4,10 +4,10 @@ use ontol_compiler::{
     error::{CompileError, UnifiedCompileError},
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    Compiler, SourceCodeRegistry, SourceSpan, Sources, SpannedCompileError,
+    Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources, SpannedCompileError,
 };
 use ontol_parser::{
-    ast::{DefStatement, MapArm, Path, Statement},
+    ast::{DefStatement, MapArm, Path, Statement, UseStatement},
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
@@ -19,16 +19,41 @@ use std::{
 };
 use substring::Substring;
 
+/// Language server state
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct State {
     pub docs: HashMap<String, Document>,
-    pub root: Option<String>,
+    pub roots: HashSet<String>,
+}
+
+/// A document and its various constituents
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct Document {
+    pub uri: String,
+    pub path: String,
+    pub name: String,
+    pub text: String,
+    pub tokens: Vec<Spanned<Token>>,
+    pub symbols: HashSet<String>,
+    pub types: HashMap<String, Spanned<DefStatement>>,
+    pub statements: Vec<Spanned<Statement>>,
+    pub imports: Vec<UseStatement>,
+}
+
+/// Helper struct for building hover documentation
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct DocPanel {
+    pub path: String,
+    pub signature: String,
+    pub docs: String,
 }
 
 impl State {
+    /// Parse ONTOL file, collecting tokens, symbols, statements and imports
     pub fn parse_statements(&mut self, url: &str) {
         if let Some(doc) = self.docs.get_mut(url) {
             let (tokens, _) = lexer().parse_recovery(doc.text.as_str());
+
             if let Some(tokens) = tokens {
                 doc.tokens = tokens;
             }
@@ -42,9 +67,11 @@ impl State {
                 }
             }
 
+            /// Recursively explore the AST, collecting types and other statements
             fn explore(
                 statements: &Vec<Spanned<Statement>>,
                 nested: &mut Vec<Spanned<Statement>>,
+                imports: &mut Vec<UseStatement>,
                 types: &mut HashMap<String, Spanned<DefStatement>>,
                 level: u8,
             ) {
@@ -53,17 +80,16 @@ impl State {
                         nested.push((statement.clone(), range.clone()))
                     }
                     match statement {
-                        Statement::Use(_) => (),
+                        Statement::Use(stmt) => imports.push(stmt.clone()),
                         Statement::Def(stmt) => {
                             let name = stmt.ident.0.to_string();
                             types.insert(name, (stmt.clone(), range.clone()));
-
-                            explore(&stmt.block.0, nested, types, level + 1);
+                            explore(&stmt.block.0, nested, imports, types, level + 1)
                         }
                         Statement::Rel(stmt) => {
                             for rel in &stmt.relations {
                                 if let Some((ctx_block, _)) = &rel.ctx_block {
-                                    explore(ctx_block, nested, types, level + 1)
+                                    explore(ctx_block, nested, imports, types, level + 1)
                                 }
                             }
                         }
@@ -73,99 +99,129 @@ impl State {
                 }
             }
 
+            doc.imports.clear();
             doc.types.clear();
 
             let (mut statements, _) = parse_statements(doc.text.as_str());
             let mut nested: Vec<Spanned<Statement>> = vec![];
 
-            explore(&statements, &mut nested, &mut doc.types, 0);
+            explore(
+                &statements,
+                &mut nested,
+                &mut doc.imports,
+                &mut doc.types,
+                0,
+            );
 
             statements.append(&mut nested);
             doc.statements = statements;
         }
     }
 
-    pub fn compile(&self) -> Result<(), UnifiedCompileError> {
-        if let Some(root) = &self.root {
-            let root_name = get_source_name(root);
-            let mut ontol_sources = Sources::default();
-            let mut source_code_registry = SourceCodeRegistry::default();
-            let mut package_graph_builder = PackageGraphBuilder::new(root_name.into());
+    /// Iterate over all docs and their parsed use statements to find root domains.
+    /// Produces the set of documents that are not imported by anything else.
+    /// This is only useful if you want to do full source tree compilations
+    /// with minimal overlap.
+    pub fn _find_roots(&self) {
+        let mut roots: HashSet<String> = self.docs.keys().map(|key| key.to_string()).collect();
+        for doc in self.docs.values() {
+            for import in &doc.imports {
+                let uri = build_uri(&doc.path, &import.reference.0);
+                roots.remove(&uri);
+            }
+        }
+    }
 
-            let topology = loop {
-                match package_graph_builder.transition().unwrap() {
-                    GraphState::RequestPackages { builder, requests } => {
-                        package_graph_builder = builder;
+    /// Build package graph from the given root and compile topology
+    pub fn compile(&self, root_url: &str) -> Result<(), UnifiedCompileError> {
+        let (root_path, filename) = get_path_and_name(root_url);
+        let root_name = get_domain_name(filename);
 
-                        for request in requests {
-                            let source_name = match &request.reference {
-                                PackageReference::Named(source_name) => source_name.as_str(),
-                            };
-                            let package_config = PackageConfig::default();
+        let mut ontol_sources = Sources::default();
+        let mut source_code_registry = SourceCodeRegistry::default();
+        let mut package_graph_builder = PackageGraphBuilder::new(root_name.into());
 
-                            match self.docs.get(&format!("file:///{}.on", source_name)) {
-                                Some(source_text) => {
-                                    package_graph_builder.provide_package(ParsedPackage::parse(
-                                        request,
-                                        &source_text.text,
-                                        package_config,
-                                        &mut ontol_sources,
-                                        &mut source_code_registry,
-                                    ));
-                                }
-                                None => {
-                                    // return Ok(());
-                                    return Err(UnifiedCompileError {
-                                        errors: vec![SpannedCompileError {
+        let mut requesting_doc = match self.docs.get(root_url) {
+            Some(doc) => doc,
+            None => panic!("Cannot find document {root_url}"),
+        };
+
+        let topology = loop {
+            match package_graph_builder.transition().unwrap() {
+                GraphState::RequestPackages { builder, requests } => {
+                    package_graph_builder = builder;
+
+                    for request in requests {
+                        let source_name = match &request.reference {
+                            PackageReference::Named(source_name) => source_name.as_str(),
+                        };
+                        let package_config = PackageConfig::default();
+                        let request_uri = build_uri(root_path, source_name);
+
+                        match self.docs.get(&request_uri) {
+                            Some(doc) => {
+                                requesting_doc = doc;
+                                package_graph_builder.provide_package(ParsedPackage::parse(
+                                    request,
+                                    &doc.text,
+                                    package_config,
+                                    &mut ontol_sources,
+                                    &mut source_code_registry,
+                                ));
+                            }
+                            None => {
+                                let mut errors: Vec<SpannedCompileError> = vec![];
+                                for import in &requesting_doc.imports {
+                                    let uri = build_uri(root_path, &import.reference.0);
+                                    if !self.docs.contains_key(&uri) {
+                                        errors.push(SpannedCompileError {
                                             error: CompileError::PackageNotFound,
-                                            span: SourceSpan::default(),
+                                            span: SourceSpan {
+                                                source_id: SourceId(1), // not used
+                                                start: import.kw.start() as u32,
+                                                end: import.reference.end() as u32,
+                                            },
                                             notes: vec![],
-                                        }],
-                                    });
+                                        })
+                                    }
                                 }
+                                return Err(UnifiedCompileError { errors });
                             }
                         }
                     }
-                    GraphState::Built(topology) => break topology,
                 }
-            };
+                GraphState::Built(topology) => break topology,
+            }
+        };
 
-            let mem = Mem::default();
-            let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
-            return compiler.compile_package_topology(topology);
-        }
-        // TODO: Handle
-        Ok(())
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
+        compiler.compile_package_topology(topology)
     }
 }
 
-fn get_source_name(name: &str) -> &str {
-    match name.strip_prefix("file:///") {
-        Some(name) => match name.strip_suffix(".on") {
-            Some(name) => name,
-            None => name,
-        },
-        None => name,
+/// Rebuild URI from full schema/path and domain name
+pub fn build_uri(path: &str, name: &str) -> String {
+    format!("{}/{}.on", path, name)
+}
+
+/// Split URI into schema/path and filename
+pub fn get_path_and_name(uri: &str) -> (&str, &str) {
+    match uri.rsplit_once('/') {
+        Some((path, name)) => (path, name),
+        None => ("", uri),
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub struct Document {
-    pub text: String,
-    pub tokens: Vec<Spanned<Token>>,
-    pub symbols: HashSet<String>,
-    pub types: HashMap<String, Spanned<DefStatement>>,
-    pub statements: Vec<Spanned<Statement>>,
-    // pub errors: Vec<Error>,
+/// Strip `.on` suffix and return the base domain name
+pub fn get_domain_name(filename: &str) -> &str {
+    match filename.strip_suffix(".on") {
+        Some(name) => name,
+        None => filename,
+    }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub struct DocPanel {
-    pub path: String,
-    pub signature: String,
-    pub docs: String,
-}
-
+/// Convert a byte index SourceSpan to a zero-based line/char Range
 pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
     let mut range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let mut start_set = false;
@@ -195,6 +251,7 @@ pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
 }
 
 impl Document {
+    /// Get a stripped-down version of a statement
     pub fn get_signature(&self, range: &std::ops::Range<usize>) -> String {
         let sig = self.text.substring(range.start(), range.end());
 
@@ -209,11 +266,12 @@ impl Document {
         }
     }
 
+    /// Build hover documentation for the targeted statement
     pub fn get_hover_docs(&self, url: &str, lineno: usize, col: usize) -> DocPanel {
         let mut cursor = 0;
 
-        for (index, line) in self.text.lines().enumerate() {
-            if index == lineno {
+        for (line_index, line) in self.text.lines().enumerate() {
+            if line_index == lineno {
                 cursor += col;
                 break;
             } else {
@@ -303,6 +361,7 @@ impl Document {
                             dp.signature = self.get_signature(range);
                             dp.docs = stmt.docs.join("\n");
                         } else {
+                            // TODO: collect hard-coded docs below from
                             match val.as_str() {
                                 "id" => {
                                     dp.path = "ontol.id".to_string();
@@ -420,11 +479,11 @@ impl Document {
                 }
             }
         }
-
         dp
     }
 }
 
+/// Completions for built-in keywords and types
 pub fn get_builtins() -> Vec<CompletionItem> {
     vec![
         CompletionItem {
@@ -574,6 +633,7 @@ pub fn get_builtins() -> Vec<CompletionItem> {
     ]
 }
 
+/// A list of reserved words in ONTOL, to separate them from user-defined symbols
 const RESERVED_WORDS: [&str; 30] = [
     "use", "as", "pub", "type", "with", "rel", "fmt", "map", "unify", "id", "is", "has", "gen",
     "auto", "default", "example", "number", "boolean", "integer", "i64", "float", "f64", "string",
