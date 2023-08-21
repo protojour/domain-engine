@@ -417,7 +417,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 if f64_range == (f64::MIN..=f64::MAX) {
                                     None
                                 } else {
-                                    Some(f64_range.clone())
+                                    Some(f64_range)
                                 },
                             ),
                         ));
