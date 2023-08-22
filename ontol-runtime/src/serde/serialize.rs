@@ -21,6 +21,11 @@ use super::{
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
+const UNIT_ATTR: Attribute = Attribute {
+    value: Value::unit(),
+    rel_params: Value::unit(),
+};
+
 impl<'e> SerdeProcessor<'e> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: Serializer>(
@@ -199,6 +204,8 @@ impl<'e> SerdeProcessor<'e> {
     ) -> Res<S> {
         let attributes = match &value.data {
             Data::Struct(attributes) => attributes,
+            // Support for empty structs that are Unit encoded:
+            Data::Unit => return serializer.serialize_map(Some(0))?.end(),
             other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
         };
 
@@ -207,16 +214,34 @@ impl<'e> SerdeProcessor<'e> {
         for (name, serde_prop) in
             struct_op.filter_properties(self.mode, self.ctx.parent_property_id)
         {
+            let unit_attr = UNIT_ATTR;
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
                     if serde_prop.is_optional() {
                         continue;
                     } else {
-                        panic!(
-                            "While serializing value {:?} with `{}`, property `{}` was not found",
-                            value, struct_op.typename, name
-                        )
+                        match self
+                            .ontology
+                            .get_serde_operator(serde_prop.value_operator_id)
+                        {
+                            SerdeOperator::Struct(struct_op) => {
+                                if struct_op.properties.is_empty() {
+                                    &unit_attr
+                                } else {
+                                    panic!(
+                                        "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
+                                        value, struct_op.typename
+                                    )
+                                }
+                            }
+                            _ => {
+                                panic!(
+                                    "While serializing value {:?} with `{}`, property `{}` was not found.",
+                                    value, struct_op.typename, name
+                                )
+                            }
+                        }
                     }
                 }
             };

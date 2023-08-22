@@ -689,8 +689,6 @@ fn test_map_dependent_scoping() {
 }
 
 #[test]
-// BUG: Empty type "foo" does not get stored as an empty struct
-#[should_panic = "property `foo` was not found"]
 fn test_seq_scope_escape1() {
     "
     type foo {}
