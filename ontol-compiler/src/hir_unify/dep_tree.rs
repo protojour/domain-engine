@@ -14,7 +14,8 @@ pub trait Scope: Clone {
 
 pub trait Expression {
     fn free_vars(&self) -> &VarSet;
-    fn optional(&self) -> bool;
+    fn is_optional(&self) -> bool;
+    fn is_seq(&self) -> bool;
 }
 
 /// A dependency tree of Expressions and Scopes
@@ -100,6 +101,8 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         for expression in expressions {
             let mut var_iter = expression.free_vars().iter();
 
+            // debug!("expr free vars: {:?}", expression.free_vars());
+
             match self.next_unscoped_var(&mut var_iter) {
                 Some(first_free_var) => {
                     let mut seq_label_count = 0;
@@ -114,8 +117,18 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                         }
                     }
 
-                    if seq_label_count > 1 {
-                        escape_exprs.push((self.scopes.clone(), expression));
+                    if seq_label_count > 0 && !expression.is_seq() {
+                        // Need to "line up" seq expressions with their seq scope
+                        debug!("    escaping expression scope!");
+                        let free_vars = expression.free_vars();
+                        let cloned_scopes = self
+                            .scopes
+                            .iter()
+                            .filter(|scope| scope.all_vars().0.is_subset(&free_vars.0))
+                            .cloned()
+                            .collect();
+
+                        escape_exprs.push((cloned_scopes, expression));
                     } else {
                         let scope_idx = scope_routing_table.get(&first_free_var).cloned().unwrap();
                         scope_assignments
@@ -162,7 +175,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         if let Some(next_free_var) = self.next_unscoped_var(&mut free_var_iter) {
             let mut scope_idx_candidate = scope_routing_table.get(&next_free_var).cloned().unwrap();
 
-            if expression.optional() {
+            if expression.is_optional() {
                 Some(scope_idx_candidate)
             } else {
                 for next_free_var in &mut free_var_iter {

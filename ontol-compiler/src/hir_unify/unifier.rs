@@ -152,37 +152,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
                 if prop.seq.is_none() {
-                    // BUG: This is probably incorrect. We _should_ panic here.
-                    // panic!(
-                    //     "unexpected gen scope: prop={:?} scope_input_seq={:?}",
-                    //     prop.prop_id, gen_scope.input_seq
-                    // );
-
-                    let const_scope = self.const_scope();
-                    let rel = self.unify(const_scope, prop.attr.rel)?;
-                    let val = self.unify(
-                        scope::Scope(scope::Kind::Gen(gen_scope), scope_meta),
-                        prop.attr.val,
-                    )?;
-
-                    return Ok(UnifiedNode {
-                        typed_binder: None,
-                        node: TypedHirNode(
-                            ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
-                                prop.struct_var,
-                                prop.prop_id,
-                                vec![ontol_hir::PropVariant {
-                                    dimension: ontol_hir::AttrDimension::Singular,
-                                    attr: ontol_hir::Attribute {
-                                        rel: Box::new(rel.node),
-                                        val: Box::new(val.node),
-                                    },
-                                }],
-                            ),
-                            expr_meta.hir_meta,
-                        ),
-                    });
+                    panic!(
+                        "unexpected gen scope: prop={:?} scope_input_seq={:?}",
+                        prop.prop_id, gen_scope.input_seq
+                    );
                 }
 
                 let seq_ty = self.types.intern(Type::Seq(
@@ -366,22 +339,38 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_tree)?.node);
                 }
 
-                for (scope_props, ungrouped_expr) in dep_tree.escape_exprs {
-                    nodes.push(
-                        self.unify(
-                            scope::Scope(
-                                scope::Kind::Escape(Box::new(scope::Kind::PropSet(
-                                    scope::PropSet(scope_binder, scope_props),
-                                ))),
-                                scope_meta.clone(),
-                            ),
-                            expr::Expr(
-                                expr::Kind::Prop(Box::new(ungrouped_expr)),
-                                expr_meta.clone(),
-                            ),
-                        )?
-                        .node,
-                    );
+                for (scope_props, escaped_expr_prop) in dep_tree.escape_exprs {
+                    // If there's only one scope_prop, unpack/unify it directly
+                    if scope_props.len() == 1 {
+                        let first_prop = scope_props.into_iter().next().unwrap();
+                        nodes.push(
+                            expr::Prop::unify_match_arm(
+                                self,
+                                first_prop,
+                                SubTree {
+                                    expressions: vec![escaped_expr_prop],
+                                    sub_trees: vec![],
+                                },
+                            )?
+                            .node,
+                        );
+                    } else {
+                        let scope_kind =
+                            scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props));
+                        nodes.push(
+                            self.unify(
+                                scope::Scope(
+                                    scope::Kind::Escape(Box::new(scope_kind)),
+                                    scope_meta.clone(),
+                                ),
+                                expr::Expr(
+                                    expr::Kind::Prop(Box::new(escaped_expr_prop)),
+                                    expr_meta.clone(),
+                                ),
+                            )?
+                            .node,
+                        );
+                    };
                 }
 
                 if !dep_tree.constants.is_empty() {

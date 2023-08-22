@@ -726,7 +726,56 @@ fn test_unify_dependent_scoping_backwards() {
 }
 
 #[test]
-fn test_unify_seq_scope_escape() {
+fn test_unify_seq_scope_escape1() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:0:0 (#u #u))
+            (prop $c S:0:1 (seq (@a) #u $b))
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d O:0:0
+                (#u
+                    (struct ($e)
+                        (prop $e O:1:0 (#u #u))
+                        (prop $e O:1:1 (seq (@a) #u $b))
+                    )
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (prop $d O:0:0
+                (#u
+                    (struct ($e)
+                        (match-prop $c S:0:1
+                            ((seq $a)
+                                (prop $e O:1:1
+                                    (#u
+                                        (gen $a ($f $_ $b)
+                                            (push $f #u $b)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                        (prop $e O:1:0
+                            (#u #u)
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_seq_scope_escape2() {
     let output = test_unify(
         "
         (struct ($e)
@@ -774,6 +823,17 @@ fn test_unify_seq_scope_escape() {
             (prop $g O:0:0
                 (#u
                     (struct ($h)
+                        (match-prop $e S:0:1
+                            ((seq $c)
+                                (prop $h O:1:1
+                                    (#u
+                                        (gen $c ($j $_ $d)
+                                            (push $j #u $d)
+                                        )
+                                    )
+                                )
+                            )
+                        )
                         (match-prop $e S:0:0
                             (($_ $f)
                                 (prop $h O:1:0
@@ -783,24 +843,13 @@ fn test_unify_seq_scope_escape() {
                                                 ((seq $a)
                                                     (prop $i O:2:0
                                                         (#u
-                                                            (gen $a ($j $_ $b)
-                                                                (push $j #u $b)
+                                                            (gen $a ($k $_ $b)
+                                                                (push $k #u $b)
                                                             )
                                                         )
                                                     )
                                                 )
                                             )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                        (match-prop $e S:0:1
-                            ((seq $c)
-                                (prop $h O:1:1
-                                    (#u
-                                        (gen $c ($k $_ $d)
-                                            (push $k #u $d)
                                         )
                                     )
                                 )

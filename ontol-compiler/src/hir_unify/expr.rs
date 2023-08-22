@@ -49,7 +49,11 @@ impl<'m> Kind<'m> {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
             Self::Struct(struct_) => format!("Struct({})", struct_.0.var),
-            Self::Prop(prop) => format!("Prop({})", prop.prop_id),
+            Self::Prop(prop) => format!(
+                "Prop({}{})",
+                if prop.seq.is_some() { "seq " } else { "" },
+                prop.prop_id
+            ),
             Self::Map(_) => "Map".to_string(),
             Self::Call(_) => "Call".to_string(),
             Self::I64(int) => format!("i64({int})"),
@@ -82,8 +86,12 @@ impl<'m> super::dep_tree::Expression for Expr<'m> {
         &self.1.free_vars
     }
 
-    fn optional(&self) -> bool {
+    fn is_optional(&self) -> bool {
         false
+    }
+
+    fn is_seq(&self) -> bool {
+        matches!(&self.0, Kind::Seq(..))
     }
 }
 
@@ -92,7 +100,11 @@ impl<'m> super::dep_tree::Expression for Prop<'m> {
         &self.free_vars
     }
 
-    fn optional(&self) -> bool {
+    fn is_optional(&self) -> bool {
         self.optional.0
+    }
+
+    fn is_seq(&self) -> bool {
+        self.seq.is_some()
     }
 }
