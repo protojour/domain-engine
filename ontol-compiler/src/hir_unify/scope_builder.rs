@@ -379,7 +379,7 @@ pub struct UnionBuilder {
 
 impl UnionBuilder {
     fn plus<'m>(&mut self, binder: ScopeBinder<'m>) -> ScopeBinder<'m> {
-        self.vars.union_with(binder.scope.vars());
+        self.vars.union_with(binder.scope.all_vars());
         binder
     }
 

@@ -228,25 +228,19 @@ fn test_struct_arithmetic_property_dependency() {
 }
 
 #[test]
-fn test_unify_basic_seq_prop() {
+fn test_unify_basic_seq_prop_no_default() {
     let output = test_unify(
         "
         (struct ($b)
             (prop $b S:0:0
-                (seq (@d)
-                    #u
-                    $a
-                )
+                (seq (@d) #u $a)
             )
         )
         ",
         "
         (struct ($c)
             (prop $c S:1:1
-                (seq (@d)
-                    #u
-                    $a
-                )
+                (seq (@d) #u $a)
             )
         )
         ",
@@ -719,6 +713,95 @@ fn test_unify_dependent_scoping_backwards() {
                                 (($_ $c)
                                     (prop $c S:0:0
                                         (#u (+ $b $c))
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_seq_scope_escape() {
+    let output = test_unify(
+        "
+        (struct ($e)
+            (prop $e S:0:0
+                (#u
+                    (struct ($f)
+                        (prop $f S:1:0
+                            (seq (@a) #u $b)
+                        )
+                    )
+                )
+            )
+            (prop $e S:0:1
+                (seq (@c) #u $d)
+            )
+        )
+        ",
+        // Note: The expr prop O:0:0 itself does not depend on anything in scope.
+        // So it's constant in this sense, but each _child_ need to _clone_ the original scope.
+        "
+        (struct ($g)
+            (prop $g O:0:0
+                (#u
+                    (struct ($h)
+                        (prop $h O:1:0
+                            (#u
+                                (struct ($i)
+                                    (prop $i O:2:0
+                                        (seq (@a) #u $b)
+                                    )
+                                )
+                            )
+                        )
+                        (prop $h O:1:1
+                            (seq (@c) #u $d)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$e| (struct ($g)
+            (prop $g O:0:0
+                (#u
+                    (struct ($h)
+                        (match-prop $e S:0:0
+                            (($_ $f)
+                                (prop $h O:1:0
+                                    (#u
+                                        (struct ($i)
+                                            (match-prop $f S:1:0
+                                                ((seq $a)
+                                                    (prop $i O:2:0
+                                                        (#u
+                                                            (gen $a ($j $_ $b)
+                                                                (push $j #u $b)
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                        (match-prop $e S:0:1
+                            ((seq $c)
+                                (prop $h O:1:1
+                                    (#u
+                                        (gen $c ($k $_ $d)
+                                            (push $k #u $d)
+                                        )
                                     )
                                 )
                             )

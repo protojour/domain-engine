@@ -120,9 +120,69 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                 })
             }
+            (expr::Kind::Prop(prop), scope::Kind::Escape(scope_kind)) => {
+                if matches!(prop.seq, Some(_)) {
+                    panic!("expected gen scope");
+                }
+
+                let rel = self.unify(
+                    scope::Scope((*scope_kind).clone(), scope_meta.clone()),
+                    prop.attr.rel,
+                )?;
+                let val = self.unify(scope::Scope(*scope_kind, scope_meta), prop.attr.val)?;
+
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Prop(
+                            ontol_hir::Optional(false),
+                            prop.struct_var,
+                            prop.prop_id,
+                            vec![ontol_hir::PropVariant {
+                                dimension: ontol_hir::AttrDimension::Singular,
+                                attr: ontol_hir::Attribute {
+                                    rel: Box::new(rel.node),
+                                    val: Box::new(val.node),
+                                },
+                            }],
+                        ),
+                        expr_meta.hir_meta,
+                    ),
+                })
+            }
             (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
-                if matches!(prop.seq, None) {
-                    panic!("unexpected gen scope");
+                if prop.seq.is_none() {
+                    // BUG: This is probably incorrect. We _should_ panic here.
+                    // panic!(
+                    //     "unexpected gen scope: prop={:?} scope_input_seq={:?}",
+                    //     prop.prop_id, gen_scope.input_seq
+                    // );
+
+                    let const_scope = self.const_scope();
+                    let rel = self.unify(const_scope, prop.attr.rel)?;
+                    let val = self.unify(
+                        scope::Scope(scope::Kind::Gen(gen_scope), scope_meta),
+                        prop.attr.val,
+                    )?;
+
+                    return Ok(UnifiedNode {
+                        typed_binder: None,
+                        node: TypedHirNode(
+                            ontol_hir::Kind::Prop(
+                                ontol_hir::Optional(false),
+                                prop.struct_var,
+                                prop.prop_id,
+                                vec![ontol_hir::PropVariant {
+                                    dimension: ontol_hir::AttrDimension::Singular,
+                                    attr: ontol_hir::Attribute {
+                                        rel: Box::new(rel.node),
+                                        val: Box::new(val.node),
+                                    },
+                                }],
+                            ),
+                            expr_meta.hir_meta,
+                        ),
+                    });
                 }
 
                 let seq_ty = self.types.intern(Type::Seq(
@@ -294,32 +354,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                 })
             }
-            (expr::Kind::Struct(struct_expr), scope_kind @ scope::Kind::Const) => {
-                let scope = scope::Scope(scope_kind, scope_meta);
-                let mut nodes = Vec::with_capacity(struct_expr.1.len());
-                for prop in struct_expr.1 {
-                    let hir_meta = self.unit_meta();
-                    let expr_meta = expr::Meta {
-                        free_vars: prop.free_vars.clone(),
-                        hir_meta,
-                    };
-                    nodes.push(
-                        self.unify(
-                            scope.clone(),
-                            expr::Expr(expr::Kind::Prop(Box::new(prop)), expr_meta),
-                        )?
-                        .node,
-                    );
-                }
-
-                Ok(UnifiedNode {
-                    typed_binder: None,
-                    node: TypedHirNode(
-                        ontol_hir::Kind::Struct(struct_expr.0, nodes),
-                        expr_meta.hir_meta,
-                    ),
-                })
-            }
             // ### "zwizzling" cases:
             (
                 expr::Kind::Struct(expr::Struct(expr_binder, props)),
@@ -330,6 +364,24 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 for (prop_scope, sub_tree) in dep_tree.trees {
                     nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_tree)?.node);
+                }
+
+                for (scope_props, ungrouped_expr) in dep_tree.escape_exprs {
+                    nodes.push(
+                        self.unify(
+                            scope::Scope(
+                                scope::Kind::Escape(Box::new(scope::Kind::PropSet(
+                                    scope::PropSet(scope_binder, scope_props),
+                                ))),
+                                scope_meta.clone(),
+                            ),
+                            expr::Expr(
+                                expr::Kind::Prop(Box::new(ungrouped_expr)),
+                                expr_meta.clone(),
+                            ),
+                        )?
+                        .node,
+                    );
                 }
 
                 if !dep_tree.constants.is_empty() {
@@ -354,6 +406,32 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::Struct(expr_binder, nodes),
+                        expr_meta.hir_meta,
+                    ),
+                })
+            }
+            (expr::Kind::Struct(struct_expr), scope_kind) => {
+                let scope = scope::Scope(scope_kind, scope_meta);
+                let mut nodes = Vec::with_capacity(struct_expr.1.len());
+                for prop in struct_expr.1 {
+                    let hir_meta = self.unit_meta();
+                    let expr_meta = expr::Meta {
+                        free_vars: prop.free_vars.clone(),
+                        hir_meta,
+                    };
+                    nodes.push(
+                        self.unify(
+                            scope.clone(),
+                            expr::Expr(expr::Kind::Prop(Box::new(prop)), expr_meta),
+                        )?
+                        .node,
+                    );
+                }
+
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Struct(struct_expr.0, nodes),
                         expr_meta.hir_meta,
                     ),
                 })
@@ -430,6 +508,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
             (expr_kind, scope::Kind::Gen(_)) => {
                 todo!("{expr_kind:#?} with gen scope")
             }
+            (_expr_kind, scope::Kind::Escape(_)) => {
+                panic!("non-prop Escape")
+            }
         }
     }
 
@@ -488,7 +569,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 debug!("expressions: {expressions:#?}");
                 todo!("struct block scope");
             }
-            scope::Kind::Gen(_) => todo!(),
+            scope::Kind::Gen(_) => todo!("Gen"),
+            scope::Kind::Escape(_) => todo!("Escape"),
         }
     }
 

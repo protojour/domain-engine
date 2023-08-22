@@ -44,6 +44,8 @@ pub enum Kind<'m> {
     Let(Let<'m>),
     /// Puts a sequence generator into scope
     Gen(Gen<'m>),
+    /// Escape one level of scope
+    Escape(Box<Self>),
 }
 
 impl<'m> Kind<'m> {
@@ -52,9 +54,40 @@ impl<'m> Kind<'m> {
         match self {
             Self::Const => "Const".to_string(),
             Self::Var(var) => format!("Var({var})"),
-            Self::PropSet(_) => "PropSet".to_string(),
+            Self::PropSet(prop_set) => format!(
+                "PropSet({:?})",
+                prop_set
+                    .1
+                    .iter()
+                    .map(|prop| prop.prop_id)
+                    .collect::<Vec<_>>()
+            ),
             Self::Let(let_) => format!("Let({})", let_.inner_binder.var),
             Self::Gen(gen) => format!("Gen({})", gen.input_seq),
+            Self::Escape(inner) => format!("Esc({})", inner.debug_short()),
+        }
+    }
+
+    fn collect_seq_labels(&self, output: &mut VarSet) {
+        match self {
+            Self::Const => {}
+            Self::Var(_) => {}
+            Self::PropSet(prop_set) => {
+                for prop in &prop_set.1 {
+                    prop.collect_seq_labels(output);
+                }
+            }
+            Self::Let(let_scope) => {
+                let_scope.sub_scope.0.collect_seq_labels(output);
+            }
+            Self::Gen(gen) => {
+                output.insert(gen.input_seq);
+                gen.bindings.0.collect_seq_labels(output);
+                gen.bindings.1.collect_seq_labels(output);
+            }
+            Self::Escape(inner) => {
+                inner.collect_seq_labels(output);
+            }
         }
     }
 }
@@ -88,6 +121,22 @@ pub struct Prop<'m> {
     pub vars: VarSet,
 }
 
+impl<'m> Prop<'m> {
+    fn collect_seq_labels(&self, output: &mut VarSet) {
+        match &self.kind {
+            PropKind::Seq(label, _, rel, val) => {
+                output.insert(ontol_hir::Var(label.label.0));
+                rel.collect_seq_labels(output);
+                val.collect_seq_labels(output);
+            }
+            PropKind::Attr(rel, val) => {
+                rel.collect_seq_labels(output);
+                val.collect_seq_labels(output);
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
@@ -112,24 +161,38 @@ impl<'m> PatternBinding<'m> {
             Self::Scope(binder, _) => ontol_hir::Binding::Binder(*binder),
         }
     }
+
+    fn collect_seq_labels(&self, output: &mut VarSet) {
+        if let Self::Scope(_, scope) = self {
+            scope.0.collect_seq_labels(output);
+        }
+    }
 }
 
 impl<'m> super::dep_tree::Scope for Scope<'m> {
-    fn vars(&self) -> &VarSet {
+    fn all_vars(&self) -> &VarSet {
         &self.1.vars
     }
 
     fn dependencies(&self) -> &VarSet {
         &self.1.dependencies
     }
+
+    fn scan_seq_labels(&self, output: &mut VarSet) {
+        self.0.collect_seq_labels(output);
+    }
 }
 
 impl<'m> super::dep_tree::Scope for Prop<'m> {
-    fn vars(&self) -> &VarSet {
+    fn all_vars(&self) -> &VarSet {
         &self.vars
     }
 
     fn dependencies(&self) -> &VarSet {
         &self.dependencies
+    }
+
+    fn scan_seq_labels(&self, output: &mut VarSet) {
+        self.collect_seq_labels(output);
     }
 }

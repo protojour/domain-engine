@@ -687,3 +687,93 @@ fn test_map_dependent_scoping() {
         );
     });
 }
+
+#[test]
+// BUG: Empty type "foo" does not get stored as an empty struct
+#[should_panic = "property `foo` was not found"]
+fn test_seq_scope_escape1() {
+    "
+    type foo {}
+
+    pub type bar {
+        rel .'foo': foo
+        rel .'p1': [string]
+    }
+
+    pub type baz {
+        rel .'foo': foo
+        rel .'p1': [string]
+    }
+
+    pub type qux {
+        rel .'baz': baz
+    }
+
+    map => {
+        bar {
+            'foo': foo {}
+            'p1': [p1]
+        }
+        qux {
+            'baz': baz {
+                'foo': foo {}
+                'p1': [p1]
+            }
+        }
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("bar", "qux"),
+            json!({ "foo": {}, "p1": ["1"] }),
+            json!({ "baz": { "foo": {}, "p1": ["1"] } }),
+        );
+    });
+}
+
+#[test]
+fn test_seq_scope_escape2() {
+    "
+    type foo {
+        rel .'p0': [string]
+    }
+
+    pub type bar {
+        rel .'foo': foo
+        rel .'p1': [string]
+    }
+
+    pub type baz {
+        rel .'foo': foo
+        rel .'p1': [string]
+    }
+
+    pub type qux {
+        rel .'baz': baz
+    }
+
+    map => {
+        bar {
+            'foo': foo {
+                'p0': [p0]
+            }
+            'p1': [p1]
+        }
+        qux {
+            'baz': baz {
+                'foo': foo {
+                    'p0': [p0]
+                }
+                'p1': [p1]
+            }
+        }
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("bar", "qux"),
+            json!({ "foo": { "p0": ["0"] }, "p1": ["1"] }),
+            json!({ "baz": { "foo": { "p0": ["0"] }, "p1": ["1"] } }),
+        );
+    });
+}

@@ -48,8 +48,8 @@ impl<'m> Kind<'m> {
         match self {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
-            Self::Struct(_) => "Struct".to_string(),
-            Self::Prop(_) => "Prop".to_string(),
+            Self::Struct(struct_) => format!("Struct({})", struct_.0.var),
+            Self::Prop(prop) => format!("Prop({})", prop.prop_id),
             Self::Map(_) => "Map".to_string(),
             Self::Call(_) => "Call".to_string(),
             Self::I64(int) => format!("i64({int})"),

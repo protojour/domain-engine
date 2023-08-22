@@ -142,6 +142,9 @@ pub(super) trait UnifyProps<'m>: Sized {
             scope_kind @ scope::Kind::Gen(_) => {
                 Self::unify_sub_scoped(unifier, scope::Scope(scope_kind, scope_meta), sub_scoped)
             }
+            _scope_kind @ scope::Kind::Escape(_) => {
+                todo!("Escape")
+            }
         }
     }
 }
@@ -211,9 +214,8 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
             ));
         }
 
-        // TODO: sub_scoped
-        for (_sub_prop_scope, _sub_scoped_prop) in sub_scoped.sub_trees {
-            todo!()
+        for (sub_prop_scope, sub_scoped_prop) in sub_scoped.sub_trees {
+            nodes.push(Self::unify_match_arm(unifier, sub_prop_scope, sub_scoped_prop)?.node);
         }
 
         Ok(nodes)
@@ -242,8 +244,8 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
     fn unify_with_prop_set<'a>(
         _unifier: &mut Unifier<'a, 'm>,
         _: (scope::PropSet<'m>, scope::Meta<'m>),
-        _sub_scoped: SubTree<Self, scope::Prop<'m>>,
+        sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        todo!()
+        todo!("sub_scoped: {sub_scoped:?}");
     }
 }

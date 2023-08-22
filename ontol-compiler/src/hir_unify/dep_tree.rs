@@ -7,8 +7,9 @@ use tracing::debug;
 use crate::hir_unify::{UnifierError, UnifierResult, VarSet};
 
 pub trait Scope: Clone {
-    fn vars(&self) -> &VarSet;
+    fn all_vars(&self) -> &VarSet;
     fn dependencies(&self) -> &VarSet;
+    fn scan_seq_labels(&self, output: &mut VarSet);
 }
 
 pub trait Expression {
@@ -17,9 +18,13 @@ pub trait Expression {
 }
 
 /// A dependency tree of Expressions and Scopes
+#[derive(Debug)]
 pub struct DepTree<E, S> {
     /// Subtrees that are dependent on some scope S
     pub trees: Vec<(S, SubTree<E, S>)>,
+
+    /// Expressions that need to escape one level of scoping
+    pub escape_exprs: Vec<(Vec<S>, E)>,
 
     /// Expressions that do not depend on anything
     pub constants: Vec<E>,
@@ -34,6 +39,7 @@ pub struct SubTree<E, S> {
 pub struct DepTreeBuilder<S> {
     scopes: Vec<S>,
     scoped_vars: BitSet,
+    seq_labels: BitSet,
     scope_index_by_var: FnvHashMap<ontol_hir::Var, usize>,
 }
 
@@ -48,15 +54,17 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
     pub fn new(scopes: Vec<S>) -> UnifierResult<Self> {
         let mut scope_index_by_var = FnvHashMap::default();
         let mut scoped_vars = BitSet::new();
+        let mut seq_labels = VarSet::default();
 
         for (idx, scope) in scopes.iter().enumerate() {
-            scoped_vars.union_with(&scope.vars().0);
+            scope.scan_seq_labels(&mut seq_labels);
+            scoped_vars.union_with(&scope.all_vars().0);
             debug!(
                 "dep tree {idx} scope vars={:?}, deps={:?}",
-                scope.vars(),
+                scope.all_vars(),
                 scope.dependencies()
             );
-            for var in scope.vars() {
+            for var in scope.all_vars() {
                 if scope_index_by_var.insert(var, idx).is_some() {
                     return Err(UnifierError::NonUniqueVariableDatapoints([var].into()));
                 }
@@ -66,6 +74,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         Ok(Self {
             scopes,
             scoped_vars,
+            seq_labels: seq_labels.0,
             scope_index_by_var,
         })
     }
@@ -77,6 +86,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         let mut scope_routing_table: FnvHashMap<ontol_hir::Var, usize> =
             self.scope_index_by_var.clone();
 
+        let mut escape_exprs: Vec<(Vec<S>, E)> = vec![];
         let mut constants: Vec<E> = vec![];
 
         for (expr_idx, expression) in expressions.iter().enumerate() {
@@ -88,13 +98,31 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         }
 
         for expression in expressions {
-            match self.next_unscoped_var(&mut expression.free_vars().iter()) {
+            let mut var_iter = expression.free_vars().iter();
+
+            match self.next_unscoped_var(&mut var_iter) {
                 Some(first_free_var) => {
-                    let scope_idx = scope_routing_table.get(&first_free_var).cloned().unwrap();
-                    scope_assignments
-                        .entry(scope_idx)
-                        .or_default()
-                        .push(expression);
+                    let mut seq_label_count = 0;
+
+                    if self.seq_labels.contains(first_free_var.0 as usize) {
+                        seq_label_count += 1;
+                    }
+
+                    while let Some(next_free_var) = self.next_unscoped_var(&mut var_iter) {
+                        if self.seq_labels.contains(next_free_var.0 as usize) {
+                            seq_label_count += 1;
+                        }
+                    }
+
+                    if seq_label_count > 1 {
+                        escape_exprs.push((self.scopes.clone(), expression));
+                    } else {
+                        let scope_idx = scope_routing_table.get(&first_free_var).cloned().unwrap();
+                        scope_assignments
+                            .entry(scope_idx)
+                            .or_default()
+                            .push(expression);
+                    }
                 }
                 None => {
                     constants.push(expression);
@@ -107,9 +135,10 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         let root_nodes = scope_assignments
             .into_iter()
             .map(|(scope_index, expressions)| {
-                let in_scope = self.scopes.get(scope_index).unwrap().vars().clone();
+                let scope = self.scopes.get(scope_index).unwrap();
+                let in_scope = scope.all_vars().clone();
 
-                self.build_expr_sub_tree(expressions, scope_index, in_scope)
+                self.build_expr_sub_tree(expressions, scope_index, in_scope.clone())
             })
             .collect();
 
@@ -118,6 +147,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
 
         DepTree {
             trees: self.into_sub_trees(root_nodes),
+            escape_exprs,
             constants,
         }
     }
@@ -193,36 +223,41 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                 .map(|var| ontol_hir::Var(var as u32));
 
             if let Some(first_unscoped_var) = self.next_unscoped_var(&mut difference) {
-                // Needs to assign to a subgroup. Algorithm:
-                // For all unscoped vars, check if there already exists a subgroup already assigned to
-                // put that variable into scope, and reuse that group.
-                // If no such group exists, create a new group using the _first unscoped variable_.
-                //
-                // This algorithm should create fewer code branches.
-
-                if let Some(group) = sub_groups.get_mut(&first_unscoped_var) {
-                    // assign to existing sub group
-                    group.push(expression);
+                if self.seq_labels.contains(first_unscoped_var.0 as usize) {
+                    panic!();
                 } else {
-                    let unassigned_expression = loop {
-                        if let Some(next_unscoped_var) = self.next_unscoped_var(&mut difference) {
-                            if let Some(group) = sub_groups.get_mut(&next_unscoped_var) {
-                                // assign to existing sub group
-                                group.push(expression);
-                                break None;
-                            }
-                        } else {
-                            // unable to assign to an existing group
-                            break Some(expression);
-                        }
-                    };
+                    // Needs to assign to a subgroup. Algorithm:
+                    // For all unscoped vars, check if there already exists a subgroup already assigned to
+                    // put that variable into scope, and reuse that group.
+                    // If no such group exists, create a new group using the _first unscoped variable_.
+                    //
+                    // This algorithm should create fewer code branches.
 
-                    if let Some(expression) = unassigned_expression {
-                        // assign to new sub group
-                        sub_groups
-                            .entry(first_unscoped_var)
-                            .or_default()
-                            .push(expression);
+                    if let Some(group) = sub_groups.get_mut(&first_unscoped_var) {
+                        // assign to existing sub group
+                        group.push(expression);
+                    } else {
+                        let unassigned_expression = loop {
+                            if let Some(next_unscoped_var) = self.next_unscoped_var(&mut difference)
+                            {
+                                if let Some(group) = sub_groups.get_mut(&next_unscoped_var) {
+                                    // assign to existing sub group
+                                    group.push(expression);
+                                    break None;
+                                }
+                            } else {
+                                // unable to assign to an existing group
+                                break Some(expression);
+                            }
+                        };
+
+                        if let Some(expression) = unassigned_expression {
+                            // assign to new sub group
+                            sub_groups
+                                .entry(first_unscoped_var)
+                                .or_default()
+                                .push(expression);
+                        }
                     }
                 }
             } else {
@@ -234,7 +269,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         let children = sub_groups
             .into_iter()
             .map(|(var, sub_expressions)| {
-                // introduce on more variable into scope:
+                // introduce one more variable into scope:
                 let mut sub_in_scope = in_scope.clone();
                 sub_in_scope.0.insert(var.0 as usize);
 
@@ -379,15 +414,7 @@ fn into_sub_tree_rec<S: Clone, E>(
     ref_counts: &mut FnvHashMap<usize, usize>,
     scopes_by_index: &mut FnvHashMap<usize, S>,
 ) -> (S, SubTree<E, S>) {
-    let scope_index = node.scope_index;
-    let count = ref_counts.get_mut(&scope_index).unwrap();
-    *count -= 1;
-
-    let scope = if *count == 0 {
-        scopes_by_index.remove(&scope_index).unwrap()
-    } else {
-        scopes_by_index.get(&scope_index).unwrap().clone()
-    };
+    let scope = take_scope(node.scope_index, ref_counts, scopes_by_index);
 
     (
         scope,
@@ -400,4 +427,19 @@ fn into_sub_tree_rec<S: Clone, E>(
                 .collect(),
         },
     )
+}
+
+fn take_scope<S: Clone>(
+    scope_index: usize,
+    ref_counts: &mut FnvHashMap<usize, usize>,
+    scopes_by_index: &mut FnvHashMap<usize, S>,
+) -> S {
+    let count = ref_counts.get_mut(&scope_index).unwrap();
+    *count -= 1;
+
+    if *count == 0 {
+        scopes_by_index.remove(&scope_index).unwrap()
+    } else {
+        scopes_by_index.get(&scope_index).unwrap().clone()
+    }
 }
