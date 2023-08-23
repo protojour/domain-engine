@@ -30,6 +30,11 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
+        fn visit_seq_prop_element(&mut self, index: usize, element: arg!($ref SeqPropertyElement<'l, L>)) {
+            self.traverse_seq_prop_element(index, element);
+        }
+
+        #[allow(unused_variables)]
         fn visit_match_arm(&mut self, index: usize, match_arm: arg!($ref MatchArm<'l, L>)) {
             self.traverse_match_arm(match_arm);
         }
@@ -88,8 +93,8 @@ macro_rules! visitor_trait_methods {
                         self.visit_node(index, child);
                     }
                 }
-                Kind::Prop(optional, struct_var, id, variants) => {
-                    self.visit_prop(optional, struct_var, id, variants);
+                Kind::Prop(optional, struct_var, prop_id, variants) => {
+                    self.visit_prop(optional, struct_var, prop_id, variants);
                 }
                 Kind::MatchProp(struct_var, id, arms) => {
                     self.visit_var(struct_var);
@@ -135,11 +140,24 @@ macro_rules! visitor_trait_methods {
         }
 
         fn traverse_prop_variant(&mut self, variant: arg!($ref PropVariant<'l, L>)) {
-            if let AttrDimension::Seq(label, _) = borrow!($ref variant.dimension) {
-                self.visit_label(label.$label());
+            match variant {
+                PropVariant::Singleton(attr) => {
+                    self.visit_node(0, borrow!($ref attr.rel));
+                    self.visit_node(1, borrow!($ref attr.val));
+                }
+                PropVariant::Seq(seq_variant) => {
+                    self.visit_label(seq_variant.label.$label());
+                    for (index, element) in seq_variant.elements.$iter().enumerate() {
+                        self.visit_seq_prop_element(index, element);
+                    }
+                }
             }
-            self.visit_node(0, borrow!($ref variant.attr.rel));
-            self.visit_node(1, borrow!($ref variant.attr.val));
+        }
+
+        #[allow(unused_variables)]
+        fn traverse_seq_prop_element(&mut self, index: usize, element: arg!($ref SeqPropertyElement<'l, L>)) {
+            self.visit_node(0, borrow!($ref element.attribute.rel));
+            self.visit_node(1, borrow!($ref element.attribute.val));
         }
 
         fn traverse_match_arm(&mut self, match_arm: arg!($ref MatchArm<'l, L>)) {

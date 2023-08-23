@@ -4,7 +4,7 @@ use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
     AttrDimension, Binding, GetKind, GetLabel, GetVar, HasDefault, IterBinder, Kind, Label, Lang,
-    MatchArm, PropPattern, PropVariant, Var,
+    MatchArm, PropPattern, PropVariant, PropVariantOld, SeqPropertyElement, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -97,10 +97,10 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Prop(optional, struct_var, id, variants) => {
+            Kind::Prop(optional, struct_var, prop_id, variants) => {
                 write!(
                     f,
-                    "{indent}(prop{} {struct_var} {id}",
+                    "{indent}(prop{} {struct_var} {prop_id}",
                     if optional.0 { "?" } else { "" }
                 )?;
                 let multi = self.print_all(Sep::Space, variants.iter(), f)?;
@@ -145,7 +145,68 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
     fn print(
         self,
         _sep: Sep,
-        PropVariant { dimension, attr }: &PropVariant<'a, L>,
+        variant: &PropVariant<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        let indent = self.indent;
+        write!(f, "{indent}(")?;
+
+        let multi = match variant {
+            PropVariant::Singleton(attr) => {
+                self.print_all(Sep::None, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?
+            }
+            PropVariant::Seq(seq_variant) => {
+                if seq_variant.has_default.0 {
+                    write!(f, "seq-default")?;
+                } else {
+                    write!(f, "seq")?;
+                }
+                write!(f, " ({})", seq_variant.label.label())?;
+
+                self.print_all(Sep::Space, seq_variant.elements.iter(), f)?;
+                Multiline(true)
+            }
+        };
+
+        // let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
+        self.print_rparen(multi, f)?;
+        Ok(Multiline(true))
+    }
+}
+
+impl<'a, L: Lang> Print<SeqPropertyElement<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        _sep: Sep,
+        element: &SeqPropertyElement<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        let indent = self.indent;
+        write!(f, "{indent}(")?;
+
+        let sep = if element.iter {
+            write!(f, "iter")?;
+            Sep::Space
+        } else {
+            Sep::None
+        };
+
+        let multi = self.print_all(
+            sep,
+            [element.attribute.rel.kind(), element.attribute.val.kind()].into_iter(),
+            f,
+        )?;
+
+        self.print_rparen(multi, f)?;
+        Ok(Multiline(true))
+    }
+}
+
+impl<'a, L: Lang> Print<PropVariantOld<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        _sep: Sep,
+        PropVariantOld { dimension, attr }: &PropVariantOld<'a, L>,
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
         let indent = self.indent;

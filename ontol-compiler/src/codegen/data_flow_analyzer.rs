@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::GetKind;
+use ontol_hir::{GetKind, PropVariant, SeqPropertyElement, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
@@ -103,18 +103,28 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Prop(_, struct_var, property_id, variants) => {
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
                 self.var_to_property
-                    .insert(*struct_var, FnvHashSet::from_iter([*property_id]));
+                    .insert(*struct_var, FnvHashSet::from_iter([*prop_id]));
 
                 let mut var_set = VarSet::default();
 
                 for variant in variants {
-                    var_set.union_with(&self.analyze_node(&variant.attr.rel));
-                    var_set.union_with(&self.analyze_node(&variant.attr.val));
+                    match variant {
+                        PropVariant::Singleton(attribute) => {
+                            var_set.union_with(&self.analyze_node(&attribute.rel));
+                            var_set.union_with(&self.analyze_node(&attribute.val));
+                        }
+                        PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
+                            for SeqPropertyElement { attribute, .. } in elements {
+                                var_set.union_with(&self.analyze_node(&attribute.rel));
+                                var_set.union_with(&self.analyze_node(&attribute.val));
+                            }
+                        }
+                    }
                 }
 
-                self.reg_output_prop(*struct_var, *property_id, var_set);
+                self.reg_output_prop(*struct_var, *prop_id, var_set);
 
                 Default::default()
             }

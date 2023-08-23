@@ -202,13 +202,10 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                     ontol_hir::Optional(false),
                     prop.struct_var,
                     prop.prop_id,
-                    vec![ontol_hir::PropVariant {
-                        dimension: ontol_hir::AttrDimension::Singular,
-                        attr: ontol_hir::Attribute {
-                            rel: Box::new(rel.node),
-                            val: Box::new(val.node),
-                        },
-                    }],
+                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                        rel: Box::new(rel.node),
+                        val: Box::new(val.node),
+                    })],
                 ),
                 unifier.unit_meta(),
             ));

@@ -264,7 +264,7 @@ fn test_deep_structural_map() {
 }
 
 #[test]
-fn test_map_matching_array() {
+fn test_map_matching_sequence() {
     "
     pub type foo
     pub type bar
@@ -285,8 +285,8 @@ fn test_map_matching_array() {
     });
 }
 
-// map call inside array
-const MAP_IN_ARRAY: &str = "
+// map call inside sequence
+const MAP_IN_SEQUENCE: &str = "
 type foo { rel .'f': string }
 type bar { rel .'b': string }
 pub type foos { rel .'foos': [foo] }
@@ -303,8 +303,8 @@ map {
 ";
 
 #[test]
-fn test_map_in_array_item_empty() {
-    MAP_IN_ARRAY.compile_ok(|test| {
+fn test_map_in_sequence_item_empty() {
+    MAP_IN_SEQUENCE.compile_ok(|test| {
         test.assert_domain_map(
             ("foos", "bars"),
             json!({ "foos": [] }),
@@ -319,8 +319,8 @@ fn test_map_in_array_item_empty() {
 }
 
 #[test]
-fn test_map_in_array_item_one() {
-    MAP_IN_ARRAY.compile_ok(|test| {
+fn test_map_in_sequence_item_one() {
+    MAP_IN_SEQUENCE.compile_ok(|test| {
         test.assert_domain_map(
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }] }),
@@ -335,8 +335,8 @@ fn test_map_in_array_item_one() {
 }
 
 #[test]
-fn test_map_in_array_item_many() {
-    MAP_IN_ARRAY.compile_ok(|test| {
+fn test_map_in_sequence_item_many() {
+    MAP_IN_SEQUENCE.compile_ok(|test| {
         test.assert_domain_map(
             ("foos", "bars"),
             json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
@@ -351,7 +351,7 @@ fn test_map_in_array_item_many() {
 }
 
 #[test]
-fn test_aggr_cross_parallel() {
+fn test_sequence_cross_parallel() {
     "
     type foo { rel .'f': string }
     type bar { rel .'b': string }
@@ -389,7 +389,7 @@ fn test_aggr_cross_parallel() {
 }
 
 #[test]
-fn test_aggr_multi_level() {
+fn test_sequence_inner_loop() {
     "
     type foo { rel .'P': string }
     type bar { rel .'Q': string }
@@ -447,7 +447,7 @@ fn test_aggr_multi_level() {
 }
 
 #[test]
-fn test_flat_map1() {
+fn test_sequence_flat_map1() {
     "
     pub type foo
     type foo_inner
@@ -485,6 +485,31 @@ fn test_flat_map1() {
             json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B1" }]),
         );
     });
+}
+
+// BUG: This should work at least one way:
+#[test]
+fn test_sequence_composer1() {
+    "
+    type foo {
+        rel .'a': string
+        rel .'b': string
+    }
+    type bar {
+        rel .'ab': [string]
+    }
+
+    map {
+        foo {
+            'a': a
+            'b': b
+        }
+        bar {
+            'ab': [a b] // ERROR TODO: maximum one element per sequence for now// ERROR TODO: requires spreading (`..`)// ERROR TODO: Incompatible aggregation group
+        }
+    }
+    "
+    .compile_fail();
 }
 
 #[test]

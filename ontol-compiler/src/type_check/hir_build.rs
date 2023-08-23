@@ -478,13 +478,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
                                     let val_node = self.build_node(value, Some(value_ty), ctx);
-                                    ontol_hir::PropVariant {
-                                        dimension: ontol_hir::AttrDimension::Singular,
-                                        attr: ontol_hir::Attribute {
-                                            rel: Box::new(rel_node),
-                                            val: Box::new(val_node),
-                                        },
-                                    }
+                                    ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                        rel: Box::new(rel_node),
+                                        val: Box::new(val_node),
+                                    })
                                 }
                                 ValueCardinality::Many => match &value.kind {
                                     ExprKind::Seq(aggr_expr_id, value) => {
@@ -494,19 +491,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let seq_ty =
                                             self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
-                                        ontol_hir::PropVariant {
-                                            dimension: ontol_hir::AttrDimension::Seq(
-                                                TypedLabel { label, ty: seq_ty },
-                                                ontol_hir::HasDefault(matches!(
-                                                    match_property.property_id.role,
-                                                    Role::Object
-                                                )),
-                                            ),
-                                            attr: ontol_hir::Attribute {
-                                                rel: Box::new(rel_node),
-                                                val: Box::new(val_node),
-                                            },
-                                        }
+                                        ontol_hir::PropVariant::Seq(ontol_hir::SeqPropertyVariant {
+                                            label: TypedLabel { label, ty: seq_ty },
+                                            has_default: ontol_hir::HasDefault(matches!(
+                                                match_property.property_id.role,
+                                                Role::Object
+                                            )),
+                                            elements: vec![ontol_hir::SeqPropertyElement {
+                                                iter: true,
+                                                attribute: ontol_hir::Attribute {
+                                                    rel: rel_node,
+                                                    val: val_node,
+                                                },
+                                            }],
+                                        })
                                     }
                                     _ => {
                                         self.type_error(

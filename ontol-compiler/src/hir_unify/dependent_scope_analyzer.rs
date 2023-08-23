@@ -149,14 +149,11 @@ impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for DepScopeAn
     ) {
         self.stack.push(StackAtom::Prop);
 
-        self.enter_child(index, |zelf| {
-            let ontol_hir::PropVariant { dimension, .. } = variant;
-            match dimension {
-                ontol_hir::AttrDimension::Singular => {
-                    zelf.traverse_prop_variant(variant);
-                }
-                ontol_hir::AttrDimension::Seq(_, _) => {}
+        self.enter_child(index, |zelf| match variant {
+            ontol_hir::PropVariant::Singleton(_) => {
+                zelf.traverse_prop_variant(variant);
             }
+            ontol_hir::PropVariant::Seq(_) => {}
         });
 
         self.stack.pop();

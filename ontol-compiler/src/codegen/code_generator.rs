@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
-use ontol_hir::{GetKind, HasDefault, PropPattern};
+use ontol_hir::{GetKind, HasDefault, PropPattern, PropVariant};
 use ontol_runtime::{
     smart_format,
+    value::PropertyId,
     vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
     DefId,
 };
@@ -247,36 +248,22 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
                 self.scope.remove(&binder.var);
             }
-            ontol_hir::Kind::Prop(_, struct_var, id, variants) => {
-                if let Some(ontol_hir::PropVariant { dimension: _, attr }) =
-                    variants.into_iter().next()
-                {
-                    let struct_local = self.var_local(struct_var);
-
-                    match attr.rel.kind() {
-                        ontol_hir::Kind::Unit => {
-                            self.gen_node(*attr.val, block);
-                            self.builder.append(
-                                block,
-                                Ir::PutAttr1(struct_local, id),
-                                Delta(-1),
-                                span,
-                            );
-                        }
-                        _ => {
-                            self.gen_node(*attr.rel, block);
-                            let rel_local = self.builder.top();
-                            self.gen_node(*attr.val, block);
-
-                            self.builder
-                                .append(block, Ir::Clone(rel_local), Delta(1), span);
-
-                            self.builder.append(
-                                block,
-                                Ir::PutAttr2(struct_local, id),
-                                Delta(-2),
-                                span,
-                            );
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
+                if let Some(variant) = variants.into_iter().next() {
+                    match variant {
+                        PropVariant::Singleton(attr) => self
+                            .gen_attribute(struct_var, prop_id, *attr.rel, *attr.val, span, block),
+                        PropVariant::Seq(seq_variant) => {
+                            if let Some(element) = seq_variant.elements.into_iter().next() {
+                                self.gen_attribute(
+                                    struct_var,
+                                    prop_id,
+                                    element.attribute.rel,
+                                    element.attribute.val,
+                                    span,
+                                    block,
+                                );
+                            }
                         }
                     }
                 }
@@ -420,7 +407,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let seq_local = self.var_local(seq_var);
                 let val_ty = match ty {
                     Type::Seq(_, val_ty) => val_ty,
-                    _ => panic!("Not an array"),
+                    _ => panic!("Not a sequence"),
                 };
                 let out_seq = self.builder.append(
                     block,
@@ -514,6 +501,37 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ),
             ontol_hir::PropPattern::Absent => {
                 todo!("Arm pattern not present")
+            }
+        }
+    }
+
+    fn gen_attribute(
+        &mut self,
+        struct_var: ontol_hir::Var,
+        prop_id: PropertyId,
+        rel: TypedHirNode<'m>,
+        val: TypedHirNode<'m>,
+        span: SourceSpan,
+        block: &mut Block,
+    ) {
+        let struct_local = self.var_local(struct_var);
+
+        match rel.kind() {
+            ontol_hir::Kind::Unit => {
+                self.gen_node(val, block);
+                self.builder
+                    .append(block, Ir::PutAttr1(struct_local, prop_id), Delta(-1), span);
+            }
+            _ => {
+                self.gen_node(rel, block);
+                let rel_local = self.builder.top();
+                self.gen_node(val, block);
+
+                self.builder
+                    .append(block, Ir::Clone(rel_local), Delta(1), span);
+
+                self.builder
+                    .append(block, Ir::PutAttr2(struct_local, prop_id), Delta(-2), span);
             }
         }
     }

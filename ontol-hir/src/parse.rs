@@ -222,35 +222,55 @@ impl<L: Lang> Parser<L> {
     }
 
     fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
-        parse_paren_delimited(next, |next| {
-            let (dimension, next) = match parse_symbol(next) {
-                Ok(("seq", next)) => {
-                    let (label, next) = parse_paren_delimited(next, parse_at_label)?;
-                    (
-                        AttrDimension::Seq(self.make_label(label), HasDefault(false)),
-                        next,
-                    )
-                }
-                Ok(("seq-default", next)) => {
-                    let (label, next) = parse_paren_delimited(next, parse_at_label)?;
-                    (
-                        AttrDimension::Seq(self.make_label(label), HasDefault(true)),
-                        next,
-                    )
-                }
-                Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
-                Err(_) => (AttrDimension::Singular, next),
-            };
-            let (rel, next) = self.parse(next)?;
-            let (value, next) = self.parse(next)?;
+        parse_paren_delimited(next, |next| match parse_symbol(next) {
+            Ok((sym @ ("seq" | "seq-default"), next)) => {
+                let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                let (elements, next) = self.parse_many(next, Self::parse_seq_property_element)?;
+                Ok((
+                    PropVariant::Seq(SeqPropertyVariant {
+                        label: self.make_label(label),
+                        has_default: HasDefault(sym != "seq"),
+                        elements,
+                    }),
+                    next,
+                ))
+            }
+            Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+            Err(_) => {
+                let (rel, next) = self.parse(next)?;
+                let (value, next) = self.parse(next)?;
 
-            Ok((
-                PropVariant {
-                    dimension,
-                    attr: Attribute {
+                Ok((
+                    PropVariant::Singleton(Attribute {
                         rel: Box::new(rel),
                         val: Box::new(value),
-                    },
+                    }),
+                    next,
+                ))
+            }
+        })
+    }
+
+    fn parse_seq_property_element<'a, 's>(
+        &self,
+        next: &'s str,
+    ) -> ParseResult<'s, SeqPropertyElement<'a, L>> {
+        parse_paren_delimited(next, |next| {
+            let (iter, next) = match parse_symbol(next) {
+                Ok(("iter", next)) => (true, next),
+                Ok((sym, _)) => {
+                    return Err(Error::Expected(Class::Symbol, Found(Token::Symbol(sym))))
+                }
+                Err(_) => (false, next),
+            };
+
+            let (rel, next) = self.parse(next)?;
+            let (val, next) = self.parse(next)?;
+
+            Ok((
+                SeqPropertyElement {
+                    iter,
+                    attribute: Attribute { rel, val },
                 },
                 next,
             ))

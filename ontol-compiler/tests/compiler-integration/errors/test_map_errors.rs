@@ -136,7 +136,7 @@ fn map_type_mismatch_in_func() {
 }
 
 #[test]
-fn map_array_mismatch() {
+fn map_sequence_mismatch() {
     "
     type foo
     rel foo 'a': [string]

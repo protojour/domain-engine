@@ -163,19 +163,16 @@ fn autogenerate_fmt_segment_property<'m>(
                 ontol_hir::Optional(false),
                 binder_var,
                 *property_id,
-                vec![ontol_hir::PropVariant {
-                    dimension: ontol_hir::AttrDimension::Singular,
-                    attr: ontol_hir::Attribute {
-                        rel: Box::new(TypedHirNode(
-                            ontol_hir::Kind::Unit,
-                            Meta {
-                                ty: unit_type,
-                                span: NO_SPAN,
-                            },
-                        )),
-                        val: Box::new(var_node),
-                    },
-                }],
+                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                    rel: Box::new(TypedHirNode(
+                        ontol_hir::Kind::Unit,
+                        Meta {
+                            ty: unit_type,
+                            span: NO_SPAN,
+                        },
+                    )),
+                    val: Box::new(var_node),
+                })],
             ),
             Meta {
                 ty: object_ty,

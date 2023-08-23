@@ -233,14 +233,14 @@ fn test_unify_basic_seq_prop_no_default() {
         "
         (struct ($b)
             (prop $b S:0:0
-                (seq (@d) #u $a)
+                (seq (@d) (iter #u $a))
             )
         )
         ",
         "
         (struct ($c)
             (prop $c S:1:1
-                (seq (@d) #u $a)
+                (seq (@d) (iter #u $a))
             )
         )
         ",
@@ -270,12 +270,13 @@ fn test_unify_seq_prop_deep() {
         (struct ($b)
             (prop $b S:0:0
                 (seq (@f)
-                    #u
-                    (struct ($c)
-                        (prop $c S:1:1
-                            (seq (@g)
-                                #u
-                                (map $a)
+                    (iter
+                        #u
+                        (struct ($c)
+                            (prop $c S:1:1
+                                (seq (@g)
+                                    (iter #u (map $a))
+                                )
                             )
                         )
                     )
@@ -286,12 +287,13 @@ fn test_unify_seq_prop_deep() {
         (struct ($d)
             (prop $d O:0:0
                 (seq (@f)
-                    #u
-                    (struct ($e)
-                        (prop $e O:1:1
-                            (seq (@g)
-                                #u
-                                (map $a)
+                    (iter
+                        #u
+                        (struct ($e)
+                            (prop $e O:1:1
+                                (seq (@g)
+                                    (iter #u (map $a))
+                                )
                             )
                         )
                     )
@@ -337,14 +339,14 @@ fn test_unify_basic_seq_prop_default_value() {
         "
         (struct ($b)
             (prop $b S:0:0
-                (seq-default (@d) #u $a)
+                (seq-default (@d) (iter #u $a))
             )
         )
         ",
         "
         (struct ($c)
             (prop $c S:1:1
-                (seq (@d) #u $a)
+                (seq (@d) (iter #u $a))
             )
         )
         ",
@@ -374,10 +376,12 @@ fn test_unify_flat_map1() {
         (struct ($c)
             (prop $c S:0:0
                 (seq (@d)
-                    #u
-                    (struct ($e)
-                        (prop $e S:2:2
-                            (#u $a)
+                    (iter
+                        #u
+                        (struct ($e)
+                            (prop $e S:2:2
+                                (#u $a)
+                            )
                         )
                     )
                 )
@@ -731,7 +735,7 @@ fn test_unify_seq_scope_escape1() {
         "
         (struct ($c)
             (prop $c S:0:0 (#u #u))
-            (prop $c S:0:1 (seq (@a) #u $b))
+            (prop $c S:0:1 (seq (@a) (iter #u $b)))
         )
         ",
         "
@@ -740,7 +744,7 @@ fn test_unify_seq_scope_escape1() {
                 (#u
                     (struct ($e)
                         (prop $e O:1:0 (#u #u))
-                        (prop $e O:1:1 (seq (@a) #u $b))
+                        (prop $e O:1:1 (seq (@a) (iter #u $b)))
                     )
                 )
             )
@@ -783,13 +787,13 @@ fn test_unify_seq_scope_escape2() {
                 (#u
                     (struct ($f)
                         (prop $f S:1:0
-                            (seq (@a) #u $b)
+                            (seq (@a) (iter #u $b))
                         )
                     )
                 )
             )
             (prop $e S:0:1
-                (seq (@c) #u $d)
+                (seq (@c) (iter #u $d))
             )
         )
         ",
@@ -804,13 +808,13 @@ fn test_unify_seq_scope_escape2() {
                             (#u
                                 (struct ($i)
                                     (prop $i O:2:0
-                                        (seq (@a) #u $b)
+                                        (seq (@a) (iter #u $b))
                                     )
                                 )
                             )
                         )
                         (prop $h O:1:1
-                            (seq (@c) #u $d)
+                            (seq (@c) (iter #u $d))
                         )
                     )
                 )

@@ -132,8 +132,7 @@ fn test_seq_prop() {
         (struct ($a)
             (prop $a S:0:0
                 (seq (@c)
-                    #u
-                    $b
+                    (iter #u $b)
                 )
             )
         )"

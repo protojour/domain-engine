@@ -86,12 +86,12 @@ pub struct Optional(pub bool);
 pub struct HasDefault(pub bool);
 
 /// One of the variants of a property
-pub struct PropVariant<'a, L: Lang> {
+pub struct PropVariantOld<'a, L: Lang> {
     pub dimension: AttrDimension<'a, L>,
     pub attr: Attribute<Box<L::Node<'a>>>,
 }
 
-impl<'a, L: Lang> Clone for PropVariant<'a, L>
+impl<'a, L: Lang> Clone for PropVariantOld<'a, L>
 where
     L::Node<'a>: Clone,
 {
@@ -99,6 +99,60 @@ where
         Self {
             dimension: self.dimension.clone(),
             attr: self.attr.clone(),
+        }
+    }
+}
+
+pub enum PropVariant<'a, L: Lang> {
+    Singleton(Attribute<Box<L::Node<'a>>>),
+    Seq(SeqPropertyVariant<'a, L>),
+}
+
+impl<'a, L: Lang> Clone for PropVariant<'a, L>
+where
+    L::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Singleton(attr) => Self::Singleton(attr.clone()),
+            Self::Seq(seq) => Self::Seq(seq.clone()),
+        }
+    }
+}
+
+pub struct SeqPropertyVariant<'a, L: Lang> {
+    pub label: L::Label<'a>,
+    pub has_default: HasDefault,
+    pub elements: Vec<SeqPropertyElement<'a, L>>,
+}
+
+impl<'a, L: Lang> Clone for SeqPropertyVariant<'a, L>
+where
+    L::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            has_default: self.has_default,
+            elements: self.elements.clone(),
+        }
+    }
+}
+
+pub struct SeqPropertyElement<'a, L: Lang> {
+    /// Is this an iterative binding (binds any number of elements)
+    pub iter: bool,
+    pub attribute: Attribute<L::Node<'a>>,
+}
+
+impl<'a, L: Lang> Clone for SeqPropertyElement<'a, L>
+where
+    L::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            iter: self.iter,
+            attribute: self.attribute.clone(),
         }
     }
 }

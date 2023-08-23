@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use ontol_hir::{PropVariant, SeqPropertyVariant};
+
 use super::expr;
 use crate::{
     hir_unify::VarSet,
@@ -149,11 +151,11 @@ impl<'m> ExprBuilder<'m> {
         match kind {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
-                .map(|variant| match variant.dimension {
-                    ontol_hir::AttrDimension::Singular => {
+                .map(|variant| match variant {
+                    PropVariant::Singleton(attribute) => {
                         let mut union = UnionBuilder::default();
-                        let rel = union.plus(self.hir_to_expr(&variant.attr.rel));
-                        let val = union.plus(self.hir_to_expr(&variant.attr.val));
+                        let rel = union.plus(self.hir_to_expr(&attribute.rel));
+                        let val = union.plus(self.hir_to_expr(&attribute.val));
 
                         expr::Prop {
                             optional: *optional,
@@ -164,17 +166,25 @@ impl<'m> ExprBuilder<'m> {
                             attr: ontol_hir::Attribute { rel, val },
                         }
                     }
-                    ontol_hir::AttrDimension::Seq(typed_label, _has_default) => {
-                        let rel = self.hir_to_expr(&variant.attr.rel);
-                        let val = self.hir_to_expr(&variant.attr.val);
+                    PropVariant::Seq(SeqPropertyVariant {
+                        label, elements, ..
+                    }) => {
+                        let only_element = if elements.len() == 1 {
+                            elements.first().unwrap()
+                        } else {
+                            todo!("More than one element");
+                        };
+
+                        let rel = self.hir_to_expr(&only_element.attribute.rel);
+                        let val = self.hir_to_expr(&only_element.attribute.val);
                         let mut free_vars = VarSet::default();
-                        free_vars.insert(typed_label.label.into());
+                        free_vars.insert(label.label.into());
 
                         expr::Prop {
                             optional: *optional,
                             prop_id: *prop_id,
                             free_vars,
-                            seq: Some(typed_label.label),
+                            seq: Some(label.label),
                             struct_var: *struct_var,
                             attr: ontol_hir::Attribute { rel, val },
                         }

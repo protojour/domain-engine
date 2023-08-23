@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_hir::{visitor::HirVisitor, GetKind};
+use ontol_hir::{visitor::HirVisitor, GetKind, SeqPropertyVariant};
 use ontol_runtime::vm::proc::BuiltinProc;
 use smallvec::SmallVec;
 
@@ -203,20 +203,20 @@ impl<'m> ScopeBuilder<'m> {
 
             for (variant_idx, variant) in variants.iter().enumerate() {
                 self.enter_child(variant_idx, |zelf| -> UnifierResult<()> {
-                    let (kind, vars, dependencies) = match variant.dimension {
-                        ontol_hir::AttrDimension::Singular => {
+                    let (kind, vars, dependencies) = match variant {
+                        ontol_hir::PropVariant::Singleton(attr) => {
                             let mut var_union = UnionBuilder::default();
                             let mut dep_union = UnionBuilder::default();
 
                             let rel = dep_union
-                                .plus_deps(var_union.plus(zelf.enter_child(0, |zelf| {
-                                    zelf.build_scope_binder(&variant.attr.rel)
-                                })?))
+                                .plus_deps(var_union.plus(
+                                    zelf.enter_child(0, |zelf| zelf.build_scope_binder(&attr.rel))?,
+                                ))
                                 .into_scope_pattern_binding();
                             let val = dep_union
-                                .plus_deps(var_union.plus(zelf.enter_child(1, |zelf| {
-                                    zelf.build_scope_binder(&variant.attr.val)
-                                })?))
+                                .plus_deps(var_union.plus(
+                                    zelf.enter_child(1, |zelf| zelf.build_scope_binder(&attr.val))?,
+                                ))
                                 .into_scope_pattern_binding();
 
                             (
@@ -225,17 +225,31 @@ impl<'m> ScopeBuilder<'m> {
                                 dep_union.vars,
                             )
                         }
-                        ontol_hir::AttrDimension::Seq(typed_label, has_default) => {
+                        ontol_hir::PropVariant::Seq(SeqPropertyVariant {
+                            label,
+                            has_default,
+                            elements,
+                        }) => {
+                            let only_element = if elements.len() == 1 {
+                                elements.iter().next().unwrap()
+                            } else {
+                                todo!("More than one seq element");
+                            };
+
                             let rel = zelf
-                                .enter_child(0, |zelf| zelf.build_scope_binder(&variant.attr.rel))?
+                                .enter_child(0, |zelf| {
+                                    zelf.build_scope_binder(&only_element.attribute.rel)
+                                })?
                                 .into_scope_pattern_binding();
                             let val = zelf
-                                .enter_child(1, |zelf| zelf.build_scope_binder(&variant.attr.val))?
+                                .enter_child(1, |zelf| {
+                                    zelf.build_scope_binder(&only_element.attribute.val)
+                                })?
                                 .into_scope_pattern_binding();
 
                             (
-                                scope::PropKind::Seq(typed_label, has_default, rel, val),
-                                VarSet::from([typed_label.label.into()]),
+                                scope::PropKind::Seq(*label, *has_default, rel, val),
+                                VarSet::from([label.label.into()]),
                                 VarSet::default(),
                             )
                         }
