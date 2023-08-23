@@ -124,7 +124,7 @@ map {
         'start_date': sd
         'end_date': ed
         // the previous map is reused here
-        'archive_items': [ai]
+        'archive_items': [..ai]
     }
     ArchiveCollection {
         'id': id
@@ -137,6 +137,6 @@ map {
         'description': d
         'startDate': sd
         'endDate': ed
-        'archiveObjects': [ai]
+        'archiveObjects': [..ai]
     }
 }

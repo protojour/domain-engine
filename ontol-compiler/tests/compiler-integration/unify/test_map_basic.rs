@@ -272,10 +272,10 @@ fn test_map_matching_array() {
     rel bar 'b': [i64]
     map {
         foo {
-            'a': [x]
+            'a': [..x]
         }
         bar {
-            'b': [x]
+            'b': [..x]
         }
     }
     "
@@ -293,8 +293,8 @@ pub type foos { rel .'foos': [foo] }
 pub type bars { rel .'bars': [bar] }
 
 map {
-    foos { 'foos': [x] }
-    bars { 'bars': [x] }
+    foos { 'foos': [..x] }
+    bars { 'bars': [..x] }
 }
 map {
     foo { 'f': x }
@@ -370,12 +370,12 @@ fn test_aggr_cross_parallel() {
     }
     map {
         foos {
-            'f1': [a]
-            'f2': [b]
+            'f1': [..a]
+            'f2': [..b]
         }
         bars {
-            'b2': [b]
-            'b1': [a]
+            'b2': [..b]
+            'b1': [..a]
         }
     }
     "
@@ -416,23 +416,23 @@ fn test_aggr_multi_level() {
     }
     map {
         f1 {
-            'a': [f0 {
-                'a': [v0]
-                'b': [v1]
+            'a': [..f0 {
+                'a': [..v0]
+                'b': [..v1]
             }]
-            'b': [f0 {
-                'a': [v2]
-                'b': [v3]
+            'b': [..f0 {
+                'a': [..v2]
+                'b': [..v3]
             }]
         }
         b1 {
-            'b': [b0 {
-                'b': [v3]
-                'a': [v2]
+            'b': [..b0 {
+                'b': [..v3]
+                'a': [..v2]
             }]
-            'a': [b0 {
-                'b': [v1]
-                'a': [v0]
+            'a': [..b0 {
+                'b': [..v1]
+                'a': [..v0]
             }]
         }
     }
@@ -468,7 +468,7 @@ fn test_flat_map1() {
     map {
         foo {
             'a': a
-            'inner': [foo_inner {
+            'inner': [..foo_inner {
                 'b': b
             }]
         }
@@ -710,12 +710,12 @@ fn test_seq_scope_escape1() {
     map => {
         bar {
             'foo': foo {}
-            'p1': [p1]
+            'p1': [..p1]
         }
         qux {
             'baz': baz {
                 'foo': foo {}
-                'p1': [p1]
+                'p1': [..p1]
             }
         }
     }
@@ -753,16 +753,16 @@ fn test_seq_scope_escape2() {
     map => {
         bar {
             'foo': foo {
-                'p0': [p0]
+                'p0': [..p0]
             }
-            'p1': [p1]
+            'p1': [..p1]
         }
         qux {
             'baz': baz {
                 'foo': foo {
-                    'p0': [p0]
+                    'p0': [..p0]
                 }
-                'p1': [p1]
+                'p1': [..p1]
             }
         }
     }

@@ -4,8 +4,9 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, StructPattern,
-    StructPatternAttr, TypeOrPattern, UnitOrSeq, UseStatement, Visibility, WithStatement,
+    ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, SeqPatternElement,
+    StructPattern, StructPatternAttr, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
+    WithStatement,
 };
 
 use super::{
@@ -284,10 +285,10 @@ fn map_arm() -> impl AstParser<MapArm> {
 
 fn pattern() -> impl AstParser<Pattern> {
     recursive(|pattern| {
-        spanned(with_unit_or_seq(braced_struct_pattern(pattern)))
+        spanned(braced_struct_pattern(pattern.clone()))
             .map(Pattern::Struct)
-            .or(with_unit_or_seq(expr_pattern())
-                .map(|(unit_or_seq, (expr, span))| Pattern::Expr(((unit_or_seq, expr), span))))
+            .or(seq_pattern(pattern).map(Pattern::Seq))
+            .or(expr_pattern().map(|(expr, span)| Pattern::Expr((expr, span))))
     })
 }
 
@@ -329,6 +330,22 @@ fn struct_pattern_attr(
                 }
             })
     })
+}
+
+fn seq_pattern(
+    pattern: impl AstParser<Pattern> + Clone + 'static,
+) -> impl AstParser<Vec<Spanned<SeqPatternElement>>> {
+    spanned(
+        spanned(dot_dot())
+            .or_not()
+            .then(spanned(pattern))
+            .map(|(spread, pattern)| SeqPatternElement {
+                spread: spread.map(|(_, span)| span),
+                pattern,
+            }),
+    )
+    .repeated()
+    .delimited_by(open('['), close(']'))
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {

@@ -662,20 +662,40 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
         match pattern {
-            ast::Pattern::Expr(((ast::UnitOrSeq::Unit, expr_pat), _)) => {
+            ast::Pattern::Expr((expr_pat, _)) => {
                 self.lower_expr_pattern((expr_pat, span), var_table)
             }
-            ast::Pattern::Expr(((ast::UnitOrSeq::Seq, expr_pat), _)) => {
-                let seq_id = self.compiler.expressions.alloc_expr_id();
-                let inner = self.lower_expr_pattern((expr_pat, span.clone()), var_table)?;
-                Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
-            }
-            ast::Pattern::Struct(((ast::UnitOrSeq::Unit, struct_pat), span)) => {
+            ast::Pattern::Struct((struct_pat, span)) => {
                 self.lower_struct_pattern((struct_pat, span), var_table)
             }
-            ast::Pattern::Struct(((ast::UnitOrSeq::Seq, struct_pat), span)) => {
+            ast::Pattern::Seq(elements) => {
+                if elements.is_empty() {
+                    return Err((
+                        CompileError::TODO(smart_format!("requires one element")),
+                        span.clone(),
+                    ));
+                }
+                if elements.len() > 1 {
+                    self.compiler.errors.push(
+                        CompileError::TODO(smart_format!(
+                            "maximum one element per sequence for now"
+                        ))
+                        .spanned(&self.src.span(&span)),
+                    );
+                }
+
+                let (element, _) = elements.into_iter().next().unwrap();
+                if element.spread.is_none() {
+                    self.compiler.errors.push(
+                        CompileError::TODO(smart_format!("requires spreading (`..`)"))
+                            .spanned(&self.src.span(&span)),
+                    );
+                }
+
+                let inner =
+                    self.lower_pattern((element.pattern.0, element.pattern.1), var_table)?;
+
                 let seq_id = self.compiler.expressions.alloc_expr_id();
-                let inner = self.lower_struct_pattern((struct_pat, span.clone()), var_table)?;
                 Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
             }
         }

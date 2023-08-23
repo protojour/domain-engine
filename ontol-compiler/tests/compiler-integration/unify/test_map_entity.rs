@@ -193,11 +193,11 @@ fn test_map_relation_sequence_default_fallback() {
     map => {
         bar_inner {
             'bar_id': id
-            'foos': [foo_inner { 'foo_id': foo }]
+            'foos': [..foo_inner { 'foo_id': foo }]
         }
         bar {
             'id': id
-            'foos': [foo]
+            'foos': [..foo]
         }
     }
     "
@@ -277,7 +277,7 @@ fn test_map_invert() {
                 work.worker {
                     'ID': p_id
                     'name': p_name
-                    'technologies': [work.technology {
+                    'technologies': [..work.technology {
                         'ID': tech_id
                         'name': tech_name
                     }]
@@ -285,7 +285,7 @@ fn test_map_invert() {
                 dev.language {
                     'id': tech_id
                     'name': tech_name
-                    'developers': [dev.developer { // ERROR TODO: Incompatible aggregation group
+                    'developers': [..dev.developer { // ERROR TODO: Incompatible aggregation group
                         'id': p_id
                         'name': p_name
                     }]
@@ -313,12 +313,12 @@ fn artist_etc_routing() {
                     gsu.artist {
                         'artist-id': id
                         'name': n
-                        'plays': [p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        'plays': [..p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                     ai.artist {
                         'ID': id
                         'name': n
-                        'plays': [p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                        'plays': [..p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
                     }
                 }
 

@@ -14,7 +14,7 @@ map => {
         'author': db.User {
             'username': author
         }
-        'tags': [db.TagEntity {
+        'tags': [..db.TagEntity {
             'tag': tag
         }]
     }
@@ -22,6 +22,6 @@ map => {
         'post_id': id
         'contents': body
         'written_by': author
-        'tags': [tag]
+        'tags': [..tag]
     }
 }

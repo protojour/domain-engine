@@ -115,11 +115,12 @@ pub enum MapArm {
 }
 
 /// A pattern is either `struct {}` or leaf expr.
-/// An expr cannot contain another struct patter.
+/// An expr cannot contain another struct pattern.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Pattern {
-    Expr(Spanned<(UnitOrSeq, ExprPattern)>),
-    Struct(Spanned<(UnitOrSeq, StructPattern)>),
+    Expr(Spanned<ExprPattern>),
+    Struct(Spanned<StructPattern>),
+    Seq(Vec<Spanned<SeqPatternElement>>),
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
@@ -134,12 +135,20 @@ pub struct StructPattern {
     pub attributes: Vec<Spanned<StructPatternAttr>>,
 }
 
+/// relation attribute within `struct { .. }`
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
     pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
     pub option: Option<Spanned<()>>,
     pub object: Spanned<Pattern>,
+}
+
+/// items within `[]`
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct SeqPatternElement {
+    pub spread: Option<Span>,
+    pub pattern: Spanned<Pattern>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
