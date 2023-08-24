@@ -74,8 +74,24 @@ pub struct Prop<'m> {
     pub struct_var: ontol_hir::Var,
     pub prop_id: PropertyId,
     pub seq: Option<ontol_hir::Label>,
-    pub attr: ontol_hir::Attribute<Expr<'m>>,
+    // pub attr: ontol_hir::Attribute<Expr<'m>>,
+    pub variant: PropVariant<'m>,
     pub free_vars: VarSet,
+}
+
+#[derive(Debug)]
+pub enum PropVariant<'m> {
+    Singleton(ontol_hir::Attribute<Expr<'m>>),
+    Seq {
+        label: ontol_hir::Label,
+        elements: Vec<SeqPropElement<'m>>,
+    },
+}
+
+#[derive(Debug)]
+pub struct SeqPropElement<'m> {
+    pub iter: bool,
+    pub attribute: ontol_hir::Attribute<Expr<'m>>,
 }
 
 #[derive(Debug)]

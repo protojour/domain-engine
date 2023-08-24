@@ -163,30 +163,47 @@ impl<'m> ExprBuilder<'m> {
                             free_vars: union.vars,
                             seq: None,
                             struct_var: *struct_var,
-                            attr: ontol_hir::Attribute { rel, val },
+                            variant: expr::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel,
+                                val,
+                            }),
                         }
                     }
                     PropVariant::Seq(SeqPropertyVariant {
                         label, elements, ..
                     }) => {
-                        let only_element = if elements.len() == 1 {
-                            elements.first().unwrap()
-                        } else {
-                            todo!("More than one element");
-                        };
+                        let mut union = UnionBuilder::default();
+                        let prop_elements = elements
+                            .iter()
+                            .map(|element| {
+                                let mut rel = self.hir_to_expr(&element.attribute.rel);
+                                let mut val = self.hir_to_expr(&element.attribute.val);
 
-                        let rel = self.hir_to_expr(&only_element.attribute.rel);
-                        let val = self.hir_to_expr(&only_element.attribute.val);
-                        let mut free_vars = VarSet::default();
-                        free_vars.insert(label.label.into());
+                                if !element.iter {
+                                    // non-iter element variables may refer to outer scope
+                                    rel = union.plus(rel);
+                                    val = union.plus(val);
+                                }
+
+                                expr::SeqPropElement {
+                                    iter: element.iter,
+                                    attribute: ontol_hir::Attribute { rel, val },
+                                }
+                            })
+                            .collect();
+
+                        union.vars.insert(label.label.into());
 
                         expr::Prop {
                             optional: *optional,
                             prop_id: *prop_id,
-                            free_vars,
+                            free_vars: union.vars,
                             seq: Some(label.label),
                             struct_var: *struct_var,
-                            attr: ontol_hir::Attribute { rel, val },
+                            variant: expr::PropVariant::Seq {
+                                label: label.label,
+                                elements: prop_elements,
+                            },
                         }
                     }
                 })
@@ -211,7 +228,7 @@ impl<'m> ExprBuilder<'m> {
 
 #[derive(Default)]
 struct UnionBuilder {
-    vars: VarSet,
+    pub vars: VarSet,
 }
 
 impl UnionBuilder {

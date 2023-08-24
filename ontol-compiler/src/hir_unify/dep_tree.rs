@@ -237,7 +237,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
 
             if let Some(first_unscoped_var) = self.next_unscoped_var(&mut difference) {
                 if self.seq_labels.contains(first_unscoped_var.0 as usize) {
-                    panic!();
+                    panic!("seq labels contains {first_unscoped_var}");
                 } else {
                     // Needs to assign to a subgroup. Algorithm:
                     // For all unscoped vars, check if there already exists a subgroup already assigned to

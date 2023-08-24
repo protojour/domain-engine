@@ -193,19 +193,24 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
             Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
 
         for prop in sub_scoped.expressions {
-            // FIXME: avoid clone by taking scope reference?
-            let rel = unifier.unify(scope.clone(), prop.attr.rel)?;
-            let val = unifier.unify(scope.clone(), prop.attr.val)?;
-
             nodes.push(TypedHirNode(
                 ontol_hir::Kind::Prop(
                     ontol_hir::Optional(false),
                     prop.struct_var,
                     prop.prop_id,
-                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                        rel: Box::new(rel.node),
-                        val: Box::new(val.node),
-                    })],
+                    vec![match prop.variant {
+                        expr::PropVariant::Singleton(attr) => {
+                            // FIXME: avoid clone by taking scope reference?
+                            let rel = unifier.unify(scope.clone(), attr.rel)?;
+                            let val = unifier.unify(scope.clone(), attr.val)?;
+
+                            ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: Box::new(rel.node),
+                                val: Box::new(val.node),
+                            })
+                        }
+                        expr::PropVariant::Seq { .. } => todo!(),
+                    }],
                 ),
                 unifier.unit_meta(),
             ));
