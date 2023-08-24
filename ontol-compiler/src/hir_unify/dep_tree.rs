@@ -255,13 +255,11 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                                 // assign to existing sub group
                                 group.push(expression);
                                 break None;
-                            } else {
-                                if !self.seq_labels.contains(next_unscoped_var.0 as usize)
-                                    && next_non_seq_label.is_none()
-                                {
-                                    // Record that this is not a seq label
-                                    next_non_seq_label = Some(next_unscoped_var);
-                                }
+                            } else if !self.seq_labels.contains(next_unscoped_var.0 as usize)
+                                && next_non_seq_label.is_none()
+                            {
+                                // Record that this is not a seq label
+                                next_non_seq_label = Some(next_unscoped_var);
                             }
                         } else {
                             // unable to assign to an existing group
