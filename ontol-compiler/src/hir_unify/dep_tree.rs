@@ -236,41 +236,53 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                 .map(|var| ontol_hir::Var(var as u32));
 
             if let Some(first_unscoped_var) = self.next_unscoped_var(&mut difference) {
-                if self.seq_labels.contains(first_unscoped_var.0 as usize) {
-                    panic!("seq labels contains {first_unscoped_var}");
+                let mut next_non_seq_label: Option<ontol_hir::Var> = None;
+
+                // Needs to assign to a subgroup. Algorithm:
+                // For all unscoped vars, check if there already exists a subgroup already assigned to
+                // put that variable into scope, and reuse that group.
+                // If no such group exists, create a new group using the _first unscoped variable_.
+                //
+                // This algorithm should create fewer code branches.
+
+                if let Some(group) = sub_groups.get_mut(&first_unscoped_var) {
+                    // assign to existing sub group
+                    group.push(expression);
                 } else {
-                    // Needs to assign to a subgroup. Algorithm:
-                    // For all unscoped vars, check if there already exists a subgroup already assigned to
-                    // put that variable into scope, and reuse that group.
-                    // If no such group exists, create a new group using the _first unscoped variable_.
-                    //
-                    // This algorithm should create fewer code branches.
-
-                    if let Some(group) = sub_groups.get_mut(&first_unscoped_var) {
-                        // assign to existing sub group
-                        group.push(expression);
-                    } else {
-                        let unassigned_expression = loop {
-                            if let Some(next_unscoped_var) = self.next_unscoped_var(&mut difference)
-                            {
-                                if let Some(group) = sub_groups.get_mut(&next_unscoped_var) {
-                                    // assign to existing sub group
-                                    group.push(expression);
-                                    break None;
-                                }
+                    let unassigned_expression = loop {
+                        if let Some(next_unscoped_var) = self.next_unscoped_var(&mut difference) {
+                            if let Some(group) = sub_groups.get_mut(&next_unscoped_var) {
+                                // assign to existing sub group
+                                group.push(expression);
+                                break None;
                             } else {
-                                // unable to assign to an existing group
-                                break Some(expression);
+                                if !self.seq_labels.contains(next_unscoped_var.0 as usize)
+                                    && next_non_seq_label.is_none()
+                                {
+                                    // Record that this is not a seq label
+                                    next_non_seq_label = Some(next_unscoped_var);
+                                }
                             }
-                        };
-
-                        if let Some(expression) = unassigned_expression {
-                            // assign to new sub group
-                            sub_groups
-                                .entry(first_unscoped_var)
-                                .or_default()
-                                .push(expression);
+                        } else {
+                            // unable to assign to an existing group
+                            break Some(expression);
                         }
+                    };
+
+                    let assignee_var = if self.seq_labels.contains(first_unscoped_var.0 as usize) {
+                        // prefer variable that is not a seq label
+                        if let Some(var) = next_non_seq_label {
+                            var
+                        } else {
+                            first_unscoped_var
+                        }
+                    } else {
+                        first_unscoped_var
+                    };
+
+                    if let Some(expression) = unassigned_expression {
+                        // assign to new sub group
+                        sub_groups.entry(assignee_var).or_default().push(expression);
                     }
                 }
             } else {

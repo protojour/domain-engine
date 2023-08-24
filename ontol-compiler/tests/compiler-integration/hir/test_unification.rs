@@ -266,34 +266,40 @@ fn test_unify_basic_seq_prop_no_default() {
 }
 
 #[test]
-fn test_unify_basic_seq_prop_element_then_rest() {
+fn test_unify_basic_seq_prop_element_iter_mix() {
     let output = test_unify(
         "
         (struct ($b)
             (prop $b S:0:0 (#u $a))
             (prop $b S:0:1 (seq (@d) (iter #u $b)))
+            (prop $b S:0:2 (#u $c))
         )
         ",
         "
         (struct ($c)
             (prop $c S:1:1
-                (seq (@d) (#u $a) (iter #u $b))
+                (seq (@d) (#u $a) (iter #u $b) (#u $c))
             )
         )
         ",
     );
     let expected = indoc! {"
         |$b| (struct ($c)
-            (match-prop $a S:0:0
-                (($a)
-                    (match-prop $b S:0:1
-                        ((seq $d)
-                            (prop $c S:1:1
-                                (#u
-                                    (sequence ($e)
-                                        (push $e #u $a)
-                                        (iter $d ($_ $b)
-                                            (push $e #u $b)
+            (match-prop $b S:0:0
+                (($_ $a)
+                    (match-prop $b S:0:2
+                        (($_ $c)
+                            (match-prop $b S:0:1
+                                ((seq $d)
+                                    (prop $c S:1:1
+                                        (#u
+                                            (sequence ($e)
+                                                (push $e #u $a)
+                                                (for-each $d ($_ $b)
+                                                    (push $e #u $b)
+                                                )
+                                                (push $e #u $c)
+                                            )
                                         )
                                     )
                                 )
