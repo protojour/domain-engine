@@ -118,14 +118,14 @@ impl<L: Lang> Parser<L> {
             }
             ("prop", next) => self.parse_prop(Optional(false), next),
             ("prop?", next) => self.parse_prop(Optional(true), next),
-            ("seq", next) => {
+            ("decl-seq", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
                 let (_, next) = parse_rparen(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(Kind::Seq(
+                    self.make_node(Kind::DeclSeq(
                         self.make_label(label),
                         Attribute {
                             rel: Box::new(rel),
@@ -150,17 +150,29 @@ impl<L: Lang> Parser<L> {
                     next,
                 ))
             }
+            ("sequence", next) => {
+                let (binder, next) = self.parse_binder(next)?;
+                let (children, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(Kind::Sequence(binder, children)), next))
+            }
             ("gen", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (binder, next) = self.parse_iter_binder(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(Kind::Gen(seq_var, binder, body)), next))
             }
-            ("iter", next) => {
+            ("for-each", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
-                let (binder, next) = self.parse_iter_binder(next)?;
+                let ((rel, val), next) = parse_paren_delimited(next, |next| {
+                    let (rel, next) = self.parse_pattern_binding(next)?;
+                    let (val, next) = self.parse_pattern_binding(next)?;
+                    Ok(((rel, val), next))
+                })?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(Kind::Iter(seq_var, binder, body)), next))
+                Ok((
+                    self.make_node(Kind::ForEach(seq_var, (rel, val), body)),
+                    next,
+                ))
             }
             ("push", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;

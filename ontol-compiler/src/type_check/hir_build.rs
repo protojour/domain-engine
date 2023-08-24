@@ -196,7 +196,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 TypedHirNode(
-                    ontol_hir::Kind::Seq(
+                    ontol_hir::Kind::DeclSeq(
                         TypedLabel { label, ty: seq_ty },
                         ontol_hir::Attribute {
                             rel: Box::new(self.unit_node_no_span()),

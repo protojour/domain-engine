@@ -182,18 +182,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?
                 };
 
-                let gen_node = TypedHirNode(
-                    ontol_hir::Kind::Gen(
-                        gen_scope.input_seq,
-                        ontol_hir::IterBinder {
-                            seq: ontol_hir::Binding::Binder(TypedBinder {
-                                var: gen_scope.output_seq,
-                                ty: seq_ty,
-                            }),
-                            rel: hir_rel_binding,
-                            val: hir_val_binding,
+                let unit_meta = self.unit_meta();
+                let seq_node = TypedHirNode(
+                    ontol_hir::Kind::Sequence(
+                        TypedBinder {
+                            var: gen_scope.output_seq,
+                            ty: seq_ty,
                         },
-                        vec![push_unified.node],
+                        vec![TypedHirNode(
+                            ontol_hir::Kind::ForEach(
+                                gen_scope.input_seq,
+                                (hir_rel_binding, hir_val_binding),
+                                vec![push_unified.node],
+                            ),
+                            unit_meta,
+                        )],
                     ),
                     Meta {
                         ty: seq_ty,
@@ -213,7 +216,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                     ontol_hir::Kind::Unit,
                                     self.unit_meta(),
                                 )),
-                                val: Box::new(gen_node),
+                                val: Box::new(seq_node),
                             })],
                         ),
                         expr_meta.hir_meta,
@@ -249,18 +252,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?
                 };
 
-                let gen_node = TypedHirNode(
-                    ontol_hir::Kind::Gen(
-                        gen_scope.input_seq,
-                        ontol_hir::IterBinder {
-                            seq: ontol_hir::Binding::Binder(TypedBinder {
-                                var: gen_scope.output_seq,
-                                ty: seq_ty,
-                            }),
-                            rel: hir_rel_binding,
-                            val: hir_val_binding,
+                let unit_meta = self.unit_meta();
+                let seq_node = TypedHirNode(
+                    ontol_hir::Kind::Sequence(
+                        TypedBinder {
+                            var: gen_scope.output_seq,
+                            ty: seq_ty,
                         },
-                        vec![push_unified.node],
+                        vec![TypedHirNode(
+                            ontol_hir::Kind::ForEach(
+                                gen_scope.input_seq,
+                                (hir_rel_binding, hir_val_binding),
+                                vec![push_unified.node],
+                            ),
+                            unit_meta,
+                        )],
                     ),
                     Meta {
                         ty: seq_ty,
@@ -270,7 +276,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: gen_node,
+                    node: seq_node,
                 })
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {

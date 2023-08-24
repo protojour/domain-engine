@@ -82,7 +82,7 @@ macro_rules! visitor_trait_methods {
                         self.visit_node(index + 1, node);
                     }
                 }
-                Kind::Seq(label, spec) => {
+                Kind::DeclSeq(label, spec) => {
                     self.visit_label(label.$label());
                     self.visit_node(0, borrow!($ref spec.rel));
                     self.visit_node(1, borrow!($ref spec.val));
@@ -96,11 +96,17 @@ macro_rules! visitor_trait_methods {
                 Kind::Prop(optional, struct_var, prop_id, variants) => {
                     self.visit_prop(optional, struct_var, prop_id, variants);
                 }
-                Kind::MatchProp(struct_var, id, arms) => {
+                Kind::MatchProp(struct_var, prop_id, arms) => {
                     self.visit_var(struct_var);
-                    self.visit_property_id(id);
+                    self.visit_property_id(prop_id);
                     for (index, arm) in arms.$iter().enumerate() {
                         self.visit_match_arm(index, arm);
+                    }
+                }
+                Kind::Sequence(binder, children) => {
+                    self.visit_binder(binder.$var());
+                    for (index, child) in children.$iter().enumerate() {
+                        self.visit_node(index, child);
                     }
                 }
                 Kind::Gen(seq_var, binder, children) => {
@@ -110,9 +116,10 @@ macro_rules! visitor_trait_methods {
                         self.visit_node(index, child);
                     }
                 }
-                Kind::Iter(seq_var, binder, children) => {
+                Kind::ForEach(seq_var, (rel, val), children) => {
                     self.visit_var(seq_var);
-                    self.visit_iter_binder(binder);
+                    self.traverse_pattern_binding(rel);
+                    self.traverse_pattern_binding(val);
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }

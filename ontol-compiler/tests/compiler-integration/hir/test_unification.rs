@@ -251,8 +251,52 @@ fn test_unify_basic_seq_prop_no_default() {
                 ((seq $d)
                     (prop $c S:1:1
                         (#u
-                            (gen $d ($e $_ $a)
-                                (push $e #u $a)
+                            (sequence ($e)
+                                (for-each $d ($_ $a)
+                                    (push $e #u $a)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_basic_seq_prop_element_then_rest() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop $b S:0:0 (#u $a))
+            (prop $b S:0:1 (seq (@d) (iter #u $b)))
+        )
+        ",
+        "
+        (struct ($c)
+            (prop $c S:1:1
+                (seq (@d) (#u $a) (iter #u $b))
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($c)
+            (match-prop $a S:0:0
+                (($a)
+                    (match-prop $b S:0:1
+                        ((seq $d)
+                            (prop $c S:1:1
+                                (#u
+                                    (sequence ($e)
+                                        (push $e #u $a)
+                                        (iter $d ($_ $a)
+                                            (push $e #u $a)
+                                        )
+                                    )
+                                )
                             )
                         )
                     )
@@ -307,15 +351,19 @@ fn test_unify_seq_prop_deep() {
                 ((seq $f)
                     (prop $d O:0:0
                         (#u
-                            (gen $f ($h $_ $c)
-                                (push $h #u
-                                    (struct ($e)
-                                        (match-prop $c S:1:1
-                                            ((seq $g)
-                                                (prop $e O:1:1
-                                                    (#u
-                                                        (gen $g ($i $_ $a)
-                                                            (push $i #u (map $a))
+                            (sequence ($h)
+                                (for-each $f ($_ $c)
+                                    (push $h #u
+                                        (struct ($e)
+                                            (match-prop $c S:1:1
+                                                ((seq $g)
+                                                    (prop $e O:1:1
+                                                        (#u
+                                                            (sequence ($i)
+                                                                (for-each $g ($_ $a)
+                                                                    (push $i #u (map $a))
+                                                                )
+                                                            )
                                                         )
                                                     )
                                                 )
@@ -357,8 +405,10 @@ fn test_unify_basic_seq_prop_default_value() {
                 ((seq-default $d)
                     (prop $c S:1:1
                         (#u
-                            (gen $d ($e $_ $a)
-                                (push $e #u $a)
+                            (sequence ($e)
+                                (for-each $d ($_ $a)
+                                    (push $e #u $a)
+                                )
                             )
                         )
                     )
@@ -390,7 +440,7 @@ fn test_unify_flat_map1() {
         )
         ",
         "
-        (seq (@d)
+        (decl-seq (@d)
             #u
             (struct ($f)
                 (prop $f O:0:0
@@ -408,18 +458,20 @@ fn test_unify_flat_map1() {
             (($_ $b)
                 (match-prop $c S:0:0
                     ((seq $d)
-                        (gen $d ($g $_ $e)
-                            (push $g #u
-                                (struct ($f)
-                                    (match-prop $e S:2:2
-                                        (($_ $a)
-                                            (prop $f O:0:0
-                                                (#u $a)
+                        (sequence ($g)
+                            (for-each $d ($_ $e)
+                                (push $g #u
+                                    (struct ($f)
+                                        (match-prop $e S:2:2
+                                            (($_ $a)
+                                                (prop $f O:0:0
+                                                    (#u $a)
+                                                )
                                             )
                                         )
-                                    )
-                                    (prop $f O:1:1
-                                        (#u $b)
+                                        (prop $f O:1:1
+                                            (#u $b)
+                                        )
                                     )
                                 )
                             )
@@ -760,8 +812,10 @@ fn test_unify_seq_scope_escape1() {
                             ((seq $a)
                                 (prop $e O:1:1
                                     (#u
-                                        (gen $a ($f $_ $b)
-                                            (push $f #u $b)
+                                        (sequence ($f)
+                                            (for-each $a ($_ $b)
+                                                (push $f #u $b)
+                                            )
                                         )
                                     )
                                 )
@@ -831,8 +885,10 @@ fn test_unify_seq_scope_escape2() {
                             ((seq $c)
                                 (prop $h O:1:1
                                     (#u
-                                        (gen $c ($j $_ $d)
-                                            (push $j #u $d)
+                                        (sequence ($j)
+                                            (for-each $c ($_ $d)
+                                                (push $j #u $d)
+                                            )
                                         )
                                     )
                                 )
@@ -847,8 +903,10 @@ fn test_unify_seq_scope_escape2() {
                                                 ((seq $a)
                                                     (prop $i O:2:0
                                                         (#u
-                                                            (gen $a ($k $_ $b)
-                                                                (push $k #u $b)
+                                                            (sequence ($k)
+                                                                (for-each $a ($_ $b)
+                                                                    (push $k #u $b)
+                                                                )
                                                             )
                                                         )
                                                     )

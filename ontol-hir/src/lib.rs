@@ -62,20 +62,36 @@ type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
 /// The syntax kind of a node.
 #[derive(Clone)]
 pub enum Kind<'a, L: Lang> {
+    /// A variable reference.
     Var(Var),
+    /// A unit value.
     Unit,
+    /// A 64 bit signed integer
     I64(i64),
+    /// A 64 bit float
     F64(f64),
+    /// A string
     String(String),
+    /// A let expression
     Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
+    /// A function call
     Call(BuiltinProc, Nodes<'a, L>),
+    /// A map call
     Map(Box<L::Node<'a>>),
-    Seq(L::Label<'a>, Attribute<Box<L::Node<'a>>>),
+    /// Standalone sequence in declarative mode.
+    DeclSeq(L::Label<'a>, Attribute<Box<L::Node<'a>>>),
+    /// A struct with associated binder. The value is the struct.
     Struct(L::Binder<'a>, Nodes<'a, L>),
+    /// A property definition associated with a struct var in scope
     Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
+    /// A property matcher/unpacker associated with a struct var
     MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
+    /// A sequence with associated binder. The value is the sequence.
+    Sequence(L::Binder<'a>, Nodes<'a, L>),
     Gen(Var, IterBinder<'a, L>, Nodes<'a, L>),
-    Iter(Var, IterBinder<'a, L>, Nodes<'a, L>),
+    /// Iterate attributes in sequence var,
+    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes<'a, L>),
+    /// Push an attribute to the end of a sequence
     Push(Var, Attribute<Box<L::Node<'a>>>),
 }
 

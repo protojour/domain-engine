@@ -230,9 +230,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::Seq(_label, _attr) => {
-                todo!("seq");
-            }
             ontol_hir::Kind::Struct(binder, nodes) => {
                 let def_id = ty.get_single_def_id().unwrap();
                 let local = self.builder.append(
@@ -403,13 +400,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::Gen(seq_var, iter_binder, nodes) => {
-                let seq_local = self.var_local(seq_var);
+            ontol_hir::Kind::Sequence(binder, nodes) => {
                 let val_ty = match ty {
                     Type::Seq(_, val_ty) => val_ty,
                     _ => panic!("Not a sequence"),
                 };
-                let out_seq = self.builder.append(
+                let seq_local = self.builder.append(
                     block,
                     Ir::CallBuiltin(
                         BuiltinProc::NewSeq,
@@ -420,6 +416,18 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     Delta(1),
                     span,
                 );
+                self.gen_in_scope(
+                    &[(seq_local, ontol_hir::Binding::Binder(binder))],
+                    nodes.into_iter(),
+                    block,
+                );
+                self.builder.append_pop_until(block, seq_local, span);
+            }
+            ontol_hir::Kind::Gen(..) => {
+                unreachable!()
+            }
+            ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
+                let seq_local = self.var_local(seq_var);
                 let counter = self
                     .builder
                     .append(block, Ir::I64(0, DefId::unit()), Delta(1), span);
@@ -428,15 +436,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let elem_rel_local = self.builder.top_plus(1);
                 let elem_val_local = self.builder.top_plus(2);
 
-                let iter_body_index = {
+                let for_each_body_index = {
                     let mut iter_block = self.builder.new_block(Delta(2), span);
 
                     self.gen_in_scope(
-                        &[
-                            (out_seq, iter_binder.seq),
-                            (elem_rel_local, iter_binder.rel),
-                            (elem_val_local, iter_binder.val),
-                        ],
+                        &[(elem_rel_local, rel_binding), (elem_val_local, val_binding)],
                         nodes.into_iter(),
                         &mut iter_block,
                     );
@@ -450,15 +454,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append(
                     block,
-                    Ir::Iter(seq_local, counter, iter_body_index),
+                    Ir::Iter(seq_local, counter, for_each_body_index),
                     Delta(0),
                     span,
                 );
 
-                self.builder.append_pop_until(block, out_seq, span);
-            }
-            ontol_hir::Kind::Iter(..) => {
-                todo!("iter");
+                self.builder.append_pop_until(block, counter, span);
             }
             ontol_hir::Kind::Push(seq_var, attr) => {
                 let top = self.builder.top();
@@ -475,6 +476,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     .append(block, Ir::AppendAttr2(seq_local), Delta(-2), span);
 
                 self.builder.append_pop_until(block, top, span);
+            }
+            ontol_hir::Kind::DeclSeq(..) => {
+                unreachable!("decl-seq is only declarative, not used in code generation");
             }
         }
     }

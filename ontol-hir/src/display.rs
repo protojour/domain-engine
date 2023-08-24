@@ -79,8 +79,8 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            Kind::Seq(label, attr) => {
-                write!(f, "{indent}(seq ({})", label.label())?;
+            Kind::DeclSeq(label, attr) => {
+                write!(f, "{indent}(decl-seq ({})", label.label())?;
                 let multi = self.print_all(
                     Sep::Space,
                     [attr.rel.as_ref(), attr.val.as_ref()]
@@ -113,14 +113,20 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
+            Kind::Sequence(binder, children) => {
+                write!(f, "{indent}(sequence ({})", binder.var())?;
+                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
             Kind::Gen(var, iter_binder, children) => {
                 write!(f, "{indent}(gen {var} {iter_binder}",)?;
                 let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Iter(var, iter_binder, children) => {
-                write!(f, "{indent}(iter {var} {iter_binder}",)?;
+            Kind::ForEach(var, (rel, val), children) => {
+                write!(f, "{indent}(for-each {var} ({rel} {val})")?;
                 let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))

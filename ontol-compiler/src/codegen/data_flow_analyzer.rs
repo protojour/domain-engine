@@ -93,8 +93,8 @@ where
                 var_set
             }
             ontol_hir::Kind::Map(node) => self.analyze_node(node),
-            ontol_hir::Kind::Seq(_, _) => {
-                todo!()
+            ontol_hir::Kind::DeclSeq(_, _) => {
+                unreachable!()
             }
             ontol_hir::Kind::Struct(_, body) => {
                 let mut var_set = VarSet::default();
@@ -188,7 +188,26 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Iter(..) => todo!(),
+            ontol_hir::Kind::Sequence(_, body) => {
+                let mut var_set = VarSet::default();
+                for node in body {
+                    var_set.union_with(&self.analyze_node(node));
+                }
+                var_set
+            }
+            ontol_hir::Kind::ForEach(var, (rel_binding, val_binding), body) => {
+                if let ontol_hir::Binding::Binder(binder) = rel_binding {
+                    self.add_dep(binder.var, *var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = val_binding {
+                    self.add_dep(binder.var, *var);
+                }
+                let mut var_set = VarSet::default();
+                for node in body {
+                    var_set.union_with(&self.analyze_node(node));
+                }
+                var_set
+            }
             ontol_hir::Kind::Push(var, attr) => {
                 let mut var_set = self.analyze_node(&attr.rel);
                 var_set.union_with(&self.analyze_node(&attr.val));

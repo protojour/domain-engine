@@ -93,7 +93,7 @@ impl<'m> ExprBuilder<'m> {
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
-            ontol_hir::Kind::Seq(typed_label, attr) => {
+            ontol_hir::Kind::DeclSeq(typed_label, attr) => {
                 let rel = self.hir_to_expr(&attr.rel);
                 let val = self.hir_to_expr(&attr.val);
 
@@ -135,10 +135,13 @@ impl<'m> ExprBuilder<'m> {
             ontol_hir::Kind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
             }
+            ontol_hir::Kind::Sequence(..) => {
+                todo!()
+            }
             ontol_hir::Kind::Gen(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Iter(..) => {
+            ontol_hir::Kind::ForEach(..) => {
                 todo!()
             }
             ontol_hir::Kind::Push(..) => {
