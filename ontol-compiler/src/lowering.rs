@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef, Variables},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, TypePath},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     Compiler, Src,
@@ -554,7 +554,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::UnitOrSeq::Unit => unit_expr,
             ast::UnitOrSeq::Seq => {
                 let seq_id = self.compiler.expressions.alloc_expr_id();
-                self.expr(ExprKind::Seq(seq_id, Box::new(unit_expr)), &span)
+                self.expr(
+                    ExprKind::Seq(
+                        seq_id,
+                        vec![ExprSeqElement {
+                            iter: true,
+                            expr: unit_expr,
+                        }],
+                    ),
+                    &span,
+                )
             }
         };
 
@@ -671,32 +680,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Pattern::Seq(elements) => {
                 if elements.is_empty() {
                     return Err((
-                        CompileError::TODO(smart_format!("requires one element")),
+                        CompileError::TODO(smart_format!("requires at least one element")),
                         span.clone(),
                     ));
                 }
-                if elements.len() > 1 {
-                    self.compiler.errors.push(
-                        CompileError::TODO(smart_format!(
-                            "maximum one element per sequence for now"
-                        ))
-                        .spanned(&self.src.span(&span)),
-                    );
-                }
 
-                let (element, _) = elements.into_iter().next().unwrap();
-                if element.spread.is_none() {
-                    self.compiler.errors.push(
-                        CompileError::TODO(smart_format!("requires spreading (`..`)"))
-                            .spanned(&self.src.span(&span)),
-                    );
+                let mut expr_elements = Vec::with_capacity(elements.len());
+                for (element, _element_span) in elements {
+                    let expr =
+                        self.lower_pattern((element.pattern.0, element.pattern.1), var_table)?;
+                    expr_elements.push(ExprSeqElement {
+                        iter: element.spread.is_some(),
+                        expr,
+                    })
                 }
-
-                let inner =
-                    self.lower_pattern((element.pattern.0, element.pattern.1), var_table)?;
 
                 let seq_id = self.compiler.expressions.alloc_expr_id();
-                Ok(self.expr(ExprKind::Seq(seq_id, Box::new(inner)), &span))
+                Ok(self.expr(ExprKind::Seq(seq_id, expr_elements), &span))
             }
         }
     }

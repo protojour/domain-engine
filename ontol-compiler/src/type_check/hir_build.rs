@@ -191,7 +191,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 };
 
-                let inner_node = self.build_node(inner, Some(val_ty), ctx);
+                if inner.len() != 1 {
+                    return self.error_node(
+                        CompileError::TODO(smart_format!("Standalone seq needs one element")),
+                        &expr.span,
+                    );
+                }
+
+                let inner_node =
+                    self.build_node(&inner.iter().next().unwrap().expr, Some(val_ty), ctx);
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
@@ -484,10 +492,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     })
                                 }
                                 ValueCardinality::Many => match &value.kind {
-                                    ExprKind::Seq(aggr_expr_id, value) => {
-                                        let val_node = self.build_node(value, Some(value_ty), ctx);
-                                        let label = *ctx.label_map.get(aggr_expr_id).unwrap();
+                                    ExprKind::Seq(aggr_expr_id, expr_elements) => {
+                                        let mut hir_elements =
+                                            Vec::with_capacity(expr_elements.len());
+                                        for element in expr_elements {
+                                            let val_node =
+                                                self.build_node(&element.expr, Some(value_ty), ctx);
+                                            hir_elements.push(ontol_hir::SeqPropertyElement {
+                                                iter: element.iter,
+                                                attribute: ontol_hir::Attribute {
+                                                    rel: rel_node.clone(),
+                                                    val: val_node,
+                                                },
+                                            });
+                                        }
 
+                                        let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                                         let seq_ty =
                                             self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
@@ -497,13 +517,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 match_property.property_id.role,
                                                 Role::Object
                                             )),
-                                            elements: vec![ontol_hir::SeqPropertyElement {
-                                                iter: true,
-                                                attribute: ontol_hir::Attribute {
-                                                    rel: rel_node,
-                                                    val: val_node,
-                                                },
-                                            }],
+                                            elements: hir_elements,
                                         })
                                     }
                                     _ => {
@@ -713,7 +727,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            ExprKind::Seq(_, expr) => self.build_implicit_rel_node(ty, expr, prop_span, ctx),
+            ExprKind::Seq(_, elements) => {
+                // FIXME: Unsure how correct this is:
+                for element in elements {
+                    let node = self.build_implicit_rel_node(ty, &element.expr, prop_span, ctx);
+                    if !matches!(node.1.ty, Type::Error) {
+                        return node;
+                    }
+                }
+
+                self.error_node(CompileError::TODO(smart_format!("")), &prop_span)
+            }
             _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
         }
     }

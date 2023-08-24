@@ -179,9 +179,10 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
                 Some(scope_idx_candidate)
             } else {
                 for next_free_var in &mut free_var_iter {
-                    let next_candidate = scope_routing_table.get(&next_free_var).cloned().unwrap();
-                    if next_candidate < scope_idx_candidate {
-                        scope_idx_candidate = next_candidate;
+                    if let Some(next_candidate) = scope_routing_table.get(&next_free_var) {
+                        if *next_candidate < scope_idx_candidate {
+                            scope_idx_candidate = *next_candidate;
+                        }
                     }
                 }
 

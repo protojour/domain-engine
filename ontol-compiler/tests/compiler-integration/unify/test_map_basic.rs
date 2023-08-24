@@ -487,29 +487,76 @@ fn test_sequence_flat_map1() {
     });
 }
 
-// BUG: This should work at least one way:
+// FIXME: This should work both ways in principe, even if the backward mapping is fallible:
 #[test]
-fn test_sequence_composer1() {
+fn test_sequence_composer_no_iteration() {
     "
     type foo {
-        rel .'a': string
-        rel .'b': string
+        rel .'a': i64
+        rel .'b': i64
     }
     type bar {
-        rel .'ab': [string]
+        rel .'ab': [i64]
     }
 
-    map {
+    map => {
         foo {
             'a': a
             'b': b
         }
         bar {
-            'ab': [a b] // ERROR TODO: maximum one element per sequence for now// ERROR TODO: requires spreading (`..`)// ERROR TODO: Incompatible aggregation group
+            'ab': [a b]
         }
     }
     "
-    .compile_fail();
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("foo", "bar"),
+            json!({
+                "a": 1,
+                "b": 2,
+            }),
+            json!({ "ab": [1, 2] }),
+        );
+    });
+}
+
+#[test]
+fn test_sequence_composer_with_iteration() {
+    "
+    type foo {
+        rel .'a': i64
+        rel .'b': [i64]
+        rel .'c': i64
+    }
+    type bar {
+        rel .'abc': [i64]
+    }
+
+    map => {
+        foo {
+            'a': a
+            'b': [..b]
+            'c': c
+        }
+        bar {
+            'abc': [a ..b c]
+        }
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("foo", "bar"),
+            json!({
+                "a": 1,
+                "b": [2, 3],
+                "c": 4
+            }),
+            json!({
+                "abc": [1, 2, 3, 4]
+            }),
+        );
+    });
 }
 
 #[test]

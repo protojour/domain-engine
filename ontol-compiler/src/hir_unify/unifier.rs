@@ -94,28 +94,110 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
                 // TODO: let else when that formats in rustfmt
-                if let expr::PropVariant::Singleton(attr) = prop.variant {
-                    let const_scope = self.const_scope();
-                    let rel = self.unify(const_scope.clone(), attr.rel)?;
-                    let val = self.unify(const_scope, attr.val)?;
+                match prop.variant {
+                    expr::PropVariant::Singleton(attr) => {
+                        let const_scope = self.const_scope();
+                        let rel = self.unify(const_scope.clone(), attr.rel)?;
+                        let val = self.unify(const_scope, attr.val)?;
 
-                    Ok(UnifiedNode {
-                        typed_binder: None,
-                        node: TypedHirNode(
-                            ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
-                                prop.struct_var,
-                                prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel: Box::new(rel.node),
-                                    val: Box::new(val.node),
-                                })],
+                        Ok(UnifiedNode {
+                            typed_binder: None,
+                            node: TypedHirNode(
+                                ontol_hir::Kind::Prop(
+                                    ontol_hir::Optional(false),
+                                    prop.struct_var,
+                                    prop.prop_id,
+                                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                        rel: Box::new(rel.node),
+                                        val: Box::new(val.node),
+                                    })],
+                                ),
+                                expr_meta.hir_meta,
                             ),
-                            expr_meta.hir_meta,
-                        ),
-                    })
-                } else {
-                    panic!("expected gen scope");
+                        })
+                    }
+                    expr::PropVariant::Seq { label, elements } => {
+                        if elements.is_empty() {
+                            panic!("No elements in seq prop");
+                        }
+                        let first_element = elements.first().unwrap();
+
+                        // FIXME: This is _probably_ incorrect.
+                        // The type of the elements in the sequence must be the common supertype of all the elements.
+                        // So the type needs to be carried over from somewhere else.
+                        let seq_ty = self.types.intern(Type::Seq(
+                            first_element.attribute.rel.hir_meta().ty,
+                            first_element.attribute.val.hir_meta().ty,
+                        ));
+
+                        let mut sequence_body = Vec::with_capacity(elements.len());
+
+                        for element in elements {
+                            if element.iter {
+                                panic!("Iter element with const scope. Scope must be Gen");
+                            }
+
+                            let mut free_vars = VarSet::default();
+                            free_vars
+                                .0
+                                .union_with(&element.attribute.rel.meta().free_vars.0);
+                            free_vars
+                                .0
+                                .union_with(&element.attribute.val.meta().free_vars.0);
+
+                            let unit_meta = self.unit_meta();
+
+                            let const_scope = self.const_scope();
+                            let push_unified = self.unify(
+                                const_scope,
+                                expr::Expr(
+                                    expr::Kind::Push(
+                                        ontol_hir::Var(label.0),
+                                        Box::new(element.attribute),
+                                    ),
+                                    expr::Meta {
+                                        hir_meta: unit_meta,
+                                        free_vars,
+                                    },
+                                ),
+                            )?;
+
+                            sequence_body.push(push_unified.node);
+                        }
+
+                        let sequence_node = TypedHirNode(
+                            ontol_hir::Kind::Sequence(
+                                TypedBinder {
+                                    var: ontol_hir::Var(label.0),
+                                    ty: seq_ty,
+                                },
+                                sequence_body,
+                            ),
+                            Meta {
+                                ty: seq_ty,
+                                span: NO_SPAN,
+                            },
+                        );
+
+                        Ok(UnifiedNode {
+                            typed_binder: None,
+                            node: TypedHirNode(
+                                ontol_hir::Kind::Prop(
+                                    ontol_hir::Optional(false),
+                                    prop.struct_var,
+                                    prop.prop_id,
+                                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                        rel: Box::new(TypedHirNode(
+                                            ontol_hir::Kind::Unit,
+                                            self.unit_meta(),
+                                        )),
+                                        val: Box::new(sequence_node),
+                                    })],
+                                ),
+                                expr_meta.hir_meta,
+                            ),
+                        })
+                    }
                 }
             }
             (expr::Kind::Prop(prop), scope::Kind::Escape(scope_kind)) => {

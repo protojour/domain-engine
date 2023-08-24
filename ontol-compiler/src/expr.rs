@@ -26,7 +26,7 @@ pub enum ExprKind {
         attributes: Box<[ExprStructAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
-    Seq(ExprId, Box<Expr>),
+    Seq(ExprId, Vec<ExprSeqElement>),
     Variable(ExprId),
     ConstI64(i64),
     ConstString(String),
@@ -38,6 +38,12 @@ pub struct ExprStructAttr {
     pub rel: Option<Expr>,
     pub bind_option: bool,
     pub value: Expr,
+}
+
+#[derive(Debug)]
+pub struct ExprSeqElement {
+    pub iter: bool,
+    pub expr: Expr,
 }
 
 #[derive(Debug)]

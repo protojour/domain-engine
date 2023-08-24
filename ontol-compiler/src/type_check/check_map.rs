@@ -245,7 +245,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     )?);
                 }
             }
-            ExprKind::Seq(expr_id, object) => {
+            ExprKind::Seq(expr_id, elements) => {
                 if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
@@ -256,26 +256,42 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
                     ctx.label_map.insert(*expr_id, label);
 
-                    let result = ctx.enter_ctrl::<Result<AggrGroupSet, AggrGroupError>>(|ctx| {
-                        self.analyze_arm(
-                            object,
-                            variables,
-                            Some(CtrlFlowGroup {
-                                label,
-                                bind_depth: ctx.current_ctrl_flow_depth(),
-                            }),
-                            ctx,
-                        )
-                    });
+                    ctx.enter_ctrl(|ctx| {
+                        for element in elements {
+                            // TODO: Skip non-iter?
+                            let result = self.analyze_arm(
+                                &element.expr,
+                                variables,
+                                Some(CtrlFlowGroup {
+                                    label,
+                                    bind_depth: ctx.current_ctrl_flow_depth(),
+                                }),
+                                ctx,
+                            );
 
-                    assert!(result.is_ok());
+                            assert!(result.is_ok());
+                        }
+                    });
                 } else {
                     let outer_bind_depth = ctx.current_ctrl_flow_depth();
 
-                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
-                        let inner_aggr_group =
-                            self.analyze_arm(object, variables, None, ctx).unwrap();
+                    let mut inner_aggr_group = AggrGroupSet::new();
+                    let mut iter_element_count = 0;
 
+                    for element in elements {
+                        if element.iter {
+                            iter_element_count += 1;
+                            ctx.enter_ctrl(|ctx| {
+                                let group = self
+                                    .analyze_arm(&element.expr, variables, None, ctx)
+                                    .unwrap();
+                                inner_aggr_group.join(group);
+                            });
+                        } else {
+                        }
+                    }
+
+                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
                                 ctx.label_map.insert(*expr_id, label);
@@ -289,18 +305,32 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                 Ok(())
                             }
                             Err(error) => {
-                                debug!("Failure: {error:?}");
+                                if iter_element_count > 0 {
+                                    debug!("Failure: {error:?}");
 
-                                self.error(
-                                    CompileError::TODO(smart_format!(
-                                        "Incompatible aggregation group"
-                                    )),
-                                    &expr.span,
-                                );
-                                Err(error)
+                                    self.error(
+                                        CompileError::TODO(smart_format!(
+                                            "Incompatible aggregation group"
+                                        )),
+                                        &expr.span,
+                                    );
+                                    Err(error)
+                                } else {
+                                    // Since there's no iteration this is considered OK
+
+                                    let label = Label(ctx.var_allocator.alloc().0);
+                                    debug!("first arm seq: expr_id={expr_id:?}");
+                                    ctx.ctrl_flow_forest.insert(
+                                        label,
+                                        parent_aggr_group.map(|parent| parent.label),
+                                    );
+                                    ctx.label_map.insert(*expr_id, label);
+
+                                    Ok(())
+                                }
                             }
                         }
-                    })?;
+                    })?
                 }
             }
             ExprKind::Variable(expr_id) => {
