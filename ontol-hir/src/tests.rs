@@ -113,12 +113,12 @@ fn test_mixed() {
 }
 
 #[test]
-fn test_seq() {
+fn test_decl_seq() {
     let src = indoc! {"
         (struct ($a)
             (prop $a S:0:0
                 (#u
-                    (seq (@c) #u $b)
+                    (decl-seq (@c) #u $b)
                 )
             )
         )"
@@ -146,7 +146,9 @@ fn test_map_seq() {
         (struct ($a)
             (match-prop $b S:0:0
                 (($_ $c)
-                    (gen $c ($d $e $f) $d)
+                    (sequence ($d)
+                        (for-each $c ($e $f) $d)
+                    )
                 )
             )
         )"
