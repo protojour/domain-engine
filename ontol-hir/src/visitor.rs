@@ -51,11 +51,6 @@ macro_rules! visitor_trait_methods {
         fn visit_binder(&mut self, var: arg!($ref Var)) {}
 
         #[allow(unused_variables)]
-        fn visit_iter_binder(&mut self, binder: arg!($ref IterBinder<'l, L>)) {
-            self.traverse_iter_binder(binder);
-        }
-
-        #[allow(unused_variables)]
         fn visit_var(&mut self, var: arg!($ref Var)) {}
 
         #[allow(unused_variables)]
@@ -105,13 +100,6 @@ macro_rules! visitor_trait_methods {
                 }
                 Kind::Sequence(binder, children) => {
                     self.visit_binder(binder.$var());
-                    for (index, child) in children.$iter().enumerate() {
-                        self.visit_node(index, child);
-                    }
-                }
-                Kind::Gen(seq_var, binder, children) => {
-                    self.visit_var(seq_var);
-                    self.visit_iter_binder(binder);
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);
                     }
@@ -185,12 +173,6 @@ macro_rules! visitor_trait_methods {
                 Binding::Binder(binder) => self.visit_binder(binder.$var()),
                 Binding::Wildcard => {}
             }
-        }
-
-        fn traverse_iter_binder(&mut self, binder: arg!($ref IterBinder<'l, L>)) {
-            self.traverse_pattern_binding(borrow!($ref binder.seq));
-            self.traverse_pattern_binding(borrow!($ref binder.rel));
-            self.traverse_pattern_binding(borrow!($ref binder.val));
         }
     }
 }

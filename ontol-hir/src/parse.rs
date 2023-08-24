@@ -155,12 +155,6 @@ impl<L: Lang> Parser<L> {
                 let (children, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(Kind::Sequence(binder, children)), next))
             }
-            ("gen", next) => {
-                let (seq_var, next) = parse_dollar_var(next)?;
-                let (binder, next) = self.parse_iter_binder(next)?;
-                let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(Kind::Gen(seq_var, binder, body)), next))
-            }
             ("for-each", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let ((rel, val), next) = parse_paren_delimited(next, |next| {
@@ -346,15 +340,6 @@ impl<L: Lang> Parser<L> {
         parse_paren_delimited(next, |next| {
             let (var, next) = parse_dollar_var(next)?;
             Ok((self.make_binder(var), next))
-        })
-    }
-
-    fn parse_iter_binder<'a, 's>(&self, next: &'s str) -> ParseResult<'s, IterBinder<'a, L>> {
-        parse_paren_delimited(next, |next| {
-            let (seq, next) = self.parse_pattern_binding(next)?;
-            let (rel, next) = self.parse_pattern_binding(next)?;
-            let (val, next) = self.parse_pattern_binding(next)?;
-            Ok((IterBinder { seq, rel, val }, next))
         })
     }
 

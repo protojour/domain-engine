@@ -423,9 +423,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 self.builder.append_pop_until(block, seq_local, span);
             }
-            ontol_hir::Kind::Gen(..) => {
-                unreachable!()
-            }
             ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
                 let seq_local = self.var_local(seq_var);
                 let counter = self

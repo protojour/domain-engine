@@ -292,8 +292,8 @@ fn test_unify_basic_seq_prop_element_then_rest() {
                                 (#u
                                     (sequence ($e)
                                         (push $e #u $a)
-                                        (iter $d ($_ $a)
-                                            (push $e #u $a)
+                                        (iter $d ($_ $b)
+                                            (push $e #u $b)
                                         )
                                     )
                                 )

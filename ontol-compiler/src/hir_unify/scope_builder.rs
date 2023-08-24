@@ -184,9 +184,6 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Gen(..) => {
-                todo!()
-            }
             ontol_hir::Kind::ForEach(..) => {
                 todo!()
             }

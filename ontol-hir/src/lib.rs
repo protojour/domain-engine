@@ -88,7 +88,6 @@ pub enum Kind<'a, L: Lang> {
     MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
     /// A sequence with associated binder. The value is the sequence.
     Sequence(L::Binder<'a>, Nodes<'a, L>),
-    Gen(Var, IterBinder<'a, L>, Nodes<'a, L>),
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes<'a, L>),
     /// Push an attribute to the end of a sequence
@@ -100,24 +99,6 @@ pub struct Optional(pub bool);
 
 #[derive(Clone, Copy, Debug)]
 pub struct HasDefault(pub bool);
-
-/// One of the variants of a property
-pub struct PropVariantOld<'a, L: Lang> {
-    pub dimension: AttrDimension<'a, L>,
-    pub attr: Attribute<Box<L::Node<'a>>>,
-}
-
-impl<'a, L: Lang> Clone for PropVariantOld<'a, L>
-where
-    L::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            dimension: self.dimension.clone(),
-            attr: self.attr.clone(),
-        }
-    }
-}
 
 pub enum PropVariant<'a, L: Lang> {
     Singleton(Attribute<Box<L::Node<'a>>>),
@@ -169,25 +150,6 @@ where
         Self {
             iter: self.iter,
             attribute: self.attribute.clone(),
-        }
-    }
-}
-
-/// The dimension of a property
-#[derive(Debug)]
-pub enum AttrDimension<'a, L: Lang> {
-    /// A single attribute
-    Singular,
-    /// A sequence of attributes, identified by a label
-    /// If `HasDefault`, an undefined property "coerces" into an empty sequence
-    Seq(L::Label<'a>, HasDefault),
-}
-
-impl<'a, L: Lang> Clone for AttrDimension<'a, L> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Singular => Self::Singular,
-            Self::Seq(label, has_default) => Self::Seq(label.clone(), *has_default),
         }
     }
 }
@@ -268,25 +230,6 @@ where
 pub enum Binding<'a, L: Lang> {
     Wildcard,
     Binder(L::Binder<'a>),
-}
-
-pub struct IterBinder<'a, L: Lang> {
-    pub seq: Binding<'a, L>,
-    pub rel: Binding<'a, L>,
-    pub val: Binding<'a, L>,
-}
-
-impl<'a, L: Lang> Clone for IterBinder<'a, L>
-where
-    <L as Lang>::Binder<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            seq: self.seq.clone(),
-            rel: self.rel.clone(),
-            val: self.val.clone(),
-        }
-    }
 }
 
 pub struct VarAllocator {

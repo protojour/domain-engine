@@ -132,10 +132,12 @@ fn test_analyze_seq1() {
                 ((seq-default $c)
                     (prop $a S:0:0
                         (#u
-                            (gen $c ($d $_ $e)
-                                (push $d #u
-                                    (match-prop $e O:1:1
-                                        (($_ $f) $f)
+                            (sequence ($d)
+                                (for-each $c ($_ $e)
+                                    (push $d #u
+                                        (match-prop $e O:1:1
+                                            (($_ $f) $f)
+                                        )
                                     )
                                 )
                             )

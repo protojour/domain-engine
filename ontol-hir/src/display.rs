@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    AttrDimension, Binding, GetKind, GetLabel, GetVar, HasDefault, IterBinder, Kind, Label, Lang,
-    MatchArm, PropPattern, PropVariant, PropVariantOld, SeqPropertyElement, Var,
+    Binding, GetKind, GetLabel, GetVar, HasDefault, Kind, Label, Lang, MatchArm, PropPattern,
+    PropVariant, SeqPropertyElement, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -119,12 +119,6 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Gen(var, iter_binder, children) => {
-                write!(f, "{indent}(gen {var} {iter_binder}",)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
-                self.print_rparen(multi, f)?;
-                Ok(Multiline(true))
-            }
             Kind::ForEach(var, (rel, val), children) => {
                 write!(f, "{indent}(for-each {var} ({rel} {val})")?;
                 let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
@@ -203,34 +197,6 @@ impl<'a, L: Lang> Print<SeqPropertyElement<'a, L>> for Printer<L> {
             f,
         )?;
 
-        self.print_rparen(multi, f)?;
-        Ok(Multiline(true))
-    }
-}
-
-impl<'a, L: Lang> Print<PropVariantOld<'a, L>> for Printer<L> {
-    fn print(
-        self,
-        _sep: Sep,
-        PropVariantOld { dimension, attr }: &PropVariantOld<'a, L>,
-        f: &mut std::fmt::Formatter,
-    ) -> PrintResult {
-        let indent = self.indent;
-        write!(f, "{indent}(")?;
-
-        let sep = match dimension {
-            AttrDimension::Singular => Sep::None,
-            AttrDimension::Seq(label, HasDefault(false)) => {
-                write!(f, "seq ({})", label.label())?;
-                self.indent.indent()
-            }
-            AttrDimension::Seq(label, HasDefault(true)) => {
-                write!(f, "seq-default ({})", label.label())?;
-                self.indent.indent()
-            }
-        };
-
-        let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }
@@ -421,12 +387,6 @@ impl<'a, L: Lang> Display for Binding<'a, L> {
             Self::Wildcard => write!(f, "$_"),
             Self::Binder(binder) => write!(f, "{}", binder.var()),
         }
-    }
-}
-
-impl<'a, L: Lang> Display for IterBinder<'a, L> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} {} {})", self.seq, self.rel, self.val)
     }
 }
 

@@ -172,22 +172,6 @@ where
 
                 var_set
             }
-            ontol_hir::Kind::Gen(var, iter_binder, body) => {
-                if let ontol_hir::Binding::Binder(binder) = iter_binder.seq {
-                    self.add_dep(binder.var, *var);
-                }
-                if let ontol_hir::Binding::Binder(binder) = iter_binder.rel {
-                    self.add_dep(binder.var, *var);
-                }
-                if let ontol_hir::Binding::Binder(binder) = iter_binder.val {
-                    self.add_dep(binder.var, *var);
-                }
-                let mut var_set = VarSet::default();
-                for node in body {
-                    var_set.union_with(&self.analyze_node(node));
-                }
-                var_set
-            }
             ontol_hir::Kind::Sequence(_, body) => {
                 let mut var_set = VarSet::default();
                 for node in body {
