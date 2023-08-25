@@ -48,7 +48,7 @@ impl Namespaces {
     pub fn lookup(&self, search_path: &[PackageId], space: Space, ident: &str) -> Option<DefId> {
         for package in search_path {
             let Some(namespace) = self.namespaces.get(package) else {
-                continue
+                continue;
             };
             if let Some(def_id) = namespace.space(space).get(ident) {
                 return Some(*def_id);
