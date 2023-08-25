@@ -45,7 +45,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     pub fn lower_statement(&mut self, stmt: (ast::Statement, Span)) -> Result<(), ()> {
         match self.stmt_to_def(stmt, BlockContext::NoContext) {
             Ok(root_defs) => {
-                self.root_defs.extend(root_defs.into_iter());
+                self.root_defs.extend(root_defs);
                 Ok(())
             }
             Err(error) => {

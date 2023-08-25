@@ -121,7 +121,7 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
         match self.slices.get(types.as_slice()) {
             Some(slice) => slice,
             None => {
-                let slice = self.mem.bump.alloc_slice_fill_iter(types.into_iter());
+                let slice = self.mem.bump.alloc_slice_fill_iter(types);
                 self.slices.insert(slice);
                 slice
             }
@@ -136,7 +136,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
         match self.slices.get(types.as_slice()) {
             Some(slice) => slice,
             None => {
-                let slice = self.mem.bump.alloc_slice_fill_iter(types.into_iter());
+                let slice = self.mem.bump.alloc_slice_fill_iter(types);
                 self.slices.insert(slice);
                 slice
             }

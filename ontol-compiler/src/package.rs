@@ -154,7 +154,7 @@ impl PackageGraphBuilder {
             .get_mut(&package.reference)
             .expect("package not requested");
         node.found = true;
-        node.dependencies.extend(children.into_iter());
+        node.dependencies.extend(children);
 
         self.parsed_packages.insert(package.package_id, package);
     }

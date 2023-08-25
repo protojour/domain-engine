@@ -287,7 +287,6 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                     .unwrap();
                                 inner_aggr_group.join(group);
                             });
-                        } else {
                         }
                     }
 
@@ -418,7 +417,7 @@ impl AggrGroupSet {
     }
 
     fn join(&mut self, other: AggrGroupSet) {
-        self.set.extend(other.set.into_iter());
+        self.set.extend(other.set);
         self.tallest_depth = core::cmp::max(self.tallest_depth, other.tallest_depth)
     }
 

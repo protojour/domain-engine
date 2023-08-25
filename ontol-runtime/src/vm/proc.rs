@@ -19,7 +19,7 @@ impl Lib {
         opcodes: impl IntoIterator<Item = OpCode>,
     ) -> Procedure {
         let address = Address(self.opcodes.len() as u32);
-        self.opcodes.extend(opcodes.into_iter());
+        self.opcodes.extend(opcodes);
 
         Procedure { address, n_params }
     }

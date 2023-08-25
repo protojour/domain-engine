@@ -13,6 +13,7 @@ members = [
     "ontol-lsp",
     "ontool",
 ]
+resolver = "2"
 
 [workspace.dependencies]
 fnv = "1"

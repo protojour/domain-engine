@@ -104,7 +104,7 @@ fn num() -> impl Parser<char, String, Error = Simple<char>> {
                 )
                 .or_not(),
         )
-        .map(|vec| String::from_iter(vec.into_iter()))
+        .map(String::from_iter)
 }
 
 fn ident() -> impl Parser<char, String, Error = Simple<char>> {
@@ -113,7 +113,7 @@ fn ident() -> impl Parser<char, String, Error = Simple<char>> {
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
         )
-        .map(|vec| String::from_iter(vec.into_iter()))
+        .map(String::from_iter)
 }
 
 fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
@@ -135,7 +135,7 @@ fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
                 .repeated(),
         )
         .then_ignore(just('"'))
-        .map(|vec| String::from_iter(vec.into_iter()))
+        .map(String::from_iter)
 }
 
 fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
@@ -157,7 +157,7 @@ fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
                 .repeated(),
         )
         .then_ignore(just('\''))
-        .map(|vec| String::from_iter(vec.into_iter()))
+        .map(String::from_iter)
 }
 
 fn regex() -> impl Parser<char, String, Error = Simple<char>> {
@@ -171,14 +171,14 @@ fn regex() -> impl Parser<char, String, Error = Simple<char>> {
                 .repeated(),
         )
         .then_ignore(just('/'))
-        .map(|vec| String::from_iter(vec.into_iter()))
+        .map(String::from_iter)
 }
 
 fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
     just("///")
         .ignore_then(just(' ').repeated())
         .ignore_then(take_until(just('\n')))
-        .map(|(vec, _)| Token::DocComment(String::from_iter(vec.into_iter())))
+        .map(|(vec, _)| Token::DocComment(String::from_iter(vec)))
 }
 
 fn special_char(c: char) -> bool {
