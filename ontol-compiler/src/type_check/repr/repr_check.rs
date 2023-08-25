@@ -80,12 +80,9 @@ enum SpanKind {
 impl<'c, 'm> ReprCheck<'c, 'm> {
     /// Check the representation of a type
     pub fn check_repr_root(&mut self) {
-        let def = match self.defs.table.get(&self.root_def_id) {
-            Some(def) => def,
-            None => {
-                // This can happen in case of errors
-                return;
-            }
+        let Some(def) = self.defs.table.get(&self.root_def_id) else {
+            // This can happen in case of errors
+            return;
         };
 
         self.state.do_trace = TRACE_BUILTIN || self.root_def_id.package_id() != ONTOL_PKG;

@@ -102,15 +102,16 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Let(..) => todo!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let (defined_var, dependencies) = match &self.current_prop_analysis_map {
-                    Some(map) => match map.get(&self.current_prop_path) {
-                        Some(prop_analysis) => (
+                    Some(map) => {
+                        let Some(prop_analysis) = map.get(&self.current_prop_path) else {
+                            panic!("Property path not found: {:?}", self.current_prop_path);
+                        };
+
+                        (
                             prop_analysis.defined_var,
                             prop_analysis.dependencies.clone(),
-                        ),
-                        None => {
-                            panic!("Property path not found: {:?}", self.current_prop_path)
-                        }
-                    },
+                        )
+                    }
                     None => (None, VarSet::default()),
                 };
 

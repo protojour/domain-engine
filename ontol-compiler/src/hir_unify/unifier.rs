@@ -93,7 +93,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 node: TypedHirNode(ontol_hir::Kind::Var(var), expr_meta.hir_meta),
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => {
-                // TODO: let else when that formats in rustfmt
                 match prop.variant {
                     expr::PropVariant::Singleton(attr) => {
                         let const_scope = self.const_scope();
@@ -201,130 +200,129 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
             }
             (expr::Kind::Prop(prop), scope::Kind::Escape(scope_kind)) => {
-                // TODO: let else when that formats in rustfmt
-                if let expr::PropVariant::Singleton(attr) = prop.variant {
-                    let rel = self.unify(
-                        scope::Scope((*scope_kind).clone(), scope_meta.clone()),
-                        attr.rel,
-                    )?;
-                    let val = self.unify(scope::Scope(*scope_kind, scope_meta), attr.val)?;
-
-                    Ok(UnifiedNode {
-                        typed_binder: None,
-                        node: TypedHirNode(
-                            ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
-                                prop.struct_var,
-                                prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel: Box::new(rel.node),
-                                    val: Box::new(val.node),
-                                })],
-                            ),
-                            expr_meta.hir_meta,
-                        ),
-                    })
-                } else {
+                let expr::PropVariant::Singleton(attr) = prop.variant else {
                     panic!("expected gen scope");
-                }
+                };
+
+                let rel = self.unify(
+                    scope::Scope((*scope_kind).clone(), scope_meta.clone()),
+                    attr.rel,
+                )?;
+                let val = self.unify(scope::Scope(*scope_kind, scope_meta), attr.val)?;
+
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Prop(
+                            ontol_hir::Optional(false),
+                            prop.struct_var,
+                            prop.prop_id,
+                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: Box::new(rel.node),
+                                val: Box::new(val.node),
+                            })],
+                        ),
+                        expr_meta.hir_meta,
+                    ),
+                })
             }
             (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
-                if let expr::PropVariant::Seq { elements, .. } = prop.variant {
-                    if elements.is_empty() {
-                        panic!("No elements in seq prop");
-                    }
-                    let first_element = elements.first().unwrap();
-
-                    // FIXME: This is _probably_ incorrect.
-                    // The type of the elements in the sequence must be the common supertype of all the elements.
-                    // So the type needs to be carried over from somewhere else.
-                    let seq_ty = self.types.intern(Type::Seq(
-                        first_element.attribute.rel.hir_meta().ty,
-                        first_element.attribute.val.hir_meta().ty,
-                    ));
-
-                    let (rel_binding, val_binding) = *gen_scope.bindings;
-                    let hir_rel_binding = rel_binding.hir_binding();
-                    let hir_val_binding = val_binding.hir_binding();
-
-                    let joined_scope = self.join_attr_scope(rel_binding, val_binding);
-
-                    let mut sequence_body = Vec::with_capacity(elements.len());
-
-                    for element in elements {
-                        let mut free_vars = VarSet::default();
-                        free_vars
-                            .0
-                            .union_with(&element.attribute.rel.meta().free_vars.0);
-                        free_vars
-                            .0
-                            .union_with(&element.attribute.val.meta().free_vars.0);
-
-                        let unit_meta = self.unit_meta();
-
-                        let push_unified = self.unify(
-                            joined_scope.clone(),
-                            expr::Expr(
-                                expr::Kind::Push(gen_scope.output_seq, Box::new(element.attribute)),
-                                expr::Meta {
-                                    hir_meta: unit_meta,
-                                    free_vars,
-                                },
-                            ),
-                        )?;
-
-                        if element.iter {
-                            sequence_body.push(TypedHirNode(
-                                ontol_hir::Kind::ForEach(
-                                    gen_scope.input_seq,
-                                    (hir_rel_binding, hir_val_binding),
-                                    vec![push_unified.node],
-                                ),
-                                unit_meta,
-                            ));
-                        } else {
-                            sequence_body.push(push_unified.node);
-                        };
-                    }
-
-                    let sequence_node = TypedHirNode(
-                        ontol_hir::Kind::Sequence(
-                            TypedBinder {
-                                var: gen_scope.output_seq,
-                                ty: seq_ty,
-                            },
-                            sequence_body,
-                        ),
-                        Meta {
-                            ty: seq_ty,
-                            span: NO_SPAN,
-                        },
-                    );
-
-                    Ok(UnifiedNode {
-                        typed_binder: None,
-                        node: TypedHirNode(
-                            ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
-                                prop.struct_var,
-                                prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel: Box::new(TypedHirNode(
-                                        ontol_hir::Kind::Unit,
-                                        self.unit_meta(),
-                                    )),
-                                    val: Box::new(sequence_node),
-                                })],
-                            ),
-                            expr_meta.hir_meta,
-                        ),
-                    })
-                } else {
+                let expr::PropVariant::Seq { elements, .. } = prop.variant else {
                     panic!(
                         "unexpected gen scope: prop={:?} scope_input_seq={:?}",
                         prop.prop_id, gen_scope.input_seq
                     );
+                };
+
+                if elements.is_empty() {
+                    panic!("No elements in seq prop");
                 }
+                let first_element = elements.first().unwrap();
+
+                // FIXME: This is _probably_ incorrect.
+                // The type of the elements in the sequence must be the common supertype of all the elements.
+                // So the type needs to be carried over from somewhere else.
+                let seq_ty = self.types.intern(Type::Seq(
+                    first_element.attribute.rel.hir_meta().ty,
+                    first_element.attribute.val.hir_meta().ty,
+                ));
+
+                let (rel_binding, val_binding) = *gen_scope.bindings;
+                let hir_rel_binding = rel_binding.hir_binding();
+                let hir_val_binding = val_binding.hir_binding();
+
+                let joined_scope = self.join_attr_scope(rel_binding, val_binding);
+
+                let mut sequence_body = Vec::with_capacity(elements.len());
+
+                for element in elements {
+                    let mut free_vars = VarSet::default();
+                    free_vars
+                        .0
+                        .union_with(&element.attribute.rel.meta().free_vars.0);
+                    free_vars
+                        .0
+                        .union_with(&element.attribute.val.meta().free_vars.0);
+
+                    let unit_meta = self.unit_meta();
+
+                    let push_unified = self.unify(
+                        joined_scope.clone(),
+                        expr::Expr(
+                            expr::Kind::Push(gen_scope.output_seq, Box::new(element.attribute)),
+                            expr::Meta {
+                                hir_meta: unit_meta,
+                                free_vars,
+                            },
+                        ),
+                    )?;
+
+                    if element.iter {
+                        sequence_body.push(TypedHirNode(
+                            ontol_hir::Kind::ForEach(
+                                gen_scope.input_seq,
+                                (hir_rel_binding, hir_val_binding),
+                                vec![push_unified.node],
+                            ),
+                            unit_meta,
+                        ));
+                    } else {
+                        sequence_body.push(push_unified.node);
+                    };
+                }
+
+                let sequence_node = TypedHirNode(
+                    ontol_hir::Kind::Sequence(
+                        TypedBinder {
+                            var: gen_scope.output_seq,
+                            ty: seq_ty,
+                        },
+                        sequence_body,
+                    ),
+                    Meta {
+                        ty: seq_ty,
+                        span: NO_SPAN,
+                    },
+                );
+
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Prop(
+                            ontol_hir::Optional(false),
+                            prop.struct_var,
+                            prop.prop_id,
+                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: Box::new(TypedHirNode(
+                                    ontol_hir::Kind::Unit,
+                                    self.unit_meta(),
+                                )),
+                                val: Box::new(sequence_node),
+                            })],
+                        ),
+                        expr_meta.hir_meta,
+                    ),
+                })
             }
             (expr::Kind::Seq(_label, attr), scope::Kind::Gen(gen_scope)) => {
                 let seq_ty = self
@@ -574,11 +572,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }
                 }
 
-                let (scope_prop, sub_scoped) = match sub_scoped.sub_trees.into_iter().next() {
-                    Some(val) => val,
-                    None => {
-                        panic!("No sub scoping but free_vars was {ordered_scope_vars:?}")
-                    }
+                let Some((scope_prop, sub_scoped)) = sub_scoped.sub_trees.into_iter().next() else {
+                    panic!("No sub scoping but free_vars was {ordered_scope_vars:?}")
                 };
 
                 let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;

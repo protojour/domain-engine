@@ -175,9 +175,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-                let property_name = match meta.relation_def_kind.value {
-                    DefKind::StringLiteral(literal) => *literal,
-                    _ => return None,
+                let DefKind::StringLiteral(property_name) = *meta.relation_def_kind.value else {
+                    return None;
                 };
 
                 let object_operator_id = self
@@ -555,29 +554,21 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let union_id = DataModifier::UNION | DataModifier::PRIMARY_ID;
 
         if def_variant.modifier.contains(union_id) {
-            let identifies_relationship_id = match properties.identified_by {
-                Some(id) => id,
-                None => {
-                    return Some(OperatorAllocation::Redirect(
-                        def_variant.remove_modifier(union_id),
-                    ));
-                }
+            let Some(identifies_relationship_id) = properties.identified_by else {
+                return Some(OperatorAllocation::Redirect(
+                    def_variant.remove_modifier(union_id),
+                ));
             };
-
-            let id_operator_id = match self.gen_operator_id(SerdeKey::Def(
+            let Some(id_operator_id) = self.gen_operator_id(SerdeKey::Def(
                 def_variant.with_local_mod(DataModifier::PRIMARY_ID),
-            )) {
-                Some(id_operator_id) => id_operator_id,
-                None => {
-                    // This type has no inherent id
-                    return Some(OperatorAllocation::Redirect(
-                        def_variant.remove_modifier(union_id),
-                    ));
-                }
+            )) else {
+                // This type has no inherent id
+                return Some(OperatorAllocation::Redirect(
+                    def_variant.remove_modifier(union_id),
+                ));
             };
 
             let map_def_variant = def_variant.remove_modifier(union_id);
-
             let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
 
             // prevent recursion
@@ -816,12 +807,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let object = meta.relationship.object.0;
 
-                        let prop_key = match meta.relation_def_kind.value {
-                            DefKind::StringLiteral(literal) => *literal,
-                            _ => panic!("Subject property is not a string literal"),
+                        let DefKind::StringLiteral(prop_key) = meta.relation_def_kind.value else {
+                            panic!("Subject property is not a string literal");
                         };
 
-                        (meta, prop_key, object)
+                        (meta, *prop_key, object)
                     }
                     Role::Object => {
                         let meta = self.defs.relationship_meta(property_id.relationship_id);

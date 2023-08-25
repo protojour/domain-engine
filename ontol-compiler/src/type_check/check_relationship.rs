@@ -248,43 +248,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let _subject_ty = self.check_def_shallow(subject.0);
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
-                match subject_def_kind {
-                    DefKind::Type(TypeDef {
-                        rel_type_for: Some(RelationshipId(outer_relationship_id)),
-                        ..
-                    }) => match self.defs.def_kind(*outer_relationship_id) {
-                        DefKind::Relationship(Relationship {
-                            object: outer_object,
-                            ..
-                        }) => match self.def_types.table.get(&outer_object.0).cloned() {
-                            Some(object_ty) => {
-                                // just copy the type, type check done later
-                                self.expected_constant_types.insert(object.0, object_ty);
-
-                                let _object_ty = self.check_def_shallow(object.0);
-
-                                self.relations
-                                    .default_const_objects
-                                    .insert(RelationshipId(*outer_relationship_id), object.0);
-
-                                object_ty
-                            }
-                            None => self.error(
-                                CompileError::TODO(smart_format!(
-                                    "the type of the default relation has not been checked"
-                                )),
-                                span,
-                            ),
-                        },
-                        _ => unreachable!(),
-                    },
-                    _ => self.error(
+                let DefKind::Type(TypeDef {
+                    rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                    ..
+                }) = subject_def_kind
+                else {
+                    return self.error(
                         CompileError::TODO(smart_format!(
                             "default not supported here, must be on a relation type"
                         )),
                         span,
-                    ),
-                }
+                    );
+                };
+
+                let DefKind::Relationship(Relationship {
+                    object: outer_object,
+                    ..
+                }) = self.defs.def_kind(*outer_relationship_id)
+                else {
+                    unreachable!();
+                };
+
+                let Some(object_ty) = self.def_types.table.get(&outer_object.0).cloned() else {
+                    return self.error(
+                        CompileError::TODO(smart_format!(
+                            "the type of the default relation has not been checked"
+                        )),
+                        span,
+                    );
+                };
+
+                // just copy the type, type check done later
+                self.expected_constant_types.insert(object.0, object_ty);
+
+                let _object_ty = self.check_def_shallow(object.0);
+
+                self.relations
+                    .default_const_objects
+                    .insert(RelationshipId(*outer_relationship_id), object.0);
+
+                object_ty
             }
             BuiltinRelationKind::Gen => {
                 let _subject_ty = self.check_def_shallow(subject.0);
@@ -292,48 +295,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
-                let value_generator_def_id = match object_ty {
-                    Type::ValueGenerator(def_id) => *def_id,
-                    _ => {
-                        return self.error(
-                            CompileError::TODO(smart_format!("Not a value generator")),
-                            &object.1,
-                        )
-                    }
+                let Type::ValueGenerator(value_generator_def_id) = object_ty else {
+                    return self.error(
+                        CompileError::TODO(smart_format!("Not a value generator")),
+                        &object.1,
+                    );
                 };
-
-                match subject_def_kind {
-                    DefKind::Type(TypeDef {
-                        rel_type_for: Some(RelationshipId(outer_relationship_id)),
-                        ..
-                    }) => match self.defs.def_kind(*outer_relationship_id) {
-                        DefKind::Relationship(Relationship {
-                            object: outer_object,
-                            ..
-                        }) => match self.def_types.table.get(&outer_object.0).cloned() {
-                            Some(_outer_object_ty) => {
-                                self.relations.value_generators_unchecked.insert(
-                                    RelationshipId(*outer_relationship_id),
-                                    (value_generator_def_id, *span),
-                                );
-                                object_ty
-                            }
-                            None => self.error(
-                                CompileError::TODO(smart_format!(
-                                    "the type of the gen relation has not been checked"
-                                )),
-                                span,
-                            ),
-                        },
-                        _ => unreachable!(),
-                    },
-                    _ => self.error(
+                let DefKind::Type(TypeDef {
+                    rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                    ..
+                }) = subject_def_kind
+                else {
+                    return self.error(
                         CompileError::TODO(smart_format!(
                             "gen not supported here, must be on a relation type"
                         )),
                         span,
-                    ),
-                }
+                    );
+                };
+                let DefKind::Relationship(Relationship {
+                    object: outer_object,
+                    ..
+                }) = self.defs.def_kind(*outer_relationship_id)
+                else {
+                    unreachable!();
+                };
+
+                let Some(_) = self.def_types.table.get(&outer_object.0) else {
+                    return self.error(
+                        CompileError::TODO(smart_format!(
+                            "the type of the gen relation has not been checked"
+                        )),
+                        span,
+                    );
+                };
+
+                self.relations.value_generators_unchecked.insert(
+                    RelationshipId(*outer_relationship_id),
+                    (*value_generator_def_id, *span),
+                );
+                object_ty
             }
             BuiltinRelationKind::Min
             | BuiltinRelationKind::Max
@@ -378,7 +379,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::StringConstant(subject_def_id)
                 if *subject_def_id == self.primitives.empty_string =>
             {
-                if let Err(e) = self.extend_string_pattern_fmt_constructor(
+                if let Err(err) = self.extend_string_pattern_fmt_constructor(
                     relation_def_id,
                     (relationship_id, relationship),
                     object.0,
@@ -387,7 +388,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     *final_state,
                     span,
                 ) {
-                    return e;
+                    return err;
                 }
             }
             Type::Anonymous(_) => {
@@ -397,23 +398,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_def_id(subject.0)
                     .map(|props| &props.constructor);
 
-                match subject_constructor {
-                    Some(Constructor::StringFmt(subject_pattern)) => {
-                        if let Err(e) = self.extend_string_pattern_fmt_constructor(
-                            relation_def_id,
-                            (relationship_id, relationship),
-                            object.0,
-                            object_ty,
-                            subject_pattern.clone(),
-                            *final_state,
-                            span,
-                        ) {
-                            return e;
-                        }
-                    }
-                    _ => {
-                        return self.error(CompileError::ConstructorMismatch, span);
-                    }
+                let Some(Constructor::StringFmt(subject_pattern)) = subject_constructor else {
+                    return self.error(CompileError::ConstructorMismatch, span);
+                };
+
+                if let Err(err) = self.extend_string_pattern_fmt_constructor(
+                    relation_def_id,
+                    (relationship_id, relationship),
+                    object.0,
+                    object_ty,
+                    subject_pattern.clone(),
+                    *final_state,
+                    span,
+                ) {
+                    return err;
                 }
             }
             _ => {
@@ -425,12 +423,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_subject_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
-        let def_id = match ty.get_single_def_id() {
-            Some(def_id) => def_id,
-            None => {
-                self.error(CompileError::SubjectMustBeDomainType, span);
-                return;
-            }
+        let Some(def_id) = ty.get_single_def_id() else {
+            self.error(CompileError::SubjectMustBeDomainType, span);
+            return;
         };
 
         match self.defs.def_kind(def_id) {
@@ -497,39 +492,37 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .clone(),
             ),
             _ => {
-                match self
+                let Some(Constructor::StringFmt(rel_segment)) = self
                     .relations
                     .properties_by_def_id(relation_def_id)
                     .map(Properties::constructor)
-                {
-                    Some(Constructor::StringFmt(rel_segment)) => StringPatternSegment::Property {
-                        property_id: PropertyId::subject(relationship.0),
-                        type_def_id: relation_def_id,
-                        segment: Box::new(rel_segment.clone()),
-                    },
-                    _ => {
-                        return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
-                    }
+                else {
+                    return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
+                };
+
+                StringPatternSegment::Property {
+                    property_id: PropertyId::subject(relationship.0),
+                    type_def_id: relation_def_id,
+                    segment: Box::new(rel_segment.clone()),
                 }
             }
         };
 
         let object_properties = self.relations.properties_by_def_id_mut(object_def);
 
-        match &mut object_properties.constructor {
-            Constructor::Transparent => {
-                object_properties.constructor =
-                    Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
+        if !matches!(&object_properties.constructor, Constructor::Transparent) {
+            return Err(self.error(CompileError::ConstructorMismatch, span));
+        }
 
-                if final_state.0 || !object_ty.is_anonymous() {
-                    // constructors of unnamable types do not need to be processed..
-                    // Register pattern processing for later:
-                    self.relations
-                        .string_pattern_constructors
-                        .insert(object_def);
-                }
-            }
-            _ => return Err(self.error(CompileError::ConstructorMismatch, span)),
+        object_properties.constructor =
+            Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
+
+        if final_state.0 || !object_ty.is_anonymous() {
+            // constructors of unnamable types do not need to be processed..
+            // Register pattern processing for later:
+            self.relations
+                .string_pattern_constructors
+                .insert(object_def);
         }
 
         Ok(())

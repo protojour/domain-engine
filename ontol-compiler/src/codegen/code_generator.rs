@@ -117,15 +117,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         let ty = meta.ty;
         let span = meta.span;
         match kind {
-            ontol_hir::Kind::Var(var) => match self.scope.get(&var) {
-                Some(local) => {
-                    self.builder
-                        .append(block, Ir::Clone(*local), Delta(1), span);
-                }
-                None => {
-                    self.errors.error(CompileError::UnboundVariable, &span);
-                }
-            },
+            ontol_hir::Kind::Var(var) => {
+                let Some(local) = self.scope.get(&var) else {
+                    return self.errors.error(CompileError::UnboundVariable, &span);
+                };
+
+                self.builder
+                    .append(block, Ir::Clone(*local), Delta(1), span);
+            }
             ontol_hir::Kind::Unit => {
                 self.builder.append(
                     block,
@@ -338,9 +337,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             let val_local = self.builder.top();
                             let rel_local = self.builder.top_minus(1);
 
-                            let seq_item_ty = match binder.ty {
-                                Type::Seq(_rel, val) => val,
-                                _ => panic!("Not a sequence"),
+                            let Type::Seq(_, seq_item_ty) = binder.ty else {
+                                panic!("Not a sequence");
                             };
 
                             // Code for generating the default values:
@@ -401,9 +399,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
             }
             ontol_hir::Kind::Sequence(binder, nodes) => {
-                let val_ty = match ty {
-                    Type::Seq(_, val_ty) => val_ty,
-                    _ => panic!("Not a sequence"),
+                let Type::Seq(_, val_ty) = ty else {
+                    panic!("Not a sequence");
                 };
                 let seq_local = self.builder.append(
                     block,
