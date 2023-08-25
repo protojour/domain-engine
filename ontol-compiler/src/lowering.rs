@@ -10,7 +10,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef, Variables},
+    def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, TypePath},
     namespace::Space,
@@ -126,14 +126,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut var_table = ExprVarTable::default();
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
-                let variables = var_table.variables.into_values().collect();
+                let var_allocator = var_table.into_allocator();
                 let direction = match direction {
                     ast::MapDirection::Omni => MapDirection::Omni,
                     ast::MapDirection::Forward => MapDirection::Forwards,
                 };
 
                 Ok([self.define(
-                    DefKind::Mapping(direction, Variables(variables), first, second),
+                    DefKind::Mapping(direction, var_allocator, first, second),
                     &span,
                 )]
                 .into())
@@ -743,8 +743,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
         span: Span,
         var_table: &mut ExprVarTable,
     ) -> Res<Expr> {
-        let id = var_table.get_or_create_var_id(var_ident, self.compiler);
-        Ok(self.expr(ExprKind::Variable(id), &span))
+        let var = var_table.get_or_create_var(var_ident);
+        Ok(self.expr(ExprKind::Variable(var), &span))
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
@@ -938,15 +938,23 @@ enum BlockContext<'a> {
 
 #[derive(Default)]
 struct ExprVarTable {
-    variables: HashMap<String, ExprId>,
+    variables: HashMap<String, ontol_hir::Var>,
 }
 
 impl ExprVarTable {
-    fn get_or_create_var_id(&mut self, ident: String, compiler: &mut Compiler) -> ExprId {
+    fn get_or_create_var(&mut self, ident: String) -> ontol_hir::Var {
+        let length = self.variables.len();
+
         *self
             .variables
             .entry(ident)
-            .or_insert_with(|| compiler.expressions.alloc_expr_id())
+            .or_insert_with(|| ontol_hir::Var(length as u32))
+    }
+
+    /// Create an allocator for allocating the successive variables
+    /// after the explicit ones
+    fn into_allocator(self) -> ontol_hir::VarAllocator {
+        ontol_hir::VarAllocator::from(ontol_hir::Var(self.variables.len() as u32))
     }
 }
 

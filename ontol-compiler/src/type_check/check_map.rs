@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
-use ontol_hir::{visitor::HirMutVisitor, Label};
+use ontol_hir::{visitor::HirMutVisitor, Label, VarAllocator};
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -10,7 +10,7 @@ use crate::{
         task::{ExplicitMapCodegenTask, MapCodegenTask, MapKeyPair},
         type_mapper::TypeMapper,
     },
-    def::{Def, MapDirection, Variables},
+    def::{Def, MapDirection},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
@@ -31,11 +31,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         def: &Def,
         direction: MapDirection,
-        variables: &Variables,
+        var_allocator: &VarAllocator,
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = HirBuildCtx::new(def.span, direction);
+        let mut ctx = HirBuildCtx::new(
+            def.span,
+            direction,
+            VarAllocator::from(*var_allocator.peek_next()),
+        );
 
         {
             let mut map_check = MapCheck {
@@ -47,7 +51,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ctx.arm = Arm::First;
             let _ = map_check.analyze_arm(
                 map_check.expressions.table.get(&first_id).unwrap(),
-                variables,
                 None,
                 &mut ctx,
             )?;
@@ -55,7 +58,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ctx.arm = Arm::Second;
             let _ = map_check.analyze_arm(
                 map_check.expressions.table.get(&second_id).unwrap(),
-                variables,
                 None,
                 &mut ctx,
             )?;
@@ -118,7 +120,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second: &mut TypedHirNode<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        for explicit_var in &mut ctx.expr_variables.values_mut() {
+        for (var, explicit_var) in &mut ctx.expr_variables {
             let first_arm = explicit_var.hir_arms.get(&Arm::First);
             let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
@@ -138,7 +140,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 if actual.is_domain_specific() || expected.is_domain_specific() =>
                             {
                                 ctx.variable_mapping.insert(
-                                    explicit_var.variable,
+                                    *var,
                                     VariableMapping {
                                         first_arm_type: actual,
                                         second_arm_type: expected,
@@ -221,7 +223,6 @@ impl<'c, 'm> MapCheck<'c, 'm> {
     fn analyze_arm(
         &mut self,
         expr: &Expr,
-        variables: &Variables,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
@@ -230,19 +231,14 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         match &expr.kind {
             ExprKind::Call(_, args) => {
                 for arg in args.iter() {
-                    group_set.join(self.analyze_arm(arg, variables, parent_aggr_group, ctx)?);
+                    group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?);
                 }
             }
             ExprKind::Struct {
                 attributes: attrs, ..
             } => {
                 for attr in attrs.iter() {
-                    group_set.join(self.analyze_arm(
-                        &attr.value,
-                        variables,
-                        parent_aggr_group,
-                        ctx,
-                    )?);
+                    group_set.join(self.analyze_arm(&attr.value, parent_aggr_group, ctx)?);
                 }
             }
             ExprKind::Seq(expr_id, elements) => {
@@ -261,7 +257,6 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                             // TODO: Skip non-iter?
                             let result = self.analyze_arm(
                                 &element.expr,
-                                variables,
                                 Some(CtrlFlowGroup {
                                     label,
                                     bind_depth: ctx.current_ctrl_flow_depth(),
@@ -282,9 +277,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         if element.iter {
                             iter_element_count += 1;
                             ctx.enter_ctrl(|ctx| {
-                                let group = self
-                                    .analyze_arm(&element.expr, variables, None, ctx)
-                                    .unwrap();
+                                let group = self.analyze_arm(&element.expr, None, ctx).unwrap();
                                 inner_aggr_group.join(group);
                             });
                         }
@@ -332,8 +325,8 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     })?
                 }
             }
-            ExprKind::Variable(expr_id) => {
-                if let Some(explicit_variable) = ctx.expr_variables.get(expr_id) {
+            ExprKind::Variable(var) => {
+                if let Some(explicit_variable) = ctx.expr_variables.get(var) {
                     // Variable is used more than once
                     if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                         self.error(
@@ -345,40 +338,28 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     debug!("Join existing bound variable");
 
                     group_set.add(explicit_variable.ctrl_group);
+                } else if ctx.arm.is_first() {
+                    ctx.expr_variables.insert(
+                        *var,
+                        ExpressionVariable {
+                            // *var,
+                            ctrl_group: parent_aggr_group,
+                            hir_arms: Default::default(),
+                        },
+                    );
+
+                    group_set.add(parent_aggr_group);
                 } else {
-                    let variable_expr_id = variables
-                        .0
-                        .iter()
-                        .find(|var_expr_id| *var_expr_id == expr_id)
-                        .unwrap();
-
-                    // Register variable
-                    let variable = ctx.var_allocator.alloc();
-
-                    if ctx.arm.is_first() {
-                        ctx.expr_variables.insert(
-                            *variable_expr_id,
-                            ExpressionVariable {
-                                variable,
+                    match ctx.expr_variables.entry(*var) {
+                        Entry::Occupied(_occ) => {
+                            todo!();
+                        }
+                        Entry::Vacant(vac) => {
+                            vac.insert(ExpressionVariable {
                                 ctrl_group: parent_aggr_group,
                                 hir_arms: Default::default(),
-                            },
-                        );
-
-                        group_set.add(parent_aggr_group);
-                    } else {
-                        match ctx.expr_variables.entry(*variable_expr_id) {
-                            Entry::Occupied(_occ) => {
-                                todo!();
-                            }
-                            Entry::Vacant(vac) => {
-                                vac.insert(ExpressionVariable {
-                                    variable,
-                                    ctrl_group: parent_aggr_group,
-                                    hir_arms: Default::default(),
-                                });
-                                group_set.add(parent_aggr_group);
-                            }
+                            });
+                            group_set.add(parent_aggr_group);
                         }
                     }
                 }

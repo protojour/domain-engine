@@ -27,7 +27,7 @@ pub enum ExprKind {
     },
     /// Expression enclosed in sequence brackets: `[expr]`
     Seq(ExprId, Vec<ExprSeqElement>),
-    Variable(ExprId),
+    Variable(ontol_hir::Var),
     ConstI64(i64),
     ConstString(String),
 }

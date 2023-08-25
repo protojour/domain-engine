@@ -232,8 +232,21 @@ pub enum Binding<'a, L: Lang> {
     Binder(L::Binder<'a>),
 }
 
+#[derive(Debug)]
 pub struct VarAllocator {
     next: Var,
+}
+
+impl VarAllocator {
+    pub fn alloc(&mut self) -> Var {
+        let next = self.next;
+        self.next.0 += 1;
+        next
+    }
+
+    pub fn peek_next(&self) -> &Var {
+        &self.next
+    }
 }
 
 impl Default for VarAllocator {
@@ -245,14 +258,6 @@ impl Default for VarAllocator {
 impl From<Var> for VarAllocator {
     fn from(value: Var) -> Self {
         Self { next: value }
-    }
-}
-
-impl VarAllocator {
-    pub fn alloc(&mut self) -> Var {
-        let next = self.next;
-        self.next.0 += 1;
-        next
     }
 }
 

@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ontol_hir::VarAllocator;
 use ontol_runtime::DefId;
 use ordered_float::NotNan;
 use tracing::debug;
@@ -58,8 +59,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_relationship(def_id, relationship, &def.span)
             }
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
-            DefKind::Mapping(direction, variables, first_id, second_id) => {
-                match self.check_map(def, *direction, variables, *first_id, *second_id) {
+            DefKind::Mapping(direction, var_allocator, first_id, second_id) => {
+                match self.check_map(def, *direction, var_allocator, *first_id, *second_id) {
                     Ok(ty) => ty,
                     Err(error) => {
                         debug!("Aggregation group error: {error:?}");
@@ -74,7 +75,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => ty,
                 };
 
-                let mut ctx = HirBuildCtx::new(expr.span, MapDirection::Omni);
+                let mut ctx =
+                    HirBuildCtx::new(expr.span, MapDirection::Omni, VarAllocator::default());
                 let node = self.build_node(&expr, Some(ty), &mut ctx);
 
                 self.codegen_tasks

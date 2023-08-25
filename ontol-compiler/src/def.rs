@@ -5,7 +5,6 @@ use ontol_runtime::{
     ontology::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
     PackageId, RelationshipId, Role,
 };
-use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
@@ -49,7 +48,7 @@ pub enum DefKind<'m> {
     // if there are different variants per type.
     Fn(BuiltinProc),
     Constant(ExprId),
-    Mapping(MapDirection, Variables, ExprId, ExprId),
+    Mapping(MapDirection, ontol_hir::VarAllocator, ExprId, ExprId),
 }
 
 impl<'m> DefKind<'m> {
@@ -85,9 +84,6 @@ pub struct TypeDef<'m> {
 pub struct TypeDefParam {
     pub id: DefParamId,
 }
-
-#[derive(Debug)]
-pub struct Variables(pub SmallVec<[ExprId; 2]>);
 
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);

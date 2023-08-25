@@ -12,14 +12,16 @@ pub struct HirBuildCtx<'m> {
     pub map_kw_span: SourceSpan,
     pub direction: MapDirection,
     pub inference: Inference<'m>,
-    pub expr_variables: FnvHashMap<ExprId, ExpressionVariable>,
+    pub expr_variables: FnvHashMap<ontol_hir::Var, ExpressionVariable>,
     pub label_map: FnvHashMap<ExprId, ontol_hir::Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
     pub variable_mapping: FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
 
-    pub object_to_edge_expr_id: FnvHashMap<ExprId, ExprId>,
+    /// Used for implicit edge/rel param mapping.
+    /// Given an object variable, get its corresponding edge variable
+    pub object_to_edge_var_table: FnvHashMap<ontol_hir::Var, ontol_hir::Var>,
 
     pub partial: bool,
 
@@ -34,7 +36,11 @@ pub struct HirBuildCtx<'m> {
 }
 
 impl<'m> HirBuildCtx<'m> {
-    pub fn new(map_kw_span: SourceSpan, direction: MapDirection) -> Self {
+    pub fn new(
+        map_kw_span: SourceSpan,
+        direction: MapDirection,
+        var_allocator: ontol_hir::VarAllocator,
+    ) -> Self {
         Self {
             map_kw_span,
             direction,
@@ -43,11 +49,11 @@ impl<'m> HirBuildCtx<'m> {
             label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
             variable_mapping: Default::default(),
-            object_to_edge_expr_id: Default::default(),
+            object_to_edge_var_table: Default::default(),
             partial: false,
             arm: Arm::First,
             ctrl_flow_depth: CtrlFlowDepth(0),
-            var_allocator: Default::default(),
+            var_allocator,
             missing_properties: FnvHashMap::default(),
         }
     }
@@ -66,7 +72,6 @@ impl<'m> HirBuildCtx<'m> {
 }
 
 pub struct ExpressionVariable {
-    pub variable: ontol_hir::Var,
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }

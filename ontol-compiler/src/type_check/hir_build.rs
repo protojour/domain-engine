@@ -260,19 +260,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
             },
-            (ExprKind::Variable(expr_id), expected_ty) => {
+            (ExprKind::Variable(var), expected_ty) => {
                 let arm = ctx.arm;
-                let explicit_variable = ctx
-                    .expr_variables
-                    .get_mut(expr_id)
-                    .expect("variable not found");
+                let explicit_variable =
+                    ctx.expr_variables.get_mut(var).expect("variable not found");
 
                 let arm_expr_id = {
                     let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
-                        let expr_id = match arm {
-                            Arm::First => *expr_id,
-                            Arm::Second => self.expressions.alloc_expr_id(),
-                        };
+                        let expr_id = self.expressions.alloc_expr_id();
 
                         ExplicitVariableArm {
                             expr_id,
@@ -290,9 +285,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         &expr.span,
                     ),
                     Some(expected_ty) => {
-                        let variable = explicit_variable.variable;
                         let variable_ref = TypedHirNode(
-                            ontol_hir::Kind::Var(variable),
+                            ontol_hir::Kind::Var(*var),
                             Meta {
                                 ty: expected_ty,
                                 span: expr.span,
@@ -699,28 +693,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         match &object.kind {
-            ExprKind::Variable(object_expr_id) => {
+            ExprKind::Variable(object_var) => {
                 // implicit mapping; for now the object needs to be a variable
-                let edge_expr_id = ctx
-                    .object_to_edge_expr_id
-                    .entry(*object_expr_id)
+                let edge_var = ctx
+                    .object_to_edge_var_table
+                    .entry(*object_var)
                     .or_insert_with(|| {
-                        let edge_expr_id = self.expressions.alloc_expr_id();
+                        let edge_var = ctx.var_allocator.alloc();
                         ctx.expr_variables.insert(
-                            edge_expr_id,
+                            edge_var,
                             ExpressionVariable {
-                                variable: ctx.var_allocator.alloc(),
                                 ctrl_group: None,
                                 hir_arms: Default::default(),
                             },
                         );
-                        edge_expr_id
+                        edge_var
                     });
+
+                let expr_id = self.expressions.alloc_expr_id();
 
                 self.build_node(
                     &Expr {
-                        id: *edge_expr_id,
-                        kind: ExprKind::Variable(*edge_expr_id),
+                        id: expr_id,
+                        kind: ExprKind::Variable(*edge_var),
                         span: prop_span,
                     },
                     Some(ty),
