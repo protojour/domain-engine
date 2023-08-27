@@ -59,6 +59,7 @@ pub type Tags {
 
 type ArticleFilter {
     rel .'slug'?: article_slug
+    // NB: These must be a sets, not lists:
     rel .'tag'?: [string]
     rel .'author'?: [username]
     rel .'favorited'?: [username]

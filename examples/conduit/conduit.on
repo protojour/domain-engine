@@ -2,7 +2,7 @@ use 'conduit_public' as public
 use 'conduit_db' as db
 
 map {
-    db::Article {
+    db.Article {
         'slug': slug
         'title': title
         'description': desc
@@ -12,7 +12,7 @@ map {
         'favorited_by': [fav_user]
         'author': author
     }
-    public::Article {
+    public.Article {
         'slug': slug
         'title': title
         'description': desc
@@ -26,25 +26,25 @@ map {
 }
 
 cond map {
-    db::Article { 'favorited_by': [db::User { 'user_id': id }] }
-    public::Article { 'favorited': true }
-    if [id] contains: memoriam::current_user
+    db.Article { 'favorited_by': [db.User { 'user_id': id }] }
+    public.Article { 'favorited': true }
+    if [id] contains: memoriam.current_user
 }
 
 cond filter {
-    public::ArticleFilter { ..and 'slug': slug }
-    db::Article { 'slug': slug }
+    public.ArticleFilter { ..and 'slug': slug }
+    db.Article { 'slug': slug }
 }
 
 cond filter {
-    public::ArticleFilter { ..and 'tags': [filter_tag] }
-    db::Article { 'tagged': [db::TagEntity { 'tag': tag }] }
+    public.ArticleFilter { ..and 'tags': [filter_tag] }
+    db.Article { 'tagged': [db.TagEntity { 'tag': tag }] }
     if [tag] intersects: [filter_tag]
 }
 
 cond filter {
-    public::ArticleFilter { ..and 'favorited': [favorited] }
-    db::Article {
+    public.ArticleFilter { ..and 'favorited': [favorited] }
+    db.Article {
         ..and
         'favorited_by': [db.User { 'username': username }]
     }
@@ -59,4 +59,52 @@ cond filter {
 cond filter {
     public.ArticleFilter { ..and 'limit': limit }
     [db.Article][..(limit ?: 20)]
+}
+
+// New attempt:
+// Backwards mapping as a forward filter.
+// Ideally, using the mapping, a given set of db.Article may re-produce its filter type!
+// Because the fields of the filter are optional, they are only set when they contributed to the filtering.
+// * Example: If there are two articles in the set, which should have different slugs, then the filter-slug is not defined, since it's a scalar.
+map <= {
+    public.ArticleFilter {
+        // The slug is optional.
+        // Either there is no slug matcher or there is one matcher for a specific slug.
+        'slug': slug
+
+        // Note: No spread for author.
+        // Data-flow wise, the article's author flows up into this field.
+        // Since multi-relations are unordered sets, this is trivial.
+        'author': [author]
+
+        'tags': [..tags]
+        'favorited': [..favorited]
+    }
+
+    // AND-filter: all clauses within the same body.
+    // Also needs to short-circuit in case of undefined filter value.
+    // All fields are short-circuited.
+    db.Article {
+        ?'slug': slug
+        ?'author': db.User {
+            'username': author
+        }
+        ?'tagged': [
+            // TODO: set-theorical operator for match. Sane default: intersection-is-nonempty?
+            ..db.TagEntity { 'tag': tags }
+
+            // ideas:
+            some(..db.TagEntity { 'tag': tags })
+            all(..db.TagEntity { 'tag': tags })
+            equals(..db.TagEntity { 'tag': tags })
+        ]
+        // idea: set-theoretical operation before set notation:
+        ?'favorited_by': exists [
+            ..db.User { 'username': favorited }
+        ]
+    }
+    // In case of OR-filters:
+    // db.Article {
+    //     'more-things': [..]
+    // }
 }
