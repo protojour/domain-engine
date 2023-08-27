@@ -23,6 +23,7 @@ pub enum ExprKind {
     Struct {
         /// The user-supplied type of the struct, None means anonymous
         type_path: Option<TypePath>,
+        modifier: Option<ExprStructModifier>,
         attributes: Box<[ExprStructAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
@@ -30,6 +31,11 @@ pub enum ExprKind {
     Variable(ontol_hir::Var),
     ConstI64(i64),
     ConstString(String),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ExprStructModifier {
+    Match,
 }
 
 #[derive(Debug)]

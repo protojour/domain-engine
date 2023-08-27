@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta, MapDirection, RelParams},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr},
+    expr::{Expr, ExprId, ExprKind, ExprStructAttr, ExprStructModifier},
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::{
@@ -107,6 +107,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (
                 ExprKind::Struct {
                     type_path: Some(type_path),
+                    modifier,
                     attributes,
                 },
                 expected_ty,
@@ -121,6 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let struct_node = self.build_property_matcher(
                     type_path.def_id,
                     struct_ty,
+                    *modifier,
                     attributes,
                     expr.span,
                     ctx,
@@ -150,6 +152,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (
                 ExprKind::Struct {
                     type_path: None,
+                    modifier,
                     attributes,
                 },
                 Some(expected_struct_ty @ Type::Anonymous(def_id)),
@@ -165,7 +168,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                self.build_property_matcher(*def_id, actual_ty, attributes, expr.span, ctx)
+                self.build_property_matcher(
+                    *def_id, actual_ty, *modifier, attributes, expr.span, ctx,
+                )
             }
             (
                 ExprKind::Struct {
@@ -346,6 +351,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         struct_def_id: DefId,
         struct_ty: TypeRef<'m>,
+        modifier: Option<ExprStructModifier>,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
@@ -617,6 +623,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         return self.build_property_matcher(
                             *def_id,
                             value_object_ty,
+                            modifier,
                             attributes,
                             span,
                             ctx,

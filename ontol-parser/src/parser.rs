@@ -5,8 +5,8 @@ use smartstring::alias::String;
 
 use crate::ast::{
     ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, SeqPatternElement,
-    StructPattern, StructPatternAttr, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
-    WithStatement,
+    StructPattern, StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq,
+    UseStatement, Visibility, WithStatement,
 };
 
 use super::{
@@ -296,13 +296,22 @@ fn braced_struct_pattern(
     pattern: impl AstParser<Pattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
     spanned(path())
+        .then(struct_pattern_modifier().or_not())
         .then(
             spanned(struct_pattern_attr(pattern))
                 .repeated()
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|(path, attributes)| StructPattern { path, attributes })
+        .map(|((path, modifier), attributes)| StructPattern {
+            path,
+            modifier,
+            attributes,
+        })
         .labelled("struct pattern")
+}
+
+fn struct_pattern_modifier() -> impl AstParser<Spanned<StructPatternModifier>> {
+    spanned(sym("match", "match").map(|_| StructPatternModifier::Match))
 }
 
 fn struct_pattern_attr(

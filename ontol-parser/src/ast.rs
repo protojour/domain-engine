@@ -132,7 +132,13 @@ pub enum UnitOrSeq {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPattern {
     pub path: Spanned<Path>,
+    pub modifier: Option<Spanned<StructPatternModifier>>,
     pub attributes: Vec<Spanned<StructPatternAttr>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum StructPatternModifier {
+    Match,
 }
 
 /// relation attribute within `struct { .. }`

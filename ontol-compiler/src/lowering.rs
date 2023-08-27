@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, TypePath},
+    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, ExprStructModifier, TypePath},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     Compiler, Src,
@@ -591,6 +591,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
                 }),
+                modifier: None,
                 attributes: [ExprStructAttr {
                     key,
                     rel: None,
@@ -617,6 +618,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     def_id: type_def_id,
                     span: self.src.span(&struct_pat.path.1),
                 }),
+                modifier: struct_pat.modifier.map(|(modifier, _span)| match modifier {
+                    ast::StructPatternModifier::Match => ExprStructModifier::Match,
+                }),
                 attributes: attrs,
             },
             &span,
@@ -640,12 +644,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
+                let object_expr = self.lower_pattern((object, object_span), var_table);
                 let rel = match relation_attrs {
                     Some((attrs, span)) => {
+                        // Inherit modifier from object expr
+                        let modifier = match &object_expr {
+                            Ok(Expr {
+                                kind: ExprKind::Struct { modifier, .. },
+                                ..
+                            }) => modifier.clone(),
+                            _ => None,
+                        };
+
                         let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
                         Some(self.expr(
                             ExprKind::Struct {
                                 type_path: None,
+                                modifier,
                                 attributes: attrs,
                             },
                             &span,
@@ -653,7 +668,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     }
                     None => None,
                 };
-                let object_expr = self.lower_pattern((object, object_span), var_table);
 
                 object_expr.map(|object_expr| ExprStructAttr {
                     key: (def, self.src.span(&relation.1)),
