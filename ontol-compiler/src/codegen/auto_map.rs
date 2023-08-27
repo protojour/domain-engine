@@ -4,7 +4,6 @@ use ontol_hir::VarAllocator;
 use ontol_runtime::DefId;
 
 use crate::{
-    def::MapDirection,
     mem::Intern,
     patterns::StringPatternSegment,
     primitive::PrimitiveKind,
@@ -14,7 +13,7 @@ use crate::{
     Compiler, NO_SPAN,
 };
 
-use super::task::{ExplicitMapCodegenTask, MapKeyPair};
+use super::task::{ExplicitMapCodegenTask, MapArm, MapKeyPair};
 
 pub fn autogenerate_mapping<'m>(
     key_pair: MapKeyPair,
@@ -77,9 +76,14 @@ fn autogenerate_fmt_to_fmt<'m>(
     )?;
 
     Some(ExplicitMapCodegenTask {
-        direction: MapDirection::Omni,
-        first: first_node,
-        second: second_node,
+        first: MapArm {
+            is_match: false,
+            node: first_node,
+        },
+        second: MapArm {
+            is_match: false,
+            node: second_node,
+        },
         span: NO_SPAN,
     })
 }
@@ -118,6 +122,7 @@ fn autogenerate_fmt_hir_struct<'m>(
                 var: binder_var,
                 ty: compiler.def_types.table.get(&def_id).unwrap(),
             },
+            ontol_hir::StructFlags::empty(),
             nodes,
         ),
         Meta { ty, span: NO_SPAN },

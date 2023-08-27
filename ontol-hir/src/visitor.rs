@@ -82,7 +82,7 @@ macro_rules! visitor_trait_methods {
                     self.visit_node(0, borrow!($ref spec.rel));
                     self.visit_node(1, borrow!($ref spec.val));
                 }
-                Kind::Struct(binder, children) => {
+                Kind::Struct(binder, _flags, children) => {
                     self.visit_binder(binder.$var());
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);

@@ -49,7 +49,7 @@ where
         body: &TypedHirNode,
     ) -> Option<Vec<PropertyFlow>> {
         match body.kind() {
-            ontol_hir::Kind::Struct(struct_binder, nodes) => {
+            ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
                 self.var_dependencies
                     .insert(struct_binder.var, VarSet::default());
@@ -96,7 +96,7 @@ where
             ontol_hir::Kind::DeclSeq(_, _) => {
                 unreachable!()
             }
-            ontol_hir::Kind::Struct(_, body) => {
+            ontol_hir::Kind::Struct(_, _, body) => {
                 let mut var_set = VarSet::default();
                 for node in body {
                     var_set.union_with(&self.analyze_node(node));

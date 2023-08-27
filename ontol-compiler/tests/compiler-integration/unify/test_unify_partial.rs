@@ -15,8 +15,8 @@ fn test_unify_partial() {
     }
 
     unify {
-        Filter { 'foo': foo } // ERROR TODO: required to be optional?// ERROR missing property `bar`
-        Foo { 'foo': foo } // ERROR missing property `bar`
+        Filter { 'foo': foo } // ERROR TODO: required to be optional?// ERROR missing property `bar`// NOTE Consider using `match {}`
+        Foo { 'foo': foo } // ERROR missing property `bar`// NOTE Consider using `match {}`
     }
     "
     .compile_fail()

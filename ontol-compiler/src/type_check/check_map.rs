@@ -1,16 +1,16 @@
 use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
-use ontol_hir::{visitor::HirMutVisitor, Label, VarAllocator};
+use ontol_hir::{visitor::HirMutVisitor, GetKind, Label, VarAllocator};
 use ontol_runtime::smart_format;
 use tracing::debug;
 
 use crate::{
     codegen::{
-        task::{ExplicitMapCodegenTask, MapCodegenTask, MapKeyPair},
+        task::{ExplicitMapCodegenTask, MapArm, MapCodegenTask, MapKeyPair},
         type_mapper::TypeMapper,
     },
-    def::{Def, MapDirection},
+    def::Def,
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, Expressions},
     mem::Intern,
@@ -30,16 +30,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_map(
         &mut self,
         def: &Def,
-        direction: MapDirection,
         var_allocator: &VarAllocator,
         first_id: ExprId,
         second_id: ExprId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
-        let mut ctx = HirBuildCtx::new(
-            def.span,
-            direction,
-            VarAllocator::from(*var_allocator.peek_next()),
-        );
+        let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
         {
             let mut map_check = MapCheck {
@@ -88,15 +83,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
+        fn mk_map_arm(node: TypedHirNode) -> MapArm {
+            let is_match = match node.kind() {
+                ontol_hir::Kind::Struct(_, flags, _) => {
+                    flags.contains(ontol_hir::StructFlags::MATCH)
+                }
+                _ => false,
+            };
+            MapArm { node, is_match }
+        }
+
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
             .find_map_key_pair(first.1.ty, second.1.ty)
         {
             self.codegen_tasks.add_map_task(
                 key_pair,
                 crate::codegen::task::MapCodegenTask::Explicit(ExplicitMapCodegenTask {
-                    direction: ctx.direction,
-                    first,
-                    second,
+                    first: mk_map_arm(first),
+                    second: mk_map_arm(second),
                     span: def.span,
                 }),
             );
@@ -178,36 +182,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {
-        let mut did_report_one_way_note = false;
-        let mut errors_in_second = false;
-
-        for arm in ctx.missing_properties.keys() {
-            if matches!(arm, Arm::Second) {
-                errors_in_second = true;
-            }
-        }
-
-        for (arm, missing) in std::mem::take(&mut ctx.missing_properties) {
+        for (_arm, missing) in std::mem::take(&mut ctx.missing_properties) {
             for (span, properties) in missing {
                 let error = CompileError::MissingProperties(properties);
-
-                if matches!(arm, Arm::First)
-                    && matches!(ctx.direction, MapDirection::Omni)
-                    && !errors_in_second
-                    && !did_report_one_way_note
-                {
-                    self.error_with_notes(
-                        error,
-                        &span,
-                        vec![SpannedNote {
-                            note: Note::ConsiderUsingOneWayMap,
-                            span: ctx.map_kw_span,
-                        }],
-                    );
-                    did_report_one_way_note = true;
-                } else {
-                    self.error(error, &span);
-                }
+                self.error_with_notes(
+                    error,
+                    &span,
+                    vec![SpannedNote {
+                        note: Note::ConsiderUsingMatch,
+                        span,
+                    }],
+                );
             }
         }
     }

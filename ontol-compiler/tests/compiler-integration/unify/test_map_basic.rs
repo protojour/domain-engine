@@ -499,8 +499,8 @@ fn test_sequence_composer_no_iteration() {
         rel .'ab': [i64]
     }
 
-    map => {
-        foo {
+    map {
+        foo match {
             'a': a
             'b': b
         }
@@ -533,8 +533,8 @@ fn test_sequence_composer_with_iteration() {
         rel .'abc': [i64]
     }
 
-    map => {
-        foo {
+    map {
+        foo match {
             'a': a
             'b': [..b]
             'c': c
@@ -779,8 +779,8 @@ fn test_seq_scope_escape1() {
         rel .'baz': baz
     }
 
-    map => {
-        bar {
+    map {
+        bar match {
             'foo': foo {}
             'p1': [..p1]
         }
@@ -822,8 +822,8 @@ fn test_seq_scope_escape2() {
         rel .'baz': baz
     }
 
-    map => {
-        bar {
+    map {
+        bar match {
             'foo': foo {
                 'p0': [..p0]
             }

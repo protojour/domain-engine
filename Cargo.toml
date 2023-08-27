@@ -33,6 +33,7 @@ tracing = "0.1"
 tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi"]}
 chrono = { version = "0.4" , features = ["serde"] }
 clap = { version = "4.3.4", features = ["derive"] }
+bitflags = { version = "2", features = ["serde"] }
 bincode = "1"
 chumsky = "0.9"
 

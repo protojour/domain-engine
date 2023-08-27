@@ -1428,6 +1428,7 @@ dependencies = [
 name = "ontol-hir"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.3.3",
  "indoc",
  "ontol-runtime",
  "pretty_assertions",

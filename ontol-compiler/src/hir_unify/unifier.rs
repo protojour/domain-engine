@@ -425,7 +425,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             // ### "zwizzling" cases:
             (
-                expr::Kind::Struct(expr::Struct(expr_binder, props)),
+                expr::Kind::Struct {
+                    binder: expr_binder,
+                    flags,
+                    props,
+                },
                 scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props)),
             ) => {
                 let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
@@ -490,15 +494,22 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ty: scope_meta.hir_meta.ty,
                     }),
                     node: TypedHirNode(
-                        ontol_hir::Kind::Struct(expr_binder, nodes),
+                        ontol_hir::Kind::Struct(expr_binder, flags, nodes),
                         expr_meta.hir_meta,
                     ),
                 })
             }
-            (expr::Kind::Struct(struct_expr), scope_kind) => {
+            (
+                expr::Kind::Struct {
+                    binder,
+                    flags,
+                    props,
+                },
+                scope_kind,
+            ) => {
                 let scope = scope::Scope(scope_kind, scope_meta);
-                let mut nodes = Vec::with_capacity(struct_expr.1.len());
-                for prop in struct_expr.1 {
+                let mut nodes = Vec::with_capacity(props.len());
+                for prop in props {
                     let hir_meta = self.unit_meta();
                     let expr_meta = expr::Meta {
                         free_vars: prop.free_vars.clone(),
@@ -516,7 +527,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: None,
                     node: TypedHirNode(
-                        ontol_hir::Kind::Struct(struct_expr.0, nodes),
+                        ontol_hir::Kind::Struct(binder, flags, nodes),
                         expr_meta.hir_meta,
                     ),
                 })

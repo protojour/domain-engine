@@ -10,13 +10,13 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, LookupRelationshipMeta, MapDirection, RelParams},
+    def::{Def, DefKind, LookupRelationshipMeta, RelParams},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprStructAttr, ExprStructModifier},
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::{
-        hir_build_ctx::{Arm, ExplicitVariableArm, ExpressionVariable},
+        hir_build_ctx::{ExplicitVariableArm, ExpressionVariable},
         inference::UnifyValue,
         repr::repr_model::ReprKind,
     },
@@ -26,6 +26,18 @@ use crate::{
 };
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
+
+pub(super) struct NodeInfo<'m> {
+    pub expected_ty: Option<TypeRef<'m>>,
+    pub parent_struct_flags: ontol_hir::StructFlags,
+}
+
+struct StructInfo<'m> {
+    struct_def_id: DefId,
+    struct_ty: TypeRef<'m>,
+    modifier: Option<ExprStructModifier>,
+    parent_struct_flags: ontol_hir::StructFlags,
+}
 
 /// This is the type check of map statements.
 /// The types that are used must be checked with `check_def_sealed`.
@@ -38,8 +50,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let expr = self.expressions.table.remove(&expr_id).unwrap();
 
         let node = self.build_node(
-            &expr, // Don't pass inference types as the expected type:
-            None, ctx,
+            &expr,
+            NodeInfo {
+                // Don't pass inference types as the expected type:
+                expected_ty: None,
+                parent_struct_flags: ontol_hir::StructFlags::empty(),
+            },
+            ctx,
         );
 
         // Save typing result for the final type unification:
@@ -61,10 +78,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn build_node(
         &mut self,
         expr: &Expr,
-        expected_ty: Option<TypeRef<'m>>,
+        node_info: NodeInfo<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let node = match (&expr.kind, expected_ty) {
+        let node = match (&expr.kind, node_info.expected_ty) {
             (ExprKind::Call(def_id, args), Some(_expected_output)) => {
                 match (
                     self.defs.table.get(def_id),
@@ -89,7 +106,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let mut parameters = vec![];
                         for (arg, param_ty) in args.iter().zip(*params) {
-                            let node = self.build_node(arg, Some(param_ty), ctx);
+                            let node = self.build_node(
+                                arg,
+                                NodeInfo {
+                                    expected_ty: Some(param_ty),
+                                    parent_struct_flags: node_info.parent_struct_flags,
+                                },
+                                ctx,
+                            );
                             parameters.push(node);
                         }
 
@@ -120,9 +144,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => return self.error_node(CompileError::DomainTypeExpected, &type_path.span),
                 };
                 let struct_node = self.build_property_matcher(
-                    type_path.def_id,
-                    struct_ty,
-                    *modifier,
+                    StructInfo {
+                        struct_def_id: type_path.def_id,
+                        struct_ty,
+                        modifier: *modifier,
+                        parent_struct_flags: node_info.parent_struct_flags,
+                    },
                     attributes,
                     expr.span,
                     ctx,
@@ -169,7 +196,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 self.build_property_matcher(
-                    *def_id, actual_ty, *modifier, attributes, expr.span, ctx,
+                    StructInfo {
+                        struct_def_id: *def_id,
+                        struct_ty: actual_ty,
+                        modifier: *modifier,
+                        parent_struct_flags: node_info.parent_struct_flags,
+                    },
+                    attributes,
+                    expr.span,
+                    ctx,
                 )
             }
             (
@@ -203,8 +238,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                let inner_node =
-                    self.build_node(&inner.iter().next().unwrap().expr, Some(val_ty), ctx);
+                let inner_node = self.build_node(
+                    &inner.iter().next().unwrap().expr,
+                    NodeInfo {
+                        expected_ty: Some(val_ty),
+                        parent_struct_flags: node_info.parent_struct_flags,
+                    },
+                    ctx,
+                );
                 let label = *ctx.label_map.get(aggr_expr_id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
@@ -331,9 +372,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
         };
 
-        debug!("expected/meta: {:?} {:?}", expected_ty, node.ty());
+        debug!("expected/meta: {:?} {:?}", node_info.expected_ty, node.ty());
 
-        match (expected_ty, node.ty()) {
+        match (node_info.expected_ty, node.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some(Type::Infer(type_var)), _) => {
                 ctx.inference
@@ -349,9 +390,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_property_matcher(
         &mut self,
-        struct_def_id: DefId,
-        struct_ty: TypeRef<'m>,
-        modifier: Option<ExprStructModifier>,
+        StructInfo {
+            struct_def_id,
+            struct_ty,
+            modifier,
+            parent_struct_flags,
+        }: StructInfo<'m>,
         attributes: &[ExprStructAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
@@ -365,6 +409,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         let properties = self.relations.properties_by_def_id(struct_def_id);
+
+        //
+        let actual_struct_flags = match modifier {
+            Some(ExprStructModifier::Match) => ontol_hir::StructFlags::MATCH,
+            None => ontol_hir::StructFlags::empty(),
+        } | parent_struct_flags;
 
         let node_kind = match self.seal_ctx.get_repr_kind(&struct_def_id).unwrap() {
             ReprKind::Struct | ReprKind::Unit => {
@@ -418,19 +468,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             value,
                         } in attributes
                         {
-                            let attr_prop = match self.defs.def_kind(*def_id) {
-                                DefKind::StringLiteral(lit) => lit,
-                                _ => {
-                                    self.error(CompileError::NamedPropertyExpected, prop_span);
-                                    continue;
-                                }
+                            let DefKind::StringLiteral(attr_prop) = self.defs.def_kind(*def_id)
+                            else {
+                                self.error(CompileError::NamedPropertyExpected, prop_span);
+                                continue;
                             };
-                            let match_property = match match_properties.get_mut(attr_prop) {
-                                Some(match_properties) => match_properties,
-                                None => {
-                                    self.error(CompileError::UnknownProperty, prop_span);
-                                    continue;
-                                }
+                            let Some(match_property) = match_properties.get_mut(attr_prop) else {
+                                self.error(CompileError::UnknownProperty, prop_span);
+                                continue;
                             };
                             if match_property.used {
                                 self.error(CompileError::DuplicateProperty, prop_span);
@@ -459,7 +504,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         },
                                     )
                                 }
-                                (_, Some(rel)) => self.build_node(rel, Some(rel_params_ty), ctx),
+                                (_, Some(rel)) => self.build_node(
+                                    rel,
+                                    NodeInfo {
+                                        expected_ty: Some(rel_params_ty),
+                                        parent_struct_flags: actual_struct_flags,
+                                    },
+                                    ctx,
+                                ),
                                 (ty @ Type::Anonymous(def_id), None) => {
                                     match self.relations.properties_by_def_id(*def_id) {
                                         Some(_) => {
@@ -485,7 +537,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             let prop_variant = match match_property.cardinality.1 {
                                 ValueCardinality::One => {
-                                    let val_node = self.build_node(value, Some(value_ty), ctx);
+                                    let val_node = self.build_node(
+                                        value,
+                                        NodeInfo {
+                                            expected_ty: Some(value_ty),
+                                            parent_struct_flags: actual_struct_flags,
+                                        },
+                                        ctx,
+                                    );
                                     ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
                                         rel: Box::new(rel_node),
                                         val: Box::new(val_node),
@@ -496,8 +555,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         let mut hir_elements =
                                             Vec::with_capacity(expr_elements.len());
                                         for element in expr_elements {
-                                            let val_node =
-                                                self.build_node(&element.expr, Some(value_ty), ctx);
+                                            let val_node = self.build_node(
+                                                &element.expr,
+                                                NodeInfo {
+                                                    expected_ty: Some(value_ty),
+                                                    parent_struct_flags: actual_struct_flags,
+                                                },
+                                                ctx,
+                                            );
                                             hir_elements.push(ontol_hir::SeqPropertyElement {
                                                 iter: element.iter,
                                                 attribute: ontol_hir::Attribute {
@@ -573,27 +638,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ));
                         }
 
-                        match (ctx.arm, ctx.direction) {
-                            (Arm::First, MapDirection::Forwards) => {
-                                // It's OK to not specify all properties here
-                            }
-                            _ => {
-                                for (name, match_property) in match_properties {
-                                    if !match_property.used
-                                        && !matches!(match_property.property_id.role, Role::Object)
-                                    {
-                                        ctx.missing_properties
-                                            .entry(ctx.arm)
-                                            .or_default()
-                                            .entry(span)
-                                            .or_default()
-                                            .push(name.into());
-                                    }
+                        if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
+                            for (name, match_property) in match_properties {
+                                if !match_property.used
+                                    && !matches!(match_property.property_id.role, Role::Object)
+                                {
+                                    ctx.missing_properties
+                                        .entry(ctx.arm)
+                                        .or_default()
+                                        .entry(span)
+                                        .or_default()
+                                        .push(name.into());
                                 }
                             }
                         }
 
-                        ontol_hir::Kind::Struct(struct_binder, hir_props)
+                        ontol_hir::Kind::Struct(struct_binder, actual_struct_flags, hir_props)
                     }
                     None => {
                         if !attributes.is_empty() {
@@ -621,9 +681,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match value_object_ty {
                     Type::Domain(def_id) => {
                         return self.build_property_matcher(
-                            *def_id,
-                            value_object_ty,
-                            modifier,
+                            StructInfo {
+                                struct_def_id: *def_id,
+                                struct_ty: value_object_ty,
+                                modifier,
+                                parent_struct_flags,
+                            },
                             attributes,
                             span,
                             ctx,
@@ -639,7 +702,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 value,
                             }) if *def_id == DefId::unit() => {
                                 let object_ty = self.check_def_sealed(single_def_id);
-                                let inner_node = self.build_node(value, Some(object_ty), ctx);
+                                let inner_node = self.build_node(
+                                    value,
+                                    NodeInfo {
+                                        expected_ty: Some(object_ty),
+                                        parent_struct_flags,
+                                    },
+                                    ctx,
+                                );
 
                                 inner_node.into_kind()
                             }
@@ -666,7 +736,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         value,
                     }) if *def_id == DefId::unit() => {
                         let object_ty = self.check_def_sealed(scalar_def_id);
-                        let inner_node = self.build_node(value, Some(object_ty), ctx);
+                        let inner_node = self.build_node(
+                            value,
+                            NodeInfo {
+                                expected_ty: Some(object_ty),
+                                parent_struct_flags,
+                            },
+                            ctx,
+                        );
 
                         inner_node.into_kind()
                     }
@@ -725,7 +802,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         kind: ExprKind::Variable(*edge_var),
                         span: prop_span,
                     },
-                    Some(ty),
+                    NodeInfo {
+                        expected_ty: Some(ty),
+                        parent_struct_flags: Default::default(),
+                    },
                     ctx,
                 )
             }

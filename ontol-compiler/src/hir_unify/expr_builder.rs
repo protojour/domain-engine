@@ -113,7 +113,7 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }
-            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
+            ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let props: Vec<_> = nodes
                     .iter()
                     .flat_map(|node| zelf.node_to_props(node))
@@ -124,7 +124,11 @@ impl<'m> ExprBuilder<'m> {
                 }
 
                 expr::Expr(
-                    expr::Kind::Struct(expr::Struct(*binder, props)),
+                    expr::Kind::Struct {
+                        binder: *binder,
+                        flags: *flags,
+                        props,
+                    },
                     expr::Meta {
                         hir_meta: *meta,
                         free_vars,

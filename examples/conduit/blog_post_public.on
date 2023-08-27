@@ -7,16 +7,16 @@ pub type BlogPost {
     rel .'tags': [string]
 }
 
-map => {
-    db.Article {
+map {
+    db.Article match {
         'article_id': id
         'body': body
         'author': db.User {
             'username': author
         }
-        'tags': [..db.TagEntity {
-            'tag': tag
-        }]
+        'tags': [
+            ..db.TagEntity { 'tag': tag }
+        ]
     }
     BlogPost {
         'post_id': id

@@ -111,11 +111,8 @@ impl<L: Lang> Parser<L> {
                 let (arg, next) = self.parse(next)?;
                 Ok((self.make_node(Kind::Map(Box::new(arg))), next))
             }
-            ("struct", next) => {
-                let (binder, next) = self.parse_binder(next)?;
-                let (children, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(Kind::Struct(binder, children)), next))
-            }
+            ("struct", next) => self.parse_struct_inner(next, StructFlags::empty()),
+            ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
             ("prop", next) => self.parse_prop(Optional(false), next),
             ("prop?", next) => self.parse_prop(Optional(true), next),
             ("decl-seq", next) => {
@@ -225,6 +222,16 @@ impl<L: Lang> Parser<L> {
                 Err(error) => return Err(error),
             }
         }
+    }
+
+    fn parse_struct_inner<'a, 's>(
+        &self,
+        next: &'s str,
+        flags: StructFlags,
+    ) -> ParseResult<'s, L::Node<'a>> {
+        let (binder, next) = self.parse_binder(next)?;
+        let (children, next) = self.parse_many(next, Self::parse)?;
+        Ok((self.make_node(Kind::Struct(binder, flags, children)), next))
     }
 
     fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {

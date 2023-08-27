@@ -7,13 +7,13 @@ use tracing::debug;
 
 use crate::{
     codegen::task::ConstCodegenTask,
-    def::{DefKind, MapDirection, TypeDef},
+    def::{DefKind, TypeDef},
     mem::Intern,
     type_check::hir_build_ctx::HirBuildCtx,
     types::{Type, TypeRef},
 };
 
-use super::TypeCheck;
+use super::{hir_build::NodeInfo, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Do type check of a type and then seal it.
@@ -59,8 +59,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_relationship(def_id, relationship, &def.span)
             }
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
-            DefKind::Mapping(direction, var_allocator, first_id, second_id) => {
-                match self.check_map(def, *direction, var_allocator, *first_id, *second_id) {
+            DefKind::Mapping(var_allocator, first_id, second_id) => {
+                match self.check_map(def, var_allocator, *first_id, *second_id) {
                     Ok(ty) => ty,
                     Err(error) => {
                         debug!("Aggregation group error: {error:?}");
@@ -75,9 +75,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(ty) => ty,
                 };
 
-                let mut ctx =
-                    HirBuildCtx::new(expr.span, MapDirection::Omni, VarAllocator::default());
-                let node = self.build_node(&expr, Some(ty), &mut ctx);
+                let mut ctx = HirBuildCtx::new(expr.span, VarAllocator::default());
+                let node = self.build_node(
+                    &expr,
+                    NodeInfo {
+                        expected_ty: Some(ty),
+                        parent_struct_flags: Default::default(),
+                    },
+                    &mut ctx,
+                );
 
                 self.codegen_tasks
                     .add_const_task(ConstCodegenTask { def_id, node });

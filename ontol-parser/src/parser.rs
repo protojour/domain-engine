@@ -4,9 +4,9 @@ use chumsky::prelude::*;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, MapDirection, Path, Pattern, SeqPatternElement,
-    StructPattern, StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq,
-    UseStatement, Visibility, WithStatement,
+    ExprPattern, FmtStatement, MapArm, Path, Pattern, SeqPatternElement, StructPattern,
+    StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
+    WithStatement,
 };
 
 use super::{
@@ -256,21 +256,12 @@ fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(Unit
 
 fn map_statement() -> impl AstParser<MapStatement> {
     keyword(Token::Map)
-        .then(just(Token::FatArrow).or_not())
         .then(
             spanned(with_unit_or_seq(map_arm()))
                 .then(spanned(with_unit_or_seq(map_arm())))
                 .delimited_by(open('{'), close('}')),
         )
-        .map(|((kw, fat_arrow), (first, second))| MapStatement {
-            kw,
-            direction: match fat_arrow {
-                Some(_) => MapDirection::Forward,
-                None => MapDirection::Omni,
-            },
-            first,
-            second,
-        })
+        .map(|(kw, (first, second))| MapStatement { kw, first, second })
 }
 
 fn map_arm() -> impl AstParser<MapArm> {

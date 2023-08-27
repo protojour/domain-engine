@@ -233,8 +233,8 @@ impl SpannedNote {
 
 #[derive(Debug, Error)]
 pub enum Note {
-    #[error("Consider using a one way mapping (`map => {{ .. }}`) here")]
-    ConsiderUsingOneWayMap,
+    #[error("Consider using `match {{}}`")]
+    ConsiderUsingMatch,
     #[error("Type is abstract")]
     TypeIsAbstract,
     #[error("Type of field is abstract")]

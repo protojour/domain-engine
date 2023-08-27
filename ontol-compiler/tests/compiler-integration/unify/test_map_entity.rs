@@ -190,8 +190,8 @@ fn test_map_relation_sequence_default_fallback() {
         rel .'foos': [string]
     }
 
-    map => {
-        bar_inner {
+    map {
+        bar_inner match {
             'bar_id': id
             'foos': [..foo_inner { 'foo_id': foo }]
         }

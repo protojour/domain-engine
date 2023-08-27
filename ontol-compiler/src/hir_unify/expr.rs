@@ -31,7 +31,11 @@ pub struct Meta<'m> {
 pub enum Kind<'m> {
     Var(ontol_hir::Var),
     Unit,
-    Struct(Struct<'m>),
+    Struct {
+        binder: TypedBinder<'m>,
+        flags: ontol_hir::StructFlags,
+        props: Vec<Prop<'m>>,
+    },
     Prop(Box<Prop<'m>>),
     Map(Box<Expr<'m>>),
     Call(Call<'m>),
@@ -48,7 +52,7 @@ impl<'m> Kind<'m> {
         match self {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
-            Self::Struct(struct_) => format!("Struct({})", struct_.0.var),
+            Self::Struct { binder, .. } => format!("Struct({})", binder.var),
             Self::Prop(prop) => format!(
                 "Prop({}{})",
                 if prop.seq.is_some() { "seq " } else { "" },
@@ -66,7 +70,11 @@ impl<'m> Kind<'m> {
 }
 
 #[derive(Debug)]
-pub struct Struct<'m>(pub TypedBinder<'m>, pub Vec<Prop<'m>>);
+pub struct Struct<'m>(
+    pub TypedBinder<'m>,
+    pub ontol_hir::StructFlags,
+    pub Vec<Prop<'m>>,
+);
 
 #[derive(Debug)]
 pub struct Prop<'m> {

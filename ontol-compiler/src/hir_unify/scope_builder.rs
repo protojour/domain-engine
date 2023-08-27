@@ -139,7 +139,7 @@ impl<'m> ScopeBuilder<'m> {
             }
             ontol_hir::Kind::Map(arg) => self.build_scope_binder(arg),
             ontol_hir::Kind::DeclSeq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
-            ontol_hir::Kind::Struct(binder, nodes) => self.enter_binder(binder, |zelf| {
+            ontol_hir::Kind::Struct(binder, _flags, nodes) => self.enter_binder(binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
                     zelf.current_prop_analysis_map = Some({
                         let mut dep_analyzer = DepScopeAnalyzer::default();

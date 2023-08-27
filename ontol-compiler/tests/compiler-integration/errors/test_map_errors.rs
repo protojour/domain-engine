@@ -38,8 +38,8 @@ fn map_attribute_mismatch() {
     rel foo 'prop1': bar
     rel foo 'prop2': bar
     rel bar is: i64
-    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
-        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`
+    map {
+        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`// NOTE Consider using `match {}`
             x
         bar {} // ERROR expected expression attribute
     }
@@ -48,27 +48,13 @@ fn map_attribute_mismatch() {
 }
 
 #[test]
-fn map_missing_property_suggest_one_way() {
-    "
-    type foo { rel .'a'|'b'|'c': string }
-    type bar { rel .'d': string }
-    map { // NOTE Consider using a one way mapping (`map => { .. }`) here
-        foo { 'a': x } // ERROR missing properties `b`, `c`
-        bar { 'd': x }
-    }
-    "
-    .compile_fail()
-}
-
-/// Tests that the "consider using one way mapping" does not appear if it's already a one-way mapping
-#[test]
-fn map_missing_attributes_one_way() {
+fn map_missing_attributes_in_match_is_ok() {
     "
     type foo { rel .'a'|'b': string }
     type bar { rel .'c'|'d': string }
-    map => {
-        foo { 'a': x }
-        bar { 'c': x } // ERROR missing property `d`
+    map {
+        foo match { 'a': x }
+        bar { 'c': x } // ERROR missing property `d`// NOTE Consider using `match {}`
     }
     "
     .compile_fail()
@@ -228,7 +214,7 @@ fn map_union() {
 
     map {
         foobar {} // ERROR cannot map a union, map each variant instead
-        foo {} // ERROR missing property `type`
+        foo {} // ERROR missing property `type`// NOTE Consider using `match {}`
     }
     "
     .compile_fail();

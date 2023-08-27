@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use ontol_parser::{
-    ast::{MapArm, MapDirection, Path, Statement, Type, TypeStatement},
+    ast::{MapArm, Path, Statement, Type, TypeStatement},
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
@@ -181,11 +181,7 @@ impl Document {
                                 Path::Path(_) => "",
                             },
                         };
-                        let arrow = match stmt.direction {
-                            MapDirection::Omni => "<->",
-                            MapDirection::Forward => "->",
-                        };
-                        dp.path = format!("map {} {} {}", first, arrow, second);
+                        dp.path = format!("map {} {}", first, second);
                         dp.docs.clear();
                         break;
                     }

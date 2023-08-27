@@ -92,15 +92,8 @@ pub enum Cardinality {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum MapDirection {
-    Omni,
-    Forward,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
     pub kw: Span,
-    pub direction: MapDirection,
     pub first: Spanned<(UnitOrSeq, MapArm)>,
     pub second: Spanned<(UnitOrSeq, MapArm)>,
 }

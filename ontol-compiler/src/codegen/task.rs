@@ -11,8 +11,8 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen, def::MapDirection, hir_unify::unify_to_function,
-    typed_hir::TypedHirNode, Compiler, SourceSpan,
+    codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHirNode,
+    Compiler, SourceSpan,
 };
 
 use super::{
@@ -72,10 +72,14 @@ pub enum MapCodegenTask<'m> {
 }
 
 pub struct ExplicitMapCodegenTask<'m> {
-    pub direction: MapDirection,
-    pub first: TypedHirNode<'m>,
-    pub second: TypedHirNode<'m>,
+    pub first: MapArm<'m>,
+    pub second: MapArm<'m>,
     pub span: SourceSpan,
+}
+
+pub struct MapArm<'m> {
+    pub node: TypedHirNode<'m>,
+    pub is_match: bool,
 }
 
 impl<'m> Debug for ConstCodegenTask<'m> {
@@ -89,8 +93,8 @@ impl<'m> Debug for ConstCodegenTask<'m> {
 impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MapCodegenTask")
-            .field("first", &DebugViaDisplay(&self.first))
-            .field("second", &DebugViaDisplay(&self.second))
+            .field("first", &DebugViaDisplay(&self.first.node))
+            .field("second", &DebugViaDisplay(&self.second.node))
             .finish()
     }
 }
@@ -175,21 +179,31 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     }
 
     for map_task in explicit_map_tasks {
-        debug!("1st (ty={:?}):\n{}", map_task.first.ty(), map_task.first);
-        debug!("2nd (ty={:?}):\n{}", map_task.second.ty(), map_task.second);
+        debug!(
+            "1st (ty={:?}):\n{}",
+            map_task.first.node.ty(),
+            map_task.first.node
+        );
+        debug!(
+            "2nd (ty={:?}):\n{}",
+            map_task.second.node.ty(),
+            map_task.second.node
+        );
 
-        debug!("Forward start");
-        match unify_to_function(&map_task.first, &map_task.second, compiler) {
-            Ok(func) => {
-                let errors = map_codegen(&mut proc_table, func, compiler);
-                compiler.errors.extend(errors);
+        if !map_task.second.is_match {
+            debug!("Forward start");
+            match unify_to_function(&map_task.first.node, &map_task.second.node, compiler) {
+                Ok(func) => {
+                    let errors = map_codegen(&mut proc_table, func, compiler);
+                    compiler.errors.extend(errors);
+                }
+                Err(err) => warn!("unifier error: {err:?}"),
             }
-            Err(err) => warn!("unifier error: {err:?}"),
         }
 
-        if matches!(map_task.direction, MapDirection::Omni) {
+        if !map_task.first.is_match {
             debug!("Backward start");
-            match unify_to_function(&map_task.second, &map_task.first, compiler) {
+            match unify_to_function(&map_task.second.node, &map_task.first.node, compiler) {
                 Ok(func) => {
                     let errors = map_codegen(&mut proc_table, func, compiler);
                     compiler.errors.extend(errors);

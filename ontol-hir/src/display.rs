@@ -4,7 +4,7 @@ use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
     Binding, GetKind, GetLabel, GetVar, HasDefault, Kind, Label, Lang, MatchArm, PropPattern,
-    PropVariant, SeqPropertyElement, Var,
+    PropVariant, SeqPropertyElement, StructFlags, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -91,8 +91,12 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Struct(binder, children) => {
-                write!(f, "{indent}(struct ({})", binder.var())?;
+            Kind::Struct(binder, flags, children) => {
+                if flags.contains(StructFlags::MATCH) {
+                    write!(f, "{indent}(match-struct ({})", binder.var())?;
+                } else {
+                    write!(f, "{indent}(struct ({})", binder.var())?;
+                }
                 let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))

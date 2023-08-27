@@ -48,7 +48,7 @@ pub enum DefKind<'m> {
     // if there are different variants per type.
     Fn(BuiltinProc),
     Constant(ExprId),
-    Mapping(MapDirection, ontol_hir::VarAllocator, ExprId, ExprId),
+    Mapping(ontol_hir::VarAllocator, ExprId, ExprId),
 }
 
 impl<'m> DefKind<'m> {
@@ -143,12 +143,6 @@ pub struct RelationshipMeta<'m> {
     pub relationship_id: RelationshipId,
     pub relationship: SpannedBorrow<'m, Relationship<'m>>,
     pub relation_def_kind: SpannedBorrow<'m, DefKind<'m>>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum MapDirection {
-    Omni,
-    Forwards,
 }
 
 #[derive(Debug)]

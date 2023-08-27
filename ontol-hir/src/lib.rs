@@ -81,7 +81,7 @@ pub enum Kind<'a, L: Lang> {
     /// Standalone sequence in declarative mode.
     DeclSeq(L::Label<'a>, Attribute<Box<L::Node<'a>>>),
     /// A struct with associated binder. The value is the struct.
-    Struct(L::Binder<'a>, Nodes<'a, L>),
+    Struct(L::Binder<'a>, StructFlags, Nodes<'a, L>),
     /// A property definition associated with a struct var in scope
     Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
     /// A property matcher/unpacker associated with a struct var
@@ -288,5 +288,12 @@ impl<'a, L: Lang> GetLabel<'a, L> for Label {
 
     fn label_mut(&mut self) -> &mut Label {
         self
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct StructFlags: u32 {
+        const MATCH = 0b00000001;
     }
 }

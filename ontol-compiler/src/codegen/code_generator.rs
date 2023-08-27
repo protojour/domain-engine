@@ -229,7 +229,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::Struct(binder, nodes) => {
+            ontol_hir::Kind::Struct(binder, _flags, nodes) => {
                 let def_id = ty.get_single_def_id().unwrap();
                 let local = self.builder.append(
                     block,

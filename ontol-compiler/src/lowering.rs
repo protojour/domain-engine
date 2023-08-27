@@ -10,7 +10,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, MapDirection, RelParams, Relationship, TypeDef},
+    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef},
     error::CompileError,
     expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, ExprStructModifier, TypePath},
     namespace::Space,
@@ -119,7 +119,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Map(ast::MapStatement {
                 kw: _,
-                direction,
                 first,
                 second,
             }) => {
@@ -127,16 +126,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
                 let var_allocator = var_table.into_allocator();
-                let direction = match direction {
-                    ast::MapDirection::Omni => MapDirection::Omni,
-                    ast::MapDirection::Forward => MapDirection::Forwards,
-                };
 
-                Ok([self.define(
-                    DefKind::Mapping(direction, var_allocator, first, second),
-                    &span,
-                )]
-                .into())
+                Ok([self.define(DefKind::Mapping(var_allocator, first, second), &span)].into())
             }
         }
     }
@@ -652,7 +643,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             Ok(Expr {
                                 kind: ExprKind::Struct { modifier, .. },
                                 ..
-                            }) => modifier.clone(),
+                            }) => *modifier,
                             _ => None,
                         };
 
