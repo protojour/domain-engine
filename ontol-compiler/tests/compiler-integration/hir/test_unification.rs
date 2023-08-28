@@ -125,6 +125,44 @@ fn test_unify_two_prop_struct() {
 }
 
 #[test]
+fn test_unify_struct_in_struct_scope() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:0:0
+                (#u
+                    (struct ($d)
+                        (prop $d S:1:0 (#u $a))
+                    )
+                )
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d O:0:0 (#u $a))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $d)
+                    (prop $d O:0:0
+                        (#u
+                            (match-prop $d S:1:0
+                                (($_ $a) $a)
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_struct_map_prop() {
     let output = test_unify(
         "
@@ -188,14 +226,14 @@ fn test_struct_arithmetic_property_dependency() {
         "
         (struct ($c)
             (prop $c S:0:0 (#u (- $a 10)))
-            (prop $c S:1:1 (#u (- $b 10)))
+            (prop $c S:0:1 (#u (- $b 10)))
         )
         ",
         "
         (struct ($d)
-            (prop $d O:2:2 (#u (+ $a $b)))
-            (prop $d O:3:3 (#u (+ $a 20)))
-            (prop $d O:4:4 (#u (+ $b 20)))
+            (prop $d O:0:0 (#u (+ $a $b)))
+            (prop $d O:0:1 (#u (+ $a 20)))
+            (prop $d O:0:2 (#u (+ $b 20)))
         )
         ",
     );
@@ -204,17 +242,84 @@ fn test_struct_arithmetic_property_dependency() {
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($a (+ $e 10))
-                        (prop $d O:3:3
+                        (prop $d O:0:1
                             (#u (+ $a 20))
                         )
-                        (match-prop $c S:1:1
+                        (match-prop $c S:0:1
                             (($_ $f)
                                 (let ($b (+ $f 10))
-                                    (prop $d O:2:2
+                                    (prop $d O:0:0
                                         (#u (+ $a $b))
                                     )
-                                    (prop $d O:4:4
+                                    (prop $d O:0:2
                                         (#u (+ $b 20))
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_struct_arithmetic_property_dependency_within_struct() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:0:0 (#u (- $a 10)))
+            (prop $c S:0:1
+                (#u
+                    (struct ($e)
+                        (prop $e S:1:0 (#u (- $b 10)))
+                    )
+                )
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d O:0:0 (#u (+ $a $b)))
+            (prop $d O:0:1 (#u (+ $a 20)))
+            (prop $d O:0:2 (#u (+ $b 20)))
+        )
+        ",
+    );
+    // FIXME: prop S:1:0 is extracted twice.
+    // This will be fixed when scope properties get flattened and rebuilt.
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $f)
+                    (let ($a (+ $f 10))
+                        (prop $d O:0:1
+                            (#u (+ $a 20))
+                        )
+                        (match-prop $c S:0:1
+                            (($_ $e)
+                                (prop $d O:0:0
+                                    (#u
+                                        (match-prop $e S:1:0
+                                            (($_ $g)
+                                                (let ($b (+ $g 10))
+                                                    (+ $a $b)
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                                (prop $d O:0:2
+                                    (#u
+                                        (match-prop $e S:1:0
+                                            (($_ $g)
+                                                (let ($b (+ $g 10))
+                                                    (+ $b 20)
+                                                )
+                                            )
+                                        )
                                     )
                                 )
                             )
@@ -787,17 +892,18 @@ fn test_unify_dependent_scoping_backwards() {
     assert_eq!(expected, output);
 }
 
-#[test]
-fn test_unify_seq_scope_escape1() {
-    let output = test_unify(
-        "
-        (struct ($c)
+mod unify_seq_scope_escape_1 {
+    use super::test_unify;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+    use test_log::test;
+
+    const ARMS: (&str, &str) = (
+        "(struct ($c)
             (prop $c S:0:0 (#u #u))
             (prop $c S:0:1 (seq (@a) (iter #u $b)))
-        )
-        ",
-        "
-        (struct ($d)
+        )",
+        "(struct ($d)
             (prop $d O:0:0
                 (#u
                     (struct ($e)
@@ -806,17 +912,55 @@ fn test_unify_seq_scope_escape1() {
                     )
                 )
             )
-        )
-        ",
+        )",
     );
-    let expected = indoc! {"
-        |$c| (struct ($d)
-            (prop $d O:0:0
-                (#u
-                    (struct ($e)
-                        (match-prop $c S:0:1
+
+    #[test]
+    fn forward() {
+        let output = test_unify(ARMS.0, ARMS.1);
+        let expected = indoc! {"
+            |$c| (struct ($d)
+                (prop $d O:0:0
+                    (#u
+                        (struct ($e)
+                            (match-prop $c S:0:1
+                                ((seq $a)
+                                    (prop $e O:1:1
+                                        (#u
+                                            (sequence ($f)
+                                                (for-each $a ($_ $b)
+                                                    (push $f #u $b)
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                            (prop $e O:1:0
+                                (#u #u)
+                            )
+                        )
+                    )
+                )
+            )"
+        };
+        assert_eq!(expected, output);
+    }
+
+    #[test]
+    // BUG: property scopes has to be refactored.
+    // Probably need to flatten cross-struct non-sequence properties before running `dep_tree`,
+    // then re-build hierarchy after.
+    #[should_panic = "not yet implemented"]
+    fn backward() {
+        let output = test_unify(ARMS.1, ARMS.0);
+        let expected = indoc! {"
+            |$d| (struct ($c)
+                (match-prop $d O:0:0
+                    (($_ $e)
+                        (match-prop $e O:1:1
                             ((seq $a)
-                                (prop $e O:1:1
+                                (prop $c S:0:1
                                     (#u
                                         (sequence ($f)
                                             (for-each $a ($_ $b)
@@ -827,22 +971,26 @@ fn test_unify_seq_scope_escape1() {
                                 )
                             )
                         )
-                        (prop $e O:1:0
-                            (#u #u)
-                        )
                     )
                 )
+                (prop $c S:0:0
+                    (#u #u)
+                )
             )
-        )"
-    };
-    assert_eq!(expected, output);
+        "
+        };
+        assert_eq!(expected, output);
+    }
 }
 
-#[test]
-fn test_unify_seq_scope_escape2() {
-    let output = test_unify(
-        "
-        (struct ($e)
+mod unify_seq_scope_escape_2 {
+    use super::test_unify;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+    use test_log::test;
+
+    const ARMS: (&str, &str) = (
+        "(struct ($e)
             (prop $e S:0:0
                 (#u
                     (struct ($f)
@@ -855,12 +1003,10 @@ fn test_unify_seq_scope_escape2() {
             (prop $e S:0:1
                 (seq (@c) (iter #u $d))
             )
-        )
-        ",
+        )",
         // Note: The expr prop O:0:0 itself does not depend on anything in scope.
         // So it's constant in this sense, but each _child_ need to _clone_ the original scope.
-        "
-        (struct ($g)
+        "(struct ($g)
             (prop $g O:0:0
                 (#u
                     (struct ($h)
@@ -879,39 +1025,43 @@ fn test_unify_seq_scope_escape2() {
                     )
                 )
             )
-        )
-        ",
+        )",
     );
-    let expected = indoc! {"
-        |$e| (struct ($g)
-            (prop $g O:0:0
-                (#u
-                    (struct ($h)
-                        (match-prop $e S:0:1
-                            ((seq $c)
-                                (prop $h O:1:1
-                                    (#u
-                                        (sequence ($j)
-                                            (for-each $c ($_ $d)
-                                                (push $j #u $d)
+
+    #[test]
+    fn forward() {
+        let output = test_unify(ARMS.0, ARMS.1);
+        let expected = indoc! {"
+            |$e| (struct ($g)
+                (prop $g O:0:0
+                    (#u
+                        (struct ($h)
+                            (match-prop $e S:0:1
+                                ((seq $c)
+                                    (prop $h O:1:1
+                                        (#u
+                                            (sequence ($j)
+                                                (for-each $c ($_ $d)
+                                                    (push $j #u $d)
+                                                )
                                             )
                                         )
                                     )
                                 )
                             )
-                        )
-                        (match-prop $e S:0:0
-                            (($_ $f)
-                                (prop $h O:1:0
-                                    (#u
-                                        (struct ($i)
-                                            (match-prop $f S:1:0
-                                                ((seq $a)
-                                                    (prop $i O:2:0
-                                                        (#u
-                                                            (sequence ($k)
-                                                                (for-each $a ($_ $b)
-                                                                    (push $k #u $b)
+                            (match-prop $e S:0:0
+                                (($_ $f)
+                                    (prop $h O:1:0
+                                        (#u
+                                            (struct ($i)
+                                                (match-prop $f S:1:0
+                                                    ((seq $a)
+                                                        (prop $i O:2:0
+                                                            (#u
+                                                                (sequence ($k)
+                                                                    (for-each $a ($_ $b)
+                                                                        (push $k #u $b)
+                                                                    )
                                                                 )
                                                             )
                                                         )
@@ -925,8 +1075,8 @@ fn test_unify_seq_scope_escape2() {
                         )
                     )
                 )
-            )
-        )"
-    };
-    assert_eq!(expected, output);
+            )"
+        };
+        assert_eq!(expected, output);
+    }
 }
