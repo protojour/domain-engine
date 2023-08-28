@@ -651,6 +651,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     .get(&relationship_id)
                                     .cloned()
                                 {
+                                    // Generate code for default value.
                                     let value_ty = self.check_def_sealed(const_def_id);
                                     hir_props.push(TypedHirNode(
                                         ontol_hir::Kind::Prop(
@@ -678,9 +679,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     continue;
                                 }
 
-                                // match self.relations.value_generators.get(&relationship_id) {
-                                //     _ => {}
-                                // }
+                                if let Some(_) =
+                                    self.relations.value_generators.get(&relationship_id)
+                                {
+                                    // Value generators should be handled in data storage,
+                                    // so leave these fields out when not mentioned.
+                                    continue;
+                                }
 
                                 ctx.missing_properties
                                     .entry(ctx.arm)
