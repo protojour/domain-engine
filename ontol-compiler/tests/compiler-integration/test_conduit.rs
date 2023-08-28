@@ -83,5 +83,6 @@ fn test_map_conduit_no_tags_in_db_object() {
 // BUG: There are many things that must be fixed for this to work:
 #[test]
 fn test_map_conduit_contrived_signup() {
-    TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile_fail();
+    TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()])
+        .compile_ok(|_test| {});
 }

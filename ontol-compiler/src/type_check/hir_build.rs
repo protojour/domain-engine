@@ -642,6 +642,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 if matches!(match_property.property_id.role, Role::Object) {
                                     continue;
                                 }
+                                if matches!(
+                                    match_property.cardinality.0,
+                                    PropertyCardinality::Optional
+                                ) {
+                                    continue;
+                                }
 
                                 let relationship_id = match_property.property_id.relationship_id;
 
