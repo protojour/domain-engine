@@ -8,7 +8,7 @@ use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{HirFunc, TypedHir, TypedHirNode},
+    typed_hir::{HirFunc, TypedBinder, TypedHir, TypedHirNode},
     types::Type,
     Compiler, SourceSpan,
 };
@@ -61,8 +61,9 @@ pub fn unify_to_function<'m>(
         (expr, expr_builder.var_allocator())
     };
 
-    let unified =
-        Unifier::new(&mut compiler.types, var_allocator).unify(scope_binder.scope, expr)?;
+    let mut unifier = Unifier::new(&mut compiler.types, var_allocator);
+    let unified = unifier.unify(scope_binder.scope, expr)?;
+    let mut var_allocator = unifier.var_allocator;
 
     match unified.typed_binder {
         Some(arg) => {
@@ -79,7 +80,13 @@ pub fn unify_to_function<'m>(
                 body: unified.node,
             })
         }
-        None => Err(UnifierError::NoInputBinder),
+        None => Ok(HirFunc {
+            arg: TypedBinder {
+                var: var_allocator.alloc(),
+                ty: scope_ty,
+            },
+            body: unified.node,
+        }),
     }
 }
 

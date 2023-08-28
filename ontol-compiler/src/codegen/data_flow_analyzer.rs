@@ -74,6 +74,7 @@ where
             ontol_hir::Kind::I64(_) => VarSet::default(),
             ontol_hir::Kind::F64(_) => VarSet::default(),
             ontol_hir::Kind::String(_) => VarSet::default(),
+            ontol_hir::Kind::Const(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
                 let var_deps = self.analyze_node(definition);
                 self.var_dependencies.insert(binder.var, var_deps);

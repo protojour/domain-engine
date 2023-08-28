@@ -133,7 +133,7 @@ impl MapKeyPair {
 pub(super) struct ProcTable {
     pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
-    pub map_calls: Vec<MapCall>,
+    pub procedure_calls: Vec<ProcedureCall>,
     pub propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
 }
 
@@ -141,16 +141,22 @@ impl ProcTable {
     /// Allocate a temporary procedure address for a map call.
     /// This will be resolved to final "physical" ID in the link phase.
     pub(super) fn gen_mapping_addr(&mut self, from: MapKey, to: MapKey) -> Address {
-        let address = Address(self.map_calls.len() as u32);
-        self.map_calls.push(MapCall {
-            mapping: (from, to),
-        });
+        let address = Address(self.procedure_calls.len() as u32);
+        self.procedure_calls.push(ProcedureCall::Map(from, to));
+        address
+    }
+
+    pub(super) fn gen_const_addr(&mut self, const_def_id: DefId) -> Address {
+        let address = Address(self.procedure_calls.len() as u32);
+        self.procedure_calls
+            .push(ProcedureCall::Const(const_def_id));
         address
     }
 }
 
-pub(super) struct MapCall {
-    pub mapping: (MapKey, MapKey),
+pub(super) enum ProcedureCall {
+    Map(MapKey, MapKey),
+    Const(DefId),
 }
 
 /// Perform all codegen tasks

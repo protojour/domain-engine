@@ -14,7 +14,7 @@ map {
         'password': password
         'following': [..follow_username]
     }
-    db.User { // ERROR missing properties `user_id`, `bio`, `image`// NOTE Consider using `match {}`
+    db.User { // ERROR missing properties `user_id`, `image`// NOTE Consider using `match {}`
         'username': username
         'email': email
         'password_hash': password

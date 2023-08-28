@@ -69,6 +69,13 @@ impl<'m> ExprBuilder<'m> {
                     free_vars: Default::default(),
                 },
             ),
+            ontol_hir::Kind::Const(const_def_id) => expr::Expr(
+                expr::Kind::Const(*const_def_id),
+                expr::Meta {
+                    hir_meta: *meta,
+                    free_vars: Default::default(),
+                },
+            ),
             ontol_hir::Kind::Let(..) => panic!(),
             ontol_hir::Kind::Call(proc, params) => {
                 let params: Vec<_> = params.iter().map(|param| self.hir_to_expr(param)).collect();

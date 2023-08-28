@@ -50,6 +50,10 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 write!(f, "{sep}'{string}'")?;
                 Ok(sep.multiline())
             }
+            Kind::Const(const_def_id) => {
+                write!(f, "{sep}(const {const_def_id:?})")?;
+                Ok(sep.multiline())
+            }
             Kind::Let(binder, definition, body) => {
                 write!(f, "{indent}(let ({}", binder.var())?;
                 let multi = self.print(Sep::Space, definition.kind(), f)?;

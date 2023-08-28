@@ -157,6 +157,13 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                 );
             }
+            ontol_hir::Kind::Const(const_def_id) => {
+                let proc = Procedure {
+                    address: self.proc_table.gen_const_addr(const_def_id),
+                    n_params: NParams(0),
+                };
+                self.builder.append(block, Ir::Call(proc), Delta(1), span);
+            }
             ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(*definition, block);
                 self.scope.insert(binder.var, self.builder.top());

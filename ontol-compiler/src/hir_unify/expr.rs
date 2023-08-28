@@ -1,4 +1,4 @@
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
 use crate::{
@@ -42,6 +42,7 @@ pub enum Kind<'m> {
     I64(i64),
     F64(f64),
     String(String),
+    Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
 }
@@ -63,6 +64,7 @@ impl<'m> Kind<'m> {
             Self::I64(int) => format!("i64({int})"),
             Self::F64(float) => format!("f64({float})"),
             Self::String(string) => format!("String({string})"),
+            Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
             Self::Push(var, _) => format!("Push({var})"),
         }

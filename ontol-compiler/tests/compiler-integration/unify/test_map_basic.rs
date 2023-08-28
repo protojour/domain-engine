@@ -205,6 +205,86 @@ fn test_map_value_to_map_func() {
 }
 
 #[test]
+fn test_map_into_default_field_using_default_value() {
+    "
+    pub type empty {}
+    pub type target {
+        rel .'field'(rel .default := 'Default!'): string
+    }
+    map {
+        empty {}
+        target {}
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("empty", "target"),
+            json!({}),
+            json!({ "field": "Default!" }),
+        );
+        test.assert_domain_map(
+            ("target", "empty"),
+            json!({ "field": "whatever" }),
+            json!({}),
+        );
+    });
+}
+
+#[test]
+fn test_map_into_default_field_using_provided_value() {
+    "
+    pub type required {
+        rel .'field': string
+    }
+    pub type target {
+        rel .'field'(rel .default := 'Default!'): string
+    }
+    map {
+        required { 'field': val }
+        target { 'field': val }
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("required", "target"),
+            json!({ "field": "This" }),
+            json!({ "field": "This" }),
+        );
+        test.assert_domain_map(
+            ("target", "required"),
+            json!({ "field": "This" }),
+            json!({ "field": "This" }),
+        );
+    });
+}
+
+#[test]
+fn test_map_into_default_field_using_map_provided() {
+    "
+    pub type empty {}
+    pub type target {
+        rel .'field'(rel .default := 'Default!'): string
+    }
+    map {
+        empty {}
+        target { 'field': 'Mapped!' }
+    }
+    "
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("empty", "target"),
+            json!({}),
+            json!({ "field": "Mapped!" }),
+        );
+        test.assert_domain_map(
+            ("target", "empty"),
+            json!({ "field": "whatever" }),
+            json!({}),
+        );
+    });
+}
+
+#[test]
 fn test_deep_structural_map() {
     "
     pub type foo

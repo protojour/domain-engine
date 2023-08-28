@@ -410,7 +410,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
-        //
         let actual_struct_flags = match modifier {
             Some(ExprStructModifier::Match) => ontol_hir::StructFlags::MATCH,
             None => ontol_hir::StructFlags::empty(),
@@ -629,10 +628,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     prop_variants,
                                 ),
                                 Meta {
-                                    ty: self.types.intern(Type::Primitive(
-                                        PrimitiveKind::Unit,
-                                        DefId::unit(),
-                                    )),
+                                    ty: self.unit_type(),
                                     span: *prop_span,
                                 },
                             ));
@@ -640,16 +636,58 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
                             for (name, match_property) in match_properties {
-                                if !match_property.used
-                                    && !matches!(match_property.property_id.role, Role::Object)
-                                {
-                                    ctx.missing_properties
-                                        .entry(ctx.arm)
-                                        .or_default()
-                                        .entry(span)
-                                        .or_default()
-                                        .push(name.into());
+                                if match_property.used {
+                                    continue;
                                 }
+                                if matches!(match_property.property_id.role, Role::Object) {
+                                    continue;
+                                }
+
+                                let relationship_id = match_property.property_id.relationship_id;
+
+                                if let Some(const_def_id) = self
+                                    .relations
+                                    .default_const_objects
+                                    .get(&relationship_id)
+                                    .cloned()
+                                {
+                                    let value_ty = self.check_def_sealed(const_def_id);
+                                    hir_props.push(TypedHirNode(
+                                        ontol_hir::Kind::Prop(
+                                            ontol_hir::Optional(false),
+                                            struct_binder.var,
+                                            match_property.property_id,
+                                            vec![ontol_hir::PropVariant::Singleton(
+                                                ontol_hir::Attribute {
+                                                    rel: Box::new(self.unit_node_no_span()),
+                                                    val: Box::new(TypedHirNode(
+                                                        ontol_hir::Kind::Const(const_def_id),
+                                                        Meta {
+                                                            ty: value_ty,
+                                                            span: NO_SPAN,
+                                                        },
+                                                    )),
+                                                },
+                                            )],
+                                        ),
+                                        Meta {
+                                            ty: self.unit_type(),
+                                            span: NO_SPAN,
+                                        },
+                                    ));
+                                    continue;
+                                }
+
+                                // match self.relations.value_generators.get(&relationship_id) {
+                                //     _ => {}
+                                // }
+
+                                ctx.missing_properties
+                                    .entry(ctx.arm)
+                                    .or_default()
+                                    .entry(span)
+                                    .or_default()
+                                    .push(name.into());
                             }
                         }
 

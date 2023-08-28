@@ -1,6 +1,6 @@
 use std::{fmt::Debug, ops::Index};
 
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc};
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
 pub mod display;
@@ -72,6 +72,8 @@ pub enum Kind<'a, L: Lang> {
     F64(f64),
     /// A string
     String(String),
+    /// Const procedure
+    Const(DefId),
     /// A let expression
     Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
     /// A function call
