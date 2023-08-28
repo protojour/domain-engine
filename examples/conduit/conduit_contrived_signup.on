@@ -1,0 +1,27 @@
+use 'conduit_db' as db
+
+pub type signup {
+    rel .'username': string
+    rel .'email': string
+    rel .'password': string
+    rel .'following': [string]
+}
+
+map {
+    signup match {
+        'username': username
+        'email': email
+        'password': password
+        'following': [..follow_username]
+    }
+    db.User { // ERROR missing properties `user_id`, `bio`, `image`// NOTE Consider using `match {}`
+        'username': username
+        'email': email
+        'password_hash': password
+        'following': [
+            ..db.User match {
+                'username': follow_username
+            }
+        ]
+    }
+}

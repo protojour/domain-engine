@@ -39,6 +39,11 @@ pub mod conduit {
         include_str!("../../examples/conduit/conduit_public.on"),
     );
 
+    pub const CONDUIT_CONTRIVED_SIGNUP: Example = (
+        SourceName("conduit_contrived_signup"),
+        include_str!("../../examples/conduit/conduit_contrived_signup.on"),
+    );
+
     pub const BLOG_POST_PUBLIC: Example = (
         SourceName("blog_post_public"),
         include_str!("../../examples/conduit/blog_post_public.on"),
