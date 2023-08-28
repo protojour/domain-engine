@@ -685,8 +685,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     continue;
                                 }
 
-                                if let Some(_) =
-                                    self.relations.value_generators.get(&relationship_id)
+                                if self
+                                    .relations
+                                    .value_generators
+                                    .get(&relationship_id)
+                                    .is_some()
                                 {
                                     // Value generators should be handled in data storage,
                                     // so leave these fields out when not mentioned.
