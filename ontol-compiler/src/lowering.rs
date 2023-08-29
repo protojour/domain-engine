@@ -819,7 +819,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut root_defs: RootDefs = [def_id].into();
 
-        self.compiler.namespaces.docs.insert(def_id, def_stmt.docs);
+        self.compiler
+            .namespaces
+            .docs
+            .entry(def_id)
+            .or_default()
+            .extend(def_stmt.docs);
 
         {
             // The inherent relation block on the type uses the just defined
