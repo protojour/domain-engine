@@ -151,7 +151,9 @@ impl<'m> Compiler<'m> {
             });
         }
 
-        let package_def_id = self.define_package(package.package_id);
+        let package_def_id = self.defs.alloc_def_id(package.package_id);
+        self.define_package(package_def_id);
+
         self.packages
             .loaded_packages
             .insert(package.reference, package_def_id);

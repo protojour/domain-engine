@@ -334,23 +334,26 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
-    pub fn define_package(&mut self, package_id: PackageId) -> DefId {
-        let def_id = self.defs.alloc_def_id(package_id);
+    pub fn define_package(&mut self, package_def_id: DefId) -> DefId {
+        let package_id = package_def_id.package_id();
         self.defs.table.insert(
-            def_id,
+            package_def_id,
             self.defs.mem.bump.alloc(Def {
-                id: def_id,
+                id: package_def_id,
                 package: package_id,
                 span: NO_SPAN,
-                kind: DefKind::Package(package_id),
+                kind: DefKind::Package(package_def_id.package_id()),
             }),
         );
         let ty = self.types.intern(Type::Package);
-        self.def_types.table.insert(def_id, ty);
+        self.def_types.table.insert(package_def_id, ty);
 
         // make sure the namespace exists
-        self.namespaces.get_namespace_mut(package_id, Space::Type);
+        let namespace = self.namespaces.get_namespace_mut(package_id, Space::Type);
 
-        def_id
+        // The name `ontol` is always defined, and refers to the ontol domain
+        namespace.insert("ontol".into(), self.primitives.ontol_domain);
+
+        package_def_id
     }
 }

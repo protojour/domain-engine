@@ -18,7 +18,7 @@ use crate::{
 
 impl<'m> Compiler<'m> {
     pub fn with_ontol(mut self) -> Self {
-        self.define_package(ONTOL_PKG);
+        self.define_package(self.primitives.ontol_domain);
 
         // fundamental types
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);

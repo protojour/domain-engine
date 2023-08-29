@@ -1,6 +1,7 @@
 use ontol_runtime::{serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
-    type_binding::TypeBinding, OntolTest, SourceName, TestCompile, TestPackages,
+    assert_json_io_matches, type_binding::TypeBinding, OntolTest, SourceName, TestCompile,
+    TestPackages,
 };
 use test_log::test;
 
@@ -54,4 +55,28 @@ fn test_relations_are_distinct_for_different_domains() {
         assert_eq!(prop.0.package_id(), foo.def_id().package_id());
         assert_eq!(other_prop.0.package_id(), other_foo.def_id().package_id());
     });
+}
+
+#[test]
+fn ontol_domain_is_defined_in_the_namespace() {
+    "
+    pub type i64 {
+        rel .is: boolean
+    }
+    pub type string {
+        rel .is: ontol.i64
+    }
+    pub type integer {
+        rel .is: string
+    }
+    "
+    .compile_ok(|test| {
+        let [integer] = test.bind(["integer"]);
+        assert_json_io_matches!(integer, Create, 42);
+    });
+}
+
+#[test]
+fn cannot_redefine_ontol() {
+    "pub type ontol // ERROR duplicate type definition".compile_fail();
 }

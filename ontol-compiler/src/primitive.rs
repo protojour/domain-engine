@@ -74,9 +74,14 @@ pub struct Primitives {
     /// The float type.
     pub float: DefId,
 
+    /// 32 bit floating point
     pub f32: DefId,
 
+    /// 64 bit floating point
     pub f64: DefId,
+
+    /// The definition of the ontol domain
+    pub ontol_domain: DefId,
 
     /// Builtin relations
     pub relations: OntolRelations,
@@ -147,6 +152,7 @@ impl Primitives {
             f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
             string: defs.add_primitive(PrimitiveKind::String, Some("string")),
+            ontol_domain: defs.alloc_def_id(ONTOL_PKG),
 
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
