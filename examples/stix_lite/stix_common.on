@@ -4,7 +4,7 @@ pub def spec_version {
 }
 
 // placeholder for ONTOL dictionary
-pub def dictionary
+pub def dictionary {}
 
 // FIXME: should maybe be defined in ONTOL_PKG?
 pub def url {

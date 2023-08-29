@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use ontol_parser::{
-    ast::{DefStatement, MapArm, Path, Statement, Type},
+    ast::{DefStatement, MapArm, Path, Statement},
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
@@ -51,12 +51,7 @@ impl State {
                             let name = stmt.ident.0.to_string();
                             types.insert(name, (stmt.clone(), range.clone()));
 
-                            if let Some((ctx_block, _)) = &stmt.ctx_block {
-                                explore(ctx_block, nested, types, level + 1)
-                            }
-                        }
-                        Statement::With(stmt) => {
-                            explore(&stmt.statements.0, nested, types, level + 1)
+                            explore(&stmt.block.0, nested, types, level + 1);
                         }
                         Statement::Rel(stmt) => {
                             for rel in &stmt.relations {
@@ -154,11 +149,6 @@ impl Document {
                         dp.path += &format!(".{}", stmt.ident.0);
                         dp.docs = stmt.docs.join("\n");
                     }
-                    Statement::With(stmt) => {
-                        if let Type::Path(Path::Ident(id)) = &stmt.ty.0 {
-                            dp.path += &format!(".{}", id);
-                        }
-                    }
                     Statement::Rel(stmt) => {
                         dp.docs = stmt.docs.join("\n");
                     }
@@ -201,7 +191,6 @@ impl Document {
                     Token::Sigil(_) => (),
                     Token::Use => (),
                     Token::Def => (),
-                    Token::With => (),
                     Token::Rel => (),
                     Token::Fmt => (),
                     Token::Map => (),

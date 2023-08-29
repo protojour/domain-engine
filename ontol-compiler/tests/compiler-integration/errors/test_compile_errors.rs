@@ -4,7 +4,7 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn error_lex() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `def`, `with`, `rel`, `fmt`, `map`, `pub`"
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
@@ -13,7 +13,7 @@ fn error_comment_span() {
     // This tests that the eror span is correct
     r#"
     /// A comment - don't remove this
-    pub def union // ERROR variants of the union have prefixes that are prefixes of other variants
+    pub def union {} // ERROR variants of the union have prefixes that are prefixes of other variants
 
     def a { fmt '' => 'foo' => . }
     def b { fmt '' => 'foobar' => . }
@@ -26,7 +26,7 @@ fn error_comment_span() {
 
 #[test]
 fn error_invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `def`, `with`, `rel`, `fmt`, `map`, `pub`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`"
         .compile_fail();
 }
 
@@ -49,10 +49,12 @@ fn error_underscore_not_allowed_at_start_of_identifier() {
 #[test]
 fn error_lex_recovery_works() {
     "
-    def foo
-    def bar
-    rel foo 'prop': string
-    rel bar 'prop': integer
+    def foo {
+        rel .'prop': string
+    }
+    def bar {
+        rel .'prop': integer
+    }
     map {
         foo {
             'prop': x
@@ -71,7 +73,7 @@ fn error_lex_recovery_works() {
 #[test]
 fn error_rel_type_not_found() {
     "
-    def foo
+    def foo {}
     rel foo 'bar':
         baz // ERROR type not found
     "
@@ -79,19 +81,10 @@ fn error_rel_type_not_found() {
 }
 
 #[test]
-fn error_duplicate_type() {
-    "
-    def foo
-    def foo // ERROR duplicate type definition
-    "
-    .compile_fail()
-}
-
-#[test]
 fn error_rel_duplicate_anonymous_relation() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel // ERROR unit type `bar` cannot be part of a union
         foo is?: bar
     rel // ERROR duplicate anonymous relationship
@@ -103,8 +96,8 @@ fn error_rel_duplicate_anonymous_relation() {
 #[test]
 fn error_map_union_unit_type() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     def u {
         rel .is?: foo // ERROR unit type `foo` cannot be part of a union
         rel .is?: bar // ERROR unit type `bar` cannot be part of a union
@@ -116,13 +109,16 @@ fn error_map_union_unit_type() {
 #[test]
 fn error_map_union_missing_discriminator() {
     "
-    def foo
-    def bar
-    rel foo 'a': 'constant'
-    rel bar 'b': string
-    def u
-    rel u is?: foo
-    rel u is?: bar // ERROR cannot discriminate type
+    def foo {
+        rel .'a': 'constant'
+    }
+    def bar {
+        rel .'b': string
+    }
+    def u {
+        rel .is?: foo
+        rel .is?: bar // ERROR cannot discriminate type
+    }
     "
     .compile_fail()
 }
@@ -130,10 +126,12 @@ fn error_map_union_missing_discriminator() {
 #[test]
 fn error_map_union_non_uniform_discriminators() {
     "
-    def foo
-    def bar
-    rel foo 'a': 'constant'
-    rel bar 'b': 'other-constant'
+    def foo {
+        rel .'a': 'constant'
+    }
+    def bar {
+        rel .'b': 'other-constant'
+    }
     def u { // ERROR no uniform discriminator found for union variants
         rel .is?: foo
         rel .is?: bar
@@ -167,10 +165,11 @@ fn error_sequence_mix1() {
 #[test]
 fn error_sequence_mix_abstract_object() {
     "
-    def u // ERROR type not representable
-    rel u 'a':
-        integer // NOTE Type of field is abstract
-    rel u 0: string // ERROR invalid mix of relationship type for subject
+    def u { // ERROR type not representable
+        rel .'a':
+            integer // NOTE Type of field is abstract
+        rel .0: string // ERROR invalid mix of relationship type for subject
+    }
     "
     .compile_fail();
 }
@@ -178,9 +177,10 @@ fn error_sequence_mix_abstract_object() {
 #[test]
 fn sequence_overlapping_indices() {
     "
-    def u
-    rel u 0..3: i64
-    rel u 2..4: string // ERROR overlapping indexes
+    def u {
+        rel .0..3: i64
+        rel .2..4: string // ERROR overlapping indexes
+    }
     "
     .compile_fail();
 }
@@ -188,9 +188,10 @@ fn sequence_overlapping_indices() {
 #[test]
 fn error_sequence_ambiguous_infinite_tail() {
     r#"
-    def u
-    rel u 0..: i64
-    rel u 1..: string // ERROR overlapping indexes
+    def u {
+        rel .0..: i64
+        rel .1..: string // ERROR overlapping indexes
+    }
     "#
     .compile_fail();
 }
@@ -198,9 +199,10 @@ fn error_sequence_ambiguous_infinite_tail() {
 #[test]
 fn error_union_in_named_relationship() {
     "
-    def foo
-    rel foo 'a': string
-    rel foo 'a': i64 // ERROR union in named relationship is not supported yet. Make a union type instead.
+    def foo {
+        rel .'a': string
+        rel .'a': i64 // ERROR union in named relationship is not supported yet. Make a union instead.
+    }
     "
     .compile_fail();
 }
@@ -208,21 +210,24 @@ fn error_union_in_named_relationship() {
 #[test]
 fn error_various_monadic_properties() {
     "
-    def foo
-    rel foo 'a': string
+    def foo {
+        rel .'a': string
+    }
     // default foo 'a': 'default'
 
-    def bar
-    // a is either a string or not present
-    rel bar 'maybe'?: string
+    def bar {
+        // a is either a string or not present
+        rel .'maybe'?: string    
 
-    // bar and string may be related via b many times
-    rel bar 'array': [string]
+        // bar and string may be related via b many times
+        rel .'array': [string]
 
-    // a is either a string or null
-    rel bar 'nullable': string
-    // FIXME: Should this work?
-    rel bar 'nullable': () // ERROR union in named relationship is not supported yet. Make a union type instead.
+        // a is either a string or null
+        rel bar 'nullable': string
+
+        // FIXME: Should this work?
+        rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead.
+    }
     "
     .compile_fail()
 }
@@ -230,8 +235,8 @@ fn error_various_monadic_properties() {
 #[test]
 fn error_mix_of_index_and_edge_type() {
     r#"
-    def foo
-    def bar
+    def foo {}
+    def bar {}
 
     rel foo 0(rel .is: bar): string // ERROR cannot mix index relation identifiers and edge types
     "#
@@ -251,8 +256,8 @@ fn error_invalid_subject_types() {
 #[test]
 fn error_invalid_relation_type() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel foo
         uuid: // ERROR invalid relation type
         bar
@@ -263,7 +268,7 @@ fn error_invalid_relation_type() {
 #[test]
 fn error_invalid_fmt_syntax() {
     "
-    fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `with`, `rel`, `fmt`, `map`, `pub`, `=>`
+    fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `rel`, `fmt`, `map`, `pub`, `=>`
     "
     .compile_fail()
 }
@@ -281,7 +286,7 @@ fn error_invalid_fmt_semantics() {
 #[test]
 fn error_spans_are_correct_projected_from_regex_syntax_errors() {
     r#"
-    def lol
+    def lol {}
     rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
     "#
     .compile_fail_then(|errors| {
@@ -313,18 +318,20 @@ fn error_complains_about_non_disambiguatable_string_id() {
 #[test]
 fn error_complains_about_ambiguous_pattern_based_unions() {
     "
-    def foo
-    def bar
-    def barbar
-    def union // ERROR variants of the union have prefixes that are prefixes of other variants
-
-    fmt '' => 'foo' => uuid => foo
-    fmt '' => 'bar' => uuid => bar
-    fmt '' => 'barbar' => uuid => barbar
-
-    rel union is?: foo
-    rel union is?: bar
-    rel union is?: barbar
+    def foo {
+        fmt '' => 'foo' => uuid => .
+    }
+    def bar {
+        fmt '' => 'bar' => uuid => .
+    }
+    def barbar {
+        fmt '' => 'barbar' => uuid => .
+    }
+    def union { // ERROR variants of the union have prefixes that are prefixes of other variants
+        rel .is?: foo
+        rel .is?: bar
+        rel .is?: barbar
+    }
     "
     .compile_fail();
 }
@@ -335,7 +342,7 @@ fn error_compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `def`, `with`, `rel`, `fmt`, `map`, `pub`
+            ! // ERROR parse error: found `!`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),
@@ -346,10 +353,8 @@ fn error_compile_error_in_dependency() {
 #[test]
 fn error_rel_wildcard_span() {
     "
-    with integer {
-        rel . // ERROR Type is sealed and cannot be modified
-            'likes': integer
-    }
+    rel integer // ERROR definition is sealed and cannot be modified
+        'likes': integer
     "
     .compile_fail()
 }
@@ -357,13 +362,13 @@ fn error_rel_wildcard_span() {
 #[test]
 fn error_fail_import_private_type() {
     TestPackages::with_sources([
-        (SourceName("dep"), "def foo"),
+        (SourceName("dep"), "def foo {}"),
         (
             SourceName::root(),
             "
             use 'dep' as dep
             pub def bar {
-                rel . 'foo': dep.foo // ERROR private type
+                rel . 'foo': dep.foo // ERROR private definition
             }
             ",
         ),
@@ -459,7 +464,7 @@ fn error_test_lazy_seal_by_map() {
     }
 
     rel
-        foo // ERROR Type is sealed and cannot be modified
+        foo // ERROR definition is sealed and cannot be modified
         'fail': string
     "
     .compile_fail();
@@ -468,7 +473,7 @@ fn error_test_lazy_seal_by_map() {
 #[test]
 fn error_test_error_object_property_in_foreign_domain() {
     TestPackages::with_sources([
-        (SourceName("foreign"), "pub def foo"),
+        (SourceName("foreign"), "pub def foo {}"),
         (
             SourceName::root(),
             "
@@ -480,7 +485,7 @@ fn error_test_error_object_property_in_foreign_domain() {
 
             pub def baz {
                 rel .'foo'::'baz'
-                    foreign.foo // ERROR Type is sealed and cannot be modified
+                    foreign.foo // ERROR definition is sealed and cannot be modified
             }
             ",
         ),

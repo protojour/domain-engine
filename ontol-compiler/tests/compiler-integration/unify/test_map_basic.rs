@@ -5,10 +5,12 @@ use test_log::test;
 #[test]
 fn test_map_simple() {
     "
-    pub def foo
-    pub def bar
-    rel foo 'f': string
-    rel bar 'b': string
+    pub def foo {
+        rel foo 'f': string
+    }
+    pub def bar {
+        rel bar 'b': string
+    }
     map {
         foo { 'f': x }
         bar { 'b': x }
@@ -56,10 +58,8 @@ fn test_map_value_to_primitive() {
 #[test]
 fn test_meters() {
     "
-    pub def meters
-    pub def millimeters
-    rel meters is: i64
-    rel millimeters is: i64
+    pub def meters { rel .is: i64 }
+    pub def millimeters { rel .is: i64 }
     map {
         meters: x / 1000
         millimeters: x
@@ -74,13 +74,8 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    pub def celsius {
-        rel .is: i64
-    }
-    pub def fahrenheit {
-        rel .is: i64
-    }
-
+    pub def celsius { rel .is: i64 }
+    pub def fahrenheit { rel .is: i64 }
     map {
         celsius: x
         fahrenheit: x * 9 / 5 + 32
@@ -167,10 +162,12 @@ fn test_nested_optional_attribute() {
 #[test]
 fn test_map_value_to_map_no_func() {
     "
-    pub def one
-    pub def two
-    rel one is: string
-    rel two 'a': string
+    pub def one {
+        rel .is: string
+    }
+    pub def two {
+        rel .'a': string
+    }
     map {
         one: x
         two {
@@ -187,10 +184,12 @@ fn test_map_value_to_map_no_func() {
 #[test]
 fn test_map_value_to_map_func() {
     "
-    pub def one
-    pub def two
-    rel one is: i64
-    rel two 'a': i64
+    pub def one {
+        rel .is: i64
+    }
+    pub def two {
+        rel .'a': i64
+    }
     map {
         one: x
         two {
@@ -287,28 +286,25 @@ fn test_map_into_default_field_using_map_provided() {
 #[test]
 fn test_deep_structural_map() {
     "
-    pub def foo
-    def foo_inner
-
-    with foo {
+    pub def foo {
         rel .'a': string
-        rel .'inner': foo_inner
     }
-    with foo_inner {
+    def foo_inner {
         rel .'b': string
         rel .'c': string
     }
+    def foo {
+        rel .'inner': foo_inner
+    }
 
-    pub def bar
-    def bar_inner
-
-    with bar {
+    def bar_inner {}
+    pub def bar {
         rel .'a': string
         rel .'b': string
         rel .'inner': bar_inner
     }
 
-    with bar_inner {
+    def bar_inner {
         rel .'c': string
     }
 
@@ -346,10 +342,12 @@ fn test_deep_structural_map() {
 #[test]
 fn test_map_matching_sequence() {
     "
-    pub def foo
-    pub def bar
-    rel foo 'a': [i64]
-    rel bar 'b': [i64]
+    pub def foo {
+        rel .'a': [i64]
+    }
+    pub def bar {
+        rel .'b': [i64]
+    }
     map {
         foo {
             'a': [..x]
@@ -529,18 +527,15 @@ fn test_sequence_inner_loop() {
 #[test]
 fn test_sequence_flat_map1() {
     "
-    pub def foo
-    def foo_inner
-    pub def bar
-
-    with foo {
+    pub def foo {
         rel .'a': string
+
+        def foo_inner {
+            rel .'b': string
+        }
         rel .'inner': [foo_inner]
     }
-    with foo_inner {
-        rel .'b': string
-    }
-    with bar {
+    pub def bar {
         rel .'a': string
         rel .'b': string
     }

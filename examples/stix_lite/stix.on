@@ -38,7 +38,7 @@ use 'SI' as SI
 /// RFC 4122 defines how one can distinguish between a UUIDv4 and UUIDv5 value. 
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing identifier.
-def identifier
+def identifier {}
 
 def attack-pattern-id {
     fmt '' => 'attack-pattern--' => uuid => .

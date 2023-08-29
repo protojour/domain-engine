@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 
+use indexmap::map::Entry;
 use ontol_parser::{ast, Span};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
@@ -87,29 +88,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Def(def_stmt) => {
                 let ident_span = def_stmt.ident.1.clone();
-                self.named_def(def_stmt, ident_span)
-            }
-            ast::Statement::With(with_stmt) => {
-                let mut root_defs = RootDefs::new();
-                let def_id = self.resolve_type_reference(
-                    with_stmt.ty.0,
-                    &with_stmt.ty.1,
-                    Some(&mut root_defs),
-                )?;
-                let context_fn = move || def_id;
-
-                for spanned_stmt in with_stmt.statements.0 {
-                    match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
-                        Ok(mut defs) => {
-                            root_defs.append(&mut defs);
-                        }
-                        Err(error) => {
-                            self.report_error(error);
-                        }
-                    }
-                }
-
-                Ok(root_defs)
+                self.named_definition(def_stmt, ident_span)
             }
             ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_to_def(rel_stmt, span, block_context)
@@ -810,7 +789,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 match def_id {
                     Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
                         DefKind::Type(TypeDef { public: false, .. }) => {
-                            Err((CompileError::PrivateType, span.clone()))
+                            Err((CompileError::PrivateDefinition, span.clone()))
                         }
                         _ => Ok(*def_id),
                     },
@@ -820,35 +799,34 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_def(&mut self, def_stmt: ast::DefStatement, span: Span) -> Res<RootDefs> {
-        let def_id = match self.named_def_id(Space::Type, &def_stmt.ident.0) {
-            Ok(def_id) => def_id,
-            Err(_) => return Err((CompileError::DuplicateTypeDefinition, def_stmt.ident.1)),
-        };
-        let ident = self.compiler.strings.intern(&def_stmt.ident.0);
-        debug!("{def_id:?}: `{ident}`");
+    fn named_definition(&mut self, def_stmt: ast::DefStatement, span: Span) -> Res<RootDefs> {
+        let (def_id, coinage) = self.named_def_id(Space::Type, &def_stmt.ident.0, &span)?;
+        if matches!(coinage, Coinage::New) {
+            let ident = self.compiler.strings.intern(&def_stmt.ident.0);
+            debug!("{def_id:?}: `{}`", def_stmt.ident.0);
 
-        self.set_def_kind(
-            def_id,
-            DefKind::Type(TypeDef {
-                public: matches!(def_stmt.visibility.0, ast::Visibility::Public),
-                ident: Some(ident),
-                rel_type_for: None,
-                concrete: true,
-            }),
-            &span,
-        );
+            self.set_def_kind(
+                def_id,
+                DefKind::Type(TypeDef {
+                    public: matches!(def_stmt.visibility.0, ast::Visibility::Public),
+                    ident: Some(ident),
+                    rel_type_for: None,
+                    concrete: true,
+                }),
+                &span,
+            );
+        }
 
         let mut root_defs: RootDefs = [def_id].into();
 
         self.compiler.namespaces.docs.insert(def_id, def_stmt.docs);
 
-        if let Some((ctx_block, _span)) = def_stmt.ctx_block {
+        {
             // The inherent relation block on the type uses the just defined
             // type as its context
             let context_fn = move || def_id;
 
-            for spanned_stmt in ctx_block {
+            for spanned_stmt in def_stmt.block.0 {
                 match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
@@ -888,16 +866,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_def_id(&mut self, space: Space, ident: &String) -> Result<DefId, DefId> {
-        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+    fn named_def_id(&mut self, space: Space, ident: &String, span: &Span) -> Res<(DefId, Coinage)> {
         match self
             .compiler
             .namespaces
             .get_namespace_mut(self.src.package_id, space)
-            .insert(ident.clone(), def_id)
+            .entry(ident.clone())
         {
-            Some(old_def_id) => Err(old_def_id),
-            None => Ok(def_id),
+            Entry::Occupied(occupied) => {
+                if occupied.get().package_id() == self.src.package_id {
+                    Ok((*occupied.get(), Coinage::Used))
+                } else {
+                    Err((
+                        CompileError::TODO(smart_format!("definition of external identifier")),
+                        span.clone(),
+                    ))
+                }
+            }
+            Entry::Vacant(vacant) => {
+                let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+                vacant.insert(def_id);
+                Ok((def_id, Coinage::New))
+            }
         }
     }
 
@@ -926,6 +916,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
             span: self.src.span(span),
         }
     }
+}
+
+enum Coinage {
+    New,
+    Used,
 }
 
 enum RelationKey {

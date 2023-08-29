@@ -78,5 +78,5 @@ fn ontol_domain_is_defined_in_the_namespace() {
 
 #[test]
 fn cannot_redefine_ontol() {
-    "pub def ontol // ERROR duplicate type definition".compile_fail();
+    "pub def ontol {} // ERROR TODO: definition of external identifier".compile_fail();
 }

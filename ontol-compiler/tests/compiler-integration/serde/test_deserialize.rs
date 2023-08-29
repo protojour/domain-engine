@@ -8,7 +8,7 @@ use test_log::test;
 
 #[test]
 fn deserialize_empty_type() {
-    "pub def foo".compile_ok(|test| {
+    "pub def foo {}".compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
         assert_error_msg!(
             create_de(&foo).data(json!(42)),
@@ -28,7 +28,7 @@ fn deserialize_empty_type() {
 #[test]
 fn deserialize_is_i64() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is: i64
     "
     .compile_ok(|test| {
@@ -50,7 +50,7 @@ fn deserialize_is_i64() {
 #[test]
 fn deserialize_is_maybe_i64() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is?: i64
     "
     .compile_ok(|test| {
@@ -72,7 +72,7 @@ fn deserialize_is_maybe_i64() {
 #[test]
 fn deserialize_string() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is?: string
     "
     .compile_ok(|test| {
@@ -92,7 +92,7 @@ fn deserialize_string() {
 #[test]
 fn deserialize_object_properties() {
     "
-    pub def obj
+    pub def obj {}
     rel obj 'a': string
     rel obj 'b': i64
     "
@@ -121,7 +121,7 @@ fn deserialize_object_properties() {
 #[test]
 fn deserialize_read_only_property_error() {
     "
-    pub def obj
+    pub def obj {}
     rel obj 'created'(rel .gen: create_time): datetime
     "
     .compile_ok(|test| {
@@ -136,9 +136,9 @@ fn deserialize_read_only_property_error() {
 #[test]
 fn deserialize_nested() {
     "
-    pub def one
-    pub def two
-    def three
+    pub def one {}
+    pub def two {}
+    def three {}
     rel one 'x': two
     rel one 'y': three
     rel two 'y': three
@@ -161,8 +161,8 @@ fn deserialize_nested() {
 #[test]
 fn deserialize_recursive() {
     "
-    pub def foo
-    pub def bar
+    pub def foo {}
+    pub def bar {}
     rel foo 'b': bar
     rel bar 'f': foo
     "
@@ -184,7 +184,7 @@ fn deserialize_recursive() {
 #[test]
 fn deserialize_union_of_primitives() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is?: string
     rel foo is?: i64
     "
@@ -205,7 +205,7 @@ fn deserialize_union_of_primitives() {
 #[test]
 fn deserialize_string_constant() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is?: 'my_value'
     "
     .compile_ok(|test| {
@@ -228,7 +228,7 @@ fn deserialize_string_constant() {
 #[test]
 fn deserialize_finite_non_uniform_sequence() {
     "
-    pub def foo
+    pub def foo {}
     rel foo 0: i64
     rel foo 1: 'a'
     "
@@ -256,7 +256,7 @@ fn deserialize_finite_non_uniform_sequence() {
 #[test]
 fn deserialize_finite_uniform_sequence() {
     "
-    pub def foo
+    pub def foo {}
     rel foo ..2: i64
     "
     .compile_ok(|test| {
@@ -283,7 +283,7 @@ fn deserialize_finite_uniform_sequence() {
 #[test]
 fn deserialize_string_union() {
     "
-    pub def foo
+    pub def foo {}
     rel foo is?: 'a'
     rel foo is?: 'b'
     "
@@ -303,15 +303,16 @@ fn deserialize_string_union() {
 #[test]
 fn deserialize_map_union() {
     "
-    pub def foo
-    pub def bar
+    pub def foo {}
+    pub def bar {}
     rel foo 'variant': 'foo'
     rel bar 'variant': 'bar'
     rel bar 'prop': i64
 
-    pub def union
-    rel union is?: foo
-    rel union is?: bar
+    pub def union {
+        rel .is?: foo
+        rel .is?: bar
+    }
     "
     .compile_ok(|test| {
         let [union] = test.bind(["union"]);

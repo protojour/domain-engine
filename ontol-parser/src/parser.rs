@@ -6,7 +6,6 @@ use smartstring::alias::String;
 use crate::ast::{
     ExprPattern, FmtStatement, MapArm, Path, Pattern, SeqPatternElement, StructPattern,
     StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
-    WithStatement,
 };
 
 use super::{
@@ -54,16 +53,11 @@ fn use_statement() -> impl AstParser<UseStatement> {
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     recursive(|stmt_parser| {
         let def_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Def));
-        let with_stmt = spanned(with_statement(stmt_parser.clone())).map(span_map(Statement::With));
         let rel_stmt = spanned(rel_statement(stmt_parser)).map(span_map(Statement::Rel));
         let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
         let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
 
-        def_stmt
-            .or(with_stmt)
-            .or(rel_stmt)
-            .or(fmt_stmt)
-            .or(map_stmt)
+        def_stmt.or(rel_stmt).or(fmt_stmt).or(map_stmt)
     })
 }
 
@@ -72,7 +66,9 @@ fn type_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPa
         .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Def))
         .then(spanned(ident()))
-        .then(spanned(stmt_parser.repeated().delimited_by(open('{'), close('}'))).or_not())
+        .then(spanned(
+            stmt_parser.repeated().delimited_by(open('{'), close('}')),
+        ))
         .map(|((((docs, public), kw), ident), ctx_block)| DefStatement {
             docs,
             visibility: match public {
@@ -81,19 +77,8 @@ fn type_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPa
             },
             kw,
             ident,
-            ctx_block,
+            block: ctx_block,
         })
-}
-
-fn with_statement(
-    stmt_parser: impl AstParser<Spanned<Statement>>,
-) -> impl AstParser<WithStatement> {
-    keyword(Token::With)
-        .then(spanned(named_type()))
-        .then(spanned(
-            stmt_parser.repeated().delimited_by(open('{'), close('}')),
-        ))
-        .map(|((kw, ty), statements)| WithStatement { kw, ty, statements })
 }
 
 fn rel_statement(
@@ -592,7 +577,7 @@ mod tests {
     fn parse_def() {
         let source = "
         /// doc comment
-        def foo
+        def foo {}
         /// doc comment
         def bar {
             rel a '': b

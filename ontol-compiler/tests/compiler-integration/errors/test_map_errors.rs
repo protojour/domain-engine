@@ -18,7 +18,7 @@ fn map_incorrect_function_arguments() {
 #[test]
 fn map_obj_non_domain_type_and_unit_type() {
     "
-    def foo
+    def foo {}
     map {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
@@ -32,8 +32,8 @@ fn map_obj_non_domain_type_and_unit_type() {
 #[test]
 fn map_attribute_mismatch() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel foo 'prop0': bar
     rel foo 'prop1': bar
     rel foo 'prop2': bar
@@ -63,8 +63,8 @@ fn map_missing_attributes_in_match_is_ok() {
 #[test]
 fn map_duplicate_unknown_property() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel foo 'a': bar
     map {
         foo {
@@ -81,8 +81,8 @@ fn map_duplicate_unknown_property() {
 #[test]
 fn map_type_mismatch_simple() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel foo 'prop': string
     rel bar 'prop': i64
     map {
@@ -103,8 +103,8 @@ fn map_type_mismatch_simple() {
 #[test]
 fn map_type_mismatch_in_func() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel foo 'prop': string
     rel bar 'prop': i64
     map {
@@ -124,13 +124,15 @@ fn map_type_mismatch_in_func() {
 #[test]
 fn map_sequence_mismatch() {
     "
-    def foo
-    rel foo 'a': [string]
-    rel foo 'b': [string]
+    def foo {
+        rel .'a': [string]
+        rel .'b': [string]
+    }
 
-    def bar
-    rel bar 'a': string
-    rel bar 'b': [i64]
+    def bar {
+        rel .'a': string
+        rel .'b': [i64]
+    }
 
     map {
         foo {
@@ -167,8 +169,8 @@ fn array_map_without_brackets() {
 #[test]
 fn only_entities_may_have_reverse_relationship() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     rel [foo] 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
     rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
     "

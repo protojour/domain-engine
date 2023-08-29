@@ -7,8 +7,9 @@ use test_log::test;
 #[test]
 fn constant_string_pattern() {
     "
-    pub def foo
-    fmt '' => 'foo' => foo
+    pub def foo {
+        fmt '' => 'foo' => .
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -23,8 +24,9 @@ fn constant_string_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    pub def foobar
-    fmt '' => 'foo' => 'bar' => foobar
+    pub def foobar {
+        fmt '' => 'foo' => 'bar' => .
+    }
     "
     .compile_ok(|test| {
         let [foobar] = test.bind(["foobar"]);
@@ -39,8 +41,9 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    pub def foo
-    fmt '' => 'foo/' => uuid => foo
+    pub def foo {
+        fmt '' => 'foo/' => uuid => .
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -64,15 +67,16 @@ fn uuid_in_string_constructor_pattern() {
 #[test]
 fn test_string_pattern_constructor_union() {
     "
-    def foo
-    def bar
-    pub def foobar
-
-    fmt '' => 'foo/' => uuid => foo
-    fmt '' => 'bar/' => uuid => bar
-
-    rel foobar is?: foo
-    rel foobar is?: bar
+    def foo {
+        fmt '' => 'foo/' => uuid => .
+    }
+    def bar {
+        fmt '' => 'bar/' => uuid => .
+    }
+    pub def foobar {
+        rel .is?: foo
+        rel .is?: bar
+    }
     "
     .compile_ok(|test| {
         let [foobar] = test.bind(["foobar"]);
@@ -96,8 +100,9 @@ fn test_string_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    pub def foo
-    rel foo 'prop': /abc*/
+    pub def foo {
+        rel .'prop': /abc*/
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -114,8 +119,9 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    pub def re
-    fmt '' => /a/ => /bc*/ => re
+    pub def re {
+        fmt '' => /a/ => /bc*/ => .
+    }
     "
     .compile_ok(|test| {
         let [re] = test.bind(["re"]);
@@ -159,8 +165,9 @@ fn test_string_patterns() {
 #[test]
 fn regex_named_group_as_relation() {
     "
-    def lol
-    rel lol is: /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
+    def lol {
+        rel .is: /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
+    }
     "
     .compile_fail()
 }

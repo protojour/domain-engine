@@ -222,10 +222,10 @@ const WORK: &str = "
 pub def worker_id { fmt '' => 'worker/' => uuid => . }
 pub def tech_id { fmt '' => 'tech/' => uuid => . }
 
-pub def worker
-pub def technology
+pub def worker {}
+pub def technology {}
 
-with worker {
+def worker {
     rel .'ID': worker_id
     rel worker_id identifies: .
     rel .'name': string
@@ -233,7 +233,7 @@ with worker {
     rel .'technologies': [technology]
 }
 
-with technology {
+def technology {
     rel .'ID': tech_id
     rel tech_id identifies: .
     rel .'name': string
@@ -244,10 +244,10 @@ const DEV: &str = "
 pub def lang_id { fmt '' => uuid => . }
 pub def dev_id { fmt '' => uuid => . }
 
-pub def language
-pub def developer
+pub def language {}
+pub def developer {}
 
-with language {
+def language {
     rel .'id': lang_id
     rel lang_id identifies: .
 
@@ -255,7 +255,7 @@ with language {
     rel .'developers': [developer]
 }
 
-with developer {
+def developer {
     rel .'id': dev_id
     rel dev_id identifies: .
     rel .'name': string

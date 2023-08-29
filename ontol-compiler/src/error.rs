@@ -32,8 +32,7 @@ pub enum CompileError {
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
     NotCallable,
     TypeNotFound,
-    PrivateType,
-    DuplicateTypeDefinition,
+    PrivateDefinition,
     NamespaceNotFound,
     InvalidType,
     InvalidInteger,
@@ -80,7 +79,7 @@ pub enum CompileError {
     IncompatibleLiteral,
     CannotGenerateValue(String),
     TypeNotRepresentable,
-    MutationOfSealedType,
+    MutationOfSealedDef,
     IntersectionOfDisjointTypes,
     CircularSubtypingRelation,
     AmbiguousNumberResolution,
@@ -109,10 +108,7 @@ impl std::fmt::Display for CompileError {
             ),
             Self::NotCallable => write!(f, "not callable"),
             Self::TypeNotFound => write!(f, "type not found"),
-            Self::PrivateType => write!(f, "private type"),
-            Self::DuplicateTypeDefinition => {
-                write!(f, "duplicate type definition")
-            }
+            Self::PrivateDefinition => write!(f, "private definition"),
             Self::NamespaceNotFound => write!(f, "namespace not found"),
             Self::InvalidType => write!(f, "invalid type"),
             Self::InvalidInteger => write!(f, "invalid integer"),
@@ -184,7 +180,7 @@ impl std::fmt::Display for CompileError {
             ),
             Self::UnionInNamedRelationshipNotSupported => write!(
                 f,
-                "union in named relationship is not supported yet. Make a union type instead."
+                "union in named relationship is not supported yet. Make a union instead."
             ),
             Self::UnsupportedCardinality => write!(f, "unsupported cardinality"),
             Self::InvalidCardinaltyCombinationInUnion => {
@@ -209,7 +205,7 @@ impl std::fmt::Display for CompileError {
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
             Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
             Self::TypeNotRepresentable => write!(f, "type not representable"),
-            Self::MutationOfSealedType => write!(f, "Type is sealed and cannot be modified"),
+            Self::MutationOfSealedDef => write!(f, "definition is sealed and cannot be modified"),
             Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
             Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
             Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),

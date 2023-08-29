@@ -66,9 +66,9 @@ fn test_repr_error4() {
 #[test]
 fn error_circular_subtyping() {
     "
-    def foo
-    def bar
-    def baz
+    def foo {}
+    def bar {}
+    def baz {}
     rel foo is: bar // ERROR Circular subtyping relation
     rel bar is: baz // ERROR Circular subtyping relation
     rel baz is: foo // ERROR Circular subtyping relation

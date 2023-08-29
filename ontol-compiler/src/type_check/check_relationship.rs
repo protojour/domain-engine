@@ -456,7 +456,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_not_sealed(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
         if let Some(def_id) = ty.get_single_def_id() {
             if self.seal_ctx.is_sealed(def_id) {
-                self.error(CompileError::MutationOfSealedType, span);
+                self.error(CompileError::MutationOfSealedDef, span);
             }
         }
     }

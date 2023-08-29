@@ -12,8 +12,8 @@ use test_log::test;
 #[test]
 fn id_cannot_identify_two_things() {
     "
-    def foo
-    def bar
+    def foo {}
+    def bar {}
     def id {
         rel .identifies: foo
         rel .identifies: bar // ERROR already identifies a type
@@ -401,7 +401,7 @@ fn recursive_entity_union() {
     pub def plant_id { fmt '' => 'plant/' => string => . }
     pub def owner_id { fmt '' => string => . }
 
-    pub def lifeform
+    pub def lifeform {}
     pub def animal {
         rel animal_id identifies: .
         rel .'class': 'animal'

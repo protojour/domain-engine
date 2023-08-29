@@ -13,7 +13,6 @@ pub enum Token {
     Sigil(char),
     Use,
     Def,
-    With,
     Rel,
     Fmt,
     Map,
@@ -32,7 +31,6 @@ impl Display for Token {
             Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
             Self::Use => write!(f, "`use`"),
             Self::Def => write!(f, "`def`"),
-            Self::With => write!(f, "`with`"),
             Self::Rel => write!(f, "`rel`"),
             Self::Fmt => write!(f, "`fmt`"),
             Self::Map => write!(f, "`map`"),
@@ -52,7 +50,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let ident = ident().map(|ident| match ident.as_str() {
         "use" => Token::Use,
         "def" => Token::Def,
-        "with" => Token::With,
         "rel" => Token::Rel,
         "fmt" => Token::Fmt,
         "map" => Token::Map,

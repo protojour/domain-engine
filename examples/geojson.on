@@ -125,19 +125,21 @@ def GeometryOrNull {
 /// A Feature object represents a spatially bounded thing.  Every Feature
 /// object is a GeoJSON object no matter where it occurs in a GeoJSON
 /// text.
-def Feature
-rel Feature 'type': 'Feature'
-rel Feature 'geometry': GeometryOrNull
+def Feature {
+    rel .'type': 'Feature'
+    rel .'geometry': GeometryOrNull
 
-// FIXME: Features is a map of 'anything'.
-// This could be a good use case for generics in ONTOL.
-rel Feature 'properties': ()
+    // FIXME: Features is a map of 'anything'.
+    // This could be a good use case for generics in ONTOL.
+    rel .'properties': ()
+}
 
 /// A GeoJSON object with the type "FeatureCollection" is a
 /// FeatureCollection object.  A FeatureCollection object has a member
 /// with the name "features".  The value of "features" is a JSON array.
 /// Each element of the array is a Feature object as defined above.  It
 /// is possible for this array to be empty.
-def FeatureCollection
-rel FeatureCollection 'type': 'FeatureCollection'
-rel FeatureCollection 'features': [Feature]
+def FeatureCollection {
+    rel .'type': 'FeatureCollection'
+    rel .'features': [Feature]
+}

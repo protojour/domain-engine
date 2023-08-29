@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "pub def foo".compile_ok(|test| {
+    "pub def foo {}".compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {});
     });
@@ -15,8 +15,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_value_type() {
     "
-    pub def foo
-    rel foo is: string
+    pub def foo { rel .is: string }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -53,8 +52,7 @@ fn test_serde_booleans() {
 #[test]
 fn test_serde_map_type() {
     "
-    pub def foo
-    rel foo 'a': string
+    pub def foo { rel .'a': string }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -65,8 +63,8 @@ fn test_serde_map_type() {
 #[test]
 fn test_serde_complex_type() {
     "
-    pub def foo
-    def bar
+    pub def foo {}
+    def bar {}
     rel foo 'a': string
     rel foo 'b': bar
     rel bar 'c': string
@@ -80,9 +78,10 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    pub def t
-    rel t 0: string
-    rel t 1: i64
+    pub def t {
+        rel .0: string
+        rel .1: i64
+    }
     "
     .compile_ok(|test| {
         let [t] = test.bind(["t"]);
@@ -93,9 +92,10 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    pub def u
-    rel u is?: 'a'
-    rel u is?: 'b'
+    pub def u {
+        rel .is?: 'a'
+        rel .is?: 'b'
+    }
     "
     .compile_ok(|test| {
         let [u] = test.bind(["u"]);
@@ -106,12 +106,14 @@ fn test_serde_value_union1() {
 #[test]
 fn test_serde_string_or_unit() {
     "
-    def string-or-unit
-    rel string-or-unit is?: string
-    rel string-or-unit is?: ()
+    def string-or-unit {
+        rel .is?: string
+        rel .is?: ()
+    }
 
-    pub def foo
-    rel foo 'a': string-or-unit
+    pub def foo {
+        rel .'a': string-or-unit
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -123,16 +125,18 @@ fn test_serde_string_or_unit() {
 #[test]
 fn test_serde_map_union() {
     "
-    def foo
-    def bar
-    rel foo 'type': 'foo'
-    rel foo 'c': i64
-    rel bar 'type': 'bar'
-    rel bar 'd': i64
-
-    pub def u
-    rel u is?: foo
-    rel u is?: bar
+    def foo {
+        rel .'type': 'foo'
+        rel .'c': i64
+    }
+    def bar {
+        rel .'type': 'bar'
+        rel .'d': i64
+    }
+    pub def u {
+        rel .is?: foo
+        rel .is?: bar
+    }
     "
     .compile_ok(|test| {
         let [u] = test.bind(["u"]);
@@ -143,7 +147,7 @@ fn test_serde_map_union() {
 #[test]
 fn test_serde_noop_intersection() {
     "
-    def bar
+    def bar {}
     pub def foo {
         rel .is: bar
         rel .'foobar': bar
@@ -158,8 +162,9 @@ fn test_serde_noop_intersection() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    pub def foo
-    rel foo 's': [string]
+    pub def foo {
+        rel .'s': [string]
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -171,11 +176,12 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    pub def foo
-    rel foo  ..2: i64
-    rel foo 2..4: string
-    rel foo 5..6: i64
-    rel foo 6.. : i64
+    pub def foo {
+        rel .  ..2: i64
+        rel . 2..4: string
+        rel . 5..6: i64
+        rel . 6.. : i64
+    }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -191,8 +197,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    pub def my_id
-    rel my_id is: uuid
+    pub def my_id { rel .is: uuid }
     "
     .compile_ok(|test| {
         let [my_id] = test.bind(["my_id"]);
@@ -215,8 +220,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    pub def my_dt
-    rel my_dt is: datetime
+    pub def my_dt { rel .is: datetime }
     "
     .compile_ok(|test| {
         let [my_dt] = test.bind(["my_dt"]);
@@ -363,9 +367,9 @@ fn test_prop_union() {
 #[test]
 fn test_jsonml() {
     "
-    def tag
-    def tag_name
-    def attributes
+    def tag {}
+    def tag_name {}
+    def attributes {}
 
     pub def element {
         rel .is?: tag

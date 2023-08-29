@@ -3,18 +3,21 @@ pub def artist {
     rel .'name': string
 }
 
-pub def record
-rel record 'name': string
+pub def record {
+    rel .'name': string
+}
 
 pub def instrument-id {
     fmt '' => 'instrument/' => uuid => .
 }
 
-pub def instrument
-rel instrument 'ID'(rel .gen: auto)|id: instrument-id
-rel instrument 'name': string
+pub def instrument {
+    rel .'ID'(rel .gen: auto)|id: instrument-id
+    rel .'name': string
+}
 
-pub def plays
-rel plays 'how_much': string
+pub def plays {
+    rel .'how_much': string
+}
 
 rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]
