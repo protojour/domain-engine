@@ -85,9 +85,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(Default::default())
             }
-            ast::Statement::Type(type_stmt) => {
-                let ident_span = type_stmt.ident.1.clone();
-                self.define_type(type_stmt, ident_span)
+            ast::Statement::Def(def_stmt) => {
+                let ident_span = def_stmt.ident.1.clone();
+                self.named_def(def_stmt, ident_span)
             }
             ast::Statement::With(with_stmt) => {
                 let mut root_defs = RootDefs::new();
@@ -820,18 +820,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define_type(&mut self, type_stmt: ast::TypeStatement, span: Span) -> Res<RootDefs> {
-        let def_id = match self.named_def_id(Space::Type, &type_stmt.ident.0) {
+    fn named_def(&mut self, def_stmt: ast::DefStatement, span: Span) -> Res<RootDefs> {
+        let def_id = match self.named_def_id(Space::Type, &def_stmt.ident.0) {
             Ok(def_id) => def_id,
-            Err(_) => return Err((CompileError::DuplicateTypeDefinition, type_stmt.ident.1)),
+            Err(_) => return Err((CompileError::DuplicateTypeDefinition, def_stmt.ident.1)),
         };
-        let ident = self.compiler.strings.intern(&type_stmt.ident.0);
+        let ident = self.compiler.strings.intern(&def_stmt.ident.0);
         debug!("{def_id:?}: `{ident}`");
 
         self.set_def_kind(
             def_id,
             DefKind::Type(TypeDef {
-                public: matches!(type_stmt.visibility.0, ast::Visibility::Public),
+                public: matches!(def_stmt.visibility.0, ast::Visibility::Public),
                 ident: Some(ident),
                 rel_type_for: None,
                 concrete: true,
@@ -841,9 +841,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut root_defs: RootDefs = [def_id].into();
 
-        self.compiler.namespaces.docs.insert(def_id, type_stmt.docs);
+        self.compiler.namespaces.docs.insert(def_id, def_stmt.docs);
 
-        if let Some((ctx_block, _span)) = type_stmt.ctx_block {
+        if let Some((ctx_block, _span)) = def_stmt.ctx_block {
             // The inherent relation block on the type uses the just defined
             // type as its context
             let context_fn = move || def_id;

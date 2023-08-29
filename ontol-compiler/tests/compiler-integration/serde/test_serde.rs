@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "pub type foo".compile_ok(|test| {
+    "pub def foo".compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {});
     });
@@ -15,7 +15,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_value_type() {
     "
-    pub type foo
+    pub def foo
     rel foo is: string
     "
     .compile_ok(|test| {
@@ -27,9 +27,9 @@ fn test_serde_value_type() {
 #[test]
 fn test_serde_booleans() {
     "
-    pub type f { rel .is: false }
-    pub type t { rel .is: true }
-    pub type b { rel .is: boolean }
+    pub def f { rel .is: false }
+    pub def t { rel .is: true }
+    pub def b { rel .is: boolean }
     "
     .compile_ok(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
@@ -53,7 +53,7 @@ fn test_serde_booleans() {
 #[test]
 fn test_serde_map_type() {
     "
-    pub type foo
+    pub def foo
     rel foo 'a': string
     "
     .compile_ok(|test| {
@@ -65,8 +65,8 @@ fn test_serde_map_type() {
 #[test]
 fn test_serde_complex_type() {
     "
-    pub type foo
-    type bar
+    pub def foo
+    def bar
     rel foo 'a': string
     rel foo 'b': bar
     rel bar 'c': string
@@ -80,7 +80,7 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    pub type t
+    pub def t
     rel t 0: string
     rel t 1: i64
     "
@@ -93,7 +93,7 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    pub type u
+    pub def u
     rel u is?: 'a'
     rel u is?: 'b'
     "
@@ -106,11 +106,11 @@ fn test_serde_value_union1() {
 #[test]
 fn test_serde_string_or_unit() {
     "
-    type string-or-unit
+    def string-or-unit
     rel string-or-unit is?: string
     rel string-or-unit is?: ()
 
-    pub type foo
+    pub def foo
     rel foo 'a': string-or-unit
     "
     .compile_ok(|test| {
@@ -123,14 +123,14 @@ fn test_serde_string_or_unit() {
 #[test]
 fn test_serde_map_union() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel foo 'type': 'foo'
     rel foo 'c': i64
     rel bar 'type': 'bar'
     rel bar 'd': i64
 
-    pub type u
+    pub def u
     rel u is?: foo
     rel u is?: bar
     "
@@ -143,8 +143,8 @@ fn test_serde_map_union() {
 #[test]
 fn test_serde_noop_intersection() {
     "
-    type bar
-    pub type foo {
+    def bar
+    pub def foo {
         rel .is: bar
         rel .'foobar': bar
     }
@@ -158,7 +158,7 @@ fn test_serde_noop_intersection() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    pub type foo
+    pub def foo
     rel foo 's': [string]
     "
     .compile_ok(|test| {
@@ -171,7 +171,7 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    pub type foo
+    pub def foo
     rel foo  ..2: i64
     rel foo 2..4: string
     rel foo 5..6: i64
@@ -191,7 +191,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    pub type my_id
+    pub def my_id
     rel my_id is: uuid
     "
     .compile_ok(|test| {
@@ -215,7 +215,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    pub type my_dt
+    pub def my_dt
     rel my_dt is: datetime
     "
     .compile_ok(|test| {
@@ -243,7 +243,7 @@ fn test_serde_datetime() {
 #[test]
 fn test_integer_default() {
     "
-    pub type foo {
+    pub def foo {
         rel .'bar'(rel .default := 42): i64
     }
     "
@@ -257,7 +257,7 @@ fn test_integer_default() {
 #[test]
 fn test_i64_range_constrained() {
     "
-    pub type percentage {
+    pub def percentage {
         rel .is: i64
         rel .min: 0
         rel .max: 100
@@ -277,7 +277,7 @@ fn test_i64_range_constrained() {
 #[test]
 fn test_integer_range_constrained() {
     "
-    pub type foo {
+    pub def foo {
         rel .is: integer
         rel .min: -1
         rel .max: 1
@@ -297,7 +297,7 @@ fn test_integer_range_constrained() {
 #[test]
 fn test_f64_range_constrained() {
     "
-    pub type fraction {
+    pub def fraction {
         rel .is: f64
         rel .min: 0
         rel .max: 1
@@ -319,7 +319,7 @@ fn test_f64_range_constrained() {
 #[test]
 fn test_float_default() {
     "
-    pub type foo {
+    pub def foo {
         rel .'bar'(rel .default := 42): f64
     }
     "
@@ -333,7 +333,7 @@ fn test_float_default() {
 #[test]
 fn test_string_default() {
     "
-    pub type foo {
+    pub def foo {
         rel .'bar'(rel .default := 'baz'): string
     }
     "
@@ -347,7 +347,7 @@ fn test_string_default() {
 #[test]
 fn test_prop_union() {
     "
-    pub type vec3 {
+    pub def vec3 {
         /// A vector component
         rel .'x'|'y'|'z': {
             rel .is: i64
@@ -363,11 +363,11 @@ fn test_prop_union() {
 #[test]
 fn test_jsonml() {
     "
-    type tag
-    type tag_name
-    type attributes
+    def tag
+    def tag_name
+    def attributes
 
-    pub type element {
+    pub def element {
         rel .is?: tag
         rel .is?: string
     }

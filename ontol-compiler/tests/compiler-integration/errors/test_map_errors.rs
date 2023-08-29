@@ -18,7 +18,7 @@ fn map_incorrect_function_arguments() {
 #[test]
 fn map_obj_non_domain_type_and_unit_type() {
     "
-    type foo
+    def foo
     map {
         number {} // ERROR expected domain type
         foo { // ERROR no properties expected
@@ -32,8 +32,8 @@ fn map_obj_non_domain_type_and_unit_type() {
 #[test]
 fn map_attribute_mismatch() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel foo 'prop0': bar
     rel foo 'prop1': bar
     rel foo 'prop2': bar
@@ -50,8 +50,8 @@ fn map_attribute_mismatch() {
 #[test]
 fn map_missing_attributes_in_match_is_ok() {
     "
-    type foo { rel .'a'|'b': string }
-    type bar { rel .'c'|'d': string }
+    def foo { rel .'a'|'b': string }
+    def bar { rel .'c'|'d': string }
     map {
         foo match { 'a': x }
         bar { 'c': x } // ERROR missing property `d`// NOTE Consider using `match {}`
@@ -63,8 +63,8 @@ fn map_missing_attributes_in_match_is_ok() {
 #[test]
 fn map_duplicate_unknown_property() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel foo 'a': bar
     map {
         foo {
@@ -81,8 +81,8 @@ fn map_duplicate_unknown_property() {
 #[test]
 fn map_type_mismatch_simple() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel foo 'prop': string
     rel bar 'prop': i64
     map {
@@ -103,8 +103,8 @@ fn map_type_mismatch_simple() {
 #[test]
 fn map_type_mismatch_in_func() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel foo 'prop': string
     rel bar 'prop': i64
     map {
@@ -124,11 +124,11 @@ fn map_type_mismatch_in_func() {
 #[test]
 fn map_sequence_mismatch() {
     "
-    type foo
+    def foo
     rel foo 'a': [string]
     rel foo 'b': [string]
 
-    type bar
+    def bar
     rel bar 'a': string
     rel bar 'b': [i64]
 
@@ -149,8 +149,8 @@ fn map_sequence_mismatch() {
 #[test]
 fn array_map_without_brackets() {
     "
-    type foo { rel .'a': [string] }
-    type bar { rel .'b': [string] }
+    def foo { rel .'a': [string] }
+    def bar { rel .'b': [string] }
 
     map {
         foo {
@@ -167,8 +167,8 @@ fn array_map_without_brackets() {
 #[test]
 fn only_entities_may_have_reverse_relationship() {
     "
-    type foo
-    type bar
+    def foo
+    def bar
     rel [foo] 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
     rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
     "
@@ -178,11 +178,11 @@ fn only_entities_may_have_reverse_relationship() {
 #[test]
 fn unresolved_transitive_map() {
     "
-    type a { rel .is?: i64 }
-    type b { rel .is?: i64 }
+    def a { rel .is?: i64 }
+    def b { rel .is?: i64 }
 
-    type c { rel .'p0': a }
-    type d { rel .'p1': b }
+    def c { rel .'p0': a }
+    def d { rel .'p1': b }
 
     map {
         c {
@@ -201,13 +201,13 @@ fn unresolved_transitive_map() {
 #[test]
 fn map_union() {
     "
-    type foo {
+    def foo {
         rel .'type': 'foo'
     }
-    type bar {
+    def bar {
         rel .'type': 'bar'
     }
-    type foobar {
+    def foobar {
         rel .is?: foo
         rel .is?: bar
     }
@@ -223,8 +223,8 @@ fn map_union() {
 #[test]
 fn map_invalid_unit_rel_params() {
     "
-    type foo { rel .'foo': string }
-    type bar { rel .'bar': string }
+    def foo { rel .'foo': string }
+    def bar { rel .'bar': string }
 
     map {
         foo {

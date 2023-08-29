@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use ontol_parser::{
-    ast::{MapArm, Path, Statement, Type, TypeStatement},
+    ast::{DefStatement, MapArm, Path, Statement, Type},
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
@@ -38,7 +38,7 @@ impl State {
             fn explore(
                 statements: &Vec<Spanned<Statement>>,
                 nested: &mut Vec<Spanned<Statement>>,
-                types: &mut HashMap<String, Spanned<TypeStatement>>,
+                types: &mut HashMap<String, Spanned<DefStatement>>,
                 level: u8,
             ) {
                 for (statement, range) in statements {
@@ -47,7 +47,7 @@ impl State {
                     }
                     match statement {
                         Statement::Use(_) => (),
-                        Statement::Type(stmt) => {
+                        Statement::Def(stmt) => {
                             let name = stmt.ident.0.to_string();
                             types.insert(name, (stmt.clone(), range.clone()));
 
@@ -89,7 +89,7 @@ pub struct Document {
     pub text: String,
     pub tokens: Vec<Spanned<Token>>,
     pub symbols: HashSet<String>,
-    pub types: HashMap<String, Spanned<TypeStatement>>,
+    pub types: HashMap<String, Spanned<DefStatement>>,
     pub statements: Vec<Spanned<Statement>>,
     // pub errors: Vec<Error>,
 }
@@ -150,7 +150,7 @@ impl Document {
                         dp.path = format!("{}", stmt.as_ident.0);
                         break;
                     }
-                    Statement::Type(stmt) => {
+                    Statement::Def(stmt) => {
                         dp.path += &format!(".{}", stmt.ident.0);
                         dp.docs = stmt.docs.join("\n");
                     }
@@ -200,7 +200,7 @@ impl Document {
                     Token::Close(_) => (),
                     Token::Sigil(_) => (),
                     Token::Use => (),
-                    Token::Type => (),
+                    Token::Def => (),
                     Token::With => (),
                     Token::Rel => (),
                     Token::Fmt => (),

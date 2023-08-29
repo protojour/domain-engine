@@ -12,7 +12,7 @@
 /// Previously, in STIX 2.0, Cyber-observable Objects could only exist as objects within an Observed Data object.
 /// It is still possible to represent Cyber-observable Objects in this way, but this method has been deprecated.
 /// See section 2.13.
-pub type stix_cyber_observable_object {
+pub def stix_cyber_observable_object {
     rel .is: stix_markings_object
 
     /// This property defines whether or not the data contained within the object has been defanged.
@@ -23,6 +23,6 @@ pub type stix_cyber_observable_object {
     rel .'defanged'?: boolean
 }
 
-pub type mime-part-type {
+pub def mime-part-type {
     // TODO
 }

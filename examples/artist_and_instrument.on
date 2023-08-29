@@ -1,20 +1,20 @@
-pub type artist {
+pub def artist {
     rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
     rel .'name': string
 }
 
-pub type record
+pub def record
 rel record 'name': string
 
-pub type instrument-id {
+pub def instrument-id {
     fmt '' => 'instrument/' => uuid => .
 }
 
-pub type instrument
+pub def instrument
 rel instrument 'ID'(rel .gen: auto)|id: instrument-id
 rel instrument 'name': string
 
-pub type plays
+pub def plays
 rel plays 'how_much': string
 
 rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]

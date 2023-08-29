@@ -2,7 +2,7 @@
 // database
 
 /// Item type enum
-type ItemType {
+def ItemType {
     /// worthless junk
     rel .is?: 'worthless junk'
     /// ancient treasure
@@ -10,7 +10,7 @@ type ItemType {
     /// alien artifact
     rel .is?: 'alien artifact'
 }
-type archive_item {
+def archive_item {
     rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
     rel .'created': datetime
     rel .'updated': datetime
@@ -20,7 +20,7 @@ type archive_item {
     rel .'asset_score': i64
     rel .'type': ItemType
 }
-type archive_group {
+def archive_group {
     rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
     rel .'created': datetime
     rel .'updated': datetime
@@ -36,7 +36,7 @@ rel [archive_group] 'archive_items'::'archive_groups' [archive_item]
 // public API
 
 /// Common dates for Archive entities
-type ArchiveDates {
+def ArchiveDates {
     /// The (estimated) date the archived object was created
     rel .'createdAt': datetime
     /// The date the archived object was last updated
@@ -46,7 +46,7 @@ type ArchiveDates {
 }
 /// ## An Archived Object
 /// Comments support [Markdown](https://www.markdownguide.org/)
-pub type ArchiveObject {
+pub def ArchiveObject {
     /// ID of the object
     rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
     /// Relevant dates for the object
@@ -62,7 +62,7 @@ pub type ArchiveObject {
 }
 /// ## An Archived Object Collection
 /// A collection of archived objects
-pub type ArchiveCollection {
+pub def ArchiveCollection {
     /// ID of the collection
     rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
     /// Relevant dates for the collection

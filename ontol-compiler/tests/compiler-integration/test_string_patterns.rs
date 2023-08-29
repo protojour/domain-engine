@@ -7,7 +7,7 @@ use test_log::test;
 #[test]
 fn constant_string_pattern() {
     "
-    pub type foo
+    pub def foo
     fmt '' => 'foo' => foo
     "
     .compile_ok(|test| {
@@ -23,7 +23,7 @@ fn constant_string_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    pub type foobar
+    pub def foobar
     fmt '' => 'foo' => 'bar' => foobar
     "
     .compile_ok(|test| {
@@ -39,7 +39,7 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    pub type foo
+    pub def foo
     fmt '' => 'foo/' => uuid => foo
     "
     .compile_ok(|test| {
@@ -64,9 +64,9 @@ fn uuid_in_string_constructor_pattern() {
 #[test]
 fn test_string_pattern_constructor_union() {
     "
-    type foo
-    type bar
-    pub type foobar
+    def foo
+    def bar
+    pub def foobar
 
     fmt '' => 'foo/' => uuid => foo
     fmt '' => 'bar/' => uuid => bar
@@ -96,7 +96,7 @@ fn test_string_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    pub type foo
+    pub def foo
     rel foo 'prop': /abc*/
     "
     .compile_ok(|test| {
@@ -114,7 +114,7 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    pub type re
+    pub def re
     fmt '' => /a/ => /bc*/ => re
     "
     .compile_ok(|test| {
@@ -133,10 +133,10 @@ fn test_simple_regex_pattern_constructor() {
 #[ignore = "figure out index relations"]
 fn test_string_patterns() {
     "
-    type hex
+    def hex
     rel '' /a-zA-Z0-9/: hex
 
-    type uuid
+    def uuid
     rel
         ''
         [hex{8}]
@@ -159,7 +159,7 @@ fn test_string_patterns() {
 #[test]
 fn regex_named_group_as_relation() {
     "
-    type lol
+    def lol
     rel lol is: /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
     "
     .compile_fail()

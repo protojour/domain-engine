@@ -8,10 +8,10 @@ use test_log::test;
 #[test]
 fn should_map_inherent_capturing_pattern_id() {
     "
-    pub type foo {
+    pub def foo {
         rel .'id'|id: { fmt '' => 'foo/' => uuid => . }
     }
-    pub type bar {
+    pub def bar {
         rel .'id'|id: { fmt '' => 'bar/' => uuid => . }
     }
 
@@ -32,30 +32,30 @@ fn should_map_inherent_capturing_pattern_id() {
 #[test]
 fn test_extract_rel_params() {
     "
-    pub type a1_id { fmt '' => 'a1/' => uuid => . }
-    pub type a2_id { fmt '' => 'a2/' => uuid => . }
-    pub type b1_id { fmt '' => 'b1/' => uuid => . }
-    pub type b2_id { fmt '' => 'b2/' => uuid => . }
+    pub def a1_id { fmt '' => 'a1/' => uuid => . }
+    pub def a2_id { fmt '' => 'a2/' => uuid => . }
+    pub def b1_id { fmt '' => 'b1/' => uuid => . }
+    pub def b2_id { fmt '' => 'b2/' => uuid => . }
 
-    type a2 {
+    def a2 {
         rel a2_id identifies: .
         rel .'foo': string
     }
-    type b2 {
+    def b2 {
         rel b2_id identifies: .
         rel .'foo': string
         rel .'bar': string
     }
 
-    type a_edge {
+    def a_edge {
         rel .'bar': string
     }
 
-    pub type a1 {
+    pub def a1 {
         rel a1_id identifies: .
         rel .'foreign'(rel .is: a_edge): a2
     }
-    pub type b1 {
+    pub def b1 {
         rel b1_id identifies: .
         rel .'foreign': b2
     }
@@ -116,28 +116,28 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
-    pub type a_id { fmt '' => 'a/' => uuid => . }
-    pub type b_id { fmt '' => 'a/' => uuid => . }
-    pub type a_inner_id { fmt '' => 'a_inner/' => uuid => . }
-    pub type b_inner_id { fmt '' => 'b_inner/' => uuid => . }
+    pub def a_id { fmt '' => 'a/' => uuid => . }
+    pub def b_id { fmt '' => 'a/' => uuid => . }
+    pub def a_inner_id { fmt '' => 'a_inner/' => uuid => . }
+    pub def b_inner_id { fmt '' => 'b_inner/' => uuid => . }
 
-    type a_inner {
+    def a_inner {
         rel a_inner_id identifies: .
         rel .'a_prop': string
     }
-    type b_inner {
+    def b_inner {
         rel b_inner_id identifies: .
         rel .'b_prop': string
     }
 
-    type a_edge { rel .'aa': string }
-    type b_edge { rel .'bb': string }
+    def a_edge { rel .'aa': string }
+    def b_edge { rel .'bb': string }
 
-    pub type a {
+    pub def a {
         rel a_id identifies: .
         rel .'foreign'(rel .is: a_edge): a_inner
     }
-    pub type b {
+    pub def b {
         rel b_id identifies: .
         rel .'foreign'(rel .is: b_edge): b_inner
     }
@@ -181,11 +181,11 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
-    pub type foo_inner { rel .'foo_id'|id: { rel .is: string } }
-    pub type bar_inner { rel .'bar_id'|id: { rel .is: string } }
+    pub def foo_inner { rel .'foo_id'|id: { rel .is: string } }
+    pub def bar_inner { rel .'bar_id'|id: { rel .is: string } }
     rel [foo_inner] 'bars'::'foos' [bar_inner]
 
-    pub type bar {
+    pub def bar {
         rel .'id'|id: { rel .is: string }
         rel .'foos': [string]
     }
@@ -219,11 +219,11 @@ fn test_map_relation_sequence_default_fallback() {
 }
 
 const WORK: &str = "
-pub type worker_id { fmt '' => 'worker/' => uuid => . }
-pub type tech_id { fmt '' => 'tech/' => uuid => . }
+pub def worker_id { fmt '' => 'worker/' => uuid => . }
+pub def tech_id { fmt '' => 'tech/' => uuid => . }
 
-pub type worker
-pub type technology
+pub def worker
+pub def technology
 
 with worker {
     rel .'ID': worker_id
@@ -241,11 +241,11 @@ with technology {
 ";
 
 const DEV: &str = "
-pub type lang_id { fmt '' => uuid => . }
-pub type dev_id { fmt '' => uuid => . }
+pub def lang_id { fmt '' => uuid => . }
+pub def dev_id { fmt '' => uuid => . }
 
-pub type language
-pub type developer
+pub def language
+pub def developer
 
 with language {
     rel .'id': lang_id

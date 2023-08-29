@@ -11,7 +11,7 @@ fn test_relations_are_distinct_for_different_domains() {
         (
             SourceName("other"),
             "
-            pub type foo {
+            pub def foo {
                 rel .'prop': string
             }
             ",
@@ -21,7 +21,7 @@ fn test_relations_are_distinct_for_different_domains() {
             "
             use 'other' as other
 
-            pub type foo {
+            pub def foo {
                 rel .'prop': string
             }
             ",
@@ -60,13 +60,13 @@ fn test_relations_are_distinct_for_different_domains() {
 #[test]
 fn ontol_domain_is_defined_in_the_namespace() {
     "
-    pub type i64 {
+    pub def i64 {
         rel .is: boolean
     }
-    pub type string {
+    pub def string {
         rel .is: ontol.i64
     }
-    pub type integer {
+    pub def integer {
         rel .is: string
     }
     "
@@ -78,5 +78,5 @@ fn ontol_domain_is_defined_in_the_namespace() {
 
 #[test]
 fn cannot_redefine_ontol() {
-    "pub type ontol // ERROR duplicate type definition".compile_fail();
+    "pub def ontol // ERROR duplicate type definition".compile_fail();
 }

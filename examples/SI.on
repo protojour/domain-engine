@@ -14,6 +14,6 @@
 /// * unit of acceleration is the meter per second per second (m/s2).
 /// * unit of area is the square meter (m2).
 /// * unit of volume is the cubic meter (m3). The liter (1 cubic decimeter), although not an SI unit, is accepted for use with the SI and is commonly used when measuring fluid volume, but is also used when measuring gases and solids.
-pub type meter {
+pub def meter {
     rel .is: number
 }

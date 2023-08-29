@@ -1,23 +1,23 @@
 use 'wgs' as wgs
 
-type longitude {
+def longitude {
     rel .is: f64
     rel .is: wgs.wgs84_longitude
 }
 
-type latitude {
+def latitude {
     rel .is: f64
     rel .is: wgs.wgs84_latitude
 }
 
 /// A position is the fundamental geometry construct.
-type position {
+def position {
     rel .0: longitude
     rel .1: latitude
 }
 
 /// A list of two positions or more.
-type position-list {
+def position-list {
     rel . ..2: position
     rel . 2..: position
 }
@@ -35,54 +35,54 @@ type position-list {
 ///   area it bounds, i.e., exterior rings are counterclockwise, and
 ///   holes are clockwise.
 ///
-type position-ring {
+def position-ring {
     rel . ..4: position
     rel . 4..: position
 }
 
 /// For type "Point", the "coordinates" member is a single position.
-pub type Point {
+pub def Point {
     rel .'type': 'Point'
     rel .'coordinates': position
 }
 
 /// For type "MultiPoint", the "coordinates" member is an array of
 /// positions.
-pub type MultiPoint {
+pub def MultiPoint {
     rel .'type': 'MultiPoint'
     rel .'coordinates': [position]
 }
 
 /// For type "LineString", the "coordinates" member is an array of two or
 /// more positions.
-pub type LineString {
+pub def LineString {
     rel .'type': 'LineString'
     rel .'coordinates': position-list
 }
 
 /// For type "MultiLineString", the "coordinates" member is an array of
 /// LineString coordinate arrays.
-pub type MultiLineString {
+pub def MultiLineString {
     rel . 'type': 'MultiLineString'
     rel . 'coordinates': [position-list]
 }
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
 /// linear ring coordinate arrays.
-pub type Polygon {
+pub def Polygon {
     rel .'type': 'Polygon'
     rel .'coordinates': position-ring
 }
 
 /// For type "MultiPolygon", the "coordinates" member is an array of
 /// Polygon coordinate arrays.
-pub type MultiPolygon {
+pub def MultiPolygon {
     rel .'type': 'MultiPolygon'
     rel .'coordinates': [position-ring]
 }
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
-pub type LeafGeometry {
+pub def LeafGeometry {
     rel .is?: Point
     rel .is?: MultiPoint
     rel .is?: LineString
@@ -96,7 +96,7 @@ pub type LeafGeometry {
 /// A GeometryCollection has a member with the name "geometries".  The
 /// value of "geometries" is an array.  Each element of this array is a
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
-pub type GeometryCollection {
+pub def GeometryCollection {
     rel .'type': 'GeometryCollection'
     rel .'geometries': [LeafGeometry]
 }
@@ -106,7 +106,7 @@ pub type GeometryCollection {
 /// matter where it occurs in a GeoJSON text.
 ///
 /// Note: Geometry is an extension of LeafGeometry + GeometryCollection.
-pub type Geometry {
+pub def Geometry {
     rel .is?: Point
     rel .is?: MultiPoint
     rel .is?: LineString
@@ -116,7 +116,7 @@ pub type Geometry {
     rel .is?: GeometryCollection
 }
 
-type GeometryOrNull {
+def GeometryOrNull {
     // TODO: Not supported yet (union tree):
     rel .is: Geometry
     // rel _ is?: ()
@@ -125,7 +125,7 @@ type GeometryOrNull {
 /// A Feature object represents a spatially bounded thing.  Every Feature
 /// object is a GeoJSON object no matter where it occurs in a GeoJSON
 /// text.
-type Feature
+def Feature
 rel Feature 'type': 'Feature'
 rel Feature 'geometry': GeometryOrNull
 
@@ -138,6 +138,6 @@ rel Feature 'properties': ()
 /// with the name "features".  The value of "features" is a JSON array.
 /// Each element of the array is a Feature object as defined above.  It
 /// is possible for this array to be empty.
-type FeatureCollection
+def FeatureCollection
 rel FeatureCollection 'type': 'FeatureCollection'
 rel FeatureCollection 'features': [Feature]

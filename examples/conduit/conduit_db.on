@@ -1,8 +1,8 @@
-pub type user_id { rel .is: uuid }
-pub type slug { rel.is: string }
-pub type tag { rel.is: string }
+pub def user_id { rel .is: uuid }
+pub def slug { rel.is: string }
+pub def tag { rel.is: string }
 
-pub type User {
+pub def User {
     // TODO: This must be an Authly user id
     rel .'user_id'(rel .gen: auto)|id: user_id
     // TODO: This is.. an authly user name? Maybe?
@@ -20,7 +20,7 @@ pub type User {
     rel .'following'::'followed_by'? [User]
 }
 
-pub type Article {
+pub def Article {
     rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
     // TODO(constraint): slug is unique
     rel .'slug': slug
@@ -31,14 +31,14 @@ pub type Article {
     rel .'updated_at'(rel .gen: update_time): datetime
 }
 
-pub type Comment {
+pub def Comment {
     rel .'id'(rel .gen: auto)|id: { rel .is: i64 }
     rel .'body': string
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
 }
 
-pub type TagEntity {
+pub def TagEntity {
     rel .'tag'|id: tag
 }
 

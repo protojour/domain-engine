@@ -1,6 +1,6 @@
 use 'conduit_db' as db
 
-pub type BlogPost {
+pub def BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
     rel .'contents': string
     rel .'written_by': string

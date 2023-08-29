@@ -38,196 +38,196 @@ use 'SI' as SI
 /// RFC 4122 defines how one can distinguish between a UUIDv4 and UUIDv5 value. 
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing identifier.
-type identifier
+def identifier
 
-type attack-pattern-id {
+def attack-pattern-id {
     fmt '' => 'attack-pattern--' => uuid => .
     rel identifier is?: .
 }
 
-type campaign-id {
+def campaign-id {
     fmt '' => 'campaign--' => uuid => .
     rel identifier is?: .
 }
 
-type course-of-action-id {
+def course-of-action-id {
     fmt '' => 'course-of-action--' => uuid => .
     rel identifier is?: .
 }
 
-type grouping-id {
+def grouping-id {
     fmt '' => 'grouping--' => uuid => .
     rel identifier is?: .
 }
 
-type identity-id {
+def identity-id {
     fmt '' => 'identity--' => uuid => .
     rel identifier is?: .
 }
 
-type indicator-id {
+def indicator-id {
     fmt '' => 'indicator--' => uuid => .
     rel identifier is?: .
 }
 
-type infrastructure-id {
+def infrastructure-id {
     fmt '' => 'infrastructure--' => uuid => .
     rel identifier is?: .
 }
 
-type intrusion-set-id {
+def intrusion-set-id {
     fmt '' => 'intrusion-set--' => uuid => .
     rel identifier is?: .
 }
 
-type location-id {
+def location-id {
     fmt '' => 'location--' => uuid => .
     rel identifier is?: .
 }
 
-type malware-id {
+def malware-id {
     fmt '' => 'malware--' => uuid => .
     rel identifier is?: .
 }
 
-type malware-analysis-id {
+def malware-analysis-id {
     fmt '' => 'malware-analysis--' => uuid => .
     rel identifier is?: .
 }
 
-type note-id {
+def note-id {
     fmt '' => 'note--' => uuid => .
     rel identifier is?: .
 }
 
-type observed-data-id {
+def observed-data-id {
     fmt '' => 'observed-data--' => uuid => .
     rel identifier is?: .
 }
 
-type opinion-id {
+def opinion-id {
     fmt '' => 'opinion--' => uuid => .
     rel identifier is?: .
 }
 
-type report-id {
+def report-id {
     fmt '' => 'report--' => uuid => .
     rel identifier is?: .
 }
 
-type threat-actor-id {
+def threat-actor-id {
     fmt '' => 'threat-actor--' => uuid => .
     rel identifier is?: .
 }
 
-type tool-id {
+def tool-id {
     fmt '' => 'tool--' => uuid => .
     rel identifier is?: .
 }
 
-type vulnerability-id {
+def vulnerability-id {
     fmt '' => 'vulnerability--' => uuid => .
     rel identifier is?: .
 }
 
 /// The identifier of a `marking-defifition`
-type marking-definition-id {
+def marking-definition-id {
     fmt '' => 'marking-definition--' => uuid => .
     rel identifier is?: .
 }
 
-type artifact-id {
+def artifact-id {
     fmt '' => 'artifact--' => uuid => .
     rel identifier is?: .
 }
 
-type autonomous-system-id {
+def autonomous-system-id {
     fmt '' => 'autonomous-system--' => uuid => .
     rel identifier is?: .
 }
 
-type directory-id {
+def directory-id {
     fmt '' => 'directory-id--' => uuid => .
     rel identifier is?: .
 }
 
-type domain-name-id {
+def domain-name-id {
     fmt '' => 'domain-name--' => uuid => .
     rel identifier is?: .
 }
 
-type email-addr-id {
+def email-addr-id {
     fmt '' => 'email-addr--' => uuid => .
     rel identifier is?: .
 }
 
-type email-message-id {
+def email-message-id {
     fmt '' => 'email-message--' => uuid => .
     rel identifier is?: .
 }
 
-type file-id {
+def file-id {
     fmt '' => 'file--' => uuid => .
     rel identifier is?: .
 }
 
-type ipv4-addr-id {
+def ipv4-addr-id {
     fmt '' => 'ipv4-addr--' => uuid => .
     rel identifier is?: .
 }
 
-type ipv6-addr-id {
+def ipv6-addr-id {
     fmt '' => 'ipv6-addr--' => uuid => .
     rel identifier is?: .
 }
 
-type mac-addr-id {
+def mac-addr-id {
     fmt '' => 'mac-addr--' => uuid => .
     rel identifier is?: .
 }
 
-type mutex-id {
+def mutex-id {
     fmt '' => 'mutex--' => uuid => .
     rel identifier is?: .
 }
 
-type network-traffic-id {
+def network-traffic-id {
     fmt '' => 'network-traffic--' => uuid => .
     rel identifier is?: .
 }
 
-type process-id {
+def process-id {
     fmt '' => 'process--' => uuid => .
     rel identifier is?: .
 }
 
-type software-id {
+def software-id {
     fmt '' => 'software--' => uuid => .
     rel identifier is?: .
 }
 
-type url-id {
+def url-id {
     fmt '' => 'url--' => uuid => .
     rel identifier is?: .
 }
 
-type user-account-id {
+def user-account-id {
     fmt '' => 'user-account--' => uuid => .
     rel identifier is?: .
 }
 
-type windows-registry-key-id {
+def windows-registry-key-id {
     fmt '' => 'windows-registry-key--' => uuid => .
     rel identifier is?: .
 }
 
-type x509-certificate-id {
+def x509-certificate-id {
     fmt '' => 'x509-certificate-key--' => uuid => .
     rel identifier is?: .
 }
 
 /// Type providing the `created_by_ref` property
-type created_by_object {
+def created_by_object {
     /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
     ///
     /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
@@ -235,7 +235,7 @@ type created_by_object {
 }
 
 // FIXME: This type has union-like properties:
-type granular-marking {
+def granular-marking {
     /// The **lang** property identifies the language of the text identified by this marking.
     /// The value of the lang property, if present, **MUST** be an [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code.
     ///
@@ -257,7 +257,7 @@ type granular-marking {
     rel .'selectors': [string]
 }
 
-type stix_markings_object {
+def stix_markings_object {
     /// The **object_marking_refs** property specifies a list of id properties of marking-definition objects that apply to this object.
     ///
     /// In some cases, though uncommon, marking definitions themselves may be marked with sharing or handling guidance.
@@ -280,7 +280,7 @@ type stix_markings_object {
 /// Each of these objects corresponds to a concept commonly used in CTI.
 ///
 /// STIX Domain Objects are defined in section 4.
-type stix_domain_object {
+def stix_domain_object {
     rel .is: meta.spec_version_object
     rel .is: meta.created_modified_object
     rel .is: meta.confidence_object
@@ -299,7 +299,7 @@ type stix_domain_object {
 /// Property information, relationship information, and examples are provided for each SRO defined below.
 /// Property information includes common properties as well as properties that are specific to each SRO.
 /// Because SROs cannot be the source or target of other SROs, relationship information is included but only to describe embedded relationships (e.g., `created_by_ref`).
-type stix_relationship_object {
+def stix_relationship_object {
     rel .is: meta.spec_version_object
     rel .is: meta.created_modified_object
     rel .is: meta.confidence_object
@@ -313,14 +313,14 @@ type stix_relationship_object {
 }
 
 /// STIX Cyber Observable Object (SCO)
-type stix_cyber_observable_object {
+def stix_cyber_observable_object {
     rel .is: meta.defanged_object
 
     rel .is: stix_markings_object
 }
 
 /// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
-pub type attack-pattern {
+pub def attack-pattern {
     rel .is: stix_domain_object
     rel .'type': 'attack-pattern'
     rel .'id'(rel .gen: auto)|id: attack-pattern-id
@@ -347,7 +347,7 @@ pub type attack-pattern {
 /// Campaigns can be characterized by their objectives and the incidents they cause, people or resources they target, and the resources (infrastructure, intelligence, Malware, Tools, etc.) they use.
 /// 
 /// For example, a Campaign could be used to describe a crime syndicate's attack using a specific variant of malware and new C2 servers against the executives of ACME Bank during the summer of 2016 in order to gain secret information about an upcoming merger with another bank.
-pub type campaign {
+pub def campaign {
     rel .is: stix_domain_object
     rel .'type': 'campaign'
     rel .'id'(rel .gen: auto)|id: campaign-id
@@ -385,7 +385,7 @@ pub type campaign {
 /// For example, a CoA that describes how to remediate a vulnerability could describe how to apply the patch that removes that vulnerability.
 ///
 /// The CoA includes the encoded content of an action or a reference to an externally defined action identified by the action_type property. 
-pub type course-of-action {
+pub def course-of-action {
     rel .is: stix_domain_object
     rel .'type': 'course-of-action'
     rel .'id'(rel .gen: auto)|id: course-of-action-id
@@ -439,7 +439,7 @@ pub type course-of-action {
 /// A STIX Grouping object might represent a set of data that, in time, given sufficient analysis, would mature to convey an incident or threat report as a STIX Report object.
 /// For example, a Grouping could be used to characterize an ongoing investigation into a security event or incident.
 /// A Grouping object could also be used to assert that the referenced STIX Objects are related to an ongoing analysis process, such as when a threat analyst is collaborating with others in their trust community to examine a series of Campaigns and Indicators. The Grouping SDO contains a list of references to SDOs, SCOs, and SROs, along with an explicit statement of the context shared by the content, a textual description, and the name of the grouping.
-pub type grouping {
+pub def grouping {
     rel .is: stix_domain_object
     rel .'type': 'grouping'
     rel .'id'(rel .gen: auto)|id: grouping-id
@@ -461,7 +461,7 @@ pub type grouping {
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, systems or groups (e.g., the finance sector).
 ///
 /// The Identity SDO can capture basic identifying information, contact information, and the sectors that the Identity belongs to. Identity is used in STIX to represent, among other things, targets of attacks, information sources, object creators, and threat actor identities.
-pub type identity {
+pub def identity {
     rel .is: stix_domain_object
     rel .'type': 'identity'
     rel .'id'(rel .gen: auto)|id: identity-id
@@ -490,7 +490,7 @@ pub type identity {
     rel .'contact_information'?: string
 }
 
-pub type indicator {
+pub def indicator {
     rel .is: stix_domain_object
     rel .'type': 'indicator'
     rel .'id'(rel .gen: auto)|id: indicator-id
@@ -537,7 +537,7 @@ pub type indicator {
 
 /// The Infrastructure SDO represents a type of TTP and describes any systems, software services and any associated physical or virtual resources intended to support some purpose (e.g., C2 servers used as part of an attack, device or server that are part of defence, database servers targeted by an attack, etc.).
 /// While elements of an attack can be represented by other SDOs or SCOs, the Infrastructure SDO represents a named group of related data that constitutes the infrastructure.
-pub type infrastructure {
+pub def infrastructure {
     rel .is: stix_domain_object
     rel .'type': 'infrastructure'
     rel .'id'(rel .gen: auto)|id: infrastructure-id
@@ -576,7 +576,7 @@ pub type infrastructure {
 ///
 /// While sometimes an Intrusion Set is not active, or changes focus, it is usually difficult to know if it has truly disappeared or ended.
 /// Analysts may have varying level of fidelity on attributing an Intrusion Set back to Threat Actors and may be able to only attribute it back to a nation state or perhaps back to an organization within that nation state.
-pub type intrusion-set {
+pub def intrusion-set {
     rel .is: stix_domain_object
     rel .'type': 'intrusion-set'
     rel .'id'(rel .gen: auto)|id: intrusion-set-id
@@ -654,7 +654,7 @@ pub type intrusion-set {
 /// If precision is specified, then the datum for latitude and longitude MUST be WGS 84 [WGS84].
 /// Organizations specifying a designated location using latitude and longitude SHOULD specify the precision which is appropriate for the scope of the location being identified.
 /// The scope is defined by the boundary as outlined by the precision around the coordinates.
-pub type location {
+pub def location {
     rel .is: stix_domain_object
     rel .'type': 'location'
     rel .'id'(rel .gen: auto)|id: location-id
@@ -720,7 +720,7 @@ pub type location {
 /// We strongly encourage the use of STIX Indicators for the detection of actual malware, due to its use of the STIX Patterning language and the clear semantics that it provides.
 ///
 /// To minimize the risk of a consumer compromising their system in parsing malware samples, producers SHOULD consider sharing defanged content (archive and password-protected samples) instead of raw, base64-encoded malware samples.
-pub type malware {
+pub def malware {
     rel .is: stix_domain_object
     rel .'type': 'malware'
     rel .'id'(rel .gen: auto)|id: malware-id
@@ -789,7 +789,7 @@ pub type malware {
 
 /// Malware Analysis captures the metadata and results of a particular static or dynamic analysis performed on a malware instance or family.
 /// One of av_result or analysis_sco_refs MUST be provided.
-pub type malware-analysis {
+pub def malware-analysis {
     rel .is: stix_domain_object
     rel .'type': 'malware-analysis'
     rel .'id'(rel .gen: auto)|id: malware-analysis-id
@@ -813,7 +813,7 @@ pub type malware-analysis {
 ///
 /// Because Notes are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Note.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
-pub type note {
+pub def note {
     rel .is: stix_domain_object
     rel .'type': 'note'
     rel .'id'(rel .gen: auto)|id: note-id
@@ -852,7 +852,7 @@ pub type note {
 /// For example, the Sighting Relationship object, can relate an Indicator, Malware, or other SDO to a specific Observed Data to represent the raw information that led to the creation of the Sighting (e.g., what was actually seen that suggested that a particular instance of malware was active).
 /// 
 /// To support backwards compatibility, related SCOs can still be specified using the objects properties, Either the objects property or the object_refs property MUST be provided, but both MUST NOT be present at the same time.
-pub type observed-data {
+pub def observed-data {
     rel .is: stix_domain_object
     rel .'type': 'observed-data'
     rel .'id'(rel .gen: auto)|id: observed-data-id
@@ -892,7 +892,7 @@ pub type observed-data {
 ///
 /// Because Opinions are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Opinion.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
-pub type opinion {
+pub def opinion {
     rel .is: stix_domain_object
     rel .'type': 'opinion'
     rel .'id'(rel .gen: auto)|id: opinion-id
@@ -920,7 +920,7 @@ pub type opinion {
 ///
 /// For example, a threat report produced by ACME Defense Corp. discussing the Glass Gazelle campaign should be represented using Report.
 /// The Report itself would contain the narrative of the report while the Campaign SDO and any related SDOs (e.g., Indicators for the Campaign, Malware it uses, and the associated Relationships) would be referenced in the report contents.
-pub type report {
+pub def report {
     rel .is: stix_domain_object
     rel .'type': 'report'
     rel .'id'(rel .gen: auto)|id: report-id
@@ -951,7 +951,7 @@ pub type report {
 /// Threat Actors leverage their resources, and possibly the resources of an Intrusion Set, to conduct attacks and run Campaigns against targets.
 ///
 /// Threat Actors can be characterized by their motives, capabilities, goals, sophistication level, past activities, resources they have access to, and their role in the organization.
-pub type threat-actor {
+pub def threat-actor {
     rel .is: stix_domain_object
     rel .'type': 'threat-actor'
     rel .'id'(rel .gen: auto)|id: threat-actor-id
@@ -1042,7 +1042,7 @@ pub type threat-actor {
 ///
 /// This SDO MUST NOT be used to characterize malware.
 /// Further, Tool MUST NOT be used to characterise tools used as part of a course of action in response to an attack.
-pub type tool {
+pub def tool {
     rel .is: stix_domain_object
     rel .'type': 'tool'
     rel .'id'(rel .gen: auto)|id: tool-id
@@ -1075,7 +1075,7 @@ pub type tool {
 /// The Vulnerability SDO is primarily used to link to external definitions of vulnerabilities or to describe 0-day vulnerabilities that do not yet have an external definition.
 /// Typically, other SDOs assert relationships to Vulnerability objects when a specific vulnerability is targeted and exploited as part of malicious cyber activity.
 /// As such, Vulnerability objects can be used as a linkage to the asset management and compliance process.
-pub type vulnerability {
+pub def vulnerability {
     rel .is: stix_domain_object
     rel .'type': 'vulnerability'
     rel .'id'(rel .gen: auto)|id: vulnerability-id
@@ -1095,7 +1095,7 @@ pub type vulnerability {
 /// The Artifact object permits capturing an array of bytes (8-bits), as a base64-encoded string, or linking to a file-like payload.
 ///
 /// One of `payload_bin` or `url` MUST be provided. It is incumbent on object creators to ensure that the URL is accessible for downstream consumers.
-pub type artifact {
+pub def artifact {
     rel .is: stix_cyber_observable_object
     rel .'type': 'artifact'
     rel .'id'(rel .gen: auto)|id: artifact-id
@@ -1132,7 +1132,7 @@ pub type artifact {
 }
 
 /// The AS object represents the properties of an Autonomous System (AS).
-pub type autonomous-system {
+pub def autonomous-system {
     rel .is: stix_cyber_observable_object
     rel .'type': 'autonomous-system'
     rel .'id'(rel .gen: auto)|id: autonomous-system-id
@@ -1148,7 +1148,7 @@ pub type autonomous-system {
 }
 
 /// The Directory object represents the properties common to a file system directory. 
-pub type directory {
+pub def directory {
     rel .is: stix_cyber_observable_object
     rel .'type': 'directory'
     rel .'id'(rel .gen: auto)|id: directory-id
@@ -1181,7 +1181,7 @@ pub type directory {
 }
 
 /// The Domain Name object represents the properties of a network domain name.
-pub type domain-name {
+pub def domain-name {
     rel .is: stix_cyber_observable_object
     rel .'type': 'domain-name'
     rel .'id'(rel .gen: auto)|id: domain-name-id
@@ -1195,7 +1195,7 @@ pub type domain-name {
 }
 
 /// The Email Address object represents a single email address.
-pub type email-addr {
+pub def email-addr {
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-addr'
     rel .'id'(rel .gen: auto)|id: email-addr-id
@@ -1226,7 +1226,7 @@ pub type email-addr {
 /// There is no property to capture the value of the “Content-Transfer-Encoding” header field, since the body MUST be decoded before being represented in the body property.
 ///
 /// One of body OR body_raw_ref MUST be included.
-type mime-part-type {
+def mime-part-type {
     /// Specifies the contents of the MIME part if the content_type is not provided or starts with text/ (e.g., in the case of plain text or HTML email).
     ///
     /// For inclusion in this property, the contents MUST be decoded to Unicode. Note that the charset provided in content_type is for informational usage and not for decoding of this property. 
@@ -1260,7 +1260,7 @@ type mime-part-type {
 /// For example, this is some text MUST be used instead of `=?iso-8859-1?q?this=20is=20some=20text?=`.
 /// Any characters in the encoded value which cannot be decoded into Unicode SHOULD be replaced with the 'REPLACEMENT CHARACTER' (U+FFFD).
 /// If it is necessary to capture the header value as observed, this can be achieved by referencing an Artifact object through the raw_email_ref property.
-pub type email-message {
+pub def email-message {
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-message'
     rel .'id'(rel .gen: auto)|id: email-message-id
@@ -1335,7 +1335,7 @@ pub type email-message {
 
 /// The File object represents the properties of a file.
 /// A File object MUST contain at least one of hashes or name.
-pub type file {
+pub def file {
     rel .is: stix_cyber_observable_object
     rel .'type': 'file'
     rel .'id'(rel .gen: auto)|id: file-id
@@ -1406,7 +1406,7 @@ pub type file {
 }
 
 /// The IPv4 Address object represents one or more IPv4 addresses expressed using CIDR notation.
-pub type ipv4-addr {
+pub def ipv4-addr {
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv4-addr'
     rel .'id'(rel .gen: auto)|id: ipv4-addr-id
@@ -1424,7 +1424,7 @@ pub type ipv4-addr {
 }
 
 /// The IPv6 Address object represents one or more IPv6 addresses expressed using CIDR notation.
-pub type ipv6-addr {
+pub def ipv6-addr {
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv6-addr'
     rel .'id'(rel .gen: auto)|id: ipv6-addr-id
@@ -1439,7 +1439,7 @@ pub type ipv6-addr {
 }
 
 /// The MAC Address object represents a single Media Access Control (MAC) address.
-pub type mac-addr {
+pub def mac-addr {
     rel .is: stix_cyber_observable_object
     rel .'type': 'mac-addr'
     rel .'id'(rel .gen: auto)|id: mac-addr-id
@@ -1454,7 +1454,7 @@ pub type mac-addr {
 }
 
 /// The Mutex object represents the properties of a mutual exclusion (mutex) object.
-pub type mutex {
+pub def mutex {
     rel .is: stix_cyber_observable_object
     rel .'type': 'mutex'
     rel .'id'(rel .gen: auto)|id: mutex-id
@@ -1469,7 +1469,7 @@ pub type mutex {
 /// 
 /// To allow for use cases where a source or destination address may be sensitive and not suitable for sharing, such as addresses that are internal to an organization’s network, the source and destination properties (src_ref and dst_ref, respectively) are defined as optional in the properties table below.
 /// However, a Network Traffic object MUST contain the protocols property and at least one of the src_ref or dst_ref properties and SHOULD contain the src_port and dst_port properties. 
-pub type network-traffic {
+pub def network-traffic {
     rel .is: stix_cyber_observable_object
     rel .'type': 'network-traffic'
     rel .'id'(rel .gen: auto)|id: network-traffic-id
@@ -1599,7 +1599,7 @@ pub type network-traffic {
 
 /// The Process object represents common properties of an instance of a computer program as executed on an operating system.
 /// A Process object MUST contain at least one property (other than type) from this object (or one of its extensions).
-pub type process {
+pub def process {
     rel .is: stix_cyber_observable_object
     rel .'type': 'process'
     rel .'id'(rel .gen: auto)|id: process-id
@@ -1661,7 +1661,7 @@ pub type process {
 }
 
 /// The Software object represents high-level properties associated with software, including software products.
-pub type software {
+pub def software {
     rel .is: stix_cyber_observable_object
     rel .'type': 'software'
     rel .'id'(rel .gen: auto)|id: software-id
@@ -1687,7 +1687,7 @@ pub type software {
 }
 
 /// The URL object represents the properties of a uniform resource locator (URL).
-pub type url {
+pub def url {
     rel .is: stix_cyber_observable_object
     rel .'type': 'url'
     rel .'id'(rel .gen: auto)|id: url-id
@@ -1699,7 +1699,7 @@ pub type url {
 
 /// The User Account object represents an instance of any type of user account, including but not limited to operating system, device, messaging service, and social media platform accounts.
 /// As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
-pub type user-account {
+pub def user-account {
     rel .is: stix_cyber_observable_object
     rel .'type': 'user-account'
     rel .'id'(rel .gen: auto)|id: user-account-id
@@ -1765,7 +1765,7 @@ pub type user-account {
 }
 
 /// The Windows Registry Value type captures the properties of a Windows Registry Key Value. As all properties of this type are optional, at least one of the properties defined below MUST be included when using this type.
-type windows-registry-value-type {
+def windows-registry-value-type {
     /// Specifies the name of the registry value. For specifying the default value in a registry key, an empty string MUST be used.
     rel .'name'?: string
 
@@ -1779,7 +1779,7 @@ type windows-registry-value-type {
 }
 
 /// The Registry Key object represents the properties of a Windows registry key. As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
-pub type windows-registry-key {
+pub def windows-registry-key {
     rel .is: stix_cyber_observable_object
     rel .'type': 'windows-registry-key'
     rel .'id'(rel .gen: auto)|id: windows-registry-key-id
@@ -1804,7 +1804,7 @@ pub type windows-registry-key {
     rel .'number_of_subkeys'?: common.integer
 }
 
-type x509-v3-extensions-type {
+def x509-v3-extensions-type {
     /// Specifies a multi-valued extension which indicates whether a certificate is a CA certificate.
     /// The first (mandatory) name is CA followed by TRUE or FALSE. If CA is TRUE, then an optional pathlen name followed by a non-negative value can be included. Also equivalent to the object ID (OID) value of 2.5.29.19.
     rel .'basic_constraints'?: string
@@ -1860,7 +1860,7 @@ type x509-v3-extensions-type {
 
 /// The X.509 Certificate object represents the properties of an X.509 certificate, as defined by ITU recommendation X.509 [X.509].
 /// An X.509 Certificate object MUST contain at least one property (other than type) from this object.
-pub type x509-certificate {
+pub def x509-certificate {
     rel .is: stix_cyber_observable_object
     rel .'type': 'x509-certificate'
     rel .'id'(rel .gen: auto)|id: x509-certificate-id

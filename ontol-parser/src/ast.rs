@@ -7,7 +7,7 @@ use super::{Span, Spanned};
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Statement {
     Use(UseStatement),
-    Type(TypeStatement),
+    Def(DefStatement),
     With(WithStatement),
     Rel(RelStatement),
     Fmt(FmtStatement),
@@ -19,7 +19,7 @@ impl Statement {
     pub fn docs(&self) -> &[String] {
         match self {
             Self::Use(_) => &[],
-            Self::Type(ty) => &ty.docs,
+            Self::Def(ty) => &ty.docs,
             Self::With(_) => &[],
             Self::Rel(rel) => &rel.docs,
             Self::Fmt(rel) => &rel.docs,
@@ -36,7 +36,7 @@ pub struct UseStatement {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct TypeStatement {
+pub struct DefStatement {
     pub docs: Vec<String>,
     pub visibility: Spanned<Visibility>,
     pub kw: Span,

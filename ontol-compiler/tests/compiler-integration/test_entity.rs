@@ -12,9 +12,9 @@ use test_log::test;
 #[test]
 fn id_cannot_identify_two_things() {
     "
-    type foo
-    type bar
-    type id {
+    def foo
+    def bar
+    def id {
         rel .identifies: foo
         rel .identifies: bar // ERROR already identifies a type
     }
@@ -25,8 +25,8 @@ fn id_cannot_identify_two_things() {
 #[test]
 fn entity_without_inherent_id() {
     "
-    pub type some_id { fmt '' => string => . }
-    pub type entity {
+    pub def some_id { fmt '' => string => . }
+    pub def entity {
         rel .id: some_id
         rel .'foo': string
     }
@@ -40,8 +40,8 @@ fn entity_without_inherent_id() {
 #[test]
 fn inherent_id_no_autogen() {
     "
-    type foo_id { rel .is: string }
-    pub type foo {
+    def foo_id { rel .is: string }
+    pub def foo {
         rel .id: foo_id
         rel .'key': foo_id
         rel .'children': [foo]
@@ -62,8 +62,8 @@ fn inherent_id_no_autogen() {
 #[test]
 fn inherent_id_autogen() {
     "
-    type foo_id { rel .is: string }
-    pub type foo {
+    def foo_id { rel .is: string }
+    pub def foo {
         rel .'key'(rel .gen: auto)|id: foo_id
         rel .'children': [foo]
     }
@@ -83,7 +83,7 @@ fn inherent_id_autogen() {
 #[test]
 fn id_and_inherent_property_inline_type() {
     "
-    pub type foo {
+    pub def foo {
         rel .'key'|id: { rel . is: string }
         rel .'children': [foo]
     }
@@ -107,7 +107,7 @@ fn id_and_inherent_property_inline_type() {
 #[test]
 fn entity_id_inline_fmt() {
     "
-    pub type foo {
+    pub def foo {
         rel .'key'|id: { fmt '' => 'foo/' => uuid => . }
     }
     "
@@ -247,8 +247,8 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    pub type node_id { fmt '' => string => . }
-    pub type node {
+    pub def node_id { fmt '' => string => . }
+    pub def node {
         rel node_id identifies: .
         rel .'name': string
         rel .'children'::'parent'? [node]
@@ -285,8 +285,8 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    pub type node_id { fmt '' => string => . }
-    pub type node {
+    pub def node_id { fmt '' => string => . }
+    pub def node {
         rel node_id identifies: .
         rel .'children'::'parent' [.]
     }
@@ -373,13 +373,13 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub type lang_id { fmt '' => string => . }
-    pub type prog_id { fmt '' => string => . }
-    pub type language {
+    pub def lang_id { fmt '' => string => . }
+    pub def prog_id { fmt '' => string => . }
+    pub def language {
         rel lang_id identifies: .
         rel .'lang-id': lang_id
     }
-    pub type programmer {
+    pub def programmer {
         rel prog_id identifies: .
         rel .'name': string
         rel .'favorite-language': language
@@ -397,24 +397,24 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    pub type animal_id { fmt '' => 'animal/' => string => . }
-    pub type plant_id { fmt '' => 'plant/' => string => . }
-    pub type owner_id { fmt '' => string => . }
+    pub def animal_id { fmt '' => 'animal/' => string => . }
+    pub def plant_id { fmt '' => 'plant/' => string => . }
+    pub def owner_id { fmt '' => string => . }
 
-    pub type lifeform
-    pub type animal {
+    pub def lifeform
+    pub def animal {
         rel animal_id identifies: .
         rel .'class': 'animal'
         rel .'eats': [lifeform]
     }
-    pub type plant {
+    pub def plant {
         rel plant_id identifies: .
         rel .'class': 'plant'
     }
     rel lifeform is?: animal
     rel lifeform is?: plant
 
-    pub type owner {
+    pub def owner {
         rel owner_id identifies: .
         rel .'name': string
         rel .'owns': [lifeform]

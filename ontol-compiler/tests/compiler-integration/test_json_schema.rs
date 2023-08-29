@@ -6,10 +6,10 @@ use test_log::test;
 #[test]
 fn json_schema_from_simple_entity() {
     "
-    type some_id { fmt '' => string => . }
+    def some_id { fmt '' => string => . }
 
     /// This is type entity
-    pub type entity {
+    pub def entity {
         rel some_id identifies: .
 
         /// This is property 'foo'

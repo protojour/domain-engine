@@ -25,8 +25,8 @@ fn test_graphql_empty_schema() {
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
     let (test, [schema]) = "
-    pub type foo_id { fmt '' => string => . }
-    pub type foo {
+    pub def foo_id { fmt '' => string => . }
+    pub def foo {
         rel foo_id identifies: .
         rel .'prop': i64
     }
@@ -93,7 +93,7 @@ async fn test_graphql_basic_schema() {
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, [schema]) = "
-    pub type foo {
+    pub def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
     }
     "
@@ -126,8 +126,8 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn test_graphql_value_type_as_field() {
     "
-    type foo { rel .is: string }
-    pub type bar {
+    def foo { rel .is: string }
+    pub def bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
         rel .'foo': foo
     }
@@ -138,8 +138,8 @@ async fn test_graphql_value_type_as_field() {
 #[test(tokio::test)]
 async fn test_graphql_value_type_in_array() {
     "
-    type foo { rel .is: string }
-    pub type bar {
+    def foo { rel .is: string }
+    pub def bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: string }
         rel .'foo': [foo]
     }
@@ -150,11 +150,11 @@ async fn test_graphql_value_type_in_array() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (test, [schema]) = "
-    pub type foo_id { fmt '' => string => . }
-    type inner {
+    pub def foo_id { fmt '' => string => . }
+    def inner {
         rel .'prop': string
     }
-    pub type foo {
+    pub def foo {
         rel foo_id identifies: .
         rel .'inner': inner
     }
@@ -228,12 +228,12 @@ async fn test_inner_struct() {
 #[test(tokio::test)]
 async fn test_docs_introspection() {
     let (test, [schema]) = "
-    type Key {
+    def Key {
         rel .is: string
     }
 
     /// this is a type
-    pub type PublicType {
+    pub def PublicType {
         rel Key identifies: .
         /// this is a field
         rel .'relation': string

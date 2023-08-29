@@ -11,8 +11,8 @@ use crate::ast::{
 
 use super::{
     ast::{
-        BinaryOp, Cardinality, MapStatement, RelStatement, RelType, Relation, Statement, Type,
-        TypeStatement,
+        BinaryOp, Cardinality, DefStatement, MapStatement, RelStatement, RelType, Relation,
+        Statement, Type,
     },
     lexer::Token,
     Span, Spanned,
@@ -53,13 +53,13 @@ fn use_statement() -> impl AstParser<UseStatement> {
 
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     recursive(|stmt_parser| {
-        let type_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Type));
+        let def_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Def));
         let with_stmt = spanned(with_statement(stmt_parser.clone())).map(span_map(Statement::With));
         let rel_stmt = spanned(rel_statement(stmt_parser)).map(span_map(Statement::Rel));
         let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
         let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
 
-        type_stmt
+        def_stmt
             .or(with_stmt)
             .or(rel_stmt)
             .or(fmt_stmt)
@@ -67,15 +67,13 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     })
 }
 
-fn type_statement(
-    stmt_parser: impl AstParser<Spanned<Statement>>,
-) -> impl AstParser<TypeStatement> {
+fn type_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
     doc_comments()
         .then(keyword(Token::Pub).or_not())
-        .then(keyword(Token::Type))
+        .then(keyword(Token::Def))
         .then(spanned(ident()))
         .then(spanned(stmt_parser.repeated().delimited_by(open('{'), close('}'))).or_not())
-        .map(|((((docs, public), kw), ident), ctx_block)| TypeStatement {
+        .map(|((((docs, public), kw), ident), ctx_block)| DefStatement {
             docs,
             visibility: match public {
                 Some(span) => (Visibility::Public, span),
@@ -591,12 +589,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_type() {
+    fn parse_def() {
         let source = "
         /// doc comment
-        type foo
+        def foo
         /// doc comment
-        type bar {
+        def bar {
             rel a '': b
             rel .lol: c
             fmt a => . => .
@@ -604,7 +602,7 @@ mod tests {
         ";
 
         let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Type(_), Statement::Type(_)]);
+        assert_matches!(stmts.as_slice(), [Statement::Def(_), Statement::Def(_)]);
 
         assert_eq!(1, stmts[0].docs().len());
     }

@@ -1,10 +1,10 @@
 use 'geojson' as geojson
 
-pub type code {
+pub def code {
     fmt '' => string => .
 }
 
-pub type municipality {
+pub def municipality {
     rel code identifies: .
     rel .'code': code
     rel .'geometry': geojson.Geometry

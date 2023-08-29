@@ -1,22 +1,22 @@
 
-type username { rel .is: string }
-type article_slug { rel .is: string }
+def username { rel .is: string }
+def article_slug { rel .is: string }
 
-pub type User {
+pub def User {
     rel .'email'|id: { rel .is: string }
     rel .'username': string
     rel .'bio': string
     rel .'image'?: string
 }
 
-pub type Profile {
+pub def Profile {
     rel .'username'|id: username
     rel .'bio': string
     rel .'image'?: string
     rel .'following': boolean
 }
 
-pub type Article {
+pub def Article {
     rel .'slug'|id: article_slug
     rel .'title': string
     rel .'description': string
@@ -28,7 +28,7 @@ pub type Article {
     rel .'author': Profile
 }
 
-pub type Comment {
+pub def Comment {
     rel .'id'|id: { rel .is: i64 }
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
@@ -36,28 +36,28 @@ pub type Comment {
     rel .'author': Profile
 }
 
-pub type SingleArticle {
+pub def SingleArticle {
     rel .'article': Article
 }
 
-pub type MultipleArticles {
+pub def MultipleArticles {
     rel .'articles': [Article]
     rel .'articlesCount': i64
 }
 
-pub type SingleComment {
+pub def SingleComment {
     rel .'comment': Comment
 }
 
-pub type MultipleComments {
+pub def MultipleComments {
     rel .'comments': [Comment]
 }
 
-pub type Tags {
+pub def Tags {
     rel .'tags': [string]
 }
 
-type ArticleFilter {
+def ArticleFilter {
     rel .'slug'?: article_slug
     // NB: These must be a sets, not lists:
     rel .'tag'?: [string]

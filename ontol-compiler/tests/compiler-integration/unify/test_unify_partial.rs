@@ -4,12 +4,12 @@ use test_log::test;
 #[test]
 fn test_unify_partial() {
     "
-    type Filter {
+    def Filter {
         rel .'foo'?: string
         rel .'bar'?: string
     }
 
-    type Foo {
+    def Foo {
         rel .'foo': string
         rel .'bar': string
     }

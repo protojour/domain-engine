@@ -4,7 +4,7 @@ use test_log::test;
 #[test]
 fn test_repr_abstract_error1() {
     "
-    type foo { // ERROR type not representable
+    def foo { // ERROR type not representable
         rel .'id'|id: { rel .is: string }
         rel .'n':
             number // NOTE Type of field is abstract
@@ -16,11 +16,11 @@ fn test_repr_abstract_error1() {
 #[test]
 fn test_repr_abstract_error2() {
     "
-    type meters { // NOTE Type is abstract
+    def meters { // NOTE Type is abstract
         rel .is: number
     }
 
-    type bar { // ERROR type not representable
+    def bar { // ERROR type not representable
         rel .'len': meters // NOTE Type of field is abstract
     }
     "
@@ -30,8 +30,8 @@ fn test_repr_abstract_error2() {
 #[test]
 fn test_repr_abstract_seq_error() {
     "
-    type foo { rel .is: number } // NOTE Type is abstract
-    type bar { rel .0: foo } // ERROR type not representable// NOTE Type of field is abstract
+    def foo { rel .is: number } // NOTE Type is abstract
+    def bar { rel .0: foo } // ERROR type not representable// NOTE Type of field is abstract
     "
     .compile_fail();
 }
@@ -39,9 +39,9 @@ fn test_repr_abstract_seq_error() {
 #[test]
 fn test_repr_error3() {
     "
-    type meters { rel .is: number }
+    def meters { rel .is: number }
 
-    type my_length { // ERROR Intersection of disjoint types
+    def my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
         rel .is: string // NOTE Base type is string
     }
@@ -53,9 +53,9 @@ fn test_repr_error3() {
 fn test_repr_error4() {
     "
     // NB: meters is a concrete type here:
-    type meters { rel .is: i64 }
+    def meters { rel .is: i64 }
 
-    type my_length { // ERROR Intersection of disjoint types
+    def my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
         rel .is: string // NOTE Base type is string
     }
@@ -66,9 +66,9 @@ fn test_repr_error4() {
 #[test]
 fn error_circular_subtyping() {
     "
-    type foo
-    type bar
-    type baz
+    def foo
+    def bar
+    def baz
     rel foo is: bar // ERROR Circular subtyping relation
     rel bar is: baz // ERROR Circular subtyping relation
     rel baz is: foo // ERROR Circular subtyping relation
@@ -79,16 +79,16 @@ fn error_circular_subtyping() {
 #[test]
 fn error_duplicate_parameter() {
     "
-    type a {
+    def a {
         rel .max: 20 // NOTE defined here
     }
-    type b {
+    def b {
         rel .max: 10 // NOTE defined here
     }
-    type c {
+    def c {
         rel .max: 5 // NOTE defined here
     }
-    type d { // ERROR duplicate type param `max`
+    def d { // ERROR duplicate type param `max`
         rel .is: a
         rel .is: b
         rel .is: c
@@ -100,11 +100,11 @@ fn error_duplicate_parameter() {
 #[test]
 fn test_repr_tuple() {
     "
-    pub type tup {
+    pub def tup {
         rel .0..2: i64
     }
 
-    pub type bar {
+    pub def bar {
         rel .'tup': tup
     }
     "
@@ -114,18 +114,18 @@ fn test_repr_tuple() {
 #[test]
 fn test_repr_valid_mesh1() {
     TestPackages::with_sources([
-        (SourceName("si"), "pub type meters { rel .is: number }"),
+        (SourceName("si"), "pub def meters { rel .is: number }"),
         (
             SourceName::root(),
             "
             use 'si' as si
 
-            type length {
+            def length {
                 rel .is: si.meters
                 rel .is: i64
             }
 
-            type bar {
+            def bar {
                 rel .id: { rel .is: string }
                 rel .'len': length
             }
