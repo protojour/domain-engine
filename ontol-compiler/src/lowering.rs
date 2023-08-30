@@ -6,6 +6,7 @@ use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format, DefId, RelationshipId,
 };
+use regex_syntax::hir::{GroupKind, Hir, HirKind};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -13,10 +14,13 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, ExprStructModifier, TypePath},
+    expr::{
+        Expr, ExprId, ExprKind, ExprRegex, ExprSeqElement, ExprStructAttr, ExprStructModifier,
+        TypePath,
+    },
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
-    Compiler, Src,
+    CompileErrors, Compiler, Src,
 };
 
 pub struct Lowering<'s, 'm> {
@@ -701,14 +705,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.expr(ExprKind::ConstString(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
-                let _def_id = self
+                let def_id = self
                     .compiler
                     .defs
                     .def_regex(&regex_literal, &span, &mut self.compiler.strings)
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
-                todo!()
+                let regex_hir = self.compiler.defs.literal_regex_hirs.get(&def_id).unwrap();
+                let mut regex_lowering = RegexLowering {
+                    output: ExprRegex {
+                        regex_def_id: def_id,
+                        captures: Default::default(),
+                    },
+                    regex_span: &span,
+                    src: &self.src,
+                    errors: &mut self.compiler.errors,
+                    var_table,
+                };
+                regex_lowering.analyze_expr_regex(regex_hir)?;
+                let expr_regex = regex_lowering.output;
+
+                Ok(self.expr(ExprKind::Regex(expr_regex), &span))
             }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
@@ -980,5 +998,55 @@ fn convert_cardinality(
         ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::One),
         ast::Cardinality::Many => (PropertyCardinality::Mandatory, ValueCardinality::Many),
         ast::Cardinality::OptionalMany => (PropertyCardinality::Optional, ValueCardinality::Many),
+    }
+}
+
+pub struct RegexLowering<'s> {
+    output: ExprRegex,
+    regex_span: &'s Span,
+    src: &'s Src,
+    errors: &'s mut CompileErrors,
+    var_table: &'s mut ExprVarTable,
+}
+
+impl<'s> RegexLowering<'s> {
+    fn analyze_expr_regex(&mut self, hir: &Hir) -> Res<()> {
+        match hir.kind() {
+            HirKind::Empty => {}
+            HirKind::Literal(_) => {}
+            HirKind::Class(_) => {}
+            HirKind::Anchor(_) => {}
+            HirKind::WordBoundary(_) => {}
+            HirKind::Group(group) => match &group.kind {
+                GroupKind::CaptureName { name, index: _ } => {
+                    let var = self.var_table.get_or_create_var(name.into());
+                    self.output.captures.insert(var, name.into());
+                }
+                GroupKind::CaptureIndex(_) => {
+                    // Found no way to extract spans from regex-syntax/Hir, they apparently
+                    // disappear in the AST => HIR translation
+                    self.errors.push(
+                        CompileError::TODO(smart_format!("Capture group must have a name"))
+                            .spanned(&self.src.span(self.regex_span)),
+                    );
+                }
+                GroupKind::NonCapturing => {}
+            },
+            HirKind::Repetition(rep) => {
+                self.analyze_expr_regex(&rep.hir)?;
+            }
+            HirKind::Concat(hirs) => {
+                for hir in hirs {
+                    self.analyze_expr_regex(hir)?;
+                }
+            }
+            HirKind::Alternation(hirs) => {
+                for hir in hirs {
+                    self.analyze_expr_regex(hir)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }

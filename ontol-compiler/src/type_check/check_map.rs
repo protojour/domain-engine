@@ -349,6 +349,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     }
                 }
             }
+            ExprKind::Regex(_) => {}
             ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
         };
 

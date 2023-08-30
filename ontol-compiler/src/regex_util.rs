@@ -108,6 +108,28 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
 pub fn parse_literal_regex_to_hir(expr: &str, expr_span: &Span) -> Result<Hir, (String, Span)> {
     let mut parser = Parser::new();
 
+    parser.parse(expr).map_err(|err| match err {
+        regex_syntax::Error::Parse(err) => (
+            smart_format!("{}", err.kind()),
+            project_regex_span(expr, expr_span, err.span()),
+        ),
+        regex_syntax::Error::Translate(err) => (
+            smart_format!("{}", err.kind()),
+            project_regex_span(expr, expr_span, err.span()),
+        ),
+        // note: regex_syntax Error is a non-exhaustive enum
+        _ => panic!("BUG: unhandled regex error"),
+    })
+}
+
+pub fn project_regex_span(
+    expr: &str,
+    expr_span: &Span,
+    regex_span: &regex_syntax::ast::Span,
+) -> Span {
+    // literal regexes start with '/' so that's part of the ontol span,
+    // but regex-syntax never sees that, so add 1.
+
     struct Scanner {
         source_cursor: usize,
         regex_cursor: usize,
@@ -128,32 +150,14 @@ pub fn parse_literal_regex_to_hir(expr: &str, expr_span: &Span) -> Result<Hir, (
         }
     }
 
-    fn project_span(expr: &str, expr_span: &Span, regex_span: &regex_syntax::ast::Span) -> Span {
-        // literal regexes start with '/' so that's part of the ontol span,
-        // but regex-syntax never sees that, so add 1.
+    let mut scanner = Scanner {
+        source_cursor: expr_span.start + 1,
+        regex_cursor: 0,
+    };
 
-        let mut scanner = Scanner {
-            source_cursor: expr_span.start + 1,
-            regex_cursor: 0,
-        };
+    let mut chars = expr.chars();
+    let start = scanner.advance_to_regex_pos(&mut chars, regex_span.start.offset);
+    let end = scanner.advance_to_regex_pos(&mut chars, regex_span.end.offset);
 
-        let mut chars = expr.chars();
-        let start = scanner.advance_to_regex_pos(&mut chars, regex_span.start.offset);
-        let end = scanner.advance_to_regex_pos(&mut chars, regex_span.end.offset);
-
-        Span { start, end }
-    }
-
-    parser.parse(expr).map_err(|err| match err {
-        regex_syntax::Error::Parse(err) => (
-            smart_format!("{}", err.kind()),
-            project_span(expr, expr_span, err.span()),
-        ),
-        regex_syntax::Error::Translate(err) => (
-            smart_format!("{}", err.kind()),
-            project_span(expr, expr_span, err.span()),
-        ),
-        // note: regex_syntax Error is a non-exhaustive enum
-        _ => panic!("BUG: unhandled regex error"),
-    })
+    Span { start, end }
 }

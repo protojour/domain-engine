@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smartstring::alias::String;
@@ -31,6 +33,7 @@ pub enum ExprKind {
     Variable(ontol_hir::Var),
     ConstI64(i64),
     ConstString(String),
+    Regex(ExprRegex),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -50,6 +53,12 @@ pub struct ExprStructAttr {
 pub struct ExprSeqElement {
     pub iter: bool,
     pub expr: Expr,
+}
+
+#[derive(Debug)]
+pub struct ExprRegex {
+    pub regex_def_id: DefId,
+    pub captures: HashMap<ontol_hir::Var, String>,
 }
 
 #[derive(Debug)]
